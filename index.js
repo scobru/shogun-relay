@@ -828,6 +828,10 @@ async function hasValidToken(msg) {
                   10
                 )}... is NOT authorized on-chain`
               );
+              
+              // Aggiungiamo un log più esplicito che stiamo rifiutando il messaggio
+              console.warn(`[hasValidToken] REJECTING MESSAGE from unauthorized public key ${pubKey.substring(0, 10)}...`);
+              
               // Se la verifica on-chain fallisce, restituiamo false direttamente
               // invece di continuare con altri metodi di autenticazione
               return false;
@@ -856,6 +860,16 @@ async function hasValidToken(msg) {
       }
     }
 
+    // MODIFICATO: Se arriviamo qui e siamo in produzione e onchainMembership è abilitato,
+    // non dovremmo permettere messaggi senza verifiche on-chain
+    if (RELAY_CONFIG.relayMembership.enabled && 
+        RELAY_CONFIG.relayMembership.onchainMembership && 
+        relayMembershipVerifier) {
+      console.warn("[hasValidToken] Message didn't go through on-chain verification but onchainMembership is enabled. Rejecting.");
+      return false;
+    }
+
+    // Altrimenti, accettiamo il messaggio (comportamento legacy)
     console.log(
       "[hasValidToken] WebSocket message, assuming authenticated by upgrade"
     );
@@ -2358,7 +2372,7 @@ async function initializeHeartbeatService() {
         console.log("Generating heartbeat...");
 
         // Calculate the current epoch (hours since epoch)
-        const epoch = Math.floor(Date.now() / 1000 / 3600);
+        const epoch = Math.floor(Date.now() / 1000 / 3600 / 60);
         console.log(`Current epoch: ${epoch}`);
 
         // Read the list of relays from the contract
@@ -2645,25 +2659,292 @@ async function startServer() {
 
       // Register middleware for WebSocket upgrades
       server.on("upgrade", websocketMiddleware);
-    });
 
-    // Graceful shutdown handling
-    ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => {
-      process.on(signal, async () => {
-        console.log(`\nReceived signal ${signal}, shutting down...`);
-
-        console.log("Closing HTTP server...");
-        server.close(() => {
-          console.log("HTTP server closed");
-          console.log("Goodbye!");
-          process.exit(0);
+      // Aggiungi un intercettore per bloccare esplicitamente messaggi da utenti non autorizzati
+      Gun.on('opt', function(context) {
+        if(context.once){ return }
+        
+        // Aggancia un hook a tutti i messaggi in entrata
+        this.to.next(context);
+        
+        // Intercetta i messaggi OUT (le scritture) prima che vengano elaborate
+        context.on('out', function(msg) {
+          // Salva il riferimento a this per usarlo nelle funzioni asincrone
+          const self = this;
+          
+          // Verifica se il messaggio è una scrittura (contiene put)
+          if (msg.put && Object.keys(msg.put).length > 0 && 
+              RELAY_CONFIG.relayMembership.enabled && 
+              RELAY_CONFIG.relayMembership.onchainMembership && 
+              relayMembershipVerifier) {
+            
+            // Funzione per estrarre e verificare la chiave pubblica
+            const verifyPubKey = async function() {
+              let pubKey = null;
+              
+              // Estrai la chiave pubblica
+              // Cerca nei nodi put che iniziano con ~
+              const putKeys = Object.keys(msg.put);
+              for (const key of putKeys) {
+                if (key.startsWith('~')) {
+                  const dotIndex = key.indexOf('.');
+                  pubKey = dotIndex > 0 ? key.substring(1, dotIndex) : key.substring(1);
+                  break;
+                }
+              }
+              
+              // Se non trovata in put, cerca in altri campi del messaggio
+              if (!pubKey) {
+                if (msg.user && msg.user.pub) {
+                  pubKey = msg.user.pub;
+                } else if (msg.from && msg.from.pub) {
+                  pubKey = msg.from.pub;
+                } else if (msg.pub) {
+                  pubKey = msg.pub;
+                }
+              }
+              
+              if (pubKey) {
+                try {
+                  // Converti pubKey in formato hex
+                  const hexPubKey = gunPubKeyToHex(pubKey);
+                  if (!hexPubKey) {
+                    console.warn(`[Gun.on.out] Failed to convert pubKey ${pubKey.substring(0, 10)}... to hex format`);
+                    return false;
+                  }
+                  
+                  // IMPORTANTE: Attendi il risultato della verifica
+                  const isAuthorized = await relayMembershipVerifier.isPublicKeyAuthorized(hexPubKey);
+                  
+                  if (!isAuthorized) {
+                    console.warn(`[Gun.on.out] BLOCKING write from unauthorized key ${pubKey.substring(0, 10)}...`);
+                    return false;
+                  }
+                  
+                  console.log(`[Gun.on.out] Allowing write from authorized key ${pubKey.substring(0, 10)}...`);
+                  return true;
+                } catch (error) {
+                  console.error(`[Gun.on.out] Error during authorization check:`, error);
+                  return false;
+                }
+              } else {
+                console.warn(`[Gun.on.out] Could not find pubKey in message`);
+                return false;
+              }
+            };
+            
+            // Esegui la verifica in modo asincrono ma blocca il flusso fino al completamento
+            verifyPubKey().then(isAuthorized => {
+              if (isAuthorized) {
+                // Solo se autorizzato, continua con il messaggio
+                self.to.next(msg);
+              } else {
+                // Altrimenti, blocca silenziosamente la scrittura non propagando il messaggio
+                console.warn(`[Gun.on.out] Message was blocked from propagating`);
+                // Forza un ACK di errore per il client
+                if (msg._.via && msg._.via.say) {
+                  try {
+                    msg._.via.say({ err: "Unauthorized: Your public key is not authorized on-chain", ok: 0, "@": msg["#"] });
+                  } catch (e) {
+                    console.error("[Gun.on.out] Error sending rejection message:", e);
+                  }
+                }
+              }
+            }).catch(err => {
+              console.error(`[Gun.on.out] Error in verification process:`, err);
+              // In caso di errore, blocca la richiesta
+            });
+            
+            // IMPORTANTE: Ritorna senza chiamare next() per bloccare il flusso normale
+            // La propagazione avverrà solo quando verifyPubKey() restituirà true
+            return;
+          }
+          
+          // Se non è un messaggio put o non abbiamo bisogno di verificarlo, continua normalmente
+          this.to.next(msg);
+        });
+        
+        // Manteniamo anche l'intercettore 'in' per sicurezza
+        context.on('in', function(msg) {
+          // Salva il riferimento a this per usarlo nelle funzioni asincrone
+          const self = this;
+          
+          // Intercetta i messaggi in ingresso che contengono dati
+          const containsPut = msg.put && Object.keys(msg.put).length > 0;
+          
+          // Se il messaggio contiene dati in put e onchainMembership è abilitato
+          if (containsPut && 
+              RELAY_CONFIG.relayMembership.enabled && 
+              RELAY_CONFIG.relayMembership.onchainMembership && 
+              relayMembershipVerifier) {
+            
+            // Funzione per estrarre e verificare la chiave pubblica
+            const verifyPubKey = async function() {
+              let pubKey = null;
+              
+              // Cerca di estrarre la chiave pubblica dai dati in put
+              if (msg.put) {
+                const putKeys = Object.keys(msg.put);
+                for (const key of putKeys) {
+                  if (key.startsWith('~')) {
+                    const dotIndex = key.indexOf('.');
+                    pubKey = dotIndex > 0 ? key.substring(1, dotIndex) : key.substring(1);
+                    break;
+                  }
+                }
+              }
+              
+              if (pubKey) {
+                try {
+                  // Converti pubKey in formato hex
+                  const hexPubKey = gunPubKeyToHex(pubKey);
+                  if (!hexPubKey) {
+                    console.warn(`[Gun.on.in] Failed to convert pubKey ${pubKey.substring(0, 10)}... to hex format`);
+                    return false;
+                  }
+                  
+                  // IMPORTANTE: Attendi il risultato della verifica
+                  const isAuthorized = await relayMembershipVerifier.isPublicKeyAuthorized(hexPubKey);
+                  
+                  if (!isAuthorized) {
+                    console.warn(`[Gun.on.in] BLOCKING data from unauthorized key ${pubKey.substring(0, 10)}...`);
+                    return false;
+                  }
+                  
+                  console.log(`[Gun.on.in] Allowing data from authorized key ${pubKey.substring(0, 10)}...`);
+                  return true;
+                } catch (error) {
+                  console.error(`[Gun.on.in] Error during authorization check:`, error);
+                  return false;
+                }
+              } else {
+                // Se non troviamo una chiave pubblica ma ci sono dati, per sicurezza blocchiamo
+                if (Object.keys(msg.put).length > 0) {
+                  console.warn(`[Gun.on.in] Could not find pubKey in message with data`);
+                  return false;
+                }
+                return true; // Altre tipologie di messaggi senza put possono passare
+              }
+            };
+            
+            // Esegui la verifica in modo asincrono ma blocca il flusso fino al completamento
+            verifyPubKey().then(isAuthorized => {
+              if (isAuthorized) {
+                // Solo se autorizzato, continua con il messaggio
+                self.to.next(msg);
+              } else {
+                // Altrimenti, blocca silenziosamente il messaggio non propagandolo
+                console.warn(`[Gun.on.in] Message was blocked from propagating`);
+              }
+            }).catch(err => {
+              console.error(`[Gun.on.in] Error in verification process:`, err);
+              // In caso di errore, blocca il messaggio
+            });
+            
+            // IMPORTANTE: Ritorna senza chiamare next() per bloccare il flusso normale
+            // La propagazione avverrà solo quando verifyPubKey() restituirà true
+            return;
+          }
+          
+          // Se non è un messaggio con put o non abbiamo bisogno di verificarlo, continua normalmente
+          this.to.next(msg);
         });
 
-        // Force close after 5 seconds
-        setTimeout(() => {
-          console.log("Timeout reached, forced shutdown");
-          process.exit(1);
-        }, 5000);
+        // AGGIUNTA: Intercetta a livello di storage per impedire scritture non autorizzate
+        if (context.on && RELAY_CONFIG.relayMembership.enabled && 
+            RELAY_CONFIG.relayMembership.onchainMembership && 
+            relayMembershipVerifier) {
+          
+          // Mantieni un riferimento al put originale
+          const originalPut = context.on.put;
+          
+          // Sostituisci con la nostra versione che verifica l'autorizzazione prima di salvare
+          context.on.put = function(msg) {
+            // Salva il riferimento al this e agli argomenti originali
+            const self = this;
+            const args = arguments;
+            
+            // Se non contiene dati, procedi normalmente
+            if (!msg || !msg.put || Object.keys(msg.put).length === 0) {
+              return originalPut.apply(self, args);
+            }
+            
+            // Estrai pubKey dai dati
+            let pubKey = null;
+            try {
+              const putKeys = Object.keys(msg.put);
+              for (const key of putKeys) {
+                if (key.startsWith('~')) {
+                  const dotIndex = key.indexOf('.');
+                  pubKey = dotIndex > 0 ? key.substring(1, dotIndex) : key.substring(1);
+                  break;
+                }
+              }
+              
+              // Controlla anche altri campi comuni
+              if (!pubKey) {
+                if (msg.user && msg.user.pub) pubKey = msg.user.pub;
+                else if (msg.from && msg.from.pub) pubKey = msg.from.pub;
+                else if (msg.pub) pubKey = msg.pub;
+              }
+            } catch (e) {
+              console.error('[Gun.on.put] Error extracting pubKey:', e);
+            }
+            
+            // Se non abbiamo una chiave pubblica, blocca per sicurezza nel dubbio
+            if (!pubKey) {
+              console.warn('[Gun.on.put] No pubKey found, blocking storage operation');
+              return; // Non chiamare originalPut
+            }
+            
+            // Verifica se il pubKey è autorizzato prima di scrivere
+            (async () => {
+              try {
+                const hexPubKey = gunPubKeyToHex(pubKey);
+                if (!hexPubKey) {
+                  console.warn(`[Gun.on.put] Failed to convert pubKey ${pubKey.substring(0, 10)}... to hex format`);
+                  return; // Non chiamare originalPut
+                }
+                
+                const isAuthorized = await relayMembershipVerifier.isPublicKeyAuthorized(hexPubKey);
+                
+                if (isAuthorized) {
+                  console.log(`[Gun.on.put] Authorizing STORAGE for key ${pubKey.substring(0, 10)}...`);
+                  originalPut.apply(self, args);
+                } else {
+                  console.warn(`[Gun.on.put] BLOCKING STORAGE for unauthorized key ${pubKey.substring(0, 10)}...`);
+                  // Non chiamare originalPut, effettivamente impedendo la persistenza del dato
+                }
+              } catch (error) {
+                console.error(`[Gun.on.put] Error during authorization check:`, error);
+                // In caso di errore di verifica, per sicurezza non procediamo con la scrittura
+              }
+            })();
+            
+            // Non chiamare originalPut qui - sarà chiamato solo dopo verifica positiva
+            return;
+          };
+        }
+      });
+
+      // Graceful shutdown handling
+      ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => {
+        process.on(signal, async () => {
+          console.log(`\nReceived signal ${signal}, shutting down...`);
+
+          console.log("Closing HTTP server...");
+          server.close(() => {
+            console.log("HTTP server closed");
+            console.log("Goodbye!");
+            process.exit(0);
+          });
+
+          // Force close after 5 seconds
+          setTimeout(() => {
+            console.log("Timeout reached, forced shutdown");
+            process.exit(1);
+          }, 5000);
+        });
       });
     });
   } catch (error) {
