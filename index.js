@@ -2552,85 +2552,88 @@ async function startServer() {
 
       // IMPORTANT: Configure WebSocket for GunDB only once after server start
       const websocketMiddleware = async (req, socket, head) => {
-        const url = req.url;
-        const origin = req.headers.origin;
+        try {
+          const url = req.url;
+          const origin = req.headers.origin;
 
-        // Log upgrade request
-        console.log(
-          `WebSocket upgrade requested for: ${url} from origin: ${
-            origin || "unknown"
-          }`
-        );
+          // Log upgrade request
+          console.log(`WebSocket upgrade requested for: ${url} from origin: ${origin || "unknown"}`);
 
-        // Validate origin if present
-        if (origin) {
-          // In development mode, allow all origins
+          // Validate origin if present
+          if (origin) {
+            // In development mode, allow all origins
+            if (process.env.NODE_ENV === "development") {
+              console.log("Development mode - origin accepted:", origin);
+            } else if (!allowedOrigins.includes(origin)) {
+              console.warn(`WebSocket upgrade rejected: origin not allowed ${origin}`);
+              socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
+              socket.destroy();
+              return;
+            }
+          }
+
+          // In development mode, allow all connections
           if (process.env.NODE_ENV === "development") {
-            console.log("Development mode - origin accepted:", origin);
-          } else if (!allowedOrigins.includes(origin)) {
-            console.warn(
-              `WebSocket upgrade rejected: origin not allowed ${origin}`
-            );
-            socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
+            console.log("Development mode - allowing all WebSocket connections");
+            // Continue with the upgrade process
+            if (url === "/gun" || url.startsWith("/gun?") || url.startsWith("/gun/")) {
+              console.log(`Handling WebSocket connection for GunDB in development mode`);
+              return; // Let Gun handle the upgrade
+            } else {
+              console.log(`Unhandled WebSocket request in development mode: ${url}`);
+              socket.destroy();
+              return;
+            }
+          }
+
+          // PRODUCTION MODE CHECKS
+          // In production, require valid authentication
+          let isAuthenticated = false;
+          
+          // Check for authentication token in the URL
+          if (url.includes("?token=") || url.includes("&token=")) {
+            try {
+              const fullUrl = `http://localhost${url}`;
+              const urlObj = new URL(fullUrl);
+              const token = urlObj.searchParams.get("token");
+
+              console.log("Token found in URL:", token ? token.substring(0, 3) + "..." : "missing");
+
+              if (token) {
+                const tokenData = await validateUserToken(token);
+                isAuthenticated = !!tokenData;
+                
+                if (isAuthenticated) {
+                  console.log("Valid URL token, authentication succeeded");
+                } else {
+                  console.warn("Invalid token provided in URL");
+                }
+              }
+            } catch (e) {
+              console.error("Error parsing URL or validating token:", e.message);
+            }
+          }
+
+          // If not authenticated in production, reject the connection
+          if (!isAuthenticated) {
+            console.warn(`WebSocket upgrade rejected: authentication required in production`);
+            socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
             socket.destroy();
             return;
           }
-        }
 
-        // In modalità di sviluppo, consentiamo tutte le connessioni
-        if (process.env.NODE_ENV === "development") {
-          console.log("Development mode - allowing all WebSocket connections");
-          return; // Continua normalmente con l'upgrade
-        }
-
-        // In produzione, richiediamo un token valido
-        let isAuthenticated = false;
-        
-        // Check for authentication token in the URL
-        if (url.includes("?token=") || url.includes("&token=")) {
-          try {
-            const fullUrl = `http://localhost${url}`;
-            const urlObj = new URL(fullUrl);
-            const token = urlObj.searchParams.get("token");
-
-            console.log(
-              "Token found in URL:",
-              token ? token.substring(0, 3) + "..." : "missing"
-            );
-
-            if (token) {
-              // Usa validateUserToken invece di validateToken che non esiste
-              const tokenData = await validateUserToken(token);
-              isAuthenticated = !!tokenData;
-              
-              if (isAuthenticated) {
-                console.log("Valid URL token, upgrade allowed");
-              } else {
-                console.warn("Invalid token provided in URL");
-              }
-            }
-          } catch (e) {
-            console.error("Error parsing URL:", e.message);
+          // Authentication passed, handle the connection
+          if (url === "/gun" || url.startsWith("/gun?") || url.startsWith("/gun/")) {
+            console.log(`Handling authenticated WebSocket connection for GunDB`);
+            return; // Let Gun handle the upgrade
+          } else {
+            console.log(`Unhandled WebSocket request: ${url}`);
+            socket.destroy();
+            return;
           }
-        }
-
-        // Se non autenticato in produzione, rifiuta la connessione
-        if (!isAuthenticated) {
-          console.warn(`WebSocket upgrade rejected: authentication required`);
-          socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
-          socket.destroy();
-          return;
-        }
-
-        if (
-          url === "/gun" ||
-          url.startsWith("/gun?") ||
-          url.startsWith("/gun/")
-        ) {
-          console.log(`Handling WebSocket connection for GunDB`);
-          // Do nothing here, Gun will handle the upgrade internally
-        } else {
-          console.log(`Unhandled WebSocket request: ${url}`);
+        } catch (error) {
+          console.error("Error in websocketMiddleware:", error);
+          socket.write("HTTP/1.1 500 Internal Server Error\r\n\r\n");
           socket.destroy();
         }
       };
