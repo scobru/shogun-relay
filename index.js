@@ -15,13 +15,14 @@ import {
   OracleBridge,
 } from "shogun-core";
 import Gun from "gun";
-import path, { dirname } from "path";
-import { fileURLToPath } from "url";
+import path from "path";
 import "bullet-catcher";
 import crypto from "crypto";
 import http from "http";
 import https from "https";
 
+// Import the utility functions
+import { gunPubKeyToHex } from "./utils.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -37,6 +38,9 @@ const gunOptions = {
   localStorage: false,
   isValid: hasValidToken,
 };
+
+// Check if we're in a development environment
+const isDevMode = process.env.NODE_ENV === 'development';
 
 // Relay components configuration
 const RELAY_CONFIG = {
@@ -59,7 +63,8 @@ const RELAY_CONFIG = {
   },
   heartbeat: {
     enabled: process.env.HEARTBEAT_ENABLED === "true" || false,
-    interval: parseInt(process.env.HEARTBEAT_INTERVAL || "3600", 10) * 1000, // Default 1 hour in milliseconds
+    // Use a shorter interval in development mode for faster testing
+    interval: isDevMode ? 10 * 1000 : parseInt(process.env.HEARTBEAT_INTERVAL || "3600", 10) * 1000, // Default 1 hour in ms, 10 seconds in dev
     oracleBridgeContract: process.env.ORACLE_BRIDGE_CONTRACT || "",
     membershipContract: process.env.RELAY_MEMBERSHIP_CONTRACT || "",
     providerUrl: process.env.ETHEREUM_PROVIDER_URL || "http://localhost:8545",
@@ -728,10 +733,6 @@ async function hasValidToken(msg) {
       return isValid;
     }
 
-    console.log(msg);
-    console.log(RELAY_CONFIG.relayMembership.enabled);
-    console.log(relayMembershipVerifier);
-    console.log(RELAY_CONFIG.relayMembership.onchainMembership);
 
     // Check for on-chain membership verification if enabled
     if (
@@ -784,28 +785,56 @@ async function hasValidToken(msg) {
             )}...`
           );
         }
+        // Check if pubKey is in the put object keys (like in SEA auth messages)
+        else if (msg.put && typeof msg.put === 'object') {
+          // Loop through the keys of the put object to find ones that start with ~
+          const putKeys = Object.keys(msg.put);
+          for (const key of putKeys) {
+            if (key.startsWith('~')) {
+              // Extract the pubKey (everything after ~ until the first . if present)
+              const dotIndex = key.indexOf('.');
+              pubKey = dotIndex > 0 ? key.substring(1, dotIndex) : key.substring(1);
+              console.log(
+                `[hasValidToken] Found pubKey in put object key: ${pubKey.substring(
+                  0,
+                  10
+                )}...`
+              );
+              break;
+            }
+          }
+        }
 
         if (pubKey) {
-          // Check if the public key is authorized on-chain
-          const isAuthorized =
-            await relayMembershipVerifier.isPublicKeyAuthorized(pubKey);
+          // Convert the GunDB public key to hex format for Ethereum
+          const hexPubKey = gunPubKeyToHex(pubKey);
+          
+          if (hexPubKey) {
+            console.log(`[hasValidToken] Converted pubKey to hex format: 0x${hexPubKey.substring(0, 20)}...`);
+            
+            const isAuthorized = await relayMembershipVerifier.isPublicKeyAuthorized(hexPubKey);
 
-          if (isAuthorized) {
-            console.log(
-              `[hasValidToken] Public key ${pubKey.substring(
-                0,
-                10
-              )}... is authorized on-chain`
-            );
-            return true;
+            if (isAuthorized) {
+              console.log(
+                `[hasValidToken] Public key ${pubKey.substring(
+                  0,
+                  10
+                )}... is authorized on-chain`
+              );
+              return true;
+            } else {
+              console.log(
+                `[hasValidToken] Public key ${pubKey.substring(
+                  0,
+                  10
+                )}... is NOT authorized on-chain`
+              );
+              // Continue with other validation methods if on-chain check fails
+            }
           } else {
             console.log(
-              `[hasValidToken] Public key ${pubKey.substring(
-                0,
-                10
-              )}... is NOT authorized on-chain`
+              "[hasValidToken] Failed to convert public key to hex format"
             );
-            // Continue with other validation methods if on-chain check fails
           }
         } else {
           console.log(
@@ -2236,6 +2265,7 @@ async function initializeHeartbeatService() {
     const oracleAbi = [
       "function publishRoot(uint256, bytes32)",
       "function roots(uint256) view returns (bytes32)",
+      "function rootTimestamps(uint256) view returns (uint256)"
     ];
 
     const membershipContract = new ethers.Contract(
@@ -2253,57 +2283,61 @@ async function initializeHeartbeatService() {
     // Function to ping a relay
     async function pingRelay(wsUrl, timeout = 5000) {
       return new Promise((resolve) => {
-        // If URL doesn't start with ws:// or wss://, add it
-        if (!wsUrl.startsWith("ws://") && !wsUrl.startsWith("wss://")) {
-          wsUrl = `ws://${wsUrl}`;
-        }
-
-        // Ensure URL ends with /gun for GunDB WebSocket endpoint
-        if (!wsUrl.endsWith("/gun")) {
-          wsUrl = `${wsUrl}/gun`;
-        }
-
-        console.log(`Attempting to ping relay at ${wsUrl}`);
-
-        // Use the WebSocket API directly
-        const ws = new WebSocket(wsUrl);
-        let settled = false;
-
-        const timer = setTimeout(() => {
-          if (!settled) {
-            settled = true;
-            try {
-              ws.terminate();
-            } catch (e) {
-              // Ignore errors when terminating
+        try {
+          // Clean the URL to ensure proper WebSocket format
+          let cleanUrl = wsUrl.trim();
+          
+          // Remove any http:// or https:// prefixes
+          if (cleanUrl.startsWith('http://')) {
+            cleanUrl = cleanUrl.substring(7);
+          } else if (cleanUrl.startsWith('https://')) {
+            cleanUrl = cleanUrl.substring(8);
+          }
+          
+          // Remove any trailing slashes
+          while (cleanUrl.endsWith('/')) {
+            cleanUrl = cleanUrl.slice(0, -1);
+          }
+          
+          // Create the WebSocket URL
+          const wsAddress = `ws://${cleanUrl}/gun`;
+          console.log(`Attempting to ping relay at ${wsAddress}`);
+          
+          // Create the WebSocket
+          const ws = new WebSocket(wsAddress);
+          let settled = false;
+          
+          const timer = setTimeout(() => {
+            if (!settled) {
+              settled = true;
+              try { ws.close(); } catch (e) {}
+              console.log(`Timeout pinging ${wsAddress}`);
+              resolve(false);
             }
-            console.log(`Timeout pinging ${wsUrl}`);
-            resolve(false);
-          }
-        }, timeout);
-
-        ws.onopen = () => {
-          if (!settled) {
-            settled = true;
-            clearTimeout(timer);
-            try {
-              ws.close();
-            } catch (e) {
-              // Ignore errors when closing
+          }, timeout);
+          
+          ws.onopen = () => {
+            if (!settled) {
+              settled = true;
+              clearTimeout(timer);
+              try { ws.close(); } catch (e) {}
+              console.log(`Successfully pinged ${wsAddress}`);
+              resolve(true);
             }
-            console.log(`Successfully pinged ${wsUrl}`);
-            resolve(true);
-          }
-        };
-
-        ws.onerror = (error) => {
-          if (!settled) {
-            settled = true;
-            clearTimeout(timer);
-            console.error(`Error pinging ${wsUrl}:`, error.message);
-            resolve(false);
-          }
-        };
+          };
+          
+          ws.onerror = (error) => {
+            if (!settled) {
+              settled = true;
+              clearTimeout(timer);
+              console.error(`Error pinging ${wsAddress}:`, error.message);
+              resolve(false);
+            }
+          };
+        } catch (error) {
+          console.error(`Error in pingRelay:`, error.message);
+          resolve(false);
+        }
       });
     }
 
@@ -2328,7 +2362,11 @@ async function initializeHeartbeatService() {
         for (let i = 0; i < count; i++) {
           try {
             const addr = await membershipContract.getRelayAt(i);
-            const url = await membershipContract.relayUrl(addr);
+            let url = await membershipContract.relayUrl(addr);
+            
+            // Clean up the URL to ensure it's in the right format
+            url = url.trim();
+            
             console.log(`Checking relay ${i + 1}/${count}: ${addr} at ${url}`);
 
             const ok = await pingRelay(url);
@@ -2576,6 +2614,8 @@ async function startServer() {
           socket.destroy();
         }
       };
+
+      initializeHeartbeatService();
 
       // Register middleware for WebSocket upgrades
       server.on("upgrade", websocketMiddleware);
@@ -3834,6 +3874,18 @@ app.get("/api/relay/oracle/status", authenticateRequest, async (req, res) => {
     // Get admin address
     const admin = await oracleBridge.getAdmin();
 
+    // Get timestamp for current epoch if available
+    let timestamp = null;
+    let date = null;
+    
+    try {
+      timestamp = await oracleBridge.getRootTimestamp(epochId);
+      // Convert timestamp to readable date if it's not zero
+      date = timestamp > 0 ? new Date(Number(timestamp) * 1000).toISOString() : null;
+    } catch (error) {
+      console.warn(`Could not get timestamp for current epoch: ${error.message}`);
+    }
+
     res.json({
       success: true,
       config: {
@@ -3842,6 +3894,8 @@ app.get("/api/relay/oracle/status", authenticateRequest, async (req, res) => {
       },
       epochId: epochId.toString(),
       admin,
+      timestamp: timestamp ? timestamp.toString() : null,
+      date: date,
     });
   } catch (error) {
     console.error("Error getting Oracle Bridge status:", error);
@@ -3906,6 +3960,47 @@ app.get(
     } catch (error) {
       console.error(
         `Error getting Merkle root for epoch ${req.params.epochId}:`,
+        error
+      );
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+);
+
+// API - Get root timestamp for a specific epoch
+app.get(
+  "/api/relay/oracle/root-timestamp/:epochId",
+  authenticateRequest,
+  async (req, res) => {
+    try {
+      const { epochId } = req.params;
+
+      // Verify that OracleBridge is initialized
+      if (!RELAY_CONFIG.oracleBridge.enabled || !oracleBridge) {
+        return res.status(503).json({
+          success: false,
+          error: "Oracle Bridge services not available",
+        });
+      }
+
+      // Get timestamp for when the root was published
+      const timestamp = await oracleBridge.getRootTimestamp(BigInt(epochId));
+      
+      // Convert timestamp to readable date if it's not zero
+      const date = timestamp > 0 ? new Date(Number(timestamp) * 1000).toISOString() : null;
+
+      res.json({
+        success: true,
+        epochId,
+        timestamp: timestamp.toString(),
+        date: date,
+      });
+    } catch (error) {
+      console.error(
+        `Error getting root timestamp for epoch ${req.params.epochId}:`,
         error
       );
       res.status(500).json({
