@@ -2551,7 +2551,7 @@ async function startServer() {
       }
 
       // IMPORTANT: Configure WebSocket for GunDB only once after server start
-      const websocketMiddleware = (req, socket, head) => {
+      const websocketMiddleware = async (req, socket, head) => {
         const url = req.url;
         const origin = req.headers.origin;
 
@@ -2577,6 +2577,15 @@ async function startServer() {
           }
         }
 
+        // In modalità di sviluppo, consentiamo tutte le connessioni
+        if (process.env.NODE_ENV === "development") {
+          console.log("Development mode - allowing all WebSocket connections");
+          return; // Continua normalmente con l'upgrade
+        }
+
+        // In produzione, richiediamo un token valido
+        let isAuthenticated = false;
+        
         // Check for authentication token in the URL
         if (url.includes("?token=") || url.includes("&token=")) {
           try {
@@ -2589,28 +2598,28 @@ async function startServer() {
               token ? token.substring(0, 3) + "..." : "missing"
             );
 
-            if (!token || !validateToken(token)) {
-              console.warn(
-                `WebSocket upgrade rejected: invalid or missing token in URL`
-              );
-              socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
-              socket.destroy();
-              return;
-            } else {
-              console.log("Valid URL token, upgrade allowed");
+            if (token) {
+              // Usa validateUserToken invece di validateToken che non esiste
+              const tokenData = await validateUserToken(token);
+              isAuthenticated = !!tokenData;
+              
+              if (isAuthenticated) {
+                console.log("Valid URL token, upgrade allowed");
+              } else {
+                console.warn("Invalid token provided in URL");
+              }
             }
           } catch (e) {
             console.error("Error parsing URL:", e.message);
           }
-        } else {
-          // Per development, permettiamo connessioni senza token
-          if (process.env.NODE_ENV !== "development") {
-            console.warn(`WebSocket upgrade: no token found in URL`);
-            // In produzione dobbiamo rifiutare le connessioni senza token
-            socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
-            socket.destroy();
-            return;
-          }
+        }
+
+        // Se non autenticato in produzione, rifiuta la connessione
+        if (!isAuthenticated) {
+          console.warn(`WebSocket upgrade rejected: authentication required`);
+          socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+          socket.destroy();
+          return;
         }
 
         if (
