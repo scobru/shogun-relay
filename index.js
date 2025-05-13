@@ -733,7 +733,6 @@ async function hasValidToken(msg) {
       return isValid;
     }
 
-
     // Check for on-chain membership verification if enabled
     if (
       RELAY_CONFIG.relayMembership.enabled &&
@@ -829,24 +828,31 @@ async function hasValidToken(msg) {
                   10
                 )}... is NOT authorized on-chain`
               );
-              // Continue with other validation methods if on-chain check fails
+              // Se la verifica on-chain fallisce, restituiamo false direttamente
+              // invece di continuare con altri metodi di autenticazione
+              return false;
             }
           } else {
             console.log(
               "[hasValidToken] Failed to convert public key to hex format"
             );
+            // Anche in caso di errore di conversione, restituiamo false
+            return false;
           }
         } else {
           console.log(
             "[hasValidToken] No public key found in message, skipping on-chain verification"
           );
+          // Se non troviamo la chiave pubblica, restituiamo false
+          return false;
         }
       } catch (error) {
         console.error(
           "[hasValidToken] Error during on-chain verification:",
           error.message
         );
-        // Continue with other validation methods if on-chain check encounters an error
+        // In caso di errore durante la verifica on-chain, restituiamo false
+        return false;
       }
     }
 
@@ -2298,9 +2304,14 @@ async function initializeHeartbeatService() {
           while (cleanUrl.endsWith('/')) {
             cleanUrl = cleanUrl.slice(0, -1);
           }
+
+
+          if (!cleanUrl.endsWith("/gun")) {
+            cleanUrl += "/gun";
+          }
           
           // Create the WebSocket URL
-          const wsAddress = `ws://${cleanUrl}/gun`;
+          const wsAddress = `ws://${cleanUrl}`;
           console.log(`Attempting to ping relay at ${wsAddress}`);
           
           // Create the WebSocket
@@ -2592,13 +2603,13 @@ async function startServer() {
             console.error("Error parsing URL:", e.message);
           }
         } else {
-          // For development, allow connections without tokens
+          // Per development, permettiamo connessioni senza token
           if (process.env.NODE_ENV !== "development") {
             console.warn(`WebSocket upgrade: no token found in URL`);
-            // In production we would reject, but for debugging allow it
-            //socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
-            //socket.destroy();
-            //return;
+            // In produzione dobbiamo rifiutare le connessioni senza token
+            socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+            socket.destroy();
+            return;
           }
         }
 
@@ -2616,6 +2627,9 @@ async function startServer() {
       };
 
       initializeHeartbeatService();
+
+      // Initialize the fund release service
+      initializeFundReleaseService();
 
       // Register middleware for WebSocket upgrades
       server.on("upgrade", websocketMiddleware);
@@ -4176,6 +4190,512 @@ app.post("/api/relay/oracle/config", authenticateRequest, async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating Oracle Bridge configuration:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// ============ FUND RELEASE SERVICE ============
+
+/**
+ * Service to release funds when an epoch is completed
+ * Using Merkle proofs to prove relay was active during the epoch
+ */
+let fundReleaseInterval = null;
+
+/**
+ * Initialize fund release service
+ * @returns {boolean} Whether the service was initialized successfully
+ */
+async function initializeFundReleaseService() {
+  try {
+    // Configuration for fund release service
+    const FUND_RELEASE_CONFIG = {
+      enabled: process.env.FUND_RELEASE_ENABLED === "true" || false,
+      interval: parseInt(process.env.FUND_RELEASE_INTERVAL || "3600", 10) * 1000, // Default 1 hour in ms
+      membershipContract: process.env.RELAY_MEMBERSHIP_CONTRACT || "",
+      oracleBridgeContract: process.env.ORACLE_BRIDGE_CONTRACT || "",
+      providerUrl: process.env.ETHEREUM_PROVIDER_URL || "http://localhost:8545",
+      privateKey: process.env.ETHEREUM_PRIVATE_KEY || "", // Private key for signing transactions
+    };
+
+    if (!FUND_RELEASE_CONFIG.enabled) {
+      console.log("Fund release service disabled, skipping initialization");
+      return false;
+    }
+
+    // Check if we have all necessary configuration
+    if (
+      !FUND_RELEASE_CONFIG.membershipContract ||
+      !FUND_RELEASE_CONFIG.oracleBridgeContract ||
+      !FUND_RELEASE_CONFIG.privateKey
+    ) {
+      console.warn(
+        "Fund release service missing required configuration, skipping initialization"
+      );
+      return false;
+    }
+
+    console.log("Initializing fund release service...");
+
+    // Import ethers and MerkleTree dynamically
+    const { ethers } = await import("ethers");
+    const { MerkleTree } = await import("merkletreejs");
+    const keccak256Module = await import("keccak256");
+    const keccak256 = keccak256Module.default;
+
+    // Set up signer
+    const privateKey = FUND_RELEASE_CONFIG.privateKey.startsWith("0x")
+      ? FUND_RELEASE_CONFIG.privateKey
+      : `0x${FUND_RELEASE_CONFIG.privateKey}`;
+
+    // Create provider
+    const provider = new ethers.JsonRpcProvider(FUND_RELEASE_CONFIG.providerUrl);
+
+    // Create wallet with private key and provider
+    const wallet = new ethers.Wallet(privateKey, provider);
+    const relayAddress = await wallet.getAddress();
+    console.log(
+      `Fund release service initialized with wallet address: ${relayAddress}`
+    );
+
+    // Set up contracts
+    const membershipAbi = [
+      "function getRelayCount() view returns (uint256)",
+      "function getRelayAt(uint256) view returns (address)",
+      "function relayUrl(address) view returns (string)",
+      "function releaseWithProof(uint256, bytes32[]) external",
+    ];
+
+    const oracleAbi = [
+      "function getEpochId() view returns (uint256)",
+      "function roots(uint256) view returns (bytes32)", 
+      "function rootTimestamps(uint256) view returns (uint256)"
+    ];
+
+    const membershipContract = new ethers.Contract(
+      FUND_RELEASE_CONFIG.membershipContract,
+      membershipAbi,
+      wallet
+    );
+
+    const oracleContract = new ethers.Contract(
+      FUND_RELEASE_CONFIG.oracleBridgeContract,
+      oracleAbi,
+      provider
+    );
+
+    // Function to ping a relay (reused from heartbeat service)
+    async function pingRelay(wsUrl, timeout = 5000) {
+      return new Promise((resolve) => {
+        try {
+          // Clean the URL to ensure proper WebSocket format
+          let cleanUrl = wsUrl.trim();
+          
+          // Remove any http:// or https:// prefixes
+          if (cleanUrl.startsWith('http://')) {
+            cleanUrl = cleanUrl.substring(7);
+          } else if (cleanUrl.startsWith('https://')) {
+            cleanUrl = cleanUrl.substring(8);
+          }
+          
+          // Remove any trailing slashes
+          while (cleanUrl.endsWith('/')) {
+            cleanUrl = cleanUrl.slice(0, -1);
+          }
+
+          if (!cleanUrl.endsWith("/gun")) {
+            cleanUrl += "/gun";
+          }
+          
+          // Create the WebSocket URL
+          const wsAddress = `ws://${cleanUrl}`;
+          console.log(`Attempting to ping relay at ${wsAddress}`);
+          
+          const ws = new WebSocket(wsAddress);
+          let settled = false;
+          
+          const timer = setTimeout(() => {
+            if (!settled) {
+              settled = true;
+              try { ws.close(); } catch (e) {}
+              console.log(`Timeout pinging ${wsAddress}`);
+              resolve(false);
+            }
+          }, timeout);
+          
+          ws.onopen = () => {
+            if (!settled) {
+              settled = true;
+              clearTimeout(timer);
+              try { ws.close(); } catch (e) {}
+              console.log(`Successfully pinged ${wsAddress}`);
+              resolve(true);
+            }
+          };
+          
+          ws.onerror = (error) => {
+            if (!settled) {
+              settled = true;
+              clearTimeout(timer);
+              console.error(`Error pinging ${wsAddress}:`, error.message);
+              resolve(false);
+            }
+          };
+        } catch (error) {
+          console.error(`Error in pingRelay:`, error.message);
+          resolve(false);
+        }
+      });
+    }
+
+    // Function to generate and submit a proof for the current epoch
+    async function generateAndSubmitProof() {
+      try {
+        console.log("Checking if funds need to be released for this relay...");
+
+        // Get the current epoch from the oracle
+        const epochId = await oracleContract.getEpochId();
+        console.log(`Current epoch: ${epochId}`);
+
+        // Check if there's a root for this epoch
+        const root = await oracleContract.roots(epochId);
+        if (root === ethers.ZeroHash) {
+          console.log(`No root found for epoch ${epochId}, skipping fund release`);
+          return;
+        }
+
+        // Get the timestamp for this root
+        const timestamp = await oracleContract.rootTimestamps(epochId);
+        if (timestamp === 0n) {
+          console.log(`No timestamp found for epoch ${epochId}, skipping fund release`);
+          return;
+        }
+
+        // Fetch all relays and check which ones are alive
+        const count = await membershipContract.getRelayCount();
+        console.log(`Found ${count} relays in membership contract`);
+
+        const aliveAddrs = [];
+        const urls = [];
+
+        // Check each relay
+        for (let i = 0; i < count; i++) {
+          try {
+            const addr = await membershipContract.getRelayAt(i);
+            let url = await membershipContract.relayUrl(addr);
+            
+            console.log(`Checking relay ${i + 1}/${count}: ${addr} at ${url}`);
+
+            const ok = await pingRelay(url);
+            if (ok) {
+              aliveAddrs.push(addr);
+              urls.push(url);
+              console.log(`Relay ${addr} is alive`);
+            } else {
+              console.log(`Relay ${addr} is not responding`);
+            }
+          } catch (error) {
+            console.error(`Error checking relay ${i}:`, error);
+          }
+        }
+
+        console.log(`Found ${aliveAddrs.length} alive relays:`, urls);
+
+        if (aliveAddrs.length === 0) {
+          console.error(`No relays online for epoch ${epochId}, cannot generate proof`);
+          return;
+        }
+
+        // Check if this relay is in the list of alive relays
+        if (!aliveAddrs.includes(relayAddress)) {
+          console.log(`This relay (${relayAddress}) is not in the list of alive relays, skipping fund release`);
+          return;
+        }
+
+        // Build Merkle tree
+        console.log("Building Merkle tree...");
+
+        // Calculate leaves - same algorithm as in the heartbeat service
+        const leaves = aliveAddrs.map((addr) =>
+          ethers.solidityPackedKeccak256(["address", "uint256"], [addr, epochId])
+        );
+
+        // Create Merkle tree
+        const tree = new MerkleTree(leaves, keccak256, { sortPairs: true });
+
+        // Get the leaf for this relay
+        const leaf = ethers.solidityPackedKeccak256(
+          ["address", "uint256"],
+          [relayAddress, epochId]
+        );
+
+        // Get the proof for this relay
+        const proof = tree.getHexProof(leaf);
+
+        console.log(`Generated Merkle proof with ${proof.length} elements for relay ${relayAddress}`);
+
+        // Check if we need to release funds
+        try {
+          console.log(`Calling releaseWithProof for epoch ${epochId}...`);
+          const tx = await membershipContract.releaseWithProof(epochId, proof);
+          console.log(`Transaction submitted: ${tx.hash}`);
+
+          const receipt = await tx.wait();
+          console.log(
+            `Funds released successfully in transaction ${receipt.hash}, block ${receipt.blockNumber}`
+          );
+        } catch (error) {
+          // Check if the error is due to funds already being released
+          if (error.message.includes("already released")) {
+            console.log(`Funds for epoch ${epochId} already released`);
+          } else {
+            console.error(`Error releasing funds for epoch ${epochId}:`, error);
+          }
+        }
+      } catch (error) {
+        console.error("Error in fund release process:", error);
+      }
+    }
+
+    // Function to manually trigger fund release for a specific epoch
+    async function manualFundRelease(epochId = null) {
+      try {
+        console.log(`Manual fund release triggered${epochId ? ` for epoch ${epochId}` : ''}`);
+        
+        // If no epoch specified, get the current epoch
+        if (epochId === null) {
+          epochId = await oracleContract.getEpochId();
+          console.log(`Using current epoch: ${epochId}`);
+        }
+
+        // Check if there's a root for this epoch
+        const root = await oracleContract.roots(epochId);
+        if (root === ethers.ZeroHash) {
+          console.log(`No root found for epoch ${epochId}, cannot generate proof`);
+          return {
+            success: false,
+            error: `No root found for epoch ${epochId}`
+          };
+        }
+
+        // Fetch all relays and check which ones are alive
+        const count = await membershipContract.getRelayCount();
+        console.log(`Found ${count} relays in membership contract`);
+
+        const aliveAddrs = [];
+
+        // Check each relay
+        for (let i = 0; i < count; i++) {
+          try {
+            const addr = await membershipContract.getRelayAt(i);
+            let url = await membershipContract.relayUrl(addr);
+            
+            console.log(`Checking relay ${i + 1}/${count}: ${addr} at ${url}`);
+
+            const ok = await pingRelay(url);
+            if (ok) {
+              aliveAddrs.push(addr);
+              console.log(`Relay ${addr} is alive`);
+            } else {
+              console.log(`Relay ${addr} is not responding`);
+            }
+          } catch (error) {
+            console.error(`Error checking relay ${i}:`, error);
+          }
+        }
+
+        if (aliveAddrs.length === 0) {
+          console.error(`No relays online for epoch ${epochId}, cannot generate proof`);
+          return {
+            success: false,
+            error: `No relays online for epoch ${epochId}`
+          };
+        }
+
+        // Check if this relay is in the list of alive relays
+        if (!aliveAddrs.includes(relayAddress)) {
+          console.log(`This relay (${relayAddress}) is not in the list of alive relays`);
+          return {
+            success: false,
+            error: `This relay (${relayAddress}) is not in the list of alive relays`
+          };
+        }
+
+        // Build Merkle tree
+        console.log("Building Merkle tree...");
+
+        // Calculate leaves
+        const leaves = aliveAddrs.map((addr) =>
+          ethers.solidityPackedKeccak256(["address", "uint256"], [addr, epochId])
+        );
+
+        // Create Merkle tree
+        const tree = new MerkleTree(leaves, keccak256, { sortPairs: true });
+
+        // Get the leaf for this relay
+        const leaf = ethers.solidityPackedKeccak256(
+          ["address", "uint256"],
+          [relayAddress, epochId]
+        );
+
+        // Get the proof for this relay
+        const proof = tree.getHexProof(leaf);
+
+        console.log(`Generated Merkle proof with ${proof.length} elements for relay ${relayAddress}`);
+
+        // Release funds
+        try {
+          console.log(`Calling releaseWithProof for epoch ${epochId}...`);
+          const tx = await membershipContract.releaseWithProof(epochId, proof);
+          console.log(`Transaction submitted: ${tx.hash}`);
+
+          const receipt = await tx.wait();
+          console.log(
+            `Funds released successfully in transaction ${tx.hash}, block ${receipt.blockNumber}`
+          );
+          
+          return {
+            success: true,
+            txHash: tx.hash,
+            proof: proof,
+            epochId: epochId.toString()
+          };
+        } catch (error) {
+          // Check if the error is due to funds already being released
+          if (error.message.includes("already released")) {
+            console.log(`Funds for epoch ${epochId} already released`);
+            return {
+              success: false,
+              error: `Funds for epoch ${epochId} already released`
+            };
+          } else {
+            console.error(`Error releasing funds for epoch ${epochId}:`, error);
+            return {
+              success: false,
+              error: `Error releasing funds: ${error.message}`
+            };
+          }
+        }
+      } catch (error) {
+        console.error("Error in manual fund release:", error);
+        return {
+          success: false,
+          error: `Error in fund release process: ${error.message}`
+        };
+      }
+    }
+
+    // Set up interval to run the fund release check
+    fundReleaseInterval = setInterval(
+      generateAndSubmitProof,
+      FUND_RELEASE_CONFIG.interval
+    );
+
+    // Run immediately on start
+    setTimeout(generateAndSubmitProof, 10000);
+
+    console.log(
+      `Fund release service initialized, running checks every ${
+        FUND_RELEASE_CONFIG.interval / 1000
+      } seconds`
+    );
+    
+    // Export the manual fund release function for API endpoint use
+    global.manualFundRelease = manualFundRelease;
+    
+    return true;
+  } catch (error) {
+    console.error("Error initializing fund release service:", error);
+    return false;
+  }
+}
+
+/**
+ * Stop the fund release service
+ */
+function stopFundReleaseService() {
+  if (fundReleaseInterval) {
+    clearInterval(fundReleaseInterval);
+    fundReleaseInterval = null;
+    console.log("Fund release service stopped");
+  }
+}
+
+// Add API endpoint for manual fund release
+// Add this in the API endpoints section, near other /api/relay endpoints
+app.post("/api/relay/release-funds", authenticateRequest, async (req, res) => {
+  try {
+    // Only admin or system tokens can manually release funds
+    if (!req.auth.isSystemToken && !req.auth.permissions?.includes("admin")) {
+      return res.status(403).json({
+        success: false,
+        error: "Only administrators can manually release funds",
+      });
+    }
+
+    // Get the epoch from the request, or use null to use the current epoch
+    const epochId = req.body.epochId || null;
+    
+    // Check if the manual fund release function is available
+    if (!global.manualFundRelease) {
+      return res.status(503).json({
+        success: false,
+        error: "Fund release service not initialized",
+      });
+    }
+
+    // Call the manual fund release function
+    const result = await global.manualFundRelease(epochId ? BigInt(epochId) : null);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: "Funds released successfully",
+        txHash: result.txHash,
+        epochId: result.epochId,
+        proofLength: result.proof.length,
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: result.error,
+      });
+    }
+  } catch (error) {
+    console.error("Error during manual fund release:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// API - Get fund release service status
+app.get("/api/relay/release-funds/status", authenticateRequest, async (req, res) => {
+  try {
+    const FUND_RELEASE_CONFIG = {
+      enabled: process.env.FUND_RELEASE_ENABLED === "true" || false,
+      interval: parseInt(process.env.FUND_RELEASE_INTERVAL || "3600", 10) * 1000,
+      membershipContract: process.env.RELAY_MEMBERSHIP_CONTRACT || "",
+      oracleBridgeContract: process.env.ORACLE_BRIDGE_CONTRACT || "",
+    };
+
+    res.json({
+      success: true,
+      config: {
+        enabled: FUND_RELEASE_CONFIG.enabled,
+        interval: FUND_RELEASE_CONFIG.interval / 1000, // Convert to seconds for readability
+        membershipContract: FUND_RELEASE_CONFIG.membershipContract,
+        oracleBridgeContract: FUND_RELEASE_CONFIG.oracleBridgeContract,
+      },
+      isRunning: !!fundReleaseInterval,
+      serviceAvailable: !!global.manualFundRelease,
+    });
+  } catch (error) {
+    console.error("Error getting fund release service status:", error);
     res.status(500).json({
       success: false,
       error: error.message,
