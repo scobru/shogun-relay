@@ -1,8 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-
-
 import cors from "cors";
 import multer from "multer";
 import fs from "fs";
@@ -16,7 +14,6 @@ import {
 } from "shogun-core";
 import Gun from "gun";
 import path from "path";
-import "bullet-catcher";
 import crypto from "crypto";
 import http from "http";
 import https from "https";
@@ -36,11 +33,10 @@ const gunOptions = {
   file: "radata",
   radisk: true,
   localStorage: false,
-  isValid: hasValidToken,
 };
 
 // Check if we're in a development environment
-const isDevMode = process.env.NODE_ENV === 'development';
+const isDevMode = process.env.NODE_ENV === "development";
 
 // Relay components configuration
 const RELAY_CONFIG = {
@@ -64,7 +60,9 @@ const RELAY_CONFIG = {
   heartbeat: {
     enabled: process.env.HEARTBEAT_ENABLED === "true" || false,
     // Use a shorter interval in development mode for faster testing
-    interval: isDevMode ? 10 * 1000 : parseInt(process.env.HEARTBEAT_INTERVAL || "3600", 10) * 1000, // Default 1 hour in ms, 10 seconds in dev
+    interval: isDevMode
+      ? 10 * 1000
+      : parseInt(process.env.HEARTBEAT_INTERVAL || "3600", 10) * 1000, // Default 1 hour in ms, 10 seconds in dev
     oracleBridgeContract: process.env.ORACLE_BRIDGE_CONTRACT || "",
     membershipContract: process.env.RELAY_MEMBERSHIP_CONTRACT || "",
     providerUrl: process.env.ETHEREUM_PROVIDER_URL || "http://localhost:8545",
@@ -701,199 +699,6 @@ const authenticateRequest = async (req, res, next) => {
     });
   }
 };
-
-// Modify the original hasValidToken function to use our new validation system
-async function hasValidToken(msg) {
-  console.log(`[hasValidToken] Current NODE_ENV: ${process.env.NODE_ENV}`);
-  if (process.env.NODE_ENV === "development") {
-    console.log(
-      "[hasValidToken] Development mode: Bypassing token validation via NODE_ENV."
-    );
-    return true;
-  }
-
-  // Check if we're in a websocket context
-  const isWebSocket = msg && msg._ && msg._.via && msg._.via.wire;
-
-  if (isWebSocket) {
-    console.log(
-      "[hasValidToken] WebSocket message detected based on msg._.via.wire."
-    );
-
-    // If a token is present in headers, validate it
-    if (msg.headers && msg.headers.token) {
-      const token = msg.headers.token;
-      const tokenData = await validateUserToken(token);
-
-      const isValid = !!tokenData;
-      console.log(
-        "[hasValidToken] WebSocket message with header token, validation:",
-        isValid
-      );
-      return isValid;
-    }
-
-    // Check for on-chain membership verification if enabled
-    if (
-      RELAY_CONFIG.relayMembership.enabled &&
-      RELAY_CONFIG.relayMembership.onchainMembership &&
-      relayMembershipVerifier
-    ) {
-      try {
-        // Extract the sender's public key from the message
-        // GunDB message format may include user credentials or pub
-        let pubKey = null;
-
-        // First check if this is an authenticated user message with pub
-        if (msg.put && msg.put.auth && msg.put.auth.pub) {
-          pubKey = msg.put.auth.pub;
-          console.log(
-            `[hasValidToken] Found authenticated message with pub: ${pubKey.substring(
-              0,
-              10
-            )}...`
-          );
-        }
-        // Check if message contains user object with pub
-        else if (msg.user && msg.user.pub) {
-          pubKey = msg.user.pub;
-          console.log(
-            `[hasValidToken] Found user message with pub: ${pubKey.substring(
-              0,
-              10
-            )}...`
-          );
-        }
-        // Check if message is from a specific user
-        else if (msg.from && msg.from.pub) {
-          pubKey = msg.from.pub;
-          console.log(
-            `[hasValidToken] Found message from user with pub: ${pubKey.substring(
-              0,
-              10
-            )}...`
-          );
-        }
-        // Alternative formats
-        else if (msg.pub) {
-          pubKey = msg.pub;
-          console.log(
-            `[hasValidToken] Found direct pub in message: ${pubKey.substring(
-              0,
-              10
-            )}...`
-          );
-        }
-        // Check if pubKey is in the put object keys (like in SEA auth messages)
-        else if (msg.put && typeof msg.put === 'object') {
-          // Loop through the keys of the put object to find ones that start with ~
-          const putKeys = Object.keys(msg.put);
-          for (const key of putKeys) {
-            if (key.startsWith('~')) {
-              // Extract the pubKey (everything after ~ until the first . if present)
-              const dotIndex = key.indexOf('.');
-              pubKey = dotIndex > 0 ? key.substring(1, dotIndex) : key.substring(1);
-              console.log(
-                `[hasValidToken] Found pubKey in put object key: ${pubKey.substring(
-                  0,
-                  10
-                )}...`
-              );
-              break;
-            }
-          }
-        }
-
-        if (pubKey) {
-          // Convert the GunDB public key to hex format for Ethereum
-          const hexPubKey = gunPubKeyToHex(pubKey);
-          
-          if (hexPubKey) {
-            console.log(`[hasValidToken] Converted pubKey to hex format: 0x${hexPubKey.substring(0, 20)}...`);
-            
-            const isAuthorized = await relayMembershipVerifier.isPublicKeyAuthorized(hexPubKey);
-
-            if (isAuthorized) {
-              console.log(
-                `[hasValidToken] Public key ${pubKey.substring(
-                  0,
-                  10
-                )}... is authorized on-chain`
-              );
-              return true;
-            } else {
-              console.log(
-                `[hasValidToken] Public key ${pubKey.substring(
-                  0,
-                  10
-                )}... is NOT authorized on-chain`
-              );
-              
-              // Aggiungiamo un log più esplicito che stiamo rifiutando il messaggio
-              console.warn(`[hasValidToken] REJECTING MESSAGE from unauthorized public key ${pubKey.substring(0, 10)}...`);
-              
-              // Se la verifica on-chain fallisce, restituiamo false direttamente
-              // invece di continuare con altri metodi di autenticazione
-              return false;
-            }
-          } else {
-            console.log(
-              "[hasValidToken] Failed to convert public key to hex format"
-            );
-            // Anche in caso di errore di conversione, restituiamo false
-            return false;
-          }
-        } else {
-          console.log(
-            "[hasValidToken] No public key found in message, skipping on-chain verification"
-          );
-          // Se non troviamo la chiave pubblica, restituiamo false
-          return false;
-        }
-      } catch (error) {
-        console.error(
-          "[hasValidToken] Error during on-chain verification:",
-          error.message
-        );
-        // In caso di errore durante la verifica on-chain, restituiamo false
-        return false;
-      }
-    }
-
-    // MODIFICATO: Se arriviamo qui e siamo in produzione e onchainMembership è abilitato,
-    // non dovremmo permettere messaggi senza verifiche on-chain
-    if (RELAY_CONFIG.relayMembership.enabled && 
-        RELAY_CONFIG.relayMembership.onchainMembership && 
-        relayMembershipVerifier) {
-      console.warn("[hasValidToken] Message didn't go through on-chain verification but onchainMembership is enabled. Rejecting.");
-      return false;
-    }
-
-    // Altrimenti, accettiamo il messaggio (comportamento legacy)
-    console.log(
-      "[hasValidToken] WebSocket message, assuming authenticated by upgrade"
-    );
-    return true;
-  }
-
-  // For regular HTTP requests or other message types
-  console.log(
-    "[hasValidToken] Non-WebSocket message or unidentifiable type. Validating as HTTP-like"
-  );
-
-  if (msg && msg.headers && msg.headers.token) {
-    const tokenData = await validateUserToken(msg.headers.token);
-    const isValid = !!tokenData;
-
-    console.log(
-      "[hasValidToken] Token validation result for non-WebSocket/HTTP-like:",
-      isValid
-    );
-    return isValid;
-  }
-
-  return false;
-}
 
 // API - FILES LIST (must be defined before app.use("/files", authenticateRequest))
 app.get("/files/all", authenticateRequest, async (req, res) => {
@@ -2285,7 +2090,7 @@ async function initializeHeartbeatService() {
     const oracleAbi = [
       "function publishRoot(uint256, bytes32)",
       "function roots(uint256) view returns (bytes32)",
-      "function rootTimestamps(uint256) view returns (uint256)"
+      "function rootTimestamps(uint256) view returns (uint256)",
     ];
 
     const membershipContract = new ethers.Contract(
@@ -2306,51 +2111,54 @@ async function initializeHeartbeatService() {
         try {
           // Clean the URL to ensure proper WebSocket format
           let cleanUrl = wsUrl.trim();
-          
+
           // Remove any http:// or https:// prefixes
-          if (cleanUrl.startsWith('http://')) {
+          if (cleanUrl.startsWith("http://")) {
             cleanUrl = cleanUrl.substring(7);
-          } else if (cleanUrl.startsWith('https://')) {
+          } else if (cleanUrl.startsWith("https://")) {
             cleanUrl = cleanUrl.substring(8);
           }
-          
+
           // Remove any trailing slashes
-          while (cleanUrl.endsWith('/')) {
+          while (cleanUrl.endsWith("/")) {
             cleanUrl = cleanUrl.slice(0, -1);
           }
-
 
           if (!cleanUrl.endsWith("/gun")) {
             cleanUrl += "/gun";
           }
-          
+
           // Create the WebSocket URL
           const wsAddress = `ws://${cleanUrl}`;
           console.log(`Attempting to ping relay at ${wsAddress}`);
-          
+
           // Create the WebSocket
           const ws = new WebSocket(wsAddress);
           let settled = false;
-          
+
           const timer = setTimeout(() => {
             if (!settled) {
               settled = true;
-              try { ws.close(); } catch (e) {}
+              try {
+                ws.close();
+              } catch (e) {}
               console.log(`Timeout pinging ${wsAddress}`);
               resolve(false);
             }
           }, timeout);
-          
+
           ws.onopen = () => {
             if (!settled) {
               settled = true;
               clearTimeout(timer);
-              try { ws.close(); } catch (e) {}
+              try {
+                ws.close();
+              } catch (e) {}
               console.log(`Successfully pinged ${wsAddress}`);
               resolve(true);
             }
           };
-          
+
           ws.onerror = (error) => {
             if (!settled) {
               settled = true;
@@ -2388,10 +2196,10 @@ async function initializeHeartbeatService() {
           try {
             const addr = await membershipContract.getRelayAt(i);
             let url = await membershipContract.relayUrl(addr);
-            
+
             // Clean up the URL to ensure it's in the right format
             url = url.trim();
-            
+
             console.log(`Checking relay ${i + 1}/${count}: ${addr} at ${url}`);
 
             const ok = await pingRelay(url);
@@ -2571,7 +2379,11 @@ async function startServer() {
           const origin = req.headers.origin;
 
           // Log upgrade request
-          console.log(`WebSocket upgrade requested for: ${url} from origin: ${origin || "unknown"}`);
+          console.log(
+            `WebSocket upgrade requested for: ${url} from origin: ${
+              origin || "unknown"
+            }`
+          );
 
           // Validate origin if present
           if (origin) {
@@ -2579,7 +2391,9 @@ async function startServer() {
             if (process.env.NODE_ENV === "development") {
               console.log("Development mode - origin accepted:", origin);
             } else if (!allowedOrigins.includes(origin)) {
-              console.warn(`WebSocket upgrade rejected: origin not allowed ${origin}`);
+              console.warn(
+                `WebSocket upgrade rejected: origin not allowed ${origin}`
+              );
               socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
               socket.destroy();
               return;
@@ -2588,13 +2402,23 @@ async function startServer() {
 
           // In development mode, allow all connections
           if (process.env.NODE_ENV === "development") {
-            console.log("Development mode - allowing all WebSocket connections");
+            console.log(
+              "Development mode - allowing all WebSocket connections"
+            );
             // Continue with the upgrade process
-            if (url === "/gun" || url.startsWith("/gun?") || url.startsWith("/gun/")) {
-              console.log(`Handling WebSocket connection for GunDB in development mode`);
+            if (
+              url === "/gun" ||
+              url.startsWith("/gun?") ||
+              url.startsWith("/gun/")
+            ) {
+              console.log(
+                `Handling WebSocket connection for GunDB in development mode`
+              );
               return; // Let Gun handle the upgrade
             } else {
-              console.log(`Unhandled WebSocket request in development mode: ${url}`);
+              console.log(
+                `Unhandled WebSocket request in development mode: ${url}`
+              );
               socket.destroy();
               return;
             }
@@ -2603,7 +2427,396 @@ async function startServer() {
           // PRODUCTION MODE CHECKS
           // In production, require valid authentication
           let isAuthenticated = false;
-          
+
+          // Aggiungi un intercettore per bloccare esplicitamente messaggi da utenti non autorizzati
+          gun.on("opt", function (context) {
+            if (context.once) {
+              return;
+            }
+
+            // Aggancia un hook a tutti i messaggi in entrata
+            this.to.next(context);
+
+            // Intercetta i messaggi OUT (le scritture) prima che vengano elaborate
+            context.on("out", function (msg) {
+              // Salva il riferimento a this per usarlo nelle funzioni asincrone
+              const self = this;
+
+              // DEVELOPMENT MODE BYPASS
+              if (process.env.NODE_ENV === "development") {
+                console.log(
+                  "[Gun.on.out] Development mode: Bypassing authorization."
+                );
+                return self.to.next(msg); // Allow message
+              }
+
+              // Verifica se il messaggio è una scrittura (contiene put)
+              if (
+                msg.put &&
+                Object.keys(msg.put).length > 0 &&
+                RELAY_CONFIG.relayMembership.enabled &&
+                RELAY_CONFIG.relayMembership.onchainMembership &&
+                relayMembershipVerifier
+              ) {
+                // Funzione per estrarre e verificare la chiave pubblica
+                const verifyPubKey = async function () {
+                  let pubKey = null;
+
+                  // Estrai la chiave pubblica
+                  // Cerca nei nodi put che iniziano con ~
+                  const putKeys = Object.keys(msg.put);
+                  for (const key of putKeys) {
+                    if (key.startsWith("~")) {
+                      const dotIndex = key.indexOf(".");
+                      pubKey =
+                        dotIndex > 0
+                          ? key.substring(1, dotIndex)
+                          : key.substring(1);
+                      break;
+                    }
+                  }
+
+                  // Se non trovata in put, cerca in altri campi del messaggio
+                  if (!pubKey) {
+                    if (msg.user && msg.user.pub) {
+                      pubKey = msg.user.pub;
+                    } else if (msg.from && msg.from.pub) {
+                      pubKey = msg.from.pub;
+                    } else if (msg.pub) {
+                      pubKey = msg.pub;
+                    }
+                  }
+
+                  if (pubKey) {
+                    try {
+                      // Converti pubKey in formato hex
+                      const hexPubKey = gunPubKeyToHex(pubKey);
+                      if (!hexPubKey) {
+                        console.warn(
+                          `[Gun.on.out] Failed to convert pubKey ${pubKey.substring(
+                            0,
+                            10
+                          )}... to hex format`
+                        );
+                        return false;
+                      }
+
+                      // IMPORTANTE: Attendi il risultato della verifica
+                      const isAuthorized =
+                        await relayMembershipVerifier.isPublicKeyAuthorized(
+                          hexPubKey
+                        );
+
+                      if (!isAuthorized) {
+                        console.warn(
+                          `[Gun.on.out] BLOCKING write from unauthorized key ${pubKey.substring(
+                            0,
+                            10
+                          )}...`
+                        );
+                        return false;
+                      }
+
+                      console.log(
+                        `[Gun.on.out] Allowing write from authorized key ${pubKey.substring(
+                          0,
+                          10
+                        )}...`
+                      );
+                      return true;
+                    } catch (error) {
+                      console.error(
+                        `[Gun.on.out] Error during authorization check:`,
+                        error
+                      );
+                      return false;
+                    }
+                  } else {
+                    console.warn(
+                      `[Gun.on.out] Could not find pubKey in message`
+                    );
+                    return false;
+                  }
+                };
+
+                // Esegui la verifica in modo asincrono ma blocca il flusso fino al completamento
+                verifyPubKey()
+                  .then((isAuthorized) => {
+                    if (isAuthorized) {
+                      // Solo se autorizzato, continua con il messaggio
+                      self.to.next(msg);
+                    } else {
+                      // Altrimenti, blocca silenziosamente la scrittura non propagando il messaggio
+                      console.warn(
+                        `[Gun.on.out] Message was blocked from propagating`
+                      );
+                      // Forza un ACK di errore per il client
+                      if (msg._.via && msg._.via.say) {
+                        try {
+                          msg._.via.say({
+                            err: "Unauthorized: Your public key is not authorized on-chain",
+                            ok: 0,
+                            "@": msg["#"],
+                          });
+                        } catch (e) {
+                          console.error(
+                            "[Gun.on.out] Error sending rejection message:",
+                            e
+                          );
+                        }
+                      }
+                    }
+                  })
+                  .catch((err) => {
+                    console.error(
+                      `[Gun.on.out] Error in verification process:`,
+                      err
+                    );
+                    // In caso di errore, blocca la richiesta
+                  });
+
+                // IMPORTANTE: Ritorna senza chiamare next() per bloccare il flusso normale
+                // La propagazione avverrà solo quando verifyPubKey() restituirà true
+                return;
+              }
+
+              // Se non è un messaggio put o non abbiamo bisogno di verificarlo, continua normalmente
+              this.to.next(msg);
+            });
+
+            // Manteniamo anche l'intercettore 'in' per sicurezza
+            context.on("in", function (msg) {
+              // Salva il riferimento a this per usarlo nelle funzioni asincrone
+              const self = this;
+
+              // Intercetta i messaggi in ingresso che contengono dati
+              const containsPut = msg.put && Object.keys(msg.put).length > 0;
+
+              // Se il messaggio contiene dati in put e onchainMembership è abilitato
+              if (
+                containsPut &&
+                RELAY_CONFIG.relayMembership.enabled &&
+                RELAY_CONFIG.relayMembership.onchainMembership &&
+                relayMembershipVerifier
+              ) {
+                // Funzione per estrarre e verificare la chiave pubblica
+                const verifyPubKey = async function () {
+                  let pubKey = null;
+
+                  // Cerca di estrarre la chiave pubblica dai dati in put
+                  if (msg.put) {
+                    const putKeys = Object.keys(msg.put);
+                    for (const key of putKeys) {
+                      if (key.startsWith("~")) {
+                        const dotIndex = key.indexOf(".");
+                        pubKey =
+                          dotIndex > 0
+                            ? key.substring(1, dotIndex)
+                            : key.substring(1);
+                        break;
+                      }
+                    }
+                  }
+
+                  if (pubKey) {
+                    try {
+                      // Converti pubKey in formato hex
+                      const hexPubKey = gunPubKeyToHex(pubKey);
+                      if (!hexPubKey) {
+                        console.warn(
+                          `[Gun.on.in] Failed to convert pubKey ${pubKey.substring(
+                            0,
+                            10
+                          )}... to hex format`
+                        );
+                        return false;
+                      }
+
+                      // IMPORTANTE: Attendi il risultato della verifica
+                      const isAuthorized =
+                        await relayMembershipVerifier.isPublicKeyAuthorized(
+                          hexPubKey
+                        );
+
+                      if (!isAuthorized) {
+                        console.warn(
+                          `[Gun.on.in] BLOCKING data from unauthorized key ${pubKey.substring(
+                            0,
+                            10
+                          )}...`
+                        );
+                        return false;
+                      }
+
+                      console.log(
+                        `[Gun.on.in] Allowing data from authorized key ${pubKey.substring(
+                          0,
+                          10
+                        )}...`
+                      );
+                      return true;
+                    } catch (error) {
+                      console.error(
+                        `[Gun.on.in] Error during authorization check:`,
+                        error
+                      );
+                      return false;
+                    }
+                  } else {
+                    // Se non troviamo una chiave pubblica ma ci sono dati, per sicurezza blocchiamo
+                    if (Object.keys(msg.put).length > 0) {
+                      console.warn(
+                        `[Gun.on.in] Could not find pubKey in message with data`
+                      );
+                      return false;
+                    }
+                    return true; // Altre tipologie di messaggi senza put possono passare
+                  }
+                };
+
+                // Esegui la verifica in modo asincrono ma blocca il flusso fino al completamento
+                verifyPubKey()
+                  .then((isAuthorized) => {
+                    if (isAuthorized) {
+                      // Solo se autorizzato, continua con il messaggio
+                      self.to.next(msg);
+                    } else {
+                      // Altrimenti, blocca silenziosamente il messaggio non propagandolo
+                      console.warn(
+                        `[Gun.on.in] Message was blocked from propagating`
+                      );
+                    }
+                  })
+                  .catch((err) => {
+                    console.error(
+                      `[Gun.on.in] Error in verification process:`,
+                      err
+                    );
+                    // In caso di errore, blocca il messaggio
+                  });
+
+                // IMPORTANTE: Ritorna senza chiamare next() per bloccare il flusso normale
+                // La propagazione avverrà solo quando verifyPubKey() restituirà true
+                return;
+              }
+
+              // Se non è un messaggio con put o non abbiamo bisogno di verificarlo, continua normalmente
+              this.to.next(msg);
+            });
+
+            // AGGIUNTA: Intercetta a livello di storage per impedire scritture non autorizzate
+            if (
+              context.on &&
+              RELAY_CONFIG.relayMembership.enabled &&
+              RELAY_CONFIG.relayMembership.onchainMembership &&
+              relayMembershipVerifier
+            ) {
+              // Mantieni un riferimento al put originale
+              const originalPut = context.on.put;
+
+              // Sostituisci con la nostra versione che verifica l'autorizzazione prima di salvare
+              context.on.put = function (msg) {
+                // Salva il riferimento al this e agli argomenti originali
+                const self = this;
+                const args = arguments;
+
+                // DEVELOPMENT MODE BYPASS
+                if (process.env.NODE_ENV === "development") {
+                  console.log(
+                    "[Gun.on.put] Development mode: Bypassing authorization for storage."
+                  );
+                  return originalPut.apply(self, args); // Allow storage
+                }
+
+                // Se non contiene dati, procedi normalmente
+                if (!msg || !msg.put || Object.keys(msg.put).length === 0) {
+                  return originalPut.apply(self, args);
+                }
+
+                // Estrai pubKey dai dati
+                let pubKey = null;
+                try {
+                  const putKeys = Object.keys(msg.put);
+                  for (const key of putKeys) {
+                    if (key.startsWith("~")) {
+                      const dotIndex = key.indexOf(".");
+                      pubKey =
+                        dotIndex > 0
+                          ? key.substring(1, dotIndex)
+                          : key.substring(1);
+                      break;
+                    }
+                  }
+
+                  // Controlla anche altri campi comuni
+                  if (!pubKey) {
+                    if (msg.user && msg.user.pub) pubKey = msg.user.pub;
+                    else if (msg.from && msg.from.pub) pubKey = msg.from.pub;
+                    else if (msg.pub) pubKey = msg.pub;
+                  }
+                } catch (e) {
+                  console.error("[Gun.on.put] Error extracting pubKey:", e);
+                }
+
+                // Se non abbiamo una chiave pubblica, blocca per sicurezza nel dubbio
+                if (!pubKey) {
+                  console.warn(
+                    "[Gun.on.put] No pubKey found, blocking storage operation"
+                  );
+                  return; // Non chiamare originalPut
+                }
+
+                // Verifica se il pubKey è autorizzato prima di scrivere
+                (async () => {
+                  try {
+                    const hexPubKey = gunPubKeyToHex(pubKey);
+                    if (!hexPubKey) {
+                      console.warn(
+                        `[Gun.on.put] Failed to convert pubKey ${pubKey.substring(
+                          0,
+                          10
+                        )}... to hex format`
+                      );
+                      return; // Non chiamare originalPut
+                    }
+
+                    const isAuthorized =
+                      await relayMembershipVerifier.isPublicKeyAuthorized(
+                        hexPubKey
+                      );
+
+                    if (isAuthorized) {
+                      console.log(
+                        `[Gun.on.put] Authorizing STORAGE for key ${pubKey.substring(
+                          0,
+                          10
+                        )}...`
+                      );
+                      originalPut.apply(self, args);
+                    } else {
+                      console.warn(
+                        `[Gun.on.put] BLOCKING STORAGE for unauthorized key ${pubKey.substring(
+                          0,
+                          10
+                        )}...`
+                      );
+                      // Non chiamare originalPut, effettivamente impedendo la persistenza del dato
+                    }
+                  } catch (error) {
+                    console.error(
+                      `[Gun.on.put] Error during authorization check:`,
+                      error
+                    );
+                    // In caso di errore di verifica, per sicurezza non procediamo con la scrittura
+                  }
+                })();
+
+                // Non chiamare originalPut qui - sarà chiamato solo dopo verifica positiva
+                return;
+              };
+            }
+          });
+
           // Check for authentication token in the URL
           if (url.includes("?token=") || url.includes("&token=")) {
             try {
@@ -2611,12 +2824,15 @@ async function startServer() {
               const urlObj = new URL(fullUrl);
               const token = urlObj.searchParams.get("token");
 
-              console.log("Token found in URL:", token ? token.substring(0, 3) + "..." : "missing");
+              console.log(
+                "Token found in URL:",
+                token ? token.substring(0, 3) + "..." : "missing"
+              );
 
               if (token) {
                 const tokenData = await validateUserToken(token);
                 isAuthenticated = !!tokenData;
-                
+
                 if (isAuthenticated) {
                   console.log("Valid URL token, authentication succeeded");
                 } else {
@@ -2624,21 +2840,32 @@ async function startServer() {
                 }
               }
             } catch (e) {
-              console.error("Error parsing URL or validating token:", e.message);
+              console.error(
+                "Error parsing URL or validating token:",
+                e.message
+              );
             }
           }
 
           // If not authenticated in production, reject the connection
           if (!isAuthenticated) {
-            console.warn(`WebSocket upgrade rejected: authentication required in production`);
+            console.warn(
+              `WebSocket upgrade rejected: authentication required in production`
+            );
             socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
             socket.destroy();
             return;
           }
 
           // Authentication passed, handle the connection
-          if (url === "/gun" || url.startsWith("/gun?") || url.startsWith("/gun/")) {
-            console.log(`Handling authenticated WebSocket connection for GunDB`);
+          if (
+            url === "/gun" ||
+            url.startsWith("/gun?") ||
+            url.startsWith("/gun/")
+          ) {
+            console.log(
+              `Handling authenticated WebSocket connection for GunDB`
+            );
             return; // Let Gun handle the upgrade
           } else {
             console.log(`Unhandled WebSocket request: ${url}`);
@@ -2659,273 +2886,6 @@ async function startServer() {
 
       // Register middleware for WebSocket upgrades
       server.on("upgrade", websocketMiddleware);
-
-      // Aggiungi un intercettore per bloccare esplicitamente messaggi da utenti non autorizzati
-      Gun.on('opt', function(context) {
-        if(context.once){ return }
-        
-        // Aggancia un hook a tutti i messaggi in entrata
-        this.to.next(context);
-        
-        // Intercetta i messaggi OUT (le scritture) prima che vengano elaborate
-        context.on('out', function(msg) {
-          // Salva il riferimento a this per usarlo nelle funzioni asincrone
-          const self = this;
-          
-          // Verifica se il messaggio è una scrittura (contiene put)
-          if (msg.put && Object.keys(msg.put).length > 0 && 
-              RELAY_CONFIG.relayMembership.enabled && 
-              RELAY_CONFIG.relayMembership.onchainMembership && 
-              relayMembershipVerifier) {
-            
-            // Funzione per estrarre e verificare la chiave pubblica
-            const verifyPubKey = async function() {
-              let pubKey = null;
-              
-              // Estrai la chiave pubblica
-              // Cerca nei nodi put che iniziano con ~
-              const putKeys = Object.keys(msg.put);
-              for (const key of putKeys) {
-                if (key.startsWith('~')) {
-                  const dotIndex = key.indexOf('.');
-                  pubKey = dotIndex > 0 ? key.substring(1, dotIndex) : key.substring(1);
-                  break;
-                }
-              }
-              
-              // Se non trovata in put, cerca in altri campi del messaggio
-              if (!pubKey) {
-                if (msg.user && msg.user.pub) {
-                  pubKey = msg.user.pub;
-                } else if (msg.from && msg.from.pub) {
-                  pubKey = msg.from.pub;
-                } else if (msg.pub) {
-                  pubKey = msg.pub;
-                }
-              }
-              
-              if (pubKey) {
-                try {
-                  // Converti pubKey in formato hex
-                  const hexPubKey = gunPubKeyToHex(pubKey);
-                  if (!hexPubKey) {
-                    console.warn(`[Gun.on.out] Failed to convert pubKey ${pubKey.substring(0, 10)}... to hex format`);
-                    return false;
-                  }
-                  
-                  // IMPORTANTE: Attendi il risultato della verifica
-                  const isAuthorized = await relayMembershipVerifier.isPublicKeyAuthorized(hexPubKey);
-                  
-                  if (!isAuthorized) {
-                    console.warn(`[Gun.on.out] BLOCKING write from unauthorized key ${pubKey.substring(0, 10)}...`);
-                    return false;
-                  }
-                  
-                  console.log(`[Gun.on.out] Allowing write from authorized key ${pubKey.substring(0, 10)}...`);
-                  return true;
-                } catch (error) {
-                  console.error(`[Gun.on.out] Error during authorization check:`, error);
-                  return false;
-                }
-              } else {
-                console.warn(`[Gun.on.out] Could not find pubKey in message`);
-                return false;
-              }
-            };
-            
-            // Esegui la verifica in modo asincrono ma blocca il flusso fino al completamento
-            verifyPubKey().then(isAuthorized => {
-              if (isAuthorized) {
-                // Solo se autorizzato, continua con il messaggio
-                self.to.next(msg);
-              } else {
-                // Altrimenti, blocca silenziosamente la scrittura non propagando il messaggio
-                console.warn(`[Gun.on.out] Message was blocked from propagating`);
-                // Forza un ACK di errore per il client
-                if (msg._.via && msg._.via.say) {
-                  try {
-                    msg._.via.say({ err: "Unauthorized: Your public key is not authorized on-chain", ok: 0, "@": msg["#"] });
-                  } catch (e) {
-                    console.error("[Gun.on.out] Error sending rejection message:", e);
-                  }
-                }
-              }
-            }).catch(err => {
-              console.error(`[Gun.on.out] Error in verification process:`, err);
-              // In caso di errore, blocca la richiesta
-            });
-            
-            // IMPORTANTE: Ritorna senza chiamare next() per bloccare il flusso normale
-            // La propagazione avverrà solo quando verifyPubKey() restituirà true
-            return;
-          }
-          
-          // Se non è un messaggio put o non abbiamo bisogno di verificarlo, continua normalmente
-          this.to.next(msg);
-        });
-        
-        // Manteniamo anche l'intercettore 'in' per sicurezza
-        context.on('in', function(msg) {
-          // Salva il riferimento a this per usarlo nelle funzioni asincrone
-          const self = this;
-          
-          // Intercetta i messaggi in ingresso che contengono dati
-          const containsPut = msg.put && Object.keys(msg.put).length > 0;
-          
-          // Se il messaggio contiene dati in put e onchainMembership è abilitato
-          if (containsPut && 
-              RELAY_CONFIG.relayMembership.enabled && 
-              RELAY_CONFIG.relayMembership.onchainMembership && 
-              relayMembershipVerifier) {
-            
-            // Funzione per estrarre e verificare la chiave pubblica
-            const verifyPubKey = async function() {
-              let pubKey = null;
-              
-              // Cerca di estrarre la chiave pubblica dai dati in put
-              if (msg.put) {
-                const putKeys = Object.keys(msg.put);
-                for (const key of putKeys) {
-                  if (key.startsWith('~')) {
-                    const dotIndex = key.indexOf('.');
-                    pubKey = dotIndex > 0 ? key.substring(1, dotIndex) : key.substring(1);
-                    break;
-                  }
-                }
-              }
-              
-              if (pubKey) {
-                try {
-                  // Converti pubKey in formato hex
-                  const hexPubKey = gunPubKeyToHex(pubKey);
-                  if (!hexPubKey) {
-                    console.warn(`[Gun.on.in] Failed to convert pubKey ${pubKey.substring(0, 10)}... to hex format`);
-                    return false;
-                  }
-                  
-                  // IMPORTANTE: Attendi il risultato della verifica
-                  const isAuthorized = await relayMembershipVerifier.isPublicKeyAuthorized(hexPubKey);
-                  
-                  if (!isAuthorized) {
-                    console.warn(`[Gun.on.in] BLOCKING data from unauthorized key ${pubKey.substring(0, 10)}...`);
-                    return false;
-                  }
-                  
-                  console.log(`[Gun.on.in] Allowing data from authorized key ${pubKey.substring(0, 10)}...`);
-                  return true;
-                } catch (error) {
-                  console.error(`[Gun.on.in] Error during authorization check:`, error);
-                  return false;
-                }
-              } else {
-                // Se non troviamo una chiave pubblica ma ci sono dati, per sicurezza blocchiamo
-                if (Object.keys(msg.put).length > 0) {
-                  console.warn(`[Gun.on.in] Could not find pubKey in message with data`);
-                  return false;
-                }
-                return true; // Altre tipologie di messaggi senza put possono passare
-              }
-            };
-            
-            // Esegui la verifica in modo asincrono ma blocca il flusso fino al completamento
-            verifyPubKey().then(isAuthorized => {
-              if (isAuthorized) {
-                // Solo se autorizzato, continua con il messaggio
-                self.to.next(msg);
-              } else {
-                // Altrimenti, blocca silenziosamente il messaggio non propagandolo
-                console.warn(`[Gun.on.in] Message was blocked from propagating`);
-              }
-            }).catch(err => {
-              console.error(`[Gun.on.in] Error in verification process:`, err);
-              // In caso di errore, blocca il messaggio
-            });
-            
-            // IMPORTANTE: Ritorna senza chiamare next() per bloccare il flusso normale
-            // La propagazione avverrà solo quando verifyPubKey() restituirà true
-            return;
-          }
-          
-          // Se non è un messaggio con put o non abbiamo bisogno di verificarlo, continua normalmente
-          this.to.next(msg);
-        });
-
-        // AGGIUNTA: Intercetta a livello di storage per impedire scritture non autorizzate
-        if (context.on && RELAY_CONFIG.relayMembership.enabled && 
-            RELAY_CONFIG.relayMembership.onchainMembership && 
-            relayMembershipVerifier) {
-          
-          // Mantieni un riferimento al put originale
-          const originalPut = context.on.put;
-          
-          // Sostituisci con la nostra versione che verifica l'autorizzazione prima di salvare
-          context.on.put = function(msg) {
-            // Salva il riferimento al this e agli argomenti originali
-            const self = this;
-            const args = arguments;
-            
-            // Se non contiene dati, procedi normalmente
-            if (!msg || !msg.put || Object.keys(msg.put).length === 0) {
-              return originalPut.apply(self, args);
-            }
-            
-            // Estrai pubKey dai dati
-            let pubKey = null;
-            try {
-              const putKeys = Object.keys(msg.put);
-              for (const key of putKeys) {
-                if (key.startsWith('~')) {
-                  const dotIndex = key.indexOf('.');
-                  pubKey = dotIndex > 0 ? key.substring(1, dotIndex) : key.substring(1);
-                  break;
-                }
-              }
-              
-              // Controlla anche altri campi comuni
-              if (!pubKey) {
-                if (msg.user && msg.user.pub) pubKey = msg.user.pub;
-                else if (msg.from && msg.from.pub) pubKey = msg.from.pub;
-                else if (msg.pub) pubKey = msg.pub;
-              }
-            } catch (e) {
-              console.error('[Gun.on.put] Error extracting pubKey:', e);
-            }
-            
-            // Se non abbiamo una chiave pubblica, blocca per sicurezza nel dubbio
-            if (!pubKey) {
-              console.warn('[Gun.on.put] No pubKey found, blocking storage operation');
-              return; // Non chiamare originalPut
-            }
-            
-            // Verifica se il pubKey è autorizzato prima di scrivere
-            (async () => {
-              try {
-                const hexPubKey = gunPubKeyToHex(pubKey);
-                if (!hexPubKey) {
-                  console.warn(`[Gun.on.put] Failed to convert pubKey ${pubKey.substring(0, 10)}... to hex format`);
-                  return; // Non chiamare originalPut
-                }
-                
-                const isAuthorized = await relayMembershipVerifier.isPublicKeyAuthorized(hexPubKey);
-                
-                if (isAuthorized) {
-                  console.log(`[Gun.on.put] Authorizing STORAGE for key ${pubKey.substring(0, 10)}...`);
-                  originalPut.apply(self, args);
-                } else {
-                  console.warn(`[Gun.on.put] BLOCKING STORAGE for unauthorized key ${pubKey.substring(0, 10)}...`);
-                  // Non chiamare originalPut, effettivamente impedendo la persistenza del dato
-                }
-              } catch (error) {
-                console.error(`[Gun.on.put] Error during authorization check:`, error);
-                // In caso di errore di verifica, per sicurezza non procediamo con la scrittura
-              }
-            })();
-            
-            // Non chiamare originalPut qui - sarà chiamato solo dopo verifica positiva
-            return;
-          };
-        }
-      });
 
       // Graceful shutdown handling
       ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => {
@@ -4184,13 +4144,16 @@ app.get("/api/relay/oracle/status", authenticateRequest, async (req, res) => {
     // Get timestamp for current epoch if available
     let timestamp = null;
     let date = null;
-    
+
     try {
       timestamp = await oracleBridge.getRootTimestamp(epochId);
       // Convert timestamp to readable date if it's not zero
-      date = timestamp > 0 ? new Date(Number(timestamp) * 1000).toISOString() : null;
+      date =
+        timestamp > 0 ? new Date(Number(timestamp) * 1000).toISOString() : null;
     } catch (error) {
-      console.warn(`Could not get timestamp for current epoch: ${error.message}`);
+      console.warn(
+        `Could not get timestamp for current epoch: ${error.message}`
+      );
     }
 
     res.json({
@@ -4295,9 +4258,10 @@ app.get(
 
       // Get timestamp for when the root was published
       const timestamp = await oracleBridge.getRootTimestamp(BigInt(epochId));
-      
+
       // Convert timestamp to readable date if it's not zero
-      const date = timestamp > 0 ? new Date(Number(timestamp) * 1000).toISOString() : null;
+      const date =
+        timestamp > 0 ? new Date(Number(timestamp) * 1000).toISOString() : null;
 
       res.json({
         success: true,
@@ -4507,7 +4471,8 @@ async function initializeFundReleaseService() {
     // Configuration for fund release service
     const FUND_RELEASE_CONFIG = {
       enabled: process.env.FUND_RELEASE_ENABLED === "true" || false,
-      interval: parseInt(process.env.FUND_RELEASE_INTERVAL || "3600", 10) * 1000, // Default 1 hour in ms
+      interval:
+        parseInt(process.env.FUND_RELEASE_INTERVAL || "3600", 10) * 1000, // Default 1 hour in ms
       membershipContract: process.env.RELAY_MEMBERSHIP_CONTRACT || "",
       oracleBridgeContract: process.env.ORACLE_BRIDGE_CONTRACT || "",
       providerUrl: process.env.ETHEREUM_PROVIDER_URL || "http://localhost:8545",
@@ -4545,7 +4510,9 @@ async function initializeFundReleaseService() {
       : `0x${FUND_RELEASE_CONFIG.privateKey}`;
 
     // Create provider
-    const provider = new ethers.JsonRpcProvider(FUND_RELEASE_CONFIG.providerUrl);
+    const provider = new ethers.JsonRpcProvider(
+      FUND_RELEASE_CONFIG.providerUrl
+    );
 
     // Create wallet with private key and provider
     const wallet = new ethers.Wallet(privateKey, provider);
@@ -4564,8 +4531,8 @@ async function initializeFundReleaseService() {
 
     const oracleAbi = [
       "function getEpochId() view returns (uint256)",
-      "function roots(uint256) view returns (bytes32)", 
-      "function rootTimestamps(uint256) view returns (uint256)"
+      "function roots(uint256) view returns (bytes32)",
+      "function rootTimestamps(uint256) view returns (uint256)",
     ];
 
     const membershipContract = new ethers.Contract(
@@ -4586,49 +4553,53 @@ async function initializeFundReleaseService() {
         try {
           // Clean the URL to ensure proper WebSocket format
           let cleanUrl = wsUrl.trim();
-          
+
           // Remove any http:// or https:// prefixes
-          if (cleanUrl.startsWith('http://')) {
+          if (cleanUrl.startsWith("http://")) {
             cleanUrl = cleanUrl.substring(7);
-          } else if (cleanUrl.startsWith('https://')) {
+          } else if (cleanUrl.startsWith("https://")) {
             cleanUrl = cleanUrl.substring(8);
           }
-          
+
           // Remove any trailing slashes
-          while (cleanUrl.endsWith('/')) {
+          while (cleanUrl.endsWith("/")) {
             cleanUrl = cleanUrl.slice(0, -1);
           }
 
           if (!cleanUrl.endsWith("/gun")) {
             cleanUrl += "/gun";
           }
-          
+
           // Create the WebSocket URL
           const wsAddress = `ws://${cleanUrl}`;
           console.log(`Attempting to ping relay at ${wsAddress}`);
-          
+
           const ws = new WebSocket(wsAddress);
           let settled = false;
-          
+
           const timer = setTimeout(() => {
             if (!settled) {
               settled = true;
-              try { ws.close(); } catch (e) {}
+              try {
+                ws.close();
+              } catch (e) {}
               console.log(`Timeout pinging ${wsAddress}`);
               resolve(false);
             }
           }, timeout);
-          
+
           ws.onopen = () => {
             if (!settled) {
               settled = true;
               clearTimeout(timer);
-              try { ws.close(); } catch (e) {}
+              try {
+                ws.close();
+              } catch (e) {}
               console.log(`Successfully pinged ${wsAddress}`);
               resolve(true);
             }
           };
-          
+
           ws.onerror = (error) => {
             if (!settled) {
               settled = true;
@@ -4656,14 +4627,18 @@ async function initializeFundReleaseService() {
         // Check if there's a root for this epoch
         const root = await oracleContract.roots(epochId);
         if (root === ethers.ZeroHash) {
-          console.log(`No root found for epoch ${epochId}, skipping fund release`);
+          console.log(
+            `No root found for epoch ${epochId}, skipping fund release`
+          );
           return;
         }
 
         // Get the timestamp for this root
         const timestamp = await oracleContract.rootTimestamps(epochId);
         if (timestamp === 0n) {
-          console.log(`No timestamp found for epoch ${epochId}, skipping fund release`);
+          console.log(
+            `No timestamp found for epoch ${epochId}, skipping fund release`
+          );
           return;
         }
 
@@ -4679,7 +4654,7 @@ async function initializeFundReleaseService() {
           try {
             const addr = await membershipContract.getRelayAt(i);
             let url = await membershipContract.relayUrl(addr);
-            
+
             console.log(`Checking relay ${i + 1}/${count}: ${addr} at ${url}`);
 
             const ok = await pingRelay(url);
@@ -4698,13 +4673,17 @@ async function initializeFundReleaseService() {
         console.log(`Found ${aliveAddrs.length} alive relays:`, urls);
 
         if (aliveAddrs.length === 0) {
-          console.error(`No relays online for epoch ${epochId}, cannot generate proof`);
+          console.error(
+            `No relays online for epoch ${epochId}, cannot generate proof`
+          );
           return;
         }
 
         // Check if this relay is in the list of alive relays
         if (!aliveAddrs.includes(relayAddress)) {
-          console.log(`This relay (${relayAddress}) is not in the list of alive relays, skipping fund release`);
+          console.log(
+            `This relay (${relayAddress}) is not in the list of alive relays, skipping fund release`
+          );
           return;
         }
 
@@ -4713,7 +4692,10 @@ async function initializeFundReleaseService() {
 
         // Calculate leaves - same algorithm as in the heartbeat service
         const leaves = aliveAddrs.map((addr) =>
-          ethers.solidityPackedKeccak256(["address", "uint256"], [addr, epochId])
+          ethers.solidityPackedKeccak256(
+            ["address", "uint256"],
+            [addr, epochId]
+          )
         );
 
         // Create Merkle tree
@@ -4728,7 +4710,9 @@ async function initializeFundReleaseService() {
         // Get the proof for this relay
         const proof = tree.getHexProof(leaf);
 
-        console.log(`Generated Merkle proof with ${proof.length} elements for relay ${relayAddress}`);
+        console.log(
+          `Generated Merkle proof with ${proof.length} elements for relay ${relayAddress}`
+        );
 
         // Check if we need to release funds
         try {
@@ -4756,8 +4740,12 @@ async function initializeFundReleaseService() {
     // Function to manually trigger fund release for a specific epoch
     async function manualFundRelease(epochId = null) {
       try {
-        console.log(`Manual fund release triggered${epochId ? ` for epoch ${epochId}` : ''}`);
-        
+        console.log(
+          `Manual fund release triggered${
+            epochId ? ` for epoch ${epochId}` : ""
+          }`
+        );
+
         // If no epoch specified, get the current epoch
         if (epochId === null) {
           epochId = await oracleContract.getEpochId();
@@ -4767,10 +4755,12 @@ async function initializeFundReleaseService() {
         // Check if there's a root for this epoch
         const root = await oracleContract.roots(epochId);
         if (root === ethers.ZeroHash) {
-          console.log(`No root found for epoch ${epochId}, cannot generate proof`);
+          console.log(
+            `No root found for epoch ${epochId}, cannot generate proof`
+          );
           return {
             success: false,
-            error: `No root found for epoch ${epochId}`
+            error: `No root found for epoch ${epochId}`,
           };
         }
 
@@ -4785,7 +4775,7 @@ async function initializeFundReleaseService() {
           try {
             const addr = await membershipContract.getRelayAt(i);
             let url = await membershipContract.relayUrl(addr);
-            
+
             console.log(`Checking relay ${i + 1}/${count}: ${addr} at ${url}`);
 
             const ok = await pingRelay(url);
@@ -4801,19 +4791,23 @@ async function initializeFundReleaseService() {
         }
 
         if (aliveAddrs.length === 0) {
-          console.error(`No relays online for epoch ${epochId}, cannot generate proof`);
+          console.error(
+            `No relays online for epoch ${epochId}, cannot generate proof`
+          );
           return {
             success: false,
-            error: `No relays online for epoch ${epochId}`
+            error: `No relays online for epoch ${epochId}`,
           };
         }
 
         // Check if this relay is in the list of alive relays
         if (!aliveAddrs.includes(relayAddress)) {
-          console.log(`This relay (${relayAddress}) is not in the list of alive relays`);
+          console.log(
+            `This relay (${relayAddress}) is not in the list of alive relays`
+          );
           return {
             success: false,
-            error: `This relay (${relayAddress}) is not in the list of alive relays`
+            error: `This relay (${relayAddress}) is not in the list of alive relays`,
           };
         }
 
@@ -4822,7 +4816,10 @@ async function initializeFundReleaseService() {
 
         // Calculate leaves
         const leaves = aliveAddrs.map((addr) =>
-          ethers.solidityPackedKeccak256(["address", "uint256"], [addr, epochId])
+          ethers.solidityPackedKeccak256(
+            ["address", "uint256"],
+            [addr, epochId]
+          )
         );
 
         // Create Merkle tree
@@ -4837,7 +4834,9 @@ async function initializeFundReleaseService() {
         // Get the proof for this relay
         const proof = tree.getHexProof(leaf);
 
-        console.log(`Generated Merkle proof with ${proof.length} elements for relay ${relayAddress}`);
+        console.log(
+          `Generated Merkle proof with ${proof.length} elements for relay ${relayAddress}`
+        );
 
         // Release funds
         try {
@@ -4849,12 +4848,12 @@ async function initializeFundReleaseService() {
           console.log(
             `Funds released successfully in transaction ${tx.hash}, block ${receipt.blockNumber}`
           );
-          
+
           return {
             success: true,
             txHash: tx.hash,
             proof: proof,
-            epochId: epochId.toString()
+            epochId: epochId.toString(),
           };
         } catch (error) {
           // Check if the error is due to funds already being released
@@ -4862,13 +4861,13 @@ async function initializeFundReleaseService() {
             console.log(`Funds for epoch ${epochId} already released`);
             return {
               success: false,
-              error: `Funds for epoch ${epochId} already released`
+              error: `Funds for epoch ${epochId} already released`,
             };
           } else {
             console.error(`Error releasing funds for epoch ${epochId}:`, error);
             return {
               success: false,
-              error: `Error releasing funds: ${error.message}`
+              error: `Error releasing funds: ${error.message}`,
             };
           }
         }
@@ -4876,7 +4875,7 @@ async function initializeFundReleaseService() {
         console.error("Error in manual fund release:", error);
         return {
           success: false,
-          error: `Error in fund release process: ${error.message}`
+          error: `Error in fund release process: ${error.message}`,
         };
       }
     }
@@ -4895,10 +4894,10 @@ async function initializeFundReleaseService() {
         FUND_RELEASE_CONFIG.interval / 1000
       } seconds`
     );
-    
+
     // Export the manual fund release function for API endpoint use
     global.manualFundRelease = manualFundRelease;
-    
+
     return true;
   } catch (error) {
     console.error("Error initializing fund release service:", error);
@@ -4931,7 +4930,7 @@ app.post("/api/relay/release-funds", authenticateRequest, async (req, res) => {
 
     // Get the epoch from the request, or use null to use the current epoch
     const epochId = req.body.epochId || null;
-    
+
     // Check if the manual fund release function is available
     if (!global.manualFundRelease) {
       return res.status(503).json({
@@ -4941,8 +4940,10 @@ app.post("/api/relay/release-funds", authenticateRequest, async (req, res) => {
     }
 
     // Call the manual fund release function
-    const result = await global.manualFundRelease(epochId ? BigInt(epochId) : null);
-    
+    const result = await global.manualFundRelease(
+      epochId ? BigInt(epochId) : null
+    );
+
     if (result.success) {
       res.json({
         success: true,
@@ -4967,31 +4968,36 @@ app.post("/api/relay/release-funds", authenticateRequest, async (req, res) => {
 });
 
 // API - Get fund release service status
-app.get("/api/relay/release-funds/status", authenticateRequest, async (req, res) => {
-  try {
-    const FUND_RELEASE_CONFIG = {
-      enabled: process.env.FUND_RELEASE_ENABLED === "true" || false,
-      interval: parseInt(process.env.FUND_RELEASE_INTERVAL || "3600", 10) * 1000,
-      membershipContract: process.env.RELAY_MEMBERSHIP_CONTRACT || "",
-      oracleBridgeContract: process.env.ORACLE_BRIDGE_CONTRACT || "",
-    };
+app.get(
+  "/api/relay/release-funds/status",
+  authenticateRequest,
+  async (req, res) => {
+    try {
+      const FUND_RELEASE_CONFIG = {
+        enabled: process.env.FUND_RELEASE_ENABLED === "true" || false,
+        interval:
+          parseInt(process.env.FUND_RELEASE_INTERVAL || "3600", 10) * 1000,
+        membershipContract: process.env.RELAY_MEMBERSHIP_CONTRACT || "",
+        oracleBridgeContract: process.env.ORACLE_BRIDGE_CONTRACT || "",
+      };
 
-    res.json({
-      success: true,
-      config: {
-        enabled: FUND_RELEASE_CONFIG.enabled,
-        interval: FUND_RELEASE_CONFIG.interval / 1000, // Convert to seconds for readability
-        membershipContract: FUND_RELEASE_CONFIG.membershipContract,
-        oracleBridgeContract: FUND_RELEASE_CONFIG.oracleBridgeContract,
-      },
-      isRunning: !!fundReleaseInterval,
-      serviceAvailable: !!global.manualFundRelease,
-    });
-  } catch (error) {
-    console.error("Error getting fund release service status:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+      res.json({
+        success: true,
+        config: {
+          enabled: FUND_RELEASE_CONFIG.enabled,
+          interval: FUND_RELEASE_CONFIG.interval / 1000, // Convert to seconds for readability
+          membershipContract: FUND_RELEASE_CONFIG.membershipContract,
+          oracleBridgeContract: FUND_RELEASE_CONFIG.oracleBridgeContract,
+        },
+        isRunning: !!fundReleaseInterval,
+        serviceAvailable: !!global.manualFundRelease,
+      });
+    } catch (error) {
+      console.error("Error getting fund release service status:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
   }
-});
+);
