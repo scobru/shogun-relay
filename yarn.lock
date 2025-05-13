@@ -1945,10 +1945,10 @@ setprototypeof@1.2.0:
   resolved "https://registry.yarnpkg.com/setprototypeof/-/setprototypeof-1.2.0.tgz#66c9a24a73f9fc28cbe66b09fed3d33dcaf1b424"
   integrity sha512-E5LDX7Wrp85Kil5bhZv46j8jOeboKq5JMmYM3gVGdGH8xFpPWXUMsNrlODCrkoxMEeNi/XZIwuRvY4XNwYMJpw==
 
-shogun-core@^1.0.6:
-  version "1.0.6"
-  resolved "https://registry.yarnpkg.com/shogun-core/-/shogun-core-1.0.6.tgz#85b83e02a369330421886ac3fd92bc1429c1b846"
-  integrity sha512-g8Zhgao9vdgKWRvXHHzFAcSDsA23k88p7fr1h+Pix9jVteDFWTkHV/93bBoo9g0QayNstayCGf2PlRY160C43Q==
+shogun-core@^1.0.8:
+  version "1.0.8"
+  resolved "https://registry.yarnpkg.com/shogun-core/-/shogun-core-1.0.8.tgz#bc72daad550298bb70cca8657175fd394f3f7acb"
+  integrity sha512-p5T9xnBJakJDMrGabq3fm8b5k4YkFf5cA8bG52GHqAVL5DLI7p7YLgajzQFFz7w2zFvUWuBaJC2V28ej8yrKsQ==
   dependencies:
     ajv "^8.17.1"
     assert "^2.1.0"

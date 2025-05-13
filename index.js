@@ -8,9 +8,8 @@ import express from "express";
 import { ShogunIpfs } from "shogun-ipfs";
 import {
   ShogunCore,
-  RelayMembershipVerifier,
+  RelayVerifier,
   DIDVerifier,
-  OracleBridge,
 } from "shogun-core";
 import Gun from "gun";
 import path from "path";
@@ -40,39 +39,24 @@ const isDevMode = process.env.NODE_ENV === "development";
 
 // Relay components configuration
 const RELAY_CONFIG = {
-  relayMembership: {
-    enabled: process.env.RELAY_MEMBERSHIP_ENABLED === "true" || false,
-    contractAddress: process.env.RELAY_MEMBERSHIP_CONTRACT || "",
+  relay: {
+    // Force relay to be enabled
+    enabled: true,
+    registryAddress: process.env.RELAY_REGISTRY_CONTRACT || "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
     providerUrl: process.env.ETHEREUM_PROVIDER_URL || "http://localhost:8545",
-    onchainMembership:
-      process.env.ONCHAIN_MEMBERSHIP_ENABLED === "true" || false,
+    // Force onchain membership to be enabled
+    onchainMembership: true,
   },
   didVerifier: {
     enabled: process.env.DID_VERIFIER_ENABLED === "true" || false,
     contractAddress: process.env.DID_REGISTRY_CONTRACT || "",
     providerUrl: process.env.ETHEREUM_PROVIDER_URL || "http://localhost:8545",
   },
-  oracleBridge: {
-    enabled: process.env.ORACLE_BRIDGE_ENABLED === "true" || false,
-    contractAddress: process.env.ORACLE_BRIDGE_CONTRACT || "",
-    providerUrl: process.env.ETHEREUM_PROVIDER_URL || "http://localhost:8545",
-  },
-  heartbeat: {
-    enabled: process.env.HEARTBEAT_ENABLED === "true" || false,
-    // Use a shorter interval in development mode for faster testing
-    interval: isDevMode
-      ? 10 * 1000
-      : parseInt(process.env.HEARTBEAT_INTERVAL || "3600", 10) * 1000, // Default 1 hour in ms, 10 seconds in dev
-    oracleBridgeContract: process.env.ORACLE_BRIDGE_CONTRACT || "",
-    membershipContract: process.env.RELAY_MEMBERSHIP_CONTRACT || "",
-    providerUrl: process.env.ETHEREUM_PROVIDER_URL || "http://localhost:8545",
-  },
 };
 
 // Relay component instances
-let relayMembershipVerifier = null;
+let relayVerifier = null;
 let didVerifier = null;
-let oracleBridge = null;
 
 // CORS Configuration
 const getDefaultAllowedOrigins = () => {
@@ -1899,7 +1883,7 @@ function setupGunIpfsMiddleware() {
 
 /**
  * Initialize shogun-core relay components
- * This function sets up the RelayMembershipVerifier, DIDVerifier, and OracleBridge instances
+ * This function sets up the RelayVerifier and DIDVerifier instances
  */
 async function initializeRelayComponents() {
   try {
@@ -1917,7 +1901,7 @@ async function initializeRelayComponents() {
 
         // Create provider
         const provider = new ethers.JsonRpcProvider(
-          RELAY_CONFIG.relayMembership.providerUrl
+          RELAY_CONFIG.relay.providerUrl
         );
 
         // Create wallet with private key and provider
@@ -1931,23 +1915,23 @@ async function initializeRelayComponents() {
       }
     }
 
-    // Initialize RelayMembershipVerifier if enabled
-    if (RELAY_CONFIG.relayMembership.enabled) {
-      if (!RELAY_CONFIG.relayMembership.contractAddress) {
+    // Initialize RelayVerifier if enabled
+    if (RELAY_CONFIG.relay.enabled) {
+      if (!RELAY_CONFIG.relay.registryAddress) {
         console.warn(
-          "RelayMembership contract address not provided, skipping initialization"
+          "Relay registry address not provided, skipping initialization"
         );
       } else {
-        console.log("Initializing RelayMembershipVerifier...");
-        relayMembershipVerifier = new RelayMembershipVerifier(
+        console.log("Initializing RelayVerifier...");
+        relayVerifier = new RelayVerifier(
           {
-            contractAddress: RELAY_CONFIG.relayMembership.contractAddress,
-            providerUrl: RELAY_CONFIG.relayMembership.providerUrl,
+            registryAddress: RELAY_CONFIG.relay.registryAddress,
+            providerUrl: RELAY_CONFIG.relay.providerUrl,
           },
           shogunCoreInstance,
           signer
         );
-        console.log("RelayMembershipVerifier initialized successfully");
+        console.log("RelayVerifier initialized successfully");
       }
     }
 
@@ -1971,26 +1955,6 @@ async function initializeRelayComponents() {
       }
     }
 
-    // Initialize OracleBridge if enabled
-    if (RELAY_CONFIG.oracleBridge.enabled) {
-      if (!RELAY_CONFIG.oracleBridge.contractAddress) {
-        console.warn(
-          "OracleBridge contract address not provided, skipping initialization"
-        );
-      } else {
-        console.log("Initializing OracleBridge...");
-        oracleBridge = new OracleBridge(
-          {
-            contractAddress: RELAY_CONFIG.oracleBridge.contractAddress,
-            providerUrl: RELAY_CONFIG.oracleBridge.providerUrl,
-          },
-          shogunCoreInstance,
-          signer
-        );
-        console.log("OracleBridge initialized successfully");
-      }
-    }
-
     return true;
   } catch (error) {
     console.error("Error initializing relay components:", error);
@@ -1999,11 +1963,11 @@ async function initializeRelayComponents() {
 }
 
 /**
- * Get the RelayMembershipVerifier instance
- * @returns {RelayMembershipVerifier|null} The RelayMembershipVerifier instance or null if not initialized
+ * Get the RelayVerifier instance
+ * @returns {RelayVerifier|null} The RelayVerifier instance or null if not initialized
  */
-function getRelayMembershipVerifier() {
-  return relayMembershipVerifier;
+function getRelayVerifier() {
+  return relayVerifier;
 }
 
 /**
@@ -2012,331 +1976,6 @@ function getRelayMembershipVerifier() {
  */
 function getDIDVerifier() {
   return didVerifier;
-}
-
-/**
- * Get the OracleBridge instance
- * @returns {OracleBridge|null} The OracleBridge instance or null if not initialized
- */
-function getOracleBridge() {
-  return oracleBridge;
-}
-
-/**
- * Heartbeat service for the relay
- * Periodically checks online relays and publishes a Merkle root to the blockchain
- */
-let heartbeatInterval = null;
-
-/**
- * Initialize heartbeat service
- * @returns {boolean} Whether the service was initialized successfully
- */
-async function initializeHeartbeatService() {
-  try {
-    if (!RELAY_CONFIG.heartbeat.enabled) {
-      console.log("Heartbeat service disabled, skipping initialization");
-      return false;
-    }
-
-    // Check if we have all necessary configuration
-    if (
-      !RELAY_CONFIG.heartbeat.oracleBridgeContract ||
-      !RELAY_CONFIG.heartbeat.membershipContract
-    ) {
-      console.warn(
-        "Heartbeat service missing contract addresses, skipping initialization"
-      );
-      return false;
-    }
-
-    // Check if we have a private key to sign transactions
-    if (!process.env.ETHEREUM_PRIVATE_KEY) {
-      console.warn(
-        "Heartbeat service requires ETHEREUM_PRIVATE_KEY for signing transactions, skipping initialization"
-      );
-      return false;
-    }
-
-    console.log("Initializing heartbeat service...");
-
-    // Import ethers dynamically to avoid issues
-    const { ethers } = await import("ethers");
-
-    // Set up signer
-    const privateKey = process.env.ETHEREUM_PRIVATE_KEY.startsWith("0x")
-      ? process.env.ETHEREUM_PRIVATE_KEY
-      : `0x${process.env.ETHEREUM_PRIVATE_KEY}`;
-
-    // Create provider
-    const provider = new ethers.JsonRpcProvider(
-      RELAY_CONFIG.heartbeat.providerUrl
-    );
-
-    // Create wallet with private key and provider
-    const signer = new ethers.Wallet(privateKey, provider);
-    console.log(
-      `Heartbeat service initialized with wallet address: ${await signer.getAddress()}`
-    );
-
-    // Set up contracts
-    const membershipAbi = [
-      "function getRelayCount() view returns (uint256)",
-      "function getRelayAt(uint256) view returns (address)",
-      "function relayUrl(address) view returns (string)",
-      "function publishRoot(uint256, bytes32)",
-    ];
-
-    const oracleAbi = [
-      "function publishRoot(uint256, bytes32)",
-      "function roots(uint256) view returns (bytes32)",
-      "function rootTimestamps(uint256) view returns (uint256)",
-    ];
-
-    const membershipContract = new ethers.Contract(
-      RELAY_CONFIG.heartbeat.membershipContract,
-      membershipAbi,
-      signer
-    );
-
-    const oracleContract = new ethers.Contract(
-      RELAY_CONFIG.heartbeat.oracleBridgeContract,
-      oracleAbi,
-      signer
-    );
-
-    // Function to ping a relay
-    async function pingRelay(wsUrl, timeout = 5000) {
-      return new Promise((resolve) => {
-        try {
-          // Clean the URL to ensure proper WebSocket format
-          let cleanUrl = wsUrl.trim();
-
-          // Remove any http:// or https:// prefixes
-          if (cleanUrl.startsWith("http://")) {
-            cleanUrl = cleanUrl.substring(7);
-          } else if (cleanUrl.startsWith("https://")) {
-            cleanUrl = cleanUrl.substring(8);
-          }
-
-          // Remove any trailing slashes
-          while (cleanUrl.endsWith("/")) {
-            cleanUrl = cleanUrl.slice(0, -1);
-          }
-
-          if (!cleanUrl.endsWith("/gun")) {
-            cleanUrl += "/gun";
-          }
-
-          // Create the WebSocket URL
-          const wsAddress = `ws://${cleanUrl}`;
-          console.log(`Attempting to ping relay at ${wsAddress}`);
-
-          // Create the WebSocket
-          const ws = new WebSocket(wsAddress);
-          let settled = false;
-
-          const timer = setTimeout(() => {
-            if (!settled) {
-              settled = true;
-              try {
-                ws.close();
-              } catch (e) {}
-              console.log(`Timeout pinging ${wsAddress}`);
-              resolve(false);
-            }
-          }, timeout);
-
-          ws.onopen = () => {
-            if (!settled) {
-              settled = true;
-              clearTimeout(timer);
-              try {
-                ws.close();
-              } catch (e) {}
-              console.log(`Successfully pinged ${wsAddress}`);
-              resolve(true);
-            }
-          };
-
-          ws.onerror = (error) => {
-            if (!settled) {
-              settled = true;
-              clearTimeout(timer);
-              console.error(`Error pinging ${wsAddress}:`, error.message);
-              resolve(false);
-            }
-          };
-        } catch (error) {
-          console.error(`Error in pingRelay:`, error.message);
-          resolve(false);
-        }
-      });
-    }
-
-    // Function to generate and publish heartbeat
-    async function generateAndPublishHeartbeat() {
-      try {
-        console.log("Generating heartbeat...");
-
-        // Calculate the current epoch (hours since epoch)
-        const epoch = Math.floor(Date.now() / 1000 / 3600 / 60);
-        console.log(`Current epoch: ${epoch}`);
-
-        // Read the list of relays from the contract
-        const count = await membershipContract.getRelayCount();
-        console.log(`Found ${count} relays in membership contract`);
-
-        const alive = [];
-        const urls = [];
-        const leavesInfo = [];
-
-        // Check each relay
-        for (let i = 0; i < count; i++) {
-          try {
-            const addr = await membershipContract.getRelayAt(i);
-            let url = await membershipContract.relayUrl(addr);
-
-            // Clean up the URL to ensure it's in the right format
-            url = url.trim();
-
-            console.log(`Checking relay ${i + 1}/${count}: ${addr} at ${url}`);
-
-            const ok = await pingRelay(url);
-            if (ok) {
-              alive.push(addr);
-              leavesInfo.push({ addr, url });
-              urls.push(url);
-              console.log(`Relay ${addr} is alive`);
-            } else {
-              console.log(`Relay ${addr} is not responding`);
-            }
-          } catch (error) {
-            console.error(`Error checking relay ${i}:`, error);
-          }
-        }
-
-        console.log(`Found ${alive.length} alive relays:`, urls);
-
-        if (alive.length === 0) {
-          console.error(
-            `No relays online for epoch ${epoch}, skipping heartbeat`
-          );
-          return;
-        }
-
-        // Build Merkle tree
-        console.log("Building Merkle tree...");
-
-        // Import dynamic modules for cryptography
-        const keccak256 = (data) => {
-          return ethers.solidityPackedKeccak256(["bytes"], [data]);
-        };
-
-        // Calculate leaves
-        const leaves = alive.map((addr) =>
-          ethers.solidityPackedKeccak256(["address", "uint256"], [addr, epoch])
-        );
-
-        // Create a simple implementation of MerkleTree
-        function createMerkleRoot(leaves) {
-          if (leaves.length === 0)
-            return "0x0000000000000000000000000000000000000000000000000000000000000000";
-
-          // Sort leaves if needed
-          leaves = [...leaves].sort();
-
-          // If only one leaf, return it
-          if (leaves.length === 1) return leaves[0];
-
-          // Process pairs of leaves
-          const nextLevel = [];
-          for (let i = 0; i < leaves.length; i += 2) {
-            if (i + 1 < leaves.length) {
-              // Concatenate and hash the pair
-              const left = leaves[i];
-              const right = leaves[i + 1];
-              const combined =
-                left < right
-                  ? ethers.solidityPackedKeccak256(
-                      ["bytes32", "bytes32"],
-                      [left, right]
-                    )
-                  : ethers.solidityPackedKeccak256(
-                      ["bytes32", "bytes32"],
-                      [right, left]
-                    );
-              nextLevel.push(combined);
-            } else {
-              // Odd number of leaves, promote the last one
-              nextLevel.push(leaves[i]);
-            }
-          }
-
-          // Recurse until we have a single root
-          return createMerkleRoot(nextLevel);
-        }
-
-        const root = createMerkleRoot(leaves);
-        console.log(`Generated root for epoch ${epoch}: ${root}`);
-
-        // Check if we already published this root
-        try {
-          const existingRoot = await oracleContract.roots(epoch);
-          if (existingRoot !== ethers.ZeroHash) {
-            console.log(
-              `Root already published for epoch ${epoch}: ${existingRoot}`
-            );
-            return;
-          }
-        } catch (error) {
-          console.error("Error checking existing root:", error);
-        }
-
-        // Publish to blockchain
-        console.log(`Publishing root for epoch ${epoch}: ${root}`);
-        const tx = await oracleContract.publishRoot(epoch, root);
-        console.log(`Transaction submitted: ${tx.hash}`);
-
-        const receipt = await tx.wait();
-        console.log(
-          `Root published in transaction ${tx.hash}, block ${receipt.blockNumber}`
-        );
-      } catch (error) {
-        console.error("Error generating and publishing heartbeat:", error);
-      }
-    }
-
-    // Set up interval to run the heartbeat
-    heartbeatInterval = setInterval(
-      generateAndPublishHeartbeat,
-      RELAY_CONFIG.heartbeat.interval
-    );
-
-    // Run immediately on start
-    setTimeout(generateAndPublishHeartbeat, 5000);
-
-    console.log(
-      `Heartbeat service initialized, running every ${
-        RELAY_CONFIG.heartbeat.interval / 1000
-      } seconds`
-    );
-    return true;
-  } catch (error) {
-    console.error("Error initializing heartbeat service:", error);
-    return false;
-  }
-}
-
-/**
- * Stop the heartbeat service
- */
-function stopHeartbeatService() {
-  if (heartbeatInterval) {
-    clearInterval(heartbeatInterval);
-    heartbeatInterval = null;
-    console.log("Heartbeat service stopped");
-  }
 }
 
 /**
@@ -2434,6 +2073,8 @@ async function startServer() {
               return;
             }
 
+            console.log("[DEBUG] Gun.on.opt middleware initialized");
+
             // Aggancia un hook a tutti i messaggi in entrata
             this.to.next(context);
 
@@ -2442,24 +2083,56 @@ async function startServer() {
               // Salva il riferimento a this per usarlo nelle funzioni asincrone
               const self = this;
 
-              // DEVELOPMENT MODE BYPASS
-              if (process.env.NODE_ENV === "development") {
-                console.log(
-                  "[Gun.on.out] Development mode: Bypassing authorization."
-                );
-                return self.to.next(msg); // Allow message
+              // DEBUGGING
+              if (msg.put && Object.keys(msg.put).length > 0) {
+                console.log("[DEBUG] Gun.on.out: Detected PUT message");
+                const putKeys = Object.keys(msg.put);
+                console.log(`[DEBUG] PUT keys: ${putKeys.join(", ")}`);
+                
+                // Extract pubKey for debugging
+                let pubKey = null;
+                for (const key of putKeys) {
+                  if (key.startsWith("~")) {
+                    const dotIndex = key.indexOf(".");
+                    pubKey = dotIndex > 0 ? key.substring(1, dotIndex) : key.substring(1);
+                    break;
+                  }
+                }
+                if (!pubKey && msg.user && msg.user.pub) pubKey = msg.user.pub;
+                if (!pubKey && msg.from && msg.from.pub) pubKey = msg.from.pub;
+                if (!pubKey && msg.pub) pubKey = msg.pub;
+                
+                if (pubKey) {
+                  console.log(`[DEBUG] Found pubKey: ${pubKey.substring(0, 10)}...`);
+                }
+                
+                console.log(`[DEBUG] RELAY_CONFIG.relay.enabled: ${RELAY_CONFIG.relay.enabled}`);
+                console.log(`[DEBUG] RELAY_CONFIG.relay.onchainMembership: ${RELAY_CONFIG.relay.onchainMembership}`);
+                console.log(`[DEBUG] relayVerifier available: ${!!relayVerifier}`);
+                console.log(`[DEBUG] process.env.NODE_ENV: ${process.env.NODE_ENV || 'not set'}`);
               }
+
+              // DEVELOPMENT MODE BYPASS - DISABLED TO ENFORCE RELAY AUTH
+              // if (process.env.NODE_ENV === "development") {
+              //   console.log(
+              //     "[Gun.on.out] Development mode: Bypassing authorization."
+              //   );
+              //   return self.to.next(msg); // Allow message
+              // }
+
+              // Intercetta i messaggi in ingresso che contengono dati
+              const containsPut = msg.put && Object.keys(msg.put).length > 0;
 
               // Verifica se il messaggio è una scrittura (contiene put)
               if (
-                msg.put &&
-                Object.keys(msg.put).length > 0 &&
-                RELAY_CONFIG.relayMembership.enabled &&
-                RELAY_CONFIG.relayMembership.onchainMembership &&
-                relayMembershipVerifier
+                containsPut &&
+                RELAY_CONFIG.relay.enabled &&
+                RELAY_CONFIG.relay.onchainMembership &&
+                relayVerifier
               ) {
                 // Funzione per estrarre e verificare la chiave pubblica
                 const verifyPubKey = async function () {
+                  console.log("===== RELAY AUTHORIZATION CHECK TRIGGERED =====");
                   let pubKey = null;
 
                   // Estrai la chiave pubblica
@@ -2488,28 +2161,50 @@ async function startServer() {
                   }
 
                   if (pubKey) {
+                    console.log(`[AUTH CHECK] Found pubKey: ${pubKey}`);
                     try {
                       // Converti pubKey in formato hex
                       const hexPubKey = gunPubKeyToHex(pubKey);
                       if (!hexPubKey) {
                         console.warn(
-                          `[Gun.on.out] Failed to convert pubKey ${pubKey.substring(
+                          `[AUTH CHECK FAILED] Failed to convert pubKey ${pubKey.substring(
                             0,
                             10
                           )}... to hex format`
                         );
                         return false;
                       }
+                      console.log(`[AUTH CHECK] Converted to hex: ${hexPubKey}`);
 
-                      // IMPORTANTE: Attendi il risultato della verifica
-                      const isAuthorized =
-                        await relayMembershipVerifier.isPublicKeyAuthorized(
+                      // Get all active relays for this user
+                      console.log(`[AUTH CHECK] Getting all active relays...`);
+                      const activeRelays = await relayVerifier.getAllRelays();
+                      console.log(`[AUTH CHECK] Found ${activeRelays.length} relays`);
+                      
+                      // If there are no active relays, reject
+                      if (!activeRelays || activeRelays.length === 0) {
+                        console.warn(`[AUTH CHECK FAILED] No active relays found, rejecting message`);
+                        return false;
+                      }
+                      
+                      // Check each relay until we find one that authorizes this pubkey
+                      let isAuthorized = false;
+                      for (const relayAddress of activeRelays) {
+                        console.log(`[AUTH CHECK] Checking authorization on relay ${relayAddress}...`);
+                        isAuthorized = await relayVerifier.isPublicKeyAuthorized(
+                          relayAddress,
                           hexPubKey
                         );
+                        
+                        if (isAuthorized) {
+                          console.log(`[AUTH CHECK SUCCESS] Key authorized by relay ${relayAddress}`);
+                          break;
+                        }
+                      }
 
                       if (!isAuthorized) {
                         console.warn(
-                          `[Gun.on.out] BLOCKING write from unauthorized key ${pubKey.substring(
+                          `[AUTH CHECK FAILED] BLOCKING write from unauthorized key ${pubKey.substring(
                             0,
                             10
                           )}...`
@@ -2518,7 +2213,7 @@ async function startServer() {
                       }
 
                       console.log(
-                        `[Gun.on.out] Allowing write from authorized key ${pubKey.substring(
+                        `[AUTH CHECK SUCCESS] Allowing write from authorized key ${pubKey.substring(
                           0,
                           10
                         )}...`
@@ -2526,14 +2221,14 @@ async function startServer() {
                       return true;
                     } catch (error) {
                       console.error(
-                        `[Gun.on.out] Error during authorization check:`,
+                        `[AUTH CHECK ERROR] Error during authorization check:`,
                         error
                       );
                       return false;
                     }
                   } else {
                     console.warn(
-                      `[Gun.on.out] Could not find pubKey in message`
+                      `[AUTH CHECK FAILED] Could not find pubKey in message`
                     );
                     return false;
                   }
@@ -2595,52 +2290,85 @@ async function startServer() {
               // Se il messaggio contiene dati in put e onchainMembership è abilitato
               if (
                 containsPut &&
-                RELAY_CONFIG.relayMembership.enabled &&
-                RELAY_CONFIG.relayMembership.onchainMembership &&
-                relayMembershipVerifier
+                RELAY_CONFIG.relay.enabled &&
+                RELAY_CONFIG.relay.onchainMembership &&
+                relayVerifier
               ) {
                 // Funzione per estrarre e verificare la chiave pubblica
                 const verifyPubKey = async function () {
+                  console.log("===== RELAY AUTHORIZATION CHECK TRIGGERED =====");
                   let pubKey = null;
 
-                  // Cerca di estrarre la chiave pubblica dai dati in put
-                  if (msg.put) {
-                    const putKeys = Object.keys(msg.put);
-                    for (const key of putKeys) {
-                      if (key.startsWith("~")) {
-                        const dotIndex = key.indexOf(".");
-                        pubKey =
-                          dotIndex > 0
-                            ? key.substring(1, dotIndex)
-                            : key.substring(1);
-                        break;
-                      }
+                  // Estrai la chiave pubblica
+                  // Cerca nei nodi put che iniziano con ~
+                  const putKeys = Object.keys(msg.put);
+                  for (const key of putKeys) {
+                    if (key.startsWith("~")) {
+                      const dotIndex = key.indexOf(".");
+                      pubKey =
+                        dotIndex > 0
+                          ? key.substring(1, dotIndex)
+                          : key.substring(1);
+                      break;
+                    }
+                  }
+
+                  // Se non trovata in put, cerca in altri campi del messaggio
+                  if (!pubKey) {
+                    if (msg.user && msg.user.pub) {
+                      pubKey = msg.user.pub;
+                    } else if (msg.from && msg.from.pub) {
+                      pubKey = msg.from.pub;
+                    } else if (msg.pub) {
+                      pubKey = msg.pub;
                     }
                   }
 
                   if (pubKey) {
+                    console.log(`[AUTH CHECK] Found pubKey: ${pubKey}`);
                     try {
                       // Converti pubKey in formato hex
                       const hexPubKey = gunPubKeyToHex(pubKey);
                       if (!hexPubKey) {
                         console.warn(
-                          `[Gun.on.in] Failed to convert pubKey ${pubKey.substring(
+                          `[AUTH CHECK FAILED] Failed to convert pubKey ${pubKey.substring(
                             0,
                             10
                           )}... to hex format`
                         );
                         return false;
                       }
+                      console.log(`[AUTH CHECK] Converted to hex: ${hexPubKey}`);
 
-                      // IMPORTANTE: Attendi il risultato della verifica
-                      const isAuthorized =
-                        await relayMembershipVerifier.isPublicKeyAuthorized(
+                      // Get all active relays for this user
+                      console.log(`[AUTH CHECK] Getting all active relays...`);
+                      const activeRelays = await relayVerifier.getAllRelays();
+                      console.log(`[AUTH CHECK] Found ${activeRelays.length} relays`);
+                      
+                      // If there are no active relays, reject
+                      if (!activeRelays || activeRelays.length === 0) {
+                        console.warn(`[AUTH CHECK FAILED] No active relays found, rejecting message`);
+                        return false;
+                      }
+                      
+                      // Check each relay until we find one that authorizes this pubkey
+                      let isAuthorized = false;
+                      for (const relayAddress of activeRelays) {
+                        console.log(`[AUTH CHECK] Checking authorization on relay ${relayAddress}...`);
+                        isAuthorized = await relayVerifier.isPublicKeyAuthorized(
+                          relayAddress,
                           hexPubKey
                         );
+                        
+                        if (isAuthorized) {
+                          console.log(`[AUTH CHECK SUCCESS] Key authorized by relay ${relayAddress}`);
+                          break;
+                        }
+                      }
 
                       if (!isAuthorized) {
                         console.warn(
-                          `[Gun.on.in] BLOCKING data from unauthorized key ${pubKey.substring(
+                          `[AUTH CHECK FAILED] BLOCKING write from unauthorized key ${pubKey.substring(
                             0,
                             10
                           )}...`
@@ -2649,7 +2377,7 @@ async function startServer() {
                       }
 
                       console.log(
-                        `[Gun.on.in] Allowing data from authorized key ${pubKey.substring(
+                        `[AUTH CHECK SUCCESS] Allowing write from authorized key ${pubKey.substring(
                           0,
                           10
                         )}...`
@@ -2657,20 +2385,16 @@ async function startServer() {
                       return true;
                     } catch (error) {
                       console.error(
-                        `[Gun.on.in] Error during authorization check:`,
+                        `[AUTH CHECK ERROR] Error during authorization check:`,
                         error
                       );
                       return false;
                     }
                   } else {
-                    // Se non troviamo una chiave pubblica ma ci sono dati, per sicurezza blocchiamo
-                    if (Object.keys(msg.put).length > 0) {
-                      console.warn(
-                        `[Gun.on.in] Could not find pubKey in message with data`
-                      );
-                      return false;
-                    }
-                    return true; // Altre tipologie di messaggi senza put possono passare
+                    console.warn(
+                      `[AUTH CHECK FAILED] Could not find pubKey in message`
+                    );
+                    return false;
                   }
                 };
 
@@ -2707,9 +2431,9 @@ async function startServer() {
             // AGGIUNTA: Intercetta a livello di storage per impedire scritture non autorizzate
             if (
               context.on &&
-              RELAY_CONFIG.relayMembership.enabled &&
-              RELAY_CONFIG.relayMembership.onchainMembership &&
-              relayMembershipVerifier
+              RELAY_CONFIG.relay.enabled &&
+              RELAY_CONFIG.relay.onchainMembership &&
+              relayVerifier
             ) {
               // Mantieni un riferimento al put originale
               const originalPut = context.on.put;
@@ -2781,7 +2505,7 @@ async function startServer() {
                     }
 
                     const isAuthorized =
-                      await relayMembershipVerifier.isPublicKeyAuthorized(
+                      await relayVerifier.isPublicKeyAuthorized(
                         hexPubKey
                       );
 
@@ -2878,14 +2602,6 @@ async function startServer() {
           socket.destroy();
         }
       };
-
-      initializeHeartbeatService();
-
-      // Initialize the fund release service
-      initializeFundReleaseService();
-
-      // Register middleware for WebSocket upgrades
-      server.on("upgrade", websocketMiddleware);
 
       // Graceful shutdown handling
       ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => {
@@ -3523,36 +3239,40 @@ app.post("/api/auth/shogun/metamask/signup", async (req, res) => {
   }
 });
 
-// ============ RELAY MEMBERSHIP VERIFIER API ============
+// ============ RELAY VERIFIER API ============
 
-// API - Check relay membership status
+// API - Check relay status
 app.get(
-  "/api/relay/membership/status",
+  "/api/relay/status",
   authenticateRequest,
   async (req, res) => {
     try {
-      // Verify that RelayMembershipVerifier is initialized
-      if (!RELAY_CONFIG.relayMembership.enabled || !relayMembershipVerifier) {
+      // Verify that RelayVerifier is initialized
+      if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
         return res.status(503).json({
           success: false,
-          error: "Relay membership services not available",
+          error: "Relay services not available",
           config: {
-            enabled: RELAY_CONFIG.relayMembership.enabled,
-            contractAddress:
-              RELAY_CONFIG.relayMembership.contractAddress || "Not configured",
+            enabled: RELAY_CONFIG.relay.enabled,
+            registryAddress:
+              RELAY_CONFIG.relay.registryAddress || "Not configured",
           },
         });
       }
 
+      // Get all registered relays
+      const allRelays = await relayVerifier.getAllRelays();
+
       res.json({
         success: true,
         config: {
-          enabled: RELAY_CONFIG.relayMembership.enabled,
-          contractAddress: RELAY_CONFIG.relayMembership.contractAddress,
+          enabled: RELAY_CONFIG.relay.enabled,
+          registryAddress: RELAY_CONFIG.relay.registryAddress,
         },
+        relaysCount: allRelays.length,
       });
     } catch (error) {
-      console.error("Error getting relay membership status:", error);
+      console.error("Error getting relay status:", error);
       res.status(500).json({
         success: false,
         error: error.message,
@@ -3561,35 +3281,81 @@ app.get(
   }
 );
 
-// API - Check address authorization
+// API - Get all relays
 app.get(
-  "/api/relay/membership/check-address/:address",
+  "/api/relay/all",
   authenticateRequest,
   async (req, res) => {
     try {
-      const { address } = req.params;
-
-      // Verify that RelayMembershipVerifier is initialized
-      if (!RELAY_CONFIG.relayMembership.enabled || !relayMembershipVerifier) {
+      // Verify that RelayVerifier is initialized
+      if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
         return res.status(503).json({
           success: false,
-          error: "Relay membership services not available",
+          error: "Relay services not available",
         });
       }
 
-      // Check if the address is authorized
-      const isAuthorized = await relayMembershipVerifier.isAddressAuthorized(
-        address
+      // Get all registered relays
+      const relayAddresses = await relayVerifier.getAllRelays();
+      
+      // Get detailed info for each relay
+      const relays = [];
+      for (const address of relayAddresses) {
+        try {
+          const relayInfo = await relayVerifier.getRelayInfo(address);
+          if (relayInfo) {
+            relays.push(relayInfo);
+          }
+        } catch (error) {
+          console.error(`Error getting info for relay ${address}:`, error);
+        }
+      }
+
+      res.json({
+        success: true,
+        relays,
+      });
+    } catch (error) {
+      console.error("Error getting all relays:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+);
+
+// API - Check if user is subscribed to a relay
+app.get(
+  "/api/relay/check-subscription/:relayAddress/:userAddress",
+  authenticateRequest,
+  async (req, res) => {
+    try {
+      const { relayAddress, userAddress } = req.params;
+
+      // Verify that RelayVerifier is initialized
+      if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
+        return res.status(503).json({
+          success: false,
+          error: "Relay services not available",
+        });
+      }
+
+      // Check if the user is subscribed to the relay
+      const isSubscribed = await relayVerifier.isUserSubscribedToRelay(
+        relayAddress, 
+        userAddress
       );
 
       res.json({
         success: true,
-        address,
-        isAuthorized,
+        relayAddress,
+        userAddress,
+        isSubscribed,
       });
     } catch (error) {
       console.error(
-        `Error checking address authorization for ${req.params.address}:`,
+        `Error checking subscription for user ${req.params.userAddress} to relay ${req.params.relayAddress}:`,
         error
       );
       res.status(500).json({
@@ -3600,9 +3366,59 @@ app.get(
   }
 );
 
-// API - Check public key authorization
+// API - Get user's active relays
+app.get(
+  "/api/relay/user-active-relays/:userAddress",
+  authenticateRequest,
+  async (req, res) => {
+    try {
+      const { userAddress } = req.params;
+
+      // Verify that RelayVerifier is initialized
+      if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
+        return res.status(503).json({
+          success: false,
+          error: "Relay services not available",
+        });
+      }
+
+      // Get all relays the user is subscribed to
+      const relayAddresses = await relayVerifier.getUserActiveRelays(userAddress);
+      
+      // Get detailed info for each relay
+      const relays = [];
+      for (const address of relayAddresses) {
+        try {
+          const relayInfo = await relayVerifier.getRelayInfo(address);
+          if (relayInfo) {
+            relays.push(relayInfo);
+          }
+        } catch (error) {
+          console.error(`Error getting info for relay ${address}:`, error);
+        }
+      }
+
+      res.json({
+        success: true,
+        userAddress,
+        relays,
+      });
+    } catch (error) {
+      console.error(
+        `Error getting active relays for user ${req.params.userAddress}:`,
+        error
+      );
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+);
+
+// API - Check public key authorization against all relays
 app.post(
-  "/api/relay/membership/check-pubkey",
+  "/api/relay/check-pubkey",
   authenticateRequest,
   async (req, res) => {
     try {
@@ -3615,23 +3431,39 @@ app.post(
         });
       }
 
-      // Verify that RelayMembershipVerifier is initialized
-      if (!RELAY_CONFIG.relayMembership.enabled || !relayMembershipVerifier) {
+      // Verify that RelayVerifier is initialized
+      if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
         return res.status(503).json({
           success: false,
-          error: "Relay membership services not available",
+          error: "Relay services not available",
         });
       }
 
-      // Check if the public key is authorized
-      const isAuthorized = await relayMembershipVerifier.isPublicKeyAuthorized(
-        publicKey
-      );
+      // Get all registered relays
+      const relayAddresses = await relayVerifier.getAllRelays();
+      
+      // Check each relay for authorization
+      const authorizedRelays = [];
+      for (const address of relayAddresses) {
+        try {
+          const isAuthorized = await relayVerifier.isPublicKeyAuthorized(
+            address,
+            publicKey
+          );
+          
+          if (isAuthorized) {
+            authorizedRelays.push(address);
+          }
+        } catch (error) {
+          console.error(`Error checking authorization on relay ${address}:`, error);
+        }
+      }
 
       res.json({
         success: true,
         publicKey,
-        isAuthorized,
+        isAuthorized: authorizedRelays.length > 0,
+        authorizedRelays,
       });
     } catch (error) {
       console.error("Error checking public key authorization:", error);
@@ -3643,86 +3475,48 @@ app.post(
   }
 );
 
-// API - Get address for public key
-app.post(
-  "/api/relay/membership/address-for-pubkey",
+// API - Get user subscription info for a specific relay
+app.get(
+  "/api/relay/subscription-info/:relayAddress/:userAddress",
   authenticateRequest,
   async (req, res) => {
     try {
-      const { publicKey } = req.body;
+      const { relayAddress, userAddress } = req.params;
 
-      if (!publicKey) {
-        return res.status(400).json({
-          success: false,
-          error: "Public key is required",
-        });
-      }
-
-      // Verify that RelayMembershipVerifier is initialized
-      if (!RELAY_CONFIG.relayMembership.enabled || !relayMembershipVerifier) {
+      // Verify that RelayVerifier is initialized
+      if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
         return res.status(503).json({
           success: false,
-          error: "Relay membership services not available",
+          error: "Relay services not available",
         });
       }
 
-      // Get address for public key
-      const address = await relayMembershipVerifier.getAddressForPublicKey(
-        publicKey
+      // Get subscription info
+      const subscriptionInfo = await relayVerifier.getUserSubscriptionInfo(
+        relayAddress,
+        userAddress
       );
 
-      res.json({
-        success: true,
-        publicKey,
-        address,
-      });
-    } catch (error) {
-      console.error("Error getting address for public key:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
-);
-
-// API - Get user info
-app.get(
-  "/api/relay/membership/user-info/:address",
-  authenticateRequest,
-  async (req, res) => {
-    try {
-      const { address } = req.params;
-
-      // Verify that RelayMembershipVerifier is initialized
-      if (!RELAY_CONFIG.relayMembership.enabled || !relayMembershipVerifier) {
-        return res.status(503).json({
-          success: false,
-          error: "Relay membership services not available",
-        });
-      }
-
-      // Get user info
-      const userInfo = await relayMembershipVerifier.getUserInfo(address);
-
-      if (!userInfo) {
+      if (!subscriptionInfo) {
         return res.status(404).json({
           success: false,
-          error: "User not found",
+          error: "User subscription not found",
         });
       }
 
       res.json({
         success: true,
-        address,
-        userInfo: {
-          expires: userInfo.expires.toString(),
-          pubKey: userInfo.pubKey,
+        relayAddress,
+        userAddress,
+        subscriptionInfo: {
+          expires: subscriptionInfo.expires.toString(),
+          pubKey: subscriptionInfo.pubKey,
+          active: subscriptionInfo.active,
         },
       });
     } catch (error) {
       console.error(
-        `Error getting user info for ${req.params.address}:`,
+        `Error getting subscription info for user ${req.params.userAddress} on relay ${req.params.relayAddress}:`,
         error
       );
       res.status(500).json({
@@ -3733,35 +3527,70 @@ app.get(
   }
 );
 
-// API - Check if user is active
-app.get(
-  "/api/relay/membership/is-active/:address",
+// API - Subscribe to a relay
+app.post(
+  "/api/relay/subscribe",
   authenticateRequest,
   async (req, res) => {
     try {
-      const { address } = req.params;
+      const { relayAddress, months, publicKey } = req.body;
 
-      // Verify that RelayMembershipVerifier is initialized
-      if (!RELAY_CONFIG.relayMembership.enabled || !relayMembershipVerifier) {
-        return res.status(503).json({
+      if (!relayAddress || !months) {
+        return res.status(400).json({
           success: false,
-          error: "Relay membership services not available",
+          error: "Relay address and number of months are required",
         });
       }
 
-      // Check if user is active
-      const isActive = await relayMembershipVerifier.isUserActive(address);
+      // Verify that RelayVerifier is initialized
+      if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
+        return res.status(503).json({
+          success: false,
+          error: "Relay services not available",
+        });
+      }
+
+      // Only admin or system tokens can subscribe users
+      if (!req.auth.isSystemToken && !req.auth.permissions?.includes("admin")) {
+        return res.status(403).json({
+          success: false,
+          error: "Only administrators can subscribe users to relays",
+        });
+      }
+
+      // Get the subscription price
+      const price = await relayVerifier.getRelayPrice(relayAddress);
+      if (!price) {
+        return res.status(400).json({
+          success: false,
+          error: "Failed to get relay subscription price",
+        });
+      }
+
+      // Subscribe to the relay
+      const tx = await relayVerifier.subscribeToRelay(
+        relayAddress,
+        months,
+        publicKey || undefined
+      );
+
+      if (!tx) {
+        return res.status(500).json({
+          success: false,
+          error: "Failed to subscribe to relay",
+        });
+      }
 
       res.json({
         success: true,
-        address,
-        isActive,
+        relayAddress,
+        months,
+        publicKey: publicKey || null,
+        transactionHash: tx.hash,
+        message: "Subscription successful",
       });
     } catch (error) {
-      console.error(
-        `Error checking if user ${req.params.address} is active:`,
-        error
-      );
+      console.error("Error subscribing to relay:", error);
       res.status(500).json({
         success: false,
         error: error.message,
@@ -3770,73 +3599,71 @@ app.get(
   }
 );
 
-// API - Update relay membership config
+// API - Update relay config
 app.post(
-  "/api/relay/membership/config",
+  "/api/relay/config",
   authenticateRequest,
   async (req, res) => {
     try {
-      const { contractAddress, providerUrl, enabled } = req.body;
+      const { registryAddress, providerUrl, enabled } = req.body;
 
       // Only system/admin users can modify the configuration
       if (!req.auth.isSystemToken && !req.auth.permissions?.includes("admin")) {
         return res.status(403).json({
           success: false,
-          error:
-            "Only administrators can modify relay membership configuration",
+          error: "Only administrators can modify relay configuration",
         });
       }
 
       // Update configuration
       if (enabled !== undefined) {
-        RELAY_CONFIG.relayMembership.enabled = enabled;
+        RELAY_CONFIG.relay.enabled = enabled;
       }
 
-      if (contractAddress) {
-        RELAY_CONFIG.relayMembership.contractAddress = contractAddress;
+      if (registryAddress) {
+        RELAY_CONFIG.relay.registryAddress = registryAddress;
       }
 
       if (providerUrl) {
-        RELAY_CONFIG.relayMembership.providerUrl = providerUrl;
+        RELAY_CONFIG.relay.providerUrl = providerUrl;
       }
 
       // Reinitialize relay components
-      if (RELAY_CONFIG.relayMembership.enabled) {
+      if (RELAY_CONFIG.relay.enabled) {
         const shogunCoreInstance = getShogunCore();
 
-        console.log("Reinitializing RelayMembershipVerifier...");
+        console.log("Reinitializing RelayVerifier...");
         try {
-          relayMembershipVerifier = new RelayMembershipVerifier(
+          relayVerifier = new RelayVerifier(
             {
-              contractAddress: RELAY_CONFIG.relayMembership.contractAddress,
-              providerUrl: RELAY_CONFIG.relayMembership.providerUrl,
+              registryAddress: RELAY_CONFIG.relay.registryAddress,
+              providerUrl: RELAY_CONFIG.relay.providerUrl,
             },
             shogunCoreInstance
           );
-          console.log("RelayMembershipVerifier reinitialized successfully");
+          console.log("RelayVerifier reinitialized successfully");
         } catch (error) {
-          console.error("Error reinitializing RelayMembershipVerifier:", error);
+          console.error("Error reinitializing RelayVerifier:", error);
           return res.status(500).json({
             success: false,
-            error:
-              "Error reinitializing RelayMembershipVerifier: " + error.message,
+            error: "Error reinitializing RelayVerifier: " + error.message,
           });
         }
       } else {
-        relayMembershipVerifier = null;
-        console.log("RelayMembershipVerifier disabled");
+        relayVerifier = null;
+        console.log("RelayVerifier disabled");
       }
 
       res.json({
         success: true,
         config: {
-          enabled: RELAY_CONFIG.relayMembership.enabled,
-          contractAddress: RELAY_CONFIG.relayMembership.contractAddress,
-          providerUrl: RELAY_CONFIG.relayMembership.providerUrl,
+          enabled: RELAY_CONFIG.relay.enabled,
+          registryAddress: RELAY_CONFIG.relay.registryAddress,
+          providerUrl: RELAY_CONFIG.relay.providerUrl,
         },
       });
     } catch (error) {
-      console.error("Error updating relay membership configuration:", error);
+      console.error("Error updating relay configuration:", error);
       res.status(500).json({
         success: false,
         error: error.message,
@@ -4117,887 +3944,4 @@ app.post("/api/relay/did/config", authenticateRequest, async (req, res) => {
   }
 });
 
-// ============ ORACLE BRIDGE API ============
-
-// API - Check Oracle Bridge status
-app.get("/api/relay/oracle/status", authenticateRequest, async (req, res) => {
-  try {
-    // Verify that OracleBridge is initialized
-    if (!RELAY_CONFIG.oracleBridge.enabled || !oracleBridge) {
-      return res.status(503).json({
-        success: false,
-        error: "Oracle Bridge services not available",
-        config: {
-          enabled: RELAY_CONFIG.oracleBridge.enabled,
-          contractAddress:
-            RELAY_CONFIG.oracleBridge.contractAddress || "Not configured",
-        },
-      });
-    }
-
-    // Get current epoch ID
-    const epochId = await oracleBridge.getEpochId();
-
-    // Get admin address
-    const admin = await oracleBridge.getAdmin();
-
-    // Get timestamp for current epoch if available
-    let timestamp = null;
-    let date = null;
-
-    try {
-      timestamp = await oracleBridge.getRootTimestamp(epochId);
-      // Convert timestamp to readable date if it's not zero
-      date =
-        timestamp > 0 ? new Date(Number(timestamp) * 1000).toISOString() : null;
-    } catch (error) {
-      console.warn(
-        `Could not get timestamp for current epoch: ${error.message}`
-      );
-    }
-
-    res.json({
-      success: true,
-      config: {
-        enabled: RELAY_CONFIG.oracleBridge.enabled,
-        contractAddress: RELAY_CONFIG.oracleBridge.contractAddress,
-      },
-      epochId: epochId.toString(),
-      admin,
-      timestamp: timestamp ? timestamp.toString() : null,
-      date: date,
-    });
-  } catch (error) {
-    console.error("Error getting Oracle Bridge status:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// API - Get current epoch ID
-app.get("/api/relay/oracle/epoch", authenticateRequest, async (req, res) => {
-  try {
-    // Verify that OracleBridge is initialized
-    if (!RELAY_CONFIG.oracleBridge.enabled || !oracleBridge) {
-      return res.status(503).json({
-        success: false,
-        error: "Oracle Bridge services not available",
-      });
-    }
-
-    // Get current epoch ID
-    const epochId = await oracleBridge.getEpochId();
-
-    res.json({
-      success: true,
-      epochId: epochId.toString(),
-    });
-  } catch (error) {
-    console.error("Error getting current epoch ID:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// API - Get Merkle root for a specific epoch
-app.get(
-  "/api/relay/oracle/root/:epochId",
-  authenticateRequest,
-  async (req, res) => {
-    try {
-      const { epochId } = req.params;
-
-      // Verify that OracleBridge is initialized
-      if (!RELAY_CONFIG.oracleBridge.enabled || !oracleBridge) {
-        return res.status(503).json({
-          success: false,
-          error: "Oracle Bridge services not available",
-        });
-      }
-
-      // Get Merkle root for the specified epoch
-      const root = await oracleBridge.getRootForEpoch(BigInt(epochId));
-
-      res.json({
-        success: true,
-        epochId,
-        root,
-      });
-    } catch (error) {
-      console.error(
-        `Error getting Merkle root for epoch ${req.params.epochId}:`,
-        error
-      );
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
-);
-
-// API - Get root timestamp for a specific epoch
-app.get(
-  "/api/relay/oracle/root-timestamp/:epochId",
-  authenticateRequest,
-  async (req, res) => {
-    try {
-      const { epochId } = req.params;
-
-      // Verify that OracleBridge is initialized
-      if (!RELAY_CONFIG.oracleBridge.enabled || !oracleBridge) {
-        return res.status(503).json({
-          success: false,
-          error: "Oracle Bridge services not available",
-        });
-      }
-
-      // Get timestamp for when the root was published
-      const timestamp = await oracleBridge.getRootTimestamp(BigInt(epochId));
-
-      // Convert timestamp to readable date if it's not zero
-      const date =
-        timestamp > 0 ? new Date(Number(timestamp) * 1000).toISOString() : null;
-
-      res.json({
-        success: true,
-        epochId,
-        timestamp: timestamp.toString(),
-        date: date,
-      });
-    } catch (error) {
-      console.error(
-        `Error getting root timestamp for epoch ${req.params.epochId}:`,
-        error
-      );
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
-);
-
-// API - Verify if a Merkle root matches the expected value
-app.post(
-  "/api/relay/oracle/verify-root",
-  authenticateRequest,
-  async (req, res) => {
-    try {
-      const { epochId, expectedRoot } = req.body;
-
-      if (!epochId || !expectedRoot) {
-        return res.status(400).json({
-          success: false,
-          error: "Epoch ID and expected root are required",
-        });
-      }
-
-      // Verify that OracleBridge is initialized
-      if (!RELAY_CONFIG.oracleBridge.enabled || !oracleBridge) {
-        return res.status(503).json({
-          success: false,
-          error: "Oracle Bridge services not available",
-        });
-      }
-
-      // Verify if the Merkle root matches the expected value
-      const isMatch = await oracleBridge.verifyRoot(
-        BigInt(epochId),
-        expectedRoot
-      );
-
-      res.json({
-        success: true,
-        epochId,
-        expectedRoot,
-        isMatch,
-      });
-    } catch (error) {
-      console.error("Error verifying Merkle root:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
-);
-
-// API - Publish a new Merkle root for an epoch
-app.post(
-  "/api/relay/oracle/publish-root",
-  authenticateRequest,
-  async (req, res) => {
-    try {
-      const { epochId, root } = req.body;
-
-      if (!epochId || !root) {
-        return res.status(400).json({
-          success: false,
-          error: "Epoch ID and root are required",
-        });
-      }
-
-      // Verify that OracleBridge is initialized
-      if (!RELAY_CONFIG.oracleBridge.enabled || !oracleBridge) {
-        return res.status(503).json({
-          success: false,
-          error: "Oracle Bridge services not available",
-        });
-      }
-
-      // Only admin or system tokens can publish roots
-      if (!req.auth.isSystemToken && !req.auth.permissions?.includes("admin")) {
-        return res.status(403).json({
-          success: false,
-          error: "Only administrators can publish roots",
-        });
-      }
-
-      // Publish a new Merkle root
-      const receipt = await oracleBridge.publishRoot(BigInt(epochId), root);
-
-      if (!receipt) {
-        return res.status(500).json({
-          success: false,
-          error: "Failed to publish root",
-        });
-      }
-
-      res.json({
-        success: true,
-        epochId,
-        root,
-        txHash: receipt.hash,
-        message: "Root published successfully",
-      });
-    } catch (error) {
-      console.error("Error publishing Merkle root:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
-);
-
-// API - Update Oracle Bridge config
-app.post("/api/relay/oracle/config", authenticateRequest, async (req, res) => {
-  try {
-    const { contractAddress, providerUrl, enabled } = req.body;
-
-    // Only system/admin users can modify the configuration
-    if (!req.auth.isSystemToken && !req.auth.permissions?.includes("admin")) {
-      return res.status(403).json({
-        success: false,
-        error: "Only administrators can modify Oracle Bridge configuration",
-      });
-    }
-
-    // Update configuration
-    if (enabled !== undefined) {
-      RELAY_CONFIG.oracleBridge.enabled = enabled;
-    }
-
-    if (contractAddress) {
-      RELAY_CONFIG.oracleBridge.contractAddress = contractAddress;
-    }
-
-    if (providerUrl) {
-      RELAY_CONFIG.oracleBridge.providerUrl = providerUrl;
-    }
-
-    // Reinitialize Oracle Bridge
-    if (RELAY_CONFIG.oracleBridge.enabled) {
-      const shogunCoreInstance = getShogunCore();
-
-      console.log("Reinitializing OracleBridge...");
-      try {
-        oracleBridge = new OracleBridge(
-          {
-            contractAddress: RELAY_CONFIG.oracleBridge.contractAddress,
-            providerUrl: RELAY_CONFIG.oracleBridge.providerUrl,
-          },
-          shogunCoreInstance
-        );
-        console.log("OracleBridge reinitialized successfully");
-      } catch (error) {
-        console.error("Error reinitializing OracleBridge:", error);
-        return res.status(500).json({
-          success: false,
-          error: "Error reinitializing OracleBridge: " + error.message,
-        });
-      }
-    } else {
-      oracleBridge = null;
-      console.log("OracleBridge disabled");
-    }
-
-    res.json({
-      success: true,
-      config: {
-        enabled: RELAY_CONFIG.oracleBridge.enabled,
-        contractAddress: RELAY_CONFIG.oracleBridge.contractAddress,
-        providerUrl: RELAY_CONFIG.oracleBridge.providerUrl,
-      },
-    });
-  } catch (error) {
-    console.error("Error updating Oracle Bridge configuration:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// ============ FUND RELEASE SERVICE ============
-
-/**
- * Service to release funds when an epoch is completed
- * Using Merkle proofs to prove relay was active during the epoch
- */
-let fundReleaseInterval = null;
-
-/**
- * Initialize fund release service
- * @returns {boolean} Whether the service was initialized successfully
- */
-async function initializeFundReleaseService() {
-  try {
-    // Configuration for fund release service
-    const FUND_RELEASE_CONFIG = {
-      enabled: process.env.FUND_RELEASE_ENABLED === "true" || false,
-      interval:
-        parseInt(process.env.FUND_RELEASE_INTERVAL || "3600", 10) * 1000, // Default 1 hour in ms
-      membershipContract: process.env.RELAY_MEMBERSHIP_CONTRACT || "",
-      oracleBridgeContract: process.env.ORACLE_BRIDGE_CONTRACT || "",
-      providerUrl: process.env.ETHEREUM_PROVIDER_URL || "http://localhost:8545",
-      privateKey: process.env.ETHEREUM_PRIVATE_KEY || "", // Private key for signing transactions
-    };
-
-    if (!FUND_RELEASE_CONFIG.enabled) {
-      console.log("Fund release service disabled, skipping initialization");
-      return false;
-    }
-
-    // Check if we have all necessary configuration
-    if (
-      !FUND_RELEASE_CONFIG.membershipContract ||
-      !FUND_RELEASE_CONFIG.oracleBridgeContract ||
-      !FUND_RELEASE_CONFIG.privateKey
-    ) {
-      console.warn(
-        "Fund release service missing required configuration, skipping initialization"
-      );
-      return false;
-    }
-
-    console.log("Initializing fund release service...");
-
-    // Import ethers and MerkleTree dynamically
-    const { ethers } = await import("ethers");
-    const { MerkleTree } = await import("merkletreejs");
-    const keccak256Module = await import("keccak256");
-    const keccak256 = keccak256Module.default;
-
-    // Set up signer
-    const privateKey = FUND_RELEASE_CONFIG.privateKey.startsWith("0x")
-      ? FUND_RELEASE_CONFIG.privateKey
-      : `0x${FUND_RELEASE_CONFIG.privateKey}`;
-
-    // Create provider
-    const provider = new ethers.JsonRpcProvider(
-      FUND_RELEASE_CONFIG.providerUrl
-    );
-
-    // Create wallet with private key and provider
-    const wallet = new ethers.Wallet(privateKey, provider);
-    const relayAddress = await wallet.getAddress();
-    console.log(
-      `Fund release service initialized with wallet address: ${relayAddress}`
-    );
-
-    // Set up contracts
-    const membershipAbi = [
-      "function getRelayCount() view returns (uint256)",
-      "function getRelayAt(uint256) view returns (address)",
-      "function relayUrl(address) view returns (string)",
-      "function releaseWithProof(uint256, bytes32[]) external",
-    ];
-
-    const oracleAbi = [
-      "function getEpochId() view returns (uint256)",
-      "function roots(uint256) view returns (bytes32)",
-      "function rootTimestamps(uint256) view returns (uint256)",
-    ];
-
-    const membershipContract = new ethers.Contract(
-      FUND_RELEASE_CONFIG.membershipContract,
-      membershipAbi,
-      wallet
-    );
-
-    const oracleContract = new ethers.Contract(
-      FUND_RELEASE_CONFIG.oracleBridgeContract,
-      oracleAbi,
-      provider
-    );
-
-    // Function to ping a relay (reused from heartbeat service)
-    async function pingRelay(wsUrl, timeout = 5000) {
-      return new Promise((resolve) => {
-        try {
-          // Clean the URL to ensure proper WebSocket format
-          let cleanUrl = wsUrl.trim();
-
-          // Remove any http:// or https:// prefixes
-          if (cleanUrl.startsWith("http://")) {
-            cleanUrl = cleanUrl.substring(7);
-          } else if (cleanUrl.startsWith("https://")) {
-            cleanUrl = cleanUrl.substring(8);
-          }
-
-          // Remove any trailing slashes
-          while (cleanUrl.endsWith("/")) {
-            cleanUrl = cleanUrl.slice(0, -1);
-          }
-
-          if (!cleanUrl.endsWith("/gun")) {
-            cleanUrl += "/gun";
-          }
-
-          // Create the WebSocket URL
-          const wsAddress = `ws://${cleanUrl}`;
-          console.log(`Attempting to ping relay at ${wsAddress}`);
-
-          const ws = new WebSocket(wsAddress);
-          let settled = false;
-
-          const timer = setTimeout(() => {
-            if (!settled) {
-              settled = true;
-              try {
-                ws.close();
-              } catch (e) {}
-              console.log(`Timeout pinging ${wsAddress}`);
-              resolve(false);
-            }
-          }, timeout);
-
-          ws.onopen = () => {
-            if (!settled) {
-              settled = true;
-              clearTimeout(timer);
-              try {
-                ws.close();
-              } catch (e) {}
-              console.log(`Successfully pinged ${wsAddress}`);
-              resolve(true);
-            }
-          };
-
-          ws.onerror = (error) => {
-            if (!settled) {
-              settled = true;
-              clearTimeout(timer);
-              console.error(`Error pinging ${wsAddress}:`, error.message);
-              resolve(false);
-            }
-          };
-        } catch (error) {
-          console.error(`Error in pingRelay:`, error.message);
-          resolve(false);
-        }
-      });
-    }
-
-    // Function to generate and submit a proof for the current epoch
-    async function generateAndSubmitProof() {
-      try {
-        console.log("Checking if funds need to be released for this relay...");
-
-        // Get the current epoch from the oracle
-        const epochId = await oracleContract.getEpochId();
-        console.log(`Current epoch: ${epochId}`);
-
-        // Check if there's a root for this epoch
-        const root = await oracleContract.roots(epochId);
-        if (root === ethers.ZeroHash) {
-          console.log(
-            `No root found for epoch ${epochId}, skipping fund release`
-          );
-          return;
-        }
-
-        // Get the timestamp for this root
-        const timestamp = await oracleContract.rootTimestamps(epochId);
-        if (timestamp === 0n) {
-          console.log(
-            `No timestamp found for epoch ${epochId}, skipping fund release`
-          );
-          return;
-        }
-
-        // Fetch all relays and check which ones are alive
-        const count = await membershipContract.getRelayCount();
-        console.log(`Found ${count} relays in membership contract`);
-
-        const aliveAddrs = [];
-        const urls = [];
-
-        // Check each relay
-        for (let i = 0; i < count; i++) {
-          try {
-            const addr = await membershipContract.getRelayAt(i);
-            let url = await membershipContract.relayUrl(addr);
-
-            console.log(`Checking relay ${i + 1}/${count}: ${addr} at ${url}`);
-
-            const ok = await pingRelay(url);
-            if (ok) {
-              aliveAddrs.push(addr);
-              urls.push(url);
-              console.log(`Relay ${addr} is alive`);
-            } else {
-              console.log(`Relay ${addr} is not responding`);
-            }
-          } catch (error) {
-            console.error(`Error checking relay ${i}:`, error);
-          }
-        }
-
-        console.log(`Found ${aliveAddrs.length} alive relays:`, urls);
-
-        if (aliveAddrs.length === 0) {
-          console.error(
-            `No relays online for epoch ${epochId}, cannot generate proof`
-          );
-          return;
-        }
-
-        // Check if this relay is in the list of alive relays
-        if (!aliveAddrs.includes(relayAddress)) {
-          console.log(
-            `This relay (${relayAddress}) is not in the list of alive relays, skipping fund release`
-          );
-          return;
-        }
-
-        // Build Merkle tree
-        console.log("Building Merkle tree...");
-
-        // Calculate leaves - same algorithm as in the heartbeat service
-        const leaves = aliveAddrs.map((addr) =>
-          ethers.solidityPackedKeccak256(
-            ["address", "uint256"],
-            [addr, epochId]
-          )
-        );
-
-        // Create Merkle tree
-        const tree = new MerkleTree(leaves, keccak256, { sortPairs: true });
-
-        // Get the leaf for this relay
-        const leaf = ethers.solidityPackedKeccak256(
-          ["address", "uint256"],
-          [relayAddress, epochId]
-        );
-
-        // Get the proof for this relay
-        const proof = tree.getHexProof(leaf);
-
-        console.log(
-          `Generated Merkle proof with ${proof.length} elements for relay ${relayAddress}`
-        );
-
-        // Check if we need to release funds
-        try {
-          console.log(`Calling releaseWithProof for epoch ${epochId}...`);
-          const tx = await membershipContract.releaseWithProof(epochId, proof);
-          console.log(`Transaction submitted: ${tx.hash}`);
-
-          const receipt = await tx.wait();
-          console.log(
-            `Funds released successfully in transaction ${receipt.hash}, block ${receipt.blockNumber}`
-          );
-        } catch (error) {
-          // Check if the error is due to funds already being released
-          if (error.message.includes("already released")) {
-            console.log(`Funds for epoch ${epochId} already released`);
-          } else {
-            console.error(`Error releasing funds for epoch ${epochId}:`, error);
-          }
-        }
-      } catch (error) {
-        console.error("Error in fund release process:", error);
-      }
-    }
-
-    // Function to manually trigger fund release for a specific epoch
-    async function manualFundRelease(epochId = null) {
-      try {
-        console.log(
-          `Manual fund release triggered${
-            epochId ? ` for epoch ${epochId}` : ""
-          }`
-        );
-
-        // If no epoch specified, get the current epoch
-        if (epochId === null) {
-          epochId = await oracleContract.getEpochId();
-          console.log(`Using current epoch: ${epochId}`);
-        }
-
-        // Check if there's a root for this epoch
-        const root = await oracleContract.roots(epochId);
-        if (root === ethers.ZeroHash) {
-          console.log(
-            `No root found for epoch ${epochId}, cannot generate proof`
-          );
-          return {
-            success: false,
-            error: `No root found for epoch ${epochId}`,
-          };
-        }
-
-        // Fetch all relays and check which ones are alive
-        const count = await membershipContract.getRelayCount();
-        console.log(`Found ${count} relays in membership contract`);
-
-        const aliveAddrs = [];
-
-        // Check each relay
-        for (let i = 0; i < count; i++) {
-          try {
-            const addr = await membershipContract.getRelayAt(i);
-            let url = await membershipContract.relayUrl(addr);
-
-            console.log(`Checking relay ${i + 1}/${count}: ${addr} at ${url}`);
-
-            const ok = await pingRelay(url);
-            if (ok) {
-              aliveAddrs.push(addr);
-              console.log(`Relay ${addr} is alive`);
-            } else {
-              console.log(`Relay ${addr} is not responding`);
-            }
-          } catch (error) {
-            console.error(`Error checking relay ${i}:`, error);
-          }
-        }
-
-        if (aliveAddrs.length === 0) {
-          console.error(
-            `No relays online for epoch ${epochId}, cannot generate proof`
-          );
-          return {
-            success: false,
-            error: `No relays online for epoch ${epochId}`,
-          };
-        }
-
-        // Check if this relay is in the list of alive relays
-        if (!aliveAddrs.includes(relayAddress)) {
-          console.log(
-            `This relay (${relayAddress}) is not in the list of alive relays`
-          );
-          return {
-            success: false,
-            error: `This relay (${relayAddress}) is not in the list of alive relays`,
-          };
-        }
-
-        // Build Merkle tree
-        console.log("Building Merkle tree...");
-
-        // Calculate leaves
-        const leaves = aliveAddrs.map((addr) =>
-          ethers.solidityPackedKeccak256(
-            ["address", "uint256"],
-            [addr, epochId]
-          )
-        );
-
-        // Create Merkle tree
-        const tree = new MerkleTree(leaves, keccak256, { sortPairs: true });
-
-        // Get the leaf for this relay
-        const leaf = ethers.solidityPackedKeccak256(
-          ["address", "uint256"],
-          [relayAddress, epochId]
-        );
-
-        // Get the proof for this relay
-        const proof = tree.getHexProof(leaf);
-
-        console.log(
-          `Generated Merkle proof with ${proof.length} elements for relay ${relayAddress}`
-        );
-
-        // Release funds
-        try {
-          console.log(`Calling releaseWithProof for epoch ${epochId}...`);
-          const tx = await membershipContract.releaseWithProof(epochId, proof);
-          console.log(`Transaction submitted: ${tx.hash}`);
-
-          const receipt = await tx.wait();
-          console.log(
-            `Funds released successfully in transaction ${tx.hash}, block ${receipt.blockNumber}`
-          );
-
-          return {
-            success: true,
-            txHash: tx.hash,
-            proof: proof,
-            epochId: epochId.toString(),
-          };
-        } catch (error) {
-          // Check if the error is due to funds already being released
-          if (error.message.includes("already released")) {
-            console.log(`Funds for epoch ${epochId} already released`);
-            return {
-              success: false,
-              error: `Funds for epoch ${epochId} already released`,
-            };
-          } else {
-            console.error(`Error releasing funds for epoch ${epochId}:`, error);
-            return {
-              success: false,
-              error: `Error releasing funds: ${error.message}`,
-            };
-          }
-        }
-      } catch (error) {
-        console.error("Error in manual fund release:", error);
-        return {
-          success: false,
-          error: `Error in fund release process: ${error.message}`,
-        };
-      }
-    }
-
-    // Set up interval to run the fund release check
-    fundReleaseInterval = setInterval(
-      generateAndSubmitProof,
-      FUND_RELEASE_CONFIG.interval
-    );
-
-    // Run immediately on start
-    setTimeout(generateAndSubmitProof, 10000);
-
-    console.log(
-      `Fund release service initialized, running checks every ${
-        FUND_RELEASE_CONFIG.interval / 1000
-      } seconds`
-    );
-
-    // Export the manual fund release function for API endpoint use
-    global.manualFundRelease = manualFundRelease;
-
-    return true;
-  } catch (error) {
-    console.error("Error initializing fund release service:", error);
-    return false;
-  }
-}
-
-/**
- * Stop the fund release service
- */
-function stopFundReleaseService() {
-  if (fundReleaseInterval) {
-    clearInterval(fundReleaseInterval);
-    fundReleaseInterval = null;
-    console.log("Fund release service stopped");
-  }
-}
-
-// Add API endpoint for manual fund release
-// Add this in the API endpoints section, near other /api/relay endpoints
-app.post("/api/relay/release-funds", authenticateRequest, async (req, res) => {
-  try {
-    // Only admin or system tokens can manually release funds
-    if (!req.auth.isSystemToken && !req.auth.permissions?.includes("admin")) {
-      return res.status(403).json({
-        success: false,
-        error: "Only administrators can manually release funds",
-      });
-    }
-
-    // Get the epoch from the request, or use null to use the current epoch
-    const epochId = req.body.epochId || null;
-
-    // Check if the manual fund release function is available
-    if (!global.manualFundRelease) {
-      return res.status(503).json({
-        success: false,
-        error: "Fund release service not initialized",
-      });
-    }
-
-    // Call the manual fund release function
-    const result = await global.manualFundRelease(
-      epochId ? BigInt(epochId) : null
-    );
-
-    if (result.success) {
-      res.json({
-        success: true,
-        message: "Funds released successfully",
-        txHash: result.txHash,
-        epochId: result.epochId,
-        proofLength: result.proof.length,
-      });
-    } else {
-      res.status(400).json({
-        success: false,
-        error: result.error,
-      });
-    }
-  } catch (error) {
-    console.error("Error during manual fund release:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// API - Get fund release service status
-app.get(
-  "/api/relay/release-funds/status",
-  authenticateRequest,
-  async (req, res) => {
-    try {
-      const FUND_RELEASE_CONFIG = {
-        enabled: process.env.FUND_RELEASE_ENABLED === "true" || false,
-        interval:
-          parseInt(process.env.FUND_RELEASE_INTERVAL || "3600", 10) * 1000,
-        membershipContract: process.env.RELAY_MEMBERSHIP_CONTRACT || "",
-        oracleBridgeContract: process.env.ORACLE_BRIDGE_CONTRACT || "",
-      };
-
-      res.json({
-        success: true,
-        config: {
-          enabled: FUND_RELEASE_CONFIG.enabled,
-          interval: FUND_RELEASE_CONFIG.interval / 1000, // Convert to seconds for readability
-          membershipContract: FUND_RELEASE_CONFIG.membershipContract,
-          oracleBridgeContract: FUND_RELEASE_CONFIG.oracleBridgeContract,
-        },
-        isRunning: !!fundReleaseInterval,
-        serviceAvailable: !!global.manualFundRelease,
-      });
-    } catch (error) {
-      console.error("Error getting fund release service status:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
-);
+export default app;
