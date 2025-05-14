@@ -5,15 +5,26 @@ import cors from "cors";
 import multer from "multer";
 import fs from "fs";
 import express from "express";
-import { ShogunIpfs } from "shogun-ipfs";
 import { ShogunCore, RelayVerifier, DIDVerifier } from "shogun-core";
 import Gun from "gun";
 import path from "path";
-import crypto from "crypto";
 import http from "http";
-import https from "https";
-//import "./bullet-catcher.js";
 import "bullet-catcher";
+import { 
+  AuthenticationManager, 
+  isKeyPreAuthorized, 
+  authorizeKey, 
+  verifyJWT, 
+  configure 
+} from "./AuthenticationManager.js";
+import ShogunIpfsManager from "./IpfsManager.js";
+import ShogunFileManager from "./FileManager.js";
+import setupAuthRoutes from "./authRoutes.js"; // Import the new auth router setup function
+import setupIpfsApiRoutes from "./ipfsApiRoutes.js"; // Import the new IPFS router setup function
+import setupRelayApiRoutes from "./relayApiRoutes.js"; // Import the new relay router setup function
+
+// create __dirname
+const __dirname = path.resolve();
 
 // Import the utility functions
 import { gunPubKeyToHex } from "./utils.js";
@@ -21,333 +32,37 @@ import { gunPubKeyToHex } from "./utils.js";
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 8765;
+const HOST = process.env.HOST || "localhost";
 const STORAGE_DIR = path.resolve("./uploads");
 const SECRET_TOKEN = process.env.API_SECRET_TOKEN || "thisIsTheTokenForReals";
+const JWT_SECRET =
+  process.env.JWT_SECRET ||
+  process.env.API_SECRET_TOKEN ||
+  "thisIsTheTokenForReals";
 const LOGS_DIR = path.resolve("./logs");
 
 // Initial configuration of RELAY_CONFIG - set once at the start
 const RELAY_CONFIG = {
   relay: {
-    // Set enabled flag only once here
-    enabled: process.env.RELAY_ENABLED === "true" || true,
-    registryAddress:
-      process.env.RELAY_REGISTRY_CONTRACT ||
-      "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-    providerUrl: process.env.ETHEREUM_PROVIDER_URL || "http://localhost:8545",
-    // Set onchainMembership flag only once here
-    onchainMembership:
-      process.env.ONCHAIN_MEMBERSHIP_ENABLED === "true" || true,
+    registryAddress: process.env.RELAY_REGISTRY_CONTRACT,
+    providerUrl: process.env.ETHEREUM_PROVIDER_URL,
+    // Convert string 'true'/'false' to actual boolean
+    onchainMembership: process.env.ONCHAIN_MEMBERSHIP_ENABLED === 'true',
   },
   didVerifier: {
-    enabled: process.env.DID_VERIFIER_ENABLED === "true" || false,
-    contractAddress: process.env.DID_REGISTRY_CONTRACT || "",
-    providerUrl: process.env.ETHEREUM_PROVIDER_URL || "http://localhost:8545",
+    // Convert string 'true'/'false' to actual boolean
+    enabled: process.env.DID_VERIFIER_ENABLED === 'true',
+    contractAddress: process.env.DID_REGISTRY_CONTRACT,
+    providerUrl: process.env.ETHEREUM_PROVIDER_URL,
   },
+  keyPair: process.env.APP_KEY_PAIR,
 };
-
-// Create a way to let the first message through if it's authorized
-const pendingValidations = new Map();
 
 // This map will store temporarily authorized keys
 const authorizedKeys = new Map();
 // Expire authorized keys after 5 minutes
 const AUTH_KEY_EXPIRY = 5 * 60 * 1000;
 
-/**
- * Check if a public key is pre-authorized in our temporary cache
- * @param {string} pubKey - The public key to check
- * @returns {boolean} - True if the key is pre-authorized
- */
-function isKeyPreAuthorized(pubKey) {
-  if (!pubKey) return false;
-  
-  const authInfo = authorizedKeys.get(pubKey);
-  if (!authInfo) return false;
-  
-  // Check if the authorization has expired
-  if (Date.now() > authInfo.expiresAt) {
-    authorizedKeys.delete(pubKey);
-    return false;
-  }
-  
-  return true;
-}
-
-/**
- * Temporarily authorize a public key
- * @param {string} pubKey - The public key to authorize
- * @param {number} expiryMs - Optional expiry time in ms, defaults to AUTH_KEY_EXPIRY
- * @returns {Object} Auth info including expiry time
- */
-function authorizeKey(pubKey, expiryMs = AUTH_KEY_EXPIRY) {
-  if (!pubKey) throw new Error("Public key required for authorization");
-  
-  const authInfo = {
-    pubKey,
-    authorizedAt: Date.now(),
-    expiresAt: Date.now() + expiryMs,
-  };
-  
-  authorizedKeys.set(pubKey, authInfo);
-  console.log(`[PRE-AUTH] Key authorized: ${pubKey.substring(0, 10)}... (expires in ${expiryMs/1000}s)`);
-  
-  return authInfo;
-}
-
-async function hasValidToken(msg) {
-  const containsPut = msg.put && Object.keys(msg.put).length > 0;
-
-  // Verify if the message is a write (contains put) and relay auth is enabled
-  if (
-    containsPut &&
-    RELAY_CONFIG.relay.enabled &&
-    RELAY_CONFIG.relay.onchainMembership &&
-    relayVerifier
-  ) {
-    // Function to extract and verify public key
-    const verifyPubKey = async function () {
-      console.log("===== RELAY AUTHORIZATION CHECK TRIGGERED =====");
-      let pubKey = null;
-
-      // Extract public key from put nodes starting with ~
-      const putKeys = Object.keys(msg.put);
-      for (const key of putKeys) {
-        if (key.startsWith("~")) {
-          const dotIndex = key.indexOf(".");
-          pubKey = dotIndex > 0 ? key.substring(1, dotIndex) : key.substring(1);
-          break;
-        }
-      }
-
-      // If not found in put, check other common fields
-      if (!pubKey) {
-        if (msg.user && msg.user.pub) {
-          pubKey = msg.user.pub;
-        } else if (msg.from && msg.from.pub) {
-          pubKey = msg.from.pub;
-        } else if (msg.pub) {
-          pubKey = msg.pub;
-        }
-      }
-
-      if (pubKey) {
-        // First check if this key is pre-authorized in our cache
-        if (isKeyPreAuthorized(pubKey)) {
-          console.log(`[RELAY-AUTH] Key ${pubKey.substring(0, 10)}... is PRE-AUTHORIZED, allowing write`);
-          return true;
-        }
-        
-        console.log(`[RELAY-AUTH] Found pubKey: ${pubKey}`);
-        try {
-          // Convert pubKey to hex format
-          const hexPubKey = gunPubKeyToHex(pubKey);
-          if (!hexPubKey) {
-            console.warn(
-              `[RELAY-AUTH] Failed to convert pubKey ${pubKey.substring(
-                0,
-                10
-              )}... to hex format`
-            );
-            return false;
-          }
-          console.log(`[RELAY-AUTH] Converted to hex: ${hexPubKey}`);
-
-          // Get all active relays
-          console.log(`[RELAY-AUTH] Getting all active relays...`);
-          const activeRelays = await relayVerifier.getAllRelays();
-          console.log(`[RELAY-AUTH] Found ${activeRelays.length} relays`);
-
-          // If there are no active relays, reject
-          if (!activeRelays || activeRelays.length === 0) {
-            console.warn(
-              `[RELAY-AUTH] No active relays found, rejecting message`
-            );
-            return false;
-          }
-
-          // Check each relay until we find one that authorizes this pubkey
-          let isAuthorized = false;
-          for (const relayAddress of activeRelays) {
-            console.log(
-              `[RELAY-AUTH] Checking authorization on relay ${relayAddress}...`
-            );
-            try {
-              isAuthorized = await relayVerifier.isPublicKeyAuthorized(
-                relayAddress,
-                hexPubKey
-              );
-
-              if (isAuthorized) {
-                console.log(
-                  `[RELAY-AUTH] Key authorized by relay ${relayAddress}`
-                );
-                
-                // If key is authorized, cache it for future writes
-                authorizeKey(pubKey);
-                
-                break;
-              } else {
-                console.log(
-                  `[RELAY-AUTH] Key not authorized by relay ${relayAddress}`
-                );
-              }
-            } catch (error) {
-              console.error(
-                `[RELAY-AUTH] Error checking relay ${relayAddress}:`,
-                error.message
-              );
-            }
-          }
-
-          if (!isAuthorized) {
-            console.warn(
-              `[RELAY-AUTH] BLOCKING write from unauthorized key ${pubKey.substring(
-                0,
-                10
-              )}...`
-            );
-            return false;
-          }
-
-          console.log(
-            `[RELAY-AUTH] Allowing write from authorized key ${pubKey.substring(
-              0,
-              10
-            )}...`
-          );
-          return true;
-        } catch (error) {
-          console.error(
-            `[RELAY-AUTH] Error during authorization check:`,
-            error
-          );
-          return false;
-        }
-      } else {
-        console.warn(`[RELAY-AUTH] Could not find pubKey in message`);
-        return false;
-      }
-    };
-
-    // Execute verification synchronously with await
-    try {
-      const isAuthorized = await verifyPubKey();
-
-      if (isAuthorized) {
-        console.log(`[RELAY-AUTH] Message allowed - authorization verified`);
-        return true;
-      } else {
-        console.warn(`[RELAY-AUTH] Message BLOCKED - authorization failed`);
-        return false;
-      }
-    } catch (err) {
-      console.error(`[RELAY-AUTH] Error in verification process:`, err);
-      // In case of error, block the request for safety
-      return false; // Make sure to return false on errors
-    }
-  }
-
-  // For non-PUT requests or when relay isn't configured, allow the message
-  return true;
-}
-
-function isValidTest(msg) {
-  return true;
-}
-
-// Fix the isValid function to properly handle authorization
-const gunOptions = {
-  web: server,
-  file: "radata",
-  radisk: true,
-  localStorage: false,
-  isValid: function (msg) {
-    // Short-circuit per messaggi non-PUT
-    if (!msg.put || Object.keys(msg.put).length === 0) {
-      return true;
-    }
-
-    // Skip se relay non è abilitato
-    if (
-      !RELAY_CONFIG.relay.enabled ||
-      !RELAY_CONFIG.relay.onchainMembership ||
-      !relayVerifier
-    ) {
-      return true;
-    }
-
-    console.log("[RELAY-AUTH] Validating message...");
-
-    // Estrai la chiave pubblica
-    let pubKey = null;
-
-    // Extract from put nodes starting with ~
-    const putKeys = Object.keys(msg.put);
-    for (const key of putKeys) {
-      if (key.startsWith("~")) {
-        const dotIndex = key.indexOf(".");
-        pubKey = dotIndex > 0 ? key.substring(1, dotIndex) : key.substring(1);
-        break;
-      }
-    }
-
-    // If not found in put, check other common fields
-    if (!pubKey) {
-      if (msg.user && msg.user.pub) {
-        pubKey = msg.user.pub;
-      } else if (msg.from && msg.from.pub) {
-        pubKey = msg.from.pub;
-      } else if (msg.pub) {
-        pubKey = msg.pub;
-      }
-    }
-
-    if (!pubKey) {
-      console.warn("[RELAY-AUTH] No public key found in message - BLOCKED");
-      return false;
-    }
-
-    // SYNCHRONOUS CHECK: Check all possible variants of the key
-    const keyVariants = [
-      pubKey,                             // Original key
-      pubKey.startsWith('@') ? pubKey.substring(1) : pubKey, // Remove @ if present
-      pubKey.startsWith('@') ? pubKey : '@' + pubKey,        // Add @ if not present
-    ];
-
-    // If pubKey contains a dot (like in pairs with epub), get only the first part
-    const dotIndex = pubKey.indexOf('.');
-    if (dotIndex > 0) {
-      const basePubKey = pubKey.substring(0, dotIndex);
-      keyVariants.push(basePubKey);
-      keyVariants.push('@' + basePubKey);
-    }
-
-    // Check all variants
-    for (const variant of keyVariants) {
-      if (isKeyPreAuthorized(variant)) {
-        console.log(`[RELAY-AUTH] Key variant ${variant.substring(0, 10)}... is pre-authorized - ALLOWED`);
-        return true;
-      }
-    }
-    
-    // If not pre-authorized, we need to handle it differently since we can't do async here
-    console.log(`[RELAY-AUTH] Key ${pubKey.substring(0, 10)}... is not pre-authorized - Queueing for verification`);
-    
-    // We need to return false for now, and suggest using the pre-authorization endpoint
-    console.log(`[RELAY-AUTH] ACTION NEEDED: Authorize key first by calling /api/relay/pre-authorize/${pubKey}`);
-    
-    return false;
-  },
-};
-
-// Check if we're in a development environment
-const isDevMode = process.env.NODE_ENV === "development";
-
-// Relay component instances
-let relayVerifier = null;
-let didVerifier = null;
-
-// CORS Configuration
 const getDefaultAllowedOrigins = () => {
   return [
     "http://localhost:3000",
@@ -358,14 +73,44 @@ const getDefaultAllowedOrigins = () => {
     "http://127.0.0.1:3000",
     "http://127.0.0.1:8080",
     "http://127.0.0.1:8765",
+    "http://localhost:8765",
   ];
 };
 
+// Define allowedOrigins once
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",")
   : getDefaultAllowedOrigins();
 
-// Configure CORS
+// Configure the AuthenticationManager with our variables
+configure({
+  SECRET_TOKEN,
+  JWT_SECRET,
+  authorizedKeys,
+  AUTH_KEY_EXPIRY,
+  RELAY_CONFIG,
+  relayVerifier: null, // Will be set later after initialization
+  allowedOrigins,
+});
+
+// Fix the isValid function to properly handle authorization
+const gunOptions = {
+  web: server,
+  peers: ["http://localhost:8765/gun"],
+  file: "radata",
+  radisk: true,
+  localStorage: false,
+  isValid: AuthenticationManager.isValidGunMessage.bind(AuthenticationManager) // Corrected: Use .bind()
+};
+
+// Relay component instances
+let relayVerifier = null;
+let didVerifier = null;
+
+// Initialize ShogunCore with the same Gun instance
+let shogunCore = null;
+
+// CORS Configuration
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -395,28 +140,8 @@ if (!fs.existsSync(LOGS_DIR)) {
   fs.mkdirSync(LOGS_DIR, { recursive: true });
 }
 
-/**
- * Log errors to file and console
- * @param {string} message - Error description
- * @param {Error} error - Error object
- */
-function logError(message, error) {
-  const timestamp = new Date().toISOString();
-  const errorLog = `[${timestamp}] ${message}: ${error.message}\n${
-    error.stack || ""
-  }\n\n`;
-
-  try {
-    fs.appendFileSync(path.join(LOGS_DIR, "error.log"), errorLog);
-  } catch (logError) {
-    console.error("Error writing to log file:", logError);
-  }
-
-  console.error(`[${timestamp}] ${message}:`, error);
-}
-
-// IPFS Configuration with in-memory state
-let IPFS_CONFIG = {
+// Initialize IpfsManager
+const ipfsManager = new ShogunIpfsManager({
   enabled: process.env.IPFS_ENABLED === "true" || false,
   service: process.env.IPFS_SERVICE || "IPFS-CLIENT",
   nodeUrl: process.env.IPFS_NODE_URL || "http://127.0.0.1:5001",
@@ -426,202 +151,15 @@ let IPFS_CONFIG = {
   encryptionEnabled: process.env.ENCRYPTION_ENABLED === "true" || false,
   encryptionKey: process.env.ENCRYPTION_KEY || "",
   encryptionAlgorithm: process.env.ENCRYPTION_ALGORITHM || "aes-256-gcm",
-};
+  apiKey: SECRET_TOKEN,
+});
 
-// Initialize ShogunIpfs
-let shogunIpfs;
+// Declare FileManager at module scope
+let fileManager; 
 
-/**
- * Initialize IPFS with the current configuration
- * @returns {Object|null} IPFS instance or null if initialization failed
- */
-function initializeIpfs() {
-  if (!IPFS_CONFIG.enabled) {
-    console.log("IPFS not enabled, initialization skipped");
-    return null;
-  }
-
-  try {
-    console.log("Initializing IPFS with configuration:", {
-      service: IPFS_CONFIG.service,
-      nodeUrl: IPFS_CONFIG.nodeUrl,
-      gateway: IPFS_CONFIG.gateway,
-      hasCredentials:
-        IPFS_CONFIG.service === "PINATA" &&
-        IPFS_CONFIG.pinataJwt &&
-        IPFS_CONFIG.pinataJwt.length > 10,
-    });
-
-    // Configuration according to documentation
-    const ipfsConfig = {
-      storage: {
-        service: IPFS_CONFIG.service || "IPFS-CLIENT", // Ensure service always has a value
-        config: {
-          url: IPFS_CONFIG.nodeUrl,
-          apiKey: SECRET_TOKEN, // Pass secret token as apiKey
-        },
-      },
-    };
-
-    // Configure based on chosen service
-    if (IPFS_CONFIG.service === "PINATA") {
-      if (!IPFS_CONFIG.pinataJwt || IPFS_CONFIG.pinataJwt.length < 10) {
-        throw new Error("JWT Pinata missing or invalid");
-      }
-
-      ipfsConfig.storage.config = {
-        pinataJwt: IPFS_CONFIG.pinataJwt,
-        pinataGateway: IPFS_CONFIG.pinataGateway,
-      };
-      console.log("Configured IPFS with Pinata service");
-    } else if (IPFS_CONFIG.service === "IPFS-CLIENT") {
-      ipfsConfig.storage.config = {
-        url: IPFS_CONFIG.nodeUrl,
-        apiKey: SECRET_TOKEN, // Pass secret token as apiKey
-      };
-      console.log(
-        "Configured IPFS with IPFS-CLIENT, URL:",
-        IPFS_CONFIG.nodeUrl
-      );
-    } else {
-      throw new Error(`IPFS service not supported: ${IPFS_CONFIG.service}`);
-    }
-
-    // Verify ShogunIpfs is defined
-    if (typeof ShogunIpfs !== "function") {
-      throw new Error("ShogunIpfs not available, check module import");
-    }
-
-    // Create IPFS instance
-    const ipfsInstance = new ShogunIpfs(ipfsConfig.storage);
-
-    // Verify instance is valid
-    if (!ipfsInstance || typeof ipfsInstance.uploadJson !== "function") {
-      throw new Error("ShogunIpfs instance does not have uploadJson method");
-    }
-
-    // Add pin/unpin methods if they don't exist
-    if (!ipfsInstance.pin) {
-      console.log("pin method not found, added fallback");
-      ipfsInstance.pin = async (hash) => {
-        if (
-          ipfsInstance.getStorage &&
-          typeof ipfsInstance.getStorage === "function"
-        ) {
-          const storage = ipfsInstance.getStorage();
-          if (storage && typeof storage.pin === "function") {
-            return storage.pin(hash);
-          }
-        }
-        console.warn(
-          "IPFS library method pin not supported, returning simulated success"
-        );
-        return { success: true, simulated: true };
-      };
-    }
-
-    if (!ipfsInstance.unpin) {
-      console.log("unpin method not found, added fallback");
-      ipfsInstance.unpin = async (hash) => {
-        if (
-          ipfsInstance.getStorage &&
-          typeof ipfsInstance.getStorage === "function"
-        ) {
-          const storage = ipfsInstance.getStorage();
-          if (storage && typeof storage.unpin === "function") {
-            return storage.unpin(hash);
-          }
-        }
-        console.warn(
-          "IPFS library method unpin not supported, returning simulated success"
-        );
-        return { success: true, simulated: true };
-      };
-    }
-
-    if (!ipfsInstance.isPinned) {
-      console.log("isPinned method not found, added fallback");
-      ipfsInstance.isPinned = async (hash) => {
-        if (
-          ipfsInstance.getStorage &&
-          typeof ipfsInstance.getStorage === "function"
-        ) {
-          const storage = ipfsInstance.getStorage();
-          if (storage && typeof storage.isPinned === "function") {
-            return storage.isPinned(hash);
-          }
-        }
-
-        try {
-          // Try to verify if the file is pinned
-          if (
-            typeof ipfsInstance.pin === "function" &&
-            typeof ipfsInstance.pin.ls === "function"
-          ) {
-            const pins = await ipfsInstance.pin.ls({ paths: [hash] });
-            let found = false;
-
-            // Convert to array if needed
-            if (pins && pins.length) {
-              for (const pin of pins) {
-                if (pin.cid && pin.cid.toString() === hash) {
-                  found = true;
-                  break;
-                }
-              }
-            }
-
-            return found;
-          } else {
-            console.warn(
-              "IPFS library method pin.ls not supported, returning false"
-            );
-            return false;
-          }
-        } catch (error) {
-          // If the error contains "not pinned", it means the file is simply not pinned
-          if (error.message && error.message.includes("not pinned")) {
-            console.log(
-              `File ${hash} not pinned, normal error:`,
-              error.message
-            );
-            return false;
-          }
-
-          console.warn(
-            `Error during pin verification for ${hash}:`,
-            error.message
-          );
-          return false;
-        }
-      };
-    }
-
-    // Verify connection if possible
-    if (typeof ipfsInstance.isConnected === "function") {
-      ipfsInstance
-        .isConnected()
-        .then((connected) => {
-          console.log(
-            `IPFS connection verified: ${connected ? "OK" : "Failed"}`
-          );
-        })
-        .catch((err) => {
-          console.warn("Unable to verify IPFS connection:", err.message);
-        });
-    }
-
-    console.log("ShogunIpfs initialized successfully");
-    return ipfsInstance;
-  } catch (error) {
-    console.error("IPFS initialization error:", error);
-    console.error("Error details:", error.message);
-
-    // Disable IPFS in case of initialization error
-    IPFS_CONFIG.enabled = false;
-    return null;
-  }
-}
+// For backward compatibility
+let IPFS_CONFIG = ipfsManager.getConfig();
+let shogunIpfs = ipfsManager.getInstance();
 
 // Create upload directory if it doesn't exist
 if (!fs.existsSync(STORAGE_DIR)) {
@@ -635,17 +173,17 @@ app.use("/uploads", express.static(STORAGE_DIR));
 app.use(Gun.serve);
 
 // Multer for file uploads
-let upload;
+let upload; // upload variable is managed by FileManager now
 
 /**
  * Configure Multer based on IPFS availability
  */
 function configureMulter() {
   console.log(
-    `Configuring Multer - IPFS ${IPFS_CONFIG.enabled ? "enabled" : "disabled"}`
+    `Configuring Multer - IPFS ${ipfsManager.isEnabled() ? "enabled" : "disabled"}`
   );
 
-  if (IPFS_CONFIG.enabled) {
+  if (ipfsManager.isEnabled()) {
     // When IPFS is enabled, use memoryStorage to keep buffer in memory
     const memoryStorage = multer.memoryStorage();
     upload = multer({
@@ -698,9 +236,9 @@ let gun;
  * @param {number} length - Length of the token
  * @returns {string} The generated token
  */
-function generateSecureToken(length = 32) {
-  return crypto.randomBytes(length).toString("hex");
-}
+// function generateSecureToken(length = 32) { // <<< REMOVED
+// return crypto.randomBytes(length).toString("hex");
+// }
 
 /**
  * Creates a new API token for a user
@@ -709,139 +247,114 @@ function generateSecureToken(length = 32) {
  * @param {Date|null} expiresAt - Optional expiration date
  * @returns {Promise<object>} The created token information
  */
-async function createUserToken(userId, tokenName, expiresAt = null) {
-  return new Promise((resolve, reject) => {
-    if (!userId) {
-      reject(new Error("User ID is required"));
-      return;
-    }
-
-    const tokenValue = generateSecureToken();
-    const tokenId = generateSecureToken(16);
-
-    const tokenData = {
-      id: tokenId,
-      token: tokenValue,
-      name: tokenName || "API Token",
-      userId: userId,
-      createdAt: Date.now(),
-      expiresAt: expiresAt ? expiresAt.getTime() : null,
-      lastUsed: null,
-      revoked: false,
-    };
-
-    // Store in GunDB under users/[userId]/tokens/[tokenId]
-    gun
-      .get("users")
-      .get(userId)
-      .get("tokens")
-      .get(tokenId)
-      .put(tokenData, (ack) => {
-        if (ack.err) {
-          reject(new Error("Failed to store token: " + ack.err));
-        } else {
-          // Also store in a token index for quick lookup
-          gun
-            .get("tokenIndex")
-            .get(tokenValue)
-            .put(
-              {
-                userId: userId,
-                tokenId: tokenId,
-              },
-              (indexAck) => {
-                if (indexAck.err) {
-                  console.warn("Failed to index token: " + indexAck.err);
-                }
-                resolve(tokenData);
-              }
-            );
-        }
-      });
-  });
-}
+// async function createUserToken(userId, tokenName, expiresAt = null) { // <<< REMOVED
+// return new Promise((resolve, reject) => {
+// console.log(
+// `[CREATE-TOKEN] Creating token for user ${userId}, name: ${
+// tokenName || "API Token"
+// }`
+// );
+// if (!userId) {
+// console.error("[CREATE-TOKEN] Error: User ID is required");
+// reject(new Error("User ID is required"));
+// return;
+// }
+// const tokenId = generateSecureToken(16);
+// const expiryDate =
+// expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+// const tokenPayload = {
+// userId: userId,
+// tokenId: tokenId,
+// name: tokenName || "API Token",
+// iat: Math.floor(Date.now() / 1000),
+// exp: Math.floor(expiryDate.getTime() / 1000),
+// };
+// const tokenValue = jwt.sign(tokenPayload, JWT_SECRET);
+// console.log(
+// `[CREATE-TOKEN] Generated tokenId: ${tokenId.substring(0, 6)}...`
+// );
+// const tokenData = {
+// id: tokenId,
+// token: tokenValue,
+// name: tokenName || "API Token",
+// userId: userId,
+// createdAt: Date.now(),
+// expiresAt: expiryDate.getTime(),
+// lastUsed: null,
+// revoked: false,
+// };
+// console.log(`[CREATE-TOKEN] Token data created, storing in Gun DB...`);
+// if (!gun) {
+// console.error("[CREATE-TOKEN] Error: Gun instance is not available");
+// reject(new Error("Gun database not available"));
+// return;
+// }
+// gun
+// .get("users")
+// .get(userId)
+// .get("tokens")
+// .get(tokenId)
+// .put(tokenData, (ack) => {
+// if (ack.err) {
+// console.error(`[CREATE-TOKEN] Failed to store token: ${ack.err}`);
+// reject(new Error("Failed to store token: " + ack.err));
+// } else {
+// console.log(`[CREATE-TOKEN] Token stored for user ${userId}`);
+// gun
+// .get("tokenIndex")
+// .get(tokenId)
+// .put(
+// {
+// userId: userId,
+// tokenId: tokenId,
+// },
+// (indexAck) => {
+// if (indexAck.err) {
+// console.warn(
+// `[CREATE-TOKEN] Failed to index token: ${indexAck.err}`
+// );
+// } else {
+// console.log(`[CREATE-TOKEN] Token indexed for quick lookup`);
+// }
+// resolve(tokenData);
+// }
+// );
+// }
+// });
+// });
+// }
 
 /**
  * Validates a user token
  * @param {string} token - The token to validate
  * @returns {Promise<object|null>} User info if token is valid, null otherwise
  */
-async function validateUserToken(token) {
-  return new Promise((resolve) => {
-    // First check the master token for admin/system operations
-    if (token === SECRET_TOKEN) {
-      resolve({
-        valid: true,
-        isSystemToken: true,
-        userId: "system",
-        permissions: ["admin"],
-      });
-      return;
-    }
-
-    // Look up the token in the index
-    gun
-      .get("tokenIndex")
-      .get(token)
-      .once(async (indexData) => {
-        if (!indexData || !indexData.userId || !indexData.tokenId) {
-          resolve(null);
-          return;
-        }
-
-        const userId = indexData.userId;
-        const tokenId = indexData.tokenId;
-
-        // Get the full token data
-        gun
-          .get("users")
-          .get(userId)
-          .get("tokens")
-          .get(tokenId)
-          .once((tokenData) => {
-            if (!tokenData || tokenData.revoked) {
-              resolve(null);
-              return;
-            }
-
-            // Check expiration
-            if (tokenData.expiresAt && Date.now() > tokenData.expiresAt) {
-              resolve(null);
-              return;
-            }
-
-            // Update last used timestamp
-            gun
-              .get("users")
-              .get(userId)
-              .get("tokens")
-              .get(tokenId)
-              .get("lastUsed")
-              .put(Date.now());
-
-            // Get user's permissions - now from the Gun user object's profile
-            gun
-              .user(userId)
-              .get("profile")
-              .get("permissions")
-              .once((permissions) => {
-                resolve({
-                  valid: true,
-                  isSystemToken: false,
-                  userId: userId,
-                  tokenId: tokenId,
-                  permissions: permissions || ["user"],
-                });
-              });
-          });
-      });
-
-    // Set a timeout in case Gun doesn't respond
-    setTimeout(() => {
-      resolve(null);
-    }, 3000);
-  });
-}
+// async function validateUserToken(token) { // <<< KEPT FOR NOW, but should be reviewed if it's still needed or if AuthenticationManager.validateToken is sufficient everywhere
+// return new Promise((resolve) => {
+// AuthenticationManager.validateToken(token)
+// .then(auth => {
+// if (!auth) {
+// resolve(null);
+// return;
+// }
+// const tokenData = {
+// valid: true,
+// isSystemToken: auth.isSystemToken,
+// userId: auth.userId,
+// permissions: auth.permissions || ["user"],
+// source: auth.source,
+// };
+// resolve(tokenData);
+// })
+// .catch(err => {
+// console.error("Error in token validation:", err);
+// resolve(null);
+// });
+// setTimeout(() => {
+// resolve(null);
+// }, 3000);
+// });
+// }
 
 /**
  * Revokes a user token
@@ -849,80 +362,53 @@ async function validateUserToken(token) {
  * @param {string} tokenId - The token ID
  * @returns {Promise<boolean>} True if revoked successfully
  */
-async function revokeUserToken(userId, tokenId) {
-  return new Promise((resolve) => {
-    gun
-      .get("users")
-      .get(userId)
-      .get("tokens")
-      .get(tokenId)
-      .get("revoked")
-      .put(true, (ack) => {
-        resolve(!ack.err);
-      });
-
-    // Set a timeout in case Gun doesn't respond
-    setTimeout(() => {
-      resolve(false);
-    }, 3000);
-  });
-}
+// async function revokeUserToken(userId, tokenId) { // <<< REMOVED
+// return new Promise((resolve) => {
+// gun
+// .get("users")
+// .get(userId)
+// .get("tokens")
+// .get(tokenId)
+// .get("revoked")
+// .put(true, (ack) => {
+// resolve(!ack.err);
+// });
+// setTimeout(() => {
+// resolve(false);
+// }, 3000);
+// });
+// }
 
 /**
  * Lists all tokens for a user
  * @param {string} userId - The user ID
  * @returns {Promise<Array>} List of tokens
  */
-async function listUserTokens(userId) {
-  return new Promise((resolve) => {
-    const tokens = [];
-
-    gun
-      .get("users")
-      .get(userId)
-      .get("tokens")
-      .map()
-      .once((token, tokenId) => {
-        if (tokenId !== "_" && token) {
-          // Don't include the actual token value in the response
-          const safeToken = { ...token };
-          if (safeToken.token) {
-            // Only show first/last few characters
-            safeToken.token =
-              safeToken.token.substring(0, 4) +
-              "..." +
-              safeToken.token.substring(safeToken.token.length - 4);
-          }
-          tokens.push(safeToken);
-        }
-      });
-
-    // Resolve after giving Gun time to respond
-    setTimeout(() => {
-      resolve(tokens);
-    }, 2000);
-  });
-}
-
-/**
- * Helper function to extract token from various request sources
- * @param {Object} req - Express request object
- * @returns {string|null} The extracted token or null
- */
-function getTokenFromRequest(req) {
-  // Check various places where token might be present
-  const authHeader = req.headers.authorization;
-  const queryToken = req.query.token;
-  const bodyToken = req.body && req.body.token;
-
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    return authHeader.substring(7); // Remove 'Bearer ' from token
-  } else if (authHeader) {
-    return authHeader; // Token might be directly in header
-  }
-
-  return queryToken || bodyToken;
-}
+// async function listUserTokens(userId) { // <<< REMOVED
+// return new Promise((resolve) => {
+// const tokens = [];
+// gun
+// .get("users")
+// .get(userId)
+// .get("tokens")
+// .map()
+// .once((token, tokenId) => {
+// if (tokenId !== "_" && token) {
+// const safeToken = { ...token };
+// if (safeToken.token) {
+// safeToken.token =
+// safeToken.token.substring(0, 4) +
+// "..." +
+// safeToken.token.substring(safeToken.token.length - 4);
+// }
+// tokens.push(safeToken);
+// }
+// });
+// setTimeout(() => {
+// resolve(tokens);
+// }, 2000);
+// });
+// }
 
 /**
  * Enhanced token validation middleware that supports both system and user tokens
@@ -931,478 +417,209 @@ function getTokenFromRequest(req) {
  * @param {Function} next - Next middleware
  */
 const authenticateRequest = async (req, res, next) => {
-  // Skip authentication for OPTIONS preflight requests
-  if (req.method === "OPTIONS") {
-    return next();
-  }
-
-  // Extract token from request
-  const token = getTokenFromRequest(req);
-
-  if (!token) {
-    console.warn("Request rejected: token missing", req.path);
-    return res.status(401).json({
-      success: false,
-      error: "Authentication required. Token missing.",
-    });
-  }
-
-  // Verify token - now supporting both system and user tokens
-  try {
-    const tokenData = await validateUserToken(token);
-
-    if (!tokenData) {
-      console.warn("Request rejected: invalid token", req.path);
-      return res.status(403).json({
-        success: false,
-        error: "Invalid token.",
-      });
-    }
-
-    // Store user info in request for use in route handlers
-    req.auth = tokenData;
-
-    // Valid token, proceed
-    next();
-  } catch (error) {
-    console.error("Authentication error:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Authentication error.",
-    });
-  }
+  return AuthenticationManager.authenticateRequest(req, res, next);
 };
 
+// Queste sono le route che non richiedono autenticazione
+// E devono essere definite PRIMA del middleware authenticateRequest
+
+// User registration endpoint
+// app.post("/api/auth/register", async (req, res) => { // <<< REMOVED
+// try {
+// const { username, password, email } = req.body;
+// if (!username || !password) {
+// return res.status(400).json({
+// success: false,
+// error: "Username and password are required",
+// });
+// }
+// const core = ensureShogunCore();
+// if (!core) {
+// return res.status(500).json({
+// success: false,
+// error: "ShogunCore not available",
+// });
+// }
+// const signUpResult = await core.signUp(username, password, password);
+// if (!signUpResult.success) {
+// return res.status(400).json({
+// success: false,
+// error: signUpResult.error || "User registration failed via ShogunCore",
+// });
+// }
+// const user = gun.user();
+// const authUserPromise = new Promise((resolve, reject) => {
+// user.auth(username, password, (ack) => {
+// if (ack.err) {
+// reject(new Error(ack.err || "Gun authentication failed after ShogunCore signup"));
+// } else {
+// resolve(ack);
+// }
+// });
+// });
+// await authUserPromise;
+// if (email) {
+// user.get("profile").get("email").put(email);
+// }
+// user.get("profile").get("permissions").put("user");
+// const tokenPayload = {
+// userId: username,
+// permissions: ["user"],
+// iat: Math.floor(Date.now() / 1000),
+// exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60),
+// };
+// const jwtToken = jwt.sign(tokenPayload, JWT_SECRET);
+// res.json({
+// success: true,
+// message: "User registered successfully via ShogunCore",
+// userId: username,
+// token: jwtToken,
+// gunCert: user._.sea,
+// shogunResult: signUpResult,
+// });
+// } catch (error) {
+// console.error("Registration error:", error);
+// res.status(500).json({
+// success: false,
+// error: error.message,
+// });
+// }
+// });
+
+// Login endpoint
+// app.post("/api/auth/login", async (req, res) => { // <<< REMOVED
+// try {
+// const { username, password } = req.body;
+// if (!username || !password) {
+// return res.status(400).json({
+// success: false,
+// error: "Username and password are required",
+// });
+// }
+// const core = ensureShogunCore();
+// if (!core) {
+// return res.status(500).json({
+// success: false,
+// error: "ShogunCore not available",
+// });
+// }
+// const loginResult = await core.login(username, password);
+// if (!loginResult.success) {
+// return res.status(401).json({
+// success: false,
+// error: loginResult.error || "Login failed via ShogunCore",
+// });
+// }
+// const user = gun.user();
+// const authUserPromise = new Promise((resolve, reject) => {
+// user.auth(username, password, (ack) => {
+// if (ack.err) {
+// reject(new Error(ack.err || "Gun authentication failed after ShogunCore login"));
+// } else {
+// resolve(ack);
+// }
+// });
+// });
+// await authUserPromise;
+// const tokenPayload = {
+// userId: username,
+// permissions: ["user"],
+// iat: Math.floor(Date.now() / 1000),
+// exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60),
+// };
+// const jwtToken = jwt.sign(tokenPayload, JWT_SECRET);
+// res.json({
+// success: true,
+// message: "Login successful via ShogunCore",
+// userId: username,
+// token: jwtToken,
+// gunCert: user._.sea,
+// shogunResult: loginResult,
+// });
+// } catch (error) {
+// console.error("Login error:", error);
+// if (error.message.includes("ShogunCore") || error.message.includes("Gun authentication")) {
+// res.status(401).json({
+// success: false,
+// error: "Invalid username or password",
+// });
+// } else {
+// res.status(500).json({
+// success: false,
+// error: error.message,
+// });
+// }
+// }
+// });
+
+// Verify a token (for testing)
+// app.post("/api/auth/verify-token", async (req, res) => { // <<< REMOVED
+// try {
+// const { token } = req.body;
+// if (!token) {
+// return res.status(400).json({
+// success: false,
+// error: "Token is required",
+// });
+// }
+// const auth = await AuthenticationManager.validateToken(token);
+// if (auth) {
+// const safeData = {
+// valid: true,
+// userId: auth.userId,
+// permissions: auth.permissions,
+// source: auth.source,
+// };
+// res.json({
+// success: true,
+// tokenInfo: safeData,
+// });
+// } else {
+// res.json({
+// success: false,
+// valid: false,
+// error: "Invalid token",
+// });
+// }
+// } catch (error) {
+// console.error("Error verifying token:", error);
+// res.status(500).json({
+// success: false,
+// error: error.message,
+// });
+// }
+// });
+
+// DOPO le eccezioni, proteggiamo tutte le altre route /api
+// Ora possiamo proteggere le route che richiedono autenticazione
+// app.use("/api", authenticateRequest); // This is now inside startServer
+// app.use("/upload", authenticateRequest); // This should be handled within startServer or a dedicated router
+// app.use("/files", authenticateRequest);  // This should be handled within startServer or a dedicated router
+
 // API - FILES LIST (must be defined before app.use("/files", authenticateRequest))
-app.get("/files/all", authenticateRequest, async (req, res) => {
-  try {
-    const files = [];
-    const seen = new Set();
-
-    console.log("Request received for all files");
-
-    // Set a timeout to ensure a response even if Gun is slow
-    const timeout = setTimeout(() => {
-      console.log(
-        `Timeout reached after 3 seconds. Returning ${files.length} files`
-      );
-      res.json({
-        success: true,
-        results: files,
-        message: "File list retrieved successfully (timeout reached)",
-      });
-    }, 3000);
-
-    // Create a Promise to make async the data collection from Gun
-    await new Promise((resolve) => {
-      // Retrieve files from GunDB
-      gun
-        .get("files")
-        .map()
-        .once((data, key) => {
-          if (key !== "_" && !seen.has(key) && data) {
-            seen.add(key);
-
-            console.log(
-              `File found in GunDB: ${key}, name: ${data.name || "unnamed"}`
-            );
-
-            // Ensure all necessary fields are present
-            const fileData = {
-              id: key,
-              name: data.name || "Unnamed file",
-              originalName: data.originalName || data.name || "Unnamed file",
-              mimetype:
-                data.mimeType || data.mimetype || "application/octet-stream",
-              size: data.size || 0,
-              fileUrl: data.url || data.fileUrl || "",
-              ipfsHash: data.ipfsHash || null,
-              ipfsUrl: data.ipfsHash
-                ? `${IPFS_CONFIG.gateway}/${data.ipfsHash}`
-                : null,
-              uploadedAt: data.timestamp || data.uploadedAt || Date.now(),
-              customName: data.customName || null,
-            };
-
-            files.push(fileData);
-          }
-        });
-
-      // Conclude Promise after a short period to give Gun time to respond
-      setTimeout(() => {
-        console.log(`Collected ${files.length} files from GunDB`);
-        resolve();
-      }, 1000);
-    });
-
-    // Cancel timeout if we've finished collection
-    clearTimeout(timeout);
-
-    console.log(`Returning ${files.length} files`);
-    res.json({
-      success: true,
-      results: files,
-      message: "File list successfully retrieved",
-    });
-  } catch (error) {
-    console.error("Error retrieving files:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      message: "Error retrieving files",
-    });
-  }
-});
-
-// Apply authentication to protected routes
-app.use("/api", authenticateRequest);
-app.use("/upload", authenticateRequest);
-app.use("/files", authenticateRequest);
+// app.get("/files/all", authenticateRequest, async (req, res) => { // MOVED TO startServer
+// ... existing code ...
+// }); // MOVED TO startServer
 
 // API - UPLOAD FILE
-app.post("/upload", upload.single("file"), async (req, res) => {
-  if (!req.file && (!req.body.content || !req.body.contentType)) {
-    return res.status(400).json({
-      success: false,
-      error: "File or content missing",
-    });
-  }
-
-  try {
-    let gunDbKey, fileBuffer, originalName, mimeType, fileSize;
-
-    if (req.file) {
-      originalName = req.file.originalname;
-      mimeType = req.file.mimetype;
-      fileSize = req.file.size;
-      gunDbKey = req.body.customName || originalName.replace(/[.\/\\]/g, "_");
-
-      // Check if file was uploaded to memory or disk
-      if (req.file.buffer) {
-        // multer.memoryStorage() - file is in memory
-        fileBuffer = req.file.buffer;
-      } else if (req.file.path) {
-        // multer.diskStorage() - file is on disk
-        fileBuffer = fs.readFileSync(req.file.path);
-      } else {
-        throw new Error("Unable to read uploaded file");
-      }
-    } else {
-      const content = req.body.content;
-      const contentType = req.body.contentType || "text/plain";
-      originalName = req.body.customName || `text-${Date.now()}.txt`;
-      gunDbKey = req.body.customName || `text-${Date.now()}`;
-      mimeType = contentType;
-      fileSize = content.length;
-      fileBuffer = Buffer.from(content);
-    }
-
-    if (!fileBuffer) {
-      throw new Error("File buffer not available");
-    }
-
-    let fileUrl = null;
-    let ipfsHash = null;
-
-    // If IPFS is enabled, upload to IPFS
-    if (IPFS_CONFIG.enabled && shogunIpfs) {
-      try {
-        console.log(
-          `Attempting upload to IPFS for file: ${originalName}, size: ${fileSize} bytes, type: ${mimeType}`
-        );
-
-        if (!fileBuffer || fileBuffer.length === 0) {
-          throw new Error("Empty or invalid file buffer");
-        }
-
-        let result;
-
-        // Use the correct method based on file type
-        if (mimeType.startsWith("text/") || mimeType === "application/json") {
-          // For text or JSON files, we can use uploadJson
-          const textContent = fileBuffer.toString("utf-8");
-
-          // Check if it's valid JSON
-          let jsonData;
-          try {
-            jsonData = JSON.parse(textContent);
-          } catch (e) {
-            // If not valid JSON, treat as normal text
-            jsonData = { content: textContent, filename: originalName };
-          }
-
-          result = await shogunIpfs.uploadJson(jsonData, {
-            name: originalName,
-            metadata: {
-              size: fileSize,
-              type: mimeType,
-              customName: req.body.customName || null,
-            },
-          });
-        } else {
-          // For binary files (images, videos, etc.) use uploadFile directly
-          // Create a temporary file
-          const tempFilePath = path.join(
-            STORAGE_DIR,
-            `temp_${Date.now()}_${originalName}`
-          );
-          fs.writeFileSync(tempFilePath, fileBuffer);
-
-          result = await shogunIpfs.uploadFile(tempFilePath, {
-            name: originalName,
-            metadata: {
-              size: fileSize,
-              type: mimeType,
-              customName: req.body.customName || null,
-            },
-          });
-
-          // Remove temporary file
-          try {
-            fs.unlinkSync(tempFilePath);
-          } catch (e) {
-            /* ignore errors */
-          }
-        }
-
-        if (result && result.id) {
-          fileUrl = `${IPFS_CONFIG.gateway}/${result.id}`;
-          ipfsHash = result.id;
-          console.log(`File uploaded to IPFS successfully. CID: ${result.id}`);
-        } else {
-          throw new Error("Upload IPFS completed but ID not received");
-        }
-      } catch (ipfsError) {
-        console.error("Error during IPFS upload:", ipfsError);
-        console.error(
-          "Error details:",
-          JSON.stringify(ipfsError.message || ipfsError)
-        );
-        // Fallback to local upload will happen automatically
-      }
-    }
-
-    // Fallback to local storage
-    if (!fileUrl) {
-      console.log(
-        `IPFS upload failed or not configured, using local storage for: ${originalName}`
-      );
-      const fileName = `${Date.now()}-${originalName}`;
-      const localPath = path.join(STORAGE_DIR, fileName);
-      fs.writeFileSync(localPath, fileBuffer);
-      fileUrl = `/uploads/${fileName}`;
-      console.log(`File saved locally successfully: ${localPath}`);
-    }
-
-    const fileData = {
-      id: gunDbKey,
-      name: originalName,
-      originalName: originalName,
-      mimeType: mimeType,
-      mimetype: mimeType,
-      size: fileSize,
-      url: fileUrl,
-      fileUrl: fileUrl,
-      ipfsHash: ipfsHash || null,
-      ipfsUrl: ipfsHash ? `${IPFS_CONFIG.gateway}/${ipfsHash}` : null,
-      timestamp: Date.now(),
-      uploadedAt: Date.now(),
-      customName: req.body.customName || null,
-    };
-
-    // Save reference in GunDB
-    console.log(
-      `[UPLOAD ENDPOINT] Preparing to save to GunDB. Key: ${gunDbKey}, IPFS Enabled: ${IPFS_CONFIG.enabled}`
-    );
-    console.log(
-      "[UPLOAD ENDPOINT] fileData being put:",
-      JSON.stringify(fileData, null, 2)
-    ); // Log the exact object
-
-    await new Promise((resolve, reject) => {
-      // Use a Promise to handle Gun callback
-      gun
-        .get("files")
-        .get(gunDbKey)
-        .put(fileData, (ack) => {
-          if (ack.err) {
-            console.error("[UPLOAD ENDPOINT] Error saving to GunDB:", ack.err);
-            reject(new Error("Error saving to GunDB: " + ack.err));
-          } else {
-            console.log(
-              "[UPLOAD ENDPOINT] File saved successfully to GunDB. ACK:",
-              ack
-            );
-            resolve();
-          }
-        });
-
-      // Add a timeout in case Gun doesn't respond
-      setTimeout(resolve, 1000);
-    });
-
-    // Verify that the file was saved correctly
-    let savedData = null;
-    try {
-      await new Promise((resolve) => {
-        gun
-          .get("files")
-          .get(gunDbKey)
-          .once((data) => {
-            if (data) {
-              savedData = data;
-              console.log("Save verification: file found in GunDB");
-            } else {
-              console.warn("Save verification: file not found in GunDB");
-            }
-            resolve();
-          });
-
-        // Timeout to handle Gun not responding
-        setTimeout(resolve, 1000);
-      });
-    } catch (verifyError) {
-      console.warn("Error during save verification:", verifyError);
-    }
-
-    res.json({
-      success: true,
-      file: fileData,
-      fileInfo: {
-        originalName,
-        size: fileSize,
-        mimetype: mimeType,
-        fileUrl,
-        ipfsHash,
-        ipfsUrl: ipfsHash ? `${IPFS_CONFIG.gateway}/${ipfsHash}` : null,
-        customName: req.body.customName || null,
-      },
-      verified: !!savedData,
-    });
-  } catch (error) {
-    console.error("File upload error:", error);
-    res.status(500).json({
-      success: false,
-      error: "Error during upload: " + error.message,
-    });
-  }
-});
+// app.post("/upload", fileManager.getUploadMiddleware().single("file"), async (req, res) => { // MOVED TO startServer
+// ... existing code ...
+// }); // MOVED TO startServer
 
 // API - FILES LIST
-app.get("/files", (req, res) => {
-  const files = [];
-  const seen = new Set();
-
-  // Timeout per gestire la risposta se Gun è troppo lento
-  const timeout = setTimeout(() => {
-    res.json({ files });
-  }, 3000);
-
-  gun
-    .get("files")
-    .map()
-    .once((data, key) => {
-      if (key !== "_" && !seen.has(key) && data) {
-        seen.add(key);
-        files.push(data);
-
-        // Se abbiamo più di 50 file, rispondiamo immediatamente
-        if (files.length >= 50) {
-          clearTimeout(timeout);
-          res.json({ files });
-        }
-      }
-    });
-});
+// app.get("/files", authenticateRequest, async (req, res) => { // MOVED TO startServer // Added authenticateRequest middleware
+// ... existing code ...
+// }); // MOVED TO startServer
 
 // API - FILE DETAILS
-app.get("/files/:id", (req, res) => {
-  const fileId = req.params.id;
-
-  // Timeout per gestire la risposta se Gun è troppo lento
-  const timeout = setTimeout(() => {
-    res.status(404).json({ error: "File non trovato" });
-  }, 3000);
-
-  gun
-    .get("files")
-    .get(fileId)
-    .once((data) => {
-      clearTimeout(timeout);
-
-      if (data) {
-        res.json({ file: data });
-      } else {
-        res.status(404).json({ error: "File non trovato" });
-      }
-    });
-});
+// app.get("/files/:id", authenticateRequest, async (req, res) => { // MOVED TO startServer // Added authenticateRequest middleware
+// ... existing code ...
+// }); // MOVED TO startServer
 
 // API - DELETE FILE
-app.delete("/files/:id", authenticateRequest, async (req, res) => {
-  try {
-    const fileId = req.params.id;
-    console.log(`Richiesta eliminazione file: ${fileId}`);
-
-    // Verifica se il file esiste in GunDB
-    const fileNode = gun.get("files").get(fileId);
-
-    let fileData = null;
-    await new Promise((resolve) => {
-      fileNode.once((data) => {
-        fileData = data;
-        resolve();
-      });
-    });
-
-    if (!fileData) {
-      return res.status(404).json({
-        success: false,
-        error: "File non trovato",
-      });
-    }
-
-    // Elimina il file dal filesystem locale
-    const localPath = fileData.localPath;
-    if (localPath && fs.existsSync(localPath)) {
-      try {
-        fs.unlinkSync(localPath);
-        console.log(`File eliminato dal filesystem locale: ${localPath}`);
-      } catch (fsError) {
-        console.error("Errore durante l'eliminazione dal filesystem:", fsError);
-        // Continuiamo comunque con l'eliminazione dal database
-      }
-    }
-
-    // Se il file è su IPFS, tenta di eliminarlo (se possibile)
-    if (fileData.ipfsHash && IPFS_CONFIG.enabled && shogunIpfs) {
-      try {
-        // Nota: la maggior parte dei nodi IPFS non supporta l'eliminazione completa
-        // Possiamo solo fare l'unpin se supportato
-        await shogunIpfs.unpin(fileData.ipfsHash);
-        console.log(`File unpinned da IPFS: ${fileData.ipfsHash}`);
-      } catch (ipfsError) {
-        console.error("Errore durante l'unpin da IPFS:", ipfsError);
-        // Continuiamo comunque con l'eliminazione dal database
-      }
-    }
-
-    // Elimina il file da GunDB
-    fileNode.put(null);
-    console.log(`File eliminato da GunDB: ${fileId}`);
-
-    res.json({
-      success: true,
-      message: "File eliminato con successo",
-    });
-  } catch (error) {
-    console.error("Errore durante l'eliminazione del file:", error);
-    res.status(500).json({
-      success: false,
-      error: `Errore durante l'eliminazione: ${error.message}`,
-    });
-  }
-});
+// app.delete("/files/:id", authenticateRequest, async (req, res) => { // MOVED TO startServer
+// ... existing code ...
+// }); // MOVED TO startServer
 
 // Endpoint per testare la connessione websocket
 app.get("/websocket-test", (req, res) => {
@@ -1420,22 +637,22 @@ app.get("/websocket-test", (req, res) => {
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = wsProtocol + '//' + window.location.host + '/gun';
         const status = document.getElementById('status');
-        
+
         status.textContent = 'Tentativo di connessione a: ' + wsUrl;
-        
+
         try {
           const ws = new WebSocket(wsUrl);
-          
+
           ws.onopen = function() {
             status.textContent = 'WebSocket connesso con successo!';
             status.style.color = 'green';
           };
-          
+
           ws.onclose = function() {
             status.textContent = 'WebSocket disconnesso';
             status.style.color = 'red';
           };
-          
+
           ws.onerror = function(error) {
             status.textContent = 'Errore WebSocket: ' + error;
             status.style.color = 'red';
@@ -1461,9 +678,9 @@ app.get("/api/status", (req, res) => {
       cors: corsOptions.origin,
     },
     ipfs: {
-      enabled: IPFS_CONFIG.enabled,
-      service: IPFS_CONFIG.service,
-      gateway: IPFS_CONFIG.gateway,
+      enabled: ipfsManager.isEnabled(),
+      service: ipfsManager.getService(),
+      gateway: ipfsManager.getGateway(),
     },
   });
 });
@@ -1494,209 +711,92 @@ app.get("/keypair", (req, res) => {
 });
 
 // API - VERIFY CERTIFICATE
-app.post("/api/auth/verify-cert", async (req, res) => {
-  try {
-    const { certificate } = req.body;
-
-    if (!certificate || !certificate.pub) {
-      return res.status(400).json({
-        success: false,
-        error:
-          "Invalid certificate format. Certificate must contain a pub key.",
-      });
-    }
-
-    // Verify if the certificate is valid for a Gun user
-    const userPub = certificate.pub;
-
-    // Check if user exists in Gun
-    const userExists = await new Promise((resolve) => {
-      gun.user(userPub).once((data) => {
-        resolve(!!data);
-      });
-
-      // Set a timeout in case Gun doesn't respond
-      setTimeout(() => resolve(false), 3000);
-    });
-
-    if (!userExists) {
-      return res.json({
-        success: false,
-        valid: false,
-        error: "User with this certificate does not exist",
-      });
-    }
-
-    // Create an API token for this user
-    const username = userPub.substring(0, 10) + "..."; // Use truncated pub as username
-    const token = await createUserToken(userPub, "Certificate Auth Token");
-
-    res.json({
-      success: true,
-      valid: true,
-      userId: userPub,
-      token: token,
-    });
-  } catch (error) {
-    console.error("Error verifying certificate:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
+// app.post("/api/auth/verify-cert", async (req, res) => { // <<< REMOVED
+// try {
+// const { certificate } = req.body;
+// if (!certificate || !certificate.pub) {
+// return res.status(400).json({
+// success: false,
+// error:
+// "Invalid certificate format. Certificate must contain a pub key.",
+// });
+// }
+// const userPub = certificate.pub;
+// const userExists = await new Promise((resolve) => {
+// gun.user(userPub).once((data) => {
+// resolve(!!data);
+// });
+// setTimeout(() => resolve(false), 3000);
+// });
+// if (!userExists) {
+// return res.json({
+// success: false,
+// valid: false,
+// error: "User with this certificate does not exist",
+// });
+// }
+// const token = await createUserToken(userPub, "Certificate Auth Token");
+// res.json({
+// success: true,
+// valid: true,
+// userId: userPub,
+// token: token,
+// });
+// } catch (error) {
+// console.error("Error verifying certificate:", error);
+// res.status(500).json({
+// success: false,
+// error: error.message,
+// });
+// }
+// });
 
 // API - IPFS STATUS
-app.get("/api/ipfs/status", authenticateRequest, (req, res) => {
-  try {
-    res.json({
-      success: true,
-      config: {
-        enabled: IPFS_CONFIG.enabled,
-        service: IPFS_CONFIG.service,
-        nodeUrl: IPFS_CONFIG.nodeUrl,
-        gateway: IPFS_CONFIG.gateway,
-        encryption: IPFS_CONFIG.encryptionEnabled,
-      },
-    });
-  } catch (error) {
-    console.error("Errore nell'ottenere lo stato IPFS:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
+// app.get("/api/ipfs/status", authenticateRequest, (req, res) => { // <<< Start of removal
+// try {
+// res.json({
+// success: true,
+// config: ipfsManager.getConfig(),
+// });
+// } catch (error) {
+// console.error("Errore nell'ottenere lo stato IPFS:", error);
+// res.status(500).json({
+// success: false,
+// error: error.message,
+// });
+// }
+// }); // <<< End of removal
 
 // API - IPFS TOGGLE
-app.post("/api/ipfs/toggle", authenticateRequest, async (req, res) => {
-  try {
-    // Inverte lo stato di IPFS
-    IPFS_CONFIG.enabled = !IPFS_CONFIG.enabled;
-
-    // Inizializza o disattiva IPFS in base allo stato
-    if (IPFS_CONFIG.enabled) {
-      console.log("Attivazione IPFS in corso...");
-
-      shogunIpfs = initializeIpfs();
-
-      if (!shogunIpfs) {
-        console.error("Inizializzazione IPFS fallita, disabilito IPFS");
-        IPFS_CONFIG.enabled = false;
-
-        return res.status(500).json({
-          success: false,
-          error:
-            "Impossibile inizializzare IPFS, verifica la configurazione e i log",
-          config: {
-            enabled: false,
-            service: IPFS_CONFIG.service,
-            nodeUrl: IPFS_CONFIG.nodeUrl,
-            gateway: IPFS_CONFIG.gateway,
-          },
-        });
-      }
-
-      // Test di connessione IPFS
-      try {
-        // Verifica la disponibilità di IPFS con un piccolo test
-        console.log("Esecuzione test di connessione IPFS...");
-
-        // Creiamo un JSON di test semplice
-        const testJson = {
-          test: true,
-          timestamp: Date.now(),
-          message: "Test di connessione",
-        };
-
-        // Utilizziamo uploadJson poiché sappiamo che è disponibile
-        const testResult = await shogunIpfs.uploadJson(testJson, {
-          name: "test-connection.json",
-        });
-
-        if (testResult && testResult.id) {
-          console.log(`Test IPFS superato, ID: ${testResult.id}`);
-
-          // Proviamo a recuperare il file caricato per verificare che sia accessibile
-          const testUrl = `${IPFS_CONFIG.gateway}/${testResult.id}`;
-          console.log(`Verifica accesso a ${testUrl}`);
-
-          try {
-            const client = testUrl.startsWith("https") ? https : http;
-
-            await new Promise((resolve, reject) => {
-              const req = client.get(testUrl, (res) => {
-                if (res.statusCode === 200) {
-                  console.log(
-                    "Test completo: file IPFS accessibile dal gateway"
-                  );
-                  resolve();
-                } else {
-                  reject(
-                    new Error(`Gateway ha restituito status ${res.statusCode}`)
-                  );
-                }
-              });
-
-              req.on("error", reject);
-              req.end();
-            });
-
-            await setupGunIpfsMiddleware();
-          } catch (gatewayError) {
-            console.warn(
-              `File caricato ma non accessibile dal gateway: ${gatewayError.message}`
-            );
-            console.warn(
-              "Il gateway potrebbe essere non disponibile o richiedere tempo per la propagazione"
-            );
-          }
-        } else {
-          throw new Error("Test di connessione fallito, ID non ricevuto");
-        }
-      } catch (testError) {
-        console.error("Test IPFS fallito:", testError.message);
-        console.warn(
-          "IPFS sarà comunque attivo ma potrebbero verificarsi errori durante l'upload"
-        );
-      }
-    } else {
-      // Disattiva IPFS
-      console.log("Disattivazione IPFS");
-      shogunIpfs = null;
-    }
-
-    // Riconfigura multer in base allo stato attuale di IPFS
-    configureMulter();
-
-    console.log(`IPFS ${IPFS_CONFIG.enabled ? "abilitato" : "disabilitato"}`);
-
-    // Invia risposta con struttura corretta
-    return res.json({
-      success: true,
-      config: {
-        enabled: IPFS_CONFIG.enabled,
-        service: IPFS_CONFIG.service,
-        nodeUrl: IPFS_CONFIG.nodeUrl,
-        gateway: IPFS_CONFIG.gateway,
-        encryption: IPFS_CONFIG.encryptionEnabled,
-      },
-    });
-  } catch (error) {
-    console.error("Errore toggle IPFS:", error);
-    return res.status(500).json({
-      success: false,
-      error: `Errore durante il toggle IPFS: ${error.message}`,
-    });
-  }
-});
+// app.post("/api/ipfs/toggle", authenticateRequest, async (req, res) => { // <<< Start of removal
+// try {
+// const newState = !ipfsManager.isEnabled();
+// ipfsManager.updateConfig({
+// enabled: newState
+// });
+// fileManager.setIpfsManager(ipfsManager); // This line is correctly in the new ipfsApiRoutes.js
+// // IPFS_CONFIG = ipfsManager.getConfig(); // REMOVE - backward compatibility handled by direct calls
+// // shogunIpfs = ipfsManager.getInstance(); // REMOVE - backward compatibility handled by direct calls
+// console.log(`IPFS ${newState ? "abilitato" : "disabilitato"}`);
+// return res.json({
+// success: true,
+// config: ipfsManager.getConfig(),
+// });
+// } catch (error) {
+// console.error("Errore toggle IPFS:", error);
+// return res.status(500).json({
+// success: false,
+// error: `Errore durante il toggle IPFS: ${error.message}`,
+// });
+// }
+// }); // <<< End of removal
 
 // API - IPFS CONFIG
 app.post("/api/ipfs/config", authenticateRequest, async (req, res) => {
   try {
     console.log("Richiesta configurazione IPFS:", req.body);
 
-    // Verifica che siano stati forniti i dati di configurazione
+    // Verify that configuration data is provided
     if (!req.body) {
       return res.status(400).json({
         success: false,
@@ -1704,44 +804,23 @@ app.post("/api/ipfs/config", authenticateRequest, async (req, res) => {
       });
     }
 
-    // Aggiorna i campi di configurazione solo se presenti
-    if (req.body.service) IPFS_CONFIG.service = req.body.service;
-    if (req.body.nodeUrl) IPFS_CONFIG.nodeUrl = req.body.nodeUrl;
-    if (req.body.gateway) IPFS_CONFIG.gateway = req.body.gateway;
-    if (req.body.pinataJwt) IPFS_CONFIG.pinataJwt = req.body.pinataJwt;
-    if (req.body.pinataGateway)
-      IPFS_CONFIG.pinataGateway = req.body.pinataGateway;
-    if (req.body.encryptionEnabled !== undefined)
-      IPFS_CONFIG.encryptionEnabled = req.body.encryptionEnabled;
+    // Update the configuration
+    const result = ipfsManager.updateConfig(req.body);
 
-    // Se IPFS è abilitato, reinizializzalo con le nuove impostazioni
-    if (IPFS_CONFIG.enabled) {
-      console.log("Reinizializzazione IPFS con nuova configurazione...");
-      shogunIpfs = initializeIpfs();
+    // Update FileManager's IPFS manager instance and reconfigure multer
+    fileManager.setIpfsManager(ipfsManager);
 
-      if (!shogunIpfs) {
-        console.error("Reinizializzazione IPFS fallita, disabilito IPFS");
-        IPFS_CONFIG.enabled = false;
-      } else {
-        console.log("IPFS reinizializzato con successo");
-      }
+    // Update global variables for backward compatibility
+    IPFS_CONFIG = ipfsManager.getConfig();
+    shogunIpfs = ipfsManager.getInstance();
 
-      // Riconfigura multer in base allo stato attuale di IPFS
-      configureMulter();
-    }
+    // Reconfigure multer if needed
+    configureMulter();
 
-    // Invia risposta con configurazione aggiornata
+    // Send response with updated configuration
     return res.json({
       success: true,
-      config: {
-        enabled: IPFS_CONFIG.enabled,
-        service: IPFS_CONFIG.service,
-        nodeUrl: IPFS_CONFIG.nodeUrl,
-        gateway: IPFS_CONFIG.gateway,
-        pinataGateway: IPFS_CONFIG.pinataGateway,
-        pinataJwt: IPFS_CONFIG.pinataJwt ? "********" : "", // Non inviare il JWT completo
-        apiKey: SECRET_TOKEN,
-      },
+      config: ipfsManager.getConfig(),
     });
   } catch (error) {
     console.error("Errore configurazione IPFS:", error);
@@ -1764,7 +843,7 @@ app.get("/api/ipfs/pin-status/:hash", authenticateRequest, async (req, res) => {
       });
     }
 
-    if (!IPFS_CONFIG.enabled || !shogunIpfs) {
+    if (!ipfsManager.isEnabled()) {
       return res.status(400).json({
         success: false,
         error: "IPFS not active",
@@ -1772,7 +851,7 @@ app.get("/api/ipfs/pin-status/:hash", authenticateRequest, async (req, res) => {
     }
 
     console.log(`Verifica stato pin per hash IPFS: ${hash}`);
-    const isPinned = await shogunIpfs.isPinned(hash);
+    const isPinned = await ipfsManager.isPinned(hash);
 
     return res.json({
       success: true,
@@ -1800,7 +879,7 @@ app.post("/api/ipfs/pin", authenticateRequest, async (req, res) => {
       });
     }
 
-    if (!IPFS_CONFIG.enabled || !shogunIpfs) {
+    if (!ipfsManager.isEnabled()) {
       return res.status(400).json({
         success: false,
         error: "IPFS not active",
@@ -1809,8 +888,8 @@ app.post("/api/ipfs/pin", authenticateRequest, async (req, res) => {
 
     console.log(`Richiesta pin per hash IPFS: ${hash}`);
 
-    // Verifica se il file è già pinnato
-    const isPinned = await shogunIpfs.isPinned(hash);
+    // Check if the file is already pinned
+    const isPinned = await ipfsManager.isPinned(hash);
     if (isPinned) {
       return res.json({
         success: true,
@@ -1820,34 +899,8 @@ app.post("/api/ipfs/pin", authenticateRequest, async (req, res) => {
       });
     }
 
-    // Esegui il pin direttamente sull'istanza shogunIpfs invece di usare getStorage()
-    console.log("Esecuzione pin per hash", hash);
-    let result;
-    try {
-      result = await shogunIpfs.pin(hash);
-      console.log("Risultato pin:", result);
-    } catch (pinError) {
-      console.error("Errore durante il pin:", pinError);
-
-      // Prova con un approccio alternativo se il metodo diretto fallisce
-      try {
-        console.log(
-          "Tentativo alternativo di pin usando serviceInstance direttamente"
-        );
-        if (
-          shogunIpfs.serviceInstance &&
-          shogunIpfs.serviceInstance.pin &&
-          shogunIpfs.serviceInstance.pin.add
-        ) {
-          // L'autenticazione dovrebbe già essere configurata nell'istanza
-          await shogunIpfs.serviceInstance.pin.add(hash);
-          result = { success: true, method: "serviceInstance.direct" };
-        }
-      } catch (altError) {
-        console.error("Anche il tentativo alternativo è fallito:", altError);
-        throw pinError; // Ripetiamo l'errore originale
-      }
-    }
+    // Execute pin
+    const result = await ipfsManager.pin(hash);
 
     return res.json({
       success: true,
@@ -1877,7 +930,7 @@ app.post("/api/ipfs/unpin", authenticateRequest, async (req, res) => {
       });
     }
 
-    if (!IPFS_CONFIG.enabled || !shogunIpfs) {
+    if (!ipfsManager.isEnabled()) {
       return res.status(400).json({
         success: false,
         error: "IPFS not active",
@@ -1886,8 +939,8 @@ app.post("/api/ipfs/unpin", authenticateRequest, async (req, res) => {
 
     console.log(`Richiesta unpin per hash IPFS: ${hash}`);
 
-    // Verifica se il file è pinnato
-    const isPinned = await shogunIpfs.isPinned(hash);
+    // Check if the file is pinned
+    const isPinned = await ipfsManager.isPinned(hash);
     if (!isPinned) {
       return res.json({
         success: true,
@@ -1897,8 +950,8 @@ app.post("/api/ipfs/unpin", authenticateRequest, async (req, res) => {
       });
     }
 
-    // Esegui l'unpin direttamente sull'istanza
-    const result = await shogunIpfs.unpin(hash);
+    // Execute unpin
+    const result = await ipfsManager.unpin(hash);
 
     return res.json({
       success: true,
@@ -2056,7 +1109,7 @@ app.post("/api/gundb/create-node", authenticateRequest, async (req, res) => {
  * This middleware simplifies IPFS data retrieval when GunDB references IPFS content
  */
 function setupGunIpfsMiddleware() {
-  if (!IPFS_CONFIG.enabled || !shogunIpfs) {
+  if (!ipfsManager.isEnabled()) {
     console.log("IPFS not enabled, middleware not configured");
     return;
   }
@@ -2069,7 +1122,7 @@ function setupGunIpfsMiddleware() {
   // We only intercept 'in' responses to retrieve IPFS data
   Gun.on("in", async function (replyMsg) {
     // If IPFS is not enabled, pass the original message
-    if (!IPFS_CONFIG.enabled || !shogunIpfs) {
+    if (!ipfsManager.isEnabled()) {
       this.to.next(replyMsg);
       return;
     }
@@ -2120,7 +1173,7 @@ function setupGunIpfsMiddleware() {
                 console.log(
                   `IPFS-MIDDLEWARE: Retrieving data from IPFS for hash: ${hash}`
                 );
-                const ipfsData = await shogunIpfs.fetchJson(hash);
+                const ipfsData = await ipfsManager.fetchJson(hash);
 
                 if (ipfsData) {
                   // If they are complete GunDB data (format created by previous middleware)
@@ -2205,7 +1258,7 @@ async function initializeRelayComponents() {
     }
 
     // Initialize RelayVerifier if enabled
-    if (RELAY_CONFIG.relay.enabled) {
+    if (RELAY_CONFIG.relay.onchainMembership) {
       if (!RELAY_CONFIG.relay.registryAddress) {
         console.warn(
           "Relay registry address not provided, skipping initialization"
@@ -2221,6 +1274,9 @@ async function initializeRelayComponents() {
           signer
         );
         console.log("RelayVerifier initialized successfully");
+        
+        // Update relayVerifier in AuthenticationManager
+        configure({ relayVerifier });
       }
     }
 
@@ -2276,167 +1332,262 @@ async function startServer() {
   try {
     console.log("Starting unified relay server...");
 
-    // Initialize IPFS if enabled
-    if (IPFS_CONFIG.enabled) {
-      shogunIpfs = initializeIpfs();
-    }
+    // Initialize AuthenticationManager configuration first
+    configure({
+      SECRET_TOKEN,
+      JWT_SECRET,
+      authorizedKeys, // Pass the map instance
+      AUTH_KEY_EXPIRY,
+      RELAY_CONFIG,
+      relayVerifier: null, // Will be set after relayVerifier init by initializeRelayComponents
+      allowedOrigins,
+    });
+    console.log("AuthenticationManager configured with initial settings.");
 
-    server.listen(PORT, async () => {
-      console.log(`Server started on port ${PORT}`);
-      console.log(`API endpoint: http://localhost:${PORT}/api`);
-      console.log(`Gun endpoint: http://localhost:${PORT}/gun`);
+    // Initialize ShogunCore and relay components. This will create relayVerifier
+    // and update AuthenticationManager with the live instance via its configure method.
+    ensureShogunCore(); // ensureShogunCore needs to be called before initializeRelayComponents if it provides the shogunCoreInstance
+    await initializeRelayComponents(); 
+    console.log("Relay and DID components initialized, AuthenticationManager updated with live verifiers.");
 
-      // Initialize Gun with the options
-      gun = Gun(gunOptions);
+    // Initialize Gun with the options. 
+    // AuthenticationManager.isValidGunMessage (bound to gunOptions.isValid) can now access the configured relayVerifier.
+    gun = Gun(gunOptions);
+    console.log("GunDB initialized.");
 
-      // Initialize ShogunCore and relay components
-      ensureShogunCore();
-      try {
-        const relayInitialized = await initializeRelayComponents();
-        if (relayInitialized) {
-          console.log("Relay components initialized successfully");
-        }
-      } catch (error) {
-        console.error("Error initializing relay components:", error);
+    // Set the gun instance in FileManager now that it's initialized
+    // fileManager.setGun(gun); // This is done in FileManager constructor or if needed, after fileManager init
+
+    // Initialize ShogunCore again to ensure it has the gun instance if it wasn't passed or if re-init is beneficial
+    // shogunCore = getShogunCore(); // Or ensureShogunCore(); - check if needed again
+    // It's generally better to initialize ShogunCore once with all dependencies if possible.
+    // If ensureShogunCore() was already called and shogunCore is a module-level let, it should be fine.
+
+    // Initialize File Manager now that gun and ipfsManager are available
+    fileManager = new ShogunFileManager(
+      {
+        storageDir: STORAGE_DIR, // Use the defined STORAGE_DIR
+        maxFileSize: 50 * 1024 * 1024, // As per the accepted diff
+        allowedMimes: ["image/jpeg", "image/png", "application/pdf"], // As per the accepted diff
+      },
+      gun,
+      ipfsManager
+    );
+    console.log("File Manager initialized inside startServer.");
+
+    // Setup API routes from modules
+    const authRouter = setupAuthRoutes(gun, JWT_SECRET, AuthenticationManager, ensureShogunCore, authenticateRequest);
+    app.use("/api/auth", authRouter); // THIS LINE SHOULD BE BEFORE app.use("/api", authenticateRequest)
+
+    const ipfsApiRouter = setupIpfsApiRoutes(ipfsManager, fileManager, authenticateRequest);
+
+    // Define the reinitializeRelayComponentsCallback within startServer scope
+    const reinitializeRelayComponentsCallback = async (updatedConfig) => {
+      console.log("[Callback] Received config update request:", updatedConfig);
+    
+      let needsReinitialize = false;
+    
+      // Check for updates to the main relay configuration part
+      if (updatedConfig && updatedConfig.registryAddress !== undefined || updatedConfig.providerUrl !== undefined || updatedConfig.onchainMembership !== undefined) {
+        RELAY_CONFIG.relay = { 
+          ...RELAY_CONFIG.relay, 
+          ...(updatedConfig.registryAddress && { registryAddress: updatedConfig.registryAddress }),
+          ...(updatedConfig.providerUrl && { providerUrl: updatedConfig.providerUrl }),
+          ...(updatedConfig.onchainMembership !== undefined && { onchainMembership: updatedConfig.onchainMembership }),
+        };
+        console.log("[Callback] Main RELAY_CONFIG.relay updated:", RELAY_CONFIG.relay);
+        needsReinitialize = true;
+      }
+    
+      // Check for updates to the didVerifier specific part of the config
+      if (updatedConfig && updatedConfig.didVerifier) {
+        RELAY_CONFIG.didVerifier = { 
+          ...RELAY_CONFIG.didVerifier, 
+          ...updatedConfig.didVerifier 
+        };
+        console.log("[Callback] RELAY_CONFIG.didVerifier updated:", RELAY_CONFIG.didVerifier);
+        needsReinitialize = true;
       }
 
-      // IMPORTANT: Configure WebSocket for GunDB only once after server start
-      const websocketMiddleware = async (req, socket, head) => {
-        try {
-          const url = req.url;
-          const origin = req.headers.origin;
+      // Fallback for direct updates to RELAY_CONFIG.relay properties if not nested under 'relay' in updatedConfig
+      // This handles the case where relayApiRoutes might send { onchainMembership: true } directly
+      if(updatedConfig && (updatedConfig.onchainMembership !== undefined && RELAY_CONFIG.relay.onchainMembership !== updatedConfig.onchainMembership)) {
+        RELAY_CONFIG.relay.onchainMembership = updatedConfig.onchainMembership;
+        console.log("[Callback] RELAY_CONFIG.relay.onchainMembership directly updated to:", RELAY_CONFIG.relay.onchainMembership);
+        needsReinitialize = true;
+      }
 
-          // Log upgrade request
-          console.log(
-            `WebSocket upgrade requested for: ${url} from origin: ${
-              origin || "unknown"
-            }`
-          );
 
-          // Validate origin if present
-          if (origin) {
-            // In development mode, allow all origins
-            if (process.env.NODE_ENV === "development") {
-              console.log("Development mode - origin accepted:", origin);
-            } else if (!allowedOrigins.includes(origin)) {
-              console.warn(
-                `WebSocket upgrade rejected: origin not allowed ${origin}`
-              );
-              socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
-              socket.destroy();
-              return;
-            }
-          }
+      if (needsReinitialize) {
+        console.log("[Callback] Reinitializing relay and/or DID components due to config change...");
+        return initializeRelayComponents(); 
+      } else {
+        console.log("[Callback] No specific relay or didVerifier config found in update that warrants re-initialization by callback logic.");
+        return false; 
+      }
+    };
 
-          // In development mode, allow all connections
-          if (process.env.NODE_ENV === "development") {
-            console.log(
-              "Development mode - allowing all WebSocket connections"
-            );
-            // Continue with the upgrade process
-            if (
-              url === "/gun" ||
-              url.startsWith("/gun?") ||
-              url.startsWith("/gun/")
-            ) {
-              console.log(
-                `Handling WebSocket connection for GunDB in development mode`
-              );
-              return; // Let Gun handle the upgrade
-            } else {
-              console.log(
-                `Unhandled WebSocket request in development mode: ${url}`
-              );
-              socket.destroy();
-              return;
-            }
-          }
+    const relayApiRouter = setupRelayApiRoutes(
+      RELAY_CONFIG, 
+      getRelayVerifier, 
+      authenticateRequest, 
+      shogunCore, 
+      reinitializeRelayComponentsCallback,
+      SECRET_TOKEN, 
+      AuthenticationManager 
+    );
+    app.use("/api/relay", relayApiRouter);
 
-          // PRODUCTION MODE CHECKS
-          // In production, require valid authentication
-          let isAuthenticated = false;
+    // FILE MANAGER API ROUTES - MOVED HERE
+    // Ensure these routes also have appropriate authentication if needed.
+    // The authenticateRequest middleware is applied to /api, /upload, /files at the top level currently.
+    // If these routes are not under /api, they might need individual authentication middleware.
 
-          // Check for authentication token in the URL
-          if (url.includes("?token=") || url.includes("&token=")) {
-            try {
-              const fullUrl = `http://localhost${url}`;
-              const urlObj = new URL(fullUrl);
-              const token = urlObj.searchParams.get("token");
+    // For /upload and /files routes, if they are meant to be protected, 
+    // they should either be under a protected path like /api/files or have middleware applied here.
+    // Assuming /upload and /files/ should be protected as per original setup:
+    app.use("/upload", authenticateRequest); 
+    app.use("/files", authenticateRequest);
 
-              console.log(
-                "Token found in URL:",
-                token ? token.substring(0, 3) + "..." : "missing"
-              );
-
-              if (token) {
-                const tokenData = await validateUserToken(token);
-                isAuthenticated = !!tokenData;
-
-                if (isAuthenticated) {
-                  console.log("Valid URL token, authentication succeeded");
-                } else {
-                  console.warn("Invalid token provided in URL");
-                }
-              }
-            } catch (e) {
-              console.error(
-                "Error parsing URL or validating token:",
-                e.message
-              );
-            }
-          }
-
-          // If not authenticated in production, reject the connection
-          if (!isAuthenticated) {
-            console.warn(
-              `WebSocket upgrade rejected: authentication required in production`
-            );
-            socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
-            socket.destroy();
-            return;
-          }
-
-          // Authentication passed, handle the connection
-          if (
-            url === "/gun" ||
-            url.startsWith("/gun?") ||
-            url.startsWith("/gun/")
-          ) {
-            console.log(
-              `Handling authenticated WebSocket connection for GunDB`
-            );
-            return; // Let Gun handle the upgrade
-          } else {
-            console.log(`Unhandled WebSocket request: ${url}`);
-            socket.destroy();
-            return;
-          }
-        } catch (error) {
-          console.error("Error in websocketMiddleware:", error);
-          socket.write("HTTP/1.1 500 Internal Server Error\r\n\r\n");
-          socket.destroy();
-        }
-      };
-
-      // Graceful shutdown handling
-      ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => {
-        process.on(signal, async () => {
-          console.log(`\nReceived signal ${signal}, shutting down...`);
-
-          console.log("Closing HTTP server...");
-          server.close(() => {
-            console.log("HTTP server closed");
-            console.log("Goodbye!");
-            process.exit(0);
-          });
-
-          // Force close after 5 seconds
-          setTimeout(() => {
-            console.log("Timeout reached, forced shutdown");
-            process.exit(1);
-          }, 5000);
+    app.get("/files/all", authenticateRequest, async (req, res) => {
+      try {
+        const files = await fileManager.getAllFiles();
+          res.json({
+            success: true,
+            results: files,
+          message: "File list retrieved successfully",
         });
+      } catch (error) {
+        console.error("Error retrieving files:", error);
+        res.status(500).json({
+          success: false,
+          error: error.message,
+          message: "Error retrieving files",
+        });
+      }
+    });
+
+    app.post("/upload", fileManager.getUploadMiddleware().single("file"), async (req, res) => {
+      try {
+        const fileData = await fileManager.handleFileUpload(req);
+        res.json({
+          success: true,
+          file: fileData,
+          fileInfo: { // Keep this for compatibility if some clients expect it
+            originalName: fileData.originalName,
+            size: fileData.size,
+            mimetype: fileData.mimetype,
+            fileUrl: fileData.fileUrl,
+            ipfsHash: fileData.ipfsHash,
+            ipfsUrl: fileData.ipfsUrl,
+            customName: fileData.customName,
+          },
+          verified: fileData.verified, // FileManager adds this
+        });
+      } catch (error) {
+        console.error("File upload error:", error);
+        res.status(500).json({
+          success: false,
+          error: "Error during upload: " + error.message,
+        });
+      }
+    });
+
+    app.get("/files", authenticateRequest, async (req, res) => {
+      try {
+        const files = await fileManager.getAllFiles();
+        res.json({ files });
+      } catch (error) {
+        console.error("Error retrieving files for /files:", error);
+        res.status(500).json({
+          success: false,
+          error: error.message,
+          message: "Error retrieving files",
+        });
+      }
+    });
+
+    app.get("/files/:id", authenticateRequest, async (req, res) => {
+      try {
+      const fileId = req.params.id;
+        const fileData = await fileManager.getFileById(fileId);
+
+        if (fileData) {
+          res.json({ file: fileData });
+          } else {
+            res.status(404).json({ error: "File non trovato" });
+          }
+      } catch (error) {
+        console.error(`Error retrieving file details for ${req.params.id}:`, error);
+        res.status(500).json({
+          success: false,
+          error: error.message,
+        });
+      }
+    });
+
+    app.delete("/files/:id", authenticateRequest, async (req, res) => {
+      try {
+        const fileId = req.params.id;
+        const result = await fileManager.deleteFile(fileId);
+        res.json(result);
+      } catch (error) {
+        console.error("Errore durante l'eliminazione del file:", error);
+        res.status(500).json({
+          success: false,
+          error: `Errore durante l'eliminazione: ${error.message}`,
+        });
+      }
+    });
+
+    // Use a separate Gun user instance for app authentication
+    if (RELAY_CONFIG.keyPair) {
+      const appUser = gun.user();
+      appUser.auth(JSON.parse(RELAY_CONFIG.keyPair), ({ err }) => {
+        if (err) {
+          console.error("App authentication error:", err);
+        } else {
+          console.log("GunDB authenticated successfully for app user");
+        }
       });
+    } else {
+      console.log("No app key pair provided, skipping app authentication");
+    }
+
+    // Setup Gun-IPFS middleware
+    if (ipfsManager.isEnabled()) {
+      setupGunIpfsMiddleware();
+    }
+    // Update FileManager's IPFS manager instance and reconfigure multer
+    // This ensures multer is reconfigured if IPFS state changes during runtime
+    fileManager.setIpfsManager(ipfsManager);
+    
+    // Graceful shutdown handling
+    ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => {
+      process.on(signal, async () => {
+        console.log(`\nReceived signal ${signal}, shutting down...`);
+
+        console.log("Closing HTTP server...");
+        server.close(() => {
+          console.log("HTTP server closed");
+          console.log("Goodbye!");
+          process.exit(0);
+        });
+
+        // Force close after 5 seconds
+        setTimeout(() => {
+          console.log("Timeout reached, forced shutdown");
+          process.exit(1);
+        }, 5000);
+      });
+    });
+
+    // Start listening for HTTP requests
+    server.listen(PORT, HOST, () => {
+      console.log(`Server listening on http://${HOST}:${PORT}`);
+      console.log(
+        `Gun relay peer accessible at http://${HOST}:${PORT}/gun`
+      );
     });
   } catch (error) {
     console.error("Error during server startup:", error);
@@ -2449,264 +1600,7 @@ startServer().catch((err) => {
   process.exit(1);
 });
 
-// API - USER TOKEN MANAGEMENT
-// These endpoints allow for token creation and management
 
-// Create new token
-app.post("/api/auth/tokens", authenticateRequest, async (req, res) => {
-  try {
-    // Only allow authenticated users to create tokens for themselves
-    const userId = req.auth.userId;
-    const { name, expiresInDays } = req.body;
-
-    // Calculate expiration date if specified
-    let expiresAt = null;
-    if (expiresInDays) {
-      expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + parseInt(expiresInDays));
-    }
-
-    const token = await createUserToken(userId, name, expiresAt);
-
-    res.json({
-      success: true,
-      token: token,
-    });
-  } catch (error) {
-    console.error("Error creating token:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// List user tokens
-app.get("/api/auth/tokens", authenticateRequest, async (req, res) => {
-  try {
-    const userId = req.auth.userId;
-    const tokens = await listUserTokens(userId);
-
-    res.json({
-      success: true,
-      tokens: tokens,
-    });
-  } catch (error) {
-    console.error("Error listing tokens:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// Revoke a token
-app.delete(
-  "/api/auth/tokens/:tokenId",
-  authenticateRequest,
-  async (req, res) => {
-    try {
-      const userId = req.auth.userId;
-      const tokenId = req.params.tokenId;
-
-      const success = await revokeUserToken(userId, tokenId);
-
-      if (success) {
-        res.json({
-          success: true,
-          message: "Token revoked successfully",
-        });
-      } else {
-        res.status(400).json({
-          success: false,
-          error: "Failed to revoke token",
-        });
-      }
-    } catch (error) {
-      console.error("Error revoking token:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
-);
-
-// Verify a token (for testing)
-app.post("/api/auth/verify-token", async (req, res) => {
-  try {
-    const { token } = req.body;
-
-    if (!token) {
-      return res.status(400).json({
-        success: false,
-        error: "Token is required",
-      });
-    }
-
-    const tokenData = await validateUserToken(token);
-
-    if (tokenData) {
-      // Don't include sensitive information
-      const safeData = {
-        valid: true,
-        userId: tokenData.userId,
-        permissions: tokenData.permissions,
-      };
-
-      res.json({
-        success: true,
-        tokenInfo: safeData,
-      });
-    } else {
-      res.json({
-        success: false,
-        valid: false,
-        error: "Invalid token",
-      });
-    }
-  } catch (error) {
-    console.error("Error verifying token:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// User registration endpoint
-app.post("/api/auth/register", async (req, res) => {
-  try {
-    const { username, password, email } = req.body;
-
-    if (!username || !password) {
-      return res.status(400).json({
-        success: false,
-        error: "Username and password are required",
-      });
-    }
-
-    // Use Gun's native user system
-    const user = gun.user();
-
-    // Create a promise to handle async GunDB operation
-    const createUser = new Promise((resolve, reject) => {
-      user.create(username, password, (ack) => {
-        if (ack.err) {
-          reject(new Error(ack.err));
-        } else {
-          resolve(ack);
-        }
-      });
-    });
-
-    await createUser;
-
-    // After user creation, auth the user to get the certificate
-    const authUser = new Promise((resolve, reject) => {
-      user.auth(username, password, (ack) => {
-        if (ack.err) {
-          reject(new Error(ack.err));
-        } else {
-          resolve(ack);
-        }
-      });
-    });
-
-    await authUser;
-
-    // Store additional user metadata
-    if (email) {
-      user.get("profile").get("email").put(email);
-    }
-
-    // Set default permissions
-    user.get("profile").get("permissions").put(["user"]);
-
-    // Create an API token for the user
-    const token = await createUserToken(username, "Default Token");
-
-    res.json({
-      success: true,
-      message: "User registered successfully",
-      userId: username,
-      token: token,
-    });
-  } catch (error) {
-    console.error("Registration error:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// Login endpoint
-app.post("/api/auth/login", async (req, res) => {
-  try {
-    const { username, password } = req.body;
-
-    if (!username || !password) {
-      return res.status(400).json({
-        success: false,
-        error: "Username and password are required",
-      });
-    }
-
-    // Use Gun's native user system
-    const user = gun.user();
-
-    // Create a promise to handle async GunDB login
-    const authUser = new Promise((resolve, reject) => {
-      user.auth(username, password, (ack) => {
-        if (ack.err) {
-          reject(new Error(ack.err || "Invalid username or password"));
-        } else {
-          resolve(ack);
-        }
-      });
-    });
-
-    await authUser;
-
-    // Get or create an API token for the user
-    const tokens = await listUserTokens(username);
-    let activeToken = tokens.find(
-      (t) => !t.revoked && (!t.expiresAt || t.expiresAt > Date.now())
-    );
-
-    if (!activeToken) {
-      // No active token, create a new one
-      const newToken = await createUserToken(username, "Login Token");
-
-      res.json({
-        success: true,
-        message: "Login successful",
-        userId: username,
-        token: newToken,
-        gunCert: user._.sea, // Include the Gun certificate for client-side use
-      });
-    } else {
-      // Return the first active token
-      res.json({
-        success: true,
-        message: "Login successful",
-        userId: username,
-        tokens,
-        gunCert: user._.sea, // Include the Gun certificate for client-side use
-      });
-    }
-  } catch (error) {
-    console.error("Login error:", error);
-    res.status(401).json({
-      success: false,
-      error: "Invalid username or password",
-    });
-  }
-});
-
-// Initialize ShogunCore with the same Gun instance
-let shogunCore;
 
 /**
  * Initialize ShogunCore if not already initialized
@@ -2750,98 +1644,8 @@ function ensureShogunCore() {
   return shogunCore;
 }
 
+// 🏓 API/RELAY/SHOGUN CORE
 // API - SHOGUN CORE AUTHENTICATION ENDPOINTS
-
-// ShogunCore login
-app.post("/api/auth/shogun/login", async (req, res) => {
-  try {
-    const { username, password } = req.body;
-
-    if (!username || !password) {
-      return res.status(400).json({
-        success: false,
-        error: "Username and password are required",
-      });
-    }
-
-    const core = ensureShogunCore();
-    if (!core) {
-      return res.status(500).json({
-        success: false,
-        error: "ShogunCore not available",
-      });
-    }
-
-    // Use ShogunCore login
-    const result = await core.login(username, password);
-
-    if (!result.success) {
-      return res.status(401).json(result);
-    }
-
-    // Create an API token for this user
-    const token = await createUserToken(username, "ShogunCore Login Token");
-
-    res.json({
-      success: true,
-      ...result,
-      token: token,
-    });
-  } catch (error) {
-    console.error("Error during ShogunCore login:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// ShogunCore signup
-app.post("/api/auth/shogun/signup", async (req, res) => {
-  try {
-    const { username, password, email } = req.body;
-
-    if (!username || !password) {
-      return res.status(400).json({
-        success: false,
-        error: "Username and password are required",
-      });
-    }
-
-    const core = ensureShogunCore();
-    if (!core) {
-      return res.status(500).json({
-        success: false,
-        error: "ShogunCore not available",
-      });
-    }
-
-    // Use ShogunCore signUp
-    const result = await core.signUp(username, password, password);
-
-    if (!result.success) {
-      return res.status(400).json(result);
-    }
-
-    // Create an API token for this user
-    const token = await createUserToken(
-      username,
-      "ShogunCore Registration Token"
-    );
-
-    res.json({
-      success: true,
-      ...result,
-      token: token,
-    });
-  } catch (error) {
-    console.error("Error during ShogunCore signup:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
 
 // WebAuthn login
 app.post("/api/auth/shogun/webauthn/login", async (req, res) => {
@@ -3054,18 +1858,19 @@ app.post("/api/auth/shogun/metamask/signup", async (req, res) => {
   }
 });
 
+// 🏓 API/RELAY
 // ============ RELAY VERIFIER API ============
 
 // API - Check relay status
 app.get("/api/relay/status", authenticateRequest, async (req, res) => {
   try {
     // Verify that RelayVerifier is initialized
-    if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
+    if (!RELAY_CONFIG.relay.onchainMembership || !relayVerifier) {
       return res.status(503).json({
         success: false,
         error: "Relay services not available",
         config: {
-          enabled: RELAY_CONFIG.relay.enabled,
+          enabled: RELAY_CONFIG.relay.onchainMembership,
           registryAddress:
             RELAY_CONFIG.relay.registryAddress || "Not configured",
         },
@@ -3078,7 +1883,7 @@ app.get("/api/relay/status", authenticateRequest, async (req, res) => {
     res.json({
       success: true,
       config: {
-        enabled: RELAY_CONFIG.relay.enabled,
+        enabled: RELAY_CONFIG.relay.onchainMembership,
         registryAddress: RELAY_CONFIG.relay.registryAddress,
       },
       relaysCount: allRelays.length,
@@ -3096,7 +1901,7 @@ app.get("/api/relay/status", authenticateRequest, async (req, res) => {
 app.get("/api/relay/all", authenticateRequest, async (req, res) => {
   try {
     // Verify that RelayVerifier is initialized
-    if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
+    if (!RELAY_CONFIG.relay.onchainMembership || !relayVerifier) {
       return res.status(503).json({
         success: false,
         error: "Relay services not available",
@@ -3141,7 +1946,7 @@ app.get(
       const { relayAddress, userAddress } = req.params;
 
       // Verify that RelayVerifier is initialized
-      if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
+      if (!RELAY_CONFIG.relay.onchainMembership || !relayVerifier) {
         return res.status(503).json({
           success: false,
           error: "Relay services not available",
@@ -3182,7 +1987,7 @@ app.get(
       const { userAddress } = req.params;
 
       // Verify that RelayVerifier is initialized
-      if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
+      if (!RELAY_CONFIG.relay.onchainMembership || !relayVerifier) {
         return res.status(503).json({
           success: false,
           error: "Relay services not available",
@@ -3238,7 +2043,7 @@ app.post("/api/relay/check-pubkey", authenticateRequest, async (req, res) => {
     }
 
     // Verify that RelayVerifier is initialized
-    if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
+    if (!RELAY_CONFIG.relay.onchainMembership || !relayVerifier) {
       return res.status(503).json({
         success: false,
         error: "Relay services not available",
@@ -3292,7 +2097,7 @@ app.get(
       const { relayAddress, userAddress } = req.params;
 
       // Verify that RelayVerifier is initialized
-      if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
+      if (!RELAY_CONFIG.relay.onchainMembership || !relayVerifier) {
         return res.status(503).json({
           success: false,
           error: "Relay services not available",
@@ -3348,7 +2153,7 @@ app.post("/api/relay/subscribe", authenticateRequest, async (req, res) => {
     }
 
     // Verify that RelayVerifier is initialized
-    if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
+    if (!RELAY_CONFIG.relay.onchainMembership || !relayVerifier) {
       return res.status(503).json({
         success: false,
         error: "Relay services not available",
@@ -3418,7 +2223,7 @@ app.post("/api/relay/config", authenticateRequest, async (req, res) => {
 
     // Update configuration
     if (enabled !== undefined) {
-      RELAY_CONFIG.relay.enabled = enabled;
+      RELAY_CONFIG.relay.onchainMembership = enabled;
     }
 
     if (registryAddress) {
@@ -3430,7 +2235,7 @@ app.post("/api/relay/config", authenticateRequest, async (req, res) => {
     }
 
     // Reinitialize relay components
-    if (RELAY_CONFIG.relay.enabled) {
+    if (RELAY_CONFIG.relay.onchainMembership) {
       const shogunCoreInstance = getShogunCore();
 
       console.log("Reinitializing RelayVerifier...");
@@ -3458,7 +2263,7 @@ app.post("/api/relay/config", authenticateRequest, async (req, res) => {
     res.json({
       success: true,
       config: {
-        enabled: RELAY_CONFIG.relay.enabled,
+        enabled: RELAY_CONFIG.relay.onchainMembership,
         registryAddress: RELAY_CONFIG.relay.registryAddress,
         providerUrl: RELAY_CONFIG.relay.providerUrl,
       },
@@ -3472,6 +2277,7 @@ app.post("/api/relay/config", authenticateRequest, async (req, res) => {
   }
 });
 
+// 🏓 API/RELAY/DID VERIFIER
 // ============ DID VERIFIER API ============
 
 // API - Check DID verifier status
@@ -3746,228 +2552,161 @@ app.post("/api/relay/did/config", authenticateRequest, async (req, res) => {
 
 // API - RELAY VERIFIER API ============
 
-// API - Pre-authorize a public key
-app.get("/api/relay/pre-authorize/:pubKey", async (req, res) => {
-  try {
-    const { pubKey } = req.params;
-    const forcedAuth = req.query.force === 'true';
-    
-    if (!pubKey) {
-      return res.status(400).json({
-        success: false,
-        error: "Public key is required"
-      });
-    }
-    
-    // Verify that RelayVerifier is initialized
-    if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
-      return res.status(503).json({
-        success: false,
-        error: "Relay services not available",
-        config: {
-          enabled: RELAY_CONFIG.relay.enabled,
-          registryAddress:
-            RELAY_CONFIG.relay.registryAddress || "Not configured",
-        },
-      });
-    }
-    
-    // Check if already authorized
-    if (isKeyPreAuthorized(pubKey)) {
-      const authInfo = authorizedKeys.get(pubKey);
-      return res.json({
-        success: true,
-        message: "Public key already authorized",
-        pubKey,
-        expiresAt: authInfo.expiresAt,
-        expiresIn: Math.round((authInfo.expiresAt - Date.now()) / 1000) + " seconds"
-      });
-    }
-    
-    // Allow force-authorization for testing with the API token
-    if (forcedAuth) {
-      // Check if request has the API token
-      const token = req.headers.authorization;
-      if (token && (token === SECRET_TOKEN || token === `Bearer ${SECRET_TOKEN}`)) {
-        console.log(`[PRE-AUTH API] Force-authorizing key: ${pubKey}`);
-        const authInfo = authorizeKey(pubKey);
-        
+// Endpoint per pre-autorizzare un token utente
+app.post(
+  "/api/auth/pre-authorize-token",
+  authenticateRequest,
+  async (req, res) => {
+    try {
+      const { token, userId, expiryMinutes } = req.body;
+
+      // Validazioni di base
+      if (!token) {
+        return res.status(400).json({
+          success: false,
+          error: "Token is required",
+        });
+      }
+
+      // Solo admin o system tokens possono pre-autorizzare i token
+      if (!req.auth.isSystemToken && !req.auth.permissions?.includes("admin")) {
+        return res.status(403).json({
+          success: false,
+          error: "Only administrators can pre-authorize tokens",
+        });
+      }
+
+      // Verifica se il token è già pre-autorizzato
+      if (authorizedKeys.has(token)) {
+        const authInfo = authorizedKeys.get(token);
         return res.json({
           success: true,
-          message: "Public key force-authorized successfully",
-          pubKey,
-          forced: true,
+          message: "Token already pre-authorized",
+          token:
+            token.substring(0, 6) + "..." + token.substring(token.length - 6),
           expiresAt: authInfo.expiresAt,
-          expiresIn: Math.round((authInfo.expiresAt - Date.now()) / 1000) + " seconds"
+          expiresIn:
+            Math.round((authInfo.expiresAt - Date.now()) / 1000) + " seconds",
         });
-      } else {
-        return res.status(401).json({
+      }
+
+      // Validazione opzionale: verifica che il token sia valido tramite validateUserToken
+      let tokenValid = true;
+      let tokenInfo = null;
+
+      // Se è specificato un userId, verifichiamo che il token appartenga a quell'utente
+      if (userId) {
+        tokenInfo = await validateUserToken(token);
+        if (!tokenInfo || tokenInfo.userId !== userId) {
+          tokenValid = false;
+        }
+      }
+
+      if (!tokenValid) {
+        return res.status(400).json({
           success: false,
-          error: "API token required for forced authorization"
+          error:
+            "The token is not valid or does not belong to the specified user",
         });
       }
-    }
-    
-    // Clean the public key before conversion
-    let cleanedPubKey = pubKey;
-    
-    // If pubKey starts with @, remove it
-    if (cleanedPubKey.startsWith('@')) {
-      cleanedPubKey = cleanedPubKey.substring(1);
-    }
-    
-    // If pubKey contains a dot (like in pairs with epub), get only the first part
-    const dotIndex = cleanedPubKey.indexOf('.');
-    if (dotIndex > 0) {
-      cleanedPubKey = cleanedPubKey.substring(0, dotIndex);
-    }
-    
-    // Convert pubKey to hex format for blockchain verification
-    const hexPubKey = gunPubKeyToHex(cleanedPubKey);
-    if (!hexPubKey) {
-      return res.status(400).json({
+
+      // Pre-autorizza il token
+      const expiry = expiryMinutes
+        ? expiryMinutes * 60 * 1000
+        : AUTH_KEY_EXPIRY;
+      const authInfo = authorizeKey(token, expiry);
+
+      res.json({
+        success: true,
+        message: "Token pre-authorized successfully",
+        token:
+          token.substring(0, 6) + "..." + token.substring(token.length - 6),
+        userId: tokenInfo?.userId || userId || "unknown",
+        expiresAt: authInfo.expiresAt,
+        expiresIn:
+          Math.round((authInfo.expiresAt - Date.now()) / 1000) + " seconds",
+      });
+    } catch (error) {
+      console.error("Error pre-authorizing token:", error);
+      res.status(500).json({
         success: false,
-        error: "Could not convert public key to hex format"
+        error: error.message,
       });
     }
-    
-    console.log(`[PRE-AUTH API] Checking authorization for key: ${pubKey}`);
-    console.log(`[PRE-AUTH API] Cleaned key: ${cleanedPubKey}`);
-    console.log(`[PRE-AUTH API] Hex format: ${hexPubKey}`);
-    
-    // Get all active relays
-    const activeRelays = await relayVerifier.getAllRelays();
-    console.log(`[PRE-AUTH API] Found ${activeRelays.length} active relays`);
-    
-    if (!activeRelays || activeRelays.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: "No active relays found"
-      });
-    }
-    
-    // Check each relay until we find one that authorizes this pubkey
-    let isAuthorized = false;
-    let authorizingRelay = null;
-    let relayErrors = [];
-    
-    for (const relayAddress of activeRelays) {
-      try {
-        console.log(`[PRE-AUTH API] Checking relay ${relayAddress}...`);
-        
-        // Direct check using ethers.js
-        try {
-          console.log(`[PRE-AUTH API] Testing direct contract access...`);
-          const { ethers } = await import("ethers");
-          const provider = new ethers.JsonRpcProvider(RELAY_CONFIG.relay.providerUrl);
-          
-          const relayAbi = [
-            "function isPublicKeyAuthorized(bytes calldata pubKey) view returns (bool)",
-            "function isAuthorizedByPubKey(bytes calldata _pubKey) external view returns (bool)"
-          ];
-          
-          const relay = new ethers.Contract(relayAddress, relayAbi, provider);
-          
-          // Call the contract directly - FIX: Removed double 0x prefix
-          const hexBytes = hexPubKey.startsWith('0x') ? hexPubKey : `0x${hexPubKey}`;
-          const pubKeyBytes = ethers.getBytes(hexBytes);
-          console.log(`[PRE-AUTH API] Calling contract with bytes of length: ${pubKeyBytes.length}`);
-          
-          let directResult = false;
-          
-          // Try both methods as different contracts might use different function names
-          try {
-            directResult = await relay.isPublicKeyAuthorized(pubKeyBytes);
-          } catch (methodError) {
-            console.log("[PRE-AUTH API] isPublicKeyAuthorized failed, trying isAuthorizedByPubKey...");
-            try {
-              directResult = await relay.isAuthorizedByPubKey(pubKeyBytes);
-            } catch (altMethodError) {
-              console.error("[PRE-AUTH API] Both methods failed:", altMethodError.message);
-              throw altMethodError;
-            }
-          }
-          
-          console.log(`[PRE-AUTH API] Direct contract call result: ${directResult}`);
-          
-          if (directResult === true) {
-            isAuthorized = true;
-            authorizingRelay = relayAddress;
-            console.log(`[PRE-AUTH API] Key directly authorized by relay ${relayAddress}`);
-            break;
-          }
-        } catch (directError) {
-          console.error(`[PRE-AUTH API] Direct contract call error:`, directError);
-          relayErrors.push(`Direct contract error: ${directError.message}`);
-        }
-        
-        // Try using the RelayVerifier implementation
-        isAuthorized = await relayVerifier.isPublicKeyAuthorized(
-          relayAddress,
-          hexPubKey
-        );
-        
-        if (isAuthorized) {
-          authorizingRelay = relayAddress;
-          console.log(`[PRE-AUTH API] Key authorized by relay ${relayAddress}`);
-          break;
-        } else {
-          console.warn(`[PRE-AUTH API] Key NOT authorized by relay ${relayAddress}`);
-        }
-      } catch (error) {
-        console.error(`[PRE-AUTH API] Error checking relay ${relayAddress}:`, error.message);
-        relayErrors.push(`Relay ${relayAddress}: ${error.message}`);
-      }
-    }
-    
-    if (!isAuthorized) {
+  }
+);
+
+// API - RELAY API AUTHENTICATION CONFIG
+app.post("/api/relay/auth/config", authenticateRequest, async (req, res) => {
+  try {
+    // Solo admin o system tokens possono modificare la configurazione
+    if (!req.auth.isSystemToken && !req.auth.permissions?.includes("admin")) {
       return res.status(403).json({
         success: false,
-        error: "Public key is not authorized by any active relay",
-        pubKey,
-        relayErrors,
-        suggestion: "You can use ?force=true with an API token to force-authorize this key"
+        error: "Only administrators can modify authentication configuration",
       });
     }
-    
-    // Key is authorized, add to pre-authorized cache
-    const authInfo = authorizeKey(pubKey);
-    
-    // Also authorize the variants of the key
-    if (pubKey !== cleanedPubKey) {
-      authorizeKey(cleanedPubKey);
+
+    const { onchainMembership } = req.body;
+
+    // Salva la configurazione precedente per confronti
+    const previousConfig = {
+      onchainMembership: RELAY_CONFIG.relay.onchainMembership,
+    };
+
+    // Aggiorna la configurazione se i parametri sono specificati
+    if (onchainMembership !== undefined) {
+      RELAY_CONFIG.relay.onchainMembership = onchainMembership;
     }
-    
-    // If the key doesn't start with @ but might be used with @, also authorize that variant
-    if (!pubKey.startsWith('@')) {
-      authorizeKey('@' + pubKey);
+
+    const currentConfig = {
+      onchainMembership: RELAY_CONFIG.relay.onchainMembership,
+    };
+
+    // Log delle modifiche alla configurazione
+    const changesLog = Object.keys(currentConfig)
+      .filter((key) => previousConfig[key] !== currentConfig[key])
+      .map((key) => `${key}: ${previousConfig[key]} -> ${currentConfig[key]}`);
+
+    if (changesLog.length > 0) {
+      console.log(
+        `[AUTH-CONFIG] Configuration changes: ${changesLog.join(", ")}`
+      );
+    } else {
+      console.log(`[AUTH-CONFIG] No changes to authentication configuration`);
     }
+
+    // Descrivi la gerarchia di autenticazione
+    const authHierarchy = [
+      "1. ADMIN_SECRET_TOKEN (highest priority)",
+    ];
     
-    // If the key starts with @ but might be used without it, also authorize that variant
-    if (pubKey.startsWith('@')) {
-      authorizeKey(pubKey.substring(1));
+    if (RELAY_CONFIG.relay.onchainMembership) {
+      authHierarchy.push("2. BLOCKCHAIN_MEMBERSHIP");
+      authHierarchy.push("3. JWT");
+      authHierarchy.push("4. PRE_AUTHORIZED_KEYS (lowest priority)");
+    } else {
+      authHierarchy.push("2. JWT");
+      authHierarchy.push("3. PRE_AUTHORIZED_KEYS (lowest priority)");
     }
-    
+
     res.json({
       success: true,
-      message: "Public key pre-authorized successfully",
-      pubKey,
-      authorizingRelay,
-      expiresAt: authInfo.expiresAt,
-      expiresIn: Math.round((authInfo.expiresAt - Date.now()) / 1000) + " seconds"
+      previousConfig,
+      currentConfig,
+      authenticationHierarchy: authHierarchy,
+      message:
+        changesLog.length > 0
+          ? "Authentication configuration updated successfully"
+          : "No changes to authentication configuration",
     });
   } catch (error) {
-    console.error("Error pre-authorizing key:", error);
+    console.error("Error updating authentication configuration:", error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
     });
   }
 });
 
-export { 
-  app as default, 
-  authorizeKey,
-  isKeyPreAuthorized,
-  RELAY_CONFIG
-};
+export { app as default, authorizeKey, isKeyPreAuthorized, RELAY_CONFIG };

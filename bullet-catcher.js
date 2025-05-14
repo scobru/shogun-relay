@@ -20,16 +20,16 @@ Gun.on('opt', function (context) {
   }
 
   // Check all incoming traffic
-  context.on('in', async function (msg) {
+  context.on('in', function (msg) {
     var to = this.to
     // restrict put
     if (msg.put) {
       let result
       try {
-        result = await isValid(msg)
+        result = isValid(msg)
         // Se la funzione restituisce una Promise, attendi il risultato
         if (result && typeof result.then === 'function') {
-          result = await result
+          result = result
         }
       } catch (e) {
         result = false
