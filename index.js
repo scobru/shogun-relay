@@ -6,16 +6,14 @@ import multer from "multer";
 import fs from "fs";
 import express from "express";
 import { ShogunIpfs } from "shogun-ipfs";
-import {
-  ShogunCore,
-  RelayVerifier,
-  DIDVerifier,
-} from "shogun-core";
+import { ShogunCore, RelayVerifier, DIDVerifier } from "shogun-core";
 import Gun from "gun";
 import path from "path";
 import crypto from "crypto";
 import http from "http";
 import https from "https";
+//import "./bullet-catcher.js";
+import "bullet-catcher";
 
 // Import the utility functions
 import { gunPubKeyToHex } from "./utils.js";
@@ -27,25 +25,18 @@ const STORAGE_DIR = path.resolve("./uploads");
 const SECRET_TOKEN = process.env.API_SECRET_TOKEN || "thisIsTheTokenForReals";
 const LOGS_DIR = path.resolve("./logs");
 
-const gunOptions = {
-  web: server,
-  file: "radata",
-  radisk: true,
-  localStorage: false,
-};
-
-// Check if we're in a development environment
-const isDevMode = process.env.NODE_ENV === "development";
-
-// Relay components configuration
+// Initial configuration of RELAY_CONFIG - set once at the start
 const RELAY_CONFIG = {
   relay: {
-    // Force relay to be enabled
-    enabled: true,
-    registryAddress: process.env.RELAY_REGISTRY_CONTRACT || "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+    // Set enabled flag only once here
+    enabled: process.env.RELAY_ENABLED === "true" || true,
+    registryAddress:
+      process.env.RELAY_REGISTRY_CONTRACT ||
+      "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
     providerUrl: process.env.ETHEREUM_PROVIDER_URL || "http://localhost:8545",
-    // Force onchain membership to be enabled
-    onchainMembership: true,
+    // Set onchainMembership flag only once here
+    onchainMembership:
+      process.env.ONCHAIN_MEMBERSHIP_ENABLED === "true" || true,
   },
   didVerifier: {
     enabled: process.env.DID_VERIFIER_ENABLED === "true" || false,
@@ -53,6 +44,304 @@ const RELAY_CONFIG = {
     providerUrl: process.env.ETHEREUM_PROVIDER_URL || "http://localhost:8545",
   },
 };
+
+// Create a way to let the first message through if it's authorized
+const pendingValidations = new Map();
+
+// This map will store temporarily authorized keys
+const authorizedKeys = new Map();
+// Expire authorized keys after 5 minutes
+const AUTH_KEY_EXPIRY = 5 * 60 * 1000;
+
+/**
+ * Check if a public key is pre-authorized in our temporary cache
+ * @param {string} pubKey - The public key to check
+ * @returns {boolean} - True if the key is pre-authorized
+ */
+function isKeyPreAuthorized(pubKey) {
+  if (!pubKey) return false;
+  
+  const authInfo = authorizedKeys.get(pubKey);
+  if (!authInfo) return false;
+  
+  // Check if the authorization has expired
+  if (Date.now() > authInfo.expiresAt) {
+    authorizedKeys.delete(pubKey);
+    return false;
+  }
+  
+  return true;
+}
+
+/**
+ * Temporarily authorize a public key
+ * @param {string} pubKey - The public key to authorize
+ * @param {number} expiryMs - Optional expiry time in ms, defaults to AUTH_KEY_EXPIRY
+ * @returns {Object} Auth info including expiry time
+ */
+function authorizeKey(pubKey, expiryMs = AUTH_KEY_EXPIRY) {
+  if (!pubKey) throw new Error("Public key required for authorization");
+  
+  const authInfo = {
+    pubKey,
+    authorizedAt: Date.now(),
+    expiresAt: Date.now() + expiryMs,
+  };
+  
+  authorizedKeys.set(pubKey, authInfo);
+  console.log(`[PRE-AUTH] Key authorized: ${pubKey.substring(0, 10)}... (expires in ${expiryMs/1000}s)`);
+  
+  return authInfo;
+}
+
+async function hasValidToken(msg) {
+  const containsPut = msg.put && Object.keys(msg.put).length > 0;
+
+  // Verify if the message is a write (contains put) and relay auth is enabled
+  if (
+    containsPut &&
+    RELAY_CONFIG.relay.enabled &&
+    RELAY_CONFIG.relay.onchainMembership &&
+    relayVerifier
+  ) {
+    // Function to extract and verify public key
+    const verifyPubKey = async function () {
+      console.log("===== RELAY AUTHORIZATION CHECK TRIGGERED =====");
+      let pubKey = null;
+
+      // Extract public key from put nodes starting with ~
+      const putKeys = Object.keys(msg.put);
+      for (const key of putKeys) {
+        if (key.startsWith("~")) {
+          const dotIndex = key.indexOf(".");
+          pubKey = dotIndex > 0 ? key.substring(1, dotIndex) : key.substring(1);
+          break;
+        }
+      }
+
+      // If not found in put, check other common fields
+      if (!pubKey) {
+        if (msg.user && msg.user.pub) {
+          pubKey = msg.user.pub;
+        } else if (msg.from && msg.from.pub) {
+          pubKey = msg.from.pub;
+        } else if (msg.pub) {
+          pubKey = msg.pub;
+        }
+      }
+
+      if (pubKey) {
+        // First check if this key is pre-authorized in our cache
+        if (isKeyPreAuthorized(pubKey)) {
+          console.log(`[RELAY-AUTH] Key ${pubKey.substring(0, 10)}... is PRE-AUTHORIZED, allowing write`);
+          return true;
+        }
+        
+        console.log(`[RELAY-AUTH] Found pubKey: ${pubKey}`);
+        try {
+          // Convert pubKey to hex format
+          const hexPubKey = gunPubKeyToHex(pubKey);
+          if (!hexPubKey) {
+            console.warn(
+              `[RELAY-AUTH] Failed to convert pubKey ${pubKey.substring(
+                0,
+                10
+              )}... to hex format`
+            );
+            return false;
+          }
+          console.log(`[RELAY-AUTH] Converted to hex: ${hexPubKey}`);
+
+          // Get all active relays
+          console.log(`[RELAY-AUTH] Getting all active relays...`);
+          const activeRelays = await relayVerifier.getAllRelays();
+          console.log(`[RELAY-AUTH] Found ${activeRelays.length} relays`);
+
+          // If there are no active relays, reject
+          if (!activeRelays || activeRelays.length === 0) {
+            console.warn(
+              `[RELAY-AUTH] No active relays found, rejecting message`
+            );
+            return false;
+          }
+
+          // Check each relay until we find one that authorizes this pubkey
+          let isAuthorized = false;
+          for (const relayAddress of activeRelays) {
+            console.log(
+              `[RELAY-AUTH] Checking authorization on relay ${relayAddress}...`
+            );
+            try {
+              isAuthorized = await relayVerifier.isPublicKeyAuthorized(
+                relayAddress,
+                hexPubKey
+              );
+
+              if (isAuthorized) {
+                console.log(
+                  `[RELAY-AUTH] Key authorized by relay ${relayAddress}`
+                );
+                
+                // If key is authorized, cache it for future writes
+                authorizeKey(pubKey);
+                
+                break;
+              } else {
+                console.log(
+                  `[RELAY-AUTH] Key not authorized by relay ${relayAddress}`
+                );
+              }
+            } catch (error) {
+              console.error(
+                `[RELAY-AUTH] Error checking relay ${relayAddress}:`,
+                error.message
+              );
+            }
+          }
+
+          if (!isAuthorized) {
+            console.warn(
+              `[RELAY-AUTH] BLOCKING write from unauthorized key ${pubKey.substring(
+                0,
+                10
+              )}...`
+            );
+            return false;
+          }
+
+          console.log(
+            `[RELAY-AUTH] Allowing write from authorized key ${pubKey.substring(
+              0,
+              10
+            )}...`
+          );
+          return true;
+        } catch (error) {
+          console.error(
+            `[RELAY-AUTH] Error during authorization check:`,
+            error
+          );
+          return false;
+        }
+      } else {
+        console.warn(`[RELAY-AUTH] Could not find pubKey in message`);
+        return false;
+      }
+    };
+
+    // Execute verification synchronously with await
+    try {
+      const isAuthorized = await verifyPubKey();
+
+      if (isAuthorized) {
+        console.log(`[RELAY-AUTH] Message allowed - authorization verified`);
+        return true;
+      } else {
+        console.warn(`[RELAY-AUTH] Message BLOCKED - authorization failed`);
+        return false;
+      }
+    } catch (err) {
+      console.error(`[RELAY-AUTH] Error in verification process:`, err);
+      // In case of error, block the request for safety
+      return false; // Make sure to return false on errors
+    }
+  }
+
+  // For non-PUT requests or when relay isn't configured, allow the message
+  return true;
+}
+
+function isValidTest(msg) {
+  return true;
+}
+
+// Fix the isValid function to properly handle authorization
+const gunOptions = {
+  web: server,
+  file: "radata",
+  radisk: true,
+  localStorage: false,
+  isValid: function (msg) {
+    // Short-circuit per messaggi non-PUT
+    if (!msg.put || Object.keys(msg.put).length === 0) {
+      return true;
+    }
+
+    // Skip se relay non è abilitato
+    if (
+      !RELAY_CONFIG.relay.enabled ||
+      !RELAY_CONFIG.relay.onchainMembership ||
+      !relayVerifier
+    ) {
+      return true;
+    }
+
+    console.log("[RELAY-AUTH] Validating message...");
+
+    // Estrai la chiave pubblica
+    let pubKey = null;
+
+    // Extract from put nodes starting with ~
+    const putKeys = Object.keys(msg.put);
+    for (const key of putKeys) {
+      if (key.startsWith("~")) {
+        const dotIndex = key.indexOf(".");
+        pubKey = dotIndex > 0 ? key.substring(1, dotIndex) : key.substring(1);
+        break;
+      }
+    }
+
+    // If not found in put, check other common fields
+    if (!pubKey) {
+      if (msg.user && msg.user.pub) {
+        pubKey = msg.user.pub;
+      } else if (msg.from && msg.from.pub) {
+        pubKey = msg.from.pub;
+      } else if (msg.pub) {
+        pubKey = msg.pub;
+      }
+    }
+
+    if (!pubKey) {
+      console.warn("[RELAY-AUTH] No public key found in message - BLOCKED");
+      return false;
+    }
+
+    // SYNCHRONOUS CHECK: Check all possible variants of the key
+    const keyVariants = [
+      pubKey,                             // Original key
+      pubKey.startsWith('@') ? pubKey.substring(1) : pubKey, // Remove @ if present
+      pubKey.startsWith('@') ? pubKey : '@' + pubKey,        // Add @ if not present
+    ];
+
+    // If pubKey contains a dot (like in pairs with epub), get only the first part
+    const dotIndex = pubKey.indexOf('.');
+    if (dotIndex > 0) {
+      const basePubKey = pubKey.substring(0, dotIndex);
+      keyVariants.push(basePubKey);
+      keyVariants.push('@' + basePubKey);
+    }
+
+    // Check all variants
+    for (const variant of keyVariants) {
+      if (isKeyPreAuthorized(variant)) {
+        console.log(`[RELAY-AUTH] Key variant ${variant.substring(0, 10)}... is pre-authorized - ALLOWED`);
+        return true;
+      }
+    }
+    
+    // If not pre-authorized, we need to handle it differently since we can't do async here
+    console.log(`[RELAY-AUTH] Key ${pubKey.substring(0, 10)}... is not pre-authorized - Queueing for verification`);
+    
+    // We need to return false for now, and suggest using the pre-authorization endpoint
+    console.log(`[RELAY-AUTH] ACTION NEEDED: Authorize key first by calling /api/relay/pre-authorize/${pubKey}`);
+    
+    return false;
+  },
+};
+
+// Check if we're in a development environment
+const isDevMode = process.env.NODE_ENV === "development";
 
 // Relay component instances
 let relayVerifier = null;
@@ -2067,480 +2356,6 @@ async function startServer() {
           // In production, require valid authentication
           let isAuthenticated = false;
 
-          // Aggiungi un intercettore per bloccare esplicitamente messaggi da utenti non autorizzati
-          gun.on("opt", function (context) {
-            if (context.once) {
-              return;
-            }
-
-            console.log("[DEBUG] Gun.on.opt middleware initialized");
-
-            // Aggancia un hook a tutti i messaggi in entrata
-            this.to.next(context);
-
-            // Intercetta i messaggi OUT (le scritture) prima che vengano elaborate
-            context.on("out", function (msg) {
-              // Salva il riferimento a this per usarlo nelle funzioni asincrone
-              const self = this;
-
-              // DEBUGGING
-              if (msg.put && Object.keys(msg.put).length > 0) {
-                console.log("[DEBUG] Gun.on.out: Detected PUT message");
-                const putKeys = Object.keys(msg.put);
-                console.log(`[DEBUG] PUT keys: ${putKeys.join(", ")}`);
-                
-                // Extract pubKey for debugging
-                let pubKey = null;
-                for (const key of putKeys) {
-                  if (key.startsWith("~")) {
-                    const dotIndex = key.indexOf(".");
-                    pubKey = dotIndex > 0 ? key.substring(1, dotIndex) : key.substring(1);
-                    break;
-                  }
-                }
-                if (!pubKey && msg.user && msg.user.pub) pubKey = msg.user.pub;
-                if (!pubKey && msg.from && msg.from.pub) pubKey = msg.from.pub;
-                if (!pubKey && msg.pub) pubKey = msg.pub;
-                
-                if (pubKey) {
-                  console.log(`[DEBUG] Found pubKey: ${pubKey.substring(0, 10)}...`);
-                }
-                
-                console.log(`[DEBUG] RELAY_CONFIG.relay.enabled: ${RELAY_CONFIG.relay.enabled}`);
-                console.log(`[DEBUG] RELAY_CONFIG.relay.onchainMembership: ${RELAY_CONFIG.relay.onchainMembership}`);
-                console.log(`[DEBUG] relayVerifier available: ${!!relayVerifier}`);
-                console.log(`[DEBUG] process.env.NODE_ENV: ${process.env.NODE_ENV || 'not set'}`);
-              }
-
-              // DEVELOPMENT MODE BYPASS - DISABLED TO ENFORCE RELAY AUTH
-              // if (process.env.NODE_ENV === "development") {
-              //   console.log(
-              //     "[Gun.on.out] Development mode: Bypassing authorization."
-              //   );
-              //   return self.to.next(msg); // Allow message
-              // }
-
-              // Intercetta i messaggi in ingresso che contengono dati
-              const containsPut = msg.put && Object.keys(msg.put).length > 0;
-
-              // Verifica se il messaggio è una scrittura (contiene put)
-              if (
-                containsPut &&
-                RELAY_CONFIG.relay.enabled &&
-                RELAY_CONFIG.relay.onchainMembership &&
-                relayVerifier
-              ) {
-                // Funzione per estrarre e verificare la chiave pubblica
-                const verifyPubKey = async function () {
-                  console.log("===== RELAY AUTHORIZATION CHECK TRIGGERED =====");
-                  let pubKey = null;
-
-                  // Estrai la chiave pubblica
-                  // Cerca nei nodi put che iniziano con ~
-                  const putKeys = Object.keys(msg.put);
-                  for (const key of putKeys) {
-                    if (key.startsWith("~")) {
-                      const dotIndex = key.indexOf(".");
-                      pubKey =
-                        dotIndex > 0
-                          ? key.substring(1, dotIndex)
-                          : key.substring(1);
-                      break;
-                    }
-                  }
-
-                  // Se non trovata in put, cerca in altri campi del messaggio
-                  if (!pubKey) {
-                    if (msg.user && msg.user.pub) {
-                      pubKey = msg.user.pub;
-                    } else if (msg.from && msg.from.pub) {
-                      pubKey = msg.from.pub;
-                    } else if (msg.pub) {
-                      pubKey = msg.pub;
-                    }
-                  }
-
-                  if (pubKey) {
-                    console.log(`[AUTH CHECK] Found pubKey: ${pubKey}`);
-                    try {
-                      // Converti pubKey in formato hex
-                      const hexPubKey = gunPubKeyToHex(pubKey);
-                      if (!hexPubKey) {
-                        console.warn(
-                          `[AUTH CHECK FAILED] Failed to convert pubKey ${pubKey.substring(
-                            0,
-                            10
-                          )}... to hex format`
-                        );
-                        return false;
-                      }
-                      console.log(`[AUTH CHECK] Converted to hex: ${hexPubKey}`);
-
-                      // Get all active relays for this user
-                      console.log(`[AUTH CHECK] Getting all active relays...`);
-                      const activeRelays = await relayVerifier.getAllRelays();
-                      console.log(`[AUTH CHECK] Found ${activeRelays.length} relays`);
-                      
-                      // If there are no active relays, reject
-                      if (!activeRelays || activeRelays.length === 0) {
-                        console.warn(`[AUTH CHECK FAILED] No active relays found, rejecting message`);
-                        return false;
-                      }
-                      
-                      // Check each relay until we find one that authorizes this pubkey
-                      let isAuthorized = false;
-                      for (const relayAddress of activeRelays) {
-                        console.log(`[AUTH CHECK] Checking authorization on relay ${relayAddress}...`);
-                        isAuthorized = await relayVerifier.isPublicKeyAuthorized(
-                          relayAddress,
-                          hexPubKey
-                        );
-                        
-                        if (isAuthorized) {
-                          console.log(`[AUTH CHECK SUCCESS] Key authorized by relay ${relayAddress}`);
-                          break;
-                        }
-                      }
-
-                      if (!isAuthorized) {
-                        console.warn(
-                          `[AUTH CHECK FAILED] BLOCKING write from unauthorized key ${pubKey.substring(
-                            0,
-                            10
-                          )}...`
-                        );
-                        return false;
-                      }
-
-                      console.log(
-                        `[AUTH CHECK SUCCESS] Allowing write from authorized key ${pubKey.substring(
-                          0,
-                          10
-                        )}...`
-                      );
-                      return true;
-                    } catch (error) {
-                      console.error(
-                        `[AUTH CHECK ERROR] Error during authorization check:`,
-                        error
-                      );
-                      return false;
-                    }
-                  } else {
-                    console.warn(
-                      `[AUTH CHECK FAILED] Could not find pubKey in message`
-                    );
-                    return false;
-                  }
-                };
-
-                // Esegui la verifica in modo asincrono ma blocca il flusso fino al completamento
-                verifyPubKey()
-                  .then((isAuthorized) => {
-                    if (isAuthorized) {
-                      // Solo se autorizzato, continua con il messaggio
-                      self.to.next(msg);
-                    } else {
-                      // Altrimenti, blocca silenziosamente la scrittura non propagando il messaggio
-                      console.warn(
-                        `[Gun.on.out] Message was blocked from propagating`
-                      );
-                      // Forza un ACK di errore per il client
-                      if (msg._.via && msg._.via.say) {
-                        try {
-                          msg._.via.say({
-                            err: "Unauthorized: Your public key is not authorized on-chain",
-                            ok: 0,
-                            "@": msg["#"],
-                          });
-                        } catch (e) {
-                          console.error(
-                            "[Gun.on.out] Error sending rejection message:",
-                            e
-                          );
-                        }
-                      }
-                    }
-                  })
-                  .catch((err) => {
-                    console.error(
-                      `[Gun.on.out] Error in verification process:`,
-                      err
-                    );
-                    // In caso di errore, blocca la richiesta
-                  });
-
-                // IMPORTANTE: Ritorna senza chiamare next() per bloccare il flusso normale
-                // La propagazione avverrà solo quando verifyPubKey() restituirà true
-                return;
-              }
-
-              // Se non è un messaggio put o non abbiamo bisogno di verificarlo, continua normalmente
-              this.to.next(msg);
-            });
-
-            // Manteniamo anche l'intercettore 'in' per sicurezza
-            context.on("in", function (msg) {
-              // Salva il riferimento a this per usarlo nelle funzioni asincrone
-              const self = this;
-
-              // Intercetta i messaggi in ingresso che contengono dati
-              const containsPut = msg.put && Object.keys(msg.put).length > 0;
-
-              // Se il messaggio contiene dati in put e onchainMembership è abilitato
-              if (
-                containsPut &&
-                RELAY_CONFIG.relay.enabled &&
-                RELAY_CONFIG.relay.onchainMembership &&
-                relayVerifier
-              ) {
-                // Funzione per estrarre e verificare la chiave pubblica
-                const verifyPubKey = async function () {
-                  console.log("===== RELAY AUTHORIZATION CHECK TRIGGERED =====");
-                  let pubKey = null;
-
-                  // Estrai la chiave pubblica
-                  // Cerca nei nodi put che iniziano con ~
-                  const putKeys = Object.keys(msg.put);
-                  for (const key of putKeys) {
-                    if (key.startsWith("~")) {
-                      const dotIndex = key.indexOf(".");
-                      pubKey =
-                        dotIndex > 0
-                          ? key.substring(1, dotIndex)
-                          : key.substring(1);
-                      break;
-                    }
-                  }
-
-                  // Se non trovata in put, cerca in altri campi del messaggio
-                  if (!pubKey) {
-                    if (msg.user && msg.user.pub) {
-                      pubKey = msg.user.pub;
-                    } else if (msg.from && msg.from.pub) {
-                      pubKey = msg.from.pub;
-                    } else if (msg.pub) {
-                      pubKey = msg.pub;
-                    }
-                  }
-
-                  if (pubKey) {
-                    console.log(`[AUTH CHECK] Found pubKey: ${pubKey}`);
-                    try {
-                      // Converti pubKey in formato hex
-                      const hexPubKey = gunPubKeyToHex(pubKey);
-                      if (!hexPubKey) {
-                        console.warn(
-                          `[AUTH CHECK FAILED] Failed to convert pubKey ${pubKey.substring(
-                            0,
-                            10
-                          )}... to hex format`
-                        );
-                        return false;
-                      }
-                      console.log(`[AUTH CHECK] Converted to hex: ${hexPubKey}`);
-
-                      // Get all active relays for this user
-                      console.log(`[AUTH CHECK] Getting all active relays...`);
-                      const activeRelays = await relayVerifier.getAllRelays();
-                      console.log(`[AUTH CHECK] Found ${activeRelays.length} relays`);
-                      
-                      // If there are no active relays, reject
-                      if (!activeRelays || activeRelays.length === 0) {
-                        console.warn(`[AUTH CHECK FAILED] No active relays found, rejecting message`);
-                        return false;
-                      }
-                      
-                      // Check each relay until we find one that authorizes this pubkey
-                      let isAuthorized = false;
-                      for (const relayAddress of activeRelays) {
-                        console.log(`[AUTH CHECK] Checking authorization on relay ${relayAddress}...`);
-                        isAuthorized = await relayVerifier.isPublicKeyAuthorized(
-                          relayAddress,
-                          hexPubKey
-                        );
-                        
-                        if (isAuthorized) {
-                          console.log(`[AUTH CHECK SUCCESS] Key authorized by relay ${relayAddress}`);
-                          break;
-                        }
-                      }
-
-                      if (!isAuthorized) {
-                        console.warn(
-                          `[AUTH CHECK FAILED] BLOCKING write from unauthorized key ${pubKey.substring(
-                            0,
-                            10
-                          )}...`
-                        );
-                        return false;
-                      }
-
-                      console.log(
-                        `[AUTH CHECK SUCCESS] Allowing write from authorized key ${pubKey.substring(
-                          0,
-                          10
-                        )}...`
-                      );
-                      return true;
-                    } catch (error) {
-                      console.error(
-                        `[AUTH CHECK ERROR] Error during authorization check:`,
-                        error
-                      );
-                      return false;
-                    }
-                  } else {
-                    console.warn(
-                      `[AUTH CHECK FAILED] Could not find pubKey in message`
-                    );
-                    return false;
-                  }
-                };
-
-                // Esegui la verifica in modo asincrono ma blocca il flusso fino al completamento
-                verifyPubKey()
-                  .then((isAuthorized) => {
-                    if (isAuthorized) {
-                      // Solo se autorizzato, continua con il messaggio
-                      self.to.next(msg);
-                    } else {
-                      // Altrimenti, blocca silenziosamente il messaggio non propagandolo
-                      console.warn(
-                        `[Gun.on.in] Message was blocked from propagating`
-                      );
-                    }
-                  })
-                  .catch((err) => {
-                    console.error(
-                      `[Gun.on.in] Error in verification process:`,
-                      err
-                    );
-                    // In caso di errore, blocca il messaggio
-                  });
-
-                // IMPORTANTE: Ritorna senza chiamare next() per bloccare il flusso normale
-                // La propagazione avverrà solo quando verifyPubKey() restituirà true
-                return;
-              }
-
-              // Se non è un messaggio con put o non abbiamo bisogno di verificarlo, continua normalmente
-              this.to.next(msg);
-            });
-
-            // AGGIUNTA: Intercetta a livello di storage per impedire scritture non autorizzate
-            if (
-              context.on &&
-              RELAY_CONFIG.relay.enabled &&
-              RELAY_CONFIG.relay.onchainMembership &&
-              relayVerifier
-            ) {
-              // Mantieni un riferimento al put originale
-              const originalPut = context.on.put;
-
-              // Sostituisci con la nostra versione che verifica l'autorizzazione prima di salvare
-              context.on.put = function (msg) {
-                // Salva il riferimento al this e agli argomenti originali
-                const self = this;
-                const args = arguments;
-
-                // DEVELOPMENT MODE BYPASS
-                if (process.env.NODE_ENV === "development") {
-                  console.log(
-                    "[Gun.on.put] Development mode: Bypassing authorization for storage."
-                  );
-                  return originalPut.apply(self, args); // Allow storage
-                }
-
-                // Se non contiene dati, procedi normalmente
-                if (!msg || !msg.put || Object.keys(msg.put).length === 0) {
-                  return originalPut.apply(self, args);
-                }
-
-                // Estrai pubKey dai dati
-                let pubKey = null;
-                try {
-                  const putKeys = Object.keys(msg.put);
-                  for (const key of putKeys) {
-                    if (key.startsWith("~")) {
-                      const dotIndex = key.indexOf(".");
-                      pubKey =
-                        dotIndex > 0
-                          ? key.substring(1, dotIndex)
-                          : key.substring(1);
-                      break;
-                    }
-                  }
-
-                  // Controlla anche altri campi comuni
-                  if (!pubKey) {
-                    if (msg.user && msg.user.pub) pubKey = msg.user.pub;
-                    else if (msg.from && msg.from.pub) pubKey = msg.from.pub;
-                    else if (msg.pub) pubKey = msg.pub;
-                  }
-                } catch (e) {
-                  console.error("[Gun.on.put] Error extracting pubKey:", e);
-                }
-
-                // Se non abbiamo una chiave pubblica, blocca per sicurezza nel dubbio
-                if (!pubKey) {
-                  console.warn(
-                    "[Gun.on.put] No pubKey found, blocking storage operation"
-                  );
-                  return; // Non chiamare originalPut
-                }
-
-                // Verifica se il pubKey è autorizzato prima di scrivere
-                (async () => {
-                  try {
-                    const hexPubKey = gunPubKeyToHex(pubKey);
-                    if (!hexPubKey) {
-                      console.warn(
-                        `[Gun.on.put] Failed to convert pubKey ${pubKey.substring(
-                          0,
-                          10
-                        )}... to hex format`
-                      );
-                      return; // Non chiamare originalPut
-                    }
-
-                    const isAuthorized =
-                      await relayVerifier.isPublicKeyAuthorized(
-                        hexPubKey
-                      );
-
-                    if (isAuthorized) {
-                      console.log(
-                        `[Gun.on.put] Authorizing STORAGE for key ${pubKey.substring(
-                          0,
-                          10
-                        )}...`
-                      );
-                      originalPut.apply(self, args);
-                    } else {
-                      console.warn(
-                        `[Gun.on.put] BLOCKING STORAGE for unauthorized key ${pubKey.substring(
-                          0,
-                          10
-                        )}...`
-                      );
-                      // Non chiamare originalPut, effettivamente impedendo la persistenza del dato
-                    }
-                  } catch (error) {
-                    console.error(
-                      `[Gun.on.put] Error during authorization check:`,
-                      error
-                    );
-                    // In caso di errore di verifica, per sicurezza non procediamo con la scrittura
-                  }
-                })();
-
-                // Non chiamare originalPut qui - sarà chiamato solo dopo verifica positiva
-                return;
-              };
-            }
-          });
-
           // Check for authentication token in the URL
           if (url.includes("?token=") || url.includes("&token=")) {
             try {
@@ -3242,88 +3057,80 @@ app.post("/api/auth/shogun/metamask/signup", async (req, res) => {
 // ============ RELAY VERIFIER API ============
 
 // API - Check relay status
-app.get(
-  "/api/relay/status",
-  authenticateRequest,
-  async (req, res) => {
-    try {
-      // Verify that RelayVerifier is initialized
-      if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
-        return res.status(503).json({
-          success: false,
-          error: "Relay services not available",
-          config: {
-            enabled: RELAY_CONFIG.relay.enabled,
-            registryAddress:
-              RELAY_CONFIG.relay.registryAddress || "Not configured",
-          },
-        });
-      }
-
-      // Get all registered relays
-      const allRelays = await relayVerifier.getAllRelays();
-
-      res.json({
-        success: true,
+app.get("/api/relay/status", authenticateRequest, async (req, res) => {
+  try {
+    // Verify that RelayVerifier is initialized
+    if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
+      return res.status(503).json({
+        success: false,
+        error: "Relay services not available",
         config: {
           enabled: RELAY_CONFIG.relay.enabled,
-          registryAddress: RELAY_CONFIG.relay.registryAddress,
+          registryAddress:
+            RELAY_CONFIG.relay.registryAddress || "Not configured",
         },
-        relaysCount: allRelays.length,
-      });
-    } catch (error) {
-      console.error("Error getting relay status:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message,
       });
     }
+
+    // Get all registered relays
+    const allRelays = await relayVerifier.getAllRelays();
+
+    res.json({
+      success: true,
+      config: {
+        enabled: RELAY_CONFIG.relay.enabled,
+        registryAddress: RELAY_CONFIG.relay.registryAddress,
+      },
+      relaysCount: allRelays.length,
+    });
+  } catch (error) {
+    console.error("Error getting relay status:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
-);
+});
 
 // API - Get all relays
-app.get(
-  "/api/relay/all",
-  authenticateRequest,
-  async (req, res) => {
-    try {
-      // Verify that RelayVerifier is initialized
-      if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
-        return res.status(503).json({
-          success: false,
-          error: "Relay services not available",
-        });
-      }
-
-      // Get all registered relays
-      const relayAddresses = await relayVerifier.getAllRelays();
-      
-      // Get detailed info for each relay
-      const relays = [];
-      for (const address of relayAddresses) {
-        try {
-          const relayInfo = await relayVerifier.getRelayInfo(address);
-          if (relayInfo) {
-            relays.push(relayInfo);
-          }
-        } catch (error) {
-          console.error(`Error getting info for relay ${address}:`, error);
-        }
-      }
-
-      res.json({
-        success: true,
-        relays,
-      });
-    } catch (error) {
-      console.error("Error getting all relays:", error);
-      res.status(500).json({
+app.get("/api/relay/all", authenticateRequest, async (req, res) => {
+  try {
+    // Verify that RelayVerifier is initialized
+    if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
+      return res.status(503).json({
         success: false,
-        error: error.message,
+        error: "Relay services not available",
       });
     }
+
+    // Get all registered relays
+    const relayAddresses = await relayVerifier.getAllRelays();
+
+    // Get detailed info for each relay
+    const relays = [];
+    for (const address of relayAddresses) {
+      try {
+        const relayInfo = await relayVerifier.getRelayInfo(address);
+        if (relayInfo) {
+          relays.push(relayInfo);
+        }
+      } catch (error) {
+        console.error(`Error getting info for relay ${address}:`, error);
+      }
+    }
+
+    res.json({
+      success: true,
+      relays,
+    });
+  } catch (error) {
+    console.error("Error getting all relays:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
-);
+});
 
 // API - Check if user is subscribed to a relay
 app.get(
@@ -3343,7 +3150,7 @@ app.get(
 
       // Check if the user is subscribed to the relay
       const isSubscribed = await relayVerifier.isUserSubscribedToRelay(
-        relayAddress, 
+        relayAddress,
         userAddress
       );
 
@@ -3383,8 +3190,10 @@ app.get(
       }
 
       // Get all relays the user is subscribed to
-      const relayAddresses = await relayVerifier.getUserActiveRelays(userAddress);
-      
+      const relayAddresses = await relayVerifier.getUserActiveRelays(
+        userAddress
+      );
+
       // Get detailed info for each relay
       const relays = [];
       for (const address of relayAddresses) {
@@ -3417,63 +3226,62 @@ app.get(
 );
 
 // API - Check public key authorization against all relays
-app.post(
-  "/api/relay/check-pubkey",
-  authenticateRequest,
-  async (req, res) => {
-    try {
-      const { publicKey } = req.body;
+app.post("/api/relay/check-pubkey", authenticateRequest, async (req, res) => {
+  try {
+    const { publicKey } = req.body;
 
-      if (!publicKey) {
-        return res.status(400).json({
-          success: false,
-          error: "Public key is required",
-        });
-      }
-
-      // Verify that RelayVerifier is initialized
-      if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
-        return res.status(503).json({
-          success: false,
-          error: "Relay services not available",
-        });
-      }
-
-      // Get all registered relays
-      const relayAddresses = await relayVerifier.getAllRelays();
-      
-      // Check each relay for authorization
-      const authorizedRelays = [];
-      for (const address of relayAddresses) {
-        try {
-          const isAuthorized = await relayVerifier.isPublicKeyAuthorized(
-            address,
-            publicKey
-          );
-          
-          if (isAuthorized) {
-            authorizedRelays.push(address);
-          }
-        } catch (error) {
-          console.error(`Error checking authorization on relay ${address}:`, error);
-        }
-      }
-
-      res.json({
-        success: true,
-        publicKey,
-        isAuthorized: authorizedRelays.length > 0,
-        authorizedRelays,
-      });
-    } catch (error) {
-      console.error("Error checking public key authorization:", error);
-      res.status(500).json({
+    if (!publicKey) {
+      return res.status(400).json({
         success: false,
-        error: error.message,
+        error: "Public key is required",
       });
     }
+
+    // Verify that RelayVerifier is initialized
+    if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
+      return res.status(503).json({
+        success: false,
+        error: "Relay services not available",
+      });
+    }
+
+    // Get all registered relays
+    const relayAddresses = await relayVerifier.getAllRelays();
+
+    // Check each relay for authorization
+    const authorizedRelays = [];
+    for (const address of relayAddresses) {
+      try {
+        const isAuthorized = await relayVerifier.isPublicKeyAuthorized(
+          address,
+          publicKey
+        );
+
+        if (isAuthorized) {
+          authorizedRelays.push(address);
+        }
+      } catch (error) {
+        console.error(
+          `Error checking authorization on relay ${address}:`,
+          error
+        );
+      }
+    }
+
+    res.json({
+      success: true,
+      publicKey,
+      isAuthorized: authorizedRelays.length > 0,
+      authorizedRelays,
+    });
+  } catch (error) {
+    console.error("Error checking public key authorization:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
-);
+});
 
 // API - Get user subscription info for a specific relay
 app.get(
@@ -3528,149 +3336,141 @@ app.get(
 );
 
 // API - Subscribe to a relay
-app.post(
-  "/api/relay/subscribe",
-  authenticateRequest,
-  async (req, res) => {
-    try {
-      const { relayAddress, months, publicKey } = req.body;
+app.post("/api/relay/subscribe", authenticateRequest, async (req, res) => {
+  try {
+    const { relayAddress, months, publicKey } = req.body;
 
-      if (!relayAddress || !months) {
-        return res.status(400).json({
-          success: false,
-          error: "Relay address and number of months are required",
-        });
-      }
-
-      // Verify that RelayVerifier is initialized
-      if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
-        return res.status(503).json({
-          success: false,
-          error: "Relay services not available",
-        });
-      }
-
-      // Only admin or system tokens can subscribe users
-      if (!req.auth.isSystemToken && !req.auth.permissions?.includes("admin")) {
-        return res.status(403).json({
-          success: false,
-          error: "Only administrators can subscribe users to relays",
-        });
-      }
-
-      // Get the subscription price
-      const price = await relayVerifier.getRelayPrice(relayAddress);
-      if (!price) {
-        return res.status(400).json({
-          success: false,
-          error: "Failed to get relay subscription price",
-        });
-      }
-
-      // Subscribe to the relay
-      const tx = await relayVerifier.subscribeToRelay(
-        relayAddress,
-        months,
-        publicKey || undefined
-      );
-
-      if (!tx) {
-        return res.status(500).json({
-          success: false,
-          error: "Failed to subscribe to relay",
-        });
-      }
-
-      res.json({
-        success: true,
-        relayAddress,
-        months,
-        publicKey: publicKey || null,
-        transactionHash: tx.hash,
-        message: "Subscription successful",
-      });
-    } catch (error) {
-      console.error("Error subscribing to relay:", error);
-      res.status(500).json({
+    if (!relayAddress || !months) {
+      return res.status(400).json({
         success: false,
-        error: error.message,
+        error: "Relay address and number of months are required",
       });
     }
+
+    // Verify that RelayVerifier is initialized
+    if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
+      return res.status(503).json({
+        success: false,
+        error: "Relay services not available",
+      });
+    }
+
+    // Only admin or system tokens can subscribe users
+    if (!req.auth.isSystemToken && !req.auth.permissions?.includes("admin")) {
+      return res.status(403).json({
+        success: false,
+        error: "Only administrators can subscribe users to relays",
+      });
+    }
+
+    // Get the subscription price
+    const price = await relayVerifier.getRelayPrice(relayAddress);
+    if (!price) {
+      return res.status(400).json({
+        success: false,
+        error: "Failed to get relay subscription price",
+      });
+    }
+
+    // Subscribe to the relay
+    const tx = await relayVerifier.subscribeToRelay(
+      relayAddress,
+      months,
+      publicKey || undefined
+    );
+
+    if (!tx) {
+      return res.status(500).json({
+        success: false,
+        error: "Failed to subscribe to relay",
+      });
+    }
+
+    res.json({
+      success: true,
+      relayAddress,
+      months,
+      publicKey: publicKey || null,
+      transactionHash: tx.hash,
+      message: "Subscription successful",
+    });
+  } catch (error) {
+    console.error("Error subscribing to relay:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
-);
+});
 
 // API - Update relay config
-app.post(
-  "/api/relay/config",
-  authenticateRequest,
-  async (req, res) => {
-    try {
-      const { registryAddress, providerUrl, enabled } = req.body;
+app.post("/api/relay/config", authenticateRequest, async (req, res) => {
+  try {
+    const { registryAddress, providerUrl, enabled } = req.body;
 
-      // Only system/admin users can modify the configuration
-      if (!req.auth.isSystemToken && !req.auth.permissions?.includes("admin")) {
-        return res.status(403).json({
-          success: false,
-          error: "Only administrators can modify relay configuration",
-        });
-      }
-
-      // Update configuration
-      if (enabled !== undefined) {
-        RELAY_CONFIG.relay.enabled = enabled;
-      }
-
-      if (registryAddress) {
-        RELAY_CONFIG.relay.registryAddress = registryAddress;
-      }
-
-      if (providerUrl) {
-        RELAY_CONFIG.relay.providerUrl = providerUrl;
-      }
-
-      // Reinitialize relay components
-      if (RELAY_CONFIG.relay.enabled) {
-        const shogunCoreInstance = getShogunCore();
-
-        console.log("Reinitializing RelayVerifier...");
-        try {
-          relayVerifier = new RelayVerifier(
-            {
-              registryAddress: RELAY_CONFIG.relay.registryAddress,
-              providerUrl: RELAY_CONFIG.relay.providerUrl,
-            },
-            shogunCoreInstance
-          );
-          console.log("RelayVerifier reinitialized successfully");
-        } catch (error) {
-          console.error("Error reinitializing RelayVerifier:", error);
-          return res.status(500).json({
-            success: false,
-            error: "Error reinitializing RelayVerifier: " + error.message,
-          });
-        }
-      } else {
-        relayVerifier = null;
-        console.log("RelayVerifier disabled");
-      }
-
-      res.json({
-        success: true,
-        config: {
-          enabled: RELAY_CONFIG.relay.enabled,
-          registryAddress: RELAY_CONFIG.relay.registryAddress,
-          providerUrl: RELAY_CONFIG.relay.providerUrl,
-        },
-      });
-    } catch (error) {
-      console.error("Error updating relay configuration:", error);
-      res.status(500).json({
+    // Only system/admin users can modify the configuration
+    if (!req.auth.isSystemToken && !req.auth.permissions?.includes("admin")) {
+      return res.status(403).json({
         success: false,
-        error: error.message,
+        error: "Only administrators can modify relay configuration",
       });
     }
+
+    // Update configuration
+    if (enabled !== undefined) {
+      RELAY_CONFIG.relay.enabled = enabled;
+    }
+
+    if (registryAddress) {
+      RELAY_CONFIG.relay.registryAddress = registryAddress;
+    }
+
+    if (providerUrl) {
+      RELAY_CONFIG.relay.providerUrl = providerUrl;
+    }
+
+    // Reinitialize relay components
+    if (RELAY_CONFIG.relay.enabled) {
+      const shogunCoreInstance = getShogunCore();
+
+      console.log("Reinitializing RelayVerifier...");
+      try {
+        relayVerifier = new RelayVerifier(
+          {
+            registryAddress: RELAY_CONFIG.relay.registryAddress,
+            providerUrl: RELAY_CONFIG.relay.providerUrl,
+          },
+          shogunCoreInstance
+        );
+        console.log("RelayVerifier reinitialized successfully");
+      } catch (error) {
+        console.error("Error reinitializing RelayVerifier:", error);
+        return res.status(500).json({
+          success: false,
+          error: "Error reinitializing RelayVerifier: " + error.message,
+        });
+      }
+    } else {
+      relayVerifier = null;
+      console.log("RelayVerifier disabled");
+    }
+
+    res.json({
+      success: true,
+      config: {
+        enabled: RELAY_CONFIG.relay.enabled,
+        registryAddress: RELAY_CONFIG.relay.registryAddress,
+        providerUrl: RELAY_CONFIG.relay.providerUrl,
+      },
+    });
+  } catch (error) {
+    console.error("Error updating relay configuration:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
-);
+});
 
 // ============ DID VERIFIER API ============
 
@@ -3944,4 +3744,230 @@ app.post("/api/relay/did/config", authenticateRequest, async (req, res) => {
   }
 });
 
-export default app;
+// API - RELAY VERIFIER API ============
+
+// API - Pre-authorize a public key
+app.get("/api/relay/pre-authorize/:pubKey", async (req, res) => {
+  try {
+    const { pubKey } = req.params;
+    const forcedAuth = req.query.force === 'true';
+    
+    if (!pubKey) {
+      return res.status(400).json({
+        success: false,
+        error: "Public key is required"
+      });
+    }
+    
+    // Verify that RelayVerifier is initialized
+    if (!RELAY_CONFIG.relay.enabled || !relayVerifier) {
+      return res.status(503).json({
+        success: false,
+        error: "Relay services not available",
+        config: {
+          enabled: RELAY_CONFIG.relay.enabled,
+          registryAddress:
+            RELAY_CONFIG.relay.registryAddress || "Not configured",
+        },
+      });
+    }
+    
+    // Check if already authorized
+    if (isKeyPreAuthorized(pubKey)) {
+      const authInfo = authorizedKeys.get(pubKey);
+      return res.json({
+        success: true,
+        message: "Public key already authorized",
+        pubKey,
+        expiresAt: authInfo.expiresAt,
+        expiresIn: Math.round((authInfo.expiresAt - Date.now()) / 1000) + " seconds"
+      });
+    }
+    
+    // Allow force-authorization for testing with the API token
+    if (forcedAuth) {
+      // Check if request has the API token
+      const token = req.headers.authorization;
+      if (token && (token === SECRET_TOKEN || token === `Bearer ${SECRET_TOKEN}`)) {
+        console.log(`[PRE-AUTH API] Force-authorizing key: ${pubKey}`);
+        const authInfo = authorizeKey(pubKey);
+        
+        return res.json({
+          success: true,
+          message: "Public key force-authorized successfully",
+          pubKey,
+          forced: true,
+          expiresAt: authInfo.expiresAt,
+          expiresIn: Math.round((authInfo.expiresAt - Date.now()) / 1000) + " seconds"
+        });
+      } else {
+        return res.status(401).json({
+          success: false,
+          error: "API token required for forced authorization"
+        });
+      }
+    }
+    
+    // Clean the public key before conversion
+    let cleanedPubKey = pubKey;
+    
+    // If pubKey starts with @, remove it
+    if (cleanedPubKey.startsWith('@')) {
+      cleanedPubKey = cleanedPubKey.substring(1);
+    }
+    
+    // If pubKey contains a dot (like in pairs with epub), get only the first part
+    const dotIndex = cleanedPubKey.indexOf('.');
+    if (dotIndex > 0) {
+      cleanedPubKey = cleanedPubKey.substring(0, dotIndex);
+    }
+    
+    // Convert pubKey to hex format for blockchain verification
+    const hexPubKey = gunPubKeyToHex(cleanedPubKey);
+    if (!hexPubKey) {
+      return res.status(400).json({
+        success: false,
+        error: "Could not convert public key to hex format"
+      });
+    }
+    
+    console.log(`[PRE-AUTH API] Checking authorization for key: ${pubKey}`);
+    console.log(`[PRE-AUTH API] Cleaned key: ${cleanedPubKey}`);
+    console.log(`[PRE-AUTH API] Hex format: ${hexPubKey}`);
+    
+    // Get all active relays
+    const activeRelays = await relayVerifier.getAllRelays();
+    console.log(`[PRE-AUTH API] Found ${activeRelays.length} active relays`);
+    
+    if (!activeRelays || activeRelays.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "No active relays found"
+      });
+    }
+    
+    // Check each relay until we find one that authorizes this pubkey
+    let isAuthorized = false;
+    let authorizingRelay = null;
+    let relayErrors = [];
+    
+    for (const relayAddress of activeRelays) {
+      try {
+        console.log(`[PRE-AUTH API] Checking relay ${relayAddress}...`);
+        
+        // Direct check using ethers.js
+        try {
+          console.log(`[PRE-AUTH API] Testing direct contract access...`);
+          const { ethers } = await import("ethers");
+          const provider = new ethers.JsonRpcProvider(RELAY_CONFIG.relay.providerUrl);
+          
+          const relayAbi = [
+            "function isPublicKeyAuthorized(bytes calldata pubKey) view returns (bool)",
+            "function isAuthorizedByPubKey(bytes calldata _pubKey) external view returns (bool)"
+          ];
+          
+          const relay = new ethers.Contract(relayAddress, relayAbi, provider);
+          
+          // Call the contract directly - FIX: Removed double 0x prefix
+          const hexBytes = hexPubKey.startsWith('0x') ? hexPubKey : `0x${hexPubKey}`;
+          const pubKeyBytes = ethers.getBytes(hexBytes);
+          console.log(`[PRE-AUTH API] Calling contract with bytes of length: ${pubKeyBytes.length}`);
+          
+          let directResult = false;
+          
+          // Try both methods as different contracts might use different function names
+          try {
+            directResult = await relay.isPublicKeyAuthorized(pubKeyBytes);
+          } catch (methodError) {
+            console.log("[PRE-AUTH API] isPublicKeyAuthorized failed, trying isAuthorizedByPubKey...");
+            try {
+              directResult = await relay.isAuthorizedByPubKey(pubKeyBytes);
+            } catch (altMethodError) {
+              console.error("[PRE-AUTH API] Both methods failed:", altMethodError.message);
+              throw altMethodError;
+            }
+          }
+          
+          console.log(`[PRE-AUTH API] Direct contract call result: ${directResult}`);
+          
+          if (directResult === true) {
+            isAuthorized = true;
+            authorizingRelay = relayAddress;
+            console.log(`[PRE-AUTH API] Key directly authorized by relay ${relayAddress}`);
+            break;
+          }
+        } catch (directError) {
+          console.error(`[PRE-AUTH API] Direct contract call error:`, directError);
+          relayErrors.push(`Direct contract error: ${directError.message}`);
+        }
+        
+        // Try using the RelayVerifier implementation
+        isAuthorized = await relayVerifier.isPublicKeyAuthorized(
+          relayAddress,
+          hexPubKey
+        );
+        
+        if (isAuthorized) {
+          authorizingRelay = relayAddress;
+          console.log(`[PRE-AUTH API] Key authorized by relay ${relayAddress}`);
+          break;
+        } else {
+          console.warn(`[PRE-AUTH API] Key NOT authorized by relay ${relayAddress}`);
+        }
+      } catch (error) {
+        console.error(`[PRE-AUTH API] Error checking relay ${relayAddress}:`, error.message);
+        relayErrors.push(`Relay ${relayAddress}: ${error.message}`);
+      }
+    }
+    
+    if (!isAuthorized) {
+      return res.status(403).json({
+        success: false,
+        error: "Public key is not authorized by any active relay",
+        pubKey,
+        relayErrors,
+        suggestion: "You can use ?force=true with an API token to force-authorize this key"
+      });
+    }
+    
+    // Key is authorized, add to pre-authorized cache
+    const authInfo = authorizeKey(pubKey);
+    
+    // Also authorize the variants of the key
+    if (pubKey !== cleanedPubKey) {
+      authorizeKey(cleanedPubKey);
+    }
+    
+    // If the key doesn't start with @ but might be used with @, also authorize that variant
+    if (!pubKey.startsWith('@')) {
+      authorizeKey('@' + pubKey);
+    }
+    
+    // If the key starts with @ but might be used without it, also authorize that variant
+    if (pubKey.startsWith('@')) {
+      authorizeKey(pubKey.substring(1));
+    }
+    
+    res.json({
+      success: true,
+      message: "Public key pre-authorized successfully",
+      pubKey,
+      authorizingRelay,
+      expiresAt: authInfo.expiresAt,
+      expiresIn: Math.round((authInfo.expiresAt - Date.now()) / 1000) + " seconds"
+    });
+  } catch (error) {
+    console.error("Error pre-authorizing key:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+export { 
+  app as default, 
+  authorizeKey,
+  isKeyPreAuthorized,
+  RELAY_CONFIG
+};
