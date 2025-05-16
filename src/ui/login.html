@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login - Shogun Relay</title>
+    <style>
+        :root {
+            --primary-color: #008875;
+            --primary-dark: #006655;
+            --secondary-color: #6e56ff;
+            --secondary-dark: #5a45d5;
+            --success-color: #4CAF50;
+            --error-color: #ff3366;
+            --warning-color: #FFC107;
+            --info-color: #2196F3;
+            --light-bg: #f9f9f9;
+            --dark-bg: #333;
+            --text-color: #333;
+            --text-light: #666;
+            --border-color: #ccc;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .login-container {
+            width: 90%;
+            max-width: 400px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .login-header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .login-header h1 {
+            font-size: 24px;
+            margin: 0;
+        }
+
+        .login-form {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            transition: border-color 0.3s;
+        }
+
+        input[type="password"]:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(0, 136, 117, 0.2);
+        }
+
+        button {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 15px;
+            width: 100%;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: var(--primary-dark);
+        }
+
+        .error-message {
+            color: var(--error-color);
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: rgba(255, 51, 102, 0.1);
+            display: none;
+        }
+
+        .info-text {
+            color: var(--text-light);
+            font-size: 14px;
+            margin-top: 15px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>Shogun Relay</h1>
+        </div>
+        <div class="login-form">
+            <div class="form-group">
+                <label for="token">Token di autenticazione</label>
+                <input type="password" id="token" placeholder="Inserisci il token di autenticazione" autocomplete="off">
+            </div>
+            <button id="login-btn">Accedi</button>
+            <div id="error-message" class="error-message">
+                Token non valido. Riprova.
+            </div>
+            <p class="info-text">Inserisci il token di autenticazione per accedere alla dashboard di Shogun Relay.</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const loginBtn = document.getElementById('login-btn');
+            const tokenInput = document.getElementById('token');
+            const errorMessage = document.getElementById('error-message');
+
+            // Controlla se l'utente è già autenticato
+            const savedToken = localStorage.getItem('authToken');
+            if (savedToken) {
+                // Verifica che il token sia ancora valido
+                testToken(savedToken).then(isValid => {
+                    if (isValid) {
+                        // Reindirizza alla dashboard
+                        window.location.href = "/";
+                    } else {
+                        // Token non valido, rimuovilo
+                        localStorage.removeItem('authToken');
+                    }
+                });
+            }
+
+            // Login con pressione Enter
+            tokenInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    doLogin();
+                }
+            });
+
+            // Login con click sul pulsante
+            loginBtn.addEventListener('click', doLogin);
+
+            // Funzione di login
+            function doLogin() {
+                const token = tokenInput.value.trim();
+                if (!token) {
+                    showError('Inserisci un token valido');
+                    return;
+                }
+
+                // Disabilita il pulsante durante la verifica
+                loginBtn.disabled = true;
+                loginBtn.textContent = 'Verifica in corso...';
+
+                // Verifica il token
+                testToken(token).then(isValid => {
+                    if (isValid) {
+                        // Token valido, salvalo e reindirizza
+                        localStorage.setItem('authToken', token);
+
+                        // Imposta una sessione
+                        sessionStorage.setItem('shogunSession', 'active');
+
+                        // Reindirizza alla dashboard
+                        window.location.href = "/";
+                    } else {
+                        showError('Token di autenticazione non valido');
+                        loginBtn.disabled = false;
+                        loginBtn.textContent = 'Accedi';
+                    }
+                }).catch(error => {
+                    showError('Errore di connessione al server');
+                    console.error('Errore durante la verifica del token:', error);
+                    loginBtn.disabled = false;
+                    loginBtn.textContent = 'Accedi';
+                });
+            }
+
+            // Funzione per testare la validità del token
+            function testToken(token) {
+                return fetch('/api/ipfs/status', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                })
+                    .then(response => {
+                        return response.ok;
+                    })
+                    .catch(error => {
+                        console.error('Errore nella richiesta di verifica token:', error);
+                        return false;
+                    });
+            }
+
+            // Funzione per mostrare messaggi di errore
+            function showError(message) {
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
+
+                // Nascondi il messaggio dopo 5 secondi
+                setTimeout(() => {
+                    errorMessage.style.display = 'none';
+                }, 5000);
+            }
+        });
+    </script>
+</body>
+
+</html>

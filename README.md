@@ -1,4 +1,4 @@
-# Shogun Relay Server
+# 📡 Shogun Relay
 
 This is a unified relay server for the Shogun application, providing Gun database, IPFS integration, and API services.
 

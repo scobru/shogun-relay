@@ -1,5 +1,5 @@
 {
-  "name": "test-env",
+  "name": "shogun-relay",
   "version": "1.0.0",
   "description": "",
   "license": "ISC",
@@ -8,10 +8,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js",
-    "dev": "nodemon index.js",
-    "test-jwt": "node test-jwt-auth.js",
-    "generate-keypair": "node generate-key-pair.js"
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "get-deployed-contracts": "node scripts/getDeployedContracts.js"
   },
   "dependencies": {
     "bullet-catcher": "^3.0.5",
@@ -29,7 +28,8 @@
     "node-fetch": "^3.3.2",
     "nodemon": "^3.1.10",
     "path": "^0.12.7",
-    "shogun-core": "^1.0.8",
+    "shogun-contracts": "^1.0.2",
+    "shogun-core": "^1.1.1",
     "shogun-ipfs": "^1.0.0",
     "url": "^0.11.4",
     "valibot": "^1.1.0"

@@ -1,0 +1,2315 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard Shogun Relay</title>
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <style>
+      :root {
+        --primary-color: #008875;
+        --primary-dark: #006655;
+        --secondary-color: #6e56ff;
+        --secondary-dark: #5a45d5;
+        --success-color: #4caf50;
+        --error-color: #ff3366;
+        --warning-color: #ffc107;
+        --info-color: #2196f3;
+        --light-bg: #f9f9f9;
+        --dark-bg: #333;
+        --text-color: #333;
+        --text-light: #666;
+        --border-color: #ccc;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        margin: 0;
+        padding: 0;
+        line-height: 1.6;
+        color: var(--text-color);
+        background-color: #f5f5f5;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      header {
+        background-color: var(--primary-color);
+        color: white;
+        padding: 15px 0;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      header h1 {
+        margin: 0;
+        padding: 0 20px;
+        font-size: 24px;
+      }
+
+      h1,
+      h2,
+      h3,
+      h4 {
+        color: var(--primary-color);
+      }
+
+      .card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 10px;
+      }
+
+      .card-title {
+        margin: 0;
+        font-size: 18px;
+      }
+
+      .card-actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+
+      .stat-card {
+        background: white;
+        border-radius: 8px;
+        padding: 15px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        text-align: center;
+      }
+
+      .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: var(--primary-color);
+        margin: 10px 0;
+      }
+
+      .stat-label {
+        color: var(--text-light);
+        font-size: 14px;
+      }
+
+      textarea,
+      input[type="text"],
+      input[type="file"] {
+        width: 100%;
+        padding: 10px;
+        font-size: 16px;
+        border-radius: 4px;
+        border: 1px solid var(--border-color);
+        margin-bottom: 10px;
+      }
+
+      textarea {
+        min-height: 100px;
+        resize: vertical;
+      }
+
+      button {
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: background 0.3s;
+      }
+
+      button:hover {
+        background: var(--primary-dark);
+      }
+
+      button.secondary {
+        background: var(--secondary-color);
+      }
+
+      button.secondary:hover {
+        background: var(--secondary-dark);
+      }
+
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+
+      .status {
+        margin-top: 10px;
+        color: var(--primary-color);
+        font-size: 14px;
+      }
+
+      .error {
+        color: var(--error-color);
+      }
+
+      .success {
+        color: var(--success-color);
+      }
+
+      .warning {
+        color: var(--warning-color);
+      }
+
+      .info {
+        color: var(--info-color);
+      }
+
+      .node-info {
+        display: inline-block;
+        margin-right: 10px;
+        background: #e9f5f3;
+        padding: 4px 8px;
+        border-radius: 4px;
+      }
+
+      .message {
+        background: white;
+        border-left: 4px solid var(--primary-color);
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 0 4px 4px 0;
+      }
+
+      .message-header {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.9em;
+        color: var(--text-light);
+        margin-bottom: 5px;
+      }
+
+      .message-name {
+        font-weight: bold;
+        color: var(--primary-color);
+      }
+
+      .message-source {
+        font-size: 0.8em;
+        color: #999;
+        background: #f0f0f0;
+        padding: 2px 5px;
+        border-radius: 3px;
+      }
+
+      .message-ipfs {
+        border-left-color: var(--secondary-color);
+      }
+
+      .message-ipfs .message-name {
+        color: var(--secondary-color);
+      }
+
+      .log-container {
+        background: var(--dark-bg);
+        color: #eee;
+        font-family: monospace;
+        padding: 10px;
+        height: 150px;
+        overflow-y: auto;
+        border-radius: 4px;
+        margin-top: 10px;
+        font-size: 12px;
+      }
+
+      .log-info {
+        color: var(--success-color);
+      }
+
+      .log-error {
+        color: var(--error-color);
+      }
+
+      .log-warn {
+        color: var(--warning-color);
+      }
+
+      .tabs {
+        display: flex;
+        margin-bottom: 10px;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .tab {
+        padding: 10px 15px;
+        background: #f0f0f0;
+        cursor: pointer;
+        border-radius: 4px 4px 0 0;
+        margin-right: 5px;
+        transition: background 0.3s;
+      }
+
+      .tab:hover {
+        background: #e0e0e0;
+      }
+
+      .tab.active {
+        background: var(--primary-color);
+        color: white;
+      }
+
+      .tab-content {
+        display: none;
+      }
+
+      .tab-content.active {
+        display: block;
+      }
+
+      #debug-toggle {
+        font-size: 12px;
+        padding: 5px 10px;
+        background: #666;
+      }
+
+      .file-list {
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      .file-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .file-item:last-child {
+        border-bottom: none;
+      }
+
+      .file-info {
+        flex: 1;
+      }
+
+      .file-name {
+        font-weight: bold;
+      }
+
+      .file-meta {
+        font-size: 12px;
+        color: var(--text-light);
+      }
+
+      .file-actions {
+        display: flex;
+        gap: 5px;
+      }
+
+      .file-actions button {
+        padding: 5px 10px;
+        font-size: 12px;
+      }
+
+      .search-form {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 10px;
+        margin-bottom: 15px;
+      }
+
+      .search-form input {
+        margin-bottom: 0;
+      }
+
+      .search-form button {
+        grid-column: 1 / -1;
+      }
+
+      .ipfs-badge {
+        display: inline-block;
+        background: var(--secondary-color);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 12px;
+        margin-left: 5px;
+      }
+
+      .local-badge {
+        display: inline-block;
+        background: var(--primary-color);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 12px;
+        margin-left: 5px;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 20px;
+        color: var(--text-light);
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 30px;
+        color: var(--text-light);
+      }
+
+      .empty-state i {
+        font-size: 48px;
+        margin-bottom: 10px;
+        color: var(--border-color);
+      }
+
+      .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .dashboard-title {
+        margin: 0;
+      }
+
+      .dashboard-actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      .ipfs-info {
+        margin-top: 5px;
+        font-size: 12px;
+        color: var(--text-light);
+        background: #f5f5f5;
+        padding: 5px;
+        border-radius: 3px;
+        word-break: break-all;
+      }
+
+      .ipfs-info small {
+        font-family: monospace;
+        display: block;
+        margin: 2px 0;
+      }
+
+      .ipfs-info a {
+        color: var(--secondary-color);
+        text-decoration: none;
+      }
+
+      .ipfs-info a:hover {
+        text-decoration: underline;
+      }
+
+      .copy-hash {
+        background: var(--secondary-color) !important;
+      }
+
+      .copy-hash:hover {
+        background: var(--secondary-dark) !important;
+      }
+
+      @media (max-width: 768px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        .search-form {
+          grid-template-columns: 1fr;
+        }
+
+        .dashboard-header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 10px;
+        }
+
+        .dashboard-actions {
+          width: 100%;
+          justify-content: space-between;
+        }
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 5px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: bold;
+        background-color: #f0f0f0;
+        color: #333;
+      }
+
+      .breadcrumb {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-bottom: 15px;
+        padding: 8px;
+        background-color: #f5f5f5;
+        border-radius: 4px;
+      }
+
+      .crumb {
+        cursor: pointer;
+        padding: 3px 6px;
+        border-radius: 3px;
+      }
+
+      .crumb:hover {
+        background-color: #e0e0e0;
+      }
+
+      .crumb:not(:last-child)::after {
+        content: "/";
+        margin-left: 6px;
+        color: #999;
+      }
+
+      .explorer-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 10px;
+        margin-bottom: 5px;
+        background-color: white;
+        border-radius: 4px;
+        border: 1px solid var(--border-color);
+      }
+
+      .explorer-item:hover {
+        background-color: #f5f5f5;
+      }
+
+      .explorer-item.clickable {
+        cursor: pointer;
+      }
+
+      .explorer-name {
+        font-weight: bold;
+      }
+
+      .explorer-preview {
+        font-size: 12px;
+        color: #666;
+        margin-top: 3px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 500px;
+      }
+
+      .explorer-type {
+        padding: 2px 6px;
+        border-radius: 3px;
+        background-color: #e0e0e0;
+        font-size: 12px;
+      }
+
+      .settings-group {
+        margin-bottom: 25px;
+        padding: 15px;
+        background-color: #f9f9f9;
+        border-radius: 4px;
+      }
+
+      .settings-group h4 {
+        margin-top: 0;
+        margin-bottom: 15px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #eee;
+      }
+
+      .setting-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+      }
+
+      .switch-container {
+        display: flex;
+        align-items: center;
+      }
+
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 48px;
+        height: 24px;
+        margin-right: 10px;
+      }
+
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: 0.4s;
+      }
+
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.4s;
+      }
+
+      input:checked + .slider {
+        background-color: var(--primary-color);
+      }
+
+      input:checked + .slider:before {
+        transform: translateX(24px);
+      }
+
+      .slider.round {
+        border-radius: 24px;
+      }
+
+      .slider.round:before {
+        border-radius: 50%;
+      }
+
+      .form-group {
+        margin-bottom: 15px;
+      }
+
+      .form-control {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        font-size: 14px;
+      }
+
+      select.form-control {
+        height: 36px;
+      }
+
+      .btn {
+        display: inline-block;
+        padding: 8px 15px;
+        font-size: 14px;
+        border-radius: 4px;
+        cursor: pointer;
+        border: none;
+        text-align: center;
+      }
+
+      .btn.primary {
+        background-color: var(--primary-color);
+        color: white;
+      }
+
+      .btn.primary:hover {
+        background-color: var(--primary-dark);
+      }
+
+      .conditional-config {
+        padding: 10px;
+        margin: 10px 0;
+        background-color: #f5f5f5;
+        border-radius: 4px;
+        border-left: 3px solid #ddd;
+      }
+
+      .view-file-btn {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+
+      .view-file-btn:hover {
+        background-color: var(--primary-dark);
+      }
+
+      .copy-hash-btn {
+        background-color: var(--secondary-color);
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+
+      .copy-hash-btn:hover {
+        background-color: var(--secondary-dark);
+      }
+
+      /* Pin/Unpin buttons styles */
+      .pin-button,
+      .unpin-button {
+        background-color: #6c5ce7;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        margin-left: 5px;
+      }
+
+      .pin-button:hover {
+        background-color: #5541d8;
+      }
+
+      .unpin-button {
+        background-color: #636e72;
+      }
+
+      .unpin-button:hover {
+        background-color: #4d5b5e;
+      }
+
+      .pin-status {
+        display: inline-block;
+        font-size: 12px;
+        padding: 2px 6px;
+        border-radius: 3px;
+        margin-left: 5px;
+      }
+
+      .pinned {
+        background-color: #6c5ce7;
+        color: white;
+      }
+
+      .unpinned {
+        background-color: #636e72;
+        color: white;
+      }
+
+      /* Stili per la Sezione Esplora GunDB */
+      #gundb-explorer {
+        margin-top: 20px;
+      }
+
+      .gundb-explorer-toolbar {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 10px;
+        gap: 10px;
+      }
+
+      .gundb-path-container {
+        font-weight: bold;
+        margin-bottom: 15px;
+        padding: 8px;
+        background-color: #f5f5f5;
+        border-radius: 4px;
+      }
+
+      .gundb-nodes {
+        display: grid;
+        gap: 10px;
+      }
+
+      .gundb-node {
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 10px;
+        display: grid;
+        grid-template-columns: 2fr 3fr auto auto;
+        align-items: center;
+        gap: 10px;
+        background-color: #f9f9f9;
+      }
+
+      .node-key {
+        font-weight: bold;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .node-value {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 100%;
+        color: #555;
+      }
+
+      .node-type {
+        color: #888;
+        font-style: italic;
+      }
+
+      .node-actions {
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .explore-node {
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      .explore-node:hover {
+        background-color: #3e8e41;
+      }
+
+      #gundb-content .loading,
+      #gundb-content .error,
+      #gundb-content .empty {
+        padding: 20px;
+        text-align: center;
+        border-radius: 4px;
+      }
+
+      #gundb-content .loading {
+        background-color: #f0f0f0;
+        color: #555;
+      }
+
+      #gundb-content .error {
+        background-color: #ffebee;
+        color: #d32f2f;
+      }
+
+      #gundb-content .empty {
+        background-color: #f5f5f5;
+        color: #757575;
+      }
+
+      .gundb-query-container {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+      }
+
+      .gundb-query-container input {
+        flex: 1;
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-family: monospace;
+      }
+
+      .gundb-query-container button {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 8px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      .gundb-query-container button:hover {
+        background-color: var(--primary-dark);
+      }
+
+      .gundb-query-result {
+        margin-top: 15px;
+        padding: 10px;
+        background-color: #f5f5f5;
+        border-radius: 4px;
+        border-left: 3px solid var(--primary-color);
+        overflow-x: auto;
+      }
+
+      .gundb-query-error {
+        margin-top: 15px;
+        padding: 10px;
+        background-color: #ffebee;
+        border-radius: 4px;
+        border-left: 3px solid var(--error-color);
+        color: var(--error-color);
+      }
+
+      .gundb-examples {
+        margin-bottom: 15px;
+        padding: 5px 10px;
+        background-color: #f5f5f5;
+        border-radius: 4px;
+        font-size: 13px;
+      }
+
+      .gundb-examples span {
+        color: #666;
+        margin-right: 10px;
+      }
+
+      .query-example {
+        display: inline-block;
+        margin-right: 15px;
+        padding: 2px 8px;
+        background-color: #e0e0e0;
+        border-radius: 3px;
+        color: var(--primary-color);
+        text-decoration: none;
+        font-family: monospace;
+      }
+
+      .query-example:hover {
+        background-color: #d0d0d0;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <h1>Dashboard Shogun Relay</h1>
+    </header>
+
+    <div class="container">
+      <div class="dashboard-header">
+        <h2 class="dashboard-title">Panoramica Sistema</h2>
+        <div class="dashboard-actions">
+          <button id="refresh-all">Aggiorna Dati</button>
+          <button id="debug-toggle">Mostra Debug</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="stat-card">
+          <div class="stat-label">Stato Server</div>
+          <div class="stat-value" id="server-status">Attivo</div>
+          <div class="stat-label">
+            Porta: <span id="server-port">8765</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Connessioni GunDB</div>
+          <div class="stat-value" id="peer-count">0</div>
+          <div class="stat-label">
+            Stato: <span id="network-status">Avvio...</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">File Caricati</div>
+          <div class="stat-value" id="file-count">0</div>
+          <div class="stat-label">
+            Totale: <span id="total-size">0 MB</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Informazioni Server</h3>
+        </div>
+        <p>
+          Gun server attivo su <code><span id="origin"></span></code>
+        </p>
+        <p>
+          WebSocket su <code><span id="ws"></span></code>
+        </p>
+        <div id="network-info">
+          <span class="node-info"
+            >Peers: <strong id="peer-count-detail">0</strong></span
+          >
+          <span class="node-info"
+            >Stato: <strong id="network-status-detail">Avvio...</strong></span
+          >
+        </div>
+        <div
+          id="log-container"
+          class="log-container"
+          style="display: none"
+        ></div>
+      </div>
+
+      <div class="card">
+        <div class="tabs">
+          <div class="tab active" data-tab="files">File</div>
+          <div class="tab" data-tab="upload">Carica File</div>
+          <div class="tab" data-tab="explorer">Esplora GunDB</div>
+          <div class="tab" data-tab="settings">Impostazioni</div>
+        </div>
+
+        <div id="files-tab" class="tab-content active">
+          <div class="card-header">
+            <h3 class="card-title">Gestione File</h3>
+            <div class="card-actions">
+              <button id="refresh-files">Aggiorna</button>
+            </div>
+          </div>
+
+          <div class="search-form">
+            <input type="text" id="file-name-search" placeholder="Nome file" />
+            <input
+              type="text"
+              id="file-mimetype-search"
+              placeholder="Tipo MIME"
+            />
+            <input
+              type="number"
+              id="file-min-size"
+              placeholder="Dimensione min (bytes)"
+            />
+            <input
+              type="number"
+              id="file-max-size"
+              placeholder="Dimensione max (bytes)"
+            />
+            <button id="search-files">Cerca</button>
+          </div>
+
+          <div class="file-list" id="file-list">
+            <div class="loading">Caricamento file in corso...</div>
+          </div>
+        </div>
+
+        <div id="upload-tab" class="tab-content">
+          <div class="card-header">
+            <h3 class="card-title">Carica File</h3>
+            <div class="card-actions">
+              <span id="ipfs-status-badge" class="badge"
+                >IPFS: Disattivato</span
+              >
+            </div>
+          </div>
+
+          <form id="upload-form">
+            <input type="file" id="file-input" />
+            <input
+              type="text"
+              id="custom-name"
+              placeholder="Nome personalizzato (opzionale)"
+            />
+            <button type="submit" id="upload-button">Carica File</button>
+            <div id="upload-status" class="status"></div>
+          </form>
+
+          <div id="upload-result" style="margin-top: 20px"></div>
+        </div>
+
+        <div id="explorer-tab" class="tab-content">
+          <div class="card-header">
+            <h3 class="card-title">Esplora GunDB</h3>
+            <div class="card-actions">
+              <button id="refresh-explorer">Aggiorna</button>
+            </div>
+          </div>
+
+          <div class="gundb-query-container">
+            <input
+              type="text"
+              id="gundb-query"
+              class="form-control"
+              placeholder="Inserisci una query GunDB (es. gun.get('files').get('file1'))"
+            />
+            <button id="execute-query" class="btn primary">Esegui Query</button>
+          </div>
+          <div class="gundb-examples">
+            <span>Esempi:</span>
+            <a href="#" class="query-example" data-query="get('files')"
+              >gun.get('files')</a
+            >
+            <a href="#" class="query-example" data-query="get('users')"
+              >gun.get('users')</a
+            >
+            <a href="#" class="query-example" data-query="get('files').map()"
+              >gun.get('files').map()</a
+            >
+          </div>
+
+          <div class="breadcrumb" id="explorer-path">
+            <span class="crumb" data-path="">Root</span>
+          </div>
+
+          <div id="explorer-content">
+            <div class="loading">Caricamento dati...</div>
+          </div>
+        </div>
+
+        <div id="settings-tab" class="tab-content">
+          <div class="card-header">
+            <h3 class="card-title">Impostazioni</h3>
+          </div>
+
+          <div class="settings-group">
+            <h4>IPFS</h4>
+            <div class="setting-item">
+              <label for="ipfs-switch">Abilita storage IPFS</label>
+              <div class="switch-container">
+                <label class="switch">
+                  <input type="checkbox" id="ipfs-switch" />
+                  <span class="slider round"></span>
+                </label>
+                <span id="ipfs-status">Disattivato</span>
+              </div>
+            </div>
+
+            <!-- Aggiungi sezione di autenticazione -->
+            <h4 style="margin-top: 20px">Autenticazione</h4>
+            <div class="setting-item">
+              <label for="auth-token">Token di Autenticazione</label>
+              <div style="display: flex; gap: 10px">
+                <input
+                  type="password"
+                  id="auth-token"
+                  class="form-control"
+                  placeholder="Inserisci il token di autenticazione"
+                />
+                <button id="save-token" class="btn primary">Salva</button>
+              </div>
+              <div id="auth-status" class="status"></div>
+            </div>
+
+            <div id="ipfs-config-form" style="margin-top: 20px">
+              <div class="form-group">
+                <label for="ipfs-service">Servizio IPFS</label>
+                <select id="ipfs-service" class="form-control">
+                  <option value="IPFS-CLIENT">IPFS Client Locale</option>
+                  <option value="PINATA">Pinata</option>
+                </select>
+              </div>
+
+              <div id="ipfs-client-config" class="conditional-config">
+                <div class="form-group">
+                  <label for="ipfs-node-url">URL Nodo IPFS</label>
+                  <input
+                    type="text"
+                    id="ipfs-node-url"
+                    class="form-control"
+                    placeholder="http://localhost:5001"
+                  />
+                </div>
+              </div>
+
+              <div
+                id="pinata-config"
+                class="conditional-config"
+                style="display: none"
+              >
+                <div class="form-group">
+                  <label for="pinata-jwt">Pinata JWT</label>
+                  <input
+                    type="text"
+                    id="pinata-jwt"
+                    class="form-control"
+                    placeholder="JWT Token"
+                  />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="ipfs-gateway">Gateway IPFS</label>
+                <input
+                  type="text"
+                  id="ipfs-gateway"
+                  class="form-control"
+                  placeholder="https://ipfs.io/ipfs"
+                />
+              </div>
+
+              <button id="save-ipfs-config" class="btn primary">
+                Salva Configurazione
+              </button>
+              <div id="ipfs-config-status" class="status"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="gundb-explorer" class="card" style="display: none">
+        <!-- Questa è la versione duplicata che è stata nascosta -->
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        // Verifica autenticazione all'avvio
+        const checkAuth = () => {
+          const token = localStorage.getItem("authToken");
+          if (!token) {
+            // Reindirizza alla pagina di login se non c'è token
+            window.location.href = "/login";
+            return false;
+          }
+          return true;
+        };
+
+        // Esegui controllo autenticazione
+        if (!checkAuth()) return;
+
+        // Logger
+        const logContainer = document.getElementById("log-container");
+        const logger = {
+          log: function (message, type = "info") {
+            const logItem = document.createElement("div");
+            logItem.className = `log-${type}`;
+            logItem.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.appendChild(logItem);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            console.log(`[${type}] ${message}`);
+          },
+          info: function (message) {
+            this.log(message, "info");
+          },
+          error: function (message) {
+            this.log(message, "error");
+          },
+          warn: function (message) {
+            this.log(message, "warn");
+          },
+        };
+
+        // Toggle debug logs
+        document
+          .getElementById("debug-toggle")
+          .addEventListener("click", function () {
+            const logContainer = document.getElementById("log-container");
+            if (logContainer.style.display === "none") {
+              logContainer.style.display = "block";
+              this.textContent = "Nascondi Debug";
+            } else {
+              logContainer.style.display = "none";
+              this.textContent = "Mostra Debug";
+            }
+          });
+
+        // Tabs switching
+        document.querySelectorAll(".tab").forEach((tab) => {
+          tab.addEventListener("click", () => {
+            // Remove active class from all tabs and content
+            document
+              .querySelectorAll(".tab")
+              .forEach((t) => t.classList.remove("active"));
+            document
+              .querySelectorAll(".tab-content")
+              .forEach((c) => c.classList.remove("active"));
+
+            // Add active class to clicked tab and corresponding content
+            tab.classList.add("active");
+            const tabName = tab.getAttribute("data-tab");
+            document.getElementById(`${tabName}-tab`).classList.add("active");
+          });
+        });
+
+        // Initialize Gun with connection to relay
+        logger.info(
+          "Inizializzazione Gun con server: " + location.origin + "/gun"
+        );
+
+        // Controlla se WebSocket è supportato
+        if (typeof WebSocket === "undefined") {
+          logger.error(
+            "WebSocket non supportato in questo browser! Utilizzo HTTP fallback"
+          );
+        } else {
+          logger.info(
+            "WebSocket supportato, tentativo di connessione WebSocket..."
+          );
+        }
+
+        // Crea URL per WebSocket
+        const wsProtocol =
+          window.location.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = wsProtocol + "//" + window.location.host + "/gun";
+        logger.info("WebSocket URL: " + wsUrl);
+
+        const gun = Gun({
+          peers: [location.origin + "/gun"],
+          localStorage: false,
+          radisk: false,
+          WebSocket: window.WebSocket, // Specifica esplicitamente WebSocket
+          secure: window.location.protocol === "https:", // Usa SSL se necessario
+          headers: {
+            token: "thisIsTheTokenForReals", // Passa il token nelle richieste
+          },
+        });
+
+        // Make the token available globally so Gun extensions can access it
+        window.gunAuthToken = "thisIsTheTokenForReals";
+
+        window.Gun = gun;
+
+        // Add token to ALL gun messages
+        Gun.on("opt", function (ctx) {
+          if (ctx.once) return;
+          
+          // Intercept all outgoing messages
+          ctx.on("out", function(msg) {
+            // Make sure headers exist
+            if (!msg.headers) msg.headers = {};
+            
+            // Add token to headers
+            msg.headers.token = window.gunAuthToken;
+            
+            this.to.next(msg);
+          });
+        });
+
+        // Test WebSocket connection
+        fetch("/check-websocket")
+          .then((res) => res.json())
+          .then((data) => {
+            logger.info(
+              "Configurazione WebSocket server: " + JSON.stringify(data)
+            );
+          })
+          .catch((err) => {
+            logger.error("Errore verifica WebSocket: " + err.message);
+          });
+
+        // Basic connection status
+        const peerCountEl = document.getElementById("peer-count");
+        const peerCountDetailEl = document.getElementById("peer-count-detail");
+        const networkStatusEl = document.getElementById("network-status");
+        const networkStatusDetailEl = document.getElementById(
+          "network-status-detail"
+        );
+        const serverStatusEl = document.getElementById("server-status");
+        const serverPortEl = document.getElementById("server-port");
+
+        document.getElementById("origin").textContent = location.origin;
+        document.getElementById("ws").textContent =
+          location.origin.replace(/^http/, "ws") + "/gun";
+        serverPortEl.textContent = location.port || "8765";
+
+        let peerCount = 0;
+        let connectionStatus = "Disconnesso";
+
+        // Ascolta gli eventi di connessione
+        gun.on("hi", (peer) => {
+          peerCount++;
+          connectionStatus = "Connesso";
+          updateConnectionStatus();
+          logger.info(`Connesso a peer: ${JSON.stringify(peer)}`);
+        });
+
+        gun.on("bye", (peer) => {
+          peerCount = Math.max(0, peerCount - 1);
+          connectionStatus = peerCount === 0 ? "Disconnesso" : "Connesso";
+          updateConnectionStatus();
+          logger.warn(`Disconnesso da peer: ${JSON.stringify(peer)}`);
+        });
+
+        // Funzione per aggiornare lo stato della connessione
+        function updateConnectionStatus() {
+          peerCountEl.textContent = peerCount;
+          peerCountDetailEl.textContent = peerCount;
+          networkStatusEl.textContent = connectionStatus;
+          networkStatusDetailEl.textContent = connectionStatus;
+          serverStatusEl.textContent = "Attivo";
+        }
+
+        // Imposta una connessione iniziale forzata
+        setTimeout(() => {
+          // Se dopo 3 secondi siamo ancora disconnessi, forza una connessione
+          if (connectionStatus === "Disconnesso") {
+            gun.get("_").put({ ping: Date.now() });
+
+            // Se il server è attivo ma non abbiamo peer, consideriamo comunque la connessione valida
+            if (connectionStatus === "Disconnesso") {
+              connectionStatus = "Connesso (Solo Locale)";
+              updateConnectionStatus();
+              logger.info("Connessione locale stabilita");
+            }
+          }
+        }, 3000);
+
+        // File management
+        const fileList = document.getElementById("file-list");
+        const fileCountEl = document.getElementById("file-count");
+        const totalSizeEl = document.getElementById("total-size");
+        const refreshFilesBtn = document.getElementById("refresh-files");
+        const searchFilesBtn = document.getElementById("search-files");
+
+        // Load all files
+        const loadFiles = async (searchParams = {}) => {
+          // Verifica autenticazione prima di procedere
+          if (!isAuthenticated()) {
+            fileList.innerHTML =
+              '<div class="error">Autenticazione richiesta per caricare i file</div>';
+            return;
+          }
+
+          fileList.innerHTML =
+            '<div class="loading">Caricamento file in corso...</div>';
+          logger.info("Inizio caricamento lista file...");
+
+          try {
+            // Prima proviamo a caricare i file tramite l'API
+            let url = "/files/all";
+            if (Object.keys(searchParams).length > 0) {
+              const queryString = new URLSearchParams(searchParams).toString();
+              url = `/files/search?${queryString}`;
+            }
+
+            const token = getAuthToken();
+            logger.info(
+              `Richiesta API a ${url} con token: ${
+                token ? "presente" : "assente"
+              }`
+            );
+
+            const response = await fetch(url, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            });
+            const data = await response.json();
+            logger.info(
+              `Risposta API ricevuta: ${JSON.stringify(data).substring(
+                0,
+                200
+              )}...`
+            );
+
+            if (data.success && data.results && data.results.length > 0) {
+              displayFiles(data.results);
+              updateFileStats(data.results);
+              logger.info(`Trovati ${data.results.length} file tramite API`);
+            } else {
+              // Se l'API non restituisce file, proviamo direttamente da GunDB
+              logger.info(
+                "Nessun file trovato tramite API, provo a recuperare direttamente da GunDB"
+              );
+
+              // Uso di Gun per ottenere i file direttamente
+              const files = [];
+              const seen = new Set();
+
+              // Promise per gestire l'asincronicità di GunDB
+              await new Promise((resolve) => {
+                let timeout = setTimeout(() => {
+                  logger.warn("Timeout GunDB, caricamento incompleto");
+                  resolve();
+                }, 3000);
+
+                gun
+                  .get("files")
+                  .map()
+                  .once((data, key) => {
+                    if (key !== "_" && !seen.has(key) && data) {
+                      seen.add(key);
+                      files.push(data);
+                      logger.info(`File trovato in GunDB: ${data.name || key}`);
+                    }
+
+                    clearTimeout(timeout);
+                    timeout = setTimeout(resolve, 500);
+                  });
+              });
+
+              if (files.length > 0) {
+                displayFiles(files);
+                updateFileStats(files);
+                logger.info(
+                  `Trovati ${files.length} file direttamente da GunDB`
+                );
+              } else {
+                fileList.innerHTML =
+                  '<div class="empty-state">Nessun file trovato</div>';
+                updateFileStats([]);
+                logger.warn(
+                  "Nessun file trovato né tramite API né tramite GunDB"
+                );
+              }
+            }
+          } catch (error) {
+            fileList.innerHTML = `<div class="error">Errore nel caricamento dei file: ${error.message}</div>`;
+            logger.error(`Errore nel caricamento dei file: ${error.message}`);
+
+            // Tentativo di recupero diretto da GunDB in caso di errore API
+            try {
+              logger.info(
+                "Tentativo di recupero diretto da GunDB dopo errore API"
+              );
+              const files = [];
+              const seen = new Set();
+
+              await new Promise((resolve) => {
+                gun
+                  .get("files")
+                  .map()
+                  .once((data, key) => {
+                    if (key !== "_" && !seen.has(key) && data) {
+                      seen.add(key);
+                      files.push(data);
+                    }
+                  });
+
+                setTimeout(resolve, 1000);
+              });
+
+              if (files.length > 0) {
+                displayFiles(files);
+                updateFileStats(files);
+                logger.info(
+                  `Recuperati ${files.length} file da GunDB dopo errore API`
+                );
+              }
+            } catch (gunError) {
+              logger.error(
+                `Anche il recupero da GunDB è fallito: ${gunError.message}`
+              );
+            }
+          }
+        };
+
+        // Gestione caricamento file - aggiungere qui
+        const uploadForm = document.getElementById("upload-form");
+        uploadForm.addEventListener("submit", async (event) => {
+          // Previene il comportamento predefinito del form (refresh della pagina)
+          event.preventDefault();
+
+          // Verifica autenticazione prima di procedere
+          if (!isAuthenticated()) {
+            document.getElementById("upload-status").innerHTML =
+              '<div class="error">Autenticazione richiesta per caricare file</div>';
+            return;
+          }
+
+          const fileInput = document.getElementById("file-input");
+          const customName = document.getElementById("custom-name").value;
+          const uploadStatus = document.getElementById("upload-status");
+          const uploadResult = document.getElementById("upload-result");
+
+          if (!fileInput.files || fileInput.files.length === 0) {
+            uploadStatus.innerHTML =
+              '<div class="error">Seleziona un file da caricare</div>';
+            return;
+          }
+
+          const file = fileInput.files[0];
+
+          uploadStatus.innerHTML =
+            '<div class="info">Caricamento in corso...</div>';
+
+          try {
+            const formData = new FormData();
+            formData.append("file", file);
+            if (customName) {
+              formData.append("customName", customName);
+            }
+
+            const response = await fetch("/upload", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${getAuthToken()}`,
+              },
+              body: formData,
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+              uploadStatus.innerHTML =
+                '<div class="success">File caricato con successo</div>';
+
+              // Mostra dettagli del file caricato
+              let resultHtml = `
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">File Caricato</h3>
+                                </div>
+                                <div class="file-info">
+                                    <div class="file-name">${
+                                      data.file.originalName
+                                    }</div>
+                                    <div class="file-meta">
+                                        ${formatFileSize(data.file.size)} • ${
+                data.file.mimeType
+              }
+                                        ${
+                                          data.file.ipfsHash
+                                            ? '<span class="ipfs-badge">IPFS</span>'
+                                            : '<span class="local-badge">Locale</span>'
+                                        }
+                                    </div>
+                                    <div class="file-url">
+                                        <strong>URL:</strong> <a href="${
+                                          data.file.fileUrl
+                                        }" target="_blank">${
+                data.file.fileUrl
+              }</a>
+                                    </div>
+                                    ${
+                                      data.file.ipfsHash
+                                        ? `
+                                        <div class="ipfs-info">
+                                            <small>IPFS Hash: ${data.file.ipfsHash}</small><br>
+                                            <small>IPFS URL: <a href="${data.file.ipfsUrl}" target="_blank">${data.file.ipfsUrl}</a></small>
+                                        </div>
+                                    `
+                                        : ""
+                                    }
+                                </div>
+                            </div>
+                        `;
+
+              uploadResult.innerHTML = resultHtml;
+
+              // Aggiorna la lista dei file
+              loadFiles();
+
+              // Reset form
+              uploadForm.reset();
+            } else {
+              uploadStatus.innerHTML = `<div class="error">Errore: ${data.error}</div>`;
+            }
+          } catch (error) {
+            uploadStatus.innerHTML = `<div class="error">Errore durante l'upload: ${error.message}</div>`;
+            logger.error(`Errore upload file: ${error.message}`);
+          }
+        });
+
+        // Funzione per formattare le dimensioni dei file
+        function formatFileSize(bytes) {
+          if (bytes === 0) return "0 Bytes";
+          const k = 1024;
+          const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+          const i = Math.floor(Math.log(bytes) / Math.log(k));
+          return (
+            parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+          );
+        }
+
+        // Funzione per verificare l'autenticazione
+        function isAuthenticated() {
+          return !!getAuthToken();
+        }
+
+        // Funzione per ottenere il token di autenticazione
+        function getAuthToken() {
+          return localStorage.getItem("authToken");
+        }
+
+        // Display files in the list
+        const displayFiles = (files) => {
+          fileList.innerHTML = "";
+
+          files.forEach((file) => {
+            const fileItem = document.createElement("div");
+            fileItem.className = "file-item";
+            // Assegna un ID basato sull'hash IPFS se presente, altrimenti sull'ID del file
+            const itemId = file.ipfsHash
+              ? `file-${file.ipfsHash}`
+              : `file-${file.id}`;
+            fileItem.id = itemId;
+
+            const fileSize = formatFileSize(file.size);
+            const uploadDate = new Date(file.uploadedAt).toLocaleString();
+
+            // Determina l'URL da usare per visualizzare il file (IPFS o locale)
+            const viewUrl = file.ipfsUrl || file.fileUrl;
+
+            // Determina il tipo di storage usato
+            const storageType = file.ipfsHash
+              ? `<span class="ipfs-badge">IPFS</span>`
+              : '<span class="local-badge">Locale</span>';
+
+            // Prepariamo il contenuto HTML per i file IPFS con pin status
+            let ipfsContent = "";
+            if (file.ipfsHash) {
+              ipfsContent = `
+                        <div class="ipfs-info">
+                            <small>IPFS Hash: ${file.ipfsHash}</small><br>
+                            <small>URL: <a href="${file.ipfsUrl}" target="_blank">${file.ipfsUrl}</a></small>
+                            <div class="pin-container" id="pin-container-${file.ipfsHash}">
+                                <span class="pin-status" id="pin-status-${file.ipfsHash}">Verifica pin...</span>
+                            </div>
+                        </div>`;
+            }
+
+            fileItem.innerHTML = `
+                        <div class="file-info">
+                            <div class="file-name">${file.originalName}</div>
+                            <div class="file-meta">
+                                ${fileSize} • ${
+              file.mimetype
+            } • Caricato: ${uploadDate}
+                                ${storageType}
+                            </div>
+                            ${ipfsContent}
+                        </div>
+                        <div class="file-actions">
+                            ${
+                              viewUrl
+                                ? `
+                                <button class="view-file" data-url="${viewUrl}">Visualizza File</button>
+                            `
+                                : ""
+                            }
+                            ${
+                              file.ipfsHash
+                                ? `
+                                <button class="copy-hash" data-hash="${file.ipfsHash}">Copia Hash</button>
+                                <div class="pin-action-buttons" id="pin-buttons-${file.ipfsHash}">
+                                    <button class="pin-button" data-hash="${file.ipfsHash}" style="display:none">Pin</button>
+                                    <button class="unpin-button" data-hash="${file.ipfsHash}" style="display:none">Unpin</button>
+                                </div>
+                            `
+                                : ""
+                            }
+                            <button class="delete-file" data-id="${
+                              file.id
+                            }" style="background-color: #ff3366;">Elimina</button>
+                        </div>
+                    `;
+
+            fileList.appendChild(fileItem);
+
+            // Se è un file IPFS, verifica lo stato del pin
+            if (file.ipfsHash) {
+              checkPinStatus(file.ipfsHash);
+            }
+          });
+
+          // Add event listeners to buttons
+          document.querySelectorAll(".view-file").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              window.open(btn.getAttribute("data-url"), "_blank");
+            });
+          });
+
+          document.querySelectorAll(".copy-hash").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+              const hash = btn.getAttribute("data-hash");
+              try {
+                await navigator.clipboard.writeText(hash);
+                alert("Hash IPFS copiato negli appunti");
+              } catch (error) {
+                alert(`Errore nella copia: ${error.message}`);
+              }
+            });
+          });
+
+          // Aggiungi event listeners per i pulsanti pin/unpin
+          document.querySelectorAll(".pin-button").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+              const hash = btn.getAttribute("data-hash");
+              await pinFile(hash);
+            });
+          });
+
+          document.querySelectorAll(".unpin-button").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+              const hash = btn.getAttribute("data-hash");
+              await unpinFile(hash);
+            });
+          });
+
+          // Aggiungi event listener per i pulsanti elimina
+          document.querySelectorAll(".delete-file").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+              const fileId = btn.getAttribute("data-id");
+              if (confirm("Sei sicuro di voler eliminare questo file?")) {
+                await deleteFile(fileId);
+              }
+            });
+          });
+        };
+
+        // Funzione per verificare lo stato del pin di un file IPFS
+        const checkPinStatus = async (hash) => {
+          try {
+            // Verifica che ci sia l'autenticazione
+            if (!isAuthenticated()) {
+              logger.error(
+                "Autenticazione richiesta per verificare lo stato del pin"
+              );
+              return;
+            }
+
+            const statusElement = document.getElementById(`pin-status-${hash}`);
+            const pinButton = document.querySelector(
+              `.pin-button[data-hash="${hash}"]`
+            );
+            const unpinButton = document.querySelector(
+              `.unpin-button[data-hash="${hash}"]`
+            );
+
+            if (!statusElement || !pinButton || !unpinButton) {
+              return;
+            }
+
+            statusElement.textContent = "Verifica pin...";
+            statusElement.className = "pin-status";
+
+            const response = await fetch(`/api/ipfs/pin-status/${hash}`, {
+              headers: {
+                Authorization: `Bearer ${getAuthToken()}`,
+              },
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+              if (data.isPinned) {
+                statusElement.textContent = "Pinnato";
+                statusElement.className = "pin-status pinned";
+                pinButton.style.display = "none";
+                unpinButton.style.display = "inline-block";
+              } else {
+                statusElement.textContent = "Non pinnato";
+                statusElement.className = "pin-status unpinned";
+                pinButton.style.display = "inline-block";
+                unpinButton.style.display = "none";
+              }
+            } else {
+              statusElement.textContent = "Errore: " + data.error;
+              statusElement.className = "pin-status unpinned";
+              logger.error(`Errore verifica pin: ${data.error}`);
+            }
+          } catch (error) {
+            logger.error(`Errore verifica pin: ${error.message}`);
+            const statusElement = document.getElementById(`pin-status-${hash}`);
+            if (statusElement) {
+              statusElement.textContent = "Errore verifica pin";
+              statusElement.className = "pin-status unpinned";
+            }
+          }
+        };
+
+        // Funzione per pinnare un file
+        const pinFile = async (hash) => {
+          try {
+            if (!isAuthenticated()) {
+              logger.error("Autenticazione richiesta per pinnare file");
+              return;
+            }
+
+            const statusElement = document.getElementById(`pin-status-${hash}`);
+            statusElement.textContent = "Pinning...";
+            statusElement.className = "pin-status";
+
+            const response = await fetch("/api/ipfs/pin", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${getAuthToken()}`,
+              },
+              body: JSON.stringify({ hash }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+              statusElement.textContent = "Pinnato";
+              statusElement.className = "pin-status pinned";
+              document.querySelector(
+                `.pin-button[data-hash="${hash}"]`
+              ).style.display = "none";
+              document.querySelector(
+                `.unpin-button[data-hash="${hash}"]`
+              ).style.display = "inline-block";
+              logger.info(`File pinnato con successo: ${hash}`);
+            } else {
+              statusElement.textContent = "Errore: " + data.error;
+              statusElement.className = "pin-status unpinned";
+              logger.error(`Errore durante il pin: ${data.error}`);
+            }
+          } catch (error) {
+            logger.error(`Errore durante il pin: ${error.message}`);
+            const statusElement = document.getElementById(`pin-status-${hash}`);
+            if (statusElement) {
+              statusElement.textContent = "Errore pin";
+              statusElement.className = "pin-status unpinned";
+            }
+          }
+        };
+
+        // Funzione per unpinnare un file
+        const unpinFile = async (hash) => {
+          try {
+            if (!isAuthenticated()) {
+              logger.error("Autenticazione richiesta per unpinnare file");
+              return;
+            }
+
+            const statusElement = document.getElementById(`pin-status-${hash}`);
+            statusElement.textContent = "Unpinning...";
+            statusElement.className = "pin-status";
+
+            const response = await fetch("/api/ipfs/unpin", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${getAuthToken()}`,
+              },
+              body: JSON.stringify({ hash }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+              statusElement.textContent = "Non pinnato";
+              statusElement.className = "pin-status unpinned";
+              document.querySelector(
+                `.pin-button[data-hash="${hash}"]`
+              ).style.display = "inline-block";
+              document.querySelector(
+                `.unpin-button[data-hash="${hash}"]`
+              ).style.display = "none";
+              logger.info(`File unpinnato con successo: ${hash}`);
+            } else {
+              statusElement.textContent = "Errore: " + data.error;
+              statusElement.className = "pin-status unpinned";
+              logger.error(`Errore durante l'unpin: ${data.error}`);
+            }
+          } catch (error) {
+            logger.error(`Errore durante l'unpin: ${error.message}`);
+            const statusElement = document.getElementById(`pin-status-${hash}`);
+            if (statusElement) {
+              statusElement.textContent = "Errore unpin";
+              statusElement.className = "pin-status unpinned";
+            }
+          }
+        };
+
+        // Funzione per eliminare un file
+        const deleteFile = async (fileId) => {
+          try {
+            if (!isAuthenticated()) {
+              logger.error("Autenticazione richiesta per eliminare file");
+              return;
+            }
+
+            logger.info(`Eliminazione file: ${fileId}`);
+
+            const response = await fetch(`/files/${fileId}`, {
+              method: "DELETE",
+              headers: {
+                Authorization: `Bearer ${getAuthToken()}`,
+              },
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+              logger.info(`File eliminato con successo: ${fileId}`);
+              // Aggiorna la lista dei file
+              loadFiles();
+            } else {
+              logger.error(
+                `Errore durante l'eliminazione: ${
+                  data.error || "Errore sconosciuto"
+                }`
+              );
+              alert(`Errore: ${data.error || "Errore sconosciuto"}`);
+            }
+          } catch (error) {
+            logger.error(`Errore durante l'eliminazione: ${error.message}`);
+            alert(`Errore: ${error.message}`);
+          }
+        };
+
+        // Update file statistics
+        const updateFileStats = (files) => {
+          let totalSize = 0;
+          files.forEach((file) => {
+            totalSize += parseInt(file.size || 0);
+          });
+
+          fileCountEl.textContent = files.length;
+          totalSizeEl.textContent = formatFileSize(totalSize);
+          logger.info(
+            `Statistiche aggiornate: ${files.length} file, ${formatFileSize(
+              totalSize
+            )}`
+          );
+        };
+
+        // Funzione per aggiornare lo stato di IPFS nell'interfaccia
+        const updateIpfsStatus = async () => {
+          try {
+            const response = await fetch("/api/ipfs/status", {
+              headers: {
+                Authorization: `Bearer ${getAuthToken()}`,
+              },
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+              const isEnabled = data.config.enabled;
+              const statusBadge = document.getElementById("ipfs-status-badge");
+              const ipfsStatusText = document.getElementById("ipfs-status");
+              const ipfsSwitch = document.getElementById("ipfs-switch");
+
+              // Aggiorna il badge di stato
+              statusBadge.textContent = isEnabled
+                ? "IPFS: Attivo"
+                : "IPFS: Disattivato";
+              statusBadge.style.backgroundColor = isEnabled
+                ? "#4CAF50"
+                : "#ff3366";
+
+              // Aggiorna il testo di stato nelle impostazioni
+              if (ipfsStatusText) {
+                ipfsStatusText.textContent = isEnabled
+                  ? "Attivo"
+                  : "Disattivato";
+              }
+
+              // Aggiorna lo switch
+              if (ipfsSwitch) {
+                ipfsSwitch.checked = isEnabled;
+              }
+
+              // Aggiorna i campi di configurazione
+              if (data.config.service) {
+                document.getElementById("ipfs-service").value =
+                  data.config.service;
+                toggleIpfsConfigForms(data.config.service);
+              }
+
+              if (data.config.nodeUrl) {
+                document.getElementById("ipfs-node-url").value =
+                  data.config.nodeUrl;
+              }
+
+              if (data.config.gateway) {
+                document.getElementById("ipfs-gateway").value =
+                  data.config.gateway;
+              }
+
+              logger.info(
+                `Stato IPFS aggiornato: ${
+                  isEnabled ? "Attivo" : "Disattivato"
+                }, Servizio: ${data.config.service}`
+              );
+            } else {
+              logger.error("Errore nel recupero dello stato IPFS");
+            }
+          } catch (error) {
+            logger.error(
+              `Errore nel controllo dello stato IPFS: ${error.message}`
+            );
+          }
+        };
+
+        // Funzione per cambiare la visualizzazione dei form di configurazione IPFS
+        const toggleIpfsConfigForms = (service) => {
+          const ipfsClientConfig =
+            document.getElementById("ipfs-client-config");
+          const pinataConfig = document.getElementById("pinata-config");
+
+          if (service === "PINATA") {
+            ipfsClientConfig.style.display = "none";
+            pinataConfig.style.display = "block";
+          } else {
+            ipfsClientConfig.style.display = "block";
+            pinataConfig.style.display = "none";
+          }
+        };
+
+        // Event listener per il cambio di servizio IPFS
+        document
+          .getElementById("ipfs-service")
+          .addEventListener("change", function () {
+            toggleIpfsConfigForms(this.value);
+          });
+
+        // Event listener per il toggle di IPFS
+        document
+          .getElementById("ipfs-switch")
+          .addEventListener("change", async function () {
+            try {
+              const response = await fetch("/api/ipfs/toggle", {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${getAuthToken()}`,
+                },
+              });
+
+              const data = await response.json();
+
+              if (data.success) {
+                // Aggiorna l'interfaccia con il nuovo stato
+                updateIpfsStatus();
+                logger.info(
+                  `IPFS ${
+                    data.config.enabled ? "attivato" : "disattivato"
+                  } con successo`
+                );
+              } else {
+                // Reimposta lo switch allo stato precedente in caso di errore
+                this.checked = !this.checked;
+                logger.error(`Errore nel toggle IPFS: ${data.error}`);
+                alert(`Errore: ${data.error}`);
+              }
+            } catch (error) {
+              // Reimposta lo switch allo stato precedente in caso di errore
+              this.checked = !this.checked;
+              logger.error(
+                `Errore nella richiesta toggle IPFS: ${error.message}`
+              );
+              alert(`Errore di rete: ${error.message}`);
+            }
+          });
+
+        // Salvataggio configurazione IPFS
+        document
+          .getElementById("save-ipfs-config")
+          .addEventListener("click", async function () {
+            const configStatus = document.getElementById("ipfs-config-status");
+            configStatus.innerHTML =
+              '<div class="info">Salvataggio configurazione...</div>';
+
+            try {
+              const service = document.getElementById("ipfs-service").value;
+              const nodeUrl = document.getElementById("ipfs-node-url").value;
+              const gateway = document.getElementById("ipfs-gateway").value;
+              const pinataJwt = document.getElementById("pinata-jwt").value;
+
+              const config = {
+                service,
+                nodeUrl,
+                gateway,
+              };
+
+              if (service === "PINATA" && pinataJwt) {
+                config.pinataJwt = pinataJwt;
+              }
+
+              const response = await fetch("/api/ipfs/config", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${getAuthToken()}`,
+                },
+                body: JSON.stringify(config),
+              });
+
+              const data = await response.json();
+
+              if (data.success) {
+                configStatus.innerHTML =
+                  '<div class="success">Configurazione salvata con successo</div>';
+                updateIpfsStatus();
+                logger.info("Configurazione IPFS aggiornata con successo");
+              } else {
+                configStatus.innerHTML = `<div class="error">Errore: ${data.error}</div>`;
+                logger.error(
+                  `Errore nel salvataggio configurazione: ${data.error}`
+                );
+              }
+            } catch (error) {
+              configStatus.innerHTML = `<div class="error">Errore: ${error.message}</div>`;
+              logger.error(`Errore nella richiesta: ${error.message}`);
+            }
+          });
+
+        // Esplora GunDB
+        const gunDbQueryInput = document.getElementById("gundb-query");
+        const executeQueryBtn = document.getElementById("execute-query");
+        const explorerContent = document.getElementById("explorer-content");
+
+        // Funzione per eseguire query GunDB dirette
+        const executeGunDbQuery = async () => {
+          try {
+            // Verifica autenticazione
+            if (!isAuthenticated()) {
+              logger.error("Autenticazione richiesta per eseguire query GunDB");
+              return;
+            }
+
+            // Ottieni la query dall'input
+            const query = gunDbQueryInput.value.trim();
+            if (!query) {
+              explorerContent.innerHTML =
+                '<div class="gundb-query-error">Inserisci una query valida</div>';
+              return;
+            }
+
+            // Mostra indicatore di caricamento
+            explorerContent.innerHTML =
+              '<div class="loading">Esecuzione query...</div>';
+            logger.info(`Esecuzione query GunDB: ${query}`);
+
+            try {
+              // Prepara la query per l'esecuzione
+              // Sostituisci "gun" con il riferimento alla nostra istanza gun
+              const safeQuery = query.replace(/^gun\./, "");
+
+              // Dividi la query in parti (get, put, etc.)
+              const parts = safeQuery.split(/\.(get|put|map|set)\(/);
+              const commands = [];
+              let currentPart = "";
+
+              for (let i = 0; i < parts.length; i++) {
+                if (i === 0) {
+                  currentPart = parts[i];
+                } else if (i % 2 === 1) {
+                  // Questo è un comando (get, put, etc.)
+                  commands.push({
+                    command: parts[i],
+                    args: currentPart,
+                  });
+                  currentPart = "";
+                } else {
+                  // Questo è un argomento
+                  currentPart = parts[i];
+                }
+              }
+
+              // Esegui la query
+              let result = null;
+              let gunNode = gun;
+
+              // Simuliamo l'esecuzione raccogliendo i risultati
+              await new Promise((resolve) => {
+                // Timeout di sicurezza
+                const timeout = setTimeout(() => {
+                  logger.warn("Timeout esecuzione query GunDB");
+                  resolve();
+                }, 5000);
+
+                // Esegui la query sulla base del percorso
+                if (safeQuery.startsWith("get(")) {
+                  // Estrai il primo argomento
+                  const match = safeQuery.match(/get\(['"]([^'"]+)['"]\)/);
+                  if (match && match[1]) {
+                    const rootNode = match[1];
+                    gunNode = gunNode.get(rootNode);
+
+                    // Ora naviga nel resto del percorso se presente
+                    const restQuery = safeQuery.substring(
+                      safeQuery.indexOf(")") + 1
+                    );
+                    const getMatches = restQuery.match(
+                      /\.get\(['"]([^'"]+)['"]\)/g
+                    );
+
+                    if (getMatches) {
+                      getMatches.forEach((getMatch) => {
+                        const nodeMatch = getMatch.match(
+                          /\.get\(['"]([^'"]+)['"]\)/
+                        );
+                        if (nodeMatch && nodeMatch[1]) {
+                          gunNode = gunNode.get(nodeMatch[1]);
+                        }
+                      });
+                    }
+                  }
+                }
+
+                // Recupera i dati
+                gunNode.once((data) => {
+                  result = data;
+                  clearTimeout(timeout);
+                  resolve();
+                });
+              });
+
+              // Visualizza i risultati
+              if (result) {
+                // Visualizza in formato JSON
+                const resultHtml = `
+                                <div class="gundb-query-result">
+                                    <h4>Risultato Query</h4>
+                                    <pre>${JSON.stringify(
+                                      result,
+                                      null,
+                                      2
+                                    )}</pre>
+                                </div>
+                            `;
+                explorerContent.innerHTML = resultHtml;
+
+                // Aggiorna anche il percorso nella breadcrumb
+                document.getElementById(
+                  "explorer-path"
+                ).innerHTML = `<span class="crumb" data-path="">Root > Query</span>`;
+
+                logger.info("Query eseguita con successo");
+              } else {
+                explorerContent.innerHTML =
+                  '<div class="gundb-query-error">Nessun risultato trovato</div>';
+                logger.warn("Nessun risultato trovato per la query");
+              }
+            } catch (queryError) {
+              explorerContent.innerHTML = `<div class="gundb-query-error">Errore nell'esecuzione della query: ${queryError.message}</div>`;
+              logger.error(
+                `Errore nell'esecuzione della query: ${queryError.message}`
+              );
+            }
+          } catch (error) {
+            explorerContent.innerHTML = `<div class="gundb-query-error">Errore: ${error.message}</div>`;
+            logger.error(`Errore esecuzione query GunDB: ${error.message}`);
+          }
+        };
+
+        // Aggiungi event listener per il pulsante di esecuzione query
+        if (executeQueryBtn) {
+          executeQueryBtn.addEventListener("click", executeGunDbQuery);
+        }
+
+        // Aggiungi event listener per l'esecuzione della query con invio
+        if (gunDbQueryInput) {
+          gunDbQueryInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") {
+              executeGunDbQuery();
+            }
+          });
+        }
+
+        // Gestisci click sugli esempi di query
+        document.querySelectorAll(".query-example").forEach((example) => {
+          example.addEventListener("click", (e) => {
+            e.preventDefault();
+            const query = example.getAttribute("data-query");
+            gunDbQueryInput.value = query;
+            executeGunDbQuery();
+          });
+        });
+
+        // Aggiungi listener per il refresh dell'explorer
+        document
+          .getElementById("refresh-explorer")
+          .addEventListener("click", () => {
+            if (gunDbQueryInput.value.trim()) {
+              executeGunDbQuery();
+            }
+          });
+
+        // Load files and update IPFS status on page load
+        loadFiles();
+        updateIpfsStatus();
+      });
+    </script>
+  </body>
+</html>
