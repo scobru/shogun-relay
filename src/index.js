@@ -4,7 +4,7 @@ dotenv.config();
 import cors from "cors";
 import fs from "fs";
 import express from "express";
-import { ShogunCore, RelayVerifier, DIDVerifier } from "shogun-core";
+import { RelayVerifier } from "shogun-core";
 import Gun from "gun";
 import path from "path";
 import http from "http";
@@ -29,6 +29,7 @@ import setupFileManagerRoutes from "./routes/fileManagerRoutes.js"; // Import th
 import {
   initializeShogunCore,
   getInitializedShogunCore,
+  ensureShogunCoreInitialized,
   initializeRelayContracts,
   createRelayVerifier
 } from "./utils/shogunCoreUtils.js"; // Import ShogunCore utility functions
@@ -68,6 +69,7 @@ const RELAY_CONFIG = {
     // Convert string 'true'/'false' to actual boolean
     onchainMembership: process.env.ONCHAIN_MEMBERSHIP_ENABLED === "true",
   },
+  keyPair: process.env.APP_KEY_PAIR,
 };
 
 // This map will store temporarily authorized keys
@@ -109,7 +111,7 @@ const gunOptions = {
 
 /**
  * Initialize shogun-core relay components
- * This function sets up the RelayVerifier and DIDVerifier instances
+ * This function sets up the RelayVerifier 
  */
 async function initializeRelayComponents() {
   try {
@@ -176,6 +178,8 @@ function getRelayVerifier() {
   return relayVerifier;
 }
 
+
+
 /**
  * Starts the unified relay server
  * Initializes IPFS, configures middleware, and sets up WebSocket handlers
@@ -235,7 +239,7 @@ async function startServer() {
 
     await initializeRelayComponents();
     console.log(
-      "Relay and DID components initialized, AuthenticationManager updated with live verifiers."
+      "Relay initialized, AuthenticationManager updated with live verifiers."
     );
 
     // Initialize File Manager now that gun and ipfsManager are available
@@ -464,6 +468,50 @@ if (RELAY_CONFIG.keyPair) {
 server.listen(PORT, HOST, () => {
   console.log(`Server listening on http://${HOST}:${PORT}`);
   console.log(`Gun relay peer accessible at http://${HOST}:${PORT}/gun`);
+  
+  // Force a test write to GunDB to verify disk persistence is working
+  try {
+    const testData = {
+      message: "Server startup test data",
+      timestamp: Date.now(),
+      server: `${HOST}:${PORT}`
+    };
+    
+    // Add headers for authentication
+    if (!gun._.opt.headers) {
+      gun._.opt.headers = {};
+    }
+    gun._.opt.headers.token = SECRET_TOKEN;
+    gun._.opt.headers.Authorization = `Bearer ${SECRET_TOKEN}`;
+    
+    // Perform write test
+    gun.get("server-test").put(testData, (ack) => {
+      if (ack.err) {
+        console.error("GunDB write test failed:", ack.err);
+      } else {
+        console.log("GunDB write test successful:", testData);
+      }
+    });
+    
+    // Also try a user write if we have a key pair
+    if (RELAY_CONFIG.keyPair) {
+      const appUser = gun.user();
+      if (appUser.is) {
+        appUser.get("server-test").put({
+          message: "Server startup user-authenticated test",
+          timestamp: Date.now()
+        }, (ack) => {
+          if (ack.err) {
+            console.error("GunDB user write test failed:", ack.err);
+          } else {
+            console.log("GunDB user write test successful");
+          }
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Error running GunDB persistence test:", error);
+  }
 });
 
 export { app as default, authorizeKey, isKeyPreAuthorized, RELAY_CONFIG };

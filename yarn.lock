@@ -3186,10 +3186,10 @@ shogun-contracts@^1.0.2:
     hardhat "^2.22.19"
     keccak256 "^1.0.6"
 
-shogun-core@^1.1.1:
-  version "1.1.1"
-  resolved "https://registry.yarnpkg.com/shogun-core/-/shogun-core-1.1.1.tgz#228245287fd877d4ebc46a95521e990213ac0702"
-  integrity sha512-ZWIVY2DTtwHUZaCHbZ2Z5Oh1jmDfrtDDzdbJCHgcrZLrdYeXKhJmetYayvrk9dOToyBAytBnA/6jw0/iKXKxhw==
+shogun-core@^1.1.2:
+  version "1.1.2"
+  resolved "https://registry.yarnpkg.com/shogun-core/-/shogun-core-1.1.2.tgz#b4d3b463e8a1aa7d695523915aa81e666a38144a"
+  integrity sha512-ffr5y449VKfIshGnGTZBos8fMbX9S9eE1QYavipwwyUXnJO2Yn9F/V4MCsQsjZC0424j8C0aqDBib01hRo8qKQ==
   dependencies:
     ajv "^8.17.1"
     assert "^2.1.0"

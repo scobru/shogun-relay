@@ -4,6 +4,49 @@ import jwt from 'jsonwebtoken';
 let config;
 
 /**
+ * Utility function to properly format a GunDB public key for blockchain verification
+ * @param {string} pubKey - The GunDB public key
+ * @returns {string} - Properly formatted key with 0x prefix for ethers.js
+ */
+function formatKeyForBlockchain(pubKey) {
+  if (!pubKey) return null;
+  
+  try {
+    // Clean the key by removing the ~ prefix if present and anything after the period
+    let cleanKey = pubKey;
+    
+    // Remove ~ prefix if present
+    if (cleanKey.startsWith("~")) {
+      cleanKey = cleanKey.substring(1);
+    }
+    
+    // Remove everything after the first period (if any)
+    const dotIndex = cleanKey.indexOf(".");
+    if (dotIndex > 0) {
+      cleanKey = cleanKey.substring(0, dotIndex);
+    }
+    
+    // Convert from GunDB's URL-safe base64 to standard base64 with padding
+    const base64Key = cleanKey.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64Key.length % 4 === 0 
+      ? base64Key 
+      : base64Key.padEnd(base64Key.length + (4 - (base64Key.length % 4)), "=");
+    
+    // Convert to binary and then to hex
+    const binaryData = Buffer.from(padded, "base64");
+    const hexData = binaryData.toString("hex");
+    
+    // Always add 0x prefix for ethers.js v6
+    const hexWithPrefix = hexData.startsWith('0x') ? hexData : `0x${hexData}`;
+    
+    return hexWithPrefix;
+  } catch (error) {
+    console.error("Error formatting key for blockchain:", error);
+    return null;
+  }
+}
+
+/**
  * Configura il modulo di autenticazione
  */
 function configure(configData) {
@@ -32,14 +75,14 @@ function configure(configData) {
  * Verifica se una chiave è pre-autorizzata
  */
 function isKeyPreAuthorized(pubKey) {
-  if (!pubKey || !authorizedKeys || !(authorizedKeys instanceof Map)) return false;
+  if (!pubKey || !config || !config.authorizedKeys || !(config.authorizedKeys instanceof Map)) return false;
 
-  const authInfo = authorizedKeys.get(pubKey);
+  const authInfo = config.authorizedKeys.get(pubKey);
   if (!authInfo) return false;
 
   // Rimuove autorizzazioni scadute
   if (Date.now() > authInfo.expiresAt) {
-    authorizedKeys.delete(pubKey);
+    config.authorizedKeys.delete(pubKey);
     return false;
   }
 
@@ -52,8 +95,11 @@ function isKeyPreAuthorized(pubKey) {
 function authorizeKey(pubKey, expiryMs = config.AUTH_KEY_EXPIRY) {
   if (!pubKey) throw new Error("Public key required for authorization");
   
-  if (!authorizedKeys || !(authorizedKeys instanceof Map)) {
-    authorizedKeys = new Map();
+  if (!config || !config.authorizedKeys || !(config.authorizedKeys instanceof Map)) {
+    if (!config) {
+      config = {};
+    }
+    config.authorizedKeys = new Map();
   }
 
   const authInfo = {
@@ -62,7 +108,7 @@ function authorizeKey(pubKey, expiryMs = config.AUTH_KEY_EXPIRY) {
     expiresAt: Date.now() + expiryMs,
   };
 
-  authorizedKeys.set(pubKey, authInfo);
+  config.authorizedKeys.set(pubKey, authInfo);
   return authInfo;
 }
 
@@ -113,103 +159,93 @@ async function generateUserToken(userId, tokenName, expiresInMs, checkBlockchain
   let isBlockchainAuthorized = false;
   if (checkBlockchain && config.RELAY_CONFIG?.relay?.onchainMembership && config.relayVerifier) {
     try {
-      if (userId && (userId.length > 40 || userId.startsWith('0x'))) {
+      // First, clean the userId in case it's a full key with epub part
+      const dotIndex = userId.indexOf('.');
+      const cleanedUserId = dotIndex > 0 ? userId.substring(0, dotIndex) : userId;
+      
+      console.log(`Checking blockchain authorization for: ${cleanedUserId}`);
+      
+      // If userId is a GunDB key or looks like a hex, proceed with verification
+      if (cleanedUserId && (cleanedUserId.length > 32 || cleanedUserId.startsWith('0x'))) {
         // Verifica se relayVerifier è un'istanza di RelayRegistry
         if (config.relayVerifier.isUserSubscribedToRelay) {
           // È un RelayRegistry, usiamo il metodo isUserSubscribedToRelay
-          const registryAddress = config.RELAY_CONFIG.relay.registryAddress;
           const individualRelayAddress = config.RELAY_CONFIG.relay.individualRelayAddress;
           
           // Se abbiamo un relay registrato, verifichiamo se l'utente è iscritto
           if (individualRelayAddress) {
             try {
-              // Verifica diretta sull'IndividualRelay
-              isBlockchainAuthorized = await config.relayVerifier.isUserSubscribedToRelay(
+              // Format the key for blockchain verification
+              const formattedKey = formatKeyForBlockchain(cleanedUserId);
+              
+              // Use the formatted key if available, otherwise fall back to original
+              const keyToUse = formattedKey || cleanedUserId;
+              
+              console.log(`Token generation - checking relay subscription with key: ${keyToUse}`);
+              
+              // Verifica diretta sull'IndividualRelay con timeout di 10 secondi
+              const subscriptionPromise = config.relayVerifier.isUserSubscribedToRelay(
                 individualRelayAddress,
-                userId
+                keyToUse
               );
-              console.log(`Verifica su IndividualRelay (${individualRelayAddress}): ${isBlockchainAuthorized}`);
-            } catch (error) {
-              console.error(`Errore nella verifica su IndividualRelay: ${error.message}`);
               
-              // Fallback: verifica diretta del contratto IndividualRelay usando ethers
-              try {
-                console.log("Tentativo di verifica diretta del contratto IndividualRelay...");
-                const { ethers } = await import("ethers");
-                const provider = new ethers.JsonRpcProvider(config.RELAY_CONFIG.relay.providerUrl);
-                
-                // ABI minimo per verificare se un utente è iscritto
-                const individualRelayAbi = [
-                  "function isSubscribed(bytes memory pubKey) view returns (bool)"
-                ];
-                
-                const contract = new ethers.Contract(
-                  individualRelayAddress, 
-                  individualRelayAbi, 
-                  provider
-                );
-                
-                // Converti la chiave pubblica nel formato adatto
-                let pubKey = userId;
-                // Rimuovi il prefisso ~ se presente
-                if (pubKey.startsWith("~")) {
-                  pubKey = pubKey.substring(1);
-                }
-                // Rimuovi tutto dopo il punto se presente
-                const dotIndex = pubKey.indexOf(".");
-                if (dotIndex > 0) {
-                  pubKey = pubKey.substring(0, dotIndex);
-                }
-                
-                // Converti da base64 a hex
-                const base64Key = pubKey.replace(/-/g, "+").replace(/_/g, "/");
-                const padded = base64Key.length % 4 === 0 
-                  ? base64Key 
-                  : base64Key.padEnd(base64Key.length + (4 - (base64Key.length % 4)), "=");
-                const binaryData = Buffer.from(padded, "base64");
-                const hexData = binaryData.toString("hex");
-                
-                // Verifica abbonamento direttamente dal contratto
-                isBlockchainAuthorized = await contract.isSubscribed(`0x${hexData}`);
-                console.log(`Verifica diretta su IndividualRelay: ${isBlockchainAuthorized}`);
-              } catch (directError) {
-                console.error(`Errore nella verifica diretta: ${directError.message}`);
-              }
-            }
-          } 
-          // Altrimenti proviamo a verificare con getAllRelays e controlliamo se l'utente è iscritto a uno qualsiasi
-          else {
-            try {
-              const allRelays = await config.relayVerifier.getAllRelays();
-              console.log(`Trovati ${allRelays.length} relay nel registro`);
+              // Add timeout protection
+              const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error("Subscription verification timed out")), 10000);
+              });
               
-              for (const relayAddress of allRelays) {
-                const isSubscribed = await config.relayVerifier.isUserSubscribedToRelay(
-                  relayAddress,
-                  userId
-                );
-                if (isSubscribed) {
-                  isBlockchainAuthorized = true;
-                  console.log(`Utente autorizzato dal relay: ${relayAddress}`);
-                  break;
-                }
-              }
+              isBlockchainAuthorized = await Promise.race([subscriptionPromise, timeoutPromise]);
+              
+              console.log(`Token generation - Relay verification result: ${isBlockchainAuthorized}`);
             } catch (error) {
-              console.error("Error checking relays:", error);
+              console.error(`Token generation - Error in IndividualRelay verification: ${error.message}`);
+              // If there's an error with the verification, allow the token to be generated
+              // but don't mark it as blockchain-verified
+              isBlockchainAuthorized = false;
             }
+          } else {
+            console.log("Token generation - No IndividualRelay specified, skipping verification");
+            isBlockchainAuthorized = false;
           }
         } else if (config.relayVerifier.isPublicKeyAuthorized) {
-          // Metodo legacy
-          isBlockchainAuthorized = await config.relayVerifier.isPublicKeyAuthorized(
-            config.RELAY_CONFIG.relay.registryAddress,
-            userId
-          );
+          console.log("Token generation - Using legacy verification method");
+          
+          // Metodo legacy - format the key first
+          const formattedKey = formatKeyForBlockchain(cleanedUserId);
+          const keyToUse = formattedKey || cleanedUserId;
+          
+          try {
+            // Add timeout protection
+            const verificationPromise = config.relayVerifier.isPublicKeyAuthorized(
+              config.RELAY_CONFIG.relay.registryAddress,
+              keyToUse
+            );
+            
+            const timeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error("Legacy verification timed out")), 10000);
+            });
+            
+            isBlockchainAuthorized = await Promise.race([verificationPromise, timeoutPromise]);
+            console.log(`Token generation - Legacy verification result: ${isBlockchainAuthorized}`);
+          } catch (error) {
+            console.error(`Token generation - Error in legacy verification: ${error.message}`);
+            isBlockchainAuthorized = false;
+          }
+        } else {
+          console.log("Token generation - No compatible verifier method found");
+          isBlockchainAuthorized = false;
         }
+      } else {
+        console.log("Token generation - UserId is not a blockchain key format");
+        isBlockchainAuthorized = false;
       }
     } catch (err) {
-      console.error("Error checking blockchain authorization:", err);
-      // Continua senza autorizzazione blockchain
+      console.error("Token generation - Error in blockchain verification:", err);
+      // Continue without blockchain authorization
+      isBlockchainAuthorized = false;
     }
+  } else {
+    console.log("Token generation - Blockchain verification skipped, not enabled");
   }
 
   const issuedAt = Math.floor(Date.now() / 1000);
@@ -231,8 +267,10 @@ async function generateUserToken(userId, tokenName, expiresInMs, checkBlockchain
   };
 
   try {
+    console.log("Token generation - Signing JWT token");
     return jwt.sign(tokenPayload, config.JWT_SECRET);
   } catch (error) {
+    console.error("Token generation - Error signing token:", error);
     throw new Error("Token signing failed.");
   }
 }
@@ -362,9 +400,13 @@ const AuthenticationManager = {
       config.relayVerifier
     ) {
       try {
+        // Format the key for blockchain verification
+        const formattedKey = formatKeyForBlockchain(options.pubKey);
+        const keyToUse = formattedKey || options.pubKey;
+        
         const isAuthorized = await config.relayVerifier.isPublicKeyAuthorized(
           config.RELAY_CONFIG.relay.registryAddress,
-          options.pubKey
+          keyToUse
         );
 
         if (isAuthorized) {
@@ -377,6 +419,7 @@ const AuthenticationManager = {
           };
         }
       } catch (error) {
+        console.error("Error in blockchain verification:", error);
         // Continua con altri metodi
       }
     }
@@ -437,6 +480,51 @@ const AuthenticationManager = {
    * Validazione messaggi GunDB
    */
   isValidGunMessage: function (msg) {
+    // Log for debugging
+    if (process.env.DEBUG_GUN_VALIDATION === "true") {
+      console.log("=== GUN MESSAGE VALIDATION ===");
+      const isPut = msg.put && Object.keys(msg.put).length > 0;
+      console.log("Is PUT message:", isPut);
+      
+      if (isPut) {
+        const keys = Object.keys(msg.put);
+        console.log("PUT keys:", keys);
+        
+        // Check soul structure 
+        for (const soul of keys) {
+          console.log("Soul:", soul);
+          
+          // Check if it's a user message
+          if (soul.startsWith("~")) {
+            const dotIndex = soul.indexOf(".");
+            const extractedPubKey = dotIndex > 0 ? soul.substring(1, dotIndex) : soul.substring(1);
+            console.log("Message from user with pub:", extractedPubKey);
+          }
+        }
+      }
+      
+      // Log headers
+      if (msg.headers) {
+        console.log("Headers present:", Object.keys(msg.headers));
+        if (msg.headers.token) {
+          console.log("Token present in headers");
+        }
+        if (msg.headers.Authorization) {
+          console.log("Authorization header present");
+        }
+      }
+      
+      // Log user
+      if (msg.user) {
+        console.log("User object present:", msg.user.pub ? `pub: ${msg.user.pub}` : "no pub");
+      }
+      
+      // Log from
+      if (msg.from) {
+        console.log("From object present:", msg.from.pub ? `pub: ${msg.from.pub}` : "no pub");
+      }
+    }
+
     // Non-PUT
     if (!msg.put || Object.keys(msg.put).length === 0) {
       return true;
@@ -477,8 +565,16 @@ const AuthenticationManager = {
       }
     }
 
+    // Log extracted pub key for debugging
+    if (process.env.DEBUG_GUN_VALIDATION === "true") {
+      console.log("Extracted pub key:", pubKey);
+    }
+
     // Verifica chiave pre-autorizzata
     if (pubKey && isKeyPreAuthorized(pubKey)) {
+      if (process.env.DEBUG_GUN_VALIDATION === "true") {
+        console.log("Key is pre-authorized:", pubKey);
+      }
       return true;
     }
 
@@ -489,10 +585,16 @@ const AuthenticationManager = {
                            msg.headers.Authorization.substring(7) : null);
       
       if (tokenToCheck && verifyJWT(tokenToCheck)) {
+        if (process.env.DEBUG_GUN_VALIDATION === "true") {
+          console.log("JWT token is valid");
+        }
         return true;
       }
     }
 
+    if (process.env.DEBUG_GUN_VALIDATION === "true") {
+      console.log("Message validation FAILED");
+    }
     return false;
   },
 
@@ -539,11 +641,16 @@ const AuthenticationManager = {
             // Blockchain auth
             if (pubKey && RELAY_CONFIG?.relay?.onchainMembership && relayVerifier) {
               try {
+                // Format the key for blockchain verification
+                const formattedKey = formatKeyForBlockchain(pubKey);
+                const keyToUse = formattedKey || pubKey;
+                
                 isAuthenticated = await relayVerifier.isPublicKeyAuthorized(
                   RELAY_CONFIG.relay.registryAddress, 
-                  pubKey
+                  keyToUse
                 );
               } catch (blockchainError) {
+                console.error("Error in WebSocket blockchain auth:", blockchainError);
                 // Continua con altri metodi
               }
             }
@@ -577,7 +684,10 @@ const AuthenticationManager = {
   generateUserToken,
   saveUserToken,
   listUserTokens,
-  revokeUserToken
+  revokeUserToken,
+  
+  // Expose the formatKeyForBlockchain utility function
+  formatKeyForBlockchain
 };
 
 // Esporta AuthenticationManager e funzioni di utilità
@@ -590,5 +700,6 @@ export {
   generateUserToken,
   saveUserToken,
   listUserTokens,
-  revokeUserToken
+  revokeUserToken,
+  formatKeyForBlockchain
 }; 

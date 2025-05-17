@@ -105,6 +105,11 @@
             background: var(--primary-dark);
         }
 
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
         .error-message {
             color: var(--error-color);
             margin-top: 15px;
@@ -120,10 +125,62 @@
             margin-top: 15px;
             text-align: center;
         }
+
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Toast notification */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            max-width: 300px;
+            z-index: 9999;
+        }
+        
+        .toast {
+            background-color: #333;
+            color: white;
+            padding: 12px 15px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            animation: slidein 0.3s ease-out;
+        }
+        
+        @keyframes slidein {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .toast-error {
+            background-color: var(--error-color);
+        }
+        
+        .toast-success {
+            background-color: var(--success-color);
+        }
     </style>
 </head>
 
 <body>
+    <div class="toast-container" id="toast-container"></div>
+    
     <div class="login-container">
         <div class="login-header">
             <h1>Shogun Relay</h1>
@@ -133,7 +190,7 @@
                 <label for="token">Token di autenticazione</label>
                 <input type="password" id="token" placeholder="Inserisci il token di autenticazione" autocomplete="off">
             </div>
-            <button id="login-btn">Accedi</button>
+            <button id="login-btn"><span class="spinner" id="login-spinner"></span>Accedi</button>
             <div id="error-message" class="error-message">
                 Token non valido. Riprova.
             </div>
@@ -146,33 +203,88 @@
             const loginBtn = document.getElementById('login-btn');
             const tokenInput = document.getElementById('token');
             const errorMessage = document.getElementById('error-message');
+            const loginSpinner = document.getElementById('login-spinner');
+            const toastContainer = document.getElementById('toast-container');
+            
+            // Toast notification function
+            const showToast = (message, type = 'info', duration = 5000) => {
+                const toast = document.createElement('div');
+                toast.className = `toast toast-${type}`;
+                toast.textContent = message;
+                toastContainer.appendChild(toast);
+                
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateX(100%)';
+                    toast.style.transition = 'all 0.3s ease-out';
+                    setTimeout(() => toast.remove(), 300);
+                }, duration);
+            };
+            
+            // Helper functions for JWT token management
+            const parseJwt = (token) => {
+                try {
+                    // Split the token and decode the payload (middle part)
+                    const base64Url = token.split('.')[1];
+                    if (!base64Url) return null;
+                    
+                    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                    }).join(''));
+                    
+                    return JSON.parse(jsonPayload);
+                } catch (error) {
+                    console.error('Error parsing JWT:', error);
+                    return null;
+                }
+            };
+            
+            const isTokenExpired = (token) => {
+                const payload = parseJwt(token);
+                if (!payload || !payload.exp) return true;
+                
+                // exp is in seconds, Date.now() is in milliseconds
+                const now = Date.now() / 1000;
+                return payload.exp < now;
+            };
 
-            // Controlla se l'utente è già autenticato
-            const savedToken = localStorage.getItem('authToken');
-            if (savedToken) {
-                // Verifica che il token sia ancora valido
-                testToken(savedToken).then(isValid => {
-                    if (isValid) {
-                        // Reindirizza alla dashboard
-                        window.location.href = "/";
-                    } else {
-                        // Token non valido, rimuovilo
-                        localStorage.removeItem('authToken');
-                    }
-                });
-            }
+            // Check if the user is already authenticated with a valid token
+            const checkExistingToken = async () => {
+                const savedToken = localStorage.getItem('authToken');
+                if (!savedToken) return false;
+                
+                // Check if token is expired
+                if (isTokenExpired(savedToken)) {
+                    // Remove expired token
+                    localStorage.removeItem('authToken');
+                    return false;
+                }
+                
+                // Verify token with server
+                return await testToken(savedToken);
+            };
+            
+            // Check existing token on page load
+            checkExistingToken().then(isValid => {
+                if (isValid) {
+                    showToast('Accesso effettuato con successo!', 'success');
+                    // Redirect to dashboard
+                    window.location.href = '/';
+                }
+            });
 
-            // Login con pressione Enter
+            // Login with Enter key press
             tokenInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     doLogin();
                 }
             });
 
-            // Login con click sul pulsante
+            // Login with button click
             loginBtn.addEventListener('click', doLogin);
 
-            // Funzione di login
+            // Login function
             function doLogin() {
                 const token = tokenInput.value.trim();
                 if (!token) {
@@ -180,59 +292,85 @@
                     return;
                 }
 
-                // Disabilita il pulsante durante la verifica
-                loginBtn.disabled = true;
-                loginBtn.textContent = 'Verifica in corso...';
+                // Disable button and show spinner during verification
+                setLoading(true);
 
-                // Verifica il token
+                // Verify token
                 testToken(token).then(isValid => {
                     if (isValid) {
-                        // Token valido, salvalo e reindirizza
+                        // Check if token is a valid JWT
+                        const payload = parseJwt(token);
+                        if (!payload) {
+                            showError('Il token fornito non è un JWT valido');
+                            setLoading(false);
+                            return;
+                        }
+                        
+                        // Check if token is expired
+                        if (isTokenExpired(token)) {
+                            showError('Il token è scaduto');
+                            setLoading(false);
+                            return;
+                        }
+                        
+                        // Token is valid and not expired, save it
                         localStorage.setItem('authToken', token);
 
-                        // Imposta una sessione
+                        // Set session
                         sessionStorage.setItem('shogunSession', 'active');
+                        sessionStorage.setItem('loginTime', Date.now());
+                        
+                        showToast('Accesso effettuato con successo!', 'success');
 
-                        // Reindirizza alla dashboard
-                        window.location.href = "/";
+                        // Redirect to dashboard
+                        window.location.href = '/';
                     } else {
                         showError('Token di autenticazione non valido');
-                        loginBtn.disabled = false;
-                        loginBtn.textContent = 'Accedi';
+                        setLoading(false);
                     }
                 }).catch(error => {
                     showError('Errore di connessione al server');
                     console.error('Errore durante la verifica del token:', error);
-                    loginBtn.disabled = false;
-                    loginBtn.textContent = 'Accedi';
+                    setLoading(false);
                 });
             }
 
-            // Funzione per testare la validità del token
+            // Function to test token validity with server
             function testToken(token) {
                 return fetch('/api/ipfs/status', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
                 })
-                    .then(response => {
-                        return response.ok;
-                    })
-                    .catch(error => {
-                        console.error('Errore nella richiesta di verifica token:', error);
-                        return false;
-                    });
+                .then(response => {
+                    return response.ok;
+                })
+                .catch(error => {
+                    console.error('Errore nella richiesta di verifica token:', error);
+                    return false;
+                });
             }
 
-            // Funzione per mostrare messaggi di errore
+            // Function to show error messages
             function showError(message) {
                 errorMessage.textContent = message;
                 errorMessage.style.display = 'block';
+                showToast(message, 'error');
 
-                // Nascondi il messaggio dopo 5 secondi
+                // Hide message after 5 seconds
                 setTimeout(() => {
                     errorMessage.style.display = 'none';
                 }, 5000);
+            }
+            
+            // Function to set loading state
+            function setLoading(isLoading) {
+                loginBtn.disabled = isLoading;
+                loginSpinner.style.display = isLoading ? 'inline-block' : 'none';
+                loginBtn.textContent = isLoading ? 'Verifica in corso...' : 'Accedi';
+                if (isLoading) {
+                    loginBtn.prepend(loginSpinner);
+                }
             }
         });
     </script>

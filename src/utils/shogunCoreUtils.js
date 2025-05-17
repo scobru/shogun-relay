@@ -1,5 +1,4 @@
 import { ShogunCore, EntryPoint, Registry, SimpleRelay, RelayVerifier } from "shogun-core";
-import { log, logError } from "./logger.js";
 
 // Singleton for the ShogunCore instance
 let shogunCoreInstance = null;
@@ -23,9 +22,9 @@ export function initializeShogunCore(gun, authToken) {
       };
 
       shogunCoreInstance = new ShogunCore(config);
-      log("ShogunCore initialized successfully");
+      console.log("ShogunCore initialized successfully");
     } catch (error) {
-      logError("Error initializing ShogunCore:", error);
+      console.error("Error initializing ShogunCore:", error);
       throw new Error(`ShogunCore initialization failed: ${error.message}`);
     }
   }
@@ -115,7 +114,52 @@ export async function initializeRelayContracts(config, coreInstance, signer = nu
 export function createRelayVerifier(contracts) {
   const { registry, entryPoint, simpleRelay } = contracts;
   
-  // Use the RelayVerifier class directly from shogun-core
-  return new RelayVerifier(registry, entryPoint, simpleRelay);
+  // Create a custom RelayVerifier with proper hex format for isSubscribed
+  const relayVerifier = new RelayVerifier(registry, entryPoint, simpleRelay);
+  
+  // Wrap the default isPublicKeyAuthorized method to ensure proper format
+  const originalIsPublicKeyAuthorized = relayVerifier.isPublicKeyAuthorized.bind(relayVerifier);
+  relayVerifier.isPublicKeyAuthorized = async function(relayAddress, pubKey) {
+    try {
+      console.log(`Verifying public key authorization: ${pubKey}`);
+      
+      // If pubKey is a base64 GunDB key, convert it properly to hex
+      if (pubKey && !pubKey.startsWith('0x') && pubKey.includes('/') || pubKey.includes('+') || pubKey.includes('=')) {
+        // Clean the key - remove anything after '.' if present
+        const cleanPubKey = pubKey.split('.')[0].replace(/~/g, '');
+        
+        // Convert from base64 to hex with proper padding
+        const base64Key = cleanPubKey.replace(/-/g, "+").replace(/_/g, "/");
+        const padded = base64Key.length % 4 === 0 
+          ? base64Key 
+          : base64Key.padEnd(base64Key.length + (4 - (base64Key.length % 4)), "=");
+        
+        const binaryData = Buffer.from(padded, "base64");
+        const hexKey = binaryData.toString("hex");
+        
+        // Always add 0x prefix for ethers.js v6
+        const hexKeyWithPrefix = hexKey.startsWith('0x') ? hexKey : `0x${hexKey}`;
+        
+        console.log(`Hex format with prefix: ${hexKeyWithPrefix}`);
+        
+        // Call the original method with properly formatted key
+        return await originalIsPublicKeyAuthorized(relayAddress, hexKeyWithPrefix);
+      }
+      
+      // If already hex but missing 0x prefix, add it
+      if (pubKey && !pubKey.startsWith('0x') && /^[0-9a-fA-F]+$/.test(pubKey)) {
+        const hexKeyWithPrefix = `0x${pubKey}`;
+        console.log(`Adding 0x prefix to hex key: ${hexKeyWithPrefix}`);
+        return await originalIsPublicKeyAuthorized(relayAddress, hexKeyWithPrefix);
+      }
+      
+      // Otherwise use the original key
+      return await originalIsPublicKeyAuthorized(relayAddress, pubKey);
+    } catch (error) {
+      console.error("Error in custom isPublicKeyAuthorized:", error);
+      return false;
+    }
+  };
+  
+  return relayVerifier;
 } 
-}; 

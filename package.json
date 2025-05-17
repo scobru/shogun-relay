@@ -10,7 +10,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "get-deployed-contracts": "node scripts/getDeployedContracts.js"
+    "get-deployed-contracts": "node scripts/getDeployedContraacts.js",
+    "generate-keypair": "node scripts/generateKeyPair.js"
   },
   "dependencies": {
     "bullet-catcher": "^3.0.5",
@@ -29,7 +30,7 @@
     "nodemon": "^3.1.10",
     "path": "^0.12.7",
     "shogun-contracts": "^1.0.2",
-    "shogun-core": "^1.1.1",
+    "shogun-core": "^1.1.2",
     "shogun-ipfs": "^1.0.0",
     "url": "^0.11.4",
     "valibot": "^1.1.0"

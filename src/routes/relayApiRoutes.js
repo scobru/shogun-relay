@@ -1,5 +1,5 @@
 import express from "express";
-import { generateUserToken, configure } from "../managers/AuthenticationManager.js";
+import { generateUserToken, configure, isKeyPreAuthorized, authorizeKey, formatKeyForBlockchain } from "../managers/AuthenticationManager.js";
 import { ethers } from "ethers";
 
 /**
@@ -47,7 +47,6 @@ export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, getRelayVerifier
 
   // Helper to access authorization methods
   const getMap = () => AuthenticationManagerInstance?.getAuthorizedKeysMap ? AuthenticationManagerInstance.getAuthorizedKeysMap() : new Map();
-  const isKeyPreAuth = (key) => AuthenticationManagerInstance?.isKeyPreAuthorized ? AuthenticationManagerInstance.isKeyPreAuthorized(key) : false;
   const authKey = (key, expiry) => AuthenticationManagerInstance?.authorizeKey ? AuthenticationManagerInstance.authorizeKey(key, expiry) : { expiresAt: Date.now() + (5*60*1000) };
   const AUTH_KEY_EXPIRY_VALUE = AuthenticationManagerInstance?.AUTH_KEY_EXPIRY || (5*60*1000);
 
@@ -66,32 +65,39 @@ export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, getRelayVerifier
   };
 
   /**
-   * Clean and standardize public key format
-   * @param {string} pubKey - Raw public key
-   * @returns {Object} Object with cleaned key formats
+   * Clean and standardize a public key
+   * @param {string} pubKey - Public key to clean
+   * @returns {Object} Cleaned key data
    */
   const _cleanPublicKey = (pubKey) => {
-    let cleanedKey = pubKey;
-    if (cleanedKey.startsWith("~") || cleanedKey.startsWith("@")) {
-      cleanedKey = cleanedKey.substring(1);
+    if (!pubKey) {
+      return { original: "", cleaned: "", hex: "" };
     }
     
-    const dotIndex = cleanedKey.indexOf(".");
-    if (dotIndex > 0) {
-      cleanedKey = cleanedKey.substring(0, dotIndex);
-    }
+    // Remove @ prefix if present
+    let cleaned = pubKey.startsWith('@') ? pubKey.substring(1) : pubKey;
+    
+    // Get the key part (before any period if present)
+    const dotIndex = cleaned.indexOf('.');
+    cleaned = dotIndex > 0 ? cleaned.substring(0, dotIndex) : cleaned;
+    
+    // Format the key for blockchain interaction
+    const blockchainFormatted = formatKeyForBlockchain(pubKey);
+    
+    // Get the hex part without 0x prefix for legacy compatibility
+    const hex = blockchainFormatted ? blockchainFormatted.substring(2) : "";
     
     return {
       original: pubKey,
-      cleaned: cleanedKey,
-      hex: gunPubKeyToHex(cleanedKey)
+      cleaned,
+      hex
     };
   };
 
   /**
-   * Verify blockchain authorization for a public key across all relays
-   * @param {string} pubKey - The public key to verify
-   * @returns {Promise<Object>} Authorization result
+   * Verify authorization through blockchain
+   * @param {string} pubKey - Public key to verify
+   * @returns {Object} Authorization result
    */
   const _verifyBlockchainAuth = async (pubKey) => {
     const keyData = _cleanPublicKey(pubKey);
@@ -110,9 +116,22 @@ export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, getRelayVerifier
 
     try {
       // Use the relayVerifier directly, which now handles all contract types
-      // The first parameter can be any value since the verification is done internally
+      // Make sure to use the properly formatted key with 0x prefix
       const registryAddress = RELAY_CONFIG_PARAM.relay.registryAddress || "check-all";
-      const isAuthorized = await relayVerifier.isPublicKeyAuthorized(registryAddress, keyData.hex);
+      
+      // Get the hex key with 0x prefix for direct contract interaction
+      const hexWithPrefix = formatKeyForBlockchain(pubKey);
+      
+      if (!hexWithPrefix) {
+        console.error(`Failed to format key for blockchain: ${pubKey}`);
+        return { 
+          isAuthorized: false, 
+          authorizingRelay: null, 
+          reason: "invalid_key_format" 
+        };
+      }
+      
+      const isAuthorized = await relayVerifier.isPublicKeyAuthorized(registryAddress, hexWithPrefix);
       
       if (isAuthorized) {
         console.log(`Public key ${keyData.cleaned} is authorized via blockchain verification`);
@@ -458,7 +477,7 @@ export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, getRelayVerifier
       }
 
       // Check if key is already pre-authorized
-      if (isKeyPreAuth(pubKey)) {
+      if (isKeyPreAuthorized(pubKey)) {
         const authInfo = getMap().get(pubKey);
         return res.json(_standardResponse(
           true,
@@ -547,6 +566,8 @@ export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, getRelayVerifier
         return res.status(400).json(_standardResponse(false, "Public key is required", {}, "Public key is required"));
       }
       
+      console.log(`Pre-authorizing key with token: ${pubKey}`);
+      
       // Ensure JWT_SECRET is configured
       if (!SECRET_TOKEN_PARAM) {
         return res.status(500).json(_standardResponse(
@@ -559,9 +580,21 @@ export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, getRelayVerifier
       
       // Clean and standardize the public key
       const keyData = _cleanPublicKey(pubKey);
+      console.log(`Cleaned key data: ${JSON.stringify(keyData)}`);
+      
+      // Set up timeout for the entire operation
+      const timeout = setTimeout(() => {
+        console.log("Pre-authorization operation timed out, sending partial response");
+        return res.status(202).json(_standardResponse(
+          true,
+          "Pre-authorization initiated but timed out, JWT might be generated asynchronously",
+          { pubKey, partial: true }
+        ));
+      }, 15000); // 15 seconds timeout
       
       // Verify blockchain authentication
       if (!RELAY_CONFIG_PARAM.relay.onchainMembership || !getRelayVerifierInstance()) {
+        clearTimeout(timeout);
         const authInfo = _authorizeKeyAllFormats(pubKey, AUTH_KEY_EXPIRY_VALUE);
         
         // Configure with SECRET_TOKEN
@@ -581,10 +614,24 @@ export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, getRelayVerifier
         ));
       }
       
-      // Verify blockchain authorization
-      const { isAuthorized, authorizingRelay, reason } = await _verifyBlockchainAuth(pubKey);
+      // Verify blockchain authorization with timeout
+      let verificationResult;
+      try {
+        const verificationPromise = _verifyBlockchainAuth(pubKey);
+        const verificationTimeout = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("Blockchain verification timed out")), 10000);
+        });
+        
+        verificationResult = await Promise.race([verificationPromise, verificationTimeout]);
+      } catch (error) {
+        console.error(`Blockchain verification error: ${error.message}`);
+        verificationResult = { isAuthorized: false, reason: `verification_error: ${error.message}` };
+      }
+      
+      const { isAuthorized, authorizingRelay, reason } = verificationResult;
       
       if (!isAuthorized) {
+        clearTimeout(timeout);
         return res.status(403).json(_standardResponse(
           false, 
           "Public key not authorized by any active relay", 
@@ -598,8 +645,72 @@ export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, getRelayVerifier
       // Configure with SECRET_TOKEN
       configure({ JWT_SECRET: SECRET_TOKEN_PARAM });
       
-      // Generate a JWT token
-      const token = await generateUserToken(pubKey, "Blockchain Verified Token", null, true);
+      // Generate a JWT token with a timeout
+      let token;
+      try {
+        console.log("Attempting to obtain a JWT token with blockchain verification...");
+        const tokenPromise = generateUserToken(pubKey, "Blockchain Verified Token", null, true);
+        const tokenTimeout = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("JWT token generation timed out")), 8000);
+        });
+        
+        token = await Promise.race([tokenPromise, tokenTimeout]);
+        console.log("JWT token obtained successfully");
+      } catch (error) {
+        console.error(`Error generating JWT token: ${error.message}`);
+        // Fall back to non-verified token if blockchain verification fails
+        token = await generateUserToken(pubKey, "Fallback Token", null, false);
+        console.log("Generated fallback JWT token without blockchain verification");
+      }
+      
+      // Clear the main timeout since we have a result now
+      clearTimeout(timeout);
+      
+      // Explicitly test writing data after authorization
+      try {
+        // Get the gun instance from the shogunCoreInstance
+        const shogunCore = shogunCoreInstance();
+        if (shogunCore && shogunCore.gun) {
+          console.log("Testing direct Gun write after authorization...");
+          
+          // Write test data
+          const testData = {
+            message: "Test data after pre-authorization",
+            timestamp: Date.now(),
+            pubKey: pubKey
+          };
+          
+          // Add the token to Gun's internal state for authenticated operations
+          if (!shogunCore.gun._.opt.headers) {
+            shogunCore.gun._.opt.headers = {};
+          }
+          shogunCore.gun._.opt.headers.Authorization = `Bearer ${token}`;
+          shogunCore.gun._.opt.headers.token = token;
+          
+          // Write to a public node with a timeout
+          const writePromise = new Promise((resolve) => {
+            shogunCore.gun.get('test-relay-auth').put(testData, (ack) => {
+              console.log("Direct write result:", ack);
+              resolve();
+            });
+          });
+          
+          const writeTimeout = new Promise((resolve) => {
+            setTimeout(() => {
+              console.log("Write operation timed out, continuing...");
+              resolve();
+            }, 3000);
+          });
+          
+          await Promise.race([writePromise, writeTimeout]);
+          
+          console.log("Test write complete, check radata folder for changes");
+          
+          // Skip the User authentication tests that were causing timeouts
+        }
+      } catch (writeError) {
+        console.error("Error during test write:", writeError);
+      }
       
       res.json(_standardResponse(
         true, 
@@ -612,6 +723,7 @@ export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, getRelayVerifier
         }
       ));
     } catch (error) {
+      console.error("Complete error in pre-authorization:", error);
       res.status(500).json(_standardResponse(false, "Error pre-authorizing key with token", {}, error.message));
     }
   });

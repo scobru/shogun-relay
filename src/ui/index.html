@@ -890,6 +890,100 @@
         background-color: #d0d0d0;
         text-decoration: none;
       }
+
+      /* Toast notification system */
+      .toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        max-width: 300px;
+        z-index: 9999;
+      }
+
+      .toast {
+        background-color: #333;
+        color: white;
+        padding: 12px 15px;
+        border-radius: 4px;
+        margin-bottom: 10px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        animation: slidein 0.3s ease-out;
+      }
+
+      @keyframes slidein {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+
+      .toast-success {
+        background-color: var(--success-color);
+      }
+
+      .toast-error {
+        background-color: var(--error-color);
+      }
+
+      .toast-warning {
+        background-color: var(--warning-color);
+        color: #333;
+      }
+
+      .toast-info {
+        background-color: var(--info-color);
+      }
+
+      .toast-close {
+        background: transparent;
+        border: none;
+        color: white;
+        font-size: 16px;
+        cursor: pointer;
+        padding: 0 0 0 10px;
+        margin: 0;
+      }
+
+      .toast-warning .toast-close {
+        color: #333;
+      }
+
+      /* Enhanced loading spinner */
+      .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        visibility: hidden;
+        opacity: 0;
+        transition: opacity 0.3s, visibility 0.3s;
+      }
+
+      .loading-overlay.active {
+        visibility: visible;
+        opacity: 1;
+      }
+
+      .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid var(--primary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
     </style>
   </head>
 
@@ -899,6 +993,14 @@
     </header>
 
     <div class="container">
+      <!-- Toast container for notifications -->
+      <div id="toast-container" class="toast-container"></div>
+
+      <!-- Loading overlay -->
+      <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+      </div>
+
       <div class="dashboard-header">
         <h2 class="dashboard-title">Panoramica Sistema</h2>
         <div class="dashboard-actions">
@@ -1157,21 +1259,146 @@
 
     <script>
       document.addEventListener("DOMContentLoaded", () => {
-        // Verifica autenticazione all'avvio
-        const checkAuth = () => {
-          const token = localStorage.getItem("authToken");
+        // Toast notification system
+        const toastContainer = document.getElementById("toast-container");
+        const showToast = (message, type = "info", duration = 5000) => {
+          const toast = document.createElement("div");
+          toast.className = `toast toast-${type}`;
+          
+          const content = document.createElement("div");
+          content.textContent = message;
+          
+          const closeBtn = document.createElement("button");
+          closeBtn.className = "toast-close";
+          closeBtn.innerHTML = "✕";
+          closeBtn.addEventListener("click", () => {
+            toast.remove();
+          });
+          
+          toast.appendChild(content);
+          toast.appendChild(closeBtn);
+          toastContainer.appendChild(toast);
+          
+          setTimeout(() => {
+            toast.style.opacity = "0";
+            toast.style.transform = "translateX(100%)";
+            toast.style.transition = "all 0.3s ease-out";
+            setTimeout(() => toast.remove(), 300);
+          }, duration);
+          
+          return toast;
+        };
+
+        // Loading overlay management
+        const loadingOverlay = document.getElementById("loading-overlay");
+        const showLoading = () => {
+          loadingOverlay.classList.add("active");
+        };
+        const hideLoading = () => {
+          loadingOverlay.classList.remove("active");
+        };
+
+        // JWT token management
+        const getAuthToken = () => {
+          return localStorage.getItem("authToken");
+        };
+
+        const getTokenData = () => {
+          const token = getAuthToken();
+          if (!token) return null;
+          
+          try {
+            // JWT tokens are base64 encoded with 3 parts: header.payload.signature
+            const parts = token.split('.');
+            if (parts.length !== 3) return null;
+            
+            // Decode the payload (middle part)
+            const payload = JSON.parse(atob(parts[1]));
+            return payload;
+          } catch (e) {
+            console.error("Error parsing token:", e);
+            return null;
+          }
+        };
+
+        const isTokenExpired = () => {
+          const tokenData = getTokenData();
+          if (!tokenData || !tokenData.exp) return true;
+          
+          // exp is in seconds, Date.now() is in milliseconds
+          return tokenData.exp * 1000 < Date.now();
+        };
+
+        const refreshToken = async () => {
+          try {
+            showLoading();
+            const response = await fetch('/api/auth/refresh-token', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${getAuthToken()}`
+              }
+            });
+            
+            if (!response.ok) {
+              throw new Error('Token refresh failed');
+            }
+            
+            const data = await response.json();
+            if (data.token) {
+              localStorage.setItem('authToken', data.token);
+              showToast("Sessione rinnovata", "success");
+              return true;
+            }
+            return false;
+          } catch (error) {
+            console.error("Error refreshing token:", error);
+            showToast("Impossibile rinnovare la sessione. Effettua nuovamente il login.", "error");
+            return false;
+          } finally {
+            hideLoading();
+          }
+        };
+
+        // Check authentication & token status
+        const checkAuth = async () => {
+          const token = getAuthToken();
           if (!token) {
-            // Reindirizza alla pagina di login se non c'è token
+            // Redirect to login page if no token
             window.location.href = "/login";
             return false;
           }
+          
+          // Check if token is expired
+          if (isTokenExpired()) {
+            // Try to refresh token
+            const refreshed = await refreshToken();
+            if (!refreshed) {
+              // If refresh failed, redirect to login
+              localStorage.removeItem("authToken");
+              window.location.href = "/login";
+              return false;
+            }
+          }
+          
           return true;
         };
 
-        // Esegui controllo autenticazione
-        if (!checkAuth()) return;
+        // Check auth immediately and setup periodic checks
+        checkAuth();
+        
+        // Setup token refresh every 5 minutes if needed
+        setInterval(async () => {
+          // Only refresh if token exists but is getting close to expiration (within 5 minutes)
+          const tokenData = getTokenData();
+          if (tokenData && tokenData.exp) {
+            const expiresIn = tokenData.exp * 1000 - Date.now();
+            if (expiresIn > 0 && expiresIn < 5 * 60 * 1000) {
+              await refreshToken();
+            }
+          }
+        }, 60 * 1000); // Check every minute
 
-        // Logger
+        // Logger enhancements
         const logContainer = document.getElementById("log-container");
         const logger = {
           log: function (message, type = "info") {
@@ -1187,10 +1414,15 @@
           },
           error: function (message) {
             this.log(message, "error");
+            showToast(message, "error");
           },
           warn: function (message) {
             this.log(message, "warn");
           },
+          success: function(message) {
+            this.log(message, "info");
+            showToast(message, "success");
+          }
         };
 
         // Toggle debug logs
@@ -1207,30 +1439,12 @@
             }
           });
 
-        // Tabs switching
-        document.querySelectorAll(".tab").forEach((tab) => {
-          tab.addEventListener("click", () => {
-            // Remove active class from all tabs and content
-            document
-              .querySelectorAll(".tab")
-              .forEach((t) => t.classList.remove("active"));
-            document
-              .querySelectorAll(".tab-content")
-              .forEach((c) => c.classList.remove("active"));
-
-            // Add active class to clicked tab and corresponding content
-            tab.classList.add("active");
-            const tabName = tab.getAttribute("data-tab");
-            document.getElementById(`${tabName}-tab`).classList.add("active");
-          });
-        });
-
         // Initialize Gun with connection to relay
         logger.info(
           "Inizializzazione Gun con server: " + location.origin + "/gun"
         );
 
-        // Controlla se WebSocket è supportato
+        // Checks if WebSocket is supported
         if (typeof WebSocket === "undefined") {
           logger.error(
             "WebSocket non supportato in questo browser! Utilizzo HTTP fallback"
@@ -1241,7 +1455,7 @@
           );
         }
 
-        // Crea URL per WebSocket
+        // Create WebSocket URL
         const wsProtocol =
           window.location.protocol === "https:" ? "wss:" : "ws:";
         const wsUrl = wsProtocol + "//" + window.location.host + "/gun";
@@ -1251,19 +1465,17 @@
           peers: [location.origin + "/gun"],
           localStorage: false,
           radisk: false,
-          WebSocket: window.WebSocket, // Specifica esplicitamente WebSocket
-          secure: window.location.protocol === "https:", // Usa SSL se necessario
+          WebSocket: window.WebSocket,
+          secure: window.location.protocol === "https:",
           headers: {
-            token: "thisIsTheTokenForReals", // Passa il token nelle richieste
+            Authorization: `Bearer ${getAuthToken()}`
           },
         });
 
-        // Make the token available globally so Gun extensions can access it
-        window.gunAuthToken = "thisIsTheTokenForReals";
-
+        // Remove hardcoded token and use the JWT from localStorage
         window.Gun = gun;
 
-        // Add token to ALL gun messages
+        // Add token to ALL gun messages with proper authorization header
         Gun.on("opt", function (ctx) {
           if (ctx.once) return;
           
@@ -1272,26 +1484,32 @@
             // Make sure headers exist
             if (!msg.headers) msg.headers = {};
             
-            // Add token to headers
-            msg.headers.token = window.gunAuthToken;
+            // Add auth token to headers
+            const token = getAuthToken();
+            if (token) {
+              msg.headers.Authorization = `Bearer ${token}`;
+            }
             
             this.to.next(msg);
           });
         });
 
-        // Test WebSocket connection
+        // Test WebSocket connection with loading indicator
+        showLoading();
         fetch("/check-websocket")
           .then((res) => res.json())
           .then((data) => {
             logger.info(
               "Configurazione WebSocket server: " + JSON.stringify(data)
             );
+            hideLoading();
           })
           .catch((err) => {
             logger.error("Errore verifica WebSocket: " + err.message);
+            hideLoading();
           });
 
-        // Basic connection status
+        // Basic connection status variables
         const peerCountEl = document.getElementById("peer-count");
         const peerCountDetailEl = document.getElementById("peer-count-detail");
         const networkStatusEl = document.getElementById("network-status");
@@ -1348,7 +1566,7 @@
           }
         }, 3000);
 
-        // File management
+        // File management with enhanced loading and error handling
         const fileList = document.getElementById("file-list");
         const fileCountEl = document.getElementById("file-count");
         const totalSizeEl = document.getElementById("total-size");
@@ -1357,19 +1575,19 @@
 
         // Load all files
         const loadFiles = async (searchParams = {}) => {
-          // Verifica autenticazione prima di procedere
-          if (!isAuthenticated()) {
-            fileList.innerHTML =
-              '<div class="error">Autenticazione richiesta per caricare i file</div>';
-            return;
-          }
-
-          fileList.innerHTML =
-            '<div class="loading">Caricamento file in corso...</div>';
-          logger.info("Inizio caricamento lista file...");
-
+          showLoading();
+          fileList.innerHTML = '<div class="loading">Caricamento file in corso...</div>';
+          
           try {
-            // Prima proviamo a caricare i file tramite l'API
+            // Check auth before proceeding
+            if (!await checkAuth()) {
+              hideLoading();
+              return;
+            }
+            
+            logger.info("Inizio caricamento lista file...");
+
+            // Construct URL with search parameters
             let url = "/files/all";
             if (Object.keys(searchParams).length > 0) {
               const queryString = new URLSearchParams(searchParams).toString();
@@ -1377,168 +1595,137 @@
             }
 
             const token = getAuthToken();
-            logger.info(
-              `Richiesta API a ${url} con token: ${
-                token ? "presente" : "assente"
-              }`
-            );
-
             const response = await fetch(url, {
               headers: {
-                Authorization: `Bearer ${token}`,
-              },
+                Authorization: `Bearer ${token}`
+              }
             });
+            
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const data = await response.json();
-            logger.info(
-              `Risposta API ricevuta: ${JSON.stringify(data).substring(
-                0,
-                200
-              )}...`
-            );
-
+            
             if (data.success && data.results && data.results.length > 0) {
               displayFiles(data.results);
               updateFileStats(data.results);
-              logger.info(`Trovati ${data.results.length} file tramite API`);
+              logger.success(`Caricati ${data.results.length} file correttamente`);
             } else {
-              // Se l'API non restituisce file, proviamo direttamente da GunDB
-              logger.info(
-                "Nessun file trovato tramite API, provo a recuperare direttamente da GunDB"
-              );
-
-              // Uso di Gun per ottenere i file direttamente
-              const files = [];
-              const seen = new Set();
-
-              // Promise per gestire l'asincronicità di GunDB
-              await new Promise((resolve) => {
-                let timeout = setTimeout(() => {
-                  logger.warn("Timeout GunDB, caricamento incompleto");
-                  resolve();
-                }, 3000);
-
-                gun
-                  .get("files")
-                  .map()
-                  .once((data, key) => {
-                    if (key !== "_" && !seen.has(key) && data) {
-                      seen.add(key);
-                      files.push(data);
-                      logger.info(`File trovato in GunDB: ${data.name || key}`);
-                    }
-
-                    clearTimeout(timeout);
-                    timeout = setTimeout(resolve, 500);
-                  });
-              });
-
+              // Fallback to GunDB if API returns no files
+              logger.info("Nessun file trovato tramite API, provo a recuperare da GunDB");
+              
+              const files = await loadFilesFromGunDB();
+              
               if (files.length > 0) {
                 displayFiles(files);
                 updateFileStats(files);
-                logger.info(
-                  `Trovati ${files.length} file direttamente da GunDB`
-                );
+                logger.success(`Recuperati ${files.length} file da GunDB`);
               } else {
-                fileList.innerHTML =
-                  '<div class="empty-state">Nessun file trovato</div>';
+                fileList.innerHTML = '<div class="empty-state">Nessun file trovato</div>';
                 updateFileStats([]);
-                logger.warn(
-                  "Nessun file trovato né tramite API né tramite GunDB"
-                );
+                logger.warn("Nessun file trovato né tramite API né tramite GunDB");
               }
             }
           } catch (error) {
             fileList.innerHTML = `<div class="error">Errore nel caricamento dei file: ${error.message}</div>`;
             logger.error(`Errore nel caricamento dei file: ${error.message}`);
-
-            // Tentativo di recupero diretto da GunDB in caso di errore API
+            
+            // Try GunDB fallback
             try {
-              logger.info(
-                "Tentativo di recupero diretto da GunDB dopo errore API"
-              );
-              const files = [];
-              const seen = new Set();
-
-              await new Promise((resolve) => {
-                gun
-                  .get("files")
-                  .map()
-                  .once((data, key) => {
-                    if (key !== "_" && !seen.has(key) && data) {
-                      seen.add(key);
-                      files.push(data);
-                    }
-                  });
-
-                setTimeout(resolve, 1000);
-              });
-
+              const files = await loadFilesFromGunDB();
               if (files.length > 0) {
                 displayFiles(files);
                 updateFileStats(files);
-                logger.info(
-                  `Recuperati ${files.length} file da GunDB dopo errore API`
-                );
+                logger.success(`Recuperati ${files.length} file da GunDB dopo errore API`);
               }
             } catch (gunError) {
-              logger.error(
-                `Anche il recupero da GunDB è fallito: ${gunError.message}`
-              );
+              logger.error(`Anche il recupero da GunDB è fallito: ${gunError.message}`);
             }
+          } finally {
+            hideLoading();
           }
         };
 
-        // Gestione caricamento file - aggiungere qui
+        // Helper function to load files from GunDB
+        const loadFilesFromGunDB = () => {
+          return new Promise((resolve) => {
+            const files = [];
+            const seen = new Set();
+            
+            let timeout = setTimeout(() => {
+              logger.warn("Timeout GunDB, caricamento incompleto");
+              resolve(files);
+            }, 5000);
+            
+            gun.get("files")
+              .map()
+              .once((data, key) => {
+                if (key !== "_" && !seen.has(key) && data) {
+                  seen.add(key);
+                  files.push(data);
+                }
+                
+                clearTimeout(timeout);
+                timeout = setTimeout(() => resolve(files), 500);
+              });
+          });
+        };
+
+        // File upload handler with enhanced confirmation and loading
         const uploadForm = document.getElementById("upload-form");
         uploadForm.addEventListener("submit", async (event) => {
-          // Previene il comportamento predefinito del form (refresh della pagina)
           event.preventDefault();
-
-          // Verifica autenticazione prima di procedere
-          if (!isAuthenticated()) {
-            document.getElementById("upload-status").innerHTML =
-              '<div class="error">Autenticazione richiesta per caricare file</div>';
+          
+          // Verify authentication
+          if (!await checkAuth()) {
+            showToast("Autenticazione richiesta per caricare file", "error");
             return;
           }
-
+          
           const fileInput = document.getElementById("file-input");
           const customName = document.getElementById("custom-name").value;
           const uploadStatus = document.getElementById("upload-status");
           const uploadResult = document.getElementById("upload-result");
-
+          
           if (!fileInput.files || fileInput.files.length === 0) {
-            uploadStatus.innerHTML =
-              '<div class="error">Seleziona un file da caricare</div>';
+            showToast("Seleziona un file da caricare", "warning");
+            uploadStatus.innerHTML = '<div class="error">Seleziona un file da caricare</div>';
             return;
           }
-
+          
           const file = fileInput.files[0];
-
-          uploadStatus.innerHTML =
-            '<div class="info">Caricamento in corso...</div>';
-
+          
+          // Show loading
+          showLoading();
+          uploadStatus.innerHTML = '<div class="info">Caricamento in corso...</div>';
+          
           try {
             const formData = new FormData();
             formData.append("file", file);
             if (customName) {
               formData.append("customName", customName);
             }
-
+            
             const response = await fetch("/upload", {
               method: "POST",
               headers: {
-                Authorization: `Bearer ${getAuthToken()}`,
+                Authorization: `Bearer ${getAuthToken()}`
               },
-              body: formData,
+              body: formData
             });
-
+            
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const data = await response.json();
-
+            
             if (data.success) {
-              uploadStatus.innerHTML =
-                '<div class="success">File caricato con successo</div>';
-
-              // Mostra dettagli del file caricato
+              uploadStatus.innerHTML = '<div class="success">File caricato con successo</div>';
+              showToast("File caricato con successo", "success");
+              
+              // Show upload details
               let resultHtml = `
                             <div class="card">
                                 <div class="card-header">
@@ -1581,17 +1768,20 @@
 
               uploadResult.innerHTML = resultHtml;
 
-              // Aggiorna la lista dei file
+              // Update file list
               loadFiles();
-
+              
               // Reset form
               uploadForm.reset();
             } else {
-              uploadStatus.innerHTML = `<div class="error">Errore: ${data.error}</div>`;
+              throw new Error(data.error || "Errore sconosciuto");
             }
           } catch (error) {
             uploadStatus.innerHTML = `<div class="error">Errore durante l'upload: ${error.message}</div>`;
+            showToast(`Errore durante l'upload: ${error.message}`, "error");
             logger.error(`Errore upload file: ${error.message}`);
+          } finally {
+            hideLoading();
           }
         });
 
@@ -1604,16 +1794,6 @@
           return (
             parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
           );
-        }
-
-        // Funzione per verificare l'autenticazione
-        function isAuthenticated() {
-          return !!getAuthToken();
-        }
-
-        // Funzione per ottenere il token di autenticazione
-        function getAuthToken() {
-          return localStorage.getItem("authToken");
         }
 
         // Display files in the list
@@ -1731,13 +1911,12 @@
             });
           });
 
-          // Aggiungi event listener per i pulsanti elimina
+          // Aggiungi event listener for delete buttons with enhanced confirmation
           document.querySelectorAll(".delete-file").forEach((btn) => {
             btn.addEventListener("click", async () => {
               const fileId = btn.getAttribute("data-id");
-              if (confirm("Sei sicuro di voler eliminare questo file?")) {
-                await deleteFile(fileId);
-              }
+              const fileName = btn.getAttribute("data-name");
+              await deleteFile(fileId, fileName);
             });
           });
         };
@@ -1746,7 +1925,7 @@
         const checkPinStatus = async (hash) => {
           try {
             // Verifica che ci sia l'autenticazione
-            if (!isAuthenticated()) {
+            if (!await checkAuth()) {
               logger.error(
                 "Autenticazione richiesta per verificare lo stato del pin"
               );
@@ -1806,7 +1985,7 @@
         // Funzione per pinnare un file
         const pinFile = async (hash) => {
           try {
-            if (!isAuthenticated()) {
+            if (!await checkAuth()) {
               logger.error("Autenticazione richiesta per pinnare file");
               return;
             }
@@ -1854,7 +2033,7 @@
         // Funzione per unpinnare un file
         const unpinFile = async (hash) => {
           try {
-            if (!isAuthenticated()) {
+            if (!await checkAuth()) {
               logger.error("Autenticazione richiesta per unpinnare file");
               return;
             }
@@ -1900,39 +2079,49 @@
         };
 
         // Funzione per eliminare un file
-        const deleteFile = async (fileId) => {
+        const deleteFile = async (fileId, fileName) => {
           try {
-            if (!isAuthenticated()) {
-              logger.error("Autenticazione richiesta per eliminare file");
+            // Verify authentication
+            if (!await checkAuth()) {
+              showToast("Autenticazione richiesta per eliminare file", "error");
               return;
             }
-
+            
+            // Show confirmation dialog
+            if (!confirm(`Sei sicuro di voler eliminare il file "${fileName || fileId}"?`)) {
+              return;
+            }
+            
+            // Show loading
+            showLoading();
             logger.info(`Eliminazione file: ${fileId}`);
-
+            
             const response = await fetch(`/files/${fileId}`, {
               method: "DELETE",
               headers: {
-                Authorization: `Bearer ${getAuthToken()}`,
-              },
+                Authorization: `Bearer ${getAuthToken()}`
+              }
             });
-
+            
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const data = await response.json();
-
+            
             if (data.success) {
-              logger.info(`File eliminato con successo: ${fileId}`);
-              // Aggiorna la lista dei file
+              showToast("File eliminato con successo", "success");
+              logger.success(`File eliminato con successo: ${fileId}`);
+              // Update file list
               loadFiles();
             } else {
-              logger.error(
-                `Errore durante l'eliminazione: ${
-                  data.error || "Errore sconosciuto"
-                }`
-              );
-              alert(`Errore: ${data.error || "Errore sconosciuto"}`);
+              throw new Error(data.error || "Errore sconosciuto");
             }
           } catch (error) {
+            showToast(`Errore durante l'eliminazione: ${error.message}`, "error");
             logger.error(`Errore durante l'eliminazione: ${error.message}`);
-            alert(`Errore: ${error.message}`);
+          } finally {
+            hideLoading();
           }
         };
 
@@ -2142,7 +2331,7 @@
         const executeGunDbQuery = async () => {
           try {
             // Verifica autenticazione
-            if (!isAuthenticated()) {
+            if (!await checkAuth()) {
               logger.error("Autenticazione richiesta per eseguire query GunDB");
               return;
             }
@@ -2306,9 +2495,15 @@
             }
           });
 
-        // Load files and update IPFS status on page load
-        loadFiles();
-        updateIpfsStatus();
+        // Load files and update IPFS status on page load with proper loading
+        showLoading();
+        Promise.all([
+          checkAuth(),
+          loadFiles(),
+          updateIpfsStatus()
+        ]).finally(() => {
+          hideLoading();
+        });
       });
     </script>
   </body>
