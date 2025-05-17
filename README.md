@@ -13,7 +13,9 @@ This is a unified relay server for the Shogun application, providing Gun databas
 - **ShogunCore Integration**: Powerful authentication with WebAuthn, MetaMask, and password
 - **Key Pair Generator**: Web interface to generate and download GunDB key pairs
 - **CORS Protection**: Configurable cross-origin resource sharing
-- **Blockchain Integration**: Connect with Ethereum smart contracts for membership verification, DIDs, and oracle services
+- **Blockchain Integration**: Connect with Ethereum smart contracts for membership verification
+- **Bullet Catcher**: Enhanced error handling and logging system for GunDB operations
+- **Debug Mode**: Comprehensive debugging tools for troubleshooting Gun messages and network operations
 
 ## Architecture
 
@@ -27,22 +29,23 @@ The relay serves as a Gun peer node, providing:
 - Optional transaction logging for audit purposes
 - Native Gun user authentication system
 - User-specific API token management
+- Bulletproof message handling with Bullet Catcher integration
 
 ### ShogunCore Integration
 
-The relay now integrates with ShogunCore for enhanced authentication:
+The relay integrates with ShogunCore for enhanced authentication:
 - WebAuthn support for passwordless authentication
 - MetaMask authentication for web3 integration
 - Traditional username/password authentication
-- DID (Decentralized Identity) management
 - Wallet management for crypto operations
+- Unified relay verifier for on-chain membership validation
 
 ### Blockchain Integration
 
-The relay includes three key blockchain components:
-- **RelayMembershipVerifier**: Validates if users are authorized members of the Shogun protocol
-- **DIDVerifier**: Manages decentralized identifiers with on-chain verification
-- **OracleBridge**: Publishes and verifies Merkle roots for data notarization
+The relay includes these key blockchain components:
+- **RelayVerifier**: Validates if users are authorized members of the Shogun protocol
+- **RelayRegistry**: Manages relay registration and permissions
+- **EntryPoint**: Contract handling relay execution and verification
 
 #### On-Chain Membership Verification
 
@@ -50,7 +53,8 @@ When enabled, the relay can verify if GunDB message senders are authorized membe
 
 - When `ONCHAIN_MEMBERSHIP_ENABLED=true`, the relay server will:
   - Extract the public key from incoming Gun messages
-  - Verify the public key against the RelayMembership smart contract
+  - Format the key appropriately for blockchain verification
+  - Verify the public key against the RelayRegistry smart contract
   - Authorize or reject messages based on on-chain verification
   - Provide an additional layer of security by ensuring only authorized participants can interact with the system
 
@@ -60,14 +64,12 @@ This provides true decentralized access control, where membership is verified on
 
 For blockchain interactions that require write operations (transactions):
 
-- Read operations (like checking membership or verifying DIDs) don't require a private key
-- Write operations (like registering DIDs or publishing Merkle roots) require a private key
+- Read operations (like checking membership) don't require a private key
+- Write operations require a private key
 - Configure `ETHEREUM_PRIVATE_KEY` in your `.env` file to enable write operations
 - The relay will automatically create a signer using this private key to sign transactions
 - For security, consider using environment variables rather than hardcoding the key
 - If no private key is provided, write operations will fail with appropriate error messages
-
-For example, the `POST /api/relay/oracle/publish-root` endpoint requires a private key to sign the transaction that publishes a new Merkle root to the OracleBridge contract.
 
 ### IPFS Layer
 
@@ -75,6 +77,7 @@ The IPFS integration provides:
 - Automatic data retrieval from IPFS when referenced in GunDB
 - Support for both local IPFS nodes and Pinata cloud storage
 - Configurable fallback to local storage when IPFS is unavailable
+- Optional encryption of IPFS content for enhanced privacy
 
 ### File Storage System
 
@@ -83,6 +86,7 @@ The file system offers:
 - Automatic IPFS backup when enabled
 - Local file storage fallback
 - Metadata tracking in GunDB
+- Configurable storage path and file size limits
 
 ## Key Pair Generator
 
@@ -100,9 +104,10 @@ The server includes several security enhancements:
 2. Token-based authentication for APIs with user-specific tokens
 3. WebSocket connection validation
 4. Input sanitization for API parameters
-5. Comprehensive error handling
+5. Comprehensive error handling with Bullet Catcher integration
 6. Gun's native SEA (Security, Encryption, Authorization) for user management
 7. Certificate-based authentication for enhanced security
+8. Debug mode for troubleshooting message validation issues
 
 ## Environment Variables
 
@@ -111,10 +116,12 @@ For security reasons, several configurations should be set via environment varia
 ```
 # Server configuration
 PORT=8765
+HOST=localhost
 NODE_ENV=development  # Use 'production' for production environments
 
 # Security
 API_SECRET_TOKEN=your_secret_token_here
+JWT_SECRET=your_jwt_secret_here
 
 # CORS configuration
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
@@ -129,41 +136,36 @@ IPFS_GATEWAY=http://127.0.0.1:8080/ipfs
 PINATA_GATEWAY=https://gateway.pinata.cloud
 PINATA_JWT=your_pinata_jwt_token
 
+# File storage configuration
+MAX_FILE_SIZE=50mb
+STORAGE_DIR=./uploads
+
 # Ethereum provider configuration
 ETHEREUM_PROVIDER_URL=http://localhost:8545  # Use Infura, Alchemy, etc. for production
 ETHEREUM_PRIVATE_KEY=  # Optional: Private key for signing transactions (needed for write operations)
 
-# Relay Membership configuration
-RELAY_MEMBERSHIP_ENABLED=false
-RELAY_MEMBERSHIP_CONTRACT=0x0000000000000000000000000000000000000000
+# Relay contracts configuration
+RELAY_REGISTRY_CONTRACT=0x0000000000000000000000000000000000000000
+INDIVIDUAL_RELAY=0x0000000000000000000000000000000000000000
+RELAY_ENTRY_POINT_CONTRACT=0x0000000000000000000000000000000000000000
 ONCHAIN_MEMBERSHIP_ENABLED=false  # Enable membership verification for Gun messages
 
-# DID Verifier configuration
-DID_VERIFIER_ENABLED=false
-DID_REGISTRY_CONTRACT=0x0000000000000000000000000000000000000000
-
-# Oracle Bridge configuration
-ORACLE_BRIDGE_ENABLED=false
-ORACLE_BRIDGE_CONTRACT=0x0000000000000000000000000000000000000000
-
-# WebAuthn configuration
-WEBAUTHN_RP_ID=localhost  # The Relying Party ID for WebAuthn
-
-# Encryption (optional)
-ENCRYPTION_ENABLED=false
-ENCRYPTION_KEY=your_encryption_key
-ENCRYPTION_ALGORITHM=aes-256-gcm
+# Debugging configuration
+DEBUG_GUN_VALIDATION=false  # Enable detailed logging for Gun message validation
 
 # SQLite configuration (optional)
 SQLITE_ENABLED=true
 SQLITE_PATH=./sqlitedata
 SQLITE_FILE=shogun.db
 SQLITE_VERBOSE=false
+
+# Application key pair for internal use
+APP_KEY_PAIR={"pub":"your_public_key","priv":"your_private_key","epub":"your_epub_key","epriv":"your_epriv_key"}
 ```
 
 ## User Management System
 
-The relay now includes a complete user management system with the following features:
+The relay includes a complete user management system with the following features:
 
 ### Native GunDB User Authentication
 
@@ -224,82 +226,17 @@ These endpoints allow verification of protocol membership:
 - `POST /api/relay/membership/address-for-pubkey` - Get the address associated with a public key
 - `GET /api/relay/membership/user-info/:address` - Get user information for an address
 - `GET /api/relay/membership/is-active/:address` - Check if a user's subscription is active
+- `POST /api/relay/membership/authorize-key` - Temporarily authorize a key for relay use
 - `POST /api/relay/membership/config` - Update relay membership configuration (admin only)
 
-### DID Verifier API
+## Debug Command
 
-These endpoints provide DID (Decentralized Identifier) verification:
+When typing "/debug" in a web application context, the system will:
+1. Examine console logs
+2. Take a screenshot of the page through the MPC server
+3. Provide diagnostic information to help troubleshoot issues
 
-- `GET /api/relay/did/status` - Check DID verifier service status
-- `GET /api/relay/did/verify/:did` - Verify a DID and get its controller
-- `POST /api/relay/did/check-controller` - Check if a DID is controlled by a specific controller
-- `POST /api/relay/did/authenticate` - Authenticate using a DID and a signature
-- `POST /api/relay/did/register` - Register a new DID (admin only)
-- `POST /api/relay/did/config` - Update DID verifier configuration (admin only)
-
-### Oracle Bridge API
-
-These endpoints interact with the OracleBridge contract:
-
-- `GET /api/relay/oracle/status` - Check Oracle Bridge service status
-- `GET /api/relay/oracle/epoch` - Get the current epoch ID
-- `GET /api/relay/oracle/root/:epochId` - Get the Merkle root for a specific epoch
-- `POST /api/relay/oracle/verify-root` - Verify if a Merkle root matches the expected value
-- `POST /api/relay/oracle/publish-root` - Publish a new Merkle root (admin only)
-- `POST /api/relay/oracle/config` - Update Oracle Bridge configuration (admin only)
-
-### Example Usage
-
-**Checking if an Ethereum address is authorized**:
-```javascript
-// Client-side code
-async function checkAddressAuthorization(address) {
-  const response = await fetch(`http://localhost:8765/api/relay/membership/check-address/${address}`, {
-    method: 'GET',
-    headers: {
-      'Authorization': 'your_api_token'
-    }
-  });
-  
-  const data = await response.json();
-  return data.isAuthorized;
-}
-```
-
-**Verifying a DID**:
-```javascript
-// Client-side code
-async function verifyDID(did) {
-  const response = await fetch(`http://localhost:8765/api/relay/did/verify/${did}`, {
-    method: 'GET',
-    headers: {
-      'Authorization': 'your_api_token'
-    }
-  });
-  
-  const data = await response.json();
-  return {
-    isValid: data.isValid,
-    controller: data.controller
-  };
-}
-```
-
-**Getting the current epoch ID**:
-```javascript
-// Client-side code
-async function getCurrentEpochId() {
-  const response = await fetch('http://localhost:8765/api/relay/oracle/epoch', {
-    method: 'GET',
-    headers: {
-      'Authorization': 'your_api_token'
-    }
-  });
-  
-  const data = await response.json();
-  return data.epochId;
-}
-```
+This feature is particularly useful for developers testing the integration of Shogun with web applications.
 
 ## IPFS-GunDB Middleware
 
@@ -348,7 +285,7 @@ gun.get('myNode').on((data) => {
 
 3. Start the server:
    ```
-   node index.js
+   node src/index.js
    ```
 
 ## API Authentication
