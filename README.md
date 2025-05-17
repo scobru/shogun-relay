@@ -38,14 +38,14 @@ The relay integrates with ShogunCore for enhanced authentication:
 - MetaMask authentication for web3 integration
 - Traditional username/password authentication
 - Wallet management for crypto operations
-- Unified relay verifier for on-chain membership validation
+- On-chain membership validation
 
 ### Blockchain Integration
 
 The relay includes these key blockchain components:
-- **RelayVerifier**: Validates if users are authorized members of the Shogun protocol
-- **RelayRegistry**: Manages relay registration and permissions
+- **Registry**: Manages relay registration and permissions
 - **EntryPoint**: Contract handling relay execution and verification
+- **Relay**: Contract that handles the relay logic
 
 #### On-Chain Membership Verification
 
