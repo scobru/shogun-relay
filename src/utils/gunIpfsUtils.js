@@ -26,8 +26,11 @@ export function setupGunIpfsMiddleware(ipfsManager) {
       return;
     }
 
+    console.log("[IPFS-MIDDLEWARE] Gun-IPFS middleware configured successfully (simplified mode)");
+
     // Check if the response message contains data
     if (replyMsg.put && Object.keys(replyMsg.put).length > 0) {
+      console.log("[IPFS-MIDDLEWARE] Found data in replyMsg.put");
       const entriesToFetch = [];
 
       // Look for IPFS references in the data

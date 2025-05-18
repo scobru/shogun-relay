@@ -1,144 +1,129 @@
 import express from "express";
+import fs from "fs";
 
-export default function setupFileManagerRoutes(fileManager, authenticateRequestMiddleware) {
+/**
+ * Set up file manager routes
+ * @param {Object} fileManager - The file manager instance
+ * @param {Function} authenticateRequest - Authentication middleware
+ * @returns {Object} Express router
+ */
+const setupFileManagerRoutes = (fileManager, authenticateRequest) => {
   const router = express.Router();
 
-  // Get all files (route unificata)
-  router.get("/", authenticateRequestMiddleware, async (req, res) => {
+  // Get all files
+  router.get("/all", authenticateRequest, async (req, res) => {
     try {
       const files = await fileManager.getAllFiles();
+      
+      // Always return a success response, even if no files found
       res.json({
         success: true,
         files: files,
-        message: "Files retrieved successfully",
+        count: files.length,
       });
     } catch (error) {
+      console.error(`[fileManagerRoutes] Error getting all files: ${error.message}`);
       res.status(500).json({
         success: false,
         error: error.message,
-        message: "Error retrieving files",
+      });
+    }
+  });
+
+  // Search files - MOVED BEFORE /:id route to ensure it matches correctly
+  router.get("/search", authenticateRequest, async (req, res) => {
+    try {
+      const { name, mimetype, minSize, maxSize } = req.query;
+      
+      // Get all files first
+      const allFiles = await fileManager.getAllFiles();
+      
+      // Apply filters
+      const results = allFiles.filter(file => {
+        let match = true;
+        
+        if (name && !file.originalName.toLowerCase().includes(name.toLowerCase())) {
+          match = false;
+        }
+        
+        if (mimetype && !file.mimetype.toLowerCase().includes(mimetype.toLowerCase())) {
+          match = false;
+        }
+        
+        if (minSize && file.size < parseInt(minSize)) {
+          match = false;
+        }
+        
+        if (maxSize && file.size > parseInt(maxSize)) {
+          match = false;
+        }
+        
+        return match;
+      });
+      
+      res.json({
+        success: true,
+        results,
+        count: results.length,
+      });
+    } catch (error) {
+      console.error(`[fileManagerRoutes] Error searching files: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        error: error.message,
       });
     }
   });
 
   // Get file by ID
-  router.get("/:id", authenticateRequestMiddleware, async (req, res) => {
+  router.get("/:id", authenticateRequest, async (req, res) => {
     try {
       const fileId = req.params.id;
-      const fileData = await fileManager.getFileById(fileId);
-
-      if (fileData) {
-        res.json({
-          success: true,
-          file: fileData
-        });
-      } else {
-        res.status(404).json({ 
+      const file = await fileManager.getFileById(fileId);
+      
+      if (!file) {
+        return res.status(404).json({
           success: false,
-          error: "File not found" 
+          error: `File not found: ${fileId}`,
         });
       }
+      
+      res.json({
+        success: true,
+        file,
+      });
     } catch (error) {
+      console.error(`[fileManagerRoutes] Error getting file: ${error.message}`);
       res.status(500).json({
         success: false,
         error: error.message,
-        message: "Error retrieving file details"
       });
     }
   });
 
   // Delete file
-  router.delete("/:id", authenticateRequestMiddleware, async (req, res) => {
+  router.delete("/:id", authenticateRequest, async (req, res) => {
     try {
       const fileId = req.params.id;
+      console.log(`[fileManagerRoutes] Delete request for file ID: ${fileId}`);
+      
       const result = await fileManager.deleteFile(fileId);
-      res.json(result);
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: error.message,
-        message: "Error deleting file"
-      });
-    }
-  });
-  
-  // Upload file
-  router.post("/upload", authenticateRequestMiddleware, (req, res) => {
-    const uploadMiddleware = fileManager.getUploadMiddleware().single("file");
-    
-    uploadMiddleware(req, res, async (err) => {
-      if (err) {
-        return res.status(400).json({
-          success: false,
-          error: err.message,
-          message: "File upload failed"
-        });
-      }
-      
-      try {
-        // Handle situation where no file or content was provided
-        if (!req.file && (!req.body.content || !req.body.contentType)) {
-          return res.status(400).json({
-            success: false,
-            error: "No file or content provided",
-            message: "File upload failed"
-          });
-        }
-        
-        const fileData = await fileManager.handleFileUpload(req);
-        
-        res.json({
-          success: true,
-          file: fileData,
-          message: "File uploaded successfully"
-        });
-      } catch (error) {
-        res.status(500).json({
-          success: false,
-          error: error.message,
-          message: "Error processing file upload"
-        });
-      }
-    });
-  });
-  
-  // Upload file content (direct content, not multipart)
-  router.post("/upload/content", authenticateRequestMiddleware, async (req, res) => {
-    try {
-      const { content, contentType, fileName } = req.body;
-      
-      if (!content) {
-        return res.status(400).json({
-          success: false,
-          error: "Content is required",
-          message: "Content upload failed"
-        });
-      }
-      
-      // Create a request-like object with the content
-      const requestObj = {
-        body: {
-          content: content,
-          contentType: contentType || "text/plain",
-          customName: fileName
-        }
-      };
-      
-      const fileData = await fileManager.handleFileUpload(requestObj);
       
       res.json({
         success: true,
-        file: fileData,
-        message: "Content uploaded successfully"
+        message: `File ${fileId} deleted successfully`,
+        result,
       });
     } catch (error) {
+      console.error(`[fileManagerRoutes] Error deleting file: ${error.message}`);
       res.status(500).json({
         success: false,
         error: error.message,
-        message: "Error processing content upload"
       });
     }
   });
 
   return router;
-} 
+};
+
+export default setupFileManagerRoutes; 

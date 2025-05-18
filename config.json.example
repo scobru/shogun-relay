@@ -1,0 +1,28 @@
+{
+    "NODE_ENV": "production",
+    "PORT": 8765,
+    "SECRET_TOKEN": "",
+    "ALLOWED_ORIGINS": "",
+    "IPFS_ENABLED": false,
+    "IPFS_SERVICE": "IPFS-CLIENT",
+    "IPFS_NODE_URL": "http://127.0.0.1:5001",
+    "IPFS_GATEWAY": "http://127.0.0.1:8080/ipfs",
+    "PINATA_GATEWAY": "https://gateway.pinata.cloud", 
+    "PINATA_JWT": "your_pinata_jwt_here",
+    "ETHEREUM_PROVIDER_URL": "",
+    "ETHEREUM_PRIVATE_KEY": "",
+    "ONCHAIN_MEMBERSHIP_ENABLED": false,
+    "RELAY_REGISTRY_CONTRACT": "",
+    "INDIVIDUAL_RELAY": "",
+    "RELAY_ENTRY_POINT_CONTRACT": "",
+    "APP_KEY_PAIR": "",
+    "ACTIVITYPUB_USER": "admin",
+    "ACTIVITYPUB_PASS": "admin",
+    "ACTIVITYPUB_DOMAIN": "localhost",
+    "ACTIVITYPUB_PORT": 8765,
+    "PRIVKEY_PATH": "",
+    "CERT_PATH": "",
+    "ADMIN_USER": "admin",
+    "ADMIN_PASS": "admin"
+}
+    

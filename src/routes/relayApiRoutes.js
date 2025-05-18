@@ -1,68 +1,10 @@
 import express from "express";
-import { generateUserToken, configure, isKeyPreAuthorized, authorizeKey, formatKeyForBlockchain } from "../managers/AuthenticationManager.js";
+import { formatKeyForBlockchain } from "../managers/AuthenticationManager.js";
 import { ethers } from "ethers";
 
-/**
- * Convert Gun SEA public key to hex format needed for the contract
- * @param pubKey Gun SEA format public key
- * @returns Hex string (without 0x prefix)
- */
-function gunPubKeyToHex(pubKey) {
-  try {
-    // Remove the ~ prefix if present
-    if (pubKey.startsWith("~")) {
-      pubKey = pubKey.substring(1);
-    }
-
-    // Remove anything after a . if present (often used in GunDB for separating pub and epub)
-    const dotIndex = pubKey.indexOf(".");
-    if (dotIndex > 0) {
-      pubKey = pubKey.substring(0, dotIndex);
-    }
-
-    // Convert from GunDB's URL-safe base64 to standard base64
-    const base64Key = pubKey.replace(/-/g, "+").replace(/_/g, "/");
-
-    // Add padding if needed
-    const padded =
-      base64Key.length % 4 === 0
-        ? base64Key
-        : base64Key.padEnd(
-            base64Key.length + (4 - (base64Key.length % 4)),
-            "="
-          );
-
-    // Convert to binary and then to hex
-    const binaryData = Buffer.from(padded, "base64");
-    const hexData = binaryData.toString("hex");
-
-    return hexData;
-  } catch (error) {
-    return "";
-  }
-}
 
 export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, getRelayVerifierInstance, authenticateRequestMiddleware, shogunCoreInstance, reinitializeRelayCallback, SECRET_TOKEN_PARAM, AuthenticationManagerInstance) {
   const router = express.Router();
-
-  // Helper to access authorization methods
-  const getMap = () => AuthenticationManagerInstance?.getAuthorizedKeysMap ? AuthenticationManagerInstance.getAuthorizedKeysMap() : new Map();
-  const authKey = (key, expiry) => AuthenticationManagerInstance?.authorizeKey ? AuthenticationManagerInstance.authorizeKey(key, expiry) : { expiresAt: Date.now() + (5*60*1000) };
-  const AUTH_KEY_EXPIRY_VALUE = AuthenticationManagerInstance?.AUTH_KEY_EXPIRY || (5*60*1000);
-
-  /**
-   * Safely execute operations that might fail
-   * @param {Function} operation - The operation to execute
-   * @param {string} errorMessage - Error message for failures
-   * @returns {Promise<any>} Operation result
-   */
-  const _safeOperation = async (operation, errorMessage) => {
-    try {
-      return await operation();
-    } catch (error) {
-      throw new Error(`${errorMessage}: ${error.message}`);
-    }
-  };
 
   /**
    * Clean and standardize a public key
@@ -156,32 +98,6 @@ export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, getRelayVerifier
         reason: `verification_error: ${error.message}` 
       };
     }
-  };
-
-  /**
-   * Authorize a key in all its formats
-   * @param {string} pubKey - Public key to authorize
-   * @param {number} expiryMs - Expiry time in milliseconds
-   * @returns {Object} Authorization info
-   */
-  const _authorizeKeyAllFormats = (pubKey, expiryMs) => {
-    const keyData = _cleanPublicKey(pubKey);
-    const authInfo = authKey(pubKey, expiryMs);
-    
-    // Authorize all common variants
-    if (pubKey !== keyData.cleaned) {
-      authKey(keyData.cleaned, expiryMs);
-    }
-    
-    if (!pubKey.startsWith("@")) {
-      authKey("@" + pubKey, expiryMs);
-    }
-    
-    if (pubKey.startsWith("@")) {
-      authKey(pubKey.substring(1), expiryMs);
-    }
-    
-    return authInfo;
   };
 
   /**
@@ -375,56 +291,17 @@ export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, getRelayVerifier
     }
   });
 
-  // API - Subscribe to a relay
-  router.post("/subscribe", authenticateRequestMiddleware, async (req, res) => {
-    try {
-      const { relayAddress, months, publicKey } = req.body;
-      const relayVerifier = getRelayVerifierInstance();
-      
-      if (!relayAddress || !months) {
-        return res.status(400).json(_standardResponse(false, "Missing required parameters", {}, "Relay address and number of months are required"));
-      }
-      
-      if (!RELAY_CONFIG_PARAM.relay.onchainMembership || !relayVerifier) {
-        return res.status(503).json(_standardResponse(false, "Relay services not available", {}, "Relay services not available"));
-      }
-      
-      if (!req.auth.isSystemToken && !req.auth.permissions?.includes("admin")) {
-        return res.status(403).json(_standardResponse(false, "Insufficient permissions", {}, "Only administrators can subscribe users to relays"));
-      }
-      
-      const price = await relayVerifier.getRelayPrice(relayAddress);
-      if (!price) {
-        return res.status(400).json(_standardResponse(false, "Failed to get relay subscription price", {}, "Failed to get relay subscription price"));
-      }
-      
-      const tx = await relayVerifier.subscribeToRelay(relayAddress, months, publicKey || undefined);
-      if (!tx) {
-        return res.status(500).json(_standardResponse(false, "Failed to subscribe to relay", {}, "Failed to subscribe to relay"));
-      }
-      
-      res.json(_standardResponse(
-        true,
-        "Subscription successful",
-        {
-          relayAddress,
-          months,
-          publicKey: publicKey || null,
-          transactionHash: tx.hash
-        }
-      ));
-    } catch (error) {
-      res.status(500).json(_standardResponse(false, "Error subscribing to relay", {}, error.message));
-    }
-  });
-
   // API - Update relay config
-  router.post("/config", authenticateRequestMiddleware, async (req, res) => {
+  router.post("/update-relay-config", authenticateRequestMiddleware, async (req, res) => {
     try {
       const { registryAddress, providerUrl, enabled } = req.body;
       
       if (!req.auth.isSystemToken && !req.auth.permissions?.includes("admin")) {
-        return res.status(403).json(_standardResponse(false, "Insufficient permissions", {}, "Only administrators can modify relay configuration"));
+        return res.status(403).json({
+          success: false,
+          error: "Insufficient permissions",
+          message: "Only administrators can modify relay configuration"
+        });
       }
 
       let needsReinitialize = false;
@@ -456,665 +333,86 @@ export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, getRelayVerifier
         providerUrl: updatedRelayConfigFragment.providerUrl || RELAY_CONFIG_PARAM.relay.providerUrl,
       };
 
-      res.json(_standardResponse(
-        true, 
-        needsReinitialize ? "Relay configuration updated" : "No changes required",
-        { config: currentConfigResponse }
-      ));
-    } catch (error) {
-      res.status(500).json(_standardResponse(false, "Error updating relay configuration", {}, error.message));
-    }
-  });
-
-  // API - Pre-authorize a public key
-  router.get("/pre-authorize/:pubKey", async (req, res) => {
-    try {
-      const { pubKey } = req.params;
-      const forcedAuth = req.query.force === "true";
-
-      if (!pubKey) {
-        return res.status(400).json(_standardResponse(false, "Public key is required", {}, "Public key is required"));
-      }
-
-      // Check if key is already pre-authorized
-      if (isKeyPreAuthorized(pubKey)) {
-        const authInfo = getMap().get(pubKey);
-        return res.json(_standardResponse(
-          true,
-          "Public key already authorized",
-          {
-            pubKey,
-            expiresAt: authInfo.expiresAt,
-            expiresIn: Math.round((authInfo.expiresAt - Date.now()) / 1000) + " seconds"
-          }
-        ));
-      }
-
-      // Handle forced authorization with admin token
-      if (forcedAuth) {
-        const token = req.headers.authorization;
-        if (token && (token === SECRET_TOKEN_PARAM || token === `Bearer ${SECRET_TOKEN_PARAM}`)) {
-          const authInfo = _authorizeKeyAllFormats(pubKey, AUTH_KEY_EXPIRY_VALUE);
-          
-          return res.json(_standardResponse(
-            true, 
-            "Public key force-authorized successfully", 
-            {
-              pubKey,
-              forced: true,
-              expiresAt: authInfo.expiresAt,
-              expiresIn: Math.round((authInfo.expiresAt - Date.now()) / 1000) + " seconds"
-            }
-          ));
-        } else {
-          return res.status(401).json(_standardResponse(false, "Authentication required", {}, "API token required for forced authorization"));
-        }
-      }
-
-      // Clean and standardize key format
-      const keyData = _cleanPublicKey(pubKey);
-
-      // Handle case when blockchain verification is disabled
-      if (!RELAY_CONFIG_PARAM.relay.onchainMembership || !getRelayVerifierInstance()) {
-        const authInfo = _authorizeKeyAllFormats(pubKey, AUTH_KEY_EXPIRY_VALUE);
-        
-        return res.json(_standardResponse(
-          true, 
-          "Public key pre-authorized successfully (blockchain verification disabled)", 
-          {
-            pubKey,
-            expiresAt: authInfo.expiresAt, 
-            expiresIn: Math.round((authInfo.expiresAt - Date.now()) / 1000) + " seconds"
-          }
-        ));
-      }
-
-      // Verify blockchain authorization
-      const { isAuthorized, authorizingRelay, reason } = await _verifyBlockchainAuth(pubKey);
-
-      if (!isAuthorized) {
-        return res.status(403).json(_standardResponse(
-          false, 
-          "Public key not authorized by any active relay", 
-          { pubKey, reason }
-        ));
-      }
-
-      // Pre-authorize key in all formats
-      const authInfo = _authorizeKeyAllFormats(pubKey, AUTH_KEY_EXPIRY_VALUE);
-
-      res.json(_standardResponse(
-        true, 
-        "Public key blockchain-verified and pre-authorized",
-        {
-          pubKey,
-          authorizingRelay,
-          expiresAt: authInfo.expiresAt,
-          expiresIn: Math.round((authInfo.expiresAt - Date.now()) / 1000) + " seconds"
-        }
-      ));
-    } catch (error) {
-      res.status(500).json(_standardResponse(false, "Error pre-authorizing key", {}, error.message));
-    }
-  });
-
-  // API - Pre-authorize with token
-  router.get("/pre-authorize-with-token/:pubKey", async (req, res) => {
-    try {
-      const { pubKey } = req.params;
-      if (!pubKey) {
-        return res.status(400).json(_standardResponse(false, "Public key is required", {}, "Public key is required"));
-      }
-      
-      console.log(`Pre-authorizing key with token: ${pubKey}`);
-      
-      // Ensure JWT_SECRET is configured
-      if (!SECRET_TOKEN_PARAM) {
-        return res.status(500).json(_standardResponse(
-          false, 
-          "Server configuration error", 
-          {},
-          "JWT_SECRET not available"
-        ));
-      }
-      
-      // Clean and standardize the public key
-      const keyData = _cleanPublicKey(pubKey);
-      console.log(`Cleaned key data: ${JSON.stringify(keyData)}`);
-      
-      // Set up timeout for the entire operation
-      const timeout = setTimeout(() => {
-        console.log("Pre-authorization operation timed out, sending partial response");
-        return res.status(202).json(_standardResponse(
-          true,
-          "Pre-authorization initiated but timed out, JWT might be generated asynchronously",
-          { pubKey, partial: true }
-        ));
-      }, 15000); // 15 seconds timeout
-      
-      // Verify blockchain authentication
-      if (!RELAY_CONFIG_PARAM.relay.onchainMembership || !getRelayVerifierInstance()) {
-        clearTimeout(timeout);
-        const authInfo = _authorizeKeyAllFormats(pubKey, AUTH_KEY_EXPIRY_VALUE);
-        
-        // Configure with SECRET_TOKEN
-        configure({ JWT_SECRET: SECRET_TOKEN_PARAM });
-        
-        // Generate JWT even without blockchain verification
-        const token = await generateUserToken(pubKey, "Pre-Authorized Access Token", null, false);
-        
-        return res.json(_standardResponse(
-          true, 
-          "Public key pre-authorized successfully (blockchain verification disabled)", 
-          {
-            pubKey,
-            expiresAt: authInfo.expiresAt,
-            token
-          }
-        ));
-      }
-      
-      // Verify blockchain authorization with timeout
-      let verificationResult;
-      try {
-        const verificationPromise = _verifyBlockchainAuth(pubKey);
-        const verificationTimeout = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("Blockchain verification timed out")), 10000);
-        });
-        
-        verificationResult = await Promise.race([verificationPromise, verificationTimeout]);
-      } catch (error) {
-        console.error(`Blockchain verification error: ${error.message}`);
-        verificationResult = { isAuthorized: false, reason: `verification_error: ${error.message}` };
-      }
-      
-      const { isAuthorized, authorizingRelay, reason } = verificationResult;
-      
-      if (!isAuthorized) {
-        clearTimeout(timeout);
-        return res.status(403).json(_standardResponse(
-          false, 
-          "Public key not authorized by any active relay", 
-          { pubKey, reason }
-        ));
-      }
-      
-      // Pre-authorize in all variants
-      const authInfo = _authorizeKeyAllFormats(pubKey, AUTH_KEY_EXPIRY_VALUE);
-      
-      // Configure with SECRET_TOKEN
-      configure({ JWT_SECRET: SECRET_TOKEN_PARAM });
-      
-      // Generate a JWT token with a timeout
-      let token;
-      try {
-        console.log("Attempting to obtain a JWT token with blockchain verification...");
-        const tokenPromise = generateUserToken(pubKey, "Blockchain Verified Token", null, true);
-        const tokenTimeout = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("JWT token generation timed out")), 8000);
-        });
-        
-        token = await Promise.race([tokenPromise, tokenTimeout]);
-        console.log("JWT token obtained successfully");
-      } catch (error) {
-        console.error(`Error generating JWT token: ${error.message}`);
-        // Fall back to non-verified token if blockchain verification fails
-        token = await generateUserToken(pubKey, "Fallback Token", null, false);
-        console.log("Generated fallback JWT token without blockchain verification");
-      }
-      
-      // Clear the main timeout since we have a result now
-      clearTimeout(timeout);
-      
-      // Explicitly test writing data after authorization
-      try {
-        // Get the gun instance from the shogunCoreInstance
-        const shogunCore = shogunCoreInstance();
-        if (shogunCore && shogunCore.gun) {
-          console.log("Testing direct Gun write after authorization...");
-          
-          // Write test data
-          const testData = {
-            message: "Test data after pre-authorization",
-            timestamp: Date.now(),
-            pubKey: pubKey
-          };
-          
-          // Add the token to Gun's internal state for authenticated operations
-          if (!shogunCore.gun._.opt.headers) {
-            shogunCore.gun._.opt.headers = {};
-          }
-          shogunCore.gun._.opt.headers.Authorization = `Bearer ${token}`;
-          shogunCore.gun._.opt.headers.token = token;
-          
-          // Write to a public node with a timeout
-          const writePromise = new Promise((resolve) => {
-            shogunCore.gun.get('test-relay-auth').put(testData, (ack) => {
-              console.log("Direct write result:", ack);
-              resolve();
-            });
-          });
-          
-          const writeTimeout = new Promise((resolve) => {
-            setTimeout(() => {
-              console.log("Write operation timed out, continuing...");
-              resolve();
-            }, 3000);
-          });
-          
-          await Promise.race([writePromise, writeTimeout]);
-          
-          console.log("Test write complete, check radata folder for changes");
-          
-          // Skip the User authentication tests that were causing timeouts
-        }
-      } catch (writeError) {
-        console.error("Error during test write:", writeError);
-      }
-      
-      res.json(_standardResponse(
-        true, 
-        "Public key blockchain-verified, pre-authorized, and token generated", 
-        {
-          pubKey, 
-          authorizingRelay,
-          expiresAt: authInfo.expiresAt, 
-          token
-        }
-      ));
-    } catch (error) {
-      console.error("Complete error in pre-authorization:", error);
-      res.status(500).json(_standardResponse(false, "Error pre-authorizing key with token", {}, error.message));
-    }
-  });
-
-  // API - Test direct authorization by IndividualRelay - NO AUTH REQUIRED FOR TESTING
-  router.get("/test-key-auth/:pubKey", async (req, res) => {
-    try {
-      const { pubKey } = req.params;
-      if (!pubKey) {
-        return res.status(400).json(_standardResponse(false, "Public key is required", {}, "Public key is required"));
-      }
-      
-      // Import ethers
-      const { ethers } = await import("ethers");
-      
-      // Clean the key
-      const keyData = _cleanPublicKey(pubKey);
-      console.log(`Test key auth - Cleaned key: ${JSON.stringify(keyData)}`);
-      
-      // Trova tutti i relay registrati per verificarli
-      const relayVerifier = getRelayVerifierInstance();
-      if (relayVerifier) {
-        try {
-          const allRelays = await relayVerifier.getAllRelays();
-          console.log(`Trovati ${allRelays.length} relays registrati`);
-          
-          // Controlla che i Relay siano contratti validi
-          const provider = new ethers.JsonRpcProvider(RELAY_CONFIG_PARAM.relay.providerUrl);
-          for (const relayAddress of allRelays) {
-            const code = await provider.getCode(relayAddress);
-            const isContract = code !== "0x" && code.length > 2;
-            console.log(`Relay ${relayAddress}: ${isContract ? "è un contratto valido" : "NON è un contratto valido"}`);
-            
-            if (isContract) {
-              try {
-                // Controlla se ha i metodi di un relay
-                const relayAbi = [
-                  "function isAuthorizedByPubKey(bytes calldata _pubKey) external view returns (bool)"
-                ];
-                const relayContract = new ethers.Contract(relayAddress, relayAbi, provider);
-                
-                const contractSize = code.length;
-                console.log(`Dimensione codice contratto: ${contractSize} bytes`);
-                
-                // Di solito un wallet EOA (non un contratto) avrebbe codice vuoto
-                if (contractSize < 100) {
-                  console.log(`ATTENZIONE: Il contratto ha un codice molto piccolo, potrebbe non essere un vero contratto Relay!`);
-                }
-              } catch (err) {
-                console.error(`Errore durante l'ispezione del contratto: ${err.message}`);
-              }
-            }
-          }
-        } catch (error) {
-          console.error(`Errore nel recuperare i relay registrati: ${error.message}`);
-        }
-      }
-      
-      // Test direct IndividualRelay connection first
-      if (RELAY_CONFIG_PARAM.relay.individualRelayAddress) {
-        const individualRelayAddress = RELAY_CONFIG_PARAM.relay.individualRelayAddress;
-        try {
-          const provider = new ethers.JsonRpcProvider(RELAY_CONFIG_PARAM.relay.providerUrl);
-          
-          // Log contract details
-          console.log(`Testing with IndividualRelay at: ${individualRelayAddress}`);
-          console.log(`Using provider: ${RELAY_CONFIG_PARAM.relay.providerUrl}`);
-          
-          // Get contract code to check if the contract exists
-          const contractCode = await provider.getCode(individualRelayAddress);
-          console.log(`Contract code length: ${contractCode.length}`);
-          if (contractCode === '0x') {
-            console.log(`ERRORE: Nessun contratto trovato all'indirizzo ${individualRelayAddress}!`);
-            return res.status(500).json({
-              success: false,
-              message: `Non esiste alcun contratto all'indirizzo ${individualRelayAddress}`,
-              details: { address: individualRelayAddress }
-            });
-          }
-          
-          // Try to connect to the contract
-          const individualRelayAbi = [
-            "function isSubscribed(bytes memory pubKey) view returns (bool)",
-            "function isPublicKeyAuthorized(bytes calldata pubKey) view returns (bool)",
-            "function isAuthorizedByPubKey(bytes calldata _pubKey) external view returns (bool)",
-            "function getCurrentPrice() view returns (uint256)",
-            "function pricePerMonth() view returns (uint256)",
-            // Aggiungiamo funzioni per identificare meglio il contratto
-            "function getOwner() external view returns (address)",
-            "function getRelayOperationalConfig() external view returns (string memory _url, uint256 _price, uint256 _daysInMonth, uint256 _stake)"
-          ];
-          
-          const relayContract = new ethers.Contract(individualRelayAddress, individualRelayAbi, provider);
-          
-          // Proviamo a identificare il tipo di contratto
-          let isIndividualRelay = false;
-          try {
-            // Verifica se il contratto ha il metodo getOwner
-            const owner = await relayContract.getOwner();
-            console.log(`Il contratto ha un proprietario: ${owner}`);
-            isIndividualRelay = true;
-          } catch (e) {
-            console.log(`Il contratto non sembra essere un IndividualRelay: ${e.message}`);
-          }
-          
-          // Se non è un IndividualRelay, verificare meglio cosa sia
-          if (!isIndividualRelay) {
-            return res.status(400).json({
-              success: false,
-              message: `Il contratto all'indirizzo ${individualRelayAddress} non sembra essere un IndividualRelay valido`,
-              details: { address: individualRelayAddress }
-            });
-          }
-          
-          // Try to get price to validate contract connection
-          let price = null;
-          try {
-            price = await relayContract.getCurrentPrice();
-            console.log(`Contract price: ${ethers.formatEther(price)} ETH`);
-          } catch (pe) {
-            console.log(`Error getting price: ${pe.message}`);
-            try {
-              price = await relayContract.pricePerMonth();
-              console.log(`Price per month: ${ethers.formatEther(price)} ETH`);
-            } catch (pm) {
-              console.log(`Error getting price per month: ${pm.message}`);
-            }
-          }
-          
-          // Format the key for contract
-          const hexKey = keyData.hex.startsWith("0x") ? keyData.hex : `0x${keyData.hex}`;
-          const keyBytes = ethers.getBytes(hexKey);
-          console.log(`Checking key: ${hexKey}`);
-          console.log(`Key bytes length: ${keyBytes.length}`);
-          
-          // Try all authorization methods
-          let isAuthorized = false;
-          let methodUsed = null;
-          
-          try {
-            isAuthorized = await relayContract.isAuthorizedByPubKey(keyBytes);
-            methodUsed = "isAuthorizedByPubKey";
-            console.log(`isAuthorizedByPubKey result: ${isAuthorized}`);
-          } catch (e1) {
-            console.log(`Error with isAuthorizedByPubKey: ${e1.message}`);
-            
-            try {
-              isAuthorized = await relayContract.isPublicKeyAuthorized(keyBytes);
-              methodUsed = "isPublicKeyAuthorized";
-              console.log(`isPublicKeyAuthorized result: ${isAuthorized}`);
-            } catch (e2) {
-              console.log(`Error with isPublicKeyAuthorized: ${e2.message}`);
-              
-              try {
-                isAuthorized = await relayContract.isSubscribed(keyBytes);
-                methodUsed = "isSubscribed";
-                console.log(`isSubscribed result: ${isAuthorized}`);
-              } catch (e3) {
-                console.log(`Error with isSubscribed: ${e3.message}`);
-              }
-            }
-          }
-          
-          // If successful, return the result
-          if (isAuthorized) {
-            return res.json({
-              success: true,
-              message: `Key is authorized by IndividualRelay using method ${methodUsed}`,
-              details: {
-                key: pubKey,
-                cleanedKey: keyData,
-                isAuthorized,
-                method: methodUsed,
-                contractAddress: individualRelayAddress
-              }
-            });
-          }
-        } catch (error) {
-          console.error(`General error testing IndividualRelay: ${error.message}`);
-        }
-      }
-      
-      // If direct test failed, use the normal verification function
-      const { isAuthorized, authorizingRelay, reason } = await _verifyBlockchainAuth(pubKey);
-      
-      // Return detailed result
-      res.json({
-        success: isAuthorized,
-        message: isAuthorized 
-          ? `Key is authorized by relay at ${authorizingRelay}` 
-          : `Key is not authorized: ${reason}`,
-        details: {
-          key: pubKey,
-          cleanedKey: keyData,
-          isAuthorized,
-          authorizingRelay,
-          reason
-        }
+      return res.json({
+        success: true, 
+        message: needsReinitialize ? "Relay configuration updated" : "No changes required",
+        config: currentConfigResponse
       });
     } catch (error) {
-      res.status(500).json(_standardResponse(false, "Error testing key authorization", {}, error.message));
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+        message: "Error updating relay configuration"
+      });
     }
   });
 
-  // ============ DID VERIFIER API ============ 
-  // API - Check DID verifier status
-  router.get("/did/status", authenticateRequestMiddleware, async (req, res) => {
+  // Legacy support for backward compatibility
+  router.post("/config", authenticateRequestMiddleware, async (req, res) => {
+    // Redirect to the new endpoint
     try {
-      const didVerifier = AuthenticationManagerInstance.getDidVerifier ? AuthenticationManagerInstance.getDidVerifier() : null;
-      
-      if (!RELAY_CONFIG_PARAM.didVerifier.enabled || !didVerifier) {
-        return res.status(503).json(_standardResponse(
-          false, 
-          "DID verifier services not available",
-          {
-            config: { 
-              enabled: RELAY_CONFIG_PARAM.didVerifier.enabled, 
-              contractAddress: RELAY_CONFIG_PARAM.didVerifier.contractAddress || "Not configured" 
-            }
-          },
-          "DID verifier services not available"
-        ));
-      }
-      
-      res.json(_standardResponse(
-        true, 
-        "DID verifier status retrieved successfully",
-        { 
-          config: { 
-            enabled: RELAY_CONFIG_PARAM.didVerifier.enabled, 
-            contractAddress: RELAY_CONFIG_PARAM.didVerifier.contractAddress 
-          } 
-        }
-      ));
-    } catch (error) {
-      res.status(500).json(_standardResponse(false, "Error getting DID verifier status", {}, error.message));
-    }
-  });
-
-  // API - Verify DID and get controller
-  router.get("/did/verify/:did", authenticateRequestMiddleware, async (req, res) => {
-    try {
-      const { did } = req.params;
-      const didVerifier = AuthenticationManagerInstance.getDidVerifier ? AuthenticationManagerInstance.getDidVerifier() : null;
-      
-      if (!RELAY_CONFIG_PARAM.didVerifier.enabled || !didVerifier) {
-        return res.status(503).json(_standardResponse(false, "DID verifier services not available", {}, "DID verifier services not available"));
-      }
-      
-      const controller = await didVerifier.verifyDID(did);
-      res.json(_standardResponse(
-        true, 
-        controller ? "DID verified successfully" : "DID verification failed",
-        { did, isValid: !!controller, controller }
-      ));
-    } catch (error) {
-      res.status(500).json(_standardResponse(false, "Error verifying DID", {}, error.message));
-    }
-  });
-
-  // API - Check if DID is controlled by a specific controller
-  router.post("/did/check-controller", authenticateRequestMiddleware, async (req, res) => {
-    try {
-      const { did, controller } = req.body;
-      const didVerifier = AuthenticationManagerInstance.getDidVerifier ? AuthenticationManagerInstance.getDidVerifier() : null;
-      
-      if (!did || !controller) {
-        return res.status(400).json(_standardResponse(false, "Missing required parameters", {}, "DID and controller are required"));
-      }
-      
-      if (!RELAY_CONFIG_PARAM.didVerifier.enabled || !didVerifier) {
-        return res.status(503).json(_standardResponse(false, "DID verifier services not available", {}, "DID verifier services not available"));
-      }
-      
-      const isControlledBy = await didVerifier.isDIDControlledBy(did, controller);
-      res.json(_standardResponse(
-        true, 
-        isControlledBy ? "DID is controlled by the specified controller" : "DID is not controlled by the specified controller",
-        { did, controller, isControlledBy }
-      ));
-    } catch (error) {
-      res.status(500).json(_standardResponse(false, "Error checking DID controller", {}, error.message));
-    }
-  });
-
-  // API - Authenticate with DID and signature
-  router.post("/did/authenticate", authenticateRequestMiddleware, async (req, res) => {
-    try {
-      const { did, message, signature } = req.body;
-      const didVerifier = AuthenticationManagerInstance.getDidVerifier ? AuthenticationManagerInstance.getDidVerifier() : null;
-      
-      if (!did || !message || !signature) {
-        return res.status(400).json(_standardResponse(false, "Missing required parameters", {}, "DID, message, and signature are required"));
-      }
-      
-      if (!RELAY_CONFIG_PARAM.didVerifier.enabled || !didVerifier) {
-        return res.status(503).json(_standardResponse(false, "DID verifier services not available", {}, "DID verifier services not available"));
-      }
-      
-      const isAuthenticated = await didVerifier.authenticateWithDID(did, message, signature);
-      res.json(_standardResponse(
-        true, 
-        isAuthenticated ? "DID authentication successful" : "DID authentication failed",
-        { did, isAuthenticated }
-      ));
-    } catch (error) {
-      res.status(500).json(_standardResponse(false, "Error authenticating with DID", {}, error.message));
-    }
-  });
-
-  // API - Register a new DID
-  router.post("/did/register", authenticateRequestMiddleware, async (req, res) => {
-    try {
-      const { did, controller } = req.body;
-      const didVerifier = AuthenticationManagerInstance.getDidVerifier ? AuthenticationManagerInstance.getDidVerifier() : null;
-      
-      if (!did || !controller) {
-        return res.status(400).json(_standardResponse(false, "Missing required parameters", {}, "DID and controller are required"));
-      }
-      
-      if (!RELAY_CONFIG_PARAM.didVerifier.enabled || !didVerifier) {
-        return res.status(503).json(_standardResponse(false, "DID verifier services not available", {}, "DID verifier services not available"));
-      }
+      const { registryAddress, providerUrl, enabled } = req.body;
       
       if (!req.auth.isSystemToken && !req.auth.permissions?.includes("admin")) {
-        return res.status(403).json(_standardResponse(false, "Insufficient permissions", {}, "Only administrators can register DIDs"));
-      }
-      
-      const registrationSuccess = await didVerifier.registerDID(did, controller);
-      res.json(_standardResponse(
-        registrationSuccess, 
-        registrationSuccess ? "DID registered successfully" : "Failed to register DID",
-        { did, controller }
-      ));
-    } catch (error) {
-      res.status(500).json(_standardResponse(false, "Error registering DID", {}, error.message));
-    }
-  });
-
-  // API - Update DID verifier config
-  router.post("/did/config", authenticateRequestMiddleware, async (req, res) => {
-    try {
-      const { contractAddress, providerUrl, enabled } = req.body;
-      
-      if (!req.auth.isSystemToken && !req.auth.permissions?.includes("admin")) {
-        return res.status(403).json(_standardResponse(false, "Insufficient permissions", {}, "Only administrators can modify DID verifier configuration"));
-      }
-      
-      const updatedDidConfigFragment = {};
-      let didNeedsReinitialize = false;
-
-      if (enabled !== undefined && RELAY_CONFIG_PARAM.didVerifier.enabled !== enabled) {
-        updatedDidConfigFragment.enabled = enabled;
-        didNeedsReinitialize = true;
-      }
-      
-      if (contractAddress && RELAY_CONFIG_PARAM.didVerifier.contractAddress !== contractAddress) {
-        updatedDidConfigFragment.contractAddress = contractAddress;
-        didNeedsReinitialize = true;
-      }
-      
-      if (providerUrl && RELAY_CONFIG_PARAM.didVerifier.providerUrl !== providerUrl) {
-        updatedDidConfigFragment.providerUrl = providerUrl;
-        didNeedsReinitialize = true;
+        return res.status(403).json({
+          success: false,
+          error: "Insufficient permissions",
+          message: "Only administrators can modify relay configuration"
+        });
       }
 
-      if (didNeedsReinitialize) {
-        await reinitializeRelayCallback({ didVerifier: updatedDidConfigFragment });
+      let needsReinitialize = false;
+      const updatedRelayConfigFragment = {};
+
+      if (enabled !== undefined && RELAY_CONFIG_PARAM.relay.onchainMembership !== enabled) {
+        updatedRelayConfigFragment.onchainMembership = enabled;
+        needsReinitialize = true;
+      }
+      
+      if (registryAddress && RELAY_CONFIG_PARAM.relay.registryAddress !== registryAddress) {
+        updatedRelayConfigFragment.registryAddress = registryAddress;
+        needsReinitialize = true;
+      }
+      
+      if (providerUrl && RELAY_CONFIG_PARAM.relay.providerUrl !== providerUrl) {
+        updatedRelayConfigFragment.providerUrl = providerUrl;
+        needsReinitialize = true;
       }
 
-      const currentDidConfigResponse = {
-        enabled: updatedDidConfigFragment.enabled !== undefined ? updatedDidConfigFragment.enabled : RELAY_CONFIG_PARAM.didVerifier.enabled,
-        contractAddress: updatedDidConfigFragment.contractAddress || RELAY_CONFIG_PARAM.didVerifier.contractAddress,
-        providerUrl: updatedDidConfigFragment.providerUrl || RELAY_CONFIG_PARAM.didVerifier.providerUrl,
+      if (needsReinitialize) {
+        await reinitializeRelayCallback(updatedRelayConfigFragment);
+      }
+      
+      // Construct the response based on the parameters
+      const currentConfigResponse = {
+        enabled: updatedRelayConfigFragment.onchainMembership !== undefined ? updatedRelayConfigFragment.onchainMembership : RELAY_CONFIG_PARAM.relay.onchainMembership,
+        registryAddress: updatedRelayConfigFragment.registryAddress || RELAY_CONFIG_PARAM.relay.registryAddress,
+        providerUrl: updatedRelayConfigFragment.providerUrl || RELAY_CONFIG_PARAM.relay.providerUrl,
       };
 
-      res.json(_standardResponse(
-        true, 
-        didNeedsReinitialize ? "DID verifier configuration updated" : "No changes required",
-        { config: currentDidConfigResponse }
-      ));
+      return res.json({
+        success: true, 
+        message: needsReinitialize ? "Relay configuration updated (legacy endpoint)" : "No changes required",
+        config: currentConfigResponse
+      });
     } catch (error) {
-      res.status(500).json(_standardResponse(false, "Error updating DID verifier configuration", {}, error.message));
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+        message: "Error updating relay configuration"
+      });
     }
   });
 
   // API - RELAY AUTHENTICATION CONFIG
-  router.post("/auth/config", authenticateRequestMiddleware, async (req, res) => {
+  router.post("/auth/update-config", authenticateRequestMiddleware, async (req, res) => {
     try {
       if (!req.auth.isSystemToken && !req.auth.permissions?.includes("admin")) {
-        return res.status(403).json(_standardResponse(false, "Insufficient permissions", {}, "Only administrators can modify authentication configuration"));
+        return res.status(403).json({
+          success: false,
+          error: "Insufficient permissions",
+          message: "Only administrators can modify authentication configuration"
+        });
       }
 
       const { onchainMembership } = req.body;
@@ -1138,24 +436,77 @@ export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, getRelayVerifier
       const authHierarchy = ["1. ADMIN_SECRET_TOKEN (highest priority)"];
       if (currentOnchainMembership) {
         authHierarchy.push("2. BLOCKCHAIN_MEMBERSHIP");
-        authHierarchy.push("3. JWT");
-        authHierarchy.push("4. PRE_AUTHORIZED_KEYS (lowest priority)");
-      } else {
-        authHierarchy.push("2. JWT");
         authHierarchy.push("3. PRE_AUTHORIZED_KEYS (lowest priority)");
+      } else {
+        authHierarchy.push("2. PRE_AUTHORIZED_KEYS (lowest priority)");
       }
 
-      res.json(_standardResponse(
-        true, 
-        needsReinitialize ? "Authentication configuration updated" : "No changes to authentication configuration",
-        {
-          previousConfig,
-          currentConfig: { onchainMembership: currentOnchainMembership },
-          authenticationHierarchy: authHierarchy
-        }
-      ));
+      return res.json({
+        success: true, 
+        message: needsReinitialize ? "Authentication configuration updated" : "No changes to authentication configuration",
+        previousConfig,
+        currentConfig: { onchainMembership: currentOnchainMembership },
+        authenticationHierarchy: authHierarchy
+      });
     } catch (error) {
-      res.status(500).json(_standardResponse(false, "Error updating authentication configuration", {}, error.message));
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+        message: "Error updating authentication configuration"
+      });
+    }
+  });
+
+  // Legacy support for backward compatibility
+  router.post("/auth/config", authenticateRequestMiddleware, async (req, res) => {
+    try {
+      if (!req.auth.isSystemToken && !req.auth.permissions?.includes("admin")) {
+        return res.status(403).json({
+          success: false,
+          error: "Insufficient permissions",
+          message: "Only administrators can modify authentication configuration"
+        });
+      }
+
+      const { onchainMembership } = req.body;
+      const previousConfig = { onchainMembership: RELAY_CONFIG_PARAM.relay.onchainMembership };
+      let needsReinitialize = false;
+      const updatedRelayConfigFragment = {};
+
+      if (onchainMembership !== undefined && RELAY_CONFIG_PARAM.relay.onchainMembership !== onchainMembership) {
+        updatedRelayConfigFragment.onchainMembership = onchainMembership;
+        needsReinitialize = true; 
+      }
+
+      if (needsReinitialize) {
+        await reinitializeRelayCallback(updatedRelayConfigFragment);
+      }
+      
+      const currentOnchainMembership = updatedRelayConfigFragment.onchainMembership !== undefined 
+                                     ? updatedRelayConfigFragment.onchainMembership 
+                                     : RELAY_CONFIG_PARAM.relay.onchainMembership;
+
+      const authHierarchy = ["1. ADMIN_SECRET_TOKEN (highest priority)"];
+      if (currentOnchainMembership) {
+        authHierarchy.push("2. BLOCKCHAIN_MEMBERSHIP");
+        authHierarchy.push("3. PRE_AUTHORIZED_KEYS (lowest priority)");
+      } else {
+        authHierarchy.push("2. PRE_AUTHORIZED_KEYS (lowest priority)");
+      }
+
+      return res.json({
+        success: true, 
+        message: needsReinitialize ? "Authentication configuration updated (legacy endpoint)" : "No changes to authentication configuration",
+        previousConfig,
+        currentConfig: { onchainMembership: currentOnchainMembership },
+        authenticationHierarchy: authHierarchy
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+        message: "Error updating authentication configuration"
+      });
     }
   });
 

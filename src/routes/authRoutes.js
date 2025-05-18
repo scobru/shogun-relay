@@ -1,11 +1,6 @@
 import express from "express";
-import jwt from "jsonwebtoken";
-import crypto from "crypto";
-import { AuthenticationManager } from "../managers/AuthenticationManager.js";
-// We will pass gun, JWT_SECRET, AuthenticationManager, ensureShogunCore, and authenticateRequestMiddleware when setting up the router
 
-
-export default function setupAuthRoutes(gunInstance, JWT_SECRET, AuthenticationManagerInstance, ensureShogunCoreInstance, authenticateRequestMiddleware) {
+export default function setupAuthRoutes(gunInstance, ensureShogunCoreInstance, AuthenticationManagerInstance) {
   const router = express.Router();
 
   // Registrazione utente (ShogunCore + GunDB)
@@ -15,7 +10,7 @@ export default function setupAuthRoutes(gunInstance, JWT_SECRET, AuthenticationM
       if (!username || !password) {
         return res.status(400).json({
           success: false,
-          error: "Username and password are required",
+          error: "Username and password are required"
         });
       }
 
@@ -23,7 +18,7 @@ export default function setupAuthRoutes(gunInstance, JWT_SECRET, AuthenticationM
       if (!core) {
         return res.status(500).json({
           success: false,
-          error: "ShogunCore not available",
+          error: "ShogunCore not available"
         });
       }
 
@@ -32,7 +27,7 @@ export default function setupAuthRoutes(gunInstance, JWT_SECRET, AuthenticationM
       if (!signUpResult.success) {
         return res.status(400).json({
           success: false,
-          error: signUpResult.error || "User registration failed via ShogunCore",
+          error: signUpResult.error || "User registration failed via ShogunCore"
         });
       }
 
@@ -49,33 +44,22 @@ export default function setupAuthRoutes(gunInstance, JWT_SECRET, AuthenticationM
       });
       await authUserPromise;
 
-      // Imposta email e permessi di default nel profilo GunDB
+      // Imposta email nel profilo GunDB
       if (email) {
         user.get("profile").get("email").put(email);
       }
-      user.get("profile").get("permissions").put("user");
-
-      // Crea JWT per la sessione
-      const tokenPayload = {
-        userId: user.is.alias,
-        permissions: ["user"],
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // 30 giorni
-      };
-      const jwtToken = jwt.sign(tokenPayload, JWT_SECRET);
 
       res.json({
         success: true,
         message: "User registered successfully",
         userId: user.is.alias,
-        token: jwtToken,
         gunCert: user._.sea,
-        shogunResult: signUpResult,
+        shogunResult: signUpResult
       });
     } catch (error) {
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: error.message
       });
     }
   });
@@ -87,7 +71,7 @@ export default function setupAuthRoutes(gunInstance, JWT_SECRET, AuthenticationM
       if (!username || !password) {
         return res.status(400).json({
           success: false,
-          error: "Username and password are required",
+          error: "Username and password are required"
         });
       }
 
@@ -95,7 +79,7 @@ export default function setupAuthRoutes(gunInstance, JWT_SECRET, AuthenticationM
       if (!core) {
         return res.status(500).json({
           success: false,
-          error: "ShogunCore not available",
+          error: "ShogunCore not available"
         });
       }
 
@@ -104,7 +88,7 @@ export default function setupAuthRoutes(gunInstance, JWT_SECRET, AuthenticationM
       if (!loginResult.success) {
         return res.status(401).json({
           success: false,
-          error: loginResult.error || "Login failed via ShogunCore",
+          error: loginResult.error || "Login failed via ShogunCore"
         });
       }
 
@@ -121,22 +105,12 @@ export default function setupAuthRoutes(gunInstance, JWT_SECRET, AuthenticationM
       });
       await authUserPromise;
 
-      // Crea JWT per la sessione
-      const tokenPayload = {
-        userId: user.is.alias,
-        permissions: ["user"],
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // 30 giorni
-      };
-      const jwtToken = jwt.sign(tokenPayload, JWT_SECRET);
-
       res.json({
         success: true,
         message: "Login successful",
         userId: user.is.alias,
-        token: jwtToken,
         gunCert: user._.sea,
-        shogunResult: loginResult,
+        shogunResult: loginResult
       });
     } catch (error) {
       // Differenzia errori di autenticazione da errori di server
@@ -146,186 +120,85 @@ export default function setupAuthRoutes(gunInstance, JWT_SECRET, AuthenticationM
           error.message.includes("Password mismatch")) {
         res.status(401).json({
           success: false,
-          error: "Invalid username or password.",
+          error: "Invalid username or password."
         });
       } else {
         res.status(500).json({
           success: false,
-          error: error.message,
+          error: error.message
         });
       }
     }
   });
 
-  // Crea nuovo token
-  router.post("/tokens", authenticateRequestMiddleware, async (req, res) => {
+  // ENDPOINT: Verifica semplice on-chain (senza JWT, restituisce solo true/false)
+  router.post("/verify-onchain", async (req, res) => {
     try {
-      const userId = req.body.userId || req.auth.userId;
-      const { name, expiresInDays } = req.body;
-
-      if (!userId) {
+      const { pubKey } = req.body;
+      
+      if (!pubKey) {
         return res.status(400).json({
           success: false,
-          error: "User ID is required",
+          error: "Public key is required"
         });
       }
-
-      let expiresInMs = null;
-      if (expiresInDays) {
-        expiresInMs = parseInt(expiresInDays) * 24 * 60 * 60 * 1000;
-      }
-
-      // Usa AuthenticationManager per generare token
-      const token = await AuthenticationManagerInstance.generateUserToken(
-        userId, 
-        name || "User Token", 
-        expiresInMs, 
-        true // checkBlockchain
-      );
-
-      // Salva il token nel database GunDB
-      const saveResult = await AuthenticationManagerInstance.saveUserToken(
-        gunInstance,
-        userId,
-        token,
-        name || "User Token",
-        expiresInMs ? Date.now() + expiresInMs : null
-      );
-
-      res.json({
-        success: true,
-        token: token,
-        tokenInfo: {
-          id: saveResult.tokenId,
-          name: name || "User Token",
-          createdAt: Date.now()
-        }
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  });
-
-  // Lista token utente
-  router.get("/tokens", authenticateRequestMiddleware, async (req, res) => {
-    try {
-      const userId = req.auth.userId;
-      // Usa AuthenticationManager per listare i token
-      const tokens = await AuthenticationManagerInstance.listUserTokens(gunInstance, userId);
-
-      res.json({
-        success: true,
-        tokens: tokens,
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  });
-
-  // Revoca token
-  router.delete("/tokens/:tokenId", authenticateRequestMiddleware, async (req, res) => {
-    try {
-      const userId = req.auth.userId;
-      const tokenId = req.params.tokenId;
-      // Usa AuthenticationManager per revocare il token
-      const success = await AuthenticationManagerInstance.revokeUserToken(gunInstance, userId, tokenId);
-
-      if (success) {
-        res.json({
-          success: true,
-          message: "Token revoked successfully",
-        });
-      } else {
-        res.status(400).json({
+      
+      // Ottieni la configurazione relay
+      const core = ensureShogunCoreInstance();
+      if (!core || !core.RELAY_CONFIG || !core.relayVerifier) {
+        return res.status(503).json({
           success: false,
-          error: "Failed to revoke token",
+          error: "Relay services not available"
         });
-      }
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  });
-
-  // Verifica token
-  router.post("/verify-token", async (req, res) => {
-    try {
-      const { token } = req.body;
-      if (!token) {
-        return res.status(400).json({ success: false, error: "Token is required" });
       }
       
-      // Usa AuthenticationManager per validare il token
-      const tokenInfo = await AuthenticationManagerInstance.validateToken(token);
-
-      if (tokenInfo && tokenInfo.valid) {
-        res.json({
-          success: true,
-          tokenInfo: tokenInfo,
-        });
-      } else {
-        res.json({
+      const RELAY_CONFIG = core.RELAY_CONFIG;
+      
+      // Verifica che on-chain membership sia abilitata
+      if (!RELAY_CONFIG.relay?.onchainMembership) {
+        return res.status(503).json({
           success: false,
-          valid: false,
-          error: "Invalid token",
+          error: "On-chain verification not configured"
+        });
+      }
+      
+      // Formatta la chiave per la verifica blockchain
+      const formattedKey = AuthenticationManagerInstance.formatKeyForBlockchain(pubKey);
+      if (!formattedKey) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid key format"
+        });
+      }
+      
+      // Verifica diretta onchain
+      try {
+        // Usa relayVerifier direttamente
+        const isAuthorized = await core.relayVerifier.isPublicKeyAuthorized(
+          RELAY_CONFIG.relay.registryAddress,
+          formattedKey
+        );
+        
+        // Restituisci solo il risultato booleano
+        return res.json({
+          success: true,
+          isAuthorized: isAuthorized
+        });
+      } catch (error) {
+        console.error("Error during on-chain verification:", error);
+        return res.status(500).json({
+          success: false,
+          error: "On-chain verification failed"
         });
       }
     } catch (error) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
-  // Verifica certificato
-  router.post("/verify-cert", async (req, res) => {
-    try {
-      const { certificate } = req.body;
-      if (!certificate || !certificate.pub) {
-        return res.status(400).json({ 
-          success: false, 
-          error: "Invalid certificate format. Certificate must contain a pub key." 
-        });
-      }
-      
-      const userPub = certificate.pub;
-      const userExists = await new Promise((resolve) => {
-        gunInstance.user(userPub).once((data) => { resolve(!!data); });
-        setTimeout(() => resolve(false), 3000);
+      console.error("Error in verify-onchain endpoint:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Server error"
       });
-      
-      if (!userExists) {
-        return res.json({ 
-          success: false, 
-          valid: false, 
-          error: "User with this certificate does not exist" 
-        });
-      }
-      
-      // Genera token per certificato
-      const token = await AuthenticationManagerInstance.generateUserToken(
-        userPub, 
-        "Certificate Auth Token", 
-        null, 
-        true // checkBlockchain
-      );
-      
-      res.json({ 
-        success: true, 
-        valid: true, 
-        userId: userPub, 
-        token: token 
-      });
-    } catch (error) {
-      res.status(500).json({ success: false, error: error.message });
     }
   });
 
   return router;
-} 
+}

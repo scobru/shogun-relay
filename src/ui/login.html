@@ -297,23 +297,28 @@
 
                 // Verify token
                 testToken(token).then(isValid => {
+                    console.log('Token valido:', isValid);
+                    console.log('Token:', token);
                     if (isValid) {
-                        // Check if token is a valid JWT
-                        const payload = parseJwt(token);
-                        if (!payload) {
-                            showError('Il token fornito non è un JWT valido');
-                            setLoading(false);
-                            return;
+                        // Check if token looks like a JWT (has two dots)
+                        const isJwt = token.split('.').length === 3;
+                        
+                        if (isJwt) {
+                            // Try to parse as JWT
+                            const payload = parseJwt(token);
+                            console.log('Payload:', payload);
+                            
+                            // If it's a JWT, check if it's expired
+                            if (payload && isTokenExpired(token)) {
+                                showError('Il token JWT è scaduto');
+                                setLoading(false);
+                                return;
+                            }
+                        } else {
+                            console.log('Non-JWT token accepted');
                         }
                         
-                        // Check if token is expired
-                        if (isTokenExpired(token)) {
-                            showError('Il token è scaduto');
-                            setLoading(false);
-                            return;
-                        }
-                        
-                        // Token is valid and not expired, save it
+                        // Token is valid according to the server, save it regardless of format
                         localStorage.setItem('authToken', token);
 
                         // Set session

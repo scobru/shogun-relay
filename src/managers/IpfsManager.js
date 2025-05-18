@@ -17,6 +17,7 @@ class IpfsManager {
       encryptionKey: config.encryptionKey || "",
       encryptionAlgorithm: config.encryptionAlgorithm || "aes-256-gcm",
       apiKey: config.apiKey || "",
+      uploadsDir: config.uploadsDir || "./uploads"
     };
     
     this.shogunIpfs = null;
@@ -32,10 +33,13 @@ class IpfsManager {
    */
   initialize() {
     if (!this.config.enabled) {
+      console.log('[IpfsManager] IPFS not enabled in configuration');
       return null;
     }
 
     try {
+      console.log('[IpfsManager] Initializing IPFS with configuration:', JSON.stringify(this._maskSensitiveData(this.config)));
+      
       // Configuration according to documentation
       const ipfsConfig = {
         storage: {
@@ -50,6 +54,7 @@ class IpfsManager {
       // Configure based on chosen service
       if (this.config.service === "PINATA") {
         if (!this.config.pinataJwt || this.config.pinataJwt.length < 10) {
+          console.error('[IpfsManager] JWT Pinata missing or invalid');
           throw new Error("JWT Pinata missing or invalid");
         }
 
@@ -63,19 +68,23 @@ class IpfsManager {
           apiKey: this.config.apiKey,
         };
       } else {
+        console.error(`[IpfsManager] IPFS service not supported: ${this.config.service}`);
         throw new Error(`IPFS service not supported: ${this.config.service}`);
       }
 
       // Verify ShogunIpfs is defined
       if (typeof ShogunIpfs !== "function") {
+        console.error('[IpfsManager] ShogunIpfs not available, check module import');
         throw new Error("ShogunIpfs not available, check module import");
       }
 
       // Create IPFS instance
+      console.log('[IpfsManager] Creating ShogunIpfs instance');
       const ipfsInstance = new ShogunIpfs(ipfsConfig.storage);
 
       // Verify instance is valid
       if (!ipfsInstance || typeof ipfsInstance.uploadJson !== "function") {
+        console.error('[IpfsManager] ShogunIpfs instance does not have uploadJson method');
         throw new Error("ShogunIpfs instance does not have uploadJson method");
       }
 
@@ -83,11 +92,54 @@ class IpfsManager {
       this._addMissingMethods(ipfsInstance);
 
       this.shogunIpfs = ipfsInstance;
+      console.log('[IpfsManager] IPFS successfully initialized');
       return ipfsInstance;
     } catch (error) {
+      // Log detailed error
+      console.error('[IpfsManager] Failed to initialize IPFS service:', error.message);
+      
       // Disable IPFS in case of initialization error
       this.config.enabled = false;
+      this.shogunIpfs = null;
       return null;
+    }
+  }
+  
+  /**
+   * Attempt to reinitialize IPFS connection
+   * @returns {Promise<boolean>} Success state
+   */
+  async reinitialize() {
+    console.log('[IpfsManager] Attempting to reinitialize IPFS connection');
+    
+    // Force enabled to true for this attempt
+    const wasEnabled = this.config.enabled;
+    this.config.enabled = true;
+    
+    // Try to initialize
+    const ipfsInstance = this.initialize();
+    
+    // If initialization failed, restore previous enabled state
+    if (!ipfsInstance) {
+      this.config.enabled = wasEnabled;
+      console.error('[IpfsManager] Reinitialization failed');
+      return false;
+    }
+    
+    // Test connection with a simple operation
+    try {
+      // Simple test with a basic JSON upload
+      const testResult = await this.testConnection();
+      if (!testResult.success) {
+        throw new Error(testResult.error || 'Connection test failed');
+      }
+      
+      console.log('[IpfsManager] IPFS reinitialized and tested successfully');
+      return true;
+    } catch (error) {
+      console.error('[IpfsManager] IPFS reinitialization test failed:', error.message);
+      this.config.enabled = wasEnabled;
+      return false;
     }
   }
   
@@ -327,7 +379,24 @@ class IpfsManager {
    * @returns {boolean} True if enabled and initialized
    */
   isEnabled() {
-    return this.config.enabled && this.shogunIpfs !== null;
+    if (!this.config.enabled || !this.shogunIpfs) {
+      return false;
+    }
+    
+    // Additional verification to ensure IPFS instance is properly configured
+    try {
+      // Check that the required methods exist
+      if (typeof this.shogunIpfs.uploadFile !== 'function' || 
+          typeof this.shogunIpfs.uploadJson !== 'function') {
+        console.error('[IpfsManager] IPFS instance missing required methods');
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('[IpfsManager] Error checking IPFS initialization:', error.message);
+      return false;
+    }
   }
   
   /**
@@ -416,6 +485,47 @@ class IpfsManager {
         error: error.message
       };
     }
+  }
+  
+  /**
+   * Get the uploads directory
+   * @returns {string} Path to uploads directory
+   */
+  getUploadsDir() {
+    return this.config.uploadsDir;
+  }
+  
+  /**
+   * Check if IPFS is connected
+   * @returns {boolean} True if connected to an IPFS node
+   */
+  isConnected() {
+    if (!this.isEnabled()) {
+      return false;
+    }
+    
+    // If we have a shogunIpfs instance, consider it connected
+    // The actual connection status will be verified with testConnection()
+    return this.shogunIpfs !== null;
+  }
+  
+  /**
+   * Get the default gateway URL
+   * @returns {string} Default gateway URL
+   */
+  getDefaultGateway() {
+    if (this.config.service === "PINATA" && this.config.pinataGateway) {
+      return this.config.pinataGateway;
+    }
+    return this.config.gateway || 'https://ipfs.io/ipfs';
+  }
+  
+  /**
+   * Get the node type (IPFS-CLIENT or PINATA)
+   * @returns {string} Node type
+   */
+  getNodeType() {
+    return this.config.service || 'IPFS-CLIENT';
   }
 }
 
