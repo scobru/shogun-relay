@@ -12,7 +12,9 @@ import {
     handleLogout,
     showToast,
     deleteFile,
-    loadFiles
+    loadFiles,
+    toggleTheme,
+    getTheme
 } from './app-nodom.js';
 
 /**
@@ -33,11 +35,18 @@ export function Navbar() {
             h('a', { href: '#', class: 'active' }, 'Dashboard'),
             h('a', { href: '#', id: 'debug-command-btn', style: 'color: #ff3366;' }, 'Debug')
         ),
-        h('button', { 
-            id: 'logout-btn', 
-            class: 'logout-btn',
-            onclick: handleLogout
-        }, 'Logout')
+        h('div', { class: 'nav-actions' },
+            h('button', { 
+                id: 'theme-toggle-btn', 
+                class: 'theme-toggle-btn',
+                onclick: toggleTheme
+            }, () => getTheme() === 'dark' ? '☀️' : '🌙'),
+            h('button', { 
+                id: 'logout-btn', 
+                class: 'logout-btn',
+                onclick: handleLogout
+            }, 'Logout')
+        )
     );
 }
 
@@ -154,7 +163,10 @@ export function StatsGrid() {
 export function ServerInfoCard() {
     return h('div', { class: 'card' },
         h('div', { class: 'card-header' },
-            h('h3', { class: 'card-title' }, 'Server Information')
+            h('h3', { class: 'card-title' }, 'Server Information'),
+            h('div', { class: 'card-actions' },
+                h('button', { id: 'debug-command-btn', class: 'btn-small' }, 'Debug')
+            )
         ),
         h('p', {},
             'Gun server active on ',

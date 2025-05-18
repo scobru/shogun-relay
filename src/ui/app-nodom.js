@@ -11,6 +11,8 @@ const [getFileStats, setFileStats] = setSignal({ count: 0, totalSize: 0 }, { key
 const [_getFiles, _setFiles] = setSignal([], { key: 'files-data', bypass: true });
 const [getIpfsStatus, setIpfsStatus] = setSignal({ enabled: false, service: 'IPFS-CLIENT' }, { key: 'ipfs-status' });
 const [getIpfsConnectionStatus, setIpfsConnectionStatus] = setSignal({ status: 'unknown', message: 'Unknown' }, { key: 'ipfs-connection-status' });
+// Tema signal
+const [getTheme, setTheme] = setSignal(localStorage.getItem('app-theme') || 'dark', { key: 'app-theme' });
 
 // Keep track of the last IPFS check time to prevent too many calls
 let lastIpfsCheckTime = 0;
@@ -20,37 +22,109 @@ let ipfsCheckInProgress = false;
 // Store gun instance globally for reuse
 let gunInstance = null;
 
+// Initialize debug module
+if (typeof window !== 'undefined' && !window.shogunDebug) {
+    window.shogunDebug = {
+        logs: [],
+        errors: [],
+        initialized: true
+    };
+    
+    // Capture console logs
+    const originalConsoleLog = console.log;
+    const originalConsoleError = console.error;
+    
+    console.log = function(...args) {
+        window.shogunDebug.logs.push({
+            type: 'log',
+            timestamp: new Date().toISOString(),
+            message: args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+            ).join(' ')
+        });
+        originalConsoleLog.apply(console, args);
+    };
+    
+    console.error = function(...args) {
+        window.shogunDebug.errors.push({
+            type: 'error',
+            timestamp: new Date().toISOString(),
+            message: args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+            ).join(' ')
+        });
+        originalConsoleError.apply(console, args);
+    };
+    
+    console.log('Debug module initialized');
+}
+
+/**
+ * Cambia tema tra dark e light
+ */
+export function toggleTheme() {
+    const currentTheme = getTheme();
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    // Aggiorna tema nel localStorage
+    localStorage.setItem('app-theme', newTheme);
+    
+    // Aggiorna signal del tema
+    setTheme(newTheme);
+    
+    // Applica tema al document
+    document.documentElement.setAttribute('data-theme', newTheme);
+    
+    showToast(`Tema ${newTheme === 'dark' ? 'scuro' : 'chiaro'} attivato`, 'info');
+}
+
+/**
+ * Inizializza il tema al caricamento dell'app
+ */
+export function initTheme() {
+    const savedTheme = localStorage.getItem('app-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    setTheme(savedTheme);
+}
+
 /**
  * Initialize the Gun database
  */
 export function initGun() {
-    // Create WebSocket URL
-    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = wsProtocol + "//" + window.location.host + "/gun";
-    
-    // Initialize Gun with optimized settings
-    gunInstance = Gun({
-        peers: [location.origin + "/gun"],
-        localStorage: false,
-        radisk: false,
-        WebSocket: window.WebSocket,
-        secure: window.location.protocol === "https:",
-        headers: {
-            Authorization: `Bearer ${getAuthToken()}`
-        },
-        retry: 1000,
-        recover: true,
-        chunk: 1024,
-        lack: 1000
-    });
-    
-    // Initialize NoDom with Gun instance
-    init(gunInstance);
-    
-    // Setup connection event listeners
-    setupGunConnectionListeners();
-    
-    return gunInstance;
+    try {
+        const token = getAuthToken();
+        
+        if (!token) {
+            console.error("No auth token found. Gun init aborted.");
+            return null;
+        }
+        
+        // Initialize Gun with the current host
+        const peers = [window.location.origin + '/gun'];
+        console.log(`Initializing Gun with peers: ${peers.join(', ')}`);
+        
+        // Create Gun instance with peers and LocalStorage support
+        const gun = Gun({
+            peers: peers,
+            localStorage: false,
+            radisk: false // Disable Radisk to prevent storage issues
+        });
+        
+        // Store it in the global variable for reuse
+        gunInstance = gun;
+        window.gunInstance = gun;
+        
+        // Set up connection monitoring
+        monitorGunConnection(gun);
+        
+        // Update server status on initialization
+        updateServerStatus();
+        
+        return gun;
+    } catch (error) {
+        console.error(`Error initializing Gun: ${error.message}`);
+        return null;
+    }
 }
 
 /**
@@ -744,13 +818,15 @@ export async function checkIpfsConnection() {
  * Debug command handler
  */
 export async function handleDebugCommand() {
-    if (window.shogunDebug) {
+    try {
         // Create a debug object to collect information
         const debugData = {
             timestamp: new Date().toISOString(),
             browser: navigator.userAgent,
             url: window.location.href,
+            serverStatus: getServerStatus(),
             ipfsStatus: getIpfsStatus(),
+            networkStatus: getNetworkStatus(),
             storage: {}
         };
         
@@ -796,82 +872,85 @@ export async function handleDebugCommand() {
             debugData.storageError = e.message;
         }
         
-        // Take screenshot using MPC
-        let screenshotUrl = null;
-        try {
-            const res = await fetch('/mpc/screenshot', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    timestamp: Date.now(),
-                    url: window.location.href
-                })
-            });
-            
-            if (res.ok) {
-                const data = await res.json();
-                if (data.success && data.screenshotUrl) {
-                    screenshotUrl = data.screenshotUrl;
-                    debugData.screenshot = data.screenshotUrl;
-                }
-            }
-        } catch (e) {
-            debugData.screenshotError = e.message;
-        }
-        
-        // Check for IPFS metadata
-        try {
-            const res = await fetch('/api/ipfs/metadata', {
-                headers: {
-                    'Authorization': `Bearer ${getAuthToken()}`
-                }
-            });
-            
-            if (res.ok) {
-                const data = await res.json();
-                debugData.ipfsMetadata = data;
-            }
-        } catch (e) {
-            debugData.ipfsMetadataError = e.message;
-        }
-        
-        // Get console logs
-        debugData.consoleLogs = window.shogunDebug.logs || [];
+        // Get console logs from debug module
+        debugData.consoleLogs = window.shogunDebug?.logs || [];
+        debugData.consoleErrors = window.shogunDebug?.errors || [];
         
         // Format and display debug info
         console.log('DEBUG DATA:', debugData);
         
-        // Show toast with confirmation
-        showToast('Debug data collected. Check console for details.', 'info');
-        
-        // Show screenshot if available
-        if (screenshotUrl) {
-            const screenshotPopup = document.createElement('div');
-            screenshotPopup.className = 'debug-screenshot';
-            screenshotPopup.innerHTML = `
-                <div class="debug-screenshot-header">
-                    <h3>Debug Screenshot</h3>
-                    <button class="close-screenshot">×</button>
-                </div>
-                <div class="debug-screenshot-body">
-                    <img src="${screenshotUrl}" alt="Debug Screenshot" />
-                </div>
-            `;
+        // Update the log container with debug information
+        const logContainer = document.getElementById('log-container');
+        if (logContainer) {
+            // Clear previous content
+            logContainer.innerHTML = '';
             
-            document.body.appendChild(screenshotPopup);
+            // Add timestamp
+            const timestampLine = document.createElement('div');
+            timestampLine.className = 'log-info';
+            timestampLine.textContent = `Debug info collected at ${debugData.timestamp}`;
+            logContainer.appendChild(timestampLine);
             
-            // Add close handler
-            document.querySelector('.close-screenshot').addEventListener('click', () => {
-                screenshotPopup.remove();
+            // Add server status
+            const serverStatusLine = document.createElement('div');
+            serverStatusLine.textContent = `Server Status: ${debugData.serverStatus.status}, Port: ${debugData.serverStatus.port}`;
+            logContainer.appendChild(serverStatusLine);
+            
+            // Add network status
+            const networkStatusLine = document.createElement('div');
+            networkStatusLine.textContent = `Network: ${debugData.networkStatus.status}, Peers: ${debugData.networkStatus.peerCount}`;
+            logContainer.appendChild(networkStatusLine);
+            
+            // Add IPFS status
+            const ipfsStatusLine = document.createElement('div');
+            ipfsStatusLine.textContent = `IPFS: ${debugData.ipfsStatus.enabled ? 'Enabled' : 'Disabled'}, Service: ${debugData.ipfsStatus.service}`;
+            logContainer.appendChild(ipfsStatusLine);
+            
+            // Add latest console errors (up to 5)
+            const errorHeader = document.createElement('div');
+            errorHeader.className = 'log-error';
+            errorHeader.textContent = '--- Recent Errors ---';
+            logContainer.appendChild(errorHeader);
+            
+            const errors = debugData.consoleErrors || [];
+            errors.slice(-5).forEach(error => {
+                const errorLine = document.createElement('div');
+                errorLine.className = 'log-error';
+                errorLine.textContent = `${error.timestamp}: ${error.message}`;
+                logContainer.appendChild(errorLine);
+            });
+            
+            // Add latest console logs (up to 10)
+            const logHeader = document.createElement('div');
+            logHeader.className = 'log-info';
+            logHeader.textContent = '--- Recent Logs ---';
+            logContainer.appendChild(logHeader);
+            
+            const logs = debugData.consoleLogs || [];
+            logs.slice(-10).forEach(log => {
+                const logLine = document.createElement('div');
+                logLine.textContent = `${log.timestamp}: ${log.message}`;
+                logContainer.appendChild(logLine);
             });
         }
         
+        // Show toast with confirmation
+        showToast('Debug data collected. Check console and debug panel for details.', 'info');
+        
         return debugData;
-    } else {
-        console.error('Debug module not initialized');
-        showToast('Debug module not initialized', 'error');
+    } catch (error) {
+        console.error('Error in handleDebugCommand:', error);
+        showToast('Error collecting debug data', 'error');
+        
+        // Try to show error in log container
+        const logContainer = document.getElementById('log-container');
+        if (logContainer) {
+            const errorLine = document.createElement('div');
+            errorLine.className = 'log-error';
+            errorLine.textContent = `Error: ${error.message}`;
+            logContainer.appendChild(errorLine);
+        }
+        
         return null;
     }
 }
@@ -968,10 +1047,92 @@ export {
     setIpfsStatus,
     getIpfsConnectionStatus,
     setIpfsConnectionStatus,
+    getTheme,
     // Export internal file signal functions for direct access
     _getFiles,
     _setFiles
 };
 
 // Export Gun instance
-export { gunInstance }; 
+export { gunInstance };
+
+/**
+ * Update server status
+ */
+export async function updateServerStatus() {
+    try {
+        const response = await fetch("/api/status", {
+            headers: {
+                Authorization: `Bearer ${getAuthToken()}`,
+                'Cache-Control': 'no-cache, no-store, must-revalidate'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Update server status
+        setServerStatus({
+            status: data.status || 'Unknown',
+            port: window.location.port || '8765',
+            version: data.server?.version || '1.0.0',
+            timestamp: data.timestamp
+        });
+        
+        console.log("Server status updated:", data);
+        
+        return data;
+    } catch (error) {
+        console.error(`Error updating server status: ${error.message}`);
+        setServerStatus({
+            status: 'Error',
+            port: window.location.port || '8765',
+            error: error.message
+        });
+    }
+}
+
+/**
+ * Monitor GunDB connection
+ * @param {Gun} gun - The Gun instance to monitor
+ */
+function monitorGunConnection(gun) {
+    if (!gun) return;
+    
+    // Update network status initially
+    setNetworkStatus({
+        peerCount: 1, // Local is a peer
+        status: 'Connected'
+    });
+    
+    // Set up interval for checking connection
+    const connectionCheckInterval = setInterval(() => {
+        // Ping Gun to check connection
+        const pingRef = gun.get('_ping');
+        const timestamp = Date.now();
+        
+        pingRef.put({ timestamp }, ack => {
+            if (ack.err) {
+                console.error(`Gun connection error: ${ack.err}`);
+                setNetworkStatus({
+                    peerCount: 0,
+                    status: 'Disconnected'
+                });
+            } else {
+                // Update connection status on successful ping
+                setNetworkStatus({
+                    peerCount: 1, // At least one peer (the server)
+                    status: 'Connected'
+                });
+            }
+        });
+    }, 10000); // Check every 10 seconds
+    
+    // Clean up interval on page unload
+    window.addEventListener('beforeunload', () => {
+        clearInterval(connectionCheckInterval);
+    });
+} 

@@ -11,7 +11,7 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "get-deployed-contracts": "node scripts/getDeployedContraacts.js",
-    "generate-keypair": "node scripts/generateKeyPair.js",
+    "generate-certs": "node scripts/generate-ssl-certs.js && node scripts/verify-ssl-certs.js",
     "clean-all": "node scripts/clean-all-data.js"
   },
   "dependencies": {

@@ -37,70 +37,6 @@ export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, getRelayVerifier
   };
 
   /**
-   * Verify authorization through blockchain
-   * @param {string} pubKey - Public key to verify
-   * @returns {Object} Authorization result
-   */
-  const _verifyBlockchainAuth = async (pubKey) => {
-    const keyData = _cleanPublicKey(pubKey);
-    const relayVerifier = getRelayVerifierInstance();
-    
-    if (!RELAY_CONFIG_PARAM.relay.onchainMembership || !relayVerifier) {
-      return { isAuthorized: false, authorizingRelay: null, reason: "blockchain_disabled" };
-    }
-    
-    if (!keyData.hex) {
-      return { isAuthorized: false, authorizingRelay: null, reason: "invalid_key_format" };
-    }
-    
-    console.log(`Verifying public key authorization: ${keyData.cleaned}`);
-    console.log(`Hex format: ${keyData.hex}`);
-
-    try {
-      // Use the relayVerifier directly, which now handles all contract types
-      // Make sure to use the properly formatted key with 0x prefix
-      const registryAddress = RELAY_CONFIG_PARAM.relay.registryAddress || "check-all";
-      
-      // Get the hex key with 0x prefix for direct contract interaction
-      const hexWithPrefix = formatKeyForBlockchain(pubKey);
-      
-      if (!hexWithPrefix) {
-        console.error(`Failed to format key for blockchain: ${pubKey}`);
-        return { 
-          isAuthorized: false, 
-          authorizingRelay: null, 
-          reason: "invalid_key_format" 
-        };
-      }
-      
-      const isAuthorized = await relayVerifier.isPublicKeyAuthorized(registryAddress, hexWithPrefix);
-      
-      if (isAuthorized) {
-        console.log(`Public key ${keyData.cleaned} is authorized via blockchain verification`);
-        return { 
-          isAuthorized: true, 
-          authorizingRelay: "detected", 
-          reason: "success" 
-        };
-      }
-
-      console.log(`Public key ${keyData.cleaned} is NOT authorized via blockchain verification`);
-      return { 
-        isAuthorized: false, 
-        authorizingRelay: null, 
-        reason: "not_authorized" 
-      };
-    } catch (error) {
-      console.error(`Error during blockchain verification: ${error.message}`);
-      return { 
-        isAuthorized: false, 
-        authorizingRelay: null, 
-        reason: `verification_error: ${error.message}` 
-      };
-    }
-  };
-
-  /**
    * Create a standardized API response
    * @param {boolean} success - Whether the operation succeeded
    * @param {string} message - Response message
@@ -234,27 +170,6 @@ export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, getRelayVerifier
       res.json(_standardResponse(true, "User active relays retrieved", { userAddress, relays }));
     } catch (error) {
       res.status(500).json(_standardResponse(false, "Error getting active relays", {}, error.message));
-    }
-  });
-
-  // API - Check public key authorization against all relays
-  router.post("/check-pubkey", authenticateRequestMiddleware, async (req, res) => {
-    try {
-      const { publicKey } = req.body;
-      if (!publicKey) {
-        return res.status(400).json(_standardResponse(false, "Public key is required", {}, "Public key is required"));
-      }
-      
-      const { isAuthorized, authorizingRelay } = await _verifyBlockchainAuth(publicKey);
-      const authorizedRelays = isAuthorized ? [authorizingRelay] : [];
-      
-      res.json(_standardResponse(
-        true, 
-        isAuthorized ? "Public key is authorized" : "Public key is not authorized", 
-        { publicKey, isAuthorized, authorizedRelays }
-      ));
-    } catch (error) {
-      res.status(500).json(_standardResponse(false, "Error checking public key authorization", {}, error.message));
     }
   });
 

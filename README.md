@@ -1,226 +1,274 @@
 # Shogun Relay
 
-Un relay server avanzato che integra GunDB, IPFS e SQLite per la gestione distribuita di dati e file.
+Un relay server avanzato che integra GunDB, IPFS ed Ethereum per la gestione decentralizzata di dati, file e autenticazione.
 
 ## Caratteristiche Principali
 
-### Storage Multi-Layer
+### Architettura Decentralizzata
 
-- **IPFS Storage**: Storage distribuito per file e dati
-- **SQLite Storage**: Database locale per dati strutturati e file
-- **Filesystem Locale**: Fallback per storage locale
+- **GunDB**: Database decentralizzato per sincronizzazione dati in tempo reale
+- **IPFS**: Storage distribuito e persistente per file e contenuti
+- **Ethereum**: Verifica on-chain opzionale per autenticazione membri
 
 ### Sicurezza
 
 - Autenticazione basata su token
-- Supporto per crittografia dei dati su IPFS
+- Supporto per verifica on-chain tramite RelayVerifier
 - Gestione sicura delle connessioni WebSocket
+- Supporto per HTTPS con certificati personalizzati
 
-### Interfaccia Web
+### API Complete
 
-- Dashboard moderna e reattiva
-- Gestione file con upload/download
-- Esploratore GunDB integrato
-- Pannello di configurazione IPFS
+- REST API per gestione file e configurazione
+- WebSocket per sincronizzazione in tempo reale
+- Supporto per upload e gestione file
+- Endpoint per integrazione IPFS
 
 ## Architettura
 
 ### Core Components
 
-1. **Server Relay (`index.js`)**
+1. **Server Relay (`src/index.js`)**
 
-   - Gestione delle connessioni WebSocket
-   - Routing delle richieste HTTP
-   - Middleware di autenticazione
-   - Configurazione CORS
+   - Gestione delle connessioni WebSocket per GunDB
+   - Routing delle richieste HTTP/HTTPS
+   - Supporto per autenticazione multi-livello
+   - Configurazione CORS avanzata
 
-2. **SQLite Adapter (`sqlite-adapter.js`)**
+2. **Authentication Manager (`src/managers/AuthenticationManager.js`)**
 
-   - Persistenza dati per GunDB
-   - Gestione delle relazioni tra nodi
-   - Supporto per query complesse
-   - Sistema di cache integrato
+   - Validazione token
+   - Integrazione con RelayVerifier per verifica on-chain
+   - Controllo accessi per API e WebSocket
 
-3. **IPFS Adapter (`ipfs-adapter.js`)**
+3. **IPFS Manager (`src/managers/IpfsManager.js`)**
 
-   - Integrazione con IPFS network
+   - Integrazione nativa con IPFS
    - Supporto per Pinata e nodi IPFS locali
-   - Crittografia dei file
-   - Gestione metadati
+   - Gestione file e metadati
 
-4. **Router (`routes.js`)**
-   - API RESTful
-   - Endpoint per gestione file
-   - Endpoint per configurazione
-   - Healthcheck e diagnostica
+4. **File Manager (`src/managers/FileManager.js`)**
+   - Gestione file locale e distribuita
+   - Sistema di upload multi-part
+   - Backup e sincronizzazione
 
-### Interfacce
+### API Routes
 
-1. **Dashboard (`index.html`)**
+1. **Auth Routes (`src/routes/authRoutes.js`)**
 
-   - Statistiche di sistema
-   - Gestione file
-   - Esploratore GunDB
-   - Configurazione IPFS
-   - Debug logs
-
-2. **Login (`login.html`)**
-   - Autenticazione utente
+   - Autenticazione utenti
    - Gestione token
-   - Persistenza sessione
+   - Verifica on-chain
+
+2. **IPFS Routes (`src/routes/ipfsApiRoutes.js`)**
+
+   - Endpoint per operazioni IPFS
+   - Gestione metadati
+   - Controllo stato IPFS
+
+3. **File Routes (`src/routes/fileManagerRoutes.js`)**
+
+   - Interrogazione e ricerca file
+   - Accesso ai dettagli dei file
+   - Query avanzate
+
+4. **Relay Routes (`src/routes/relayApiRoutes.js`)**
+   - Configurazione relay
+   - Stato e diagnostica
+   - Gestione sottoscrizioni
 
 ## API Endpoints
 
-### File Management
+### Autenticazione
 
-- `POST /upload`: Upload file
-- `GET /files`: Lista file
-- `GET /files/:id`: Dettagli file
-- `DELETE /files/:id`: Rimozione file
+- `POST /auth/register`: Registrazione utente
+- `POST /auth/login`: Login utente
+- `POST /auth/verify-onchain`: Verifica on-chain di chiavi pubbliche
+
+### File
+
+- `GET /api/files/all`: Lista di tutti i file
+- `GET /api/files/search`: Ricerca file con criteri personalizzati
+- `GET /api/files/:id`: Dettagli di un file specifico
 
 ### IPFS
 
-- `GET /api/ipfs/status`: Stato IPFS
-- `POST /api/ipfs/toggle`: Attiva/disattiva IPFS
-- `POST /api/ipfs/config`: Configurazione IPFS
+- `GET /api/ipfs/status`: Stato del servizio IPFS
+- `GET /api/ipfs/health-check`: Controllo salute del sistema IPFS
+- `GET /api/ipfs/metadata`: Metadati dei file IPFS
+- `GET /api/ipfs/pin-status/:hash`: Stato di pin per un hash specifico
+- `POST /api/ipfs/pin`: Aggiunge pin a contenuto
+- `POST /api/ipfs/unpin`: Rimuove pin da contenuto
+- `POST /api/ipfs/toggle`: Attiva/disattiva il servizio IPFS
+- `POST /api/ipfs/update-config`: Aggiorna configurazione IPFS
 
-### GunDB
+### Relay
 
-- `GET /api/gundb/explore`: Esplora nodi
-- `POST /api/gundb/create-node`: Crea nodo
-- `GET /gun`: Endpoint WebSocket GunDB
+- `GET /api/relay/status`: Stato del relay server
+- `GET /api/relay/all`: Lista di tutti i relay disponibili
+- `GET /api/relay/check-subscription/:relayAddress/:userAddress`: Verifica sottoscrizione
+- `GET /api/relay/user-active-relays/:userAddress`: Relays attivi per un utente
+- `GET /api/relay/subscription-info/:relayAddress/:userAddress`: Info sottoscrizione
+- `POST /api/relay/update-relay-config`: Aggiorna configurazione relay
+- `POST /api/relay/auth/update-config`: Aggiorna configurazione autenticazione
 
-### Sistema
+### WebSocket
 
-- `GET /api/status`: Stato server
-- `GET /api/info`: Info API
-- `GET /websocket-test`: Test WebSocket
+- `/gun`: Endpoint WebSocket GunDB
 
 ## Configurazione
 
-### Variabili Ambiente
+Il server utilizza un file di configurazione `config.json` che contiene tutte le opzioni necessarie.
 
-```env
-PORT=8765
-SECRET_TOKEN=your_token
-ALLOWED_ORIGINS=http://localhost:3001,http://localhost:5173
-
-# IPFS Config
-IPFS_SERVICE=IPFS-CLIENT
-IPFS_NODE_URL=http://127.0.0.1:5001
-IPFS_GATEWAY=http://127.0.0.1:8080/ipfs
-PINATA_GATEWAY=https://gateway.pinata.cloud
-PINATA_JWT=your_jwt_token
-ENCRYPTION_ENABLED=false
-ENCRYPTION_KEY=your_key
-ENCRYPTION_ALGORITHM=aes-256-gcm
-
-# SQLite Config
-SQLITE_ENABLED=true
-SQLITE_PATH=./sqlitedata
-SQLITE_FILE=shogun.db
-SQLITE_VERBOSE=false
-SQLITE_FILES_ENABLED=true
-SQLITE_MAX_FILE_SIZE=10485760
+```json
+{
+    "NODE_ENV": "production",
+    "PORT": 8765,
+    "SECRET_TOKEN": "",
+    "ALLOWED_ORIGINS": "",
+    "IPFS_ENABLED": false,
+    "IPFS_SERVICE": "IPFS-CLIENT",
+    "IPFS_NODE_URL": "http://127.0.0.1:5001",
+    "IPFS_GATEWAY": "http://127.0.0.1:8080/ipfs",
+    "PINATA_GATEWAY": "https://gateway.pinata.cloud", 
+    "PINATA_JWT": "your_pinata_jwt_here",
+    "ETHEREUM_PROVIDER_URL": "",
+    "ETHEREUM_PRIVATE_KEY": "",
+    "ONCHAIN_MEMBERSHIP_ENABLED": false,
+    "RELAY_REGISTRY_CONTRACT": "",
+    "INDIVIDUAL_RELAY": "",
+    "RELAY_ENTRY_POINT_CONTRACT": "",
+    "ACTIVITYPUB_USER": "admin",
+    "ACTIVITYPUB_PASS": "admin",
+    "ACTIVITYPUB_DOMAIN": "localhost",
+    "ACTIVITYPUB_PORT": 8765,
+    "PRIVKEY_PATH": "",
+    "CERT_PATH": "",
+    "ADMIN_USER": "admin",
+    "ADMIN_PASS": "admin"
+}
 ```
 
-### Storage Priorities
+### Opzioni Principali
 
-1. IPFS (se abilitato)
-2. SQLite (se abilitato)
-3. Filesystem locale (fallback)
+- **PORT**: Porta del server (default: 8765)
+- **SECRET_TOKEN**: Token per autenticazione API
+- **ALLOWED_ORIGINS**: Domini autorizzati per CORS (separati da virgole)
+- **IPFS_ENABLED**: Abilita funzionalità IPFS
+- **ETHEREUM_PROVIDER_URL**: URL provider Ethereum
+- **ONCHAIN_MEMBERSHIP_ENABLED**: Abilita verifica membri on-chain
+- **PRIVKEY_PATH/CERT_PATH**: Percorsi per certificati HTTPS
 
-## Sicurezza
-
-### Autenticazione
-
-- Token-based authentication
-- CORS configurabile
-- Validazione richieste WebSocket
-
-### Crittografia
-
-- Supporto per crittografia file su IPFS
-- Algoritmo configurabile (default: aes-256-gcm)
-- Chiavi di crittografia personalizzabili
-
-## Sviluppo
+## Installazione
 
 ### Prerequisiti
 
-- Node.js >= 14
-- SQLite3
+- Node.js >= 16
 - IPFS node (opzionale)
+- Accesso a provider Ethereum (opzionale)
 
-### Installazione
+### Setup
 
 ```bash
-git clone <repository>
+# Clona il repository
+git clone https://github.com/yourusername/shogun-relay.git
 cd shogun-relay
+
+# Installa dipendenze
 npm install
-```
 
-### Avvio
+# Copia e configura il file di configurazione
+cp config.json.example config.json
+# Modifica config.json con i tuoi parametri
 
-```bash
+# Genera una coppia di chiavi (opzionale)
+npm run generate-keypair
+
+# Avvia il server
 npm start
 ```
 
-### Debug
+## Comandi
 
-- Log dettagliati via console
-- UI debug integrata
-- Monitoraggio WebSocket
-- Tracciamento operazioni IPFS/SQLite
+Il server offre diversi script npm:
 
-## Best Practices
+- `npm start`: Avvia il server
+- `npm run dev`: Avvia il server in modalità sviluppo con hot-reload
+- `npm run generate-keypair`: Genera coppia di chiavi per autenticazione
+- `npm run get-deployed-contracts`: Ottiene indirizzi contratti deployati
+- `npm run clean-all`: Pulisce tutti i dati (GunDB, file, etc)
 
-### Storage
+## Debug
 
-- Usa IPFS per file distribuiti
-- SQLite per dati strutturati
-- Filesystem per file temporanei
+Per attivare la modalità debug:
 
-### Performance
+```bash
+# Avvia con debug options
+DEBUG=shogun-relay:* npm start
+```
 
-- Cache SQLite attiva
-- Chunking per file grandi
-- Connessioni WebSocket persistenti
-- Ottimizzazione query GunDB
+### Console Debug
 
-### Sicurezza
+- `/debug` - Attiva modalità debug nella console (se in ambiente web)
+- Cerca `DEBUG=true` nei logs per info diagnostiche
+- Utilizza `bullet-catcher.js` per catturare gli errori imprevisti
 
-- Validazione input
-- Sanitizzazione percorsi
-- Rate limiting
-- Token rotation
+## Sicurezza
+
+### Best Practices
+
+1. **Configura HTTPS**
+   - Imposta `PRIVKEY_PATH` e `CERT_PATH` per abilitare HTTPS
+
+2. **Abilita Autenticazione On-chain**
+   - Imposta `ONCHAIN_MEMBERSHIP_ENABLED=true`
+   - Configura gli indirizzi dei contratti rilevanti
+
+3. **Limita CORS**
+   - Specifica solo i domini necessari in `ALLOWED_ORIGINS`
+
+4. **Proteggi API Admin**
+   - Modifica `ADMIN_USER` e `ADMIN_PASS` con credenziali sicure
 
 ## Troubleshooting
 
 ### Problemi Comuni
 
-1. **Connessione WebSocket**
+1. **GunDB non sincronizza**
+   - Verifica configurazione WebSocket
+   - Controlla permessi directory `radata`
+   - Verifica connessione con i peer
 
-   - Verifica CORS
-   - Controlla token
-   - Verifica porte
+2. **IPFS non funziona**
+   - Verifica che IPFS sia in esecuzione all'indirizzo specificato
+   - Controlla token JWT Pinata se utilizzi servizio remoto
+   - Verifica connettività gateway IPFS
 
-2. **Upload File**
+3. **Autenticazione fallisce**
+   - Verifica SECRET_TOKEN
+   - Controlla configurazione RelayVerifier per auth on-chain
+   - Verifica permessi e directory chiavi
 
-   - Controlla permessi
-   - Verifica limiti dimensione
-   - Controlla storage disponibile
+## Utility
 
-3. **IPFS**
+### Utils
 
-   - Verifica nodo IPFS
-   - Controlla credenziali Pinata
-   - Verifica gateway
+1. **ShogunCore Utils (`src/utils/shogunCoreUtils.js`)**
+   - Inizializzazione ed interazione con ShogunCore
+   - Setup dei contratti Relay
+   - Gestione del RelayVerifier
 
-4. **SQLite**
-   - Controlla permessi DB
-   - Verifica spazio disco
-   - Monitora lock file
+2. **GunDB Utils (`src/utils/gunIpfsUtils.js`)**
+   - Middleware per integrazione GunDB con IPFS
+   - Gestione dati sincronizzati
+
+3. **Debug Utils (`src/utils/debugUtils.js`)**
+   - Strumenti di diagnostica
+   - Logging avanzato
+
+4. **Bullet Catcher (`src/utils/bullet-catcher.js`)**
+   - Gestione globale eccezioni non catturate
+   - Prevenzione crash del server
 
 ## Estensioni Possibili
 

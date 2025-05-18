@@ -34,10 +34,7 @@ export function FilesTabContent() {
             // Card header with IPFS status indicator
             const ipfsStatus = getIpfsStatus();
             const ipfsStatusIndicator = h('span', { 
-                class: 'badge', 
-                style: ipfsStatus.enabled 
-                    ? 'background-color: #4CAF50; margin-left: 10px; font-size: 0.8em; padding: 2px 6px;' 
-                    : 'background-color: #ff3366; margin-left: 10px; font-size: 0.8em; padding: 2px 6px;'
+                class: `ipfs-status-badge ${ipfsStatus.enabled ? 'ipfs-status-enabled' : 'ipfs-status-disabled'}`
             }, ipfsStatus.enabled ? 'IPFS: Active' : 'IPFS: Disabled');
             
             const cardHeader = h('div', { class: 'card-header' },
@@ -85,7 +82,7 @@ export function FilesTabContent() {
             
             // Add debug button for IPFS metadata
             const debugIpfsButton = h('button', {
-                style: 'background-color: #6e3fff; margin-left: auto;',
+                class: 'secondary',
                 onclick: async () => {
                     try {
                         const response = await fetch('/api/ipfs/metadata', {
@@ -210,14 +207,6 @@ export function FilesTabContent() {
 export function UploadTabContent() {
     const tabContent = h('div', { id: 'upload-tab', class: 'tab-content' });
     
-    // Form state - use bypass to prevent GunDB storage
-    const [getUploadStatus, setUploadStatus] = setSignal('', { key: 'upload-status', bypass: true });
-    const [getUploadResult, setUploadResult] = setSignal(null, { key: 'upload-result', bypass: true });
-    
-    // Track if we've already checked IPFS on this tab activation
-    let ipfsCheckedOnActivation = false;
-    
-    // Effect to update the tab content based on active state
     setEffect(() => {
         const isActive = getActiveTab() === 'upload';
         tabContent.className = isActive ? 'tab-content active' : 'tab-content';
@@ -225,151 +214,105 @@ export function UploadTabContent() {
         if (isActive) {
             tabContent.innerHTML = '';
             
-            // IPFS status badge
+            // Card header with IPFS status indicator
             const ipfsStatus = getIpfsStatus();
-            const ipfsStatusBadge = h('span', { 
-                id: 'ipfs-status-badge',
-                class: 'badge',
-                style: ipfsStatus.enabled 
-                    ? 'background-color: #4CAF50;' 
-                    : 'background-color: #ff3366;'
-            }, ipfsStatus.enabled ? 'IPFS: Active' : 'IPFS: Disabled');
+            const ipfsStatusIndicator = h('span', { 
+                class: `ipfs-status-badge ${ipfsStatus.enabled ? 'ipfs-status-enabled' : 'ipfs-status-disabled'}`
+            }, ipfsStatus.enabled ? 'IPFS: Enabled' : 'IPFS: Disabled');
             
-            // Card header
             const cardHeader = h('div', { class: 'card-header' },
-                h('h3', { class: 'card-title' }, 'Upload File'),
-                h('div', { class: 'card-actions' }, ipfsStatusBadge)
+                h('div', { style: 'display: flex; align-items: center;' },
+                    h('h3', { class: 'card-title' }, 'Upload File'),
+                    ipfsStatusIndicator
+                )
             );
             
-            // Upload form
+            // Form container
             const uploadForm = createUploadForm();
             
-            // Result container
-            const resultContainer = h('div', { 
-                id: 'upload-result',
-                style: 'margin-top: 20px'
+            // Results container
+            const resultsContainer = h('div', { 
+                id: 'upload-results', 
+                style: 'margin-top: 20px;'
             });
             
-            // Add all elements to tab content
+            // Add to tab content
             tabContent.appendChild(cardHeader);
             tabContent.appendChild(uploadForm);
-            tabContent.appendChild(resultContainer);
-            
-            // Try to get the upload result from both signal and localStorage
-            let uploadResult = getUploadResult();
-            
-            // If signal doesn't have valid data, try localStorage
-            if (!uploadResult || !uploadResult.originalName) {
-                try {
-                    const storedResult = localStorage.getItem('lastUploadResult');
-                    if (storedResult) {
-                        uploadResult = JSON.parse(storedResult);
-                        // Update the signal with the parsed data
-                        setUploadResult(uploadResult);
-                    }
-                } catch (error) {
-                    console.error('Error parsing stored upload result:', error);
-                }
-            }
-            
-            // Now display the result if we have valid data
-            if (uploadResult && typeof uploadResult === 'object' && uploadResult.originalName) {
-                console.log('Found valid upload result to display:', uploadResult.originalName);
-                resultContainer.innerHTML = '';
-                resultContainer.appendChild(createResultCard(uploadResult));
-            }
-            
-            // Check IPFS status on tab activation, but only once
-            if (ipfsStatus.enabled && !ipfsCheckedOnActivation) {
-                // Set the flag to prevent multiple checks
-                ipfsCheckedOnActivation = true;
-                
-                // Use a timeout to avoid too many simultaneous checks
-                setTimeout(() => {
-                    checkIpfsConnection().then(status => {
-                        setIpfsConnectionStatus(status);
-                    }).catch(error => {
-                        console.error("Error checking IPFS status on tab activation:", error);
-                        setIpfsConnectionStatus({
-                            status: 'error',
-                            message: 'Check failed'
-                        });
-                    });
-                }, 1000);
-            }
+            tabContent.appendChild(resultsContainer);
         }
     });
     
-    // Create upload form
+    /**
+     * Create upload form
+     */
     function createUploadForm() {
-        // Create form container
-        const form = h('form', { id: 'upload-form' });
-        
-        // File input
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.id = 'file-input';
-        
-        // Custom name input
-        const customNameInput = document.createElement('input');
-        customNameInput.type = 'text';
-        customNameInput.id = 'custom-name';
-        customNameInput.placeholder = 'Custom name (optional)';
-        
-        // Upload button
-        const uploadButton = h('button', { 
-            type: 'submit',
-            id: 'upload-button'
-        }, 'Upload File');
-        
-        // Status display
-        const uploadStatus = h('div', { 
-            id: 'upload-status',
-            class: 'status',
-            innerHTML: getUploadStatus()
+        const form = h('form', { 
+            id: 'file-upload-form',
+            style: 'margin-top: 20px;'
         });
         
-        // IPFS connection status display (only show when IPFS is enabled)
-        const ipfsStatus = getIpfsStatus();
-        let connectionStatus = null;
+        // File input container with styling
+        const fileInputContainer = h('div', { 
+            style: 'margin-bottom: 20px; border: 2px dashed var(--border-color); border-radius: 10px; padding: 30px; text-align: center;'
+        });
         
-        if (ipfsStatus.enabled) {
-            const connStatus = getIpfsConnectionStatus();
-            
-            connectionStatus = h('div', { 
-                class: 'connection-status',
-                id: 'ipfs-connection-status'
-            },
-                h('span', { class: 'status-label' }, 'Connection status:'),
-                h('span', { 
-                    id: 'ipfs-status-indicator',
-                    class: `status-${connStatus.status || 'unknown'}`
-                }, connStatus.message || 'Unknown'),
-                h('button', {
-                    id: 'ipfs-check-connection',
-                    class: 'btn-small',
-                    onclick: async (e) => {
-                        e.preventDefault();
-                        const statusIndicator = document.getElementById('ipfs-status-indicator');
-                        if (statusIndicator) {
-                            statusIndicator.className = 'status-checking';
-                            statusIndicator.textContent = 'Verifica in corso...';
-                        }
-                        const status = await checkIpfsConnection();
-                        setIpfsConnectionStatus(status);
-                    }
-                }, 'Check')
-            );
-        }
+        // File input
+        const fileInput = h('input', { 
+            type: 'file', 
+            id: 'file-upload', 
+            style: 'display: none;'
+        });
         
-        // Append all elements to form
-        form.appendChild(fileInput);
-        form.appendChild(customNameInput);
-        form.appendChild(uploadButton);
-        form.appendChild(uploadStatus);
-        if (connectionStatus) form.appendChild(connectionStatus);
+        // File input label (styled as button)
+        const fileInputLabel = h('label', { 
+            for: 'file-upload', 
+            class: 'upload-btn',
+            style: 'display: inline-block; cursor: pointer; padding: 12px 30px; background: var(--primary-color); color: white; border-radius: 6px; font-weight: 600; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); transition: all 0.3s ease;'
+        }, 'Choose File');
         
-        // Handle form submission
+        // File status
+        const fileStatus = h('div', { 
+            id: 'file-upload-status', 
+            style: 'margin-top: 10px; color: var(--text-secondary);'
+        }, 'No file selected');
+        
+        // Add to file input container
+        fileInputContainer.appendChild(fileInput);
+        fileInputContainer.appendChild(fileInputLabel);
+        fileInputContainer.appendChild(fileStatus);
+        
+        // File name input
+        const fileNameLabel = h('label', { 
+            for: 'file-name',
+            style: 'display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-color);'
+        }, 'Custom file name (optional)');
+        
+        const fileNameInput = h('input', { 
+            type: 'text', 
+            id: 'file-name', 
+            placeholder: 'Enter custom name for the file'
+        });
+        
+        // Submit button with styling
+        const submitBtn = h('button', { 
+            type: 'submit',
+            class: 'upload-btn',
+            style: 'margin-top: 20px; width: 100%;'
+        }, 'Upload File');
+        
+        // Add all elements to form
+        form.appendChild(fileInputContainer);
+        form.appendChild(fileNameLabel);
+        form.appendChild(fileNameInput);
+        form.appendChild(submitBtn);
+        
+        // Add event listeners
+        fileInput.addEventListener('change', () => {
+            const fileName = fileInput.files[0]?.name || 'No file selected';
+            fileStatus.textContent = fileName;
+        });
+        
         form.addEventListener('submit', handleUpload);
         
         return form;
@@ -379,12 +322,11 @@ export function UploadTabContent() {
     async function handleUpload(e) {
         e.preventDefault();
         
-        const fileInput = document.getElementById('file-input');
-        const customName = document.getElementById('custom-name').value;
+        const fileInput = document.getElementById('file-upload');
+        const customName = document.getElementById('file-name').value;
         
         if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
             showToast('Please select a file to upload', 'warning');
-            setUploadStatus('<div class="error">Please select a file to upload</div>');
             return;
         }
         
@@ -407,7 +349,6 @@ export function UploadTabContent() {
         
         // Show loading
         setIsLoading(true);
-        setUploadStatus('<div class="info">Uploading file...</div>');
         
         try {
             const formData = new FormData();
@@ -434,10 +375,8 @@ export function UploadTabContent() {
                 // Check if the file was uploaded to IPFS
                 if (data.file && data.file.ipfsHash) {
                     console.log(`File uploaded to IPFS successfully: ${data.file.ipfsHash}`);
-                    setUploadStatus('<div class="success">File uploaded to IPFS successfully</div>');
                     showToast('File uploaded to IPFS successfully', 'success');
                 } else {
-                    setUploadStatus('<div class="success">File uploaded successfully</div>');
                     showToast('File uploaded successfully', 'success');
                 }
                 
@@ -458,21 +397,10 @@ export function UploadTabContent() {
                 console.log('Upload result complete file data:', completeFileData);
                 
                 // Store the completed file data both in signal and localStorage for redundancy
-                setUploadResult(completeFileData);
                 localStorage.setItem('lastUploadResult', JSON.stringify(completeFileData));
                 
                 // Clear file form after successful upload
                 e.target.reset();
-                
-                // Only update the result container once with the complete data
-                const resultContainer = document.getElementById('upload-result');
-                if (resultContainer) {
-                    resultContainer.innerHTML = '';
-                    resultContainer.appendChild(createResultCard(completeFileData));
-                }
-                
-                // Wait a moment to ensure the file is processed
-                await new Promise(resolve => setTimeout(resolve, 1500));
                 
                 // Reload files list with cache busting
                 try {
@@ -489,109 +417,10 @@ export function UploadTabContent() {
                 throw new Error(data.error || "Unknown error");
             }
         } catch (error) {
-            setUploadStatus(`<div class="error">Upload error: ${error.message}</div>`);
             showToast(`Upload error: ${error.message}`, 'error');
             console.error("Error uploading file:", error);
         } finally {
             setIsLoading(false);
-        }
-    }
-    
-    // Create result card
-    function createResultCard(file) {
-        // Additional safety check
-        if (!file || typeof file !== 'object' || !file.originalName) {
-            console.error('Invalid or empty file data provided to result card:', file);
-            return h('div', { class: 'card error' }, 'Invalid file data');
-        }
-        
-        try {
-            // Debug log for IPFS data
-            console.log("Creating result card for file:", {
-                name: file.originalName,
-                size: file.size,
-                mimeType: file.mimeType || file.mimetype,
-                hasIPFS: !!file.ipfsHash,
-                ipfsHash: file.ipfsHash,
-                ipfsUrl: file.ipfsUrl,
-                fileUrl: file.fileUrl
-            });
-            
-            const card = h('div', { class: 'card' });
-            
-            // Card header with file icon based on mimetype
-            const cardHeader = h('div', { class: 'card-header' },
-                h('h3', { class: 'card-title' }, 'File Uploaded')
-            );
-            
-            // File info 
-            const fileInfo = h('div', { class: 'file-info' });
-            
-            // File name
-            const fileName = h('div', { class: 'file-name' }, file.originalName);
-            
-            // File metadata
-            const fileMeta = h('div', { class: 'file-meta' },
-                `${formatFileSize(file.size)} • ${file.mimeType || file.mimetype} `,
-                file.ipfsHash 
-                    ? h('span', { class: 'ipfs-badge' }, 'IPFS')
-                    : h('span', { class: 'local-badge' }, 'Local')
-            );
-            
-            // File URL
-            const fileUrl = h('div', { class: 'file-url' },
-                h('strong', {}, 'URL: '),
-                h('a', { 
-                    href: file.fileUrl,
-                    target: '_blank'
-                }, file.fileUrl)
-            );
-            
-            fileInfo.appendChild(fileName);
-            fileInfo.appendChild(fileMeta);
-            fileInfo.appendChild(fileUrl);
-            
-            // IPFS information if available
-            if (file.ipfsHash) {
-                const ipfsGateway = getIpfsStatus().gateway || 'https://ipfs.io/ipfs';
-                const ipfsUrl = file.ipfsUrl || `${ipfsGateway}/${file.ipfsHash}`;
-                
-                const ipfsInfo = h('div', { class: 'ipfs-info' },
-                    h('small', {}, `IPFS Hash: ${file.ipfsHash}`),
-                    h('br'),
-                    h('small', {}, 
-                        'IPFS URL: ',
-                        h('a', { 
-                            href: ipfsUrl,
-                            target: '_blank'
-                        }, ipfsUrl)
-                    )
-                );
-                fileInfo.appendChild(ipfsInfo);
-                
-                // Add copy hash button
-                const copyButton = h('button', {
-                    class: 'copy-hash',
-                    onclick: async () => {
-                        try {
-                            await navigator.clipboard.writeText(file.ipfsHash);
-                            showToast('IPFS hash copied to clipboard', 'success');
-                        } catch (error) {
-                            showToast(`Error copying hash: ${error.message}`, 'error');
-                        }
-                    }
-                }, 'Copy Hash');
-                fileInfo.appendChild(copyButton);
-            }
-            
-            // Add elements to card
-            card.appendChild(cardHeader);
-            card.appendChild(fileInfo);
-            
-            return card;
-        } catch (error) {
-            console.error('Error creating result card:', error);
-            return h('div', { class: 'card error' }, 'Error creating result card');
         }
     }
     

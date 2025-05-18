@@ -348,8 +348,11 @@ async function startServer() {
     app.use("/app-nodom.js", express.static(path.join(__dirname, "src/ui/app-nodom.js")));
     app.use("/components-nodom.js", express.static(path.join(__dirname, "src/ui/components-nodom.js")));
     app.use("/tabs-nodom.js", express.static(path.join(__dirname, "src/ui/tabs-nodom.js")));
-
-
+    app.use("/nodom.css", express.static(path.join(__dirname, "src/ui/nodom.css"), { 
+      setHeaders: (res) => {
+        res.setHeader('Content-Type', 'text/css');
+      }
+    }));
 
     // Set up the upload route separately
     app.post(
@@ -642,11 +645,6 @@ app.get("/check-websocket", (req, res) => {
 
 // Serve l'interfaccia web di base
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "src/ui/index.html"));
-});
-
-// Serve la pagina di login html
-app.get("/nodom", (req, res) => {
   res.sendFile(path.join(__dirname, "src/ui/index-nodom.html"));
 });
 

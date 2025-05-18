@@ -15,7 +15,6 @@
     "RELAY_REGISTRY_CONTRACT": "",
     "INDIVIDUAL_RELAY": "",
     "RELAY_ENTRY_POINT_CONTRACT": "",
-    "APP_KEY_PAIR": "",
     "ACTIVITYPUB_USER": "admin",
     "ACTIVITYPUB_PASS": "admin",
     "ACTIVITYPUB_DOMAIN": "localhost",
