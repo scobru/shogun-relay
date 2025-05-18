@@ -1,12 +1,11 @@
 node_modules/
-./dist/
+dist/
 .env
 .DS_Store 
-./radata/
-./uploads/*
-./logs
+radata/
+uploads/
+logs
 config.json
 keys/
-./keys/private.pem
-./keys/cert.pem
+
 
