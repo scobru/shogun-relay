@@ -10,6 +10,15 @@ import path from "path";
 import http from "http";
 import https from "https";
 import "./utils/bullet-catcher.js";
+import { parse, inferSchema, validate } from "mityli";
+import { 
+  validateFileData, 
+  validateUploadResponse, 
+  validateConfig,
+  isValidationEnabled,
+  isStrictValidationEnabled,
+  updateValidationConfig
+} from "./utils/typeValidation.js";
 
 import {
   AuthenticationManager,
@@ -42,6 +51,15 @@ try {
   );
   CONFIG = JSON.parse(configData);
   console.log("Configuration loaded from config.json");
+  
+  // Validate the configuration using Mityli
+  try {
+    CONFIG = validateConfig(CONFIG);
+    console.log("Configuration validated successfully with Mityli");
+  } catch (validationError) {
+    console.warn("Configuration validation warning:", validationError.message);
+    console.warn("Continuing with unvalidated configuration");
+  }
 } catch (error) {
   console.error("Error loading config.json:", error.message);
   console.log("Using default configuration");
@@ -383,29 +401,44 @@ async function startServer() {
           }, 30000); // 30 second timeout
           
           // Process the upload
-          const fileData = await fileManager.handleFileUpload(req);
+          let fileData = await fileManager.handleFileUpload(req);
+          
+          // Validate the file data using Mityli
+          try {
+            fileData = validateFileData(fileData);
+            console.log("[Server] File data validated successfully with Mityli");
+          } catch (validationError) {
+            console.error("[Server] File data validation error:", validationError.message);
+            // Continue without validation if it fails - for backward compatibility
+          }
           
           // Clear the timeout since we completed successfully
           clearTimeout(uploadTimeout);
           
           console.log(`[Server] File upload completed successfully: ${fileData.id}`);
           
+          // Prepare response
+          const response = {
+            success: true,
+            file: fileData,
+            fileInfo: {
+              originalName: fileData.originalName,
+              size: fileData.size,
+              mimetype: fileData.mimetype,
+              fileUrl: fileData.fileUrl,
+              ipfsHash: fileData.ipfsHash,
+              ipfsUrl: fileData.ipfsUrl,
+              customName: fileData.customName,
+            },
+            verified: fileData.verified,
+          };
+          
+          // Validate response with Mityli before sending
+          const validatedResponse = validateUploadResponse(response);
+          
           // Send response if not already sent
           if (!res.headersSent) {
-            res.json({
-              success: true,
-              file: fileData,
-              fileInfo: {
-                originalName: fileData.originalName,
-                size: fileData.size,
-                mimetype: fileData.mimetype,
-                fileUrl: fileData.fileUrl,
-                ipfsHash: fileData.ipfsHash,
-                ipfsUrl: fileData.ipfsUrl,
-                customName: fileData.customName,
-              },
-              verified: fileData.verified,
-            });
+            res.json(validatedResponse);
           }
         } catch (error) {
           console.error("[Server] File upload error:", error);
@@ -543,6 +576,160 @@ app.get("/api/status", (req, res) => {
       gateway: ipfsManager.getConfig().gateway,
     },
   });
+});
+
+// Mityli Type Validation Test Endpoint
+app.get("/api/test-mityli", (req, res) => {
+  console.log("MITYLI_TEST: Starting validation test");
+  
+  // Sample data with both valid and invalid variants
+  const samples = {
+    validFileData: {
+      id: "valid_file_123",
+      name: "valid.jpg",
+      originalName: "valid.jpg",
+      mimeType: "image/jpeg",
+      mimetype: "image/jpeg",
+      size: 12345,
+      url: "/uploads/valid.jpg",
+      fileUrl: "/uploads/valid.jpg",
+      localPath: "/path/to/valid.jpg",
+      ipfsHash: "QmValidHash123",
+      ipfsUrl: "https://gateway.ipfs.io/ipfs/QmValidHash123",
+      timestamp: Date.now(),
+      uploadedAt: Date.now(),
+      customName: "my-valid-name",
+      verified: true
+    },
+    invalidFileData: {
+      id: "invalid_file_123",
+      name: "invalid.jpg",
+      // Missing required fields
+      size: "not-a-number", // Wrong type
+      timestamp: "not-a-timestamp" // Wrong type
+    }
+  };
+  
+  const results = {
+    testTime: new Date().toISOString(),
+    validationResults: {}
+  };
+  
+  // Test validation for valid data
+  try {
+    const validParsed = validateFileData(samples.validFileData);
+    results.validationResults.validData = {
+      success: true,
+      message: "Valid data validated successfully",
+      data: validParsed
+    };
+  } catch (error) {
+    results.validationResults.validData = {
+      success: false,
+      message: "Validation of valid data failed unexpectedly: " + error.message
+    };
+  }
+  
+  // Test validation for invalid data
+  try {
+    const invalidParsed = validateFileData(samples.invalidFileData);
+    results.validationResults.invalidData = {
+      success: true, // This should not happen
+      message: "Invalid data unexpectedly validated successfully",
+      data: invalidParsed
+    };
+  } catch (error) {
+    results.validationResults.invalidData = {
+      success: false,
+      message: "Invalid data correctly failed validation: " + error.message
+    };
+  }
+  
+  // Test assignment validation with Proxy
+  try {
+    const validParsed = validateFileData(samples.validFileData);
+    
+    // Test valid assignment
+    validParsed.size = 54321; // Should work (same type)
+    results.validationResults.validAssignment = {
+      success: true,
+      message: "Valid assignment passed",
+      newSize: validParsed.size
+    };
+    
+    // Test invalid assignment (might throw)
+    try {
+      validParsed.size = "invalid-size"; // Should throw (wrong type)
+      results.validationResults.invalidAssignment = {
+        success: false,
+        message: "Invalid assignment unexpectedly succeeded"
+      };
+    } catch (assignError) {
+      results.validationResults.invalidAssignment = {
+        success: true,
+        message: "Invalid assignment correctly threw error: " + assignError.message
+      };
+    }
+  } catch (error) {
+    results.validationResults.assignment = {
+      success: false,
+      message: "Assignment validation test failed: " + error.message
+    };
+  }
+  
+  // Add current validation configuration
+  results.configuration = {
+    validationEnabled: isValidationEnabled(),
+    strictValidation: isStrictValidationEnabled()
+  };
+  
+  // Return all results
+  res.json(results);
+});
+
+// Type Validation Configuration Endpoint
+app.post("/api/validation-config", authenticateRequest, (req, res) => {
+  console.log("[Server] Processing validation config update request");
+  
+  // Extract configuration from request
+  const { enabled, strict } = req.body;
+  
+  // Validate input
+  if (typeof enabled !== 'boolean' && typeof strict !== 'boolean') {
+    return res.status(400).json({
+      success: false,
+      error: "Invalid configuration. Expected 'enabled' and/or 'strict' boolean parameters."
+    });
+  }
+  
+  try {
+    const { updateValidationConfig, isValidationEnabled, isStrictValidationEnabled } = require("./utils/typeValidation.js");
+    
+    // Update configuration
+    updateValidationConfig({
+      TYPE_VALIDATION_ENABLED: typeof enabled === 'boolean' ? enabled : undefined,
+      TYPE_VALIDATION_STRICT: typeof strict === 'boolean' ? strict : undefined
+    });
+    
+    // Get current configuration
+    const currentConfig = {
+      enabled: isValidationEnabled(),
+      strict: isStrictValidationEnabled()
+    };
+    
+    // Return success response
+    res.json({
+      success: true,
+      message: "Validation configuration updated successfully",
+      config: currentConfig
+    });
+  } catch (error) {
+    console.error("[Server] Error updating validation configuration:", error);
+    res.status(500).json({
+      success: false,
+      error: "Error updating validation configuration: " + error.message
+    });
+  }
 });
 
 // GunDB Test Endpoint

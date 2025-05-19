@@ -1,15 +1,15 @@
 {
-    "NODE_ENV": "production",
+    "NODE_ENV": "development",
     "PORT": 8765,
     "HTTPS_PORT": 8443,
-    "SECRET_TOKEN": "",
+    "SECRET_TOKEN": "thisIsTheTokenForReals",
     "ALLOWED_ORIGINS": "",
     "IPFS_ENABLED": false,
-    "IPFS_SERVICE": "IPFS-CLIENT",
-    "IPFS_NODE_URL": "http://127.0.0.1:5001",
-    "IPFS_GATEWAY": "http://127.0.0.1:8080/ipfs",
-    "PINATA_GATEWAY": "https://gateway.pinata.cloud", 
-    "PINATA_JWT": "your_pinata_jwt_here",
+    "IPFS_SERVICE": "",
+    "IPFS_NODE_URL": "",
+    "IPFS_GATEWAY": "",
+    "PINATA_GATEWAY": "", 
+    "PINATA_JWT": "",
     "ETHEREUM_PROVIDER_URL": "",
     "ETHEREUM_PRIVATE_KEY": "",
     "ONCHAIN_MEMBERSHIP_ENABLED": false,
@@ -24,4 +24,3 @@
     "TYPE_VALIDATION_STRICT": false,
     "MAX_FILE_SIZE": "50mb"
 }
-    

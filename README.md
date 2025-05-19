@@ -1,346 +1,283 @@
-# Shogun Relay
+# Shogun Relay 📡
 
-Un relay server avanzato che integra GunDB, IPFS ed Ethereum per la gestione decentralizzata di dati, file e autenticazione.
+An advanced relay server that integrates GunDB, IPFS and Ethereum for decentralized management of data, files and authentication.
 
-## Caratteristiche Principali
+## Technology Stack
 
-### Architettura Decentralizzata
+- **Express**: Web server framework for API endpoints and routing
+- **GunDB**: Decentralized real-time database for data synchronization
+- **Shogun Core**: Core library providing relay verification and authentication
+- **Shogun IPFS**: IPFS integration for decentralized storage
+- **Mityli**: Runtime type checking and validation
+- **Shogun NoDom**: Lightweight UI framework for the management interface
 
-- **GunDB**: Database decentralizzato per sincronizzazione dati in tempo reale
-- **IPFS**: Storage distribuito e persistente per file e contenuti
-- **Ethereum**: Verifica on-chain opzionale per autenticazione membri
+## Main Features
 
-### Sicurezza
+### Decentralized Architecture
 
-- Autenticazione basata su token
-- Supporto per verifica on-chain tramite RelayVerifier
-- Gestione sicura delle connessioni WebSocket
-- Supporto per HTTPS con certificati personalizzati
+- **GunDB**: Decentralized database for real-time data synchronization
+- **IPFS**: Distributed and persistent storage for files and content
+- **Ethereum**: Optional on-chain verification for member authentication
+- **Mityli**: Runtime type validation to ensure data integrity
 
-### API Complete
+### User Interface
 
-- REST API per gestione file e configurazione
-- WebSocket per sincronizzazione in tempo reale
-- Supporto per upload e gestione file
-- Endpoint per integrazione IPFS
+The project includes a built-in management UI that allows you to:
+- Monitor relay status and connections
+- Manage files and IPFS content
+- Configure system settings
+- Test and debug connections
+- View logs and diagnostics
 
-## Architettura
+The UI is powered by Shogun NoDom, a lightweight UI framework that offers excellent performance with minimal overhead.
+
+### Security
+
+- Token-based authentication
+- Support for on-chain verification via RelayVerifier
+- Secure WebSocket connection handling
+- HTTPS support with custom certificates
+- Automatic data type validation to prevent corruption
+
+### Complete APIs
+
+- REST API for file management and configuration
+- WebSocket for real-time synchronization
+- Support for file upload and management
+- Endpoints for IPFS integration
+
+## Architecture
 
 ### Core Components
 
-1. **Server Relay (`src/index.js`)**
+1. **Relay Server (`src/index.js`)**
 
-   - Gestione delle connessioni WebSocket per GunDB
-   - Routing delle richieste HTTP/HTTPS
-   - Supporto per autenticazione multi-livello
-   - Configurazione CORS avanzata
+   - WebSocket connection management for GunDB
+   - HTTP/HTTPS request routing
+   - Multi-level authentication support
+   - Advanced CORS configuration
 
 2. **Authentication Manager (`src/managers/AuthenticationManager.js`)**
 
-   - Validazione token
-   - Integrazione con RelayVerifier per verifica on-chain
-   - Controllo accessi per API e WebSocket
+   - Token validation
+   - Integration with RelayVerifier for on-chain verification
+   - Access control for API and WebSocket
 
 3. **IPFS Manager (`src/managers/IpfsManager.js`)**
 
-   - Integrazione nativa con IPFS
-   - Supporto per Pinata e nodi IPFS locali
-   - Gestione file e metadati
+   - Native IPFS integration
+   - Support for Pinata and local IPFS nodes
+   - File and metadata management
 
 4. **File Manager (`src/managers/FileManager.js`)**
-   - Gestione file locale e distribuita
-   - Sistema di upload multi-part
-   - Backup e sincronizzazione
+   - Local and distributed file management
+   - Multi-part upload system
+   - Backup and synchronization
 
 ### API Routes
 
 1. **Auth Routes (`src/routes/authRoutes.js`)**
 
-   - Autenticazione utenti
-   - Gestione token
-   - Verifica on-chain
+   - User authentication
+   - Token management
+   - On-chain verification
 
 2. **IPFS Routes (`src/routes/ipfsApiRoutes.js`)**
 
-   - Endpoint per operazioni IPFS
-   - Gestione metadati
-   - Controllo stato IPFS
+   - Endpoints for IPFS operations
+   - Metadata management
+   - IPFS status control
 
 3. **File Routes (`src/routes/fileManagerRoutes.js`)**
 
-   - Interrogazione e ricerca file
-   - Accesso ai dettagli dei file
-   - Query avanzate
+   - File querying and search
+   - File details access
+   - Advanced queries
 
 4. **Relay Routes (`src/routes/relayApiRoutes.js`)**
-   - Configurazione relay
-   - Stato e diagnostica
-   - Gestione sottoscrizioni
+   - Relay configuration
+   - Status and diagnostics
+   - Subscription management
 
 ## API Endpoints
 
-### Autenticazione
+### Authentication
 
-- `POST /auth/register`: Registrazione utente
-- `POST /auth/login`: Login utente
-- `POST /auth/verify-onchain`: Verifica on-chain di chiavi pubbliche
+- `POST /auth/register`: User registration
+- `POST /auth/login`: User login
+- `POST /auth/verify-onchain`: On-chain verification of public keys
 
-### File
+### Files
 
-- `GET /api/files/all`: Lista di tutti i file
-- `GET /api/files/search`: Ricerca file con criteri personalizzati
-- `GET /api/files/:id`: Dettagli di un file specifico
+- `GET /api/files/all`: List of all files
+- `GET /api/files/search`: File search with custom criteria
+- `GET /api/files/:id`: Details of a specific file
 
 ### IPFS
 
-- `GET /api/ipfs/status`: Stato del servizio IPFS
-- `GET /api/ipfs/health-check`: Controllo salute del sistema IPFS
-- `GET /api/ipfs/metadata`: Metadati dei file IPFS
-- `GET /api/ipfs/pin-status/:hash`: Stato di pin per un hash specifico
-- `POST /api/ipfs/pin`: Aggiunge pin a contenuto
-- `POST /api/ipfs/unpin`: Rimuove pin da contenuto
-- `POST /api/ipfs/toggle`: Attiva/disattiva il servizio IPFS
-- `POST /api/ipfs/update-config`: Aggiorna configurazione IPFS
+- `GET /api/ipfs/status`: IPFS service status
+- `GET /api/ipfs/health-check`: IPFS system health check
+- `GET /api/ipfs/metadata`: IPFS file metadata
+- `GET /api/ipfs/pin-status/:hash`: Pin status for specific hash
+- `POST /api/ipfs/pin`: Add pin to content
+- `POST /api/ipfs/unpin`: Remove pin from content
+- `POST /api/ipfs/toggle`: Enable/disable IPFS service
+- `POST /api/ipfs/update-config`: Update IPFS configuration
+
+### Type Validation
+
+- `GET /api/test-mityli`: Test type validation implementation
+- `POST /api/validation-config`: Update type validation configuration (requires authentication)
 
 ### Relay
 
-- `GET /api/relay/status`: Stato del relay server
-- `GET /api/relay/all`: Lista di tutti i relay disponibili
-- `GET /api/relay/check-subscription/:relayAddress/:userAddress`: Verifica sottoscrizione
-- `GET /api/relay/user-active-relays/:userAddress`: Relays attivi per un utente
-- `GET /api/relay/subscription-info/:relayAddress/:userAddress`: Info sottoscrizione
-- `POST /api/relay/update-relay-config`: Aggiorna configurazione relay
-- `POST /api/relay/auth/update-config`: Aggiorna configurazione autenticazione
+- `GET /api/relay/status`: Relay server status
+- `GET /api/relay/all`: List of all available relays
+- `GET /api/relay/check-subscription/:relayAddress/:userAddress`: Check subscription
+- `GET /api/relay/user-active-relays/:userAddress`: Active relays for a user
+- `GET /api/relay/subscription-info/:relayAddress/:userAddress`: Subscription info
+- `POST /api/relay/update-relay-config`: Update relay configuration
+- `POST /api/relay/auth/update-config`: Update authentication configuration
 
 ### WebSocket
 
-- `/gun`: Endpoint WebSocket GunDB
+- `/gun`: GunDB WebSocket endpoint
 
-## Configurazione
+## Configuration
 
-Il server utilizza un file di configurazione `config.json` che contiene tutte le opzioni necessarie.
+The server uses a `config.json` file containing all necessary options.
 
-```json
-{
-    "NODE_ENV": "production",
-    "PORT": 8765,
-    "SECRET_TOKEN": "",
-    "ALLOWED_ORIGINS": "",
-    "IPFS_ENABLED": false,
-    "IPFS_SERVICE": "IPFS-CLIENT",
-    "IPFS_NODE_URL": "http://127.0.0.1:5001",
-    "IPFS_GATEWAY": "http://127.0.0.1:8080/ipfs",
-    "PINATA_GATEWAY": "https://gateway.pinata.cloud", 
-    "PINATA_JWT": "your_pinata_jwt_here",
-    "ETHEREUM_PROVIDER_URL": "",
-    "ETHEREUM_PRIVATE_KEY": "",
-    "ONCHAIN_MEMBERSHIP_ENABLED": false,
-    "RELAY_REGISTRY_CONTRACT": "",
-    "INDIVIDUAL_RELAY": "",
-    "RELAY_ENTRY_POINT_CONTRACT": "",
-    "ACTIVITYPUB_USER": "admin",
-    "ACTIVITYPUB_PASS": "admin",
-    "ACTIVITYPUB_DOMAIN": "localhost",
-    "ACTIVITYPUB_PORT": 8765,
-    "PRIVKEY_PATH": "",
-    "CERT_PATH": "",
-    "ADMIN_USER": "admin",
-    "ADMIN_PASS": "admin"
-}
-```
+## Installation
 
-### Opzioni Principali
+### Prerequisites
 
-- **PORT**: Porta del server (default: 8765)
-- **SECRET_TOKEN**: Token per autenticazione API
-- **ALLOWED_ORIGINS**: Domini autorizzati per CORS (separati da virgole)
-- **IPFS_ENABLED**: Abilita funzionalità IPFS
-- **ETHEREUM_PROVIDER_URL**: URL provider Ethereum
-- **ONCHAIN_MEMBERSHIP_ENABLED**: Abilita verifica membri on-chain
-- **PRIVKEY_PATH/CERT_PATH**: Percorsi per certificati HTTPS
+- **Node.js**: Version 16 or higher
+- **IPFS**: Local IPFS node (optional, can use Pinata instead)
+- **Ethereum Provider**: Access to Ethereum provider (optional, for on-chain verification)
+- **Dependencies**:
+  - Express: Web server framework
+  - GunDB: Decentralized database
+  - Shogun Core: Core relay functionality 
+  - Shogun IPFS: IPFS integration
+  - Mityli: Runtime type validation
+  - Shogun NoDom: UI framework
 
-## Installazione
-
-### Prerequisiti
-
-- Node.js >= 16
-- IPFS node (opzionale)
-- Accesso a provider Ethereum (opzionale)
-
-### Setup
+### Quick Start
 
 ```bash
-# Clona il repository
+# Clone the repository
 git clone https://github.com/yourusername/shogun-relay.git
 cd shogun-relay
 
-# Installa dipendenze
+# Install dependencies
 npm install
 
-# Copia e configura il file di configurazione
+# Copy example configuration
 cp config.json.example config.json
-# Modifica config.json con i tuoi parametri
 
-# Genera una coppia di chiavi (opzionale)
-npm run generate-keypair
+# Edit configuration as needed
+nano config.json
 
-# Avvia il server
+# Start the server
 npm start
 ```
 
-## Comandi
-
-Il server offre diversi script npm:
-
-- `npm start`: Avvia il server
-- `npm run dev`: Avvia il server in modalità sviluppo con hot-reload
-- `npm run generate-keypair`: Genera coppia di chiavi per autenticazione
-- `npm run get-deployed-contracts`: Ottiene indirizzi contratti deployati
-- `npm run clean-all`: Pulisce tutti i dati (GunDB, file, etc)
-
-## Debug
-
-Per attivare la modalità debug:
+### Development Setup
 
 ```bash
-# Avvia con debug options
-DEBUG=shogun-relay:* npm start
+# Start in development mode with hot reload
+npm run dev
+
+# In a separate terminal, monitor logs
+tail -f server.log
 ```
 
-### Console Debug
+### UI Development
 
-- `/debug` - Attiva modalità debug nella console (se in ambiente web)
-- Cerca `DEBUG=true` nei logs per info diagnostiche
-- Utilizza `bullet-catcher.js` per catturare gli errori imprevisti
+The NoDom-based UI is located in `src/ui/` directory. If you wish to modify the UI:
 
-## Sicurezza
+```bash
+# Modify the UI files
+nano src/ui/app-nodom.js
+nano src/ui/components-nodom.js
 
-### Best Practices
-
-1. **Configura HTTPS**
-   - Imposta `PRIVKEY_PATH` e `CERT_PATH` per abilitare HTTPS
-
-2. **Abilita Autenticazione On-chain**
-   - Imposta `ONCHAIN_MEMBERSHIP_ENABLED=true`
-   - Configura gli indirizzi dei contratti rilevanti
-
-3. **Limita CORS**
-   - Specifica solo i domini necessari in `ALLOWED_ORIGINS`
-
-4. **Proteggi API Admin**
-   - Modifica `ADMIN_USER` e `ADMIN_PASS` con credenziali sicure
-
-## Troubleshooting
-
-### Problemi Comuni
-
-1. **GunDB non sincronizza**
-   - Verifica configurazione WebSocket
-   - Controlla permessi directory `radata`
-   - Verifica connessione con i peer
-
-2. **IPFS non funziona**
-   - Verifica che IPFS sia in esecuzione all'indirizzo specificato
-   - Controlla token JWT Pinata se utilizzi servizio remoto
-   - Verifica connettività gateway IPFS
-
-3. **Autenticazione fallisce**
-   - Verifica SECRET_TOKEN
-   - Controlla configurazione RelayVerifier per auth on-chain
-   - Verifica permessi e directory chiavi
-
-## Utility
-
-### Utils
-
-1. **ShogunCore Utils (`src/utils/shogunCoreUtils.js`)**
-   - Inizializzazione ed interazione con ShogunCore
-   - Setup dei contratti Relay
-   - Gestione del RelayVerifier
-
-2. **GunDB Utils (`src/utils/gunIpfsUtils.js`)**
-   - Middleware per integrazione GunDB con IPFS
-   - Gestione dati sincronizzati
-
-3. **Debug Utils (`src/utils/debugUtils.js`)**
-   - Strumenti di diagnostica
-   - Logging avanzato
-
-4. **Bullet Catcher (`src/utils/bullet-catcher.js`)**
-   - Gestione globale eccezioni non catturate
-   - Prevenzione crash del server
-
-## Estensioni Possibili
-
-### Implementazione Indexer
-
-Per migliorare le performance di ricerca e l'organizzazione dei dati, è possibile implementare un indexer con le seguenti caratteristiche:
-
-1. **Indicizzazione File**
-
-   - Metadati (nome, dimensione, tipo)
-   - Hash contenuto
-   - Tag e categorie
-   - Relazioni tra file
-
-2. **Storage Options**
-
-   - SQLite (tabella dedicata)
-   - Elasticsearch
-   - MongoDB
-
-3. **Funzionalità**
-
-   - Ricerca full-text
-   - Filtri avanzati
-   - Aggregazioni
-   - Suggerimenti
-
-4. **Esempio Implementazione SQLite**
-
-```sql
-CREATE TABLE file_index (
-    id INTEGER PRIMARY KEY,
-    file_id TEXT NOT NULL,
-    filename TEXT NOT NULL,
-    content_hash TEXT,
-    mime_type TEXT,
-    size INTEGER,
-    tags TEXT,
-    metadata TEXT,
-    created_at INTEGER,
-    updated_at INTEGER,
-    UNIQUE(file_id)
-);
-
-CREATE INDEX idx_filename ON file_index(filename);
-CREATE INDEX idx_content_hash ON file_index(content_hash);
-CREATE INDEX idx_mime_type ON file_index(mime_type);
+# The changes will be served immediately when the server is running
 ```
 
-5. **API Endpoints Suggeriti**
+## UI Endpoints
 
-```javascript
-// Ricerca avanzata
-GET /api/search
-{
-  query: string,
-  filters: {
-    mimeType: string[],
-    size: { min: number, max: number },
-    tags: string[],
-    dateRange: { start: Date, end: Date }
-  },
-  sort: { field: string, order: 'asc' | 'desc' },
-  page: number,
-  limit: number
-}
+The management interface is accessible through the following URLs:
 
-// Gestione tag
-POST /api/files/:id/tags
-DELETE /api/files/:id/tags/:tag
+- `/`: Main management dashboard
+- `/login`: Authentication page
+- `/debug-interface`: Debug and diagnostics interface
 
-// Aggregazioni
-GET /api/stats/by-type
-GET /api/stats/by-date
+### Accessing the UI
+
+1. Start the server using `npm start`
+2. Open your browser and navigate to `http://localhost:8765` (or your configured HOST:PORT)
+3. You will be presented with the NoDom-powered management interface
+4. Use the admin credentials from your config.json to log in
+
+### UI Features
+
+- **Dashboard**: Overview of system status, connections, and recent activities
+- **File Manager**: Browse, upload, and manage files (both local and IPFS)
+- **Settings**: Configure relay server settings
+- **Diagnostics**: Tools for debugging and testing connectivity
+- **Logs**: View system logs and error reports
+
+## Debugging
+
+### Debug Commands
+
+- Use `/debug` command in the UI to activate debug mode
+- Debug logs are stored in the `logs` directory
+- Debug mode provides additional logging and detailed error information
+
+### Debugging APIs
+
+The following endpoints are available for debugging:
+
+- `GET /api/status`: Overall server status
+- `GET /api/test-gundb`: Test GunDB connectivity
+- `GET /check-websocket`: Check WebSocket configuration
+- `GET /api/test-mityli`: Test type validation system
+- `POST /debug`: Generate detailed debug information
+
+### Debugging Tools
+
+- **Bullet Catcher**: Global exception handler to prevent server crashes
+- **Console Logging**: Detailed logs with timestamp and context
+- **Type Validation**: Runtime checking of data structures
+
+## Command Reference
+
+### Server Commands
+
+```bash
+# Start the server in production mode
+npm start
+
+# Start the server in development mode with hot reload
+npm run dev
+
+# Clean all data (radata, uploads, logs)
+npm run clean-all
+
+# Generate a new key pair for authentication
+npm run generate-keypair
+```
+
+### Testing Commands
+
+```bash
+# Test GunDB connectivity
+curl http://localhost:8765/api/test-gundb
+
+# Check server status
+curl http://localhost:8765/api/status
+
+# Test type validation system
+curl http://localhost:8765/api/test-mityli
 ```

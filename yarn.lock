@@ -2573,6 +2573,13 @@ minimist@^1.2.6:
   resolved "https://registry.npmjs.org/minimist/-/minimist-1.2.8.tgz"
   integrity sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==
 
+mityli@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/mityli/-/mityli-1.0.1.tgz#59f2fb5452922fa3a5df8f958f3bf4cd14ef098f"
+  integrity sha512-vTUTb1jtn22ZS35KUi81+V9SBCCg8ftrwKCTm92I7/y0x3TD1ZQ8w4daJ1N9FrP25aLJqjvSxB+XxDMQQMBSDg==
+  dependencies:
+    valibot "^0.24.0"
+
 mkdirp@^0.5.4:
   version "0.5.6"
   resolved "https://registry.npmjs.org/mkdirp/-/mkdirp-0.5.6.tgz"
@@ -3740,6 +3747,11 @@ uuid@^8.3.2:
   version "8.3.2"
   resolved "https://registry.npmjs.org/uuid/-/uuid-8.3.2.tgz"
   integrity sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==
+
+valibot@^0.24.0:
+  version "0.24.1"
+  resolved "https://registry.yarnpkg.com/valibot/-/valibot-0.24.1.tgz#c51b2f3f0806e59f60f266fcff06185dcc1fabbf"
+  integrity sha512-Toclbuy20XsECZiueh2dkQ63he2AGaBIj/FJRDAFti2kueFldm9bjJzSYvPaL5CE1HXDMRhq7olak8at7xCz5A==
 
 valibot@^1.1.0:
   version "1.1.0"
