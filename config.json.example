@@ -19,7 +19,5 @@
     "PRIVKEY_PATH": "",
     "CERT_PATH": "",
     "TYPE_VALIDATION_ENABLED": true,
-    "TYPE_VALIDATION_STRICT": false,
-    "MAX_FILE_SIZE": "50mb"
-}
+    "TYPE_VALIDATION_STRICT": false,}
     
