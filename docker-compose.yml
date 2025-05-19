@@ -1,0 +1,14 @@
+version: "3.8"
+services:
+  test-env:
+    build: .
+    ports:
+      - "8765:8765"
+      - "8443:8443"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      # Aggiungi qui altre variabili d'ambiente se necessario
+    command: yarn start
