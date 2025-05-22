@@ -20,8 +20,7 @@ export function initializeShogunCore(gun, authToken) {
           signup: 30000,
         }
       };
-
-      shogunCoreInstance = new ShogunCore(config);
+      
       console.log("ShogunCore initialized successfully");
     } catch (error) {
       console.error("Error initializing ShogunCore:", error);

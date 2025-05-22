@@ -1,0 +1,217 @@
+:root {
+  /* Variabili principali */
+  --transition: all 0.3s ease;
+  
+  /* Shadow */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  
+  /* Specifiche per il tema chiaro */
+  --bg-primary: #f8f9fa;
+  --bg-secondary: #f1f3f5;
+  --border: #dee2e6;
+  --text-primary: #212529;
+  --text-secondary: #6c757d;
+  --primary: #2980b9;
+  --secondary: #7f8c8d;
+  --success: #27ae60;
+  --warning: #f39c12;
+  --danger: #e74c3c;
+  
+  /* Gradienti */
+  --gradient-primary: linear-gradient(135deg, #2980b9, #3498db);
+  --gradient-danger: linear-gradient(135deg, #e74c3c, #c0392b);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background-color: #f0f2f5;
+  padding: 20px;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 15px;
+  transition: var(--transition);
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.app-header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  display: inline-block;
+}
+
+.app-header p {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+}
+
+.logo {
+  width: 60px;
+  height: 60px;
+  margin-bottom: 1rem;
+}
+
+/* Fullscreen mode */
+.fullscreen-mode {
+  /* Reset margin and padding to 0 */
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  
+  /* Take full viewport dimensions */
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9999 !important;
+  
+  /* Change background to primary bg */
+  background-color: var(--background-primary) !important;
+}
+
+/* Hide non-essential elements in fullscreen mode */
+.fullscreen-mode .app-header,
+.fullscreen-mode #modeSelector,
+.fullscreen-mode #userSetup,
+.fullscreen-mode #status,
+.fullscreen-mode #roomInfo,
+.fullscreen-mode #chatTabs,
+.fullscreen-mode #shareLink,
+.fullscreen-mode #audioControl {
+  display: none !important;
+}
+
+/* Show only essential chat elements */
+.fullscreen-mode #roomChatTab,
+.fullscreen-mode #privateChatTab {
+  padding: 0 !important;
+  margin: 0 !important;
+  height: 100vh !important;
+  width: 100vw !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Adjust the chat containers */
+.fullscreen-mode .chat-container {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 80px !important;
+  height: auto !important;
+  max-height: none !important;
+  padding: 10px !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  overflow-y: auto !important;
+}
+
+/* Style the message form in fullscreen */
+.fullscreen-mode .message-form {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 80px !important;
+  padding: 15px !important;
+  background-color: var(--background-primary) !important;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1) !important;
+  border-top: 1px solid var(--border-color) !important;
+  z-index: 100 !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Style the exit fullscreen button */
+.exit-fullscreen {
+  position: fixed !important;
+  top: 10px !important;
+  right: 10px !important;
+  z-index: 10000 !important;
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background-color: var(--background-primary) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-primary) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+.exit-fullscreen:hover {
+  transform: scale(1.1) !important;
+  background-color: var(--primary-color) !important;
+  color: white !important;
+}
+
+/* Varie utilities */
+.hidden {
+  display: none !important;
+}
+
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1rem; }
+.mb-1 { margin-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 1rem; }
+
+/* Animazioni */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* Scrollbar personalizzata */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #1e6091;
+}
+
+/* Ripristino visualizzazione tab */
+#roomChatTab {
+  display: block;
+}

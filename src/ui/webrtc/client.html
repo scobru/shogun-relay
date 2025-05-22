@@ -1,0 +1,433 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1" name="viewport" />
+    <meta content="yes" name="mobile-web-app-capable" />
+    <meta content="black" name="apple-mobile-web-app-status-bar-style" />
+    <meta content="yes" name="apple-mobile-web-app-capable" />
+    <title>Pan Pot - Crittografato</title>
+    <script src="https://cdn.jsdelivr.net/npm/eventemitter3@4.0.0/index.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bugout@0.0.13/docs/bugout.min.js"></script>
+    <script src="./bugoff.js"></script>
+    <style>
+      :root {
+        --primary-color: #6366f1;
+        --primary-dark: #4f46e5;
+        --secondary-color: #c084fc;
+        --light-bg: #f3f4f6;
+        --dark-bg: #1f2937;
+        --dark-card: #111827;
+        --text-light: #f9fafb;
+        --text-dark: #374151;
+        --success: #10b981;
+        --danger: #ef4444;
+        --warning: #f59e0b;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--dark-bg);
+        color: var(--text-light);
+        max-width: 800px;
+        text-align: center;
+        margin: 0 auto;
+        width: 100%;
+        padding: 20px;
+        line-height: 1.6;
+      }
+
+      header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+
+      .logo {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+      }
+
+      .logo img {
+        height: 100px;
+        margin-right: 15px;
+        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+      }
+
+      h1 {
+        font-size: 2.5rem;
+        margin: 0;
+        color: white;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+      }
+
+      h2 {
+        font-size: 1.2rem;
+        font-weight: 400;
+        color: var(--secondary-color);
+        margin-bottom: 20px;
+      }
+
+      .status-card {
+        background-color: var(--dark-card);
+        border-radius: 12px;
+        padding: 15px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-left: 4px solid var(--primary-color);
+      }
+
+      #connected {
+        font-weight: bold;
+      }
+
+      #connected.yes {
+        color: var(--success);
+      }
+
+      #connected.no {
+        color: var(--danger);
+      }
+
+      #ui {
+        display: none;
+        background-color: var(--dark-card);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      .input-group {
+        margin-bottom: 15px;
+      }
+
+      input {
+        width: 100%;
+        background-color: rgba(31, 41, 55, 0.8);
+        color: var(--text-light);
+        border: 1px solid #374151;
+        padding: 12px 16px;
+        margin-bottom: 10px;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+        font-family: inherit;
+        font-size: 1em;
+      }
+
+      input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+      }
+
+      button {
+        padding: 10px 16px;
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        font-family: inherit;
+        font-size: 1em;
+        float: right;
+      }
+
+      button:hover {
+        background-color: var(--primary-dark);
+        transform: translateY(-1px);
+      }
+
+      button:active {
+        transform: translateY(1px);
+      }
+
+      pre {
+        width: 100%;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: left;
+        word-wrap: break-word;
+        white-space: pre-wrap;
+        background-color: var(--dark-card);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-left: 4px solid var(--secondary-color);
+        margin-top: 20px;
+        font-size: 0.9em;
+        line-height: 1.5;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      .tech-badge {
+        display: inline-block;
+        background-color: rgba(99, 102, 241, 0.2);
+        color: var(--primary-color);
+        padding: 3px 8px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        margin-right: 5px;
+        margin-bottom: 10px;
+      }
+
+      .security-badge {
+        display: inline-block;
+        background-color: rgba(16, 185, 129, 0.2);
+        color: var(--success);
+        padding: 3px 8px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        margin-right: 5px;
+        margin-bottom: 10px;
+      }
+
+      footer {
+        margin-top: 20px;
+        font-size: 0.9em;
+        color: #9ca3af;
+      }
+
+      .server-link {
+        margin-top: 15px;
+      }
+
+      .server-link a {
+        display: inline-block;
+        color: var(--primary-color);
+        text-decoration: none;
+        padding: 8px 12px;
+        background-color: rgba(99, 102, 241, 0.1);
+        border-radius: 8px;
+        transition: all 0.2s ease;
+      }
+
+      .server-link a:hover {
+        background-color: rgba(99, 102, 241, 0.2);
+        transform: translateY(-1px);
+      }
+
+      #username {
+        font-weight: 600;
+        border-left: 3px solid var(--warning);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo">
+        <!-- <img src="./shogun.svg" alt="SHOGUN Logo"/> -->
+        <div>
+          <h1>PAN POT</h1>
+          <h2>WebTorrent Crittografato</h2>
+        </div>
+      </div>
+    </header>
+
+    <div class="tech-badge">Bugoff</div>
+    <div class="tech-badge">WebTorrent</div>
+    <div class="security-badge">Crittografato</div>
+    
+    <div class="status-card">
+      <p>Status: <span id="connected" class="no">Disconnesso</span></p>
+    </div>
+    
+    <div id="ui">
+      <div class="input-group">
+        <input id="username" maxlength="30" placeholder="Il tuo username..." />
+      </div>
+      <div class="input-group">
+        <input id="message" maxlength="279" placeholder="Il tuo messaggio..." />
+        <button id="send">Invia</button>
+      </div>
+    </div>
+    
+    <pre id="messages">Caricamento...</pre>
+    
+    <div class="server-link">
+      <a href="messageboard-server-encrypted.html" target="_NEW">Avvia il tuo server</a>
+    </div>
+
+    <footer>
+      <p>Messageboard Client Crittografato - Basato su Bugoff</p>
+    </footer>
+  </body>
+  <script>
+    var serveraddress =
+      window.location.hash.substr(1) || "bUH7ukDvd9R2xLLRKMKWZ1mGPkgdVfufye";
+    var b;
+    var msglist = document.getElementById("messages");
+    var clientAddress = "";
+
+    try {
+      // Inizializza Bugoff con l'indirizzo del server
+      b = new Bugoff(serveraddress);
+      
+      // Inizializza SEA per la crittografia
+      b.SEA()
+        .then(function () {
+          console.log("SEA initialized with keypair");
+          
+          // Carica l'username salvato se disponibile
+          var savedUsername = localStorage["bugout-username"];
+          if (savedUsername) {
+            document.getElementById("username").value = savedUsername;
+          }
+        })
+        .catch(function (err) {
+          console.error("Error initializing SEA:", err);
+        });
+
+      
+
+      msglist.textContent =
+        "Connessione a " + serveraddress + "...\n(Può richiedere uno o due minuti)";
+    } catch (error) {
+      console.error("Error connecting to server:", error);
+      msglist.textContent =
+        "Errore di connessione al server: " +
+        error.message +
+        "\nTentativo di connessione senza crittografia...";
+
+      // Try to connect without encryption as fallback
+      try {
+        b = new Bugout(serveraddress);
+        console.log("Connected to server without encryption");
+        msglist.textContent = "Connesso a " + serveraddress + " senza crittografia\n(Può richiedere uno o due minuti)";
+      } catch (fallbackError) {
+        console.error("Fatal error connecting to server:", fallbackError);
+        msglist.textContent = "Errore fatale di connessione al server: " + fallbackError.message;
+      }
+    }
+    
+    // events
+
+    // if the user clicks the send button
+    document.getElementById("send").onclick = function (ev) {
+      var serveraddress =
+      window.location.hash.substr(1) || "bUH7ukDvd9R2xLLRKMKWZ1mGPkgdVfufye";
+      
+      var m = document.getElementById("message");
+      var usernameInput = document.getElementById("username");
+      
+      // Salva l'username in localStorage per riutilizzarlo in futuro
+      if (usernameInput.value) {
+        localStorage["bugout-username"] = usernameInput.value;
+      }
+      
+      // Usa l'username salvato o "Anonimo" se non specificato
+      var username = usernameInput.value || localStorage["bugout-username"] || "Anonimo";
+      
+      if (m.value) {
+        msglist.textContent = "Invio messaggio...";
+        
+        // Crea un messaggio formattato con username e testo
+        var formattedMessage = username + ": " + m.value;
+        
+        // Invia il messaggio mantenendo la struttura attuale
+        b.send(formattedMessage);
+        
+        m.value = "";
+      }
+    };
+
+    // watch for connection to the server
+    b.on("server", function () {
+      refreshMessages();
+    });
+
+    // if the server tells us to refresh messages
+    b.on("message", function (address, message) {
+      if (message == "refresh") {
+        refreshMessages();
+      }
+    });
+
+    // Gestisci messaggi decriptati (specifico di Bugoff)
+    b.on("decrypted", function (address, pubkeys, message) {
+      console.log("Decrypted message from:", address);
+      // Se il messaggio decriptato è "refresh", aggiorna la lista
+      if (message === "refresh") {
+        refreshMessages();
+      }
+    });
+
+    // Add error handling for network issues
+    b.on("close", function () {
+      console.error("Connection closed");
+      document.getElementById("connected").textContent = "no (disconnesso)";
+      document.getElementById("connected").className = "no";
+    });
+
+    b.on("error", function (error) {
+      console.error("Connection error:", error);
+      document.getElementById("connected").textContent = "no (errore)";
+      document.getElementById("connected").className = "no";
+    });
+
+    // if we see a wire join or leave
+    b.on("wireseen", updateWires);
+    b.on("wireleft", updateWires);
+
+    function updateWires(count) {
+      const connectionStatus = document.getElementById("connected");
+      if (count) {
+        document.getElementById("ui").style.display = "block";
+        connectionStatus.textContent = "Connesso (" + count + ")";
+        connectionStatus.className = "yes";
+      } else {
+        connectionStatus.textContent = "Disconnesso";
+        connectionStatus.className = "no";
+      }
+    }
+
+    // utility functions
+
+    function refreshMessages() {
+      msglist.textContent = "Aggiornamento messaggi...";
+      // get a list of the messages - esattamente come nel file originale
+      b.rpc("list", null, function (messages) {
+        updateMessagelist(messages);
+      });
+    }
+
+    function updateMessagelist(messages) {
+      msglist.textContent = messages
+        .map(function (m) {
+          // Estrai username e messaggio se possibile
+          var messageText = m.m;
+          var sender = m.address;
+          
+          // Prova a estrarre l'username dal formato "username: messaggio"
+          var usernameMatch = messageText.match(/^([^:]+):\s*(.*)/);
+          if (usernameMatch) {
+            sender = usernameMatch[1];
+            messageText = usernameMatch[2];
+          }
+          
+          return (
+            new Date(m.t).toString() +
+            "\n" +
+            "Da: " + sender +
+            "\n" +
+            "\n" +
+            messageText +
+            "\n"
+          );
+        })
+        .join("\n\n");
+    }
+  </script>
+</html>
+

@@ -1,0 +1,462 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1" name="viewport" />
+    <title>Pan Pot - Server Crittografato</title>
+    <script src="https://cdn.jsdelivr.net/npm/eventemitter3@4.0.0/index.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>    
+    <script src="https://cdn.jsdelivr.net/npm/bugout@0.0.13/docs/bugout.min.js"></script>
+    <script src="./bugoff.js"></script>
+    <script src="//cdn.jsdelivr.net/npm/qrcode@latest/build/qrcode.min.js"></script>
+    <style>
+      :root {
+        --primary-color: #6366f1;
+        --primary-dark: #4f46e5;
+        --secondary-color: #c084fc;
+        --light-bg: #f3f4f6;
+        --dark-bg: #1f2937;
+        --dark-card: #111827;
+        --darker-bg: #0f172a;
+        --text-light: #f9fafb;
+        --text-dark: #374151;
+        --success: #10b981;
+        --danger: #ef4444;
+        --warning: #f59e0b;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--darker-bg);
+        color: var(--text-light);
+        max-width: 800px;
+        text-align: center;
+        margin: 0 auto;
+        width: 100%;
+        padding: 20px;
+        line-height: 1.6;
+      }
+
+      header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+
+      .logo {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+      }
+
+      .logo img {
+        height: 80px;
+        margin-right: 15px;
+        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+      }
+
+      h1 {
+        font-size: 2.2rem;
+        margin: 0;
+        color: white;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+      }
+
+      h2 {
+        font-size: 1.1rem;
+        font-weight: 400;
+        color: var(--secondary-color);
+        margin-bottom: 20px;
+      }
+
+      .server-info {
+        background-color: var(--dark-card);
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        border-left: 4px solid var(--primary-color);
+      }
+
+      pre {
+        background-color: var(--dark-bg);
+        color: var(--text-light);
+        padding: 15px;
+        border-radius: 10px;
+        text-align: left;
+        overflow-y: auto;
+        max-height: 500px;
+        word-wrap: break-word;
+        white-space: pre-wrap;
+        line-height: 1.5;
+        font-family: "Consolas", monospace;
+        font-size: 0.9em;
+        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
+        border-left: 4px solid var(--secondary-color);
+      }
+
+      .tech-badge {
+        display: inline-block;
+        background-color: rgba(99, 102, 241, 0.2);
+        color: var(--primary-color);
+        padding: 3px 8px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        margin-right: 5px;
+        margin-bottom: 10px;
+      }
+
+      .security-badge {
+        display: inline-block;
+        background-color: rgba(16, 185, 129, 0.2);
+        color: var(--success);
+        padding: 3px 8px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        margin-right: 5px;
+        margin-bottom: 10px;
+      }
+
+      .server-status {
+        display: inline-block;
+        background-color: rgba(16, 185, 129, 0.2);
+        color: var(--success);
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        margin: 10px 0;
+        font-weight: 600;
+      }
+
+      footer {
+        margin-top: 20px;
+        font-size: 0.9em;
+        color: #9ca3af;
+      }
+
+      .qr-container {
+        background-color: white;
+        padding: 15px;
+        border-radius: 10px;
+        display: inline-block;
+        margin: 15px 0;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo">
+        <!-- <img src="./shogun.svg" alt="SHOGUN Logo" /> -->
+        <div>
+          <h1>PAN POT</h1>
+          <h2>WebTorrent Server Crittografato</h2>
+        </div>
+      </div>
+    </header>
+
+    <div class="tech-badge">Bugoff</div>
+    <div class="tech-badge">WebTorrent</div>
+    <div class="tech-badge">Server</div>
+    <div class="security-badge">Crittografato</div>
+
+    <div class="server-info">
+      <div class="server-status">Server Attivo</div>
+      <div id="address-display"></div>
+      <div id="qr-container" class="qr-container" style="display: none;"></div>
+    </div>
+
+    <pre id="log">Inizializzazione del server...</pre>
+
+    <footer>
+      <p>Pan Pot - Messageboard Server Crittografato</p>
+    </footer>
+  </body>
+  <script>
+    log("*PANPOT WEBTORRENT SERVER*");
+    log("\nmessageboard server\n");
+    log("(view source to see the server code)\n");
+
+    // instantiate our bugout instance
+    var seed = localStorage["bugout-messageboard-seed"];
+    var b;
+    var serverAddress = "";
+
+    try {
+      // Try to initialize with saved seed
+      if (seed) {
+        b = new Bugoff({ seed: seed });
+        log("Using existing seed");
+      } else {
+        // Create a new instance if no seed
+        b = new Bugoff();
+        log("Created with new seed");
+      }
+
+      // save the seed for next time
+      localStorage["bugout-messageboard-seed"] = b.seed;
+
+      // Get and log the server's address
+      try {
+        serverAddress = b.address();
+        log("address:", serverAddress);
+        document.getElementById("address-display").innerHTML = "<strong>Indirizzo server:</strong> " + serverAddress;
+        log("announcing...");
+      } catch (addrError) {
+        log("Error getting address:", addrError);
+        // Try to get address as property if method fails
+        if (b._address) {
+          serverAddress = b._address;
+          log("address (from property):", serverAddress);
+          document.getElementById("address-display").innerHTML = "<strong>Indirizzo server:</strong> " + serverAddress;
+        }
+      }
+
+      // Initialize SEA for encryption
+      b.SEA()
+        .then(function () {
+          log("SEA initialized with keypair");
+        })
+        .catch(function (err) {
+          log("Error initializing SEA:", err);
+        });
+
+      console.log(b);
+    } catch (error) {
+      // If initialization fails, try again with a fresh instance
+      log("Error initializing with saved seed:", error);
+      log("Retrying with a fresh instance...");
+
+      // Clear the saved seed
+      localStorage.removeItem("bugout-messageboard-seed");
+
+      // Create a fresh instance
+      try {
+        b = new Bugoff();
+        localStorage["bugout-messageboard-seed"] = b.seed;
+
+        // Get and log the server's address
+        try {
+          serverAddress = b.address();
+          log("Created fresh instance with address:", serverAddress);
+          document.getElementById("address-display").innerHTML = "<strong>Indirizzo server:</strong> " + serverAddress;
+        } catch (addrError) {
+          log("Error getting address from fresh instance:", addrError);
+          // Try to get address as property if method fails
+          if (b._address) {
+            serverAddress = b._address;
+            log("address (from property):", serverAddress);
+            document.getElementById("address-display").innerHTML = "<strong>Indirizzo server:</strong> " + serverAddress;
+          }
+        }
+      } catch (freshError) {
+        log("Fatal error creating fresh instance:", freshError);
+      }
+    }
+
+    // load messages from previous run
+    if (localStorage["bugout-messageboard"]) {
+      messages = JSON.parse(localStorage["bugout-messageboard"]);
+    }
+    if (typeof messages != "object" || !messages["length"]) {
+      messages = [];
+    }
+
+    /*** rpc calls ***/
+
+    // simple "ping" rpc call
+    b.register("ping", function (address, args, cb) {
+      args["pong"] = Math.random();
+      cb(args);
+    });
+
+    /*** messageboard server API ***/
+
+    b.register(
+      "post",
+      function (address, message, cb) {
+        if (typeof message == "string" && message.length < 280) {
+          var m = { address: address, m: message, t: new Date().getTime() };
+          log("messageboard:", m);
+          messages.push(m);
+          messages = messages.slice(Math.max(0, messages.length - 10));
+          localStorage["bugout-messageboard"] = JSON.stringify(messages);
+
+          // Invia il messaggio di refresh a tutti i client
+          try {
+            b.send("refresh");
+            log("Sent refresh message to all clients");
+          } catch (error) {
+            log("Error sending refresh message:", error);
+          }
+
+          // Conferma al client che ha inviato il messaggio
+          cb(true);
+        } else {
+          cb(false);
+        }
+      },
+      "Post a message to the board"
+    );
+
+    b.register(
+      "list",
+      function (address, args, cb) {
+        cb(messages.slice().reverse());
+      },
+      "List most recent messages"
+    );
+
+    /*** logging ***/
+
+    // log when network connectivity changes
+    var connected = false;
+    b.on("connections", function (c) {
+      if (c == 0 && connected == false) {
+        connected = true;
+        log("ready");
+        var clientURL =
+          document.location.href.replace("server.html", "client.html") + "#" + b.address();
+        // qrcode for the client URL
+        if (window.innerWidth > 600) {
+          // Crea un QR code più bello
+          const qrContainer = document.getElementById("qr-container");
+          qrContainer.style.display = "block";
+          QRCode.toCanvas(
+            clientURL,
+            {
+              width: 180,
+              margin: 4,
+              color: {
+                dark: "#4f46e5",
+                light: "#ffffff",
+              }
+            },
+            function (error, canvas) {
+              if (error) {
+                console.error("Error generating QR code", error);
+                return;
+              }
+              qrContainer.appendChild(canvas);
+              
+              // Aggiungi il link client sotto il QR code
+              const linkElement = document.createElement("div");
+              linkElement.style.marginTop = "10px";
+              linkElement.style.color = "#374151";
+              linkElement.style.fontSize = "0.85em";
+              linkElement.innerHTML = "<strong>Client Link:</strong><br>" + clientURL;
+              qrContainer.appendChild(linkElement);
+            }
+          );
+          
+          log(qr(clientURL));
+        } else {
+          log();
+        }
+        log(clientURL + "\n");
+        log("Connect back to this server-in-a-tab using the link above.");
+      }
+      log("connections:", c);
+    });
+
+    // log when a client sends a message
+
+    
+
+    // Gestisci messaggi decriptati (specifico di Bugoff)
+    b.on("decrypted", function (address, pubkeys, message) {
+      log("decrypted message from:", address);
+      log("sender pubkeys:", pubkeys);
+      log("decrypted message:", message);
+
+      // Se non è un messaggio di sistema (come "refresh"), salvalo come post
+      if (message !== "refresh" && typeof message === "string") {
+        // Salva il messaggio come post
+        var m = { address: address, m: message, t: new Date().getTime() };
+        log("messageboard (from decrypted):", m);
+        messages.push(m);
+        messages = messages.slice(Math.max(0, messages.length - 10));
+        localStorage["bugout-messageboard"] = JSON.stringify(messages);
+
+        // Invia il messaggio di refresh a tutti i client
+        try {
+          b.send("refresh");
+          log("Sent refresh message to all clients");
+        } catch (error) {
+          log("Error sending refresh message:", error);
+        }
+      }
+    });
+
+    b.on("message", (address, data) =>
+      log("From:", address, "Received message!", data)
+    );
+    
+    // log when a client makes an rpc call
+    b.on("rpc", function (address, call, args) {
+      log("rpc:", address, call, args);
+    });
+
+    // log when we see a new client address
+    b.on("seen", function (address) {
+      log("seen:", address);
+
+      // Invia un messaggio di benvenuto al nuovo client
+      try {
+        // Invia un messaggio diretto al nuovo client
+        b.send(address, "Welcome to the messageboard!");
+        log("Sent welcome message to:", address);
+      } catch (error) {
+        log("Error sending welcome message:", error);
+      }
+    });
+
+    // simple logging function
+    function log() {
+      var args = Array.prototype.slice.call(arguments);
+      console.log.apply(null, args);
+      args = args.map(function (a) {
+        if (typeof a == "string") return a;
+        else return JSON.stringify(a);
+      });
+      document.getElementById("log").textContent += args.join(" ") + "\n";
+    }
+
+    // generate a text based qr code
+
+    function qr(txt) {
+      var q = QRCode.create(txt);
+      var code = "\n\n";
+      for (var i = 0; i < 2; i++) {
+        code += "  ████";
+        for (var j = 0; j < q.modules.size; j++) {
+          code += "██";
+        }
+        code += "████\n";
+      }
+      for (var i = 0; i < q.modules.size; i++) {
+        code += "  ████";
+        for (var j = 0; j < q.modules.size; j++) {
+          code += q.modules.data[i * q.modules.size + j] ? "  " : "██";
+        }
+        code += "████\n";
+      }
+      for (var i = 0; i < 2; i++) {
+        code += "  ████";
+        for (var j = 0; j < q.modules.size; j++) {
+          code += "██";
+        }
+        code += "████\n";
+      }
+      return code + "\n\n";
+    }
+  </script>
+</html>

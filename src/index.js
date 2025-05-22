@@ -6,18 +6,18 @@ import fs from "fs";
 import express from "express";
 import { RelayVerifier } from "shogun-core";
 import Gun from "gun";
+import "gun/axe.js";
+import "gun/lib/wire.js"
 import path from "path";
 import http from "http";
 import https from "https";
 import "./utils/bullet-catcher.js";
-import { parse, inferSchema, validate } from "mityli";
-import { 
-  validateFileData, 
-  validateUploadResponse, 
+import {
+  validateFileData,
+  validateUploadResponse,
   validateConfig,
   isValidationEnabled,
   isStrictValidationEnabled,
-  updateValidationConfig
 } from "./utils/typeValidation.js";
 
 import {
@@ -37,7 +37,9 @@ import {
   initializeRelayContracts,
   createRelayVerifier,
 } from "./utils/shogunCoreUtils.js"; // Import ShogunCore utility functions
-import { setupGunIpfsMiddleware } from "./utils/gunIpfsUtils.js"; // Import Gun-IPFS middleware utility
+import { setupGunIpfsMiddleware } from "./utils/gunIpfsUtils.js";
+import MerkleTree  from 'merkletreejs';
+import StorageLog from "./utils/storageLog.js";
 
 // create __dirname
 const __dirname = path.resolve();
@@ -51,7 +53,7 @@ try {
   );
   CONFIG = JSON.parse(configData);
   console.log("Configuration loaded from config.json");
-  
+
   // Validate the configuration using Mityli
   try {
     CONFIG = validateConfig(CONFIG);
@@ -70,7 +72,7 @@ const server = http.createServer(app);
 const PORT = CONFIG.PORT || 8765;
 const HOST = CONFIG.HOST || "localhost";
 const STORAGE_DIR = path.resolve("./uploads");
-const SECRET_TOKEN = CONFIG.SECRET_TOKEN || "thisIsTheTokenForReals";
+const SECRET_TOKEN = CONFIG.SECRET_TOKEN || "";
 const LOGS_DIR = path.resolve("./logs");
 
 // Declare global variables for important instances
@@ -108,6 +110,23 @@ const getDefaultAllowedOrigins = () => {
   ];
 };
 
+
+// In-memory Merkle tree di pubKey autorizzate (esempi in hex)
+// let allowedPubKeys = [
+//   Buffer.from(hexPubKeyX + hexPubKeyY, 'hex')
+// ];
+
+let allowedPubKeys = [
+  Buffer.from("0x0000000000000000000000000000000000000000000000000000000000000000", 'hex')
+];
+
+
+let merkleTree = new MerkleTree(allowedPubKeys, x => keccak('keccak256').update(x).digest(), { sort: true });
+
+function getRoot() {
+  return Buffer.from(merkleTree.getRoot()).toString('hex');
+}
+
 // Define allowedOrigins once
 const allowedOrigins = CONFIG.ALLOWED_ORIGINS
   ? CONFIG.ALLOWED_ORIGINS.split(",")
@@ -116,11 +135,11 @@ const allowedOrigins = CONFIG.ALLOWED_ORIGINS
 // Fix the isValid function to properly handle authorization
 let gunOptions = {
   web: server,
-  peers: ["http://localhost:8765/gun"],
+  peers: CONFIG.PEERS,
   file: "radata",
   radisk: true,
   localStorage: false,
-  isValid: AuthenticationManager.isValidGunMessage.bind(AuthenticationManager), // Corrected: Use .bind()
+  isValid: AuthenticationManager.isValidGunMessage.bind(AuthenticationManager),
 };
 
 // Initialize ShogunCore and relay components. This will create relayVerifier
@@ -245,68 +264,8 @@ async function startServer() {
     gun = Gun(gunOptions);
     console.log("GunDB initialized.");
 
-    // MINIMAL GUNDB TEST
-    console.log("GUNDB_MINIMAL_TEST: Starting minimal test...");
-    const testNode = gun.get("gundb_minimal_test_key");
-    const testData = { message: "Hello GunDB", timestamp: Date.now() };
-
-    console.log(
-      "GUNDB_MINIMAL_TEST: Attempting .put() with data:",
-      JSON.stringify(testData)
-    );
-    let putDone = false;
-    const putTimeout = setTimeout(() => {
-      if (!putDone)
-        console.error(
-          "GUNDB_MINIMAL_TEST: .put() callback DID NOT FIRE within 5s"
-        );
-    }, 5000);
-
-    testNode.put(testData, (putAck) => {
-      putDone = true;
-      clearTimeout(putTimeout);
-      if (putAck.err) {
-        console.error("GUNDB_MINIMAL_TEST: .put() failed:", putAck.err);
-      } else {
-        console.log(
-          "GUNDB_MINIMAL_TEST: .put() successful, ack:",
-          JSON.stringify(putAck)
-        );
-
-        console.log(
-          "GUNDB_MINIMAL_TEST: Attempting immediate .once() to read back..."
-        );
-        let onceDone = false;
-        const onceTimeout = setTimeout(() => {
-          if (!onceDone)
-            console.error(
-              "GUNDB_MINIMAL_TEST: .once() callback DID NOT FIRE within 5s"
-            );
-        }, 5000);
-
-        testNode.once((readData, readKey) => {
-          onceDone = true;
-          clearTimeout(onceTimeout);
-          console.log(
-            "GUNDB_MINIMAL_TEST: .once() callback fired. Key:",
-            readKey,
-            "Data:",
-            JSON.stringify(readData)
-          );
-          if (readData && readData.message === testData.message) {
-            console.log(
-              "GUNDB_MINIMAL_TEST: SUCCESS - Data read back matches put data!"
-            );
-          } else {
-            console.error(
-              "GUNDB_MINIMAL_TEST: FAILED - Data mismatch or no data from .once(). Read data:",
-              JSON.stringify(readData)
-            );
-          }
-        });
-      }
-    });
-    // END MINIMAL GUNDB TEST
+    // Initialize StorageLog
+    new StorageLog(Gun,gun);
 
     // Initialize ShogunCore and relay components
     console.log("Initializing ShogunCore with Gun instance");
@@ -361,16 +320,63 @@ async function startServer() {
     app.use("/files", fileManagerRouter);
 
     app.set("gun", gun);
+
+    app.use(
+      "/bugoff.js",
+      express.static(path.join(__dirname, "src/ui/webrtc/bugoff.js"))
+    );
+
+    app.use(
+      "/bugout.min.js",
+      express.static(path.join(__dirname, "src/ui/webrtc/bugout.min.js"))
+    );
+
     
-    app.use("/nodom.js", express.static(path.join(__dirname, "src/ui/nodom.js")));
-    app.use("/app-nodom.js", express.static(path.join(__dirname, "src/ui/app-nodom.js")));
-    app.use("/components-nodom.js", express.static(path.join(__dirname, "src/ui/components-nodom.js")));
-    app.use("/tabs-nodom.js", express.static(path.join(__dirname, "src/ui/tabs-nodom.js")));
-    app.use("/nodom.css", express.static(path.join(__dirname, "src/ui/nodom.css"), { 
-      setHeaders: (res) => {
-        res.setHeader('Content-Type', 'text/css');
-      }
-    }));
+    app.use(
+      "/shogun-core.js",
+      express.static(path.join(__dirname, "src/ui/msg/shogun-core.js"))
+    );
+
+    app.use(
+      "/msg/client.html",
+      express.static(path.join(__dirname, "src/ui/msg/client.html"))
+    );
+
+    app.use(
+      "/client.html",
+      express.static(path.join(__dirname, "src/ui/webrtc/client.html"))
+    );
+
+    app.use(
+      "/server.html",
+      express.static(path.join(__dirname, "src/ui/webrtc/server.html"))
+    );
+
+
+    app.use(
+      "/nodom.js",
+      express.static(path.join(__dirname, "src/ui/dashboard/nodom.js"))
+    );
+    app.use(
+      "/app-nodom.js",
+      express.static(path.join(__dirname, "src/ui/dashboard/app-nodom.js"))
+    );
+    app.use(
+      "/components-nodom.js",
+      express.static(path.join(__dirname, "src/ui/dashboard/components-nodom.js"))
+    );
+    app.use(
+      "/tabs-nodom.js",
+      express.static(path.join(__dirname, "src/ui/dashboard/tabs-nodom.js"))
+    );
+    app.use(
+      "/nodom.css",
+      express.static(path.join(__dirname, "src/ui/dashboard/nodom.css"), {
+        setHeaders: (res) => {
+          res.setHeader("Content-Type", "text/css");
+        },
+      })
+    );
 
     // Set up the upload route separately
     app.post(
@@ -380,43 +386,50 @@ async function startServer() {
       async (req, res) => {
         try {
           console.log("[Server] Processing file upload request");
-          
+
           // Check if there's actually a file to upload
           if (!req.file && (!req.body.content || !req.body.contentType)) {
             return res.status(400).json({
               success: false,
-              error: "No file or content provided"
+              error: "No file or content provided",
             });
           }
-          
+
           // Set a timeout to prevent hanging uploads
           const uploadTimeout = setTimeout(() => {
             console.error("[Server] File upload processing timeout after 30s");
             if (!res.headersSent) {
               res.status(500).json({
                 success: false,
-                error: "Upload timed out"
+                error: "Upload timed out",
               });
             }
           }, 30000); // 30 second timeout
-          
+
           // Process the upload
           let fileData = await fileManager.handleFileUpload(req);
-          
+
           // Validate the file data using Mityli
           try {
             fileData = validateFileData(fileData);
-            console.log("[Server] File data validated successfully with Mityli");
+            console.log(
+              "[Server] File data validated successfully with Mityli"
+            );
           } catch (validationError) {
-            console.error("[Server] File data validation error:", validationError.message);
+            console.error(
+              "[Server] File data validation error:",
+              validationError.message
+            );
             // Continue without validation if it fails - for backward compatibility
           }
-          
+
           // Clear the timeout since we completed successfully
           clearTimeout(uploadTimeout);
-          
-          console.log(`[Server] File upload completed successfully: ${fileData.id}`);
-          
+
+          console.log(
+            `[Server] File upload completed successfully: ${fileData.id}`
+          );
+
           // Prepare response
           const response = {
             success: true,
@@ -432,17 +445,17 @@ async function startServer() {
             },
             verified: fileData.verified,
           };
-          
+
           // Validate response with Mityli before sending
           const validatedResponse = validateUploadResponse(response);
-          
+
           // Send response if not already sent
           if (!res.headersSent) {
             res.json(validatedResponse);
           }
         } catch (error) {
           console.error("[Server] File upload error:", error);
-          
+
           // Send error response if not already sent
           if (!res.headersSent) {
             res.status(500).json({
@@ -581,7 +594,7 @@ app.get("/api/status", (req, res) => {
 // Mityli Type Validation Test Endpoint
 app.get("/api/test-mityli", (req, res) => {
   console.log("MITYLI_TEST: Starting validation test");
-  
+
   // Sample data with both valid and invalid variants
   const samples = {
     validFileData: {
@@ -599,90 +612,91 @@ app.get("/api/test-mityli", (req, res) => {
       timestamp: Date.now(),
       uploadedAt: Date.now(),
       customName: "my-valid-name",
-      verified: true
+      verified: true,
     },
     invalidFileData: {
       id: "invalid_file_123",
       name: "invalid.jpg",
       // Missing required fields
       size: "not-a-number", // Wrong type
-      timestamp: "not-a-timestamp" // Wrong type
-    }
+      timestamp: "not-a-timestamp", // Wrong type
+    },
   };
-  
+
   const results = {
     testTime: new Date().toISOString(),
-    validationResults: {}
+    validationResults: {},
   };
-  
+
   // Test validation for valid data
   try {
     const validParsed = validateFileData(samples.validFileData);
     results.validationResults.validData = {
       success: true,
       message: "Valid data validated successfully",
-      data: validParsed
+      data: validParsed,
     };
   } catch (error) {
     results.validationResults.validData = {
       success: false,
-      message: "Validation of valid data failed unexpectedly: " + error.message
+      message: "Validation of valid data failed unexpectedly: " + error.message,
     };
   }
-  
+
   // Test validation for invalid data
   try {
     const invalidParsed = validateFileData(samples.invalidFileData);
     results.validationResults.invalidData = {
       success: true, // This should not happen
       message: "Invalid data unexpectedly validated successfully",
-      data: invalidParsed
+      data: invalidParsed,
     };
   } catch (error) {
     results.validationResults.invalidData = {
       success: false,
-      message: "Invalid data correctly failed validation: " + error.message
+      message: "Invalid data correctly failed validation: " + error.message,
     };
   }
-  
+
   // Test assignment validation with Proxy
   try {
     const validParsed = validateFileData(samples.validFileData);
-    
+
     // Test valid assignment
     validParsed.size = 54321; // Should work (same type)
     results.validationResults.validAssignment = {
       success: true,
       message: "Valid assignment passed",
-      newSize: validParsed.size
+      newSize: validParsed.size,
     };
-    
+
     // Test invalid assignment (might throw)
     try {
       validParsed.size = "invalid-size"; // Should throw (wrong type)
       results.validationResults.invalidAssignment = {
         success: false,
-        message: "Invalid assignment unexpectedly succeeded"
+        message: "Invalid assignment unexpectedly succeeded",
       };
     } catch (assignError) {
       results.validationResults.invalidAssignment = {
         success: true,
-        message: "Invalid assignment correctly threw error: " + assignError.message
+        message:
+          "Invalid assignment correctly threw error: " + assignError.message,
       };
     }
   } catch (error) {
     results.validationResults.assignment = {
       success: false,
-      message: "Assignment validation test failed: " + error.message
+      message: "Assignment validation test failed: " + error.message,
     };
   }
-  
+
   // Add current validation configuration
   results.configuration = {
     validationEnabled: isValidationEnabled(),
-    strictValidation: isStrictValidationEnabled()
+    strictValidation: isStrictValidationEnabled(),
   };
-  
+
   // Return all results
   res.json(results);
 });
@@ -690,44 +704,50 @@ app.get("/api/test-mityli", (req, res) => {
 // Type Validation Configuration Endpoint
 app.post("/api/validation-config", authenticateRequest, (req, res) => {
   console.log("[Server] Processing validation config update request");
-  
+
   // Extract configuration from request
   const { enabled, strict } = req.body;
-  
+
   // Validate input
-  if (typeof enabled !== 'boolean' && typeof strict !== 'boolean') {
+  if (typeof enabled !== "boolean" && typeof strict !== "boolean") {
     return res.status(400).json({
       success: false,
-      error: "Invalid configuration. Expected 'enabled' and/or 'strict' boolean parameters."
+      error:
+        "Invalid configuration. Expected 'enabled' and/or 'strict' boolean parameters.",
     });
   }
-  
+
   try {
-    const { updateValidationConfig, isValidationEnabled, isStrictValidationEnabled } = require("./utils/typeValidation.js");
-    
+    const {
+      updateValidationConfig,
+      isValidationEnabled,
+      isStrictValidationEnabled,
+    } = require("./utils/typeValidation.js");
+
     // Update configuration
     updateValidationConfig({
-      TYPE_VALIDATION_ENABLED: typeof enabled === 'boolean' ? enabled : undefined,
-      TYPE_VALIDATION_STRICT: typeof strict === 'boolean' ? strict : undefined
+      TYPE_VALIDATION_ENABLED:
+        typeof enabled === "boolean" ? enabled : undefined,
+      TYPE_VALIDATION_STRICT: typeof strict === "boolean" ? strict : undefined,
     });
-    
+
     // Get current configuration
     const currentConfig = {
       enabled: isValidationEnabled(),
-      strict: isStrictValidationEnabled()
+      strict: isStrictValidationEnabled(),
     };
-    
+
     // Return success response
     res.json({
       success: true,
       message: "Validation configuration updated successfully",
-      config: currentConfig
+      config: currentConfig,
     });
   } catch (error) {
     console.error("[Server] Error updating validation configuration:", error);
     res.status(500).json({
       success: false,
-      error: "Error updating validation configuration: " + error.message
+      error: "Error updating validation configuration: " + error.message,
     });
   }
 });
@@ -821,23 +841,24 @@ app.get("/api/test-gundb", (req, res) => {
 });
 
 // Endpoint per verificare la configurazione WebSocket
-app.get("/check-websocket", (req, res) => {
+app.get("/check-websocket", authenticateRequest, (req, res) => {
   res.json({
     serverInfo: {
       port: PORT,
       websocketUrl: `ws://${req.headers.host}/gun`,
+      ok: true,
     },
   });
 });
 
 // Serve l'interfaccia web di base
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "src/ui/index-nodom.html"));
+  res.sendFile(path.join(__dirname, "src/ui/dashboard/index-nodom.html"));
 });
 
 // Serve la pagina di login html
 app.get("/login", (req, res) => {
-  res.sendFile(path.join(__dirname, "src/ui/login.html"));
+  res.sendFile(path.join(__dirname, "src/ui/dashboard/login.html"));
 });
 
 // Serve la pagina di login html
@@ -916,25 +937,31 @@ app.post("/debug", (req, res) => {
   }
 });
 
-// Hook into message processing for GunDB to detect debug commands
-const originalPut = Gun.chain.put;
-Gun.chain.put = function (data, cb) {
-  // Check if this is a message with text content that might contain a debug command
-  if (
-    data &&
-    typeof data === "object" &&
-    data.text &&
-    typeof data.text === "string"
-  ) {
-    if (data.text.trim() === "/debug") {
-      console.log("Debug command detected in Gun message:", data);
-      // We could trigger additional diagnostics here if needed
-    }
-  }
 
-  // Call the original put method
-  return originalPut.call(this, data, cb);
-};
+app.post('/write', async (req, res) => {
+  try {
+    const { proof, publicSignals, fileContent } = req.body;
+    const [ rootSignal, fileHashSignal ] = publicSignals.map(x => x.toString());
+
+    // 1) controlla che la root richiesta sia l’ultima
+    if (rootSignal !== getRoot()) {
+      return res.status(400).json({ error: 'Merkle root non aggiornata' });
+    }
+
+    // 2) verifica la proof
+    const ok = await groth16.verify(vKey, publicSignals, proof);
+    if (!ok) {
+      return res.status(400).json({ error: 'Proof non valida' });
+    }
+
+    gun.get('files').get(fileHashSignal).put({ content: fileContent, ts: Date.now() });
+
+    return res.json({ success: true, fileHash: fileHashSignal });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: 'Errore interno' });
+  }
+});
 
 // Graceful shutdown handling
 ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => {
@@ -966,6 +993,7 @@ Gun.chain.put = function (data, cb) {
     }, 5000);
   });
 });
+
 
 // Start listening for HTTP requests
 server.listen(PORT, HOST, () => {

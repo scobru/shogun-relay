@@ -221,45 +221,13 @@
                 }, duration);
             };
             
-            // Helper functions for JWT token management
-            const parseJwt = (token) => {
-                try {
-                    // Split the token and decode the payload (middle part)
-                    const base64Url = token.split('.')[1];
-                    if (!base64Url) return null;
-                    
-                    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-                        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-                    }).join(''));
-                    
-                    return JSON.parse(jsonPayload);
-                } catch (error) {
-                    console.error('Error parsing JWT:', error);
-                    return null;
-                }
-            };
-            
-            const isTokenExpired = (token) => {
-                const payload = parseJwt(token);
-                if (!payload || !payload.exp) return true;
-                
-                // exp is in seconds, Date.now() is in milliseconds
-                const now = Date.now() / 1000;
-                return payload.exp < now;
-            };
-
+            /
+        
             // Check if the user is already authenticated with a valid token
             const checkExistingToken = async () => {
                 const savedToken = localStorage.getItem('authToken');
                 if (!savedToken) return false;
                 
-                // Check if token is expired
-                if (isTokenExpired(savedToken)) {
-                    // Remove expired token
-                    localStorage.removeItem('authToken');
-                    return false;
-                }
                 
                 // Verify token with server
                 return await testToken(savedToken);
@@ -300,24 +268,6 @@
                     console.log('Token valido:', isValid);
                     console.log('Token:', token);
                     if (isValid) {
-                        // Check if token looks like a JWT (has two dots)
-                        const isJwt = token.split('.').length === 3;
-                        
-                        if (isJwt) {
-                            // Try to parse as JWT
-                            const payload = parseJwt(token);
-                            console.log('Payload:', payload);
-                            
-                            // If it's a JWT, check if it's expired
-                            if (payload && isTokenExpired(token)) {
-                                showError('Il token JWT è scaduto');
-                                setLoading(false);
-                                return;
-                            }
-                        } else {
-                            console.log('Non-JWT token accepted');
-                        }
-                        
                         // Token is valid according to the server, save it regardless of format
                         localStorage.setItem('authToken', token);
 
@@ -342,7 +292,7 @@
 
             // Function to test token validity with server
             function testToken(token) {
-                return fetch('/api/ipfs/status', {
+                return fetch('/check-websocket', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
