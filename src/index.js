@@ -8,6 +8,7 @@ import { RelayVerifier } from "shogun-core";
 import Gun from "gun";
 import "gun/axe.js";
 import "gun/lib/wire.js"
+import "gun/lib/webrtc.js"
 import path from "path";
 import http from "http";
 import https from "https";
@@ -19,6 +20,7 @@ import {
   isValidationEnabled,
   isStrictValidationEnabled,
 } from "./utils/typeValidation.js";
+import keccak from "keccak";
 
 import {
   AuthenticationManager,
@@ -38,8 +40,9 @@ import {
   createRelayVerifier,
 } from "./utils/shogunCoreUtils.js"; // Import ShogunCore utility functions
 import { setupGunIpfsMiddleware } from "./utils/gunIpfsUtils.js";
-import MerkleTree  from 'merkletreejs';
+import { MerkleTree } from 'merkletreejs';
 import StorageLog from "./utils/storageLog.js";
+import { MerkleManager } from './utils/merkleUtils.js';
 
 // create __dirname
 const __dirname = path.resolve();
@@ -82,6 +85,7 @@ let shogunCore = null;
 let relayVerifier = null;
 let fileManager = null;
 let ipfsManager = null;
+let merkleManager;
 
 // Initial configuration of RELAY_CONFIG - set once at the start
 let RELAY_CONFIG = {
@@ -109,23 +113,6 @@ const getDefaultAllowedOrigins = () => {
     "http://localhost:8765",
   ];
 };
-
-
-// In-memory Merkle tree di pubKey autorizzate (esempi in hex)
-// let allowedPubKeys = [
-//   Buffer.from(hexPubKeyX + hexPubKeyY, 'hex')
-// ];
-
-let allowedPubKeys = [
-  Buffer.from("0x0000000000000000000000000000000000000000000000000000000000000000", 'hex')
-];
-
-
-let merkleTree = new MerkleTree(allowedPubKeys, x => keccak('keccak256').update(x).digest(), { sort: true });
-
-function getRoot() {
-  return Buffer.from(merkleTree.getRoot()).toString('hex');
-}
 
 // Define allowedOrigins once
 const allowedOrigins = CONFIG.ALLOWED_ORIGINS
@@ -270,6 +257,14 @@ async function startServer() {
     // Initialize ShogunCore and relay components
     console.log("Initializing ShogunCore with Gun instance");
     shogunCore = initializeShogunCore(gun, SECRET_TOKEN);
+
+    const radataPath = path.resolve('./radata');
+    console.log(`Using absolute radata path: ${radataPath}`);
+
+    // Then initialize Merkle tree with radata path
+    merkleManager = new MerkleManager(radataPath);
+    await merkleManager.initialize();
+    console.log("Merkle root:", merkleManager.getRoot());
 
     await initializeRelayComponents();
     console.log(
@@ -934,32 +929,6 @@ app.post("/debug", (req, res) => {
       success: false,
       error: `Error processing debug command: ${error.message}`,
     });
-  }
-});
-
-
-app.post('/write', async (req, res) => {
-  try {
-    const { proof, publicSignals, fileContent } = req.body;
-    const [ rootSignal, fileHashSignal ] = publicSignals.map(x => x.toString());
-
-    // 1) controlla che la root richiesta sia l’ultima
-    if (rootSignal !== getRoot()) {
-      return res.status(400).json({ error: 'Merkle root non aggiornata' });
-    }
-
-    // 2) verifica la proof
-    const ok = await groth16.verify(vKey, publicSignals, proof);
-    if (!ok) {
-      return res.status(400).json({ error: 'Proof non valida' });
-    }
-
-    gun.get('files').get(fileHashSignal).put({ content: fileContent, ts: Date.now() });
-
-    return res.json({ success: true, fileHash: fileHashSignal });
-  } catch (e) {
-    console.error(e);
-    return res.status(500).json({ error: 'Errore interno' });
   }
 });
 
