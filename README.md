@@ -10,6 +10,7 @@ An advanced relay server that integrates GunDB, IPFS and Ethereum for decentrali
 - **Shogun IPFS**: IPFS integration for decentralized storage
 - **Mityli**: Runtime type checking and validation
 - **Shogun NoDom**: Lightweight UI framework for the management interface
+- **MerkleTree**: For data integrity verification and proof generation
 
 ## Main Features
 
@@ -19,25 +20,40 @@ An advanced relay server that integrates GunDB, IPFS and Ethereum for decentrali
 - **IPFS**: Distributed and persistent storage for files and content
 - **Ethereum**: Optional on-chain verification for member authentication
 - **Mityli**: Runtime type validation to ensure data integrity
+- **MerkleTree**: Cryptographic verification of data consistency
 
-### User Interface
+### User Interface Components
 
-The project includes a built-in management UI that allows you to:
-- Monitor relay status and connections
-- Manage files and IPFS content
-- Configure system settings
-- Test and debug connections
-- View logs and diagnostics
+The project includes multiple UI interfaces for different functionalities:
 
-The UI is powered by Shogun NoDom, a lightweight UI framework that offers excellent performance with minimal overhead.
+1. **Dashboard UI** (`/src/ui/dashboard/`)
+   - Built with ShogunNoDom lightweight framework
+   - Accessible at the root endpoint `/`
+   - Provides system monitoring, configuration, and management
+   - Login interface at `/login`
+
+2. **WebRTC Communication UI** (`/src/ui/webrtc/`)
+   - Implements peer-to-peer communication
+   - Uses Bugout for WebRTC functionality
+   - Client interface at `/client.html`
+   - Server interface at `/server.html`
+
+3. **Messaging UI** (`/src/ui/messages-gun/`)
+   - GunDB-powered messaging system
+   - Client accessible at `/msg/client.html`
+
+4. **Debug Interface** (`/src/ui/debug.html`)
+   - Advanced debugging tools
+   - Accessible at `/debug-interface`
 
 ### Security
 
-- Token-based authentication
+- Enhanced token-based authentication with system and user token support
 - Support for on-chain verification via RelayVerifier
 - Secure WebSocket connection handling
 - HTTPS support with custom certificates
 - Automatic data type validation to prevent corruption
+- StorageLog for tracking and auditing data operations
 
 ### Complete APIs
 
@@ -45,6 +61,8 @@ The UI is powered by Shogun NoDom, a lightweight UI framework that offers excell
 - WebSocket for real-time synchronization
 - Support for file upload and management
 - Endpoints for IPFS integration
+- Type validation configuration endpoints
+- WebSocket configuration checking
 
 ## Architecture
 
@@ -56,10 +74,12 @@ The UI is powered by Shogun NoDom, a lightweight UI framework that offers excell
    - HTTP/HTTPS request routing
    - Multi-level authentication support
    - Advanced CORS configuration
+   - MerkleTree integration for data integrity
+   - StorageLog for operation tracking
 
 2. **Authentication Manager (`src/managers/AuthenticationManager.js`)**
 
-   - Token validation
+   - token validation
    - Integration with RelayVerifier for on-chain verification
    - Access control for API and WebSocket
 
@@ -142,6 +162,11 @@ The UI is powered by Shogun NoDom, a lightweight UI framework that offers excell
 ### WebSocket
 
 - `/gun`: GunDB WebSocket endpoint
+- `GET /check-websocket`: Check WebSocket configuration
+
+### Debug
+
+- `POST /debug`: Generate detailed debug information
 
 ## Configuration
 
