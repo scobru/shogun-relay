@@ -317,33 +317,33 @@ async function startServer() {
     app.set("gun", gun);
 
     app.use(
-      "/bugoff.js",
-      express.static(path.join(__dirname, "src/ui/webrtc/bugoff.js"))
-    );
-
-    app.use(
-      "/bugout.min.js",
-      express.static(path.join(__dirname, "src/ui/webrtc/bugout.min.js"))
-    );
-
-    app.use(
       "/shogun-core.js",
-      express.static(path.join(__dirname, "src/ui/msg/shogun-core.js"))
+      express.static(path.join(__dirname, "src/ui/messenger/shogun-core.js"))
     );
 
     app.use(
       "/messenger",
-      express.static(path.join(__dirname, "src/ui/msg/client.html"))
+      express.static(path.join(__dirname, "src/ui/messenger/client.html"))
+    );
+
+    app.use(
+      "/bugoff.js",
+      express.static(path.join(__dirname, "src/ui/chat/bugoff.js"))
+    );
+
+    app.use(
+      "/bugout.min.js",
+      express.static(path.join(__dirname, "src/ui/chat/bugout.min.js"))
     );
 
     app.use(
       "/client",
-      express.static(path.join(__dirname, "src/ui/webrtc/client.html"))
+      express.static(path.join(__dirname, "src/ui/chat/client.html"))
     );
 
     app.use(
       "/node",
-      express.static(path.join(__dirname, "src/ui/webrtc/server.html"))
+      express.static(path.join(__dirname, "src/ui/chat/server.html"))
     );
 
     app.use(
