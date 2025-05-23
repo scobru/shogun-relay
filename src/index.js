@@ -7,8 +7,8 @@ import express from "express";
 import { RelayVerifier } from "shogun-core";
 import Gun from "gun";
 import "gun/axe.js";
-import "gun/lib/wire.js"
-import "gun/lib/webrtc.js"
+import "gun/lib/wire.js";
+import "gun/lib/webrtc.js";
 import path from "path";
 import http from "http";
 import https from "https";
@@ -40,9 +40,9 @@ import {
   createRelayVerifier,
 } from "./utils/shogunCoreUtils.js"; // Import ShogunCore utility functions
 import { setupGunIpfsMiddleware } from "./utils/gunIpfsUtils.js";
-import { MerkleTree } from 'merkletreejs';
+import { MerkleTree } from "merkletreejs";
 import StorageLog from "./utils/storageLog.js";
-import { MerkleManager } from './utils/merkleUtils.js';
+import { MerkleManager } from "./utils/merkleUtils.js";
 
 // create __dirname
 const __dirname = path.resolve();
@@ -252,13 +252,13 @@ async function startServer() {
     console.log("GunDB initialized.");
 
     // Initialize StorageLog
-    new StorageLog(Gun,gun);
+    new StorageLog(Gun, gun);
 
     // Initialize ShogunCore and relay components
     console.log("Initializing ShogunCore with Gun instance");
     shogunCore = initializeShogunCore(gun, SECRET_TOKEN);
 
-    const radataPath = path.resolve('./radata');
+    const radataPath = path.resolve("./radata");
     console.log(`Using absolute radata path: ${radataPath}`);
 
     // Then initialize Merkle tree with radata path
@@ -326,44 +326,48 @@ async function startServer() {
       express.static(path.join(__dirname, "src/ui/webrtc/bugout.min.js"))
     );
 
-    
     app.use(
       "/shogun-core.js",
       express.static(path.join(__dirname, "src/ui/msg/shogun-core.js"))
     );
 
     app.use(
-      "/msg/client.html",
+      "/messenger",
       express.static(path.join(__dirname, "src/ui/msg/client.html"))
     );
 
     app.use(
-      "/client.html",
+      "/client",
       express.static(path.join(__dirname, "src/ui/webrtc/client.html"))
     );
 
     app.use(
-      "/server.html",
+      "/node",
       express.static(path.join(__dirname, "src/ui/webrtc/server.html"))
     );
-
 
     app.use(
       "/nodom.js",
       express.static(path.join(__dirname, "src/ui/dashboard/nodom.js"))
     );
+
     app.use(
       "/app-nodom.js",
       express.static(path.join(__dirname, "src/ui/dashboard/app-nodom.js"))
     );
+
     app.use(
       "/components-nodom.js",
-      express.static(path.join(__dirname, "src/ui/dashboard/components-nodom.js"))
+      express.static(
+        path.join(__dirname, "src/ui/dashboard/components-nodom.js")
+      )
     );
+
     app.use(
       "/tabs-nodom.js",
       express.static(path.join(__dirname, "src/ui/dashboard/tabs-nodom.js"))
     );
+
     app.use(
       "/nodom.css",
       express.static(path.join(__dirname, "src/ui/dashboard/nodom.css"), {
@@ -858,11 +862,6 @@ app.get("/login", (req, res) => {
 
 // Serve la pagina di login html
 
-// Serve the debug interface
-app.get("/debug-interface", (req, res) => {
-  res.sendFile(path.join(__dirname, "src/ui/debug.html"));
-});
-
 // Endpoint to handle /debug command explicitly
 app.post("/debug", (req, res) => {
   console.log("Debug command received via dedicated endpoint");
@@ -872,16 +871,6 @@ app.post("/debug", (req, res) => {
   console.log("Debug request body:", req.body);
 
   try {
-    // Check for authentication
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      console.warn("Debug request missing valid authorization");
-      return res.status(401).json({
-        success: false,
-        error: "Unauthorized - Missing valid token",
-      });
-    }
-
     // Extract debug information
     const debugInfo = {
       timestamp: new Date().toISOString(),
@@ -962,7 +951,6 @@ app.post("/debug", (req, res) => {
     }, 5000);
   });
 });
-
 
 // Start listening for HTTP requests
 server.listen(PORT, HOST, () => {
