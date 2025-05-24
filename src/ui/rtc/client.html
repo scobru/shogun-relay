@@ -1,0 +1,560 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1" name="viewport" />
+    <meta content="yes" name="mobile-web-app-capable" />
+    <meta content="black" name="apple-mobile-web-app-status-bar-style" />
+    <meta content="yes" name="apple-mobile-web-app-capable" />
+    <title>WebRTC Messenger Client</title>
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/eventemitter3@4.0.0/index.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bugout@0.0.13/docs/bugout.min.js"></script>
+    <script src="./bugoff.js"></script>
+    <!-- Dashboard Styles -->
+    <link rel="stylesheet" href="/nodom.css" />
+  </head>
+  <body class="theme-dark">
+    <div id="app">
+      <div class="container">
+        <!-- Header -->
+        <div class="dashboard-header">
+          <h1>WebRTC Messenger Client</h1>
+          <div class="subtitle">Secure peer-to-peer messaging</div>
+        </div>
+        
+        <!-- Status Card -->
+        <div class="card status-card">
+          <div class="card-header">
+            <h2>Connection Status</h2>
+          </div>
+          <div class="card-content">
+            <div class="status-indicator">
+              <span id="status-text" class="status-offline">Disconnected</span>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Server:</div>
+              <div id="server-address" class="info-value code">Connecting...</div>
+            </div>
+            <button id="retry-button" class="btn primary" style="display: none;">Retry Connection</button>
+          </div>
+        </div>
+        
+        <!-- Message Center Card -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Message Center</h2>
+          </div>
+          <div class="card-content">
+            <div class="form-group">
+              <label for="username">Your Username</label>
+              <input
+                type="text"
+                id="username"
+                class="input"
+                placeholder="Enter your username"
+                value=""
+              />
+            </div>
+            
+            <div class="form-group">
+              <label for="message">Message</label>
+              <div class="input-with-button">
+                <input
+                  type="text"
+                  id="message"
+                  class="input"
+                  placeholder="Type your message..."
+                  value=""
+                  disabled
+                />
+                <button id="send-button" class="btn primary" disabled>Send</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Messages Card -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Messages</h2>
+            <button id="refresh-button" class="btn small" disabled>Refresh</button>
+          </div>
+          <div class="card-content">
+            <div id="message-container" class="message-container">
+              <div class="empty-state">Connecting to server...</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Log Card -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Connection Log</h2>
+            <button id="clear-log" class="btn small">Clear</button>
+          </div>
+          <div class="card-content">
+            <pre id="log" class="server-log">Initializing client...</pre>
+          </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+          <div class="badge primary">Bugoff</div>
+          <div class="badge success">WebRTC</div>
+          <div class="badge warning">Encrypted</div>
+          <div class="server-link">
+            <a href="server2.html" target="_blank" class="btn small outline">Start Your Own Server</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <style>
+      /* Additional styles specific to the chat interface */
+      .message-container {
+        max-height: 300px;
+        min-height: 150px;
+        overflow-y: auto;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        background: var(--card-bg-secondary);
+      }
+      
+      .message-item {
+        padding: 12px;
+        border-bottom: 1px solid var(--border-color);
+      }
+      
+      .message-item:last-child {
+        border-bottom: none;
+      }
+      
+      .message-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 6px;
+      }
+      
+      .message-sender {
+        font-weight: 600;
+        color: var(--accent-color);
+      }
+      
+      .message-time {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+      }
+      
+      .message-content {
+        line-height: 1.5;
+        word-break: break-word;
+      }
+      
+      .status-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 15px;
+      }
+      
+      .status-online {
+        color: var(--success-color);
+        font-weight: 600;
+      }
+      
+      .status-offline {
+        color: var(--danger-color);
+        font-weight: 600;
+      }
+      
+      .empty-state {
+        padding: 20px;
+        text-align: center;
+        color: var(--text-secondary);
+        font-style: italic;
+      }
+      
+      .input-with-button {
+        display: flex;
+        gap: 8px;
+      }
+      
+      .input-with-button .input {
+        flex: 1;
+      }
+      
+      .server-link {
+        margin-top: 12px;
+      }
+      
+      .badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-right: 6px;
+      }
+      
+      .badge.primary {
+        background-color: var(--primary-color-transparent);
+        color: var(--primary-color);
+      }
+      
+      .badge.success {
+        background-color: var(--success-color-transparent);
+        color: var(--success-color);
+      }
+      
+      .badge.warning {
+        background-color: var(--warning-color-transparent);
+        color: var(--warning-color);
+      }
+      
+      .info-item {
+        display: flex;
+        margin-bottom: 12px;
+        align-items: center;
+      }
+      
+      .info-label {
+        font-weight: 600;
+        width: 100px;
+        flex-shrink: 0;
+      }
+      
+      .info-value {
+        flex: 1;
+      }
+      
+      .code {
+        font-family: monospace;
+        background-color: var(--card-bg-secondary);
+        padding: 4px 8px;
+        border-radius: 4px;
+        word-break: break-all;
+      }
+      
+      .server-log {
+        background-color: var(--card-bg-secondary);
+        color: var(--text-primary);
+        padding: 15px;
+        border-radius: 6px;
+        height: 150px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 0.85rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+    </style>
+    
+    <script>
+      // DOM Elements
+      const statusText = document.getElementById('status-text');
+      const serverAddressElement = document.getElementById('server-address');
+      const usernameInput = document.getElementById('username');
+      const messageInput = document.getElementById('message');
+      const sendButton = document.getElementById('send-button');
+      const refreshButton = document.getElementById('refresh-button');
+      const messageContainer = document.getElementById('message-container');
+      const logElement = document.getElementById('log');
+      const retryButton = document.getElementById('retry-button');
+      const clearLogButton = document.getElementById('clear-log');
+      
+      // Client variables
+      let serverAddress = window.location.hash.substr(1) || "bUH7ukDvd9R2xLLRKMKWZ1mGPkgdVfufye";
+      let b;
+      let connected = false;
+      let connectionCount = 0;
+      const logMessages = [];
+      
+      // Load saved username
+      usernameInput.value = localStorage["bugout-username"] || "";
+      
+      // Event listeners
+      sendButton.addEventListener('click', sendMessage);
+      refreshButton.addEventListener('click', refreshMessages);
+      retryButton.addEventListener('click', initClient);
+      clearLogButton.addEventListener('click', () => {
+        logMessages.length = 0;
+        logElement.textContent = "Log cleared";
+      });
+      
+      messageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          sendMessage();
+        }
+      });
+      
+      // Logging function
+      function log(...args) {
+        const logMessage = args.map(arg => 
+          typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+        ).join(' ');
+        
+        console.log(...args);
+        logMessages.push(logMessage);
+        logElement.textContent = logMessages.join('\n');
+        
+        // Auto-scroll to bottom
+        logElement.scrollTop = logElement.scrollHeight;
+      }
+      
+      // Update UI based on connection status
+      function updateConnectionStatus(status, count = 0) {
+        connected = status;
+        connectionCount = count;
+        
+        if (status) {
+          statusText.textContent = `Connected (${count})`;
+          statusText.className = 'status-online';
+          messageInput.disabled = false;
+          sendButton.disabled = false;
+          refreshButton.disabled = false;
+          retryButton.style.display = 'none';
+        } else {
+          statusText.textContent = 'Disconnected';
+          statusText.className = 'status-offline';
+          messageInput.disabled = true;
+          sendButton.disabled = true;
+          refreshButton.disabled = true;
+          retryButton.style.display = 'block';
+        }
+      }
+      
+      // Initialize the client
+      function initClient() {
+        log("Initializing WebRTC client...");
+        updateConnectionStatus(false);
+        
+        // Update server address display
+        serverAddressElement.textContent = serverAddress;
+        
+        messageContainer.innerHTML = '<div class="empty-state">Connecting to server at ' + serverAddress + '...</div>';
+        
+        try {
+          // Check if Bugoff is available
+          if (typeof Bugoff !== 'function') {
+            log("ERROR: Bugoff library not found or not loaded correctly");
+            messageContainer.innerHTML = '<div class="empty-state">Error: Bugoff library not available</div>';
+            return;
+          }
+          
+          // Initialize Bugoff with server address
+          log("Connecting to server:", serverAddress);
+          b = new Bugoff(serverAddress);
+          
+          // Initialize SEA for encryption
+          b.SEA()
+            .then(() => {
+              log("SEA initialized with keypair");
+            })
+            .catch((err) => {
+              log("Error initializing SEA:", err);
+            });
+          
+          // Set up event handlers
+          
+          // Connection to server event
+          b.on("server", () => {
+            log("Connected to server");
+            refreshMessages();
+          });
+          
+          // Message handler
+          b.on("message", (address, message) => {
+            log("Message from:", address, message);
+            if (message === "refresh") {
+              refreshMessages();
+            }
+          });
+          
+          // Decrypted message handler
+          b.on("decrypted", (address, pubkeys, message) => {
+            log("Decrypted message from:", address);
+            if (message === "refresh") {
+              refreshMessages();
+            }
+          });
+          
+          // Wire connections updates
+          b.on("wireseen", (count) => {
+            log("Wire connections:", count);
+            updateConnectionStatus(count > 0, count);
+          });
+          
+          b.on("wireleft", (count) => {
+            log("Wire left:", count);
+            updateConnectionStatus(count > 0, count);
+          });
+          
+          // Connection closed event
+          b.on("close", () => {
+            log("Connection closed");
+            updateConnectionStatus(false);
+          });
+          
+          // Error handler
+          b.on("error", (error) => {
+            log("Connection error:", error);
+            updateConnectionStatus(false);
+          });
+          
+        } catch (error) {
+          log("Error connecting to server:", error);
+          updateConnectionStatus(false);
+          
+          // Try fallback without encryption
+          try {
+            log("Trying fallback connection without encryption...");
+            b = new Bugout(serverAddress);
+            log("Connected without encryption");
+            
+            // Set up basic event handlers
+            b.on("wireseen", (count) => {
+              log("Wire connections (unencrypted):", count);
+              updateConnectionStatus(count > 0, count);
+            });
+            
+            b.on("wireleft", (count) => {
+              log("Wire left (unencrypted):", count);
+              updateConnectionStatus(count > 0, count);
+            });
+            
+            b.on("server", () => {
+              log("Connected to server (unencrypted)");
+              refreshMessages();
+            });
+            
+            b.on("message", (address, message) => {
+              if (message === "refresh") {
+                refreshMessages();
+              }
+            });
+            
+          } catch (fallbackError) {
+            log("Fatal error - cannot connect:", fallbackError);
+            messageContainer.innerHTML = '<div class="empty-state">Fatal error: Unable to connect to server</div>';
+          }
+        }
+      }
+      
+      // Send a message
+      function sendMessage() {
+        if (!connected || !messageInput.value) return;
+        
+        // Save username for future use
+        if (usernameInput.value) {
+          localStorage["bugout-username"] = usernameInput.value;
+        }
+        
+        const user = usernameInput.value || "Anonymous";
+        const formattedMessage = `${user}: ${messageInput.value}`;
+        
+        log("Sending message:", formattedMessage);
+        
+        try {
+          b.send(formattedMessage);
+          messageInput.value = "";
+          
+          // Request refresh of messages
+          setTimeout(() => {
+            refreshMessages();
+          }, 1000);
+          
+        } catch (error) {
+          log("Error sending message:", error);
+        }
+      }
+      
+      // Refresh messages from server
+      function refreshMessages() {
+        if (!connected) {
+          messageContainer.innerHTML = '<div class="empty-state">Not connected to server</div>';
+          return;
+        }
+        
+        log("Requesting messages from server...");
+        messageContainer.innerHTML = '<div class="empty-state">Loading messages...</div>';
+        
+        try {
+          b.rpc("list", null, (messages) => {
+            log("Received", messages.length, "messages");
+            
+            if (messages.length === 0) {
+              messageContainer.innerHTML = '<div class="empty-state">No messages yet. Be the first to send one!</div>';
+              return;
+            }
+            
+            let messageHTML = '';
+            
+            messages.forEach((m) => {
+              // Extract username and message
+              let messageText = m.m;
+              let sender = m.address;
+              
+              const usernameMatch = messageText.match(/^([^:]+):\s*(.*)/);
+              if (usernameMatch) {
+                sender = usernameMatch[1];
+                messageText = usernameMatch[2];
+              }
+              
+              const timestamp = new Date(m.t).toLocaleString();
+              
+              messageHTML += `
+                <div class="message-item">
+                  <div class="message-header">
+                    <span class="message-sender">${sender}</span>
+                    <span class="message-time">${timestamp}</span>
+                  </div>
+                  <div class="message-content">${messageText}</div>
+                </div>
+              `;
+            });
+            
+            messageContainer.innerHTML = messageHTML;
+            // Scroll to bottom
+            messageContainer.scrollTop = messageContainer.scrollHeight;
+            
+          });
+        } catch (error) {
+          log("Error refreshing messages:", error);
+          messageContainer.innerHTML = '<div class="empty-state">Error loading messages</div>';
+        }
+      }
+      
+      // Start the client
+      window.addEventListener('load', () => {
+        // Allow time for scripts to load
+        setTimeout(initClient, 1000);
+      });
+      
+      // Handle hash changes (for server address)
+      window.addEventListener('hashchange', () => {
+        const newServerAddress = window.location.hash.substr(1);
+        
+        if (newServerAddress && newServerAddress !== serverAddress) {
+          log("Server address changed to:", newServerAddress);
+          serverAddress = newServerAddress;
+          
+          // Disconnect current connection if any
+          if (b) {
+            try {
+              b.destroy();
+            } catch (e) {
+              log("Error destroying previous connection:", e);
+            }
+          }
+          
+          // Connect to new server
+          initClient();
+        }
+      });
+    </script>
+  </body>
+</html> 

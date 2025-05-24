@@ -208,6 +208,23 @@ function getRelayVerifier() {
   return relayVerifier;
 }
 
+// Add function to read merkle root from file
+function readMerkleRootFromFile(filePath) {
+  try {
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      console.log(`Loaded Merkle root from file: ${data.root}`);
+      console.log(`Generated at: ${data.generatedAt} with ${data.pubKeysCount} pub keys`);
+      return data.root;
+    }
+    console.log(`Merkle root file not found at ${filePath}`);
+    return null;
+  } catch (error) {
+    console.error(`Error reading Merkle root file: ${error.message}`);
+    return null;
+  }
+}
+
 /**
  * Starts the unified relay server
  * Initializes IPFS, configures middleware, and sets up WebSocket handlers
@@ -261,10 +278,21 @@ async function startServer() {
     const radataPath = path.resolve("./radata");
     console.log(`Using absolute radata path: ${radataPath}`);
 
-    // Then initialize Merkle tree with radata path
-    merkleManager = new MerkleManager(radataPath);
-    await merkleManager.initialize();
-    console.log("Merkle root:", merkleManager.getRoot());
+    const merkleRootFilePath = path.resolve("./merkle-root.json");
+    let merkleRoot = readMerkleRootFromFile(merkleRootFilePath);
+    
+    if (merkleRoot) {
+      // If we have a pre-calculated root, create a minimal merkleManager that just returns this root
+      merkleManager = {
+        getRoot: () => merkleRoot
+      };
+      console.log("Using pre-calculated Merkle root from file");
+    } else {
+      console.log("No pre-calculated Merkle root found, calculating on-demand (this may take time)...");
+      merkleManager = new MerkleManager(radataPath);
+      await merkleManager.initialize();
+      console.log("Merkle root calculated:", merkleManager.getRoot());
+    }
 
     await initializeRelayComponents();
     console.log(
@@ -322,33 +350,53 @@ async function startServer() {
     );
 
     app.use(
-      "/messenger",
-      express.static(path.join(__dirname, "src/ui/messenger/client.html"))
+      "/gundb/client",
+      express.static(path.join(__dirname, "src/ui/gundb/client.html"))
     );
 
     app.use(
-      "/bugoff.js",
-      express.static(path.join(__dirname, "src/ui/chat/bugoff.js"))
+      "/rtc/bugoff.js",
+      express.static(path.join(__dirname, "src/ui/rtc/bugoff.js"))
     );
 
     app.use(
-      "/bugout.min.js",
-      express.static(path.join(__dirname, "src/ui/chat/bugout.min.js"))
+      "/rtc/bugout.min.js",
+      express.static(path.join(__dirname, "src/ui/rtc/bugout.min.js"))
     );
 
     app.use(
-      "/client",
-      express.static(path.join(__dirname, "src/ui/chat/client.html"))
+      "/rtc/client",
+      express.static(path.join(__dirname, "src/ui/rtc/client.html"), {
+        setHeaders: (res) => {
+          res.setHeader("Content-Type", "text/html");
+        },
+      })
     );
 
     app.use(
-      "/node",
-      express.static(path.join(__dirname, "src/ui/chat/server.html"))
+      "/rtc/server",
+      express.static(path.join(__dirname, "src/ui/rtc/server.html"), {
+        setHeaders: (res) => {
+          res.setHeader("Content-Type", "text/html");
+          res.setHeader("Access-Control-Allow-Origin", "*");
+        },
+      })
+    );
+
+    // Add new NoDom versions of client and server
+    app.use(
+      "/client-nodom.html",
+      express.static(path.join(__dirname, "src/ui/chat/client-nodom.html"))
+    );
+
+    app.use(
+      "/server-nodom.html",
+      express.static(path.join(__dirname, "src/ui/chat/server-nodom.html"))
     );
 
     app.use(
       "/nodom.js",
-      express.static(path.join(__dirname, "src/ui/dashboard/nodom.js"))
+      express.static(path.join(__dirname, "src/ui/nodom.js"))
     );
 
     app.use(
@@ -370,7 +418,7 @@ async function startServer() {
 
     app.use(
       "/nodom.css",
-      express.static(path.join(__dirname, "src/ui/dashboard/nodom.css"), {
+      express.static(path.join(__dirname, "src/ui/nodom.css"), {
         setHeaders: (res) => {
           res.setHeader("Content-Type", "text/css");
         },
@@ -572,6 +620,12 @@ app.use(Gun.serve);
 const authenticateRequest = async (req, res, next) => {
   return AuthenticationManager.authenticateRequest(req, res, next);
 };
+
+app.get("/root", (req, res) => {
+  res.json({
+    root: merkleManager.getRoot(),
+  });
+});
 
 // API - STATUS CORS
 app.get("/api/status", (req, res) => {
@@ -863,12 +917,8 @@ app.get("/login", (req, res) => {
 // Serve la pagina di login html
 
 // Endpoint to handle /debug command explicitly
-app.post("/debug", (req, res) => {
+app.get("/debug", (req, res) => {
   console.log("Debug command received via dedicated endpoint");
-
-  // Log request info
-  console.log("Debug request headers:", req.headers);
-  console.log("Debug request body:", req.body);
 
   try {
     // Extract debug information

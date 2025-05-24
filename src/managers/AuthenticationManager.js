@@ -82,8 +82,16 @@ const AuthenticationManager = {
       return true;
     }
 
+    if (msg?.query?.token === config.SECRET_TOKEN) {
+      return true;
+    }
+
     // Admin token in headers è l'unico metodo valido
     if (msg?.headers?.token === config.SECRET_TOKEN) {
+      return true;
+    }
+
+    if(msg?.token === config.SECRET_TOKEN) {
       return true;
     }
 

@@ -32,23 +32,23 @@ The project includes multiple UI interfaces for different functionalities:
    - Provides system monitoring, configuration, and management
    - Login interface at `/login`
 
-2. **WebRTC Communication UI** (`/src/ui/webrtc/`)
+2. **Chat UI** (`/src/ui/chat/`)
    - Implements peer-to-peer communication
    - Uses Bugout for WebRTC functionality
    - Client interface at `/client.html`
    - Server interface at `/server.html`
 
-3. **Messaging UI** (`/src/ui/messages-gun/`)
+3. **Messenger UI** (`/src/ui/messenger/`)
    - GunDB-powered messaging system
-   - Client accessible at `/msg/client.html`
+   - Client accessible at `/messenger`
 
-4. **Debug Interface** (`/src/ui/debug.html`)
-   - Advanced debugging tools
-   - Accessible at `/debug-interface`
+4. **Debug Interface**
+   - Advanced debugging tools and diagnostics
+   - Integrated with the dashboard
 
 ### Security
 
-- Enhanced token-based authentication with system and user token support
+- Token-based authentication
 - Support for on-chain verification via RelayVerifier
 - Secure WebSocket connection handling
 - HTTPS support with custom certificates
@@ -79,7 +79,7 @@ The project includes multiple UI interfaces for different functionalities:
 
 2. **Authentication Manager (`src/managers/AuthenticationManager.js`)**
 
-   - token validation
+   - Token validation
    - Integration with RelayVerifier for on-chain verification
    - Access control for API and WebSocket
 
@@ -123,9 +123,9 @@ The project includes multiple UI interfaces for different functionalities:
 
 ### Authentication
 
-- `POST /auth/register`: User registration
-- `POST /auth/login`: User login
-- `POST /auth/verify-onchain`: On-chain verification of public keys
+- `POST /api/auth/register`: User registration
+- `POST /api/auth/login`: User login
+- `POST /api/auth/verify-onchain`: On-chain verification of public keys
 
 ### Files
 
@@ -166,7 +166,7 @@ The project includes multiple UI interfaces for different functionalities:
 
 ### Debug
 
-- `POST /debug`: Generate detailed debug information
+- `POST /debug`: Generate detailed debug information and logs
 
 ## Configuration
 

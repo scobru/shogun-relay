@@ -12,7 +12,7 @@ const [_getFiles, _setFiles] = setSignal([], { key: 'files-data', bypass: true }
 const [getIpfsStatus, setIpfsStatus] = setSignal({ enabled: false, service: 'IPFS-CLIENT' }, { key: 'ipfs-status' });
 const [getIpfsConnectionStatus, setIpfsConnectionStatus] = setSignal({ status: 'unknown', message: 'Unknown' }, { key: 'ipfs-connection-status' });
 // Tema signal
-const [getTheme, setTheme] = setSignal(localStorage.getItem('app-theme') || 'dark', { key: 'app-theme' });
+const [getTheme, setTheme] = setSignal(localStorage.getItem('app-theme') || 'light', { key: 'app-theme' });
 
 // Keep track of the last IPFS check time to prevent too many calls
 let lastIpfsCheckTime = 0;
