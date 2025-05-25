@@ -6,9 +6,14 @@
     "auditLog": "D:\\shogun-2\\test-env\\logs\\.be94fa38be47d8d7fdaba43a3b2695e18a46c8ce-audit.json",
     "files": [
         {
-            "date": 1748179967692,
+            "date": 1748182076014,
             "name": "D:\\shogun-2\\test-env\\logs\\application-2025-05-25.log",
-            "hash": "45051e530568ef0b7774f16cc1d599e94e10b01a9fe06ff8f3dbfffe9a7b853d"
+            "hash": "b5b95998a6cd67d4fc37bc4e980f4d1d987a4cc6a826735442010579ce285be9"
+        },
+        {
+            "date": 1748210789328,
+            "name": "D:\\shogun-2\\test-env\\logs\\application-2025-05-26.log",
+            "hash": "8fb457d0d32d142887ff957c91af29699a3e87e7e8cf72e83a3300619cefe838"
         }
     ],
     "hashType": "sha256"

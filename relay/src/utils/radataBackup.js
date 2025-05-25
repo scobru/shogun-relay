@@ -21,6 +21,7 @@ const execAsync = promisify(exec);
  * @param {string} options.backupDir - Directory to store backups (default: '../../backups')
  * @param {boolean} options.compress - Whether to compress the backup (default: true)
  * @param {Object} options.ipfsConfig - IPFS configuration options
+ * @param {boolean} options.skipIpfs - Skip IPFS upload (default: false)
  * @returns {Promise<Object>} - Information about the backup
  */
 export async function backupRadataToIpfs(options = {}) {
@@ -32,7 +33,8 @@ export async function backupRadataToIpfs(options = {}) {
       radataPath = path.resolve(__dirname, '../../radata'),
       backupDir = path.resolve(__dirname, '../../backups'),
       compress = true,
-      ipfsConfig = {}
+      ipfsConfig = {},
+      skipIpfs = false
     } = options;
     
     // Create backup directory if it doesn't exist
@@ -61,50 +63,80 @@ export async function backupRadataToIpfs(options = {}) {
     
     backupLogger.info('Archive created successfully');
     
-    // Initialize IPFS manager with provided or default config
-    const defaultIpfsConfig = {
-      enabled: true,
-      service: process.env.IPFS_SERVICE || 'IPFS-CLIENT',
-      nodeUrl: process.env.IPFS_NODE_URL || 'http://127.0.0.1:5001',
-      gateway: process.env.IPFS_GATEWAY || 'http://127.0.0.1:8080/ipfs',
-      pinataGateway: process.env.PINATA_GATEWAY || 'https://gateway.pinata.cloud',
-      pinataJwt: process.env.PINATA_JWT || '',
-      encryptionEnabled: process.env.ENCRYPTION_ENABLED === 'true',
-      encryptionKey: process.env.ENCRYPTION_KEY || '',
-      encryptionAlgorithm: process.env.ENCRYPTION_ALGORITHM || 'aes-256-gcm',
-      apiKey: process.env.SECRET_TOKEN || ''
-    };
-    
-    const ipfsManager = new ShogunIpfsManager({
-      ...defaultIpfsConfig,
-      ...ipfsConfig
-    });
-    
-    // Check if IPFS is enabled
-    if (!ipfsManager.isEnabled()) {
-      throw new Error('IPFS is not enabled. Cannot upload backup.');
-    }
-    
-    backupLogger.info('Uploading backup to IPFS...');
-    
-    // Upload file to IPFS
-    const fileStream = fs.createReadStream(finalBackupPath);
-    const ipfsResult = await ipfsManager.uploadFile(fileStream, {
-      fileName: path.basename(finalBackupPath),
-      pin: true
-    });
-    
-    backupLogger.info(`Backup successfully uploaded to IPFS with hash: ${ipfsResult.hash}`);
-    
-    // Return backup information
+    // Initialize backup info
     const backupInfo = {
       timestamp,
       localBackupPath: finalBackupPath,
-      ipfsHash: ipfsResult.hash,
-      ipfsUrl: `${ipfsManager.getConfig().gateway}/${ipfsResult.hash}`,
-      pinned: true,
+      ipfsHash: null,
+      ipfsUrl: null,
+      pinned: false,
       size: fs.statSync(finalBackupPath).size
     };
+    
+    // IPFS Upload (if not skipped)
+    if (!skipIpfs) {
+      // Initialize IPFS manager with provided or default config
+      const defaultIpfsConfig = {
+        enabled: true,
+        service: process.env.IPFS_SERVICE || 'IPFS-CLIENT',
+        nodeUrl: process.env.IPFS_NODE_URL || 'http://127.0.0.1:5001',
+        gateway: process.env.IPFS_GATEWAY || 'http://127.0.0.1:8080/ipfs',
+        pinataGateway: process.env.PINATA_GATEWAY || 'https://gateway.pinata.cloud',
+        pinataJwt: process.env.PINATA_JWT || '',
+        encryptionEnabled: process.env.ENCRYPTION_ENABLED === 'true',
+        encryptionKey: process.env.ENCRYPTION_KEY || '',
+        encryptionAlgorithm: process.env.ENCRYPTION_ALGORITHM || 'aes-256-gcm',
+        apiKey: process.env.SECRET_TOKEN || ''
+      };
+      
+      const ipfsManager = new ShogunIpfsManager({
+        ...defaultIpfsConfig,
+        ...ipfsConfig
+      });
+      
+      // Check if IPFS is enabled
+      if (ipfsManager.isEnabled()) {
+        try {
+          // Test IPFS connection first
+          const testResult = await ipfsManager.testConnection();
+          
+          if (testResult.success) {
+            backupLogger.info('IPFS connection test successful, uploading backup...');
+            
+            // Upload file to IPFS
+            backupLogger.info('Uploading backup to IPFS...');
+            const ipfsResult = await ipfsManager.uploadFile(finalBackupPath, {
+              fileName: path.basename(finalBackupPath),
+              pin: true
+            });
+            
+            // Check if upload was successful and returned a hash
+            if (ipfsResult && ipfsResult.id) {
+              backupInfo.ipfsHash = ipfsResult.id;
+              backupInfo.ipfsUrl = `${ipfsManager.getConfig().gateway}/${ipfsResult.id}`;
+              backupInfo.pinned = true;
+              backupLogger.info(`Backup successfully uploaded to IPFS with hash: ${ipfsResult.id}`);
+            } else {
+              backupLogger.warn('IPFS upload completed but did not return a valid hash', { 
+                result: ipfsResult 
+              });
+            }
+          } else {
+            backupLogger.warn('IPFS connection test failed, skipping upload', { 
+              error: testResult.error 
+            });
+          }
+        } catch (ipfsError) {
+          backupLogger.warn('Error during IPFS upload, continuing with local backup only', { 
+            error: ipfsError.message 
+          });
+        }
+      } else {
+        backupLogger.warn('IPFS is not enabled or properly configured, skipping upload');
+      }
+    } else {
+      backupLogger.info('IPFS upload skipped as requested');
+    }
     
     // Save backup info to a log file
     const backupLogPath = path.join(backupDir, 'backups.json');
@@ -122,9 +154,11 @@ export async function backupRadataToIpfs(options = {}) {
     fs.writeFileSync(backupLogPath, JSON.stringify(backupLog, null, 2));
     
     backupLogger.info('Backup process completed successfully', { 
-      ipfsHash: backupInfo.ipfsHash, 
-      size: backupInfo.size 
+      ipfsHash: backupInfo.id || 'not uploaded', 
+      size: backupInfo.size,
+      localPath: backupInfo.localBackupPath
     });
+    
     return backupInfo;
   } catch (error) {
     backupLogger.error('Error during radata backup:', { 
@@ -154,6 +188,8 @@ async function main() {
         i++;
       } else if (args[i] === '--no-compress') {
         options.compress = false;
+      } else if (args[i] === '--skip-ipfs') {
+        options.skipIpfs = true;
       }
     }
     
@@ -161,8 +197,8 @@ async function main() {
     backupLogger.info('Backup Summary:', {
       timestamp: result.timestamp,
       localPath: result.localBackupPath,
-      ipfsHash: result.ipfsHash,
-      ipfsUrl: result.ipfsUrl,
+      ipfsHash: result.ipfsHash || 'not uploaded',
+      ipfsUrl: result.ipfsUrl || 'not available',
       sizeMB: (result.size / 1024 / 1024).toFixed(2)
     });
   } catch (error) {

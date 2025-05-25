@@ -1,6 +1,7 @@
 // Configurazione globale
 let config
 
+import { authLogger } from "../utils/logger.js";
 /**
  * Utility function to properly format a GunDB public key for blockchain verification
  * @param {string} pubKey - The GunDB public key
@@ -66,23 +67,20 @@ function configure(configData) {
  * Modulo centrale di autenticazione
  */
 const AuthenticationManager = {
+
   /**
    * Validazione messaggi GunDB
    */
-  isValidGunMessage: function (msg) {
+  isValidGunMessage: function (msg) {  
     console.log("isValidGunMessage", msg);
-   
     // return if cofig.SECRET_TOKEN is not set
     if (!config.SECRET_TOKEN) {
+      authLogger.info(`[AuthenticationManager] isValidGunMessage: no SECRET_TOKEN ✅`);
       return true;
     }
 
     // Non-PUT messages are always valid
     if (!msg.put || Object.keys(msg.put).length === 0) {
-      return true;
-    }
-
-    if (msg?.query?.token === config.SECRET_TOKEN) {
       return true;
     }
 
@@ -99,10 +97,7 @@ const AuthenticationManager = {
       return true;
     }
 
-    // In modalità sviluppo, consenti tutti i messaggi
-    if (process.env.NODE_ENV === "development") {
-      return true;
-    }
+    authLogger.info(`[AuthenticationManager] ❌ Not valid token: ${msg?.headers?.Authorization}`);
 
     // Ogni altro messaggio è rifiutato
     return false;

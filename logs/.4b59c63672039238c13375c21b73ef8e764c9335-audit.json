@@ -6,9 +6,9 @@
     "auditLog": "D:\\shogun-2\\test-env\\logs\\.4b59c63672039238c13375c21b73ef8e764c9335-audit.json",
     "files": [
         {
-            "date": 1748179967707,
+            "date": 1748182076060,
             "name": "D:\\shogun-2\\test-env\\logs\\backup-2025-05-25.log",
-            "hash": "8153ed15b10b956897f37499aa38d7784a291c10e029eafb80ee7da95a923faa"
+            "hash": "d564152957e9a0b5f4e6c4c97e7154079ddbfcf25105a8908e002ce8d3d7cb56"
         }
     ],
     "hashType": "sha256"

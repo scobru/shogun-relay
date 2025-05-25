@@ -16,6 +16,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  *   --radataPath <path>  Path to radata folder
  *   --backupDir <path>   Path to store backups
  *   --no-compress        Do not compress the backup
+ *   --skip-ipfs          Skip uploading to IPFS (local backup only)
  */
 async function runBackup() {
   try {
@@ -35,6 +36,8 @@ async function runBackup() {
         i++;
       } else if (args[i] === '--no-compress') {
         options.compress = false;
+      } else if (args[i] === '--skip-ipfs') {
+        options.skipIpfs = true;
       }
     }
     
@@ -62,6 +65,7 @@ async function runBackup() {
     backupLogger.info(`Using radata path: ${options.radataPath}`);
     backupLogger.info(`Using backup directory: ${options.backupDir}`);
     backupLogger.info(`Compression: ${options.compress !== false ? 'Enabled' : 'Disabled'}`);
+    backupLogger.info(`IPFS Upload: ${options.skipIpfs ? 'Disabled' : 'Enabled'}`);
     
     // Run the backup
     const result = await backupRadataToIpfs(options);
@@ -70,8 +74,8 @@ async function runBackup() {
     backupLogger.info('Backup Summary', {
       timestamp: result.timestamp,
       localBackup: result.localBackupPath,
-      ipfsHash: result.ipfsHash,
-      ipfsUrl: result.ipfsUrl,
+      ipfsHash: result.id || 'not uploaded',
+      ipfsUrl: result.ipfsUrl || 'not available',
       sizeMB: (result.size / (1024 * 1024)).toFixed(2)
     });
     
