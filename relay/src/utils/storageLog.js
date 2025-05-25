@@ -10,14 +10,14 @@ class StorageLog {
   init() {
     this.gun.on("get", function (WireMessage) {
       this.to.next(WireMessage);
-      console.log("! GET", WireMessage.get);
+      console.log("**⬅️** GET", WireMessage.get);
     });
 
     /**** put - patches the contents of a given node ****/
 
     this.gun.on("put", function (WireMessage) {
       this.to.next(WireMessage);
-      console.log("! PUT", WireMessage.put);
+      console.log("**➡️** PUT", WireMessage.put);
     });
   }
 }

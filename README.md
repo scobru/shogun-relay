@@ -306,3 +306,38 @@ curl http://localhost:8765/api/status
 # Test type validation system
 curl http://localhost:8765/api/test-mityli
 ```
+
+## Performance Optimization
+
+### Merkle Root Calculation
+
+The relay server maintains a Merkle tree of public keys for verification purposes. This implementation now features:
+
+1. **Real-time key detection**: The system automatically intercepts Gun messages (both GET and PUT) and extracts public keys, including:
+   - User aliases (`~@username`)
+   - Standard GunDB public keys (`~3tOyGGfychTwgJUHkwFR0bSodKMdSau35puoGqM0qxY.GCtCVYR...`)
+   - All message formats supported by GunDB
+
+2. **Dynamic updates**: When new keys are detected, they are immediately added to the Merkle tree, which is then rebuilt and saved to disk.
+
+3. **Fast startup**: On startup, the relay reads a pre-calculated Merkle root from the `merkle-root.json` file if available, avoiding the expensive scan of the entire `radata` directory.
+
+4. **Persistent storage**: When new keys are added, the updated Merkle root is automatically saved to the `merkle-root.json` file.
+
+#### Pre-calculation for First Startup
+
+For the first startup or to force a complete recalculation, you can pre-calculate the Merkle root using the provided scripts:
+
+#### For Unix/Linux/macOS:
+```bash
+./relay/scripts/update-merkle-root.sh
+```
+
+#### For Windows:
+```cmd
+relay\scripts\update-merkle-root.bat
+```
+
+This will generate a `merkle-root.json` file that the relay will use for faster startup, and subsequent public keys will be added dynamically as users connect.
+
+**Note:** While manual updates are no longer necessary, you can still run these scripts if you want to force a complete recalculation of the Merkle tree.

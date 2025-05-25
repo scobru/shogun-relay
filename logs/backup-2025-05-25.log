@@ -1,0 +1,8 @@
+[2025-05-25 14:54:04] 💾 info ✅: Backup started {
+  "service": "shogun-relay"
+}
+[2025-05-25 14:54:04] 💾 info ✅: Backup completed {
+  "service": "shogun-relay",
+  "size": "15MB",
+  "path": "/backups/latest"
+}

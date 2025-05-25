@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "D:\\shogun-2\\test-env\\logs\\.be94fa38be47d8d7fdaba43a3b2695e18a46c8ce-audit.json",
+    "files": [
+        {
+            "date": 1748179967692,
+            "name": "D:\\shogun-2\\test-env\\logs\\application-2025-05-25.log",
+            "hash": "45051e530568ef0b7774f16cc1d599e94e10b01a9fe06ff8f3dbfffe9a7b853d"
+        }
+    ],
+    "hashType": "sha256"
+}

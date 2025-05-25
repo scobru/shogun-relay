@@ -1,0 +1,88 @@
+[2025-05-25 14:54:04] 🔷 error ❌: Direct logger error test {
+  "service": "shogun-relay"
+}
+[2025-05-25 14:54:04] 🔷 warn ⚠️: Direct logger warning test {
+  "service": "shogun-relay"
+}
+[2025-05-25 14:54:04] 🔷 info ✅: Direct logger info test {
+  "service": "shogun-relay"
+}
+[2025-05-25 14:54:04] 🚀 info ✅: Server starting up {
+  "service": "shogun-relay"
+}
+[2025-05-25 14:54:04] 🚀 error ❌: Server error occurred {
+  "service": "shogun-relay",
+  "reason": "test error"
+}
+[2025-05-25 14:54:04] 📦 info ✅: IPFS connected {
+  "service": "shogun-relay"
+}
+[2025-05-25 14:54:04] 📦 error ❌: IPFS error occurred {
+  "service": "shogun-relay",
+  "reason": "connection failed"
+}
+[2025-05-25 14:54:04] 🔫 info ✅: Gun database initialized {
+  "service": "shogun-relay"
+}
+[2025-05-25 14:54:04] 🔫 warn ⚠️: Gun database warning {
+  "service": "shogun-relay",
+  "peers": 0
+}
+[2025-05-25 14:54:04] 🔑 info ✅: User authenticated {
+  "service": "shogun-relay"
+}
+[2025-05-25 14:54:04] 🔑 warn ⚠️: Auth token expiring {
+  "service": "shogun-relay",
+  "expiresIn": "5m"
+}
+[2025-05-25 14:54:04] 💾 info ✅: Backup started {
+  "service": "shogun-relay"
+}
+[2025-05-25 14:54:04] 💾 info ✅: Backup completed {
+  "service": "shogun-relay",
+  "size": "15MB",
+  "path": "/backups/latest"
+}
+[2025-05-25 14:54:04] 🔷 info ✅: Custom module initialized {
+  "service": "shogun-relay"
+}
+[2025-05-25 14:54:04] 🔷 error ❌: Custom module error {
+  "service": "shogun-relay",
+  "errorCode": "CUSTOM_ERROR"
+}
+[2025-05-25 15:32:47] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-25 15:32:47] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-25 15:32:47] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-25 15:32:47] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-25 15:32:47] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-25 15:32:47] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-25 15:32:47] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-25 15:32:47] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-25 15:32:47] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-25 15:32:48] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-25 15:32:48] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-25 15:33:37] 🚀 info ✅: [Server] Received signal SIGINT, shutting down... 🔥 {
+  "service": "shogun-relay"
+}

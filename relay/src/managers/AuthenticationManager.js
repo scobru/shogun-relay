@@ -70,8 +70,8 @@ const AuthenticationManager = {
    * Validazione messaggi GunDB
    */
   isValidGunMessage: function (msg) {
+    console.log("isValidGunMessage", msg);
    
-
     // return if cofig.SECRET_TOKEN is not set
     if (!config.SECRET_TOKEN) {
       return true;

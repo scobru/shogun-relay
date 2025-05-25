@@ -11,7 +11,6 @@ import "gun/lib/wire.js";
 import "gun/lib/webrtc.js";
 import path from "path";
 import http from "http";
-import https from "https";
 import "./utils/bullet-catcher.js";
 import {
   validateFileData,
@@ -20,7 +19,6 @@ import {
   isValidationEnabled,
   isStrictValidationEnabled,
 } from "./utils/typeValidation.js";
-import keccak from "keccak";
 
 import {
   AuthenticationManager,
@@ -40,9 +38,19 @@ import {
   createRelayVerifier,
 } from "./utils/shogunCoreUtils.js"; // Import ShogunCore utility functions
 import { setupGunIpfsMiddleware } from "./utils/gunIpfsUtils.js";
-import { MerkleTree } from "merkletreejs";
 import StorageLog from "./utils/storageLog.js";
-import { MerkleManager } from "./utils/merkleUtils.js";
+import { serverLogger, ipfsLogger, gunLogger, authLogger } from "./utils/logger.js";
+
+// Global error handlers to prevent crashes
+process.on('uncaughtException', (err) => {
+  serverLogger.error('UNCAUGHT EXCEPTION! 💥', { error: err.message, stack: err.stack });
+  serverLogger.error('The server will continue running, but please fix this error.');
+});
+
+process.on('unhandledRejection', (err) => {
+  serverLogger.error('UNHANDLED PROMISE REJECTION! 💥', { error: err?.message, stack: err?.stack });
+  serverLogger.error('The server will continue running, but please fix this error.');
+});
 
 // create __dirname
 const __dirname = path.resolve();
@@ -55,19 +63,19 @@ try {
     "utf8"
   );
   CONFIG = JSON.parse(configData);
-  console.log("Configuration loaded from config.json");
+  serverLogger.info("Configuration loaded from config.json ✅");
 
   // Validate the configuration using Mityli
   try {
     CONFIG = validateConfig(CONFIG);
-    console.log("Configuration validated successfully with Mityli");
+    serverLogger.info("Configuration validated successfully with Mityli ✅");
   } catch (validationError) {
-    console.warn("Configuration validation warning:", validationError.message);
-    console.warn("Continuing with unvalidated configuration");
+    serverLogger.warn("Configuration validation warning:", { error: validationError.message });
+    serverLogger.warn("Continuing with unvalidated configuration");
   }
 } catch (error) {
-  console.error("Error loading config.json:", error.message);
-  console.log("Using default configuration");
+  serverLogger.error("Error loading config.json:", { error: error.message });
+  serverLogger.error("Using default configuration");
 }
 
 const app = express();
@@ -85,7 +93,6 @@ let shogunCore = null;
 let relayVerifier = null;
 let fileManager = null;
 let ipfsManager = null;
-let merkleManager;
 
 // Initial configuration of RELAY_CONFIG - set once at the start
 let RELAY_CONFIG = {
@@ -98,7 +105,7 @@ let RELAY_CONFIG = {
   },
 };
 
-console.log(RELAY_CONFIG);
+serverLogger.debug("Relay configuration:", RELAY_CONFIG);
 
 const getDefaultAllowedOrigins = () => {
   return [
@@ -118,16 +125,6 @@ const getDefaultAllowedOrigins = () => {
 const allowedOrigins = CONFIG.ALLOWED_ORIGINS
   ? CONFIG.ALLOWED_ORIGINS.split(",")
   : getDefaultAllowedOrigins();
-
-// Fix the isValid function to properly handle authorization
-let gunOptions = {
-  web: server,
-  peers: CONFIG.PEERS,
-  file: "radata",
-  radisk: true,
-  localStorage: false,
-  isValid: AuthenticationManager.isValidGunMessage.bind(AuthenticationManager),
-};
 
 // Initialize ShogunCore and relay components. This will create relayVerifier
 // and update AuthenticationManager with the live instance via its configure method.
@@ -157,12 +154,10 @@ async function initializeRelayComponents() {
 
         // Create wallet with private key and provider
         signer = new ethers.Wallet(privateKey, provider);
-        console.log(
-          `Ethereum wallet created with address: ${await signer.getAddress()}`
-        );
+        serverLogger.info(`Ethereum wallet created with address: ${await signer.getAddress()} 💰`);
       } catch (error) {
-        console.error("Error creating Ethereum wallet:", error);
-        console.warn("Continuing without signer for write operations");
+        serverLogger.error("Error creating Ethereum wallet:", { error: error.message });
+        serverLogger.warn("Continuing without signer for write operations");
       }
     }
 
@@ -179,12 +174,9 @@ async function initializeRelayComponents() {
         // Create a unified relay verifier using the contracts
         relayVerifier = createRelayVerifier(relayContracts);
 
-        console.log("Relay verification components initialized successfully");
+        serverLogger.info("Relay verification components initialized successfully ✅");
       } catch (error) {
-        console.error(
-          "Error initializing relay verification components:",
-          error
-        );
+        serverLogger.error("Error initializing relay verification components:", { error: error.message });
       }
 
       // Update relayVerifier in AuthenticationManager if we have one
@@ -195,7 +187,7 @@ async function initializeRelayComponents() {
 
     return true;
   } catch (error) {
-    console.error("Error initializing relay components:", error);
+    serverLogger.error("Error initializing relay components:", { error: error.message });
     return false;
   }
 }
@@ -208,22 +200,17 @@ function getRelayVerifier() {
   return relayVerifier;
 }
 
-// Add function to read merkle root from file
-function readMerkleRootFromFile(filePath) {
-  try {
-    if (fs.existsSync(filePath)) {
-      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-      console.log(`Loaded Merkle root from file: ${data.root}`);
-      console.log(`Generated at: ${data.generatedAt} with ${data.pubKeysCount} pub keys`);
-      return data.root;
-    }
-    console.log(`Merkle root file not found at ${filePath}`);
-    return null;
-  } catch (error) {
-    console.error(`Error reading Merkle root file: ${error.message}`);
-    return null;
-  }
-}
+// Fix the isValid function to properly handle authorization
+let gunOptions = {
+  web: server,
+  peers: CONFIG.PEERS,
+  file: "radata",
+  radisk: true,
+  localStorage: false,
+  isValid: AuthenticationManager.isValidGunMessage.bind(AuthenticationManager),
+  // Add crash: true to prevent Gun from crashing on errors
+  crash: true
+};
 
 /**
  * Starts the unified relay server
@@ -232,7 +219,7 @@ function readMerkleRootFromFile(filePath) {
  */
 async function startServer() {
   try {
-    console.log("Starting unified relay server...");
+    serverLogger.info("Starting unified relay server... 🚀");
 
     // Configure the AuthenticationManager with our variables
     configure({
@@ -254,7 +241,7 @@ async function startServer() {
       encryptionAlgorithm: CONFIG.ENCRYPTION_ALGORITHM || "aes-256-gcm",
       apiKey: SECRET_TOKEN,
     });
-    console.log("IpfsManager initialized.");
+    ipfsLogger.info("IpfsManager initialized. ✅");
 
     // Initialize AuthenticationManager configuration first
     configure({
@@ -262,42 +249,22 @@ async function startServer() {
       RELAY_CONFIG,
       relayVerifier: null, // Will be set after relayVerifier init by initializeRelayComponents
     });
-    console.log("AuthenticationManager configured with initial settings.");
-
-    // Initialize Gun with the options FIRST - before we use it for ShogunCore
+    authLogger.info("AuthenticationManager configured with initial settings. ✅");
+    
+    // Initialize Gun first
     gun = Gun(gunOptions);
-    console.log("GunDB initialized.");
+    gunLogger.info("GunDB initialized. ✅");
+
 
     // Initialize StorageLog
     new StorageLog(Gun, gun);
 
     // Initialize ShogunCore and relay components
-    console.log("Initializing ShogunCore with Gun instance");
+    serverLogger.info("Initializing ShogunCore with Gun instance 🚀");
     shogunCore = initializeShogunCore(gun, SECRET_TOKEN);
 
-    const radataPath = path.resolve("./radata");
-    console.log(`Using absolute radata path: ${radataPath}`);
-
-    const merkleRootFilePath = path.resolve("./merkle-root.json");
-    let merkleRoot = readMerkleRootFromFile(merkleRootFilePath);
-    
-    if (merkleRoot) {
-      // If we have a pre-calculated root, create a minimal merkleManager that just returns this root
-      merkleManager = {
-        getRoot: () => merkleRoot
-      };
-      console.log("Using pre-calculated Merkle root from file");
-    } else {
-      console.log("No pre-calculated Merkle root found, calculating on-demand (this may take time)...");
-      merkleManager = new MerkleManager(radataPath);
-      await merkleManager.initialize();
-      console.log("Merkle root calculated:", merkleManager.getRoot());
-    }
-
     await initializeRelayComponents();
-    console.log(
-      "Relay initialized, AuthenticationManager updated with live verifiers."
-    );
+    serverLogger.info("Relay initialized, AuthenticationManager updated with live verifiers. ✅");
 
     // Initialize File Manager now that gun and ipfsManager are available
     fileManager = new ShogunFileManager({
@@ -306,7 +273,7 @@ async function startServer() {
       storagePath: STORAGE_DIR,
       maxFileSize: CONFIG.MAX_FILE_SIZE || "50mb",
     });
-    console.log("File Manager initialized inside startServer.");
+    serverLogger.info("File Manager initialized inside startServer. ✅");
 
     // Setup API routes from modules
     const authRouter = setupAuthRoutes(
@@ -432,7 +399,7 @@ async function startServer() {
       fileManager.getUploadMiddleware().single("file"),
       async (req, res) => {
         try {
-          console.log("[Server] Processing file upload request");
+          serverLogger.info("[Server] Processing file upload request 🚀");
 
           // Check if there's actually a file to upload
           if (!req.file && (!req.body.content || !req.body.contentType)) {
@@ -444,7 +411,7 @@ async function startServer() {
 
           // Set a timeout to prevent hanging uploads
           const uploadTimeout = setTimeout(() => {
-            console.error("[Server] File upload processing timeout after 30s");
+            serverLogger.error("[Server] File upload processing timeout after 30s ❌");
             if (!res.headersSent) {
               res.status(500).json({
                 success: false,
@@ -459,23 +426,16 @@ async function startServer() {
           // Validate the file data using Mityli
           try {
             fileData = validateFileData(fileData);
-            console.log(
-              "[Server] File data validated successfully with Mityli"
-            );
+            serverLogger.info("[Server] File data validated successfully with Mityli ✅");
           } catch (validationError) {
-            console.error(
-              "[Server] File data validation error:",
-              validationError.message
-            );
+            serverLogger.error("[Server] File data validation error:", { error: validationError.message });
             // Continue without validation if it fails - for backward compatibility
           }
 
           // Clear the timeout since we completed successfully
           clearTimeout(uploadTimeout);
 
-          console.log(
-            `[Server] File upload completed successfully: ${fileData.id}`
-          );
+          serverLogger.info(`[Server] File upload completed successfully: ${fileData.id} ✅`);
 
           // Prepare response
           const response = {
@@ -501,7 +461,7 @@ async function startServer() {
             res.json(validatedResponse);
           }
         } catch (error) {
-          console.error("[Server] File upload error:", error);
+          serverLogger.error("[Server] File upload error: ❌", { error: error.message });
 
           // Send error response if not already sent
           if (!res.headersSent) {
@@ -530,16 +490,16 @@ async function startServer() {
         const privKeyPath = path.resolve(__dirname, ".", CONFIG.PRIVKEY_PATH);
         const certPath = path.resolve(__dirname, ".", CONFIG.CERT_PATH);
 
-        console.log(`Loading SSL private key from: ${privKeyPath}`);
-        console.log(`Loading SSL certificate from: ${certPath}`);
+        serverLogger.info(`Loading SSL private key from: ${privKeyPath} 🔑`);
+        serverLogger.info(`Loading SSL certificate from: ${certPath} 🔑`);
 
         // Check if files exist
         if (!fs.existsSync(privKeyPath)) {
-          throw new Error(`Private key file not found: ${privKeyPath}`);
+          throw new Error(`Private key file not found: ${privKeyPath} ❌`);
         }
 
         if (!fs.existsSync(certPath)) {
-          throw new Error(`Certificate file not found: ${certPath}`);
+          throw new Error(`Certificate file not found: ${certPath} ❌`);
         }
 
         const sslOptions = {
@@ -552,26 +512,24 @@ async function startServer() {
         // Start HTTPS server if SSL is configured
         const httpsPort = parseInt(CONFIG.HTTPS_PORT || "8443");
         httpsServer.listen(httpsPort, HOST, () => {
-          console.log(`HTTPS server listening on https://${HOST}:${httpsPort}`);
+          serverLogger.info(`HTTPS server listening on https://${HOST}:${httpsPort}`);
         });
 
-        console.log("SSL configuration loaded successfully");
+        serverLogger.info("SSL configuration loaded successfully ✅");
       } catch (err) {
-        console.error("Error loading SSL certificates:", err);
-        console.error("HTTPS server will not be available");
-        console.log(
-          "To generate SSL certificates, run: node scripts/generate-ssl-certs.js"
-        );
+        serverLogger.error("Error loading SSL certificates:", { error: err.message });
+        serverLogger.error("HTTPS server will not be available");
+        serverLogger.info("To generate SSL certificates, run: node scripts/generate-ssl-certs.js 🔑");
       }
     }
   } catch (error) {
-    console.error("Error during server startup:", error);
+    serverLogger.error("Error during server startup:", { error: error.message, stack: error.stack });
     process.exit(1);
   }
 }
 
 startServer().catch((err) => {
-  console.error("Critical error during startup:", err);
+  serverLogger.error("Critical error during startup:", { error: err.message, stack: err.stack });
   process.exit(1);
 });
 
@@ -590,7 +548,7 @@ app.use(
       if (allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
-        console.warn(`Origin blocked by CORS: ${origin}`);
+        serverLogger.warn(`Origin blocked by CORS: ${origin}`);
         callback(null, false);
       }
     },
@@ -621,12 +579,6 @@ const authenticateRequest = async (req, res, next) => {
   return AuthenticationManager.authenticateRequest(req, res, next);
 };
 
-app.get("/root", (req, res) => {
-  res.json({
-    root: merkleManager.getRoot(),
-  });
-});
-
 // API - STATUS CORS
 app.get("/api/status", (req, res) => {
   res.json({
@@ -646,7 +598,7 @@ app.get("/api/status", (req, res) => {
 
 // Mityli Type Validation Test Endpoint
 app.get("/api/test-mityli", (req, res) => {
-  console.log("MITYLI_TEST: Starting validation test");
+  serverLogger.info("MITYLI_TEST: Starting validation test 🔑");
 
   // Sample data with both valid and invalid variants
   const samples = {
@@ -756,7 +708,7 @@ app.get("/api/test-mityli", (req, res) => {
 
 // Type Validation Configuration Endpoint
 app.post("/api/validation-config", authenticateRequest, (req, res) => {
-  console.log("[Server] Processing validation config update request");
+  serverLogger.info("[Server] Processing validation config update request 🔑");
 
   // Extract configuration from request
   const { enabled, strict } = req.body;
@@ -796,8 +748,9 @@ app.post("/api/validation-config", authenticateRequest, (req, res) => {
       message: "Validation configuration updated successfully",
       config: currentConfig,
     });
+    serverLogger.info("[Server] Validation configuration updated successfully ✅");
   } catch (error) {
-    console.error("[Server] Error updating validation configuration:", error);
+    serverLogger.error("[Server] Error updating validation configuration:", { error: error.message });
     res.status(500).json({
       success: false,
       error: "Error updating validation configuration: " + error.message,
@@ -807,14 +760,11 @@ app.post("/api/validation-config", authenticateRequest, (req, res) => {
 
 // GunDB Test Endpoint
 app.get("/api/test-gundb", (req, res) => {
-  console.log(
-    "GUNDB_TEST_ENDPOINT: Starting test at",
-    new Date().toISOString()
-  );
+  gunLogger.info("GUNDB_TEST_ENDPOINT: Starting test at " + new Date().toISOString());
 
   // Generate a unique test key
   const testKey = `test_key_${Date.now()}`;
-  console.log(`GUNDB_TEST_ENDPOINT: Using test key: ${testKey}`);
+  gunLogger.info(`GUNDB_TEST_ENDPOINT: Using test key: ${testKey} 🔑`);
 
   const testData = {
     message: "Test data from endpoint",
@@ -835,46 +785,37 @@ app.get("/api/test-gundb", (req, res) => {
   // Using a promise with timeout to handle async operations with a time limit
   const runTestWithTimeout = new Promise((resolve) => {
     const testNode = gun.get(testKey);
-    console.log(`GUNDB_TEST_ENDPOINT: Attempting .put() with data:`, testData);
+    gunLogger.info(`GUNDB_TEST_ENDPOINT: Attempting .put() with data:`, testData);
 
     // Set overall timeout for the entire test
     const testTimeout = setTimeout(() => {
-      console.log(`GUNDB_TEST_ENDPOINT: Test timed out after 10s`);
+      gunLogger.error(`GUNDB_TEST_ENDPOINT: Test timed out after 10s ❌`);
       resolve(results);
     }, 10000);
 
     testNode.put(testData, (putAck) => {
       results.putCallbackFired = true;
-      console.log(`GUNDB_TEST_ENDPOINT: .put() callback fired with:`, putAck);
+      gunLogger.info(`GUNDB_TEST_ENDPOINT: .put() callback fired with:`, putAck);
 
       if (putAck.err) {
-        console.error(`GUNDB_TEST_ENDPOINT: .put() failed:`, putAck.err);
+        gunLogger.error(`GUNDB_TEST_ENDPOINT: .put() failed:`, { error: putAck.err });
         results.putError = putAck.err;
       } else {
-        console.log(`GUNDB_TEST_ENDPOINT: .put() successful`);
+        gunLogger.info(`GUNDB_TEST_ENDPOINT: .put() successful ✅`);
 
         // Try to read back the data
-        console.log(
-          `GUNDB_TEST_ENDPOINT: Attempting .once() to read back data`
-        );
+        gunLogger.info(`GUNDB_TEST_ENDPOINT: Attempting .once() to read back data 🔑`);
 
         testNode.once((readData, readKey) => {
           results.onceCallbackFired = true;
-          console.log(
-            `GUNDB_TEST_ENDPOINT: .once() callback fired. Key: ${readKey}, Data:`,
-            readData
-          );
+          gunLogger.info(`GUNDB_TEST_ENDPOINT: .once() callback fired. Key: ${readKey}`, { data: readData });
 
           results.retrievedData = readData;
           if (readData && readData.message === testData.message) {
-            console.log(
-              `GUNDB_TEST_ENDPOINT: Data read back matches put data!`
-            );
+            gunLogger.info(`GUNDB_TEST_ENDPOINT: Data read back matches put data!`);
             results.dataMatches = true;
           } else {
-            console.error(
-              `GUNDB_TEST_ENDPOINT: Data mismatch or no data from .once()`
-            );
+            gunLogger.error(`GUNDB_TEST_ENDPOINT: Data mismatch or no data from .once()`);
           }
 
           // Test completed successfully, clear timeout and resolve
@@ -888,13 +829,14 @@ app.get("/api/test-gundb", (req, res) => {
 
   // Wait for the test to complete (or time out) then return results
   runTestWithTimeout.then((results) => {
-    console.log(`GUNDB_TEST_ENDPOINT: Test completed, results:`, results);
+    gunLogger.info(`GUNDB_TEST_ENDPOINT: Test completed`, { results });
     res.json(results);
   });
 });
 
 // Endpoint per verificare la configurazione WebSocket
 app.get("/check-websocket", authenticateRequest, (req, res) => {
+  serverLogger.info("[Server] Checking WebSocket connection 📡");
   res.json({
     serverInfo: {
       port: PORT,
@@ -914,11 +856,9 @@ app.get("/login", (req, res) => {
   res.sendFile(path.join(__dirname, "src/ui/dashboard/login.html"));
 });
 
-// Serve la pagina di login html
-
 // Endpoint to handle /debug command explicitly
 app.get("/debug", (req, res) => {
-  console.log("Debug command received via dedicated endpoint");
+  serverLogger.info("[Server] Debug command received via dedicated endpoint");
 
   try {
     // Extract debug information
@@ -946,24 +886,21 @@ app.get("/debug", (req, res) => {
     };
 
     // Log the debug info
-    console.log(
-      "Debug information generated:",
-      JSON.stringify(debugInfo, null, 2)
-    );
+    serverLogger.info("[Server] Debug information generated:", debugInfo);
 
     // Record this debug session in the logs directory
     try {
       const debugLogPath = path.join(LOGS_DIR, `debug_${Date.now()}.json`);
       fs.writeFileSync(debugLogPath, JSON.stringify(debugInfo, null, 2));
-      console.log(`Debug log written to ${debugLogPath}`);
+      serverLogger.info(`Debug log written to ${debugLogPath}`);
     } catch (logError) {
-      console.error("Error writing debug log:", logError);
+      serverLogger.error("Error writing debug log:", { error: logError.message });
     }
 
     // Return debug info to client
     res.json(debugInfo);
   } catch (error) {
-    console.error("Error processing debug command:", error);
+    serverLogger.error("Error processing debug command:", { error: error.message });
     res.status(500).json({
       success: false,
       error: `Error processing debug command: ${error.message}`,
@@ -974,29 +911,29 @@ app.get("/debug", (req, res) => {
 // Graceful shutdown handling
 ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => {
   process.on(signal, async () => {
-    console.log(`\nReceived signal ${signal}, shutting down...`);
+    serverLogger.info(`[Server] Received signal ${signal}, shutting down... 🔥`);
 
-    console.log("Closing HTTP server...");
+    serverLogger.info("[Server] Closing HTTP server... 🔥");
     server.close(() => {
-      console.log("HTTP server closed");
+      serverLogger.info("[Server] HTTP server closed 🔥");
 
       // Close HTTPS server if it exists
       if (httpsServer) {
-        console.log("Closing HTTPS server...");
+        serverLogger.info("[Server] Closing HTTPS server... 🔥");
         httpsServer.close(() => {
-          console.log("HTTPS server closed");
-          console.log("Goodbye!");
+          serverLogger.info("[Server] HTTPS server closed");
+          serverLogger.info("[Server] Goodbye! 👋");
           process.exit(0);
         });
       } else {
-        console.log("Goodbye!");
+        serverLogger.info("[Server] Goodbye! 👋");
         process.exit(0);
       }
     });
 
     // Force close after 5 seconds
     setTimeout(() => {
-      console.log("Timeout reached, forced shutdown");
+      serverLogger.warn("[Server] Timeout reached, forced shutdown 🔥");
       process.exit(1);
     }, 5000);
   });
@@ -1004,8 +941,8 @@ app.get("/debug", (req, res) => {
 
 // Start listening for HTTP requests
 server.listen(PORT, HOST, () => {
-  console.log(`Server listening on http://${HOST}:${PORT}`);
-  console.log(`Gun relay peer accessible at http://${HOST}:${PORT}/gun`);
+  serverLogger.info(`[Server] Server listening on http://${HOST}:${PORT}`);
+  serverLogger.info(`[Server] Gun relay peer accessible at http://${HOST}:${PORT}/gun`);
 });
 
 export { app as default, RELAY_CONFIG };
