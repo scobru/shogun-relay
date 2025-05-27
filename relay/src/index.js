@@ -253,44 +253,8 @@ let gunOptions = {
     }
   },
   isValid: (msg) => {
-    // Special case: GET requests without PUT data should be allowed
-    if (msg.get && (!msg.put || Object.keys(msg.put || {}).length === 0)) {
-      if (msg.get['#'] && msg.get['#'].startsWith('~@')) {
-        console.log(`⚠️ User authentication message allowed: ${msg.get['#']}`);
-        return true;
-      }
-    }
-    
-    // Special case: Allow PUT operations on user data (for registration and login)
-    if (msg.put) {
-      // Check if this is a user-related PUT (user creation, auth, etc.)
-      const keys = Object.keys(msg.put || {});
-      if (keys.length > 0) {
-        // User-related operations should start with ~ (user public keys)
-        const isUserRelatedPut = keys.some(key => key.startsWith('~'));
-        if (isUserRelatedPut) {
-          console.log(`⚠️ User-related PUT operation allowed: Keys=${keys.join(', ')}`);
-          return true;
-        }
-      }
-    }
-    
     // First call the standard authentication manager validation
     const isValidResult = AuthenticationManager.isValidGunMessage(msg);
-    
-    // If not valid with standard validation, check for token in URL query parameters
-    if (!isValidResult && msg.url) {
-      try {
-        const url = new URL(msg.url);
-        const token = url.searchParams.get('token');
-        if (token === CONFIG.SECRET_TOKEN) {
-          console.log(`🔑 Valid token found in URL: ${token}`);
-          return true;
-        }
-      } catch (e) {
-        console.error("Error parsing URL:", e);
-      }
-    }
     
     return isValidResult;
   }
