@@ -72,34 +72,78 @@ const AuthenticationManager = {
    * Validazione messaggi GunDB
    */
   isValidGunMessage: function (msg) {  
-    console.log("isValidGunMessage", msg);
-    // return if cofig.SECRET_TOKEN is not set
+    console.log("isValidGunMessage", msg)
+    
+    // Special case: GET requests without PUT data should be allowed unconditionally
+    if (msg.get && (!msg.put || Object.keys(msg.put || {}).length === 0)) {
+      console.log("⚠️ GET message with no PUT data allowed");
+      return true;
+    }
+
+    // return if config.SECRET_TOKEN is not set
     if (!config.SECRET_TOKEN) {
       authLogger.info(`[AuthenticationManager] isValidGunMessage: no SECRET_TOKEN ✅`);
       return true;
     }
 
-    // Non-PUT messages are always valid
-    if (!msg.put || Object.keys(msg.put).length === 0) {
+    // Check for token in multiple places
+    const headerToken = msg.headers?.token;
+    const authHeaderToken = msg.headers?.Authorization?.replace('Bearer ', '');
+    const directToken = msg.token;
+    const internalToken = msg._?.token;
+    const optHeadersToken = msg.opt?.headers?.token;
+    const optAuthHeaderToken = msg.opt?.headers?.Authorization?.replace('Bearer ', '');
+    
+    // Try to get URL token if available
+    let urlToken = undefined;
+    if (msg.url) {
+      try {
+        const url = new URL(msg.url);
+        urlToken = url.searchParams.get('token');
+      } catch (e) {
+        console.error("Error parsing URL:", e);
+      }
+    }
+    
+    // Check if any of the tokens match the expected token
+    const validTokens = [
+      headerToken, 
+      authHeaderToken,
+      directToken, 
+      internalToken, 
+      optHeadersToken, 
+      optAuthHeaderToken,
+      urlToken
+    ].filter(token => token === config.SECRET_TOKEN);
+    
+    // If any valid token was found, authentication passes
+    if (validTokens.length > 0) {
+      authLogger.info(`[AuthenticationManager] Valid token found ✅`);
       return true;
     }
-
-    // Admin token in headers è l'unico metodo valido
-    if (msg?.headers?.token === config.SECRET_TOKEN) {
-      return true;
-    }
-
-    if(msg?.token === config.SECRET_TOKEN) {
-      return true;
-    }
-
-    if (msg?.headers?.Authorization === "Bearer " + config.SECRET_TOKEN) {
-      return true;
-    }
-
-    authLogger.info(`[AuthenticationManager] ❌ Not valid token: ${msg?.headers?.Authorization}`);
-
-    // Ogni altro messaggio è rifiutato
+    
+    // Log all the places we checked for tokens
+    authLogger.info(`[AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: ${headerToken}
+      headers.Authorization: ${authHeaderToken}
+      direct token: ${directToken}
+      internal token: ${internalToken}
+      opt.headers.token: ${optHeadersToken}
+      opt.headers.Authorization: ${optAuthHeaderToken}
+      URL token: ${urlToken}
+     `, { service: "shogun-relay" });
+    
+    console.log("🔑 Gun message validation failed:", {
+      msgType: msg.get ? "GET" : msg.put ? "PUT" : "OTHER",
+      headerToken,
+      authHeaderToken,
+      directToken,
+      internalToken,
+      optHeadersToken,
+      optAuthHeaderToken,
+      urlToken
+    });
+    
     return false;
   },
 

@@ -200,6 +200,20 @@ function getRelayVerifier() {
   return relayVerifier;
 }
 
+// Add debug middleware to inspect all incoming Gun messages
+const debugGunMessages = (msg) => {
+  console.log("🔍 INCOMING MESSAGE INSPECTION:");
+  
+  // Check headers in all possible locations
+  console.log(`- URL token: ${msg.url ? (new URL(msg.url)).searchParams.get('token') : 'n/a'}`);
+  console.log(`- Headers: ${JSON.stringify(msg.headers || {})}`);
+  console.log(`- Direct token: ${msg.token || 'undefined'}`);
+  console.log(`- Internal token: ${msg._ && msg._.token ? msg._.token : 'undefined'}`);
+  console.log(`- Message type: ${msg.put ? 'PUT' : (msg.get ? 'GET' : 'OTHER')}`);
+  
+  return msg;
+};
+
 // Fix the isValid function to properly handle authorization
 let gunOptions = {
   web: server,
@@ -207,9 +221,79 @@ let gunOptions = {
   file: "radata",
   radisk: true,
   localStorage: false,
-  isValid: AuthenticationManager.isValidGunMessage.bind(AuthenticationManager),
-  // Add crash: true to prevent Gun from crashing on errors
-  crash: true
+  // Add middleware to capture query parameters and convert to headers
+  middleware: {
+    // This is a Gun middleware to inspect and potentially modify messages
+    input: function(msg, gunInstance) {
+      // If there's a URL with a token in the query string, extract it
+      if (msg && msg.url) {
+        try {
+          const url = new URL(msg.url);
+          const token = url.searchParams.get('token');
+          if (token) {
+            if (!msg.headers) msg.headers = {};
+            msg.headers.token = token;
+            msg.headers.Authorization = `Bearer ${token}`;
+            msg.token = token; // Also set direct token
+            if (!msg._) msg._ = {};
+            if (typeof msg._ === 'object') {
+              msg._.token = token; // Set in internal state
+            }
+            console.log(`🔑 Extracted token from URL: ${token}`);
+          }
+        } catch (e) {
+          console.error("Error parsing URL:", e);
+        }
+      }
+      
+      // Log the message for debugging
+      debugGunMessages(msg);
+      
+      return msg; // Return the possibly modified message
+    }
+  },
+  isValid: (msg) => {
+    // Special case: GET requests without PUT data should be allowed
+    if (msg.get && (!msg.put || Object.keys(msg.put || {}).length === 0)) {
+      if (msg.get['#'] && msg.get['#'].startsWith('~@')) {
+        console.log(`⚠️ User authentication message allowed: ${msg.get['#']}`);
+        return true;
+      }
+    }
+    
+    // Special case: Allow PUT operations on user data (for registration and login)
+    if (msg.put) {
+      // Check if this is a user-related PUT (user creation, auth, etc.)
+      const keys = Object.keys(msg.put || {});
+      if (keys.length > 0) {
+        // User-related operations should start with ~ (user public keys)
+        const isUserRelatedPut = keys.some(key => key.startsWith('~'));
+        if (isUserRelatedPut) {
+          console.log(`⚠️ User-related PUT operation allowed: Keys=${keys.join(', ')}`);
+          return true;
+        }
+      }
+    }
+    
+    // First call the standard authentication manager validation
+    const isValidResult = AuthenticationManager.isValidGunMessage(msg);
+    
+    // If not valid with standard validation, check for token in URL query parameters
+    if (!isValidResult && msg.url) {
+      try {
+        const url = new URL(msg.url);
+        const token = url.searchParams.get('token');
+        if (token === CONFIG.SECRET_TOKEN) {
+          console.log(`🔑 Valid token found in URL: ${token}`);
+          return true;
+        }
+      } catch (e) {
+        console.error("Error parsing URL:", e);
+      }
+    }
+    
+    return isValidResult;
+  }
 };
 
 /**
@@ -255,6 +339,7 @@ async function startServer() {
     gun = Gun(gunOptions);
     gunLogger.info("GunDB initialized. ✅");
 
+    gun.on('out', {get: {'#': {'*': ''}}})
 
     // Initialize StorageLog
     new StorageLog(Gun, gun);
