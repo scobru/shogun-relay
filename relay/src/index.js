@@ -6,12 +6,12 @@ import fs from "fs";
 import express from "express";
 import { RelayVerifier } from "shogun-core";
 import Gun from "gun";
-import "gun/axe.js";
-import "gun/lib/wire.js";
-import "gun/lib/webrtc.js";
 import path from "path";
 import http from "http";
-import "./utils/bullet-catcher.js";
+
+// Fix the import if bullet-catcher.js exists in utils directory, otherwise use direct import
+import "bullet-catcher"
+
 import {
   validateFileData,
   validateUploadResponse,
@@ -39,17 +39,33 @@ import {
 } from "./utils/shogunCoreUtils.js"; // Import ShogunCore utility functions
 import { setupGunIpfsMiddleware } from "./utils/gunIpfsUtils.js";
 import StorageLog from "./utils/storageLog.js";
-import { serverLogger, ipfsLogger, gunLogger, authLogger } from "./utils/logger.js";
+import {
+  serverLogger,
+  ipfsLogger,
+  gunLogger,
+  authLogger,
+} from "./utils/logger.js";
+
 
 // Global error handlers to prevent crashes
-process.on('uncaughtException', (err) => {
-  serverLogger.error('UNCAUGHT EXCEPTION! 💥', { error: err.message, stack: err.stack });
-  serverLogger.error('The server will continue running, but please fix this error.');
+process.on("uncaughtException", (err) => {
+  serverLogger.error("UNCAUGHT EXCEPTION! 💥", {
+    error: err.message,
+    stack: err.stack,
+  });
+  serverLogger.error(
+    "The server will continue running, but please fix this error."
+  );
 });
 
-process.on('unhandledRejection', (err) => {
-  serverLogger.error('UNHANDLED PROMISE REJECTION! 💥', { error: err?.message, stack: err?.stack });
-  serverLogger.error('The server will continue running, but please fix this error.');
+process.on("unhandledRejection", (err) => {
+  serverLogger.error("UNHANDLED PROMISE REJECTION! 💥", {
+    error: err?.message,
+    stack: err?.stack,
+  });
+  serverLogger.error(
+    "The server will continue running, but please fix this error."
+  );
 });
 
 // create __dirname
@@ -70,7 +86,9 @@ try {
     CONFIG = validateConfig(CONFIG);
     serverLogger.info("Configuration validated successfully with Mityli ✅");
   } catch (validationError) {
-    serverLogger.warn("Configuration validation warning:", { error: validationError.message });
+    serverLogger.warn("Configuration validation warning:", {
+      error: validationError.message,
+    });
     serverLogger.warn("Continuing with unvalidated configuration");
   }
 } catch (error) {
@@ -84,7 +102,7 @@ const PORT = CONFIG.PORT || 8765;
 const HOST = CONFIG.HOST || "localhost";
 const STORAGE_DIR = path.resolve("./uploads");
 const SECRET_TOKEN = CONFIG.SECRET_TOKEN || "";
-const LOGS_DIR = path.resolve("./logs");
+const LOGS_DIR = path.join(__dirname, "logs");
 
 // Declare global variables for important instances
 // These will be initialized in startServer
@@ -154,9 +172,13 @@ async function initializeRelayComponents() {
 
         // Create wallet with private key and provider
         signer = new ethers.Wallet(privateKey, provider);
-        serverLogger.info(`Ethereum wallet created with address: ${await signer.getAddress()} 💰`);
+        serverLogger.info(
+          `Ethereum wallet created with address: ${await signer.getAddress()} 💰`
+        );
       } catch (error) {
-        serverLogger.error("Error creating Ethereum wallet:", { error: error.message });
+        serverLogger.error("Error creating Ethereum wallet:", {
+          error: error.message,
+        });
         serverLogger.warn("Continuing without signer for write operations");
       }
     }
@@ -174,9 +196,14 @@ async function initializeRelayComponents() {
         // Create a unified relay verifier using the contracts
         relayVerifier = createRelayVerifier(relayContracts);
 
-        serverLogger.info("Relay verification components initialized successfully ✅");
+        serverLogger.info(
+          "Relay verification components initialized successfully ✅"
+        );
       } catch (error) {
-        serverLogger.error("Error initializing relay verification components:", { error: error.message });
+        serverLogger.error(
+          "Error initializing relay verification components:",
+          { error: error.message }
+        );
       }
 
       // Update relayVerifier in AuthenticationManager if we have one
@@ -187,7 +214,9 @@ async function initializeRelayComponents() {
 
     return true;
   } catch (error) {
-    serverLogger.error("Error initializing relay components:", { error: error.message });
+    serverLogger.error("Error initializing relay components:", {
+      error: error.message,
+    });
     return false;
   }
 }
@@ -203,16 +232,78 @@ function getRelayVerifier() {
 // Add debug middleware to inspect all incoming Gun messages
 const debugGunMessages = (msg) => {
   console.log("🔍 INCOMING MESSAGE INSPECTION:");
-  
+
   // Check headers in all possible locations
-  console.log(`- URL token: ${msg.url ? (new URL(msg.url)).searchParams.get('token') : 'n/a'}`);
+  console.log(
+    `- URL token: ${
+      msg.url ? new URL(msg.url).searchParams.get("token") : "n/a"
+    }`
+  );
   console.log(`- Headers: ${JSON.stringify(msg.headers || {})}`);
-  console.log(`- Direct token: ${msg.token || 'undefined'}`);
-  console.log(`- Internal token: ${msg._ && msg._.token ? msg._.token : 'undefined'}`);
-  console.log(`- Message type: ${msg.put ? 'PUT' : (msg.get ? 'GET' : 'OTHER')}`);
-  
+  console.log(`- Direct token: ${msg.token || "undefined"}`);
+  console.log(
+    `- Internal token: ${msg._ && msg._.token ? msg._.token : "undefined"}`
+  );
+  console.log(`- Message type: ${msg.put ? "PUT" : msg.get ? "GET" : "OTHER"}`);
+
   return msg;
 };
+
+// Helper function to identify Gun system messages that should bypass authentication
+function isGunSystemMessage(msg) {
+  // Check for GET messages with special paths
+  if (msg.get) {
+    const getPath = msg.get["#"];
+    if (
+      typeof getPath === "string" &&
+      (getPath === "null" || getPath === "#")
+    ) {
+      return true;
+    }
+
+    // Only allow GET for user profiles during authentication
+    if (
+      typeof getPath === "string" &&
+      (getPath.startsWith("~@") || getPath.startsWith("~"))
+    ) {
+      console.log("AUTH-RELATED GET for user profile:", getPath);
+      return true;
+    }
+  }
+
+  // For PUT messages, be more restrictive
+  if (msg.put) {
+    // Only allow system-level PUTs, NOT general user data
+    // For user authentication, we only need to allow auth messages
+    if (msg.put && msg.put.auth) {
+      console.log("Allowing auth-related PUT message");
+      return true;
+    }
+
+    // For true system messages, check if they're actual Gun system messages
+    const isSystemMessage =
+      msg.dam === "hi" || // Handshake messages
+      msg.dam === "opt" || // Option messages
+      (msg["#"] &&
+        msg.put &&
+        !Object.keys(msg.put).some((k) => k.startsWith("test_"))); // Chain messages but not test data
+
+    if (isSystemMessage) {
+      console.log("Allowing true Gun system message with dam:", msg.dam);
+      return true;
+    }
+
+    return false; // All other PUTs must be authenticated
+  }
+
+  // By default, don't allow bypassing authentication
+  return false;
+}
+
+function hasValidToken (msg) {
+  console.log("HAS VALID TOKEN:", msg); 
+  return msg && msg && msg.headers && msg.headers.token && msg.headers.token === SECRET_TOKEN;
+}
 
 // Fix the isValid function to properly handle authorization
 let gunOptions = {
@@ -221,43 +312,7 @@ let gunOptions = {
   file: "radata",
   radisk: true,
   localStorage: false,
-  // Add middleware to capture query parameters and convert to headers
-  middleware: {
-    // This is a Gun middleware to inspect and potentially modify messages
-    input: function(msg, gunInstance) {
-      // If there's a URL with a token in the query string, extract it
-      if (msg && msg.url) {
-        try {
-          const url = new URL(msg.url);
-          const token = url.searchParams.get('token');
-          if (token) {
-            if (!msg.headers) msg.headers = {};
-            msg.headers.token = token;
-            msg.headers.Authorization = `Bearer ${token}`;
-            msg.token = token; // Also set direct token
-            if (!msg._) msg._ = {};
-            if (typeof msg._ === 'object') {
-              msg._.token = token; // Set in internal state
-            }
-            console.log(`🔑 Extracted token from URL: ${token}`);
-          }
-        } catch (e) {
-          console.error("Error parsing URL:", e);
-        }
-      }
-      
-      // Log the message for debugging
-      debugGunMessages(msg);
-      
-      return msg; // Return the possibly modified message
-    }
-  },
-  isValid: (msg) => {
-    // First call the standard authentication manager validation
-    const isValidResult = AuthenticationManager.isValidGunMessage(msg);
-    
-    return isValidResult;
-  }
+  isValid: hasValidToken,
 };
 
 /**
@@ -297,13 +352,24 @@ async function startServer() {
       RELAY_CONFIG,
       relayVerifier: null, // Will be set after relayVerifier init by initializeRelayComponents
     });
-    authLogger.info("AuthenticationManager configured with initial settings. ✅");
-    
+    authLogger.info(
+      "AuthenticationManager configured with initial settings. ✅"
+    );
+
     // Initialize Gun first
     gun = Gun(gunOptions);
     gunLogger.info("GunDB initialized. ✅");
 
-    gun.on('out', {get: {'#': {'*': ''}}})
+    // Add debug middleware after initialization
+    Gun.on('opt', function(ctx) {
+      if (ctx.once) return;
+      ctx.on('in', function(msg) {
+        debugGunMessages(msg);
+        this.to.next(msg);
+      });
+    });
+
+    gun.on("out", { get: { "#": { "*": "" } } });
 
     // Initialize StorageLog
     new StorageLog(Gun, gun);
@@ -313,7 +379,9 @@ async function startServer() {
     shogunCore = initializeShogunCore(gun, SECRET_TOKEN);
 
     await initializeRelayComponents();
-    serverLogger.info("Relay initialized, AuthenticationManager updated with live verifiers. ✅");
+    serverLogger.info(
+      "Relay initialized, AuthenticationManager updated with live verifiers. ✅"
+    );
 
     // Initialize File Manager now that gun and ipfsManager are available
     fileManager = new ShogunFileManager({
@@ -460,7 +528,9 @@ async function startServer() {
 
           // Set a timeout to prevent hanging uploads
           const uploadTimeout = setTimeout(() => {
-            serverLogger.error("[Server] File upload processing timeout after 30s ❌");
+            serverLogger.error(
+              "[Server] File upload processing timeout after 30s ❌"
+            );
             if (!res.headersSent) {
               res.status(500).json({
                 success: false,
@@ -475,16 +545,22 @@ async function startServer() {
           // Validate the file data using Mityli
           try {
             fileData = validateFileData(fileData);
-            serverLogger.info("[Server] File data validated successfully with Mityli ✅");
+            serverLogger.info(
+              "[Server] File data validated successfully with Mityli ✅"
+            );
           } catch (validationError) {
-            serverLogger.error("[Server] File data validation error:", { error: validationError.message });
+            serverLogger.error("[Server] File data validation error:", {
+              error: validationError.message,
+            });
             // Continue without validation if it fails - for backward compatibility
           }
 
           // Clear the timeout since we completed successfully
           clearTimeout(uploadTimeout);
 
-          serverLogger.info(`[Server] File upload completed successfully: ${fileData.id} ✅`);
+          serverLogger.info(
+            `[Server] File upload completed successfully: ${fileData.id} ✅`
+          );
 
           // Prepare response
           const response = {
@@ -510,7 +586,9 @@ async function startServer() {
             res.json(validatedResponse);
           }
         } catch (error) {
-          serverLogger.error("[Server] File upload error: ❌", { error: error.message });
+          serverLogger.error("[Server] File upload error: ❌", {
+            error: error.message,
+          });
 
           // Send error response if not already sent
           if (!res.headersSent) {
@@ -561,24 +639,36 @@ async function startServer() {
         // Start HTTPS server if SSL is configured
         const httpsPort = parseInt(CONFIG.HTTPS_PORT || "8443");
         httpsServer.listen(httpsPort, HOST, () => {
-          serverLogger.info(`HTTPS server listening on https://${HOST}:${httpsPort}`);
+          serverLogger.info(
+            `HTTPS server listening on https://${HOST}:${httpsPort}`
+          );
         });
 
         serverLogger.info("SSL configuration loaded successfully ✅");
       } catch (err) {
-        serverLogger.error("Error loading SSL certificates:", { error: err.message });
+        serverLogger.error("Error loading SSL certificates:", {
+          error: err.message,
+        });
         serverLogger.error("HTTPS server will not be available");
-        serverLogger.info("To generate SSL certificates, run: node scripts/generate-ssl-certs.js 🔑");
+        serverLogger.info(
+          "To generate SSL certificates, run: node scripts/generate-ssl-certs.js 🔑"
+        );
       }
     }
   } catch (error) {
-    serverLogger.error("Error during server startup:", { error: error.message, stack: error.stack });
+    serverLogger.error("Error during server startup:", {
+      error: error.message,
+      stack: error.stack,
+    });
     process.exit(1);
   }
 }
 
 startServer().catch((err) => {
-  serverLogger.error("Critical error during startup:", { error: err.message, stack: err.stack });
+  serverLogger.error("Critical error during startup:", {
+    error: err.message,
+    stack: err.stack,
+  });
   process.exit(1);
 });
 
@@ -603,7 +693,12 @@ app.use(
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "token",
+    ],
   })
 );
 
@@ -797,9 +892,13 @@ app.post("/api/validation-config", authenticateRequest, (req, res) => {
       message: "Validation configuration updated successfully",
       config: currentConfig,
     });
-    serverLogger.info("[Server] Validation configuration updated successfully ✅");
+    serverLogger.info(
+      "[Server] Validation configuration updated successfully ✅"
+    );
   } catch (error) {
-    serverLogger.error("[Server] Error updating validation configuration:", { error: error.message });
+    serverLogger.error("[Server] Error updating validation configuration:", {
+      error: error.message,
+    });
     res.status(500).json({
       success: false,
       error: "Error updating validation configuration: " + error.message,
@@ -809,7 +908,9 @@ app.post("/api/validation-config", authenticateRequest, (req, res) => {
 
 // GunDB Test Endpoint
 app.get("/api/test-gundb", (req, res) => {
-  gunLogger.info("GUNDB_TEST_ENDPOINT: Starting test at " + new Date().toISOString());
+  gunLogger.info(
+    "GUNDB_TEST_ENDPOINT: Starting test at " + new Date().toISOString()
+  );
 
   // Generate a unique test key
   const testKey = `test_key_${Date.now()}`;
@@ -834,7 +935,10 @@ app.get("/api/test-gundb", (req, res) => {
   // Using a promise with timeout to handle async operations with a time limit
   const runTestWithTimeout = new Promise((resolve) => {
     const testNode = gun.get(testKey);
-    gunLogger.info(`GUNDB_TEST_ENDPOINT: Attempting .put() with data:`, testData);
+    gunLogger.info(
+      `GUNDB_TEST_ENDPOINT: Attempting .put() with data:`,
+      testData
+    );
 
     // Set overall timeout for the entire test
     const testTimeout = setTimeout(() => {
@@ -844,27 +948,41 @@ app.get("/api/test-gundb", (req, res) => {
 
     testNode.put(testData, (putAck) => {
       results.putCallbackFired = true;
-      gunLogger.info(`GUNDB_TEST_ENDPOINT: .put() callback fired with:`, putAck);
+      gunLogger.info(
+        `GUNDB_TEST_ENDPOINT: .put() callback fired with:`,
+        putAck
+      );
 
       if (putAck.err) {
-        gunLogger.error(`GUNDB_TEST_ENDPOINT: .put() failed:`, { error: putAck.err });
+        gunLogger.error(`GUNDB_TEST_ENDPOINT: .put() failed:`, {
+          error: putAck.err,
+        });
         results.putError = putAck.err;
       } else {
         gunLogger.info(`GUNDB_TEST_ENDPOINT: .put() successful ✅`);
 
         // Try to read back the data
-        gunLogger.info(`GUNDB_TEST_ENDPOINT: Attempting .once() to read back data 🔑`);
+        gunLogger.info(
+          `GUNDB_TEST_ENDPOINT: Attempting .once() to read back data 🔑`
+        );
 
         testNode.once((readData, readKey) => {
           results.onceCallbackFired = true;
-          gunLogger.info(`GUNDB_TEST_ENDPOINT: .once() callback fired. Key: ${readKey}`, { data: readData });
+          gunLogger.info(
+            `GUNDB_TEST_ENDPOINT: .once() callback fired. Key: ${readKey}`,
+            { data: readData }
+          );
 
           results.retrievedData = readData;
           if (readData && readData.message === testData.message) {
-            gunLogger.info(`GUNDB_TEST_ENDPOINT: Data read back matches put data!`);
+            gunLogger.info(
+              `GUNDB_TEST_ENDPOINT: Data read back matches put data!`
+            );
             results.dataMatches = true;
           } else {
-            gunLogger.error(`GUNDB_TEST_ENDPOINT: Data mismatch or no data from .once()`);
+            gunLogger.error(
+              `GUNDB_TEST_ENDPOINT: Data mismatch or no data from .once()`
+            );
           }
 
           // Test completed successfully, clear timeout and resolve
@@ -943,13 +1061,17 @@ app.get("/debug", (req, res) => {
       fs.writeFileSync(debugLogPath, JSON.stringify(debugInfo, null, 2));
       serverLogger.info(`Debug log written to ${debugLogPath}`);
     } catch (logError) {
-      serverLogger.error("Error writing debug log:", { error: logError.message });
+      serverLogger.error("Error writing debug log:", {
+        error: logError.message,
+      });
     }
 
     // Return debug info to client
     res.json(debugInfo);
   } catch (error) {
-    serverLogger.error("Error processing debug command:", { error: error.message });
+    serverLogger.error("Error processing debug command:", {
+      error: error.message,
+    });
     res.status(500).json({
       success: false,
       error: `Error processing debug command: ${error.message}`,
@@ -960,7 +1082,9 @@ app.get("/debug", (req, res) => {
 // Graceful shutdown handling
 ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => {
   process.on(signal, async () => {
-    serverLogger.info(`[Server] Received signal ${signal}, shutting down... 🔥`);
+    serverLogger.info(
+      `[Server] Received signal ${signal}, shutting down... 🔥`
+    );
 
     serverLogger.info("[Server] Closing HTTP server... 🔥");
     server.close(() => {
@@ -991,7 +1115,9 @@ app.get("/debug", (req, res) => {
 // Start listening for HTTP requests
 server.listen(PORT, HOST, () => {
   serverLogger.info(`[Server] Server listening on http://${HOST}:${PORT}`);
-  serverLogger.info(`[Server] Gun relay peer accessible at http://${HOST}:${PORT}/gun`);
+  serverLogger.info(
+    `[Server] Gun relay peer accessible at http://${HOST}:${PORT}/gun`
+  );
 });
 
 export { app as default, RELAY_CONFIG };

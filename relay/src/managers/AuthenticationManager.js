@@ -69,15 +69,6 @@ function configure(configData) {
 const AuthenticationManager = {
 
   /**
-   * Validazione messaggi GunDB
-   */
-  isValidGunMessage: function (msg) {  
-    console.log("isValidGunMessage", msg)
-    
-    return true;
-  },
-
-  /**
    * Middleware HTTP per protezione route
    * Versione semplificata che verifica solo il SECRET_TOKEN
    */

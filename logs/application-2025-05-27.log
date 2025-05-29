@@ -1,0 +1,1099 @@
+[2025-05-27 00:04:48] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 00:05:03] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 00:11:20] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 00:12:59] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 00:13:21] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 00:14:23] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 00:15:43] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 00:17:37] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 00:18:10] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 00:18:43] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 00:18:43] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 00:18:43] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 00:18:43] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 00:18:43] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 00:18:43] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 00:18:43] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 00:18:43] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 00:18:43] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 00:18:44] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 00:18:44] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 01:16:54] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:24:02] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:24:03] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:24:03] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:24:03] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:24:03] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:24:03] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:24:03] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:24:03] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:24:03] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:24:04] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:24:04] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:28:37] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:29:33] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:29:33] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:29:33] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:29:33] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:29:33] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:29:33] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:29:33] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:29:33] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:29:33] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:29:34] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:29:34] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:29:57] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:30:44] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:30:44] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:30:44] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:30:44] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:30:44] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:30:44] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:30:44] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:30:44] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:30:44] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:30:44] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:30:44] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:31:19] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:31:19] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:31:19] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:31:19] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:31:19] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:31:19] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:31:19] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:31:19] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:31:19] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:31:20] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:31:20] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:33:59] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:34:23] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:34:23] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:34:23] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:34:23] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:34:23] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:34:23] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:34:23] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:34:23] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:34:23] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:34:23] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:34:23] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:34:44] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:42:22] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:42:22] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:42:22] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:42:22] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:42:22] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:42:22] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:42:22] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:42:22] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:42:22] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:42:22] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:42:22] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:46:02] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:46:52] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:47:11] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:48:19] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:48:19] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:48:19] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:48:19] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:48:19] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:48:20] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:48:20] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:48:20] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:48:20] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:48:20] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:48:20] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:48:25] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:50:41] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:59:21] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 09:59:51] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:05:54] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:05:54] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:05:54] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:05:54] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:05:54] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:05:54] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:05:54] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:05:54] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:05:54] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:05:54] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:05:54] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:06:15] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:06:15] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:06:15] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:06:15] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:06:15] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:06:15] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:06:15] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:06:15] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:06:15] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:06:15] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:06:15] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:12:11] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      _.token: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:17:12] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:17:12] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:17:12] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:17:12] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:17:12] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:17:13] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:17:13] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:17:13] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:17:13] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:17:13] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:17:13] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:32:42] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:32:42] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:32:42] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:32:42] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:32:42] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:32:42] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:32:42] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:32:42] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:32:42] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:32:42] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:32:42] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 10:33:11] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      _.token: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:05:00] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      _.token: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:07:09] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      _.token: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:07:37] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:07:37] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:07:37] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:07:37] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:07:37] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:07:37] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:07:37] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:07:37] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:07:37] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:07:37] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:07:37] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:08:35] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      _.token: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:08:45] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      direct token: undefined
+      headers.Authorization: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      _.token: undefined
+     {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:09:31] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:09:31] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:09:31] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:09:31] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:09:31] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:09:31] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:09:31] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:09:31] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:09:31] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:09:31] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:09:31] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:10:40] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:10:40] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:10:40] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:10:40] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:10:40] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:10:40] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:10:40] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:10:40] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:10:40] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:10:40] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:10:40] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:12:28] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:12:28] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:12:28] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:12:28] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:12:28] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:12:28] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:12:28] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:12:28] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:12:28] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:12:28] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 11:12:28] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 15:58:21] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 15:58:21] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 15:58:22] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 15:58:22] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 15:58:22] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 15:58:23] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 15:58:23] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 15:58:23] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 15:58:23] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 15:58:23] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 15:58:23] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 17:55:23] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 17:55:23] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 17:55:23] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 17:55:23] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 17:55:23] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 17:55:24] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 17:55:24] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 17:55:24] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 17:55:24] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 17:55:24] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 17:55:24] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 17:55:24] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      headers.Authorization: undefined
+      direct token: undefined
+      internal token: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      URL token: undefined
+      {
+  "service": "shogun-relay"
+}
+[2025-05-27 17:55:26] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      headers.Authorization: undefined
+      direct token: undefined
+      internal token: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      URL token: undefined
+      {
+  "service": "shogun-relay"
+}
+[2025-05-27 18:16:14] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      headers.Authorization: undefined
+      direct token: undefined
+      internal token: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      URL token: undefined
+      {
+  "service": "shogun-relay"
+}
+[2025-05-27 18:17:42] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      headers.Authorization: undefined
+      direct token: undefined
+      internal token: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      URL token: undefined
+      {
+  "service": "shogun-relay"
+}
+[2025-05-27 19:13:32] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      headers.Authorization: undefined
+      direct token: undefined
+      internal token: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      URL token: undefined
+      {
+  "service": "shogun-relay"
+}
+[2025-05-27 19:35:03] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      headers.Authorization: undefined
+      direct token: undefined
+      internal token: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      URL token: undefined
+      {
+  "service": "shogun-relay"
+}
+[2025-05-27 19:43:57] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      headers.Authorization: undefined
+      direct token: undefined
+      internal token: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      URL token: undefined
+      {
+  "service": "shogun-relay"
+}
+[2025-05-27 19:48:47] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      headers.Authorization: undefined
+      direct token: undefined
+      internal token: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      URL token: undefined
+      {
+  "service": "shogun-relay"
+}
+[2025-05-27 20:00:31] 🚀 info ✅: [Server] Received signal SIGINT, shutting down... 🔥 {
+  "service": "shogun-relay"
+}
+[2025-05-27 20:00:48] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 20:00:48] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 20:00:48] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 20:00:48] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 20:00:48] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 20:00:49] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 20:00:49] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 20:00:49] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 20:00:49] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 20:00:49] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 20:00:49] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 20:00:49] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      headers.Authorization: undefined
+      direct token: undefined
+      internal token: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      URL token: undefined
+      {
+  "service": "shogun-relay"
+}
+[2025-05-27 20:04:03] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      headers.Authorization: undefined
+      direct token: undefined
+      internal token: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      URL token: undefined
+      {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:40:14] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      headers.Authorization: undefined
+      direct token: undefined
+      internal token: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      URL token: undefined
+      {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:44:32] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      headers.Authorization: undefined
+      direct token: undefined
+      internal token: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      URL token: undefined
+      {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:44:42] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      headers.Authorization: undefined
+      direct token: undefined
+      internal token: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      URL token: undefined
+      {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:45:56] 🔑 info ✅: [AuthenticationManager] ❌ Not valid token in any location:
+      headers.token: undefined
+      headers.Authorization: undefined
+      direct token: undefined
+      internal token: undefined
+      opt.headers.token: undefined
+      opt.headers.Authorization: undefined
+      URL token: undefined
+      {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:04] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:04] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:04] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:04] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:04] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:05] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:05] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:05] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:05] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:05] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:05] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:27] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:27] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:27] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:27] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:27] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:27] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:27] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:27] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:27] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:27] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-05-27 22:47:27] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}

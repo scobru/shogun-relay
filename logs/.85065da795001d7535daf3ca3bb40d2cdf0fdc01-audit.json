@@ -1,0 +1,30 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "D:\\shogun-2\\test-env\\logs\\.85065da795001d7535daf3ca3bb40d2cdf0fdc01-audit.json",
+    "files": [
+        {
+            "date": 1748270236131,
+            "name": "D:\\shogun-2\\test-env\\logs\\error-2025-05-26.log",
+            "hash": "ef832c6165cd998e4d32515a4dd956fd9d1947a8227bb199cf3a02bf02a23a4a"
+        },
+        {
+            "date": 1748297922809,
+            "name": "D:\\shogun-2\\test-env\\logs\\error-2025-05-27.log",
+            "hash": "27d4e399e3ade439dbbfd03e5c76dbfebaf50d10e0b1e63ca987934dbb50d60f"
+        },
+        {
+            "date": 1748410587120,
+            "name": "D:\\shogun-2\\test-env\\logs\\error-2025-05-28.log",
+            "hash": "2d1def4b1f23af3a0389a57c96bd601031e9f4686837061287322c2a3d627d8a"
+        },
+        {
+            "date": 1748470056026,
+            "name": "D:\\shogun-2\\test-env\\logs\\error-2025-05-29.log",
+            "hash": "18987a3048d46abcd9b9a285cd54790386945d89760bdc548ba0d07bdf201264"
+        }
+    ],
+    "hashType": "sha256"
+}
