@@ -1,0 +1,23 @@
+{
+    "NODE_ENV": "production",
+    "PORT": 8765,
+    "HTTPS_PORT": 8443,
+    "SECRET_TOKEN": "thisIsTheTokenForReals",
+    "ALLOWED_ORIGINS": "",
+    "IPFS_ENABLED": false,
+    "IPFS_SERVICE": "",
+    "IPFS_NODE_URL": "",
+    "IPFS_GATEWAY": "",
+    "PINATA_GATEWAY": "", 
+    "PINATA_JWT": "",
+    "ETHEREUM_PROVIDER_URL": "",
+    "ETHEREUM_PRIVATE_KEY": "",
+    "ONCHAIN_MEMBERSHIP_ENABLED": false,
+    "RELAY_REGISTRY_CONTRACT": "",
+    "INDIVIDUAL_RELAY": "",
+    "RELAY_ENTRY_POINT_CONTRACT": "",
+    "PRIVKEY_PATH": "",
+    "CERT_PATH": "",
+    "TYPE_VALIDATION_ENABLED": true,
+    "TYPE_VALIDATION_STRICT": false,}
+    

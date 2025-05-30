@@ -1,0 +1,1325 @@
+<!doctype html>
+<html data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1.0"
+    />
+    <title>GunDB Messenger Client</title>
+    <link rel="stylesheet" href="/nodom.css" />
+    <style>
+      /* Additional custom styles for the minimal interface */
+      body {
+        margin: 0 auto;
+        padding: 20px;
+      }
+      
+      h1 {
+        font-size: 1.8rem;
+        margin-bottom: 2rem;
+      }
+      
+      h2 {
+        font-size: 1.4rem;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        font-weight: 500;
+      }
+      
+      h3 {
+        font-size: 1.2rem;
+        margin-top: 1.5rem;
+        margin-bottom: 0.8rem;
+      }
+      
+      .secure-label {
+        float: right;
+        font-size: 0.9rem;
+        opacity: 0.8;
+      }
+      
+      .status-info {
+        margin-bottom: 0.5rem;
+      }
+      
+      .status-label {
+        display: inline-block;
+        width: 100px;
+        font-weight: 500;
+      }
+      
+      .message-input {
+        width: 100%;
+        margin-bottom: 1rem;
+        padding: 0.5rem;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+      }
+      
+      .message-list {
+        margin-top: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background-color: rgba(255, 255, 255, 0.05);
+        height: 400px;
+        overflow-y: scroll;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-radius: 8px;
+      }
+      
+      .message {
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      
+      .message-sender {
+        font-weight: 500;
+      }
+      
+      .message-time {
+        float: right;
+        color: var(--text-secondary);
+        font-size: 0.8rem;
+      }
+      
+      .message-text {
+        margin-top: 0.3rem;
+      }
+
+      input,
+      textarea {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        padding: 0.5rem;
+        border-radius: 4px;
+        width: 100%;
+      }
+      
+      button {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 8px 16px;
+        cursor: pointer;
+      }
+      
+      button:hover {
+        background-color: var(--primary-dark);
+      }
+      
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      
+      .tab-container {
+        display: flex;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        margin-bottom: 1rem;
+      }
+      
+      .tab-button {
+        background-color: transparent;
+        border: none;
+        color: var(--text-secondary);
+        padding: 8px 16px;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+      }
+      
+      .tab-button.active {
+        color: white;
+        border-bottom-color: var(--primary-color);
+      }
+      
+      .tab-content {
+        display: none;
+      }
+      
+      .user-list {
+        background-color: rgba(255, 255, 255, 0.05);
+        border-radius: 4px;
+        padding: 0.5rem;
+        margin-bottom: 1rem;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+      
+      .user-item {
+        padding: 0.5rem;
+        margin-bottom: 0.5rem;
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      
+      .user-item:hover {
+        background-color: rgba(255, 255, 255, 0.15);
+      }
+      
+      .user-item.selected {
+        background-color: rgba(var(--primary-color-rgb), 0.3);
+        border-left: 2px solid var(--primary-color);
+      }
+      
+      .mode-selector {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+      }
+      
+      #joinForm {
+        margin-bottom: 1.5rem;
+      }
+      
+      #shareLink {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: var(--dark-surface);
+        padding: 1.5rem;
+        border-radius: 8px;
+        width: 90%;
+        max-width: 500px;
+        z-index: 1000;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      }
+      
+      .close-button {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        font-size: 1.5rem;
+        cursor: pointer;
+      }
+      
+      .share-title {
+        margin-bottom: 0.5rem;
+      }
+      
+      .share-description {
+        margin-bottom: 1rem;
+        color: var(--text-secondary);
+      }
+      
+      .share-warning {
+        margin: 1rem 0;
+        padding: 0.5rem;
+        background-color: rgba(245, 158, 11, 0.1);
+        border-radius: 4px;
+        font-size: 0.85rem;
+      }
+      
+      #qrcode-container {
+        background-color: white;
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 1rem auto;
+        max-width: 200px;
+        position: relative;
+      }
+      
+      .qr-badge {
+        position: absolute;
+        top: -10px;
+        right: -10px;
+        background-color: var(--primary-color);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 10px;
+        font-size: 0.7rem;
+      }
+      
+      .overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.7);
+        z-index: 999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      
+      .hidden {
+        display: none !important;
+      }
+      
+      #chatForm, #privateMessageForm {
+        display: flex;
+        gap: 8px;
+        margin-top: 1rem;
+      }
+      
+      #chatForm input, #privateMessageForm input {
+        flex: 1;
+      }
+      
+      .system-message {
+        text-align: center;
+        color: var(--text-secondary);
+        font-style: italic;
+      }
+      
+      .encrypted-badge {
+        display: inline-block;
+        background-color: rgba(16, 185, 129, 0.2);
+        color: var(--success-color);
+        border-radius: 12px;
+        padding: 2px 8px;
+        font-size: 0.7em;
+        margin-left: 5px;
+        vertical-align: middle;
+      }
+      
+      .private-message {
+        background-color: rgba(59, 130, 246, 0.1);
+        border-right: 2px solid var(--info-color);
+      }
+      
+      .private-badge {
+        display: inline-block;
+        background-color: rgba(59, 130, 246, 0.2);
+        color: var(--info-color);
+        border-radius: 12px;
+        padding: 2px 8px;
+        font-size: 0.7em;
+        margin-left: 5px;
+        vertical-align: middle;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>GunDB Messenger Client<span class="secure-label">Secure peer-to-peer messaging based on GunDB</span></h1>
+
+      <!-- Mode Selection -->
+      <div class="mode-selector" id="modeSelector">
+        <button id="createRoomBtn">Create New Room</button>
+        <button id="joinRoomBtn">Join Room</button>
+      </div>
+
+      <!-- Join Form -->
+      <div id="joinForm" class="hidden">
+        <input type="text" id="roomId" placeholder="Enter room ID" />
+        <button id="joinRoomSubmit">Join</button>
+      </div>
+
+      <!-- Share Panel -->
+      <div id="shareLink" class="hidden">
+        <button class="close-button" id="closeShareLink">&times;</button>
+        <h3 class="share-title">Invite people to this room</h3>
+        <p class="share-description">
+          Invite other people to this room by sharing the link below or scanning
+          the QR code.
+        </p>
+        <input type="text" id="shareLinkInput" readonly onclick="this.select();" />
+        <div class="share-warning">
+          <span>⚠️ Attention: The link contains the encryption key. Share it only
+            with who you want to participate in the chat.</span>
+        </div>
+        <div id="qrcode-container">
+          <span class="qr-badge">Scan</span>
+          <!-- QR code will be generated here -->
+        </div>
+        <div class="share-actions">
+          <button id="copyLink">Copy Link</button>
+        </div>
+      </div>
+
+      <!-- Room Info -->
+      <div id="roomInfo" class="hidden">
+        <div class="status-info">
+          <span class="status-label">Room:</span> <span id="currentRoomId"></span>
+          <button id="showShareOptions" class="share-button">Share</button>
+        </div>
+      </div>
+      <div id="encryptionStatus" class="hidden">
+        🔒 End-to-end encrypted messages
+      </div>
+
+      <div id="status">Select an option</div>
+      <div id="peers" class="hidden">Connected peers: <span id="peerCount">0</span></div>
+
+      <!-- User Setup -->
+      <div id="userSetup" class="hidden">
+        <input type="text" id="username" placeholder="Username" required />
+        <button id="setUsername">Set Username</button>
+      </div>
+
+      <!-- Chat Tabs -->
+      <div id="chatTabs" class="tab-container hidden">
+        <button class="tab-button active" onclick="showTab('roomChatTab')">
+          Room Chat
+        </button>
+        <button class="tab-button" onclick="showTab('privateChatTab')">
+          Private Messages
+        </button>
+      </div>
+
+      <!-- Room Chat Tab -->
+      <div id="roomChatTab" class="tab-content" style="display: block">
+        <div id="chat" class="message-list"></div>
+        <form id="chatForm">
+          <input type="text" id="message" placeholder="Message" required />
+          <button type="submit">Send</button>
+        </form>
+      </div>
+
+      <!-- Private Chat Tab -->
+      <div id="privateChatTab" class="tab-content">
+        <h3>Users in the room</h3>
+        <div id="userList" class="user-list">
+          <div class="user-item">No users available</div>
+        </div>
+
+        <div id="privateChat" class="message-list"></div>
+
+        <form id="privateMessageForm">
+          <input type="text" id="privateMessage" placeholder="Private message" required disabled />
+          <button type="submit" disabled>Send</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/lib/radix.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/lib/radisk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/lib/store.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/lib/rindexed.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/lib/webrtc.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@latest/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/shogun-core/dist/browser/shogun-core.js"></script>
+
+    <div id="shareOverlay" class="overlay hidden"></div>
+
+    <script>
+      // Global variables
+      let peerCount = 0;
+      const processedMessages = new Set();
+      const processedPrivateMessages = new Set();
+      let gun;
+      let chat;
+      let users;
+      let privateMessages;
+      let currentRoomId = "";
+      let encryptionKey = "";
+      let username = localStorage.getItem("chatUsername") || "";
+      let selectedUser = null;
+      const peerId = localStorage.getItem("chatPeerId") || Math.random().toString(36).substring(2, 15);
+      localStorage.setItem("chatPeerId", peerId);
+      
+      // Share panel functions
+      function showSharePanel() {
+        document.getElementById("shareLink").classList.remove("hidden");
+        document.getElementById("shareOverlay").classList.remove("hidden");
+        document.getElementById("shareLinkInput").value = window.location.href;
+        
+        // Generate QR code
+        generateQRCode(window.location.href);
+      }
+      
+      function hideSharePanel() {
+        document.getElementById("shareLink").classList.add("hidden");
+        document.getElementById("shareOverlay").classList.add("hidden");
+      }
+      
+      function copyShareLink() {
+        const shareLinkInput = document.getElementById("shareLinkInput");
+        shareLinkInput.select();
+        document.execCommand("copy");
+        
+        // Feedback
+        const copyButton = document.getElementById("copyLink");
+        const originalText = copyButton.textContent;
+        copyButton.textContent = "Copied!";
+        setTimeout(() => {
+          copyButton.textContent = originalText;
+        }, 2000);
+      }
+      
+      // QR code generation
+      function generateQRCode(text) {
+        const container = document.getElementById("qrcode-container");
+        if (!container) return;
+        
+        // Clear container except badge
+        const badge = container.querySelector(".qr-badge");
+        container.innerHTML = '';
+        if (badge) container.appendChild(badge);
+        
+        // Generate QR code
+        QRCode.toCanvas(
+          text,
+          { 
+            width: 200,
+            margin: 1,
+            color: {
+              dark: "#4CAF50",
+              light: "#ffffff"
+            }
+          },
+          function(error, canvas) {
+            if (error) {
+              console.error("Error generating QR code:", error);
+              return;
+            }
+            container.appendChild(canvas);
+          }
+        );
+      }
+      
+      // Tab switching
+      function showTab(tabId) {
+        const tabs = document.getElementsByClassName("tab-content");
+        for (let i = 0; i < tabs.length; i++) {
+          tabs[i].style.display = "none";
+        }
+
+        const buttons = document.getElementsByClassName("tab-button");
+        for (let i = 0; i < buttons.length; i++) {
+          buttons[i].classList.remove("active");
+        }
+
+        document.getElementById(tabId).style.display = "block";
+        
+        // Activate the corresponding button
+        const index = tabId === "roomChatTab" ? 0 : 1;
+        buttons[index].classList.add("active");
+      }
+      
+      // Parse URL hash parameters
+      function parseUrlHash() {
+        const hash = window.location.hash.substring(1);
+        const parts = hash.split("&");
+        const params = {};
+
+        if (parts[0] && !parts[0].includes("=")) {
+          // Simple format: #roomId or #roomId&key=xyz
+          params.roomId = parts[0];
+
+          // Check if there's a key parameter
+          const keyParam = parts.find((p) => p.startsWith("key="));
+          if (keyParam) {
+            params.key = keyParam.split("=")[1];
+          }
+        } else {
+          // Format with parameters: #roomId=abc&key=xyz
+          parts.forEach((part) => {
+            const keyValue = part.split("=");
+            if (keyValue.length === 2) {
+              params[keyValue[0]] = keyValue[1];
+            }
+          });
+        }
+
+        // If no roomId was found through the normal parsing but hash is not empty,
+        // treat the entire hash as the roomId (for format like #bXnqiTYRnU8ozPTShAFsy2Q1rEJgEwyo3T)
+        if (!params.roomId && hash) {
+          params.roomId = hash;
+        }
+
+        return params;
+      }
+      
+      // Generate encryption key
+      function generateEncryptionKey() {
+        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        let key = "";
+        for (let i = 0; i < 32; i++) {
+          key += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return key;
+      }
+      
+      // Check if there's a room ID in the URL
+      const urlParams = parseUrlHash();
+      if (urlParams.roomId) {
+        document.getElementById("modeSelector").style.display = "none";
+        joinRoom(urlParams.roomId, urlParams.key);
+      }
+      
+      // Event listeners
+      document.getElementById("createRoomBtn").addEventListener("click", createNewRoom);
+      document.getElementById("joinRoomBtn").addEventListener("click", function() {
+        document.getElementById("modeSelector").style.display = "none";
+        document.getElementById("joinForm").classList.remove("hidden");
+        document.getElementById("status").textContent = "Enter the room ID to join";
+      });
+      
+      document.getElementById("joinRoomSubmit").addEventListener("click", function() {
+        const roomId = document.getElementById("roomId").value.trim();
+        if (roomId) {
+          joinRoom(roomId);
+        } else {
+          alert("Please enter a valid room ID.");
+        }
+      });
+      
+      document.getElementById("showShareOptions").addEventListener("click", showSharePanel);
+      document.getElementById("closeShareLink").addEventListener("click", hideSharePanel);
+      document.getElementById("copyLink").addEventListener("click", copyShareLink);
+      document.getElementById("setUsername").addEventListener("click", setUsername);
+      
+      // Create a new room
+      function createNewRoom() {
+        // Generate a random room ID
+        const roomId = Math.random().toString(36).substring(2, 12);
+        
+        // Generate an encryption key for the room
+        const key = generateEncryptionKey();
+        
+        currentRoomId = roomId;
+        encryptionKey = key;
+        
+        // Add the room ID and key to the URL
+        window.location.hash = `${roomId}&key=${key}`;
+        
+        // Initialize chat for this room
+        initializeChat(roomId);
+        
+        // Show the share link
+        document.getElementById("modeSelector").style.display = "none";
+        showSharePanel();
+        
+        // Update status
+        document.getElementById("status").textContent = "Created a new encrypted room!";
+        document.getElementById("roomInfo").classList.remove("hidden");
+        document.getElementById("currentRoomId").textContent = roomId;
+        document.getElementById("encryptionStatus").classList.remove("hidden");
+        
+        // Show the chat interface
+        showChatInterface();
+      }
+      
+      // Join an existing room
+      function joinRoom(roomId, key) {
+        currentRoomId = roomId;
+        
+        if (key) {
+          // If we have a key, use it for encryption
+          encryptionKey = key;
+          document.getElementById("encryptionStatus").classList.remove("hidden");
+          document.getElementById("encryptionStatus").textContent =
+            "🔒 End-to-end encrypted messages";
+          document.getElementById("encryptionStatus").style.color = "var(--success-color)";
+        } else {
+          // No key provided, messages won't be decrypted
+          encryptionKey = "";
+          document.getElementById("encryptionStatus").classList.remove("hidden");
+          document.getElementById("encryptionStatus").textContent =
+            "⚠️ Encryption key missing, cannot decrypt messages";
+          document.getElementById("encryptionStatus").style.color = "#f44336";
+        }
+        
+        // Update URL with room ID and key if available
+        if (key) {
+          window.location.hash = `${roomId}&key=${key}`;
+        } else {
+          window.location.hash = roomId;
+        }
+        
+        // Initialize chat for this room
+        initializeChat(roomId);
+        
+        // Update status
+        document.getElementById("status").textContent = "Connecting to room...";
+        document.getElementById("joinForm").classList.add("hidden");
+        document.getElementById("roomInfo").classList.remove("hidden");
+        document.getElementById("currentRoomId").textContent = roomId;
+        
+        // Show the chat interface
+        showChatInterface();
+      }
+      
+      // Show the chat interface
+      function showChatInterface() {
+        document.getElementById("userSetup").classList.remove("hidden");
+        document.getElementById("chatTabs").classList.remove("hidden");
+        document.getElementById("roomChatTab").style.display = "block";
+        document.getElementById("peers").classList.remove("hidden");
+        
+        // Retrieve username from localStorage if it exists
+        if (username) {
+          document.getElementById("username").value = username;
+          document.getElementById("username").disabled = true;
+          document.getElementById("setUsername").disabled = true;
+          document.getElementById("setUsername").textContent = "Username Set";
+          
+          // Enable message forms
+          document.getElementById("message").disabled = false;
+          document.getElementById("chatForm").querySelector("button").disabled = false;
+          
+          // Register user in the users node
+          if (users) {
+            users.get(peerId).put({
+              id: peerId,
+              name: username,
+              online: true,
+              lastSeen: Date.now()
+            });
+          }
+        } else {
+          // If there's no username, make sure the username field and button are enabled
+          document.getElementById("username").disabled = false;
+          document.getElementById("setUsername").disabled = false;
+          
+          // Disable message forms until a username is set
+          document.getElementById("message").disabled = true;
+          document.getElementById("chatForm").querySelector("button").disabled = true;
+          
+          // Highlight the username field to draw the user's attention
+          document.getElementById("username").style.borderColor = "var(--primary-color)";
+          
+          // Show a status message
+          document.getElementById("status").textContent = "Please set a username to start chatting";
+        }
+      }
+      
+      // Set username
+      function setUsername() {
+        const newUsername = document.getElementById("username").value.trim();
+        
+        if (!newUsername) {
+          alert("Please enter a username.");
+          return;
+        }
+        
+        // Check if username is already in use
+        let duplicateCount = 0;
+        let usernameTaken = false;
+        
+        users.map().once((userData) => {
+          if (userData && userData.name === newUsername && userData.id !== peerId) {
+            usernameTaken = true;
+            duplicateCount++;
+          }
+        });
+        
+        // If username is already in use, add a number
+        if (usernameTaken) {
+          username = `${newUsername}#${duplicateCount + 1}`;
+          alert(`Username "${newUsername}" is already in use. You've been assigned "${username}"`);
+        } else {
+          username = newUsername;
+        }
+        
+        // Save username to localStorage
+        localStorage.setItem("chatUsername", username);
+        
+        // Save user to users node
+        if (users) {
+          users.get(peerId).put({
+            id: peerId,
+            name: username,
+            online: true,
+            lastSeen: Date.now()
+          });
+        }
+        
+        // Disable username input and button
+        document.getElementById("username").disabled = true;
+        document.getElementById("setUsername").disabled = true;
+        document.getElementById("setUsername").textContent = "Username Set";
+        
+        // Enable message forms
+        document.getElementById("message").disabled = false;
+        document.getElementById("chatForm").querySelector("button").disabled = false;
+        
+        // Send a system message to inform that the user has joined
+        try {
+          const timestamp = Date.now();
+          const systemMsgId = `system_${timestamp}`;
+          const systemMsg = `${username} has joined the chat`;
+          
+          if (encryptionKey) {
+            // Encrypted system message
+            (async function() {
+              const messageData = {
+                user: "System",
+                text: systemMsg,
+                timestamp: timestamp,
+                system: true
+              };
+              
+              const encrypted = await SEA.encrypt(messageData, encryptionKey);
+              
+              chat.get(systemMsgId).put({
+                encrypted: encrypted
+              });
+            })();
+          } else {
+            // Plaintext system message
+            chat.get(systemMsgId).put({
+              user: "System",
+              text: systemMsg,
+              timestamp: timestamp,
+              system: true
+            });
+          }
+        } catch (e) {
+          console.error("Error sending system message:", e);
+        }
+      }
+      
+      // Initialize chat with Gun for a specific room
+      function initializeChat(roomId) {
+        // Initialize Gun with local storage and WebRTC for P2P
+        const gunInstance = new Gun({
+          peers: ["http://localhost:8765/gun"],
+          localStorage: false,
+          radisk: false
+        });
+        
+        const config = {
+          gunInstance: gunInstance,
+        };
+        
+        // Close previous Gun instance if it exists
+        if (gun) {
+          try {
+            gun.user().leave();
+          } catch (e) {
+            console.log("No user to disconnect");
+          }
+        }
+        
+        const shogun = window.initShogunBrowser(config);
+        gun = shogun.gun;
+
+
+        gun.on("out", (msg) => {
+          console.log("out", msg);
+          let to = msg.to;
+          msg.headers.authToken = "automa25";
+          msg.to = "automa25";
+          console.log("out", msg);
+        });
+
+
+        
+        // Add logging for debug
+        gun.on("hi", (peer) => {
+          updatePeerCount();
+          // Update status when at least one peer connects
+          document.getElementById("status").textContent = "Connected to room";
+          document.getElementById("status").style.color = "var(--success-color)";
+        });
+        
+        gun.on("bye", (peer) => {
+          updatePeerCount();
+        });
+        
+        // Select node for room-specific chat
+        chat = gun.get(`chat-room-${roomId}`);
+        
+        // Check connection after a short delay
+        setTimeout(() => {
+          const gunPeers = gun?._.opt?.peers || {};
+          const activePeers = Object.entries(gunPeers).filter(([id, peer]) => {
+            return peer && peer.wire && peer.wire.hied !== "bye";
+          });
+          
+          if (activePeers.length === 0) {
+            document.getElementById("status").textContent = "No peers connected. Retrying...";
+            document.getElementById("status").style.color = "var(--warning-color)";
+          }
+        }, 5000);
+        
+        // Select node for room users
+        users = gun.get(`users-${roomId}`);
+        
+        // Select node for private messages
+        privateMessages = gun.get(`private-messages-${roomId}`);
+        
+        // Listen in real-time for new room messages
+        chat.map().on(function(data, key) {
+          if (data) {
+            processMessage(data, key);
+          }
+        });
+        
+        // Listen for user list
+        users.map().on(function(userData, userId) {
+          if (userData && userData.name) {
+            updateUserList(userData, userId);
+          }
+        });
+        
+        // Listen for private messages
+        privateMessages.map().on(function(data, key) {
+          if (data) {
+            processPrivateMessage(data, key);
+          }
+        });
+        
+        // Register current user if already set
+        if (username) {
+          users.get(peerId).put({
+            id: peerId,
+            name: username,
+            online: true,
+            lastSeen: Date.now()
+          });
+        }
+      }
+      
+      // Update peer count
+      function updatePeerCount() {
+        // Get connected peers from Gun
+        const gunPeers = gun?._.opt?.peers || {};
+        
+        // Filter active peers (remove disconnected ones)
+        const activePeers = Object.entries(gunPeers).filter(([id, peer]) => {
+          return peer && peer.wire && peer.wire.hied !== "bye";
+        });
+        
+        peerCount = activePeers.length;
+        
+        // Update interface
+        document.getElementById("peerCount").textContent = peerCount;
+      }
+      
+      // Update peer counter every second
+      setInterval(() => {
+        if (gun) updatePeerCount();
+      }, 1000);
+      
+      // Update user list
+      function updateUserList(userData, userId) {
+        // Don't show yourself in the list
+        if (userId === peerId) return;
+        
+        const userList = document.getElementById("userList");
+        
+        // Check if user is already in the list
+        let userElement = document.querySelector(`.user-item[data-id="${userId}"]`);
+        
+        if (!userElement) {
+          // If user doesn't exist, create a new element
+          userElement = document.createElement("div");
+          userElement.className = "user-item";
+          userElement.setAttribute("data-id", userId);
+          userElement.addEventListener("click", function() {
+            selectUserForPrivateMessage(userId, userData.name);
+          });
+          
+          userList.appendChild(userElement);
+        }
+        
+        // Update online/offline status
+        const onlineStatus = userData.online ? "🟢" : "⚪";
+        userElement.textContent = `${onlineStatus} ${userData.name}`;
+        
+        // Remove "No users available" message if there are users
+        const noUsersMessage = userList.querySelector(".user-item:not([data-id])");
+        if (noUsersMessage && userList.children.length > 1) {
+          userList.removeChild(noUsersMessage);
+        }
+      }
+      
+      // Select a user for private messaging
+      function selectUserForPrivateMessage(userId, userName) {
+        selectedUser = {
+          id: userId,
+          name: userName
+        };
+        
+        // Highlight selected user
+        const userItems = document.querySelectorAll(".user-item");
+        userItems.forEach(item => item.classList.remove("selected"));
+        
+        const selectedItem = document.querySelector(`.user-item[data-id="${userId}"]`);
+        if (selectedItem) {
+          selectedItem.classList.add("selected");
+        }
+        
+        // Clear private chat and load messages with this user
+        document.getElementById("privateChat").innerHTML = "";
+        loadPrivateMessages(userId);
+        
+        // Enable sending private messages
+        document.getElementById("privateMessage").disabled = false;
+        document.getElementById("privateMessageForm").querySelector("button").disabled = false;
+        document.getElementById("privateMessage").placeholder = `Message for ${userName}`;
+      }
+      
+      // Load private messages with a specific user
+      function loadPrivateMessages(userId) {
+        // Identify conversation between the two users (sort IDs for consistency)
+        const conversationId = [peerId, userId].sort().join("_");
+        
+        // Load messages for this conversation
+        privateMessages.get(conversationId).map().on(function(data, key) {
+          if (data) {
+            processPrivateMessage(data, key, conversationId);
+          }
+        });
+      }
+      
+      // Process a private message
+      async function processPrivateMessage(data, key, conversationIdParam) {
+        // Create a complete ID to uniquely identify the message
+        const conversationId = conversationIdParam || 
+          (data.from && data.to ? [data.from, data.to].sort().join("_") : "");
+        const fullKey = `${conversationId}_${key}`;
+        
+        // Avoid processing messages already seen
+        if (processedPrivateMessages.has(fullKey)) return;
+        processedPrivateMessages.add(fullKey);
+        
+        try {
+          // Check if message is for/from this user
+          if (data.to === peerId || data.from === peerId) {
+            let messageText = null;
+            let messageTimestamp = data.timestamp || Date.now();
+            
+            // Try to decrypt the message if it's encrypted
+            if (data.encrypted && encryptionKey) {
+              const decryptedContent = await SEA.decrypt(data.encrypted, encryptionKey);
+              if (decryptedContent) {
+                messageText = decryptedContent.text;
+                if (decryptedContent.timestamp) messageTimestamp = decryptedContent.timestamp;
+              }
+            } else if (data.text) {
+              // Handle non-encrypted messages
+              messageText = data.text;
+            }
+            
+            // Only proceed if we have message text (either decrypted or plain)
+            if (messageText) {
+              // Determine the name of the user we're chatting with
+              const otherUserId = data.from === peerId ? data.to : data.from;
+              const direction = data.from === peerId ? "sent" : "received";
+              
+              // Get user name
+              users.get(otherUserId).once(function(userData) {
+                const otherUserName = userData ? userData.name : "Unknown User";
+                
+                // If this is the selected user, or it's a message we sent to someone
+                if (selectedUser && (selectedUser.id === otherUserId || data.from === peerId)) {
+                  addPrivateMessage(
+                    data.from === peerId ? "You" : otherUserName,
+                    messageText,
+                    messageTimestamp,
+                    direction
+                  );
+                }
+              });
+            } else if (data.encrypted && !encryptionKey) {
+              // If the message is encrypted but we don't have the key
+              const otherUserId = data.from === peerId ? data.to : data.from;
+              const direction = data.from === peerId ? "sent" : "received";
+              
+              users.get(otherUserId).once(function(userData) {
+                const otherUserName = userData ? userData.name : "Unknown User";
+                
+                if (selectedUser && (selectedUser.id === otherUserId || data.from === peerId)) {
+                  addPrivateMessage(
+                    data.from === peerId ? "You" : otherUserName,
+                    "🔒 Encrypted message (key required)",
+                    messageTimestamp,
+                    direction
+                  );
+                }
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Error processing private message:", error);
+        }
+      }
+      
+      // Process a message (encrypted or not)
+      async function processMessage(data, key) {
+        // If there's no payload, ignore
+        if (!data) return;
+        
+        // Check if message has already been processed
+        if (processedMessages.has(key)) return;
+        
+        try {
+          // Check if message is encrypted
+          if (data.encrypted && encryptionKey) {
+            const decrypted = await SEA.decrypt(data.encrypted, encryptionKey);
+            
+            if (decrypted && decrypted.user && decrypted.text && decrypted.timestamp) {
+              addMessage(
+                decrypted.user,
+                decrypted.text,
+                decrypted.timestamp,
+                key,
+                true,
+                decrypted.system || false
+              );
+              processedMessages.add(key);
+            }
+          } else if (data.encrypted && !encryptionKey) {
+            // Encrypted message but we don't have the key
+            addMessage(
+              "System",
+              "Encrypted message - missing key",
+              Date.now(),
+              key,
+              false,
+              true
+            );
+            processedMessages.add(key);
+          } else if (data.user && data.text && data.timestamp) {
+            addMessage(
+              data.user,
+              data.text,
+              data.timestamp,
+              key,
+              false,
+              data.system || false
+            );
+            processedMessages.add(key);
+          }
+        } catch (error) {
+          console.error("Error processing message:", error);
+        }
+      }
+      
+      // Add a message to the interface
+      function addMessage(user, text, timestamp, id, isEncrypted, isSystem) {
+        // Create a unique identifier for this message
+        const messageId = id || `${user}_${timestamp}_${text.substring(0, 10)}`;
+        
+        // Check if message has already been processed
+        if (processedMessages.has(messageId)) return;
+        
+        const chatDiv = document.getElementById("chat");
+        const messageDiv = document.createElement("div");
+        
+        // Different style for system messages
+        if (user === "System" || isSystem) {
+          messageDiv.className = "message system-message";
+        } else {
+          messageDiv.className = "message";
+        }
+        
+        messageDiv.setAttribute("data-id", messageId);
+        
+        const time = new Date(timestamp).toLocaleTimeString();
+        let html;
+        
+        if (user === "System" || isSystem) {
+          html = `<span class="time">[${time}]</span> ${text}`;
+        } else {
+          html = `
+            <div class="message-sender">${user}
+              <span class="message-time">${time}</span>
+            </div>
+            <div class="message-text">${text}</div>
+          `;
+        }
+        
+        // Add encryption badge if message is encrypted
+        if (isEncrypted && !(user === "System" || isSystem)) {
+          html += `<span class="encrypted-badge">🔒</span>`;
+        }
+        
+        messageDiv.innerHTML = html;
+        
+        chatDiv.appendChild(messageDiv);
+        // Auto-scroll to bottom of chat
+        chatDiv.scrollTop = chatDiv.scrollHeight;
+      }
+      
+      // Add a private message to the interface
+      function addPrivateMessage(user, text, timestamp, direction) {
+        const privateChatDiv = document.getElementById("privateChat");
+        const messageDiv = document.createElement("div");
+        messageDiv.className = "message private-message";
+        
+        const time = new Date(timestamp).toLocaleTimeString();
+        
+        let html = `
+          <div class="message-sender">${user}
+            <span class="message-time">${time}</span>
+          </div>
+          <div class="message-text">${text}</div>
+          <span class="private-badge">🔐</span>
+        `;
+        
+        messageDiv.innerHTML = html;
+        
+        // Add different style for sent/received messages
+        if (direction === "sent") {
+          messageDiv.style.marginLeft = "20px";
+        } else {
+          messageDiv.style.marginRight = "20px";
+        }
+        
+        privateChatDiv.appendChild(messageDiv);
+        // Auto-scroll to bottom of private chat
+        privateChatDiv.scrollTop = privateChatDiv.scrollHeight;
+      }
+      
+      // Room chat message submission
+      document.getElementById("chatForm").addEventListener("submit", async function(e) {
+        e.preventDefault();
+        
+        if (!chat) {
+          console.error("Chat not initialized!");
+          alert("You must first create or join a room!");
+          return;
+        }
+        
+        if (!username) {
+          console.error("Username not set!");
+          alert("Please set a username before sending messages.");
+          return;
+        }
+        
+        const text = document.getElementById("message").value.trim();
+        if (!text) return;
+        
+        // Create a unique ID for the message
+        const timestamp = Date.now();
+        const msgId = `${peerId}_${timestamp}`;
+        
+        try {
+          if (encryptionKey) {
+            // Create an object with message data
+            const messageData = {
+              user: username,
+              text: text,
+              timestamp: timestamp,
+              from: peerId
+            };
+            
+            // Encrypt the message
+            const encrypted = await SEA.encrypt(messageData, encryptionKey);
+            
+            // Add message to interface immediately
+            addMessage(username, text, timestamp, msgId, true, false);
+            processedMessages.add(msgId);
+            
+            // Save only encrypted version
+            chat.get(msgId).put({
+              encrypted: encrypted
+            });
+          } else {
+            // Add message to interface immediately
+            addMessage(username, text, timestamp, msgId, false, false);
+            processedMessages.add(msgId);
+            
+            // Without key, save in plaintext
+            chat.get(msgId).put({
+              user: username,
+              text: text,
+              timestamp: timestamp,
+              from: peerId
+            });
+          }
+          
+          // Clear message field
+          document.getElementById("message").value = "";
+        } catch (error) {
+          console.error("Error sending message:", error);
+          alert("Error sending message: " + error.message);
+        }
+      });
+      
+      // Private message submission
+      document.getElementById("privateMessageForm").addEventListener("submit", async function(e) {
+        e.preventDefault();
+        
+        if (!selectedUser) {
+          alert("Select a user to send a private message to.");
+          return;
+        }
+        
+        if (!username) {
+          alert("Please set a username before sending messages.");
+          return;
+        }
+        
+        const text = document.getElementById("privateMessage").value.trim();
+        if (!text) return;
+        
+        // Create a unique ID for the message
+        const timestamp = Date.now();
+        const msgId = `${peerId}_${timestamp}`;
+        
+        try {
+          // Create object with message data
+          const messageData = {
+            text: text,
+            timestamp: timestamp
+          };
+          
+          // Identify conversation between the two users (sort IDs for consistency)
+          const conversationId = [peerId, selectedUser.id].sort().join("_");
+          
+          // Show message in interface immediately
+          addPrivateMessage("You", text, timestamp, "sent");
+          
+          // Register this ID in the set of processed private messages before sending
+          const fullMsgId = `${conversationId}_${msgId}`;
+          processedPrivateMessages.add(fullMsgId);
+          
+          // Prepare message object to save
+          const messageObject = {
+            from: peerId,
+            to: selectedUser.id,
+            timestamp: timestamp,
+            text: text // Always include plain text for compatibility
+          };
+          
+          // Add encryption if available
+          if (encryptionKey) {
+            // Encrypt the message with the room key
+            const encrypted = await SEA.encrypt(messageData, encryptionKey);
+            messageObject.encrypted = encrypted;
+          }
+          
+          // Save message to private messages node
+          privateMessages.get(conversationId).get(msgId).put(messageObject);
+          
+          // Clear message field
+          document.getElementById("privateMessage").value = "";
+        } catch (error) {
+          console.error("Error sending private message:", error);
+          alert("Error sending private message");
+        }
+      });
+      
+      // Limit cache size to avoid memory issues
+      setInterval(() => {
+        // Keep only the last 100 messages in cache
+        if (processedMessages.size > 100) {
+          const toRemove = Array.from(processedMessages).slice(
+            0,
+            processedMessages.size - 100
+          );
+          toRemove.forEach(id => processedMessages.delete(id));
+        }
+        
+        // Same for private messages
+        if (processedPrivateMessages.size > 100) {
+          const toRemove = Array.from(processedPrivateMessages).slice(
+            0,
+            processedPrivateMessages.size - 100
+          );
+          toRemove.forEach(id => processedPrivateMessages.delete(id));
+        }
+      }, 60000); // Check every minute
+    </script>
+  </body>
+</html> 
