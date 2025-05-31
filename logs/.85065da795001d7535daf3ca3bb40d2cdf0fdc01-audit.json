@@ -29,6 +29,11 @@
             "date": 1748637297241,
             "name": "D:\\shogun-2\\test-env\\logs\\error-2025-05-30.log",
             "hash": "c6b2dec0caf92a431a956238ee73290a1ed362495e70036fa6776d2a1a5f6ebe"
+        },
+        {
+            "date": 1748643348276,
+            "name": "D:\\shogun-2\\test-env\\logs\\error-2025-05-31.log",
+            "hash": "51565ae294011a81bc4cc38e8d49ad1c271ae80152963ac08f3b76a026439fe0"
         }
     ],
     "hashType": "sha256"
