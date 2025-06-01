@@ -122,21 +122,22 @@ class FileManager {
       throw new Error("File or content missing");
     }
 
-    let gunDbKey, fileBuffer, originalName, mimeType, fileSize;
+    let gunDbKey, fileBuffer, originalName, mimeType, fileSize, uploadTimestamp;
+
+    // Create a consistent timestamp for the entire upload process
+    uploadTimestamp = Date.now();
 
     if (req.file) {
       originalName = req.file.originalname;
       mimeType = req.file.mimetype;
       fileSize = req.file.size;
+      
       // Create a safe key for GunDB by removing problematic characters
-      // Use a more consistent ID format that will work better with GunDB
-      gunDbKey =
-        req.body.customName ||
-        originalName
-          .replace(/\.[^/.]+$/, "") // Remove extension
-          .replace(/[^a-zA-Z0-9_-]/g, "_") + // Replace special chars with underscore
-          "_" +
-          Date.now().toString().substring(7); // Add timestamp suffix for uniqueness
+      // Use the same format as filesystem naming to ensure consistency
+      const safeOriginalName = originalName.replace(/[^a-zA-Z0-9.-]/g, "_");
+      
+      // Use consistent ID format: timestamp-filename (like filesystem)
+      gunDbKey = req.body.customName || `${uploadTimestamp}-${safeOriginalName.replace(/\.[^/.]+$/, "")}`;
 
       // Check if file was uploaded to memory or disk
       if (req.file.buffer) {
@@ -151,8 +152,8 @@ class FileManager {
     } else {
       const content = req.body.content;
       const contentType = req.body.contentType || "text/plain";
-      originalName = req.body.customName || `text-${Date.now()}.txt`;
-      gunDbKey = req.body.customName || `text-${Date.now()}`;
+      originalName = req.body.customName || `text-${uploadTimestamp}.txt`;
+      gunDbKey = req.body.customName || `${uploadTimestamp}-text`;
       mimeType = contentType;
       fileSize = content.length;
       fileBuffer = Buffer.from(content);
@@ -273,7 +274,7 @@ class FileManager {
       console.log(
         `IPFS upload failed or not configured, using local storage for: ${originalName}`
       );
-      const fileName = `${Date.now()}-${originalName.replace(
+      const fileName = `${uploadTimestamp}-${originalName.replace(
         /[^a-zA-Z0-9.-]/g,
         "_"
       )}`;
@@ -300,8 +301,8 @@ class FileManager {
       ipfsUrl: ipfsHash
         ? this.config.ipfsManager.getGatewayUrl(ipfsHash)
         : null,
-      timestamp: Date.now(),
-      uploadedAt: Date.now(),
+      timestamp: uploadTimestamp,
+      uploadedAt: uploadTimestamp,
       customName: req.body.customName || null,
     };
 
@@ -341,8 +342,10 @@ class FileManager {
       fileData.verified = true; // Optimistically assume it will work
     }
 
-    // Save IPFS metadata to a local file
-    this._saveIpfsMetadata(safeId, ipfsHash);
+    // Save IPFS metadata to a local file only if we have an IPFS hash
+    if (ipfsHash) {
+      this._saveIpfsMetadata(safeId, ipfsHash);
+    }
 
     return fileData;
   }
@@ -379,23 +382,35 @@ class FileManager {
       const timestamp = timestampMatch ? timestampMatch[1] : Date.now().toString();
       const baseFilename = fileId.replace(/^(\d+)-/, '').split('_')[0];
       
+      // Also extract the original filename if it contains an extension pattern
+      const originalFilename = fileId.replace(/^(\d+)-/, '').replace(/_\d+$/, '');
+      
       // Update metadata with new entry and additional identifiers
       metadata[fileId] = {
         ipfsHash,
         timestamp: Date.now(),
         originalTimestamp: timestamp,
         baseFilename: baseFilename,
+        originalFilename: originalFilename,
+        fullFileId: fileId,
         alternateIds: [
           // Store various key formats to help with matching
           fileId,
           baseFilename,
-          timestamp + '-' + baseFilename
-        ]
+          originalFilename,
+          timestamp + '-' + baseFilename,
+          timestamp + '-' + originalFilename,
+          // For files uploaded, store a pattern that matches filesystem naming
+          `${timestamp}-${originalFilename}`,
+          // Store potential variations
+          originalFilename.replace(/\.[^/.]+$/, ''), // without extension
+          baseFilename.replace(/\.[^/.]+$/, ''), // base without extension
+        ].filter(Boolean) // Remove empty/undefined values
       };
       
       // Save back to file
       fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
-      console.log(`[FileManager] Saved IPFS metadata for file ${fileId}`);
+      console.log(`[FileManager] Saved IPFS metadata for file ${fileId} with ${metadata[fileId].alternateIds.length} alternate IDs`);
     } catch (error) {
       console.error(`[FileManager] Error saving IPFS metadata: ${error.message}`);
     }
@@ -779,34 +794,96 @@ class FileManager {
           
           console.log(`[FileManager] Added IPFS data to file ${fileId}: hash=${fileObject.ipfsHash}`);
         } else {
-          // Try alternative metadata key formats
+          // Try enhanced metadata matching with multiple strategies
           let ipfsMetadataFound = false;
           
-          // Loop through all metadata keys to find a potential match
-          for (const key in ipfsMetadata) {
-            // Check if the key contains our timestamp or filename
-            if (key.includes(timestamp.toString()) || 
-                key.includes(filename.replace(/\.[^/.]+$/, "")) ||
-                filename.includes(key.split('_')[0])) {
+          // Strategy 1: Check alternateIds in each metadata entry
+          for (const [metaKey, metadata] of Object.entries(ipfsMetadata)) {
+            if (metadata.alternateIds && Array.isArray(metadata.alternateIds)) {
+              // Check if any alternate ID matches our file patterns
+              const matches = metadata.alternateIds.some(altId => {
+                // Direct match
+                if (altId === fileId) return true;
+                
+                // Filename without extension match
+                const filenameNoExt = filename.replace(/\.[^/.]+$/, '');
+                if (altId === filenameNoExt) return true;
+                
+                // Check if filename starts with the alternate ID
+                if (filename.startsWith(altId)) return true;
+                
+                // Check timestamp-based matching
+                if (altId.includes(timestamp.toString())) return true;
+                
+                return false;
+              });
               
-              const metadata = ipfsMetadata[key];
-              fileObject.ipfsHash = metadata.ipfsHash;
-              
-              // Add IPFS URL
-              if (fileObject.ipfsHash && this.config.ipfsManager) {
-                fileObject.ipfsUrl = this.config.ipfsManager.getGatewayUrl(fileObject.ipfsHash);
-              } else if (fileObject.ipfsHash) {
-                fileObject.ipfsUrl = `https://ipfs.io/ipfs/${fileObject.ipfsHash}`;
+              if (matches) {
+                fileObject.ipfsHash = metadata.ipfsHash;
+                
+                // Add IPFS URL
+                if (fileObject.ipfsHash && this.config.ipfsManager) {
+                  fileObject.ipfsUrl = this.config.ipfsManager.getGatewayUrl(fileObject.ipfsHash);
+                } else if (fileObject.ipfsHash) {
+                  fileObject.ipfsUrl = `https://ipfs.io/ipfs/${fileObject.ipfsHash}`;
+                }
+                
+                console.log(`[FileManager] Added IPFS data to file ${fileId} using alternateIds match with ${metaKey}: hash=${fileObject.ipfsHash}`);
+                ipfsMetadataFound = true;
+                break;
               }
+            }
+          }
+          
+          // Strategy 2: If no alternateIds match, try the original logic with enhancements
+          if (!ipfsMetadataFound) {
+            for (const [key, metadata] of Object.entries(ipfsMetadata)) {
+              // Extract filename components for comparison
+              const baseFilenameNoExt = filename.replace(/\.[^/.]+$/, '').replace(/^\d+-/, '');
+              const keyBaseNoExt = key.replace(/\.[^/.]+$/, '').replace(/^\d+-/, '');
               
-              console.log(`[FileManager] Added IPFS data to file ${fileId} using alternative key ${key}: hash=${fileObject.ipfsHash}`);
-              ipfsMetadataFound = true;
-              break;
+              // Enhanced matching logic
+              const conditions = [
+                // Timestamp match
+                key.includes(timestamp.toString()),
+                // Base filename match
+                key.includes(baseFilenameNoExt),
+                filename.includes(keyBaseNoExt),
+                // Partial key match
+                baseFilenameNoExt.includes(key.split('_')[0]),
+                // Direct partial match (useful for simple names)
+                filename.includes(key) || key.includes(filename.replace(/\.[^/.]+$/, '')),
+                // Check against stored base filename
+                metadata.baseFilename && (
+                  baseFilenameNoExt.includes(metadata.baseFilename) ||
+                  metadata.baseFilename.includes(baseFilenameNoExt)
+                ),
+                // Check against stored original filename
+                metadata.originalFilename && (
+                  filename.includes(metadata.originalFilename) ||
+                  metadata.originalFilename.includes(baseFilenameNoExt)
+                )
+              ];
+              
+              if (conditions.some(condition => condition)) {
+                fileObject.ipfsHash = metadata.ipfsHash;
+                
+                // Add IPFS URL
+                if (fileObject.ipfsHash && this.config.ipfsManager) {
+                  fileObject.ipfsUrl = this.config.ipfsManager.getGatewayUrl(fileObject.ipfsHash);
+                } else if (fileObject.ipfsHash) {
+                  fileObject.ipfsUrl = `https://ipfs.io/ipfs/${fileObject.ipfsHash}`;
+                }
+                
+                console.log(`[FileManager] Added IPFS data to file ${fileId} using enhanced matching with ${key}: hash=${fileObject.ipfsHash}`);
+                ipfsMetadataFound = true;
+                break;
+              }
             }
           }
           
           if (!ipfsMetadataFound) {
-            console.log(`[FileManager] No IPFS metadata found for file ${fileId}`);
+            console.log(`[FileManager] No IPFS metadata found for file ${fileId} (checked ${Object.keys(ipfsMetadata).length} metadata entries)`);
           }
         }
 
