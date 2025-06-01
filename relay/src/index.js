@@ -30,21 +30,18 @@ const port = CONFIG.PORT || 8000;
 let authToken = CONFIG.AUTH_TOKEN || "automa25";
 
 function hasValidToken(msg) {
-  return (
-    msg && msg.headers && msg.headers.token && msg.headers.token === authToken
-  );
-}
+  const valid =
+    (msg &&
+      msg.headers &&
+      msg.headers.token &&
+      msg.headers.token === authToken) ||
+    (msg && msg.token && msg.token === authToken);
 
-function isInternalMessage(msg) {
-  // Messages from Gun's internal operations often have specific properties
-  // Internal messages typically have faith=true, or come from storage/sync operations
-  return (
-    (msg._ && msg._.faith) || // Internal faith-based messages
-    (msg._ && msg._.ram) || // RAM-based internal messages
-    (msg._ && msg._.rad) || // Radial/sync messages
-    !msg.headers || // No headers usually means internal
-    (msg._ && !msg._.via) // Messages without 'via' are often internal
-  );
+  if (valid) {
+    console.log("WRITING - Valid token found");
+  }
+
+  return valid;
 }
 
 // Add listener
@@ -63,22 +60,19 @@ Gun.on("opt", function (ctx) {
       return;
     }
 
-    // For PUT operations, check if it's internal or has valid token
-    if (isInternalMessage(msg)) {
-      console.log("WRITING - Internal Gun message");
-      to.next(msg);
-      return;
-    }
-
+    // For PUT operations, apply token validation logic
     if (hasValidToken(msg)) {
-      console.log("WRITING - Valid token found");
+      console.log(
+        "WRITING - Valid token found",
+        JSON.stringify(msg).slice(0, 100) + "..."
+      );
       to.next(msg);
       return;
     }
 
-    // Block external PUT operations without valid token
+    // Block everything else
     console.log(
-      "BLOCKED - External PUT without valid token:",
+      "BLOCKED - PUT without valid token:",
       JSON.stringify(msg.put).slice(0, 100) + "..."
     );
     // Don't forward unauthorized puts

@@ -246,96 +246,18 @@ const debugGunMessages = (msg) => {
 };
 
 function hasValidToken(msg) {
-  return (
-    msg && msg.headers && msg.headers.token && msg.headers.token === "automa25"
-  );
-}
+  const valid =
+    (msg &&
+      msg.headers &&
+      msg.headers.token &&
+      msg.headers.token === SECRET_TOKEN) ||
+    (msg && msg.token && msg.token === SECRET_TOKEN);
 
-// Helper functions to identify message types
-function isAuthOperation(msg) {
-  // Auth operations typically involve user credentials
-  if (msg.put) {
-    const keys = Object.keys(msg.put);
-
-    // Check for user alias patterns (e.g., ~@_newman)
-    for (const key of keys) {
-      // User aliases start with ~@
-      if (key.startsWith("~@")) {
-        console.log("ALLOWING: Auth operation with user alias:", key);
-        return true;
-      }
-
-      // Public keys in Gun often start with ~ or contain a dot
-      if ((key.startsWith("~") || key.includes(".")) && msg.put[key]) {
-        // Check for auth data
-        const data = msg.put[key];
-        if (data && (data.auth || data.alias || data.epub || data.pub)) {
-          console.log("ALLOWING: Auth operation with credentials");
-          return true;
-        }
-
-        // Check for auth-related properties that might indicate state transitions
-        if (data && (data.sea || data._sea || data.$$)) {
-          console.log("ALLOWING: Auth operation with sea/state data");
-          return true;
-        }
-      }
-    }
+  if (valid) {
+    console.log("WRITING - Valid token found");
   }
 
-  // Also check for specific auth-related patterns in the message itself
-  if (
-    msg.put &&
-    msg["#"] &&
-    (msg["#"].includes("auth") ||
-      msg["#"].includes("user") ||
-      msg["#"].includes("btc_"))
-  ) {
-    console.log("ALLOWING: Auth operation based on message ID pattern");
-    return true;
-  }
-
-  return false;
-}
-
-function isInternalOperation(msg) {
-  // Check for internal operations that don't need authentication
-  if (msg.put) {
-    // Messages with # properties are often system messages
-    if (msg["#"] && msg["#"].startsWith("test_key_")) {
-      return true; // Test keys are internal
-    }
-
-    // Check if this is a radisk/storage sync operation
-    const keys = Object.keys(msg.put);
-    for (const key of keys) {
-      // System keys or collections
-      if (key.startsWith("_") || key === "users") {
-        return true;
-      }
-
-      // User public keys that aren't carrying credentials
-      // but just usernames or metadata
-      if (key.includes(".") && msg.put[key] && msg.put[key].username) {
-        console.log("ALLOWING: User metadata update");
-        return true;
-      }
-
-      // Bitcoin wallet operations
-      if (
-        key.includes("btc_") ||
-        (msg.put[key] &&
-          typeof msg.put[key] === "object" &&
-          (msg.put[key].bitcoin ||
-            (msg.put[key].alias && msg.put[key].alias.startsWith("btc_"))))
-      ) {
-        console.log("ALLOWING: Bitcoin wallet operation");
-        return true;
-      }
-    }
-  }
-
-  return false;
+  return valid;
 }
 
 Gun.on("opt", function (ctx) {
@@ -349,49 +271,16 @@ Gun.on("opt", function (ctx) {
 
     // Allow all operations that aren't PUTs
     if (!msg.put) {
-      if (msg.get) {
-        console.log(
-          "GET operation:",
-          JSON.stringify(msg.get).slice(0, 100) + "..."
-        );
-      }
       to.next(msg);
       return;
     }
 
     // For PUT operations, apply token validation logic
     if (hasValidToken(msg)) {
-      console.log("WRITING - Valid token found");
-      to.next(msg);
-      return;
-    }
-
-    // Special case: Check for Bitcoin wallet or auth-related messages by content
-    const msgStr = JSON.stringify(msg.put || {}).toLowerCase();
-    if (
-      msgStr.includes("btc_") ||
-      msgStr.includes("bitcoin") ||
-      msgStr.includes("auth") ||
-      msgStr.includes("sea") ||
-      msgStr.includes("state transition")
-    ) {
       console.log(
-        "WRITING - Bitcoin or auth-related operation detected by content"
+        "WRITING - Valid token found",
+        JSON.stringify(msg).slice(0, 100) + "..."
       );
-      to.next(msg);
-      return;
-    }
-
-    // Allow auth operations without token
-    if (isAuthOperation(msg)) {
-      console.log("WRITING - Auth operation allowed without token");
-      to.next(msg);
-      return;
-    }
-
-    // Allow certain internal operations without token
-    if (isInternalOperation(msg)) {
-      console.log("WRITING - Internal operation allowed without token");
       to.next(msg);
       return;
     }
@@ -414,30 +303,38 @@ let gunOptions = {
 };
 
 // Add S3 configuration if available in CONFIG
-if (CONFIG.S3_ACCESS_KEY_ID && CONFIG.S3_SECRET_ACCESS_KEY && CONFIG.S3_BUCKET) {
-  serverLogger.info("S3 configuration found in config, adding to Gun options 🪣");
-  
+if (
+  CONFIG.S3_ACCESS_KEY_ID &&
+  CONFIG.S3_SECRET_ACCESS_KEY &&
+  CONFIG.S3_BUCKET
+) {
+  serverLogger.info(
+    "S3 configuration found in config, adding to Gun options 🪣"
+  );
+
   gunOptions.s3 = {
     bucket: CONFIG.S3_BUCKET,
-    region: CONFIG.S3_REGION || 'us-east-1',
+    region: CONFIG.S3_REGION || "us-east-1",
     accessKeyId: CONFIG.S3_ACCESS_KEY_ID,
     secretAccessKey: CONFIG.S3_SECRET_ACCESS_KEY,
-    endpoint: CONFIG.S3_ENDPOINT || 'http://0.0.0.0:4569',
+    endpoint: CONFIG.S3_ENDPOINT || "http://0.0.0.0:4569",
     s3ForcePathStyle: true,
-    address: CONFIG.S3_ADDRESS || '0.0.0.0',
+    address: CONFIG.S3_ADDRESS || "0.0.0.0",
     port: CONFIG.S3_PORT || 4569,
     key: CONFIG.S3_ACCESS_KEY_ID,
     secret: CONFIG.S3_SECRET_ACCESS_KEY,
   };
-  
+
   serverLogger.info("S3 configuration added to Gun options:", {
     bucket: gunOptions.s3.bucket,
     endpoint: gunOptions.s3.endpoint,
     address: gunOptions.s3.address,
-    port: gunOptions.s3.port
+    port: gunOptions.s3.port,
   });
 } else {
-  serverLogger.info("S3 configuration not found in config, using radisk only 💽");
+  serverLogger.info(
+    "S3 configuration not found in config, using radisk only 💽"
+  );
 }
 
 /**
