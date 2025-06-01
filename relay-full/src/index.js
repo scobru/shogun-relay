@@ -702,9 +702,9 @@ app.use(
       if (!origin) return callback(null, true);
 
       // Check if CORS restrictions are disabled via environment variable
-      if (CONFIG.DISABLE_CORS_RESTRICTIONS === true || 
-          CONFIG.DISABLE_CORS_RESTRICTIONS === "true" || 
-          process.env.DISABLE_CORS_RESTRICTIONS === "true") {
+      if (CONFIG.DISABLE_CORS === true || 
+          CONFIG.DISABLE_CORS === "true" || 
+          process.env.DISABLE_CORS === "true") {
         serverLogger.info(`CORS restrictions disabled - allowing all origins`);
         return callback(null, true);
       }
@@ -755,9 +755,9 @@ const authenticateRequest = async (req, res, next) => {
 
 // API - STATUS CORS
 app.get("/api/status", (req, res) => {
-  const corsRestricted = !(CONFIG.DISABLE_CORS_RESTRICTIONS === true || 
-                          CONFIG.DISABLE_CORS_RESTRICTIONS === "true" || 
-                          process.env.DISABLE_CORS_RESTRICTIONS === "true");
+  const corsRestricted = !(CONFIG.DISABLE_CORS === true || 
+                          CONFIG.DISABLE_CORS === "true" || 
+                          process.env.DISABLE_CORS === "true");
   
   res.json({
     status: "online",

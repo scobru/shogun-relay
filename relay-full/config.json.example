@@ -10,6 +10,8 @@
     "S3_ENDPOINT": "",
     "S3_ADDRESS": "",
     "S3_PORT": "",
+    "ALLOWED_ORIGINS": "",
+    "DISABLE_CORS": false,
     "IPFS_ENABLED": false,
     "IPFS_SERVICE": "",
     "IPFS_NODE_URL": "",
