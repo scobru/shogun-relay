@@ -1297,3 +1297,84 @@
 [2025-06-01 17:51:25] 🚀 info ✅: [Server] Received signal SIGINT, shutting down... 🔥 {
   "service": "shogun-relay"
 }
+[2025-06-01 18:46:17] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:46:17] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:46:17] 🚀 info ✅: S3 configuration not found in config, using radisk only 💽 {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:46:17] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:46:18] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:46:18] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:46:18] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:46:18] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:46:18] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:46:18] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:46:19] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:46:19] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:52:42] 🚀 info ✅: Configuration loaded from config.json ✅ {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:52:42] 🚀 info ✅: Configuration validated successfully with Mityli ✅ {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:52:42] 🚀 info ✅: S3 configuration not found in config, using radisk only 💽 {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:52:42] 🚀 info ✅: Starting unified relay server... 🚀 {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:52:42] 📦 info ✅: IpfsManager initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:52:42] 🔑 info ✅: AuthenticationManager configured with initial settings. ✅ {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:52:42] 🔫 info ✅: GunDB initialized. ✅ {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:52:42] 🚀 info ✅: Initializing ShogunCore with Gun instance 🚀 {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:52:42] 🚀 info ✅: Relay initialized, AuthenticationManager updated with live verifiers. ✅ {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:52:42] 🚀 info ✅: File Manager initialized inside startServer. ✅ {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:52:42] 🚀 info ✅: [Server] Server listening on http://localhost:8765 {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:52:42] 🚀 info ✅: [Server] Gun relay peer accessible at http://localhost:8765/gun {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:53:46] 🚀 info ✅: [Server] Checking WebSocket connection 📡 {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:54:08] 🚀 info ✅: [Server] Received signal SIGINT, shutting down... 🔥 {
+  "service": "shogun-relay"
+}
+[2025-06-01 18:54:08] 🚀 info ✅: [Server] Closing HTTP server... 🔥 {
+  "service": "shogun-relay"
+}
