@@ -1,7 +1,6 @@
 // Configurazione globale
 let config
 
-import { authLogger } from "../utils/logger.js";
 /**
  * Utility function to properly format a GunDB public key for blockchain verification
  * @param {string} pubKey - The GunDB public key

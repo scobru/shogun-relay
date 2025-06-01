@@ -5,18 +5,24 @@ const fs = require('fs');
 const corsConfig = require.resolve('s3rver/example/cors.xml');
 const websiteConfig = require.resolve('s3rver/example/website.xml');
 
+let authToken = 'automa25'
+let bucketName = 'satellite-1'
+let port = 4569
+let address = '0.0.0.0'
+let directory = './buckets'
+
 const instance = new S3rver({
-  port: 4569,
-  address: '0.0.0.0',
+  port: port,
+  address: address,
   silent: false,
-  directory: './buckets',
-  accessKeyId:'S3RVER',
-  secretAccessKey:'S3RVER',
+  directory: directory,
+  accessKeyId:authToken,
+  secretAccessKey:authToken,
   configureBuckets: [
     {
-      name: 'test-bucket3',
-      accessKeyId: 'S3RVER',
-      secretAccessKey: 'S3RVER',
+      name: bucketName,
+      accessKeyId: authToken,
+      secretAccessKey: authToken,
       cors: fs.readFileSync(corsConfig),
       website: fs.readFileSync(websiteConfig),
     },

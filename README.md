@@ -10,17 +10,41 @@ An advanced relay server that integrates GunDB, IPFS and Ethereum for decentrali
 - **Shogun IPFS**: IPFS integration for decentralized storage
 - **Mityli**: Runtime type checking and validation
 - **Shogun NoDom**: Lightweight UI framework for the management interface
-- **MerkleTree**: For data integrity verification and proof generation
+- **Better SQLite3**: For local data persistence
+- **S3rver**: Mock S3 server for development and testing
+
+## Repository Structure
+
+This repository contains three main components:
+
+### 1. **relay/** 
+Simple GunDB relay implementation for basic peer-to-peer communication.
+
+### 2. **relay-full/**
+Advanced relay server with comprehensive features including:
+- GunDB WebSocket relay
+- IPFS integration with Pinata support
+- Authentication and authorization
+- File management system
+- Management dashboard UI
+- Backup and maintenance scripts
+- Docker support
+
+### 3. **satellite-s3/**
+Mock S3-compatible storage service built with S3rver. This component:
+- Provides S3-compatible API endpoints
+- Enables development without requiring AWS S3
+- Supports CORS and website hosting configurations
+- Uses local filesystem storage (`./buckets`)
+- Default configuration: port 4569, bucket name 'satellite-1'
 
 ## Main Features
 
 ### Decentralized Architecture
 
 - **GunDB**: Decentralized database for real-time data synchronization
-- **IPFS**: Distributed and persistent storage for files and content
+- **IPFS**: Distributed and persistent storage for files and content (optional)
 - **Ethereum**: Optional on-chain verification for member authentication
-- **Mityli**: Runtime type validation to ensure data integrity
-- **MerkleTree**: Cryptographic verification of data consistency
 
 ### User Interface Components
 
@@ -32,28 +56,46 @@ The project includes multiple UI interfaces for different functionalities:
    - Provides system monitoring, configuration, and management
    - Login interface at `/login`
 
-2. **Chat UI** (`/src/ui/chat/`)
-   - Implements peer-to-peer communication
-   - Uses Bugout for WebRTC functionality
-   - Client interface at `/client.html`
-   - Server interface at `/server.html`
+2. **GunDB UI** (`/src/ui/gundb/`)
+   - Direct GunDB interface for database interactions
 
-3. **Messenger UI** (`/src/ui/messenger/`)
-   - GunDB-powered messaging system
-   - Client accessible at `/messenger`
+3. **RTC UI** (`/src/ui/rtc/`)
+   - Real-time communication interface
+   - WebRTC functionality for peer-to-peer connections
 
-4. **Debug Interface**
-   - Advanced debugging tools and diagnostics
-   - Integrated with the dashboard
+### Security & Authentication
 
-### Security
+- **Admin token authentication**: Uses SECRET_TOKEN for administrative access to relay APIs
+- **Optional on-chain verification**: Public key authorization check via smart contracts (when enabled)
+- **Gun message filtering**: Token validation for write operations to prevent unauthorized data
+- **HTTPS support**: SSL certificate generation and management for secure connections
 
-- Token-based authentication
-- Support for on-chain verification via RelayVerifier
-- Secure WebSocket connection handling
-- HTTPS support with custom certificates
-- Automatic data type validation to prevent corruption
-- StorageLog for tracking and auditing data operations
+### Manager Components
+
+1. **AuthenticationManager (`src/managers/AuthenticationManager.js`)**
+   - SECRET_TOKEN validation for admin endpoints
+   - Public key formatting utilities for blockchain verification
+   - HTTP request authentication middleware
+
+2. **IPFS Manager (`src/managers/IpfsManager.js`)**
+   - IPFS integration with multiple services (local node, Pinata)
+   - File upload and retrieval operations
+   - Metadata management and caching
+
+3. **File Manager (`src/managers/FileManager.js`)**
+   - Local file storage and management
+   - Integration with IPFS for distributed storage
+   - Upload handling with multer middleware
+
+### Backup & Maintenance
+
+The relay includes comprehensive backup and maintenance utilities:
+
+- **Automated Backup System**: Scheduled backup of GunDB radata
+- **SSL Certificate Management**: Generation and verification of SSL certificates
+- **Data Cleanup**: Scripts to reset and clean all relay data
+- **Key Verification**: Tools for verifying cryptographic keys
+- **Logging**: Comprehensive logging system with rotation
 
 ### Complete APIs
 
@@ -62,70 +104,32 @@ The project includes multiple UI interfaces for different functionalities:
 - Support for file upload and management
 - Endpoints for IPFS integration
 - Type validation configuration endpoints
-- WebSocket configuration checking
+- Backup and maintenance APIs
 
 ## Architecture
 
 ### Core Components
 
 1. **Relay Server (`src/index.js`)**
-
    - WebSocket connection management for GunDB
    - HTTP/HTTPS request routing
-   - Multi-level authentication support
-   - Advanced CORS configuration
-   - MerkleTree integration for data integrity
-   - StorageLog for operation tracking
+   - CORS configuration and middleware setup
+   - S3 storage integration when configured
+   - Comprehensive logging system
 
-2. **Authentication Manager (`src/managers/AuthenticationManager.js`)**
+2. **Manager Components** (see Manager Components section above)
 
-   - Token validation
-   - Integration with RelayVerifier for on-chain verification
-   - Access control for API and WebSocket
-
-3. **IPFS Manager (`src/managers/IpfsManager.js`)**
-
-   - Native IPFS integration
-   - Support for Pinata and local IPFS nodes
-   - File and metadata management
-
-4. **File Manager (`src/managers/FileManager.js`)**
-   - Local and distributed file management
-   - Multi-part upload system
-   - Backup and synchronization
-
-### API Routes
-
-1. **Auth Routes (`src/routes/authRoutes.js`)**
-
-   - User authentication
-   - Token management
-   - On-chain verification
-
-2. **IPFS Routes (`src/routes/ipfsApiRoutes.js`)**
-
-   - Endpoints for IPFS operations
-   - Metadata management
-   - IPFS status control
-
-3. **File Routes (`src/routes/fileManagerRoutes.js`)**
-
-   - File querying and search
-   - File details access
-   - Advanced queries
-
-4. **Relay Routes (`src/routes/relayApiRoutes.js`)**
-   - Relay configuration
-   - Status and diagnostics
-   - Subscription management
+3. **Route Handlers**
+   - Auth routes: Simple user registration/login
+   - IPFS routes: File operations and IPFS management
+   - File routes: Local file management and queries
+   - Relay routes: Configuration and diagnostics
 
 ## API Endpoints
 
 ### Authentication
 
-- `POST /api/auth/register`: User registration
-- `POST /api/auth/login`: User login
-- `POST /api/auth/verify-onchain`: On-chain verification of public keys
+- `POST /api/auth/verify-onchain`: On-chain public key authorization check (when blockchain verification is enabled)
 
 ### Files
 
@@ -170,32 +174,93 @@ The project includes multiple UI interfaces for different functionalities:
 
 ## Configuration
 
-The server uses a `config.json` file containing all necessary options.
+Both relay components support dynamic S3 integration with satellite-s3.
+
+### Configuration Files
+
+Both `relay/` and `relay-full/` use `config.json` files for configuration.
+
+#### **relay-full/config.json** Key Options:
+- **Basic Settings**: PORT, HTTPS_PORT, SECRET_TOKEN
+- **IPFS Integration**: IPFS_ENABLED, IPFS_SERVICE, PINATA_JWT
+- **Ethereum Integration**: ETHEREUM_PROVIDER_URL, ONCHAIN_MEMBERSHIP_ENABLED
+- **SSL/TLS**: PRIVKEY_PATH, CERT_PATH
+- **Type Validation**: TYPE_VALIDATION_ENABLED, TYPE_VALIDATION_STRICT
+- **S3 Integration**: S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_BUCKET, S3_ENDPOINT
+
+#### **relay/config.json** Key Options:
+- **Basic Settings**: PORT, AUTH_TOKEN, PEERS
+- **S3 Integration**: S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_BUCKET, S3_ENDPOINT
+
+### Dynamic S3 Integration
+
+Both relay implementations automatically detect S3 configuration and integrate with satellite-s3:
+
+**✅ S3 Enabled**: When S3 credentials are provided in config.json:
+```json
+{
+  "S3_ACCESS_KEY_ID": "automa25",
+  "S3_SECRET_ACCESS_KEY": "automa25",
+  "S3_BUCKET": "satellite-1",
+  "S3_ENDPOINT": "http://0.0.0.0:4569"
+}
+```
+- GunDB will use satellite-s3 as storage backend
+- Data is stored in S3-compatible format
+- Console will show: `S3 configuration found in config, adding to Gun options 🪣`
+
+**❌ S3 Disabled**: When S3 credentials are empty or missing:
+```json
+{
+  "S3_ACCESS_KEY_ID": "",
+  "S3_SECRET_ACCESS_KEY": ""
+}
+```
+- GunDB will use local storage (radisk for relay-full, default for relay)
+- Console will show: `S3 configuration not found in config, using [local] storage 💽`
+
+### Configuration Examples
+
+#### For satellite-s3 integration:
+```json
+{
+  "S3_ACCESS_KEY_ID": "automa25",
+  "S3_SECRET_ACCESS_KEY": "automa25",
+  "S3_BUCKET": "satellite-1",
+  "S3_REGION": "us-east-1",
+  "S3_ENDPOINT": "http://0.0.0.0:4569",
+  "S3_ADDRESS": "0.0.0.0",
+  "S3_PORT": 4569
+}
+```
+
+#### For local storage only:
+```json
+{
+  "S3_ACCESS_KEY_ID": "",
+  "S3_SECRET_ACCESS_KEY": ""
+}
+```
 
 ## Installation
 
 ### Prerequisites
 
 - **Node.js**: Version 16 or higher
+- **Yarn**: Package manager
 - **IPFS**: Local IPFS node (optional, can use Pinata instead)
 - **Ethereum Provider**: Access to Ethereum provider (optional, for on-chain verification)
-- **Dependencies**:
-  - Express: Web server framework
-  - GunDB: Decentralized database
-  - Shogun Core: Core relay functionality 
-  - Shogun IPFS: IPFS integration
-  - Mityli: Runtime type validation
-  - Shogun NoDom: UI framework
 
 ### Quick Start
 
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/shogun-relay.git
-cd shogun-relay
+cd shogun-relay/test-env
 
-# Install dependencies
-npm install
+# Option 1: Start the full-featured relay
+cd relay-full
+yarn install
 
 # Copy example configuration
 cp config.json.example config.json
@@ -203,30 +268,85 @@ cp config.json.example config.json
 # Edit configuration as needed
 nano config.json
 
-# Start the server
-npm start
+# Start the relay server
+yarn start
+
+# Option 2: Start the simple relay
+cd ../relay
+yarn install  # or npm install
+
+# Edit configuration if needed
+nano config.json
+
+# Start the simple relay
+node src/index.js
+
+# Option 3: Start satellite-s3 (optional, for S3 storage)
+cd ../satellite-s3
+yarn install
+node index.js
 ```
 
 ### Development Setup
 
 ```bash
-# Start in development mode with hot reload
-npm run dev
+# Start relay-full in development mode with hot reload
+cd relay-full
+yarn dev
 
 # In a separate terminal, monitor logs
-tail -f server.log
+tail -f logs/server.log
+
+# Start satellite-s3 for S3-compatible storage
+cd ../satellite-s3
+node index.js
 ```
 
-### UI Development
-
-The NoDom-based UI is located in `src/ui/` directory. If you wish to modify the UI:
+### SSL Certificate Generation
 
 ```bash
-# Modify the UI files
-nano src/ui/app-nodom.js
-nano src/ui/components-nodom.js
+# Generate SSL certificates for HTTPS
+cd relay-full
+yarn generate-certs
+```
 
-# The changes will be served immediately when the server is running
+## Backup & Maintenance Scripts
+
+The `relay-full/scripts/` directory contains essential maintenance utilities:
+
+### Backup Scripts
+- **`backup-radata.js`**: Creates backups of GunDB's radata directory
+- **`setup-backup-cron.js`**: Configures automated backup scheduling
+
+### Security Scripts
+- **`generate-ssl-certs.js`**: Creates SSL certificates for HTTPS
+- **`verify-ssl-certs.js`**: Validates existing SSL certificates
+- **`verify-key.js`**: Verifies cryptographic keys and their integrity
+
+### Maintenance Scripts
+- **`clean-all-data.js`**: Resets/cleans all relay data
+- **`test-logger.js`**: Tests the logging system functionality
+
+### Smart Contract Scripts
+- **`getDeployedContraacts.js`**: Retrieves deployed contract information
+
+### Usage Examples
+
+```bash
+# Backup radata
+node scripts/backup-radata.js
+
+# Setup automated backups
+node scripts/setup-backup-cron.js
+
+# Clean all data (use with caution)
+yarn clean-all
+
+# Generate SSL certificates
+yarn generate-certs
+
+# Verify a specific key
+node scripts/verify-key.js [key] [root]
 ```
 
 ## UI Endpoints
@@ -239,7 +359,7 @@ The management interface is accessible through the following URLs:
 
 ### Accessing the UI
 
-1. Start the server using `npm start`
+1. Start the server using `yarn start`
 2. Open your browser and navigate to `http://localhost:8765` (or your configured HOST:PORT)
 3. You will be presented with the NoDom-powered management interface
 4. Use the admin credentials from your config.json to log in
@@ -251,6 +371,33 @@ The management interface is accessible through the following URLs:
 - **Settings**: Configure relay server settings
 - **Diagnostics**: Tools for debugging and testing connectivity
 - **Logs**: View system logs and error reports
+
+## Satellite-S3 Mock Service
+
+The satellite-s3 component provides S3-compatible API endpoints for development and testing:
+
+### Features
+- **S3-Compatible API**: Fully compatible with AWS S3 SDK
+- **Local Storage**: Uses filesystem-based storage in `./buckets`
+- **CORS Support**: Configurable CORS settings
+- **Website Hosting**: Static website hosting capabilities
+- **Event Monitoring**: Real-time event logging for S3 operations
+
+### Configuration
+- **Port**: 4569 (default)
+- **Address**: 0.0.0.0 (all interfaces)
+- **Bucket**: satellite-1 (default)
+- **Auth Token**: automa25 (for both access key and secret)
+
+### Usage
+```bash
+# Start satellite-s3
+cd satellite-s3
+node index.js
+
+# The service will be available at http://localhost:4569
+# Use access key and secret key: automa25
+```
 
 ## Debugging
 
@@ -273,71 +420,84 @@ The following endpoints are available for debugging:
 ### Debugging Tools
 
 - **Bullet Catcher**: Global exception handler to prevent server crashes
-- **Console Logging**: Detailed logs with timestamp and context
-- **Type Validation**: Runtime checking of data structures
+- **Winston Logging**: Comprehensive logging with daily rotation
+- **Type Validation**: Runtime checking of data structures with Mityli
 
 ## Command Reference
 
-### Server Commands
+### Relay-Full Commands
 
 ```bash
-# Start the server in production mode
-npm start
+# Start the relay server in production mode
+yarn start
 
-# Start the server in development mode with hot reload
-npm run dev
+# Start the relay server in development mode with hot reload
+yarn dev
 
 # Clean all data (radata, uploads, logs)
-npm run clean-all
+yarn clean-all
 
-# Generate a new key pair for authentication
-npm run generate-keypair
+# Generate SSL certificates
+yarn generate-certs
+
+# Get deployed contract information
+yarn get-deployed-contracts
+```
+
+### Simple Relay Commands
+
+```bash
+# Start the simple relay server
+node src/index.js
+
+# Start with npm (if using npm instead of yarn)
+npm start
 ```
 
 ### Testing Commands
 
 ```bash
-# Test GunDB connectivity
+# Test GunDB connectivity (relay-full)
 curl http://localhost:8765/api/test-gundb
 
-# Check server status
+# Check server status (relay-full)
 curl http://localhost:8765/api/status
 
-# Test type validation system
+# Test type validation system (relay-full)
 curl http://localhost:8765/api/test-mityli
+
+# Test simple relay connectivity
+curl http://localhost:8000/gun
 ```
 
-## Performance Optimization
+### Backup Commands
 
-### Merkle Root Calculation
-
-The relay server maintains a Merkle tree of public keys for verification purposes. This implementation now features:
-
-1. **Real-time key detection**: The system automatically intercepts Gun messages (both GET and PUT) and extracts public keys, including:
-   - User aliases (`~@username`)
-   - Standard GunDB public keys (`~3tOyGGfychTwgJUHkwFR0bSodKMdSau35puoGqM0qxY.GCtCVYR...`)
-   - All message formats supported by GunDB
-
-2. **Dynamic updates**: When new keys are detected, they are immediately added to the Merkle tree, which is then rebuilt and saved to disk.
-
-3. **Fast startup**: On startup, the relay reads a pre-calculated Merkle root from the `merkle-root.json` file if available, avoiding the expensive scan of the entire `radata` directory.
-
-4. **Persistent storage**: When new keys are added, the updated Merkle root is automatically saved to the `merkle-root.json` file.
-
-#### Pre-calculation for First Startup
-
-For the first startup or to force a complete recalculation, you can pre-calculate the Merkle root using the provided scripts:
-
-#### For Unix/Linux/macOS:
 ```bash
-./relay/scripts/update-merkle-root.sh
+# Create manual backup (relay-full)
+node scripts/backup-radata.js
+
+# Setup automated backup schedule (relay-full)
+node scripts/setup-backup-cron.js
+
+# Test logging system (relay-full)
+node scripts/test-logger.js
 ```
 
-#### For Windows:
-```cmd
-relay\scripts\update-merkle-root.bat
+## Docker Support
+
+The relay-full component includes Docker support:
+
+```bash
+# Build Docker image
+docker build -t shogun-relay .
+
+# Run with Docker Compose
+docker-compose up
 ```
 
-This will generate a `merkle-root.json` file that the relay will use for faster startup, and subsequent public keys will be added dynamically as users connect.
+## Performance Considerations
 
-**Note:** While manual updates are no longer necessary, you can still run these scripts if you want to force a complete recalculation of the Merkle tree.
+- **Type Validation**: Can be disabled or set to non-strict mode for better performance
+- **IPFS Integration**: Optional and can be disabled if not needed
+- **Logging**: Configurable log levels to balance detail and performance
+- **Backup Scheduling**: Automated backups can be scheduled during low-traffic periods

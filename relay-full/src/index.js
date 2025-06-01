@@ -413,6 +413,33 @@ let gunOptions = {
   radisk: true,
 };
 
+// Add S3 configuration if available in CONFIG
+if (CONFIG.S3_ACCESS_KEY_ID && CONFIG.S3_SECRET_ACCESS_KEY && CONFIG.S3_BUCKET) {
+  serverLogger.info("S3 configuration found in config, adding to Gun options 🪣");
+  
+  gunOptions.s3 = {
+    bucket: CONFIG.S3_BUCKET,
+    region: CONFIG.S3_REGION || 'us-east-1',
+    accessKeyId: CONFIG.S3_ACCESS_KEY_ID,
+    secretAccessKey: CONFIG.S3_SECRET_ACCESS_KEY,
+    endpoint: CONFIG.S3_ENDPOINT || 'http://0.0.0.0:4569',
+    s3ForcePathStyle: true,
+    address: CONFIG.S3_ADDRESS || '0.0.0.0',
+    port: CONFIG.S3_PORT || 4569,
+    key: CONFIG.S3_ACCESS_KEY_ID,
+    secret: CONFIG.S3_SECRET_ACCESS_KEY,
+  };
+  
+  serverLogger.info("S3 configuration added to Gun options:", {
+    bucket: gunOptions.s3.bucket,
+    endpoint: gunOptions.s3.endpoint,
+    address: gunOptions.s3.address,
+    port: gunOptions.s3.port
+  });
+} else {
+  serverLogger.info("S3 configuration not found in config, using radisk only 💽");
+}
+
 /**
  * Starts the unified relay server
  * Initializes IPFS, configures middleware, and sets up WebSocket handlers
