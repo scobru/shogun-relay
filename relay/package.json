@@ -7,11 +7,13 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "simple": "node src/simple.js"
   },
   "dependencies": {
     "aws-sdk": "^2.1692.0",
     "gun": "^0.2020.1240",
-    "http": "^0.0.1-security"
+    "http": "^0.0.1-security",
+    "shogun-create": "^1.0.3"
   }
 }

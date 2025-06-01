@@ -182,7 +182,7 @@ gopd@^1.0.1, gopd@^1.2.0:
   resolved "https://registry.yarnpkg.com/gopd/-/gopd-1.2.0.tgz#89f56b8217bdbc8802bd299df6d7f1081d7e51a1"
   integrity sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==
 
-gun@^0.2020.1240:
+gun@^0.2020.1239, gun@^0.2020.1240:
   version "0.2020.1240"
   resolved "https://registry.yarnpkg.com/gun/-/gun-0.2020.1240.tgz#759ad9a736bc41eaaa5801e0b83a9e106684e098"
   integrity sha512-uhnyadZTywn0HHgBjS2DePqpcdwLeVm6nFeSZZBPJRltm9O8MjFPyltaxk2PBKS+O8wSZac9qlbCIriJDgQQog==
@@ -292,6 +292,13 @@ math-intrinsics@^1.1.0:
   resolved "https://registry.yarnpkg.com/math-intrinsics/-/math-intrinsics-1.1.0.tgz#a0dd74be81e2aa5c2f27e65ce283605ee4e2b7f9"
   integrity sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==
 
+mityli@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/mityli/-/mityli-1.0.1.tgz#59f2fb5452922fa3a5df8f958f3bf4cd14ef098f"
+  integrity sha512-vTUTb1jtn22ZS35KUi81+V9SBCCg8ftrwKCTm92I7/y0x3TD1ZQ8w4daJ1N9FrP25aLJqjvSxB+XxDMQQMBSDg==
+  dependencies:
+    valibot "^0.24.0"
+
 possible-typed-array-names@^1.0.0:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/possible-typed-array-names/-/possible-typed-array-names-1.1.0.tgz#93e3582bc0e5426586d9d07b79ee40fc841de4ae"
@@ -350,6 +357,14 @@ set-function-length@^1.2.2:
     gopd "^1.0.1"
     has-property-descriptors "^1.0.2"
 
+shogun-create@^1.0.3:
+  version "1.0.3"
+  resolved "https://registry.yarnpkg.com/shogun-create/-/shogun-create-1.0.3.tgz#57369e4ab286b3b5f2ab26299421c702c4b3a80e"
+  integrity sha512-FZ3PPNJbO/7SkYKXdlcWgz6JNdxmAqoJXoA8v/MVFHPM09KqkNBnFpm8tWgXupiOV1lLzs4pDyBmidNWdI0U5A==
+  dependencies:
+    gun "^0.2020.1239"
+    mityli "^1.0.1"
+
 tslib@^2.0.0, tslib@^2.6.2, tslib@^2.7.0, tslib@^2.8.1:
   version "2.8.1"
   resolved "https://registry.yarnpkg.com/tslib/-/tslib-2.8.1.tgz#612efe4ed235d567e8aba5f2a5fab70280ade83f"
@@ -378,6 +393,11 @@ uuid@8.0.0:
   version "8.0.0"
   resolved "https://registry.yarnpkg.com/uuid/-/uuid-8.0.0.tgz#bc6ccf91b5ff0ac07bbcdbf1c7c4e150db4dbb6c"
   integrity sha512-jOXGuXZAWdsTH7eZLtyXMqUb9EcWMGZNbL9YcGBJl4MH4nrxHmZJhEHvyLFrkxo+28uLb/NYRcStH48fnD0Vzw==
+
+valibot@^0.24.0:
+  version "0.24.1"
+  resolved "https://registry.yarnpkg.com/valibot/-/valibot-0.24.1.tgz#c51b2f3f0806e59f60f266fcff06185dcc1fabbf"
+  integrity sha512-Toclbuy20XsECZiueh2dkQ63he2AGaBIj/FJRDAFti2kueFldm9bjJzSYvPaL5CE1HXDMRhq7olak8at7xCz5A==
 
 webcrypto-core@^1.8.0:
   version "1.8.1"

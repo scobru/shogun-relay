@@ -66,7 +66,7 @@ The project includes multiple UI interfaces for different functionalities:
 ### Security & Authentication
 
 - **Admin token authentication**: Uses SECRET_TOKEN for administrative access to relay APIs
-- **Optional on-chain verification**: Public key authorization check via smart contracts (when enabled)
+- **Basic on-chain verification**: Simple address check via connected provider (when enabled)
 - **Gun message filtering**: Token validation for write operations to prevent unauthorized data
 - **HTTPS support**: SSL certificate generation and management for secure connections
 
@@ -129,7 +129,7 @@ The relay includes comprehensive backup and maintenance utilities:
 
 ### Authentication
 
-- `POST /api/auth/verify-onchain`: On-chain public key authorization check (when blockchain verification is enabled)
+- `POST /api/auth/verify-onchain`: Basic address check via connected provider (when blockchain verification is enabled)
 
 ### Files
 
@@ -207,6 +207,7 @@ Both relay implementations automatically detect S3 configuration and integrate w
 ```
 - GunDB will use satellite-s3 as storage backend
 - Data is stored in S3-compatible format
+- Bucket defaults to 'satellite-1' if not specified
 - Console will show: `S3 configuration found in config, adding to Gun options 🪣`
 
 **❌ S3 Disabled**: When S3 credentials are empty or missing:
@@ -354,7 +355,7 @@ node scripts/verify-key.js [key] [root]
 The management interface is accessible through the following URLs:
 
 - `/`: Main management dashboard
-- `/login`: Authentication page
+- `/login`: Admin token authentication form (SECRET_TOKEN required)
 - `/debug-interface`: Debug and diagnostics interface
 
 ### Accessing the UI
@@ -362,7 +363,7 @@ The management interface is accessible through the following URLs:
 1. Start the server using `yarn start`
 2. Open your browser and navigate to `http://localhost:8765` (or your configured HOST:PORT)
 3. You will be presented with the NoDom-powered management interface
-4. Use the admin credentials from your config.json to log in
+4. Use the SECRET_TOKEN from your config.json to authenticate admin access
 
 ### UI Features
 
