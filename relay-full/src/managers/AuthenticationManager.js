@@ -78,7 +78,7 @@ const AuthenticationManager = {
 
     const token = req.headers.authorization?.startsWith("Bearer ")
       ? req.headers.authorization.substring(7)
-      : req.headers.authorization || req.query.token || req.body?.token;
+      : req.headers.authorization || req.query.token || req.body?.token || req.headers.token;
 
     if (!token) {
       return res.status(401).json({

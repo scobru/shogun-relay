@@ -215,6 +215,9 @@
               msg.token = authToken;
               // o
               msg.auth = { token: authToken };
+              msg.headers = {
+                token: authToken,
+              };
             }
             this.to.next(msg);
           });
