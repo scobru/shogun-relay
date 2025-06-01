@@ -456,6 +456,11 @@ async function startServer() {
     );
 
     app.use(
+      "/gun",
+      express.static(path.join(__dirname, "src/ui/gun/note.html"))
+    );
+
+    app.use(
       "/gundb/client",
       express.static(path.join(__dirname, "src/ui/gundb/client.html"))
     );
