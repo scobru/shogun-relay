@@ -58,10 +58,20 @@ The project includes multiple UI interfaces for different functionalities:
 
 2. **GunDB UI** (`/src/ui/gundb/`)
    - Direct GunDB interface for database interactions
+   - **Access URL**: `http://localhost:8765/gundb` (relay-full)
+   - Real-time messaging with GunDB synchronization
+   - End-to-end encrypted messages
 
 3. **RTC UI** (`/src/ui/rtc/`)
    - Real-time communication interface
    - WebRTC functionality for peer-to-peer connections
+   - **Access URLs**: 
+     - Server: `http://localhost:8765/rtc/server` (relay-full)
+     - Client: `http://localhost:8765/rtc/client` (relay-full)
+   - Secure peer-to-peer messaging
+
+   ![WebRTC Server Interface](webrtc1-chat.png)
+   ![WebRTC Client Interface](webrtc2-chat.png)
 
 ### Security & Authentication
 
@@ -357,6 +367,9 @@ The management interface is accessible through the following URLs:
 - `/`: Main management dashboard
 - `/login`: Admin token authentication form (SECRET_TOKEN required)
 - `/debug-interface`: Debug and diagnostics interface
+- `/gundb`: GunDB chat interface for real-time messaging
+- `/rtc/server`: WebRTC server interface for peer-to-peer messaging
+- `/rtc/client`: WebRTC client interface for peer-to-peer messaging
 
 ### Accessing the UI
 
@@ -368,10 +381,47 @@ The management interface is accessible through the following URLs:
 ### UI Features
 
 - **Dashboard**: Overview of system status, connections, and recent activities
+
+  ![Dashboard Overview](dashboard.png)
+
 - **File Manager**: Browse, upload, and manage files (both local and IPFS)
+
+  ![File Management](file-managment.png)
+  ![File Upload](upload-file.png)
+
+- **GunDB Chat**: Real-time messaging with decentralized synchronization
+
+  ![GunDB Chat](gun-chat.png)
+
+- **WebRTC Messaging**: Secure peer-to-peer communication
+
+  ![WebRTC Server](webrtc1-chat.png)
+  ![WebRTC Client](webrtc2-chat.png)
+
 - **Settings**: Configure relay server settings
 - **Diagnostics**: Tools for debugging and testing connectivity
 - **Logs**: View system logs and error reports
+
+### Chat Interfaces Access
+
+#### GunDB Chat
+- **URL**: `http://localhost:8765/gundb/client`
+- **Features**: 
+  - Real-time messaging with GunDB synchronization
+  - End-to-end encrypted messages
+  - Decentralized message storage
+  - Room-based conversations
+  - User presence indicators
+
+#### WebRTC Messaging
+- **Server URL**: `http://localhost:8765/rtc/server`
+- **Client URL**: `http://localhost:8765/rtc/client`
+- **Features**:
+  - Direct peer-to-peer communication
+  - No server message storage
+  - WebRTC data channels
+  - QR code connection sharing
+  - Real-time connection status
 
 ## Satellite-S3 Mock Service
 
