@@ -701,6 +701,14 @@ app.use(
       // Allow requests without origin (like mobile apps or curl)
       if (!origin) return callback(null, true);
 
+      // Check if CORS restrictions are disabled via environment variable
+      if (CONFIG.DISABLE_CORS_RESTRICTIONS === true || 
+          CONFIG.DISABLE_CORS_RESTRICTIONS === "true" || 
+          process.env.DISABLE_CORS_RESTRICTIONS === "true") {
+        serverLogger.info(`CORS restrictions disabled - allowing all origins`);
+        return callback(null, true);
+      }
+
       // Enable all origins in development mode
       if (CONFIG.NODE_ENV === "development") {
         return callback(null, true);
@@ -747,12 +755,17 @@ const authenticateRequest = async (req, res, next) => {
 
 // API - STATUS CORS
 app.get("/api/status", (req, res) => {
+  const corsRestricted = !(CONFIG.DISABLE_CORS_RESTRICTIONS === true || 
+                          CONFIG.DISABLE_CORS_RESTRICTIONS === "true" || 
+                          process.env.DISABLE_CORS_RESTRICTIONS === "true");
+  
   res.json({
     status: "online",
     timestamp: Date.now(),
     server: {
       version: "1.0.0",
-      cors: allowedOrigins,
+      cors: corsRestricted ? allowedOrigins : "all origins allowed",
+      corsRestricted: corsRestricted,
     },
     ipfs: {
       enabled: ipfsManager.isEnabled(),
