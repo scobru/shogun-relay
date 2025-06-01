@@ -832,16 +832,18 @@
 
       // Initialize chat with Gun for a specific room
       function initializeChat(roomId) {
+
+        let url = window.location.origin;
         // Initialize Gun with local storage and WebRTC for P2P
         const gunInstance = new Gun({
-          peers: ["http://localhost:8765/gun"],
+          peers: [`${url}/gun`],
           localStorage: false,
           radisk: false,
         });
 
         const config = {
           gunInstance: gunInstance,
-          peers: ["http://localhost:8765/gun"],
+          peers: [`${url}/gun`],
         };
 
         // Close previous Gun instance if it exists
