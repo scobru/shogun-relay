@@ -23,7 +23,9 @@ import {
     removePeer,
     reconnectToPeer,
     testPeerConnection,
-    getNetworkStatus
+    getNetworkStatus,
+    // Import file management functions
+    deleteFile
 } from './app-nodom.js';
 import { FileSearchForm, FileItem, EmptyState, LoadingState, PeerItem } from './components-nodom.js';
 
