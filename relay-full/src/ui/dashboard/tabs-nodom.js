@@ -140,6 +140,13 @@ export function FilesTabContent() {
                     updateFileList(fileListContainer);
                 });
             }
+            
+            // Re-add the effect to update file list when files change
+            // This is needed to refresh the UI when data changes
+            setEffect(() => {
+                const files = getFiles();
+                updateFileList(fileListContainer);
+            });
         }
     });
     
