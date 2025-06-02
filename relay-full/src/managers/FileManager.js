@@ -509,64 +509,6 @@ class FileManager {
           if (fileObject.ipfsHash) {
             console.log(`[FileManager] Found file with IPFS data: ${normalizedId}, hash: ${fileObject.ipfsHash}`);
           }
-          
-          // Even if we don't see an ipfsHash in the fileObject, try to find it in the IPFS metadata
-          else if (this.config.storageDir) {
-            try {
-              const metadataPath = path.join(this.config.storageDir, 'ipfs-metadata.json');
-              if (fs.existsSync(metadataPath)) {
-                const content = fs.readFileSync(metadataPath, 'utf8');
-                const ipfsMetadata = JSON.parse(content);
-                
-                // Try direct match
-                if (ipfsMetadata[normalizedId]) {
-                  fileObject.ipfsHash = ipfsMetadata[normalizedId].ipfsHash;
-                  fileObject.ipfsUrl = this.config.ipfsManager ? 
-                    this.config.ipfsManager.getGatewayUrl(fileObject.ipfsHash) : 
-                    `https://ipfs.io/ipfs/${fileObject.ipfsHash}`;
-                  console.log(`[FileManager] Added IPFS data from metadata for ${normalizedId}`);
-                } 
-                // Try other matches
-                else {
-                  // Extract identifiers from the file ID
-                  const timestampMatch = normalizedId.match(/^(\d+)-/);
-                  const timestamp = timestampMatch ? timestampMatch[1] : null;
-                  const baseFilename = normalizedId.replace(/^(\d+)-/, '').split('_')[0];
-                  
-                  for (const metaKey in ipfsMetadata) {
-                    const meta = ipfsMetadata[metaKey];
-                    
-                    // Check for any match with the stored alternate IDs
-                    if (meta.alternateIds && Array.isArray(meta.alternateIds)) {
-                      if (meta.alternateIds.some(id => id === normalizedId || 
-                          (timestamp && id.includes(timestamp)) || 
-                          (baseFilename && id.includes(baseFilename)))) {
-                        
-                        fileObject.ipfsHash = meta.ipfsHash;
-                        fileObject.ipfsUrl = this.config.ipfsManager ? 
-                          this.config.ipfsManager.getGatewayUrl(fileObject.ipfsHash) : 
-                          `https://ipfs.io/ipfs/${fileObject.ipfsHash}`;
-                        console.log(`[FileManager] Added IPFS data from metadata (alternative match) for ${normalizedId}`);
-                        break;
-                      }
-                    }
-                    // For older metadata format that doesn't have alternateIds
-                    else if (timestamp && metaKey.includes(timestamp) || 
-                            baseFilename && metaKey.includes(baseFilename)) {
-                      fileObject.ipfsHash = meta.ipfsHash;
-                      fileObject.ipfsUrl = this.config.ipfsManager ? 
-                        this.config.ipfsManager.getGatewayUrl(fileObject.ipfsHash) : 
-                        `https://ipfs.io/ipfs/${fileObject.ipfsHash}`;
-                      console.log(`[FileManager] Added IPFS data from metadata (simple match) for ${normalizedId}`);
-                      break;
-                    }
-                  }
-                }
-              }
-            } catch (metaErr) {
-              console.error(`[FileManager] Error checking IPFS metadata: ${metaErr.message}`);
-            }
-          }
         } else {
           console.log(`[FileManager] Invalid data for key ${key}: ${data}`);
           return; // Skip invalid data
@@ -610,9 +552,70 @@ class FileManager {
         console.error(`[FileManager] Error reading storage dir: ${fsErr.message}`);
       }
 
-      // If we found files in storage, save them to GunDB for synchronization
-      if (filesFromStorage.length > 0) {
-        for (const file of filesFromStorage) {
+      // CRITICAL FIX: Load files from IPFS metadata if available
+      let filesFromIpfsMetadata = [];
+      try {
+        const metadataPath = path.join(this.config.storageDir, 'ipfs-metadata.json');
+        if (fs.existsSync(metadataPath)) {
+          console.log(`[FileManager] Loading files from IPFS metadata`);
+          const content = fs.readFileSync(metadataPath, 'utf8');
+          const ipfsMetadata = JSON.parse(content);
+          
+          for (const [fileId, metadata] of Object.entries(ipfsMetadata)) {
+            // Skip if this file has been deleted
+            if (deletedFileIds.has(fileId)) {
+              console.log(`[FileManager] Skipping deleted IPFS file: ${fileId}`);
+              continue;
+            }
+            
+            // Create a file object from IPFS metadata
+            const ipfsFile = {
+              id: fileId,
+              name: metadata.originalFilename || metadata.baseFilename || fileId,
+              originalName: metadata.originalFilename || metadata.baseFilename || fileId,
+              ipfsHash: metadata.ipfsHash,
+              ipfsUrl: this.config.ipfsManager ? 
+                this.config.ipfsManager.getGatewayUrl(metadata.ipfsHash) : 
+                `https://ipfs.io/ipfs/${metadata.ipfsHash}`,
+              fileUrl: this.config.ipfsManager ? 
+                this.config.ipfsManager.getGatewayUrl(metadata.ipfsHash) : 
+                `https://ipfs.io/ipfs/${metadata.ipfsHash}`,
+              timestamp: metadata.originalTimestamp || metadata.timestamp,
+              uploadedAt: metadata.originalTimestamp || metadata.timestamp,
+              mimeType: "application/octet-stream", // Default mime type for IPFS files
+              mimetype: "application/octet-stream",
+              size: 0, // Size not stored in IPFS metadata
+              verified: true
+            };
+            
+            filesFromIpfsMetadata.push(ipfsFile);
+            console.log(`[FileManager] Added IPFS file from metadata: ${fileId}`);
+          }
+          
+          console.log(`[FileManager] Found ${filesFromIpfsMetadata.length} files from IPFS metadata`);
+        }
+      } catch (ipfsMetaErr) {
+        console.error(`[FileManager] Error reading IPFS metadata: ${ipfsMetaErr.message}`);
+      }
+
+      // Combine all files: storage files + IPFS metadata files
+      const allFoundFiles = [...filesFromStorage, ...filesFromIpfsMetadata];
+      
+      // Remove duplicates by ID
+      const uniqueFiles = [];
+      const processedIds = new Set();
+      
+      for (const file of allFoundFiles) {
+        if (!processedIds.has(file.id)) {
+          uniqueFiles.push(file);
+          processedIds.add(file.id);
+        }
+      }
+
+      // If we found files in storage/IPFS metadata, save them to GunDB for synchronization
+      if (uniqueFiles.length > 0) {
+        console.log(`[FileManager] Syncing ${uniqueFiles.length} files to GunDB`);
+        for (const file of uniqueFiles) {
           // Skip if this file has been deleted
           if (deletedFileIds.has(file.id)) {
             console.log(`[FileManager] Not syncing deleted file to GunDB: ${file.id}`);
@@ -620,68 +623,55 @@ class FileManager {
           }
           
           try {
-            // Save to GunDB for synchronization, but don't wait
+            // Save to GunDB asynchronously without waiting
             this.config.gun.get("files").get(file.id).put(file);
-          } catch (err) {
-            console.error(`[FileManager] Error saving file to GunDB: ${err.message}`);
+            console.log(`[FileManager] Synced file to GunDB: ${file.id}`);
+          } catch (syncErr) {
+            console.error(`[FileManager] Error syncing to GunDB: ${syncErr.message}`);
           }
         }
         
-        // If we found files in storage, just return these
-        console.log(`[FileManager] getAllFiles: Found ${filesFromStorage.length} files from storage`);
-        return filesFromStorage;
-      }
-
-      // Fall back to GunDB - attempt to get all files with a reasonable timeout
-        const rawData = await this.gunPromiseWithTimeout((cb) => {
-          this.config.gun.get("files").once((data) => cb(data));
-      }, 5000);
-
-      if (!rawData) {
-        console.log("[FileManager] No data received from GunDB, falling back to filesystem");
-        // If no data from GunDB, return files from storage
-        return filesFromStorage.length > 0 ? filesFromStorage : [];
-      }
-
-      // Process the direct GunDB data to extract files
-          Object.entries(rawData).forEach(([key, value]) => {
-        // Skip GunDB metadata
-            if (key.startsWith("_")) return;
-
-        console.log(`[FileManager] Found key in files node: ${key}`);
-
-        // If this is already a file object, process it directly
-        if (value && typeof value === "object" && (value.name || value.fileUrl)) {
-          processFileData(value, key);
-        }
-      });
-
-      // If we found files, return them
-          if (files.length > 0) {
-        console.log(`[FileManager] getAllFiles: Found ${files.length} files in GunDB data`);
-            return files;
+        // Add files to our result
+        for (const file of uniqueFiles) {
+          if (!seen.has(file.id)) {
+            files.push(file);
+            seen.add(file.id);
           }
-
-      // If we still don't have files, fallback to storage as a last resort
-      if (files.length === 0 && filesFromStorage.length > 0) {
-        console.log("[FileManager] No files found in GunDB, using storage files");
-        return filesFromStorage;
+        }
+        
+        console.log(`[FileManager] Added ${uniqueFiles.length} files from storage/IPFS to result`);
       }
 
-      // If no files found at all, return empty array
-      console.log("[FileManager] No files found in GunDB or storage");
-        return [];
+      // Now try to get files from GunDB (this may be empty but we try anyway)
+      try {
+        console.log("[FileManager] Attempting to read from GunDB files node");
+        
+        const gunData = await this.gunPromiseWithTimeout((resolve) => {
+          this.config.gun.get("files").once((data) => {
+            console.log(`[FileManager] GunDB files data received:`, typeof data, data ? Object.keys(data).length : 0);
+            resolve(data);
+          });
+        }, 5000);
+
+        if (gunData && typeof gunData === "object") {
+          console.log(`[FileManager] Processing GunDB data with ${Object.keys(gunData).length} keys`);
+          
+          for (const [key, value] of Object.entries(gunData)) {
+            processFileData(value, key);
+          }
+        } else {
+          console.log("[FileManager] No data found in GunDB files node");
+        }
+      } catch (gunErr) {
+        console.error(`[FileManager] Error reading from GunDB: ${gunErr.message}`);
+      }
+
     } catch (error) {
       console.error(`[FileManager] Error in getAllFiles: ${error.message}`);
-      // As a last resort, try the filesystem
-      try {
-        const filesFromStorage = await this.getFilesFromStorage(deletedFileIds);
-        return filesFromStorage;
-      } catch (fsErr) {
-        console.error(`[FileManager] Filesystem fallback error: ${fsErr.message}`);
-        return [];
-      }
     }
+
+    console.log(`[FileManager] Returning ${files.length} files total`);
+    return files;
   }
 
   /**

@@ -428,6 +428,11 @@ export async function loadFiles(searchParams = {}) {
       // Support both 'files' and 'results' property names
       const fileArray = data.files || data.results || [];
 
+      // Enhanced debug logging
+      console.log("DEBUG: Raw API response:", data);
+      console.log("DEBUG: File array length:", fileArray.length);
+      console.log("DEBUG: First few files:", fileArray.slice(0, 3));
+
       // Process files to ensure IPFS files are properly identified
       const processedFiles = fileArray.map((file) => {
         // Create a clean processed file with all fields preserved
