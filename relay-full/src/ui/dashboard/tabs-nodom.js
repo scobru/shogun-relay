@@ -14,75 +14,85 @@ import {
     checkIpfsConnection,
     getIpfsConnectionStatus,
     setIpfsConnectionStatus,
-    _setFiles
+    setFiles,
+    // Import peer management functions
+    getPeers,
+    getPeerConnections,
+    updatePeerStatus,
+    addPeer,
+    removePeer,
+    reconnectToPeer,
+    testPeerConnection,
+    getNetworkStatus
 } from './app-nodom.js';
-import { FileSearchForm, FileItem, EmptyState, LoadingState } from './components-nodom.js';
+import { FileSearchForm, FileItem, EmptyState, LoadingState, PeerItem } from './components-nodom.js';
+
+// Debouncing per evitare richieste multiple
+let networkUpdateTimeout = null;
+let networkTabActive = false;
 
 /**
  * Files Tab Content Component
  */
 export function FilesTabContent() {
-    const tabContent = h('div', { id: 'files-tab', class: 'tab-content' });
+    const tabContent = h('div', { 
+        id: 'files-tab', 
+        class: 'tab-content', 
+        style: 'display: none;' 
+    });
     
     setEffect(() => {
         const isActive = getActiveTab() === 'files';
-        tabContent.className = isActive ? 'tab-content active' : 'tab-content';
+        tabContent.style.display = isActive ? 'block' : 'none';
         
-        if (isActive) {
+        if (isActive && tabContent.innerHTML === '') {
             tabContent.innerHTML = '';
             
             // Card header with IPFS status indicator
             const ipfsStatus = getIpfsStatus();
-            const ipfsStatusIndicator = h('span', { 
-                class: `ipfs-status-badge ${ipfsStatus.enabled ? 'ipfs-status-enabled' : 'ipfs-status-disabled'}`
-            }, ipfsStatus.enabled ? 'IPFS: Active' : 'IPFS: Disabled');
+            const ipfsStatusIndicator = h('div', { 
+                class: `badge ${ipfsStatus.enabled ? 'badge-success' : 'badge-error'} gap-2`
+            }, 
+                h('span', {}, ipfsStatus.enabled ? '✅' : '❌'),
+                h('span', {}, ipfsStatus.enabled ? 'IPFS Active' : 'IPFS Disabled')
+            );
             
-            const cardHeader = h('div', { class: 'card-header' },
-                h('div', { style: 'display: flex; align-items: center;' },
-                    h('h3', { class: 'card-title' }, 'File Management'),
+            const cardHeader = h('div', { class: 'flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6' },
+                h('div', { class: 'flex items-center gap-3' },
+                    h('h3', { class: 'text-2xl font-bold text-base-content' }, '📁 File Management'),
                     ipfsStatusIndicator
                 ),
-                h('div', { class: 'card-actions' },
-                    h('button', { 
-                        id: 'refresh-files',
-                        onclick: () => {
-                            loadFiles();
-                            showToast('Refreshing files...', 'info');
-                        }
-                    }, 'Refresh')
-                )
+                h('button', { 
+                    id: 'refresh-files',
+                    class: 'btn btn-primary btn-sm',
+                    onclick: () => {
+                        loadFiles();
+                        showToast('Refreshing files...', 'info');
+                    }
+                }, '🔄 Refresh Files')
             );
             
             // Search form
             const searchForm = FileSearchForm();
             
-            // IPFS filter and tab controls
-            const filterContainer = h('div', { 
-                class: 'filter-controls', 
-                style: 'margin-top: 10px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px;'
-            });
+            // IPFS filter and controls
+            const filterContainer = h('div', { class: 'flex flex-wrap items-center gap-4 mb-6' });
             
             // IPFS filter toggle
-            const ipfsFilterContainer = h('div', { 
-                class: 'ipfs-filter',
-                style: 'display: flex; align-items: center;'
-            });
-            const ipfsFilterCheckbox = h('input', { 
-                type: 'checkbox', 
-                id: 'ipfs-filter',
-                style: 'margin-right: 5px;'
-            });
-            const ipfsFilterLabel = h('label', { 
-                for: 'ipfs-filter',
-                style: 'font-weight: bold; color: #6e3fff;'
-            }, 'Show only IPFS files');
+            const ipfsFilterContainer = h('div', { class: 'form-control' },
+                h('label', { class: 'label cursor-pointer gap-2' },
+                    h('input', { 
+                        type: 'checkbox', 
+                        id: 'ipfs-filter',
+                        class: 'checkbox checkbox-secondary'
+                    }),
+                    h('span', { class: 'label-text font-medium' }, '🌐 Show only IPFS files')
+                )
+            );
             
-            ipfsFilterContainer.appendChild(ipfsFilterCheckbox);
-            ipfsFilterContainer.appendChild(ipfsFilterLabel);
-            
-            // Add debug button for IPFS metadata
+            // Debug IPFS metadata button
             const debugIpfsButton = h('button', {
-                class: 'secondary',
+                class: 'btn btn-outline btn-sm',
                 onclick: async () => {
                     try {
                         const response = await fetch('/api/ipfs/metadata', {
@@ -103,13 +113,16 @@ export function FilesTabContent() {
                         showToast(`Error: ${error.message}`, 'error');
                     }
                 }
-            }, 'Debug IPFS Metadata');
+            }, '🔍 Debug IPFS Metadata');
             
             filterContainer.appendChild(ipfsFilterContainer);
             filterContainer.appendChild(debugIpfsButton);
             
             // Create file list container
-            const fileListContainer = h('div', { class: 'file-list', id: 'file-list' });
+            const fileListContainer = h('div', { 
+                class: 'space-y-4', 
+                id: 'file-list' 
+            });
             
             // Add these elements to tab content
             tabContent.appendChild(cardHeader);
@@ -121,9 +134,12 @@ export function FilesTabContent() {
             updateFileList(fileListContainer);
             
             // Add IPFS filter functionality
-            ipfsFilterCheckbox.addEventListener('change', () => {
-                updateFileList(fileListContainer);
-            });
+            const ipfsFilterCheckbox = document.getElementById('ipfs-filter');
+            if (ipfsFilterCheckbox) {
+                ipfsFilterCheckbox.addEventListener('change', () => {
+                    updateFileList(fileListContainer);
+                });
+            }
             
             // Set up effect to update file list when files change
             setEffect(() => {
@@ -140,14 +156,16 @@ export function FilesTabContent() {
         const isLoading = getIsLoading();
         const ipfsFilterEnabled = document.getElementById('ipfs-filter')?.checked || false;
         
-        // Show loading state or empty state
+        // Show loading state
         if (isLoading) {
-            container.innerHTML = '<div class="loading">Loading files...</div>';
+            container.innerHTML = '';
+            container.appendChild(LoadingState('Loading files...'));
             return;
         }
         
         if (!files || !Array.isArray(files) || files.length === 0) {
-            container.innerHTML = '<div class="empty-state">No files found</div>';
+            container.innerHTML = '';
+            container.appendChild(EmptyState('No files found'));
             return;
         }
         
@@ -157,7 +175,8 @@ export function FilesTabContent() {
             : files;
             
         if (filteredFiles.length === 0) {
-            container.innerHTML = '<div class="empty-state">No ' + (ipfsFilterEnabled ? 'IPFS ' : '') + 'files found</div>';
+            container.innerHTML = '';
+            container.appendChild(EmptyState(`No ${ipfsFilterEnabled ? 'IPFS ' : ''}files found`));
             return;
         }
         
@@ -166,14 +185,17 @@ export function FilesTabContent() {
         
         // Display summary
         const ipfsCount = files.filter(file => file && file.ipfsHash).length;
-        const summary = h('div', { 
-            class: 'file-summary',
-            style: 'margin-bottom: 15px; padding: 8px; background-color: #f5f5f5; border-radius: 4px;'
-        },
-            h('span', {}, `Showing ${filteredFiles.length} of ${files.length} files`),
-            h('span', { 
-                style: 'margin-left: 10px; color: #6e3fff; font-weight: bold;'
-            }, `(${ipfsCount} stored on IPFS)`)
+        const summary = h('div', { class: 'stats stats-horizontal shadow mb-6' },
+            h('div', { class: 'stat' },
+                h('div', { class: 'stat-title' }, 'Total Files'),
+                h('div', { class: 'stat-value text-primary' }, filteredFiles.length),
+                h('div', { class: 'stat-desc' }, `of ${files.length} files`)
+            ),
+            h('div', { class: 'stat' },
+                h('div', { class: 'stat-title' }, 'IPFS Files'),
+                h('div', { class: 'stat-value text-secondary' }, ipfsCount),
+                h('div', { class: 'stat-desc' }, 'stored on IPFS')
+            )
         );
         container.appendChild(summary);
         
@@ -194,7 +216,10 @@ export function FilesTabContent() {
             });
         } catch (error) {
             console.error('Error displaying files:', error);
-            container.innerHTML = `<div class="error">Error displaying files: ${error.message}</div>`;
+            container.innerHTML = '';
+            container.appendChild(h('div', { class: 'alert alert-error' }, 
+                `Error displaying files: ${error.message}`
+            ));
         }
     }
     
@@ -205,35 +230,40 @@ export function FilesTabContent() {
  * Upload Tab Content Component
  */
 export function UploadTabContent() {
-    const tabContent = h('div', { id: 'upload-tab', class: 'tab-content' });
+    const tabContent = h('div', { 
+        id: 'upload-tab', 
+        class: 'tab-content',
+        style: 'display: none;' 
+    });
     
     setEffect(() => {
         const isActive = getActiveTab() === 'upload';
-        tabContent.className = isActive ? 'tab-content active' : 'tab-content';
+        tabContent.style.display = isActive ? 'block' : 'none';
         
-        if (isActive) {
+        if (isActive && tabContent.innerHTML === '') {
             tabContent.innerHTML = '';
             
-            // Card header with IPFS status indicator
+            // Card header with IPFS status
             const ipfsStatus = getIpfsStatus();
-            const ipfsStatusIndicator = h('span', { 
-                class: `ipfs-status-badge ${ipfsStatus.enabled ? 'ipfs-status-enabled' : 'ipfs-status-disabled'}`
-            }, ipfsStatus.enabled ? 'IPFS: Enabled' : 'IPFS: Disabled');
-            
-            const cardHeader = h('div', { class: 'card-header' },
-                h('div', { style: 'display: flex; align-items: center;' },
-                    h('h3', { class: 'card-title' }, 'Upload File'),
-                    ipfsStatusIndicator
-                )
+            const ipfsStatusIndicator = h('div', { 
+                class: `badge ${ipfsStatus.enabled ? 'badge-success' : 'badge-error'} gap-2`
+            }, 
+                h('span', {}, ipfsStatus.enabled ? '✅' : '❌'),
+                h('span', {}, ipfsStatus.enabled ? 'IPFS Enabled' : 'IPFS Disabled')
             );
             
-            // Form container
+            const cardHeader = h('div', { class: 'flex items-center gap-3 mb-6' },
+                h('h3', { class: 'text-2xl font-bold text-base-content' }, '⬆️ Upload File'),
+                ipfsStatusIndicator
+            );
+            
+            // Upload form with enhanced styling
             const uploadForm = createUploadForm();
             
             // Results container
             const resultsContainer = h('div', { 
                 id: 'upload-results', 
-                style: 'margin-top: 20px;'
+                class: 'mt-6'
             });
             
             // Add to tab content
@@ -244,84 +274,102 @@ export function UploadTabContent() {
     });
     
     /**
-     * Create upload form
+     * Create enhanced upload form with DaisyUI
      */
     function createUploadForm() {
-        const form = h('form', { 
-            id: 'file-upload-form',
-            style: 'margin-top: 20px;'
+        const form = h('div', { class: 'space-y-6' });
+        
+        // File upload area with drag & drop styling
+        const fileUploadArea = h('div', { 
+            class: 'border-2 border-dashed border-base-300 rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer bg-base-50',
+            onclick: () => document.getElementById('file-upload').click()
         });
         
-        // File input container with styling
-        const fileInputContainer = h('div', { 
-            style: 'margin-bottom: 20px; border: 2px dashed var(--border-color); border-radius: 10px; padding: 30px; text-align: center;'
-        });
-        
-        // File input
+        // Hidden file input
         const fileInput = h('input', { 
             type: 'file', 
             id: 'file-upload', 
-            style: 'display: none;'
+            class: 'hidden',
+            multiple: false
         });
         
-        // File input label (styled as button)
-        const fileInputLabel = h('label', { 
-            for: 'file-upload', 
-            class: 'upload-btn',
-            style: 'display: inline-block; cursor: pointer; padding: 12px 30px; background: var(--primary-color); color: white; border-radius: 6px; font-weight: 600; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); transition: all 0.3s ease;'
-        }, 'Choose File');
+        // Upload area content
+        const uploadAreaContent = h('div', { class: 'space-y-4' },
+            h('div', { class: 'text-6xl' }, '📁'),
+            h('div', { class: 'space-y-2' },
+                h('p', { class: 'text-lg font-medium' }, 'Click to select file or drag & drop'),
+                h('p', { class: 'text-sm text-base-content/60' }, 'Any file type supported')
+            ),
+            h('button', { 
+                type: 'button',
+                class: 'btn btn-primary btn-lg',
+                onclick: (e) => {
+                    e.stopPropagation();
+                    document.getElementById('file-upload').click();
+                }
+            }, '📂 Choose File')
+        );
         
-        // File status
+        // File status display
         const fileStatus = h('div', { 
             id: 'file-upload-status', 
-            style: 'margin-top: 10px; color: var(--text-secondary);'
-        }, 'No file selected');
-        
-        // Add to file input container
-        fileInputContainer.appendChild(fileInput);
-        fileInputContainer.appendChild(fileInputLabel);
-        fileInputContainer.appendChild(fileStatus);
-        
-        // File name input
-        const fileNameLabel = h('label', { 
-            for: 'file-name',
-            style: 'display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-color);'
-        }, 'Custom file name (optional)');
-        
-        const fileNameInput = h('input', { 
-            type: 'text', 
-            id: 'file-name', 
-            placeholder: 'Enter custom name for the file'
+            class: 'mt-4 text-center hidden'
         });
         
-        // Submit button with styling
+        fileUploadArea.appendChild(uploadAreaContent);
+        fileUploadArea.appendChild(fileStatus);
+        
+        // File name input
+        const fileNameSection = h('div', { class: 'form-control w-full' },
+            h('label', { class: 'label' },
+                h('span', { class: 'label-text font-medium' }, '✏️ Custom file name (optional)')
+            ),
+            h('input', { 
+                type: 'text', 
+                id: 'file-name', 
+                placeholder: 'Enter custom name for the file',
+                class: 'input input-bordered w-full'
+            }),
+            h('label', { class: 'label' },
+                h('span', { class: 'label-text-alt' }, 'Leave empty to use original filename')
+            )
+        );
+        
+        // Submit button
         const submitBtn = h('button', { 
-            type: 'submit',
-            class: 'upload-btn',
-            style: 'margin-top: 20px; width: 100%;'
-        }, 'Upload File');
+            type: 'button',
+            id: 'upload-submit',
+            class: 'btn btn-success btn-lg w-full',
+            onclick: handleUpload
+        }, '🚀 Upload File');
         
         // Add all elements to form
-        form.appendChild(fileInputContainer);
-        form.appendChild(fileNameLabel);
-        form.appendChild(fileNameInput);
+        form.appendChild(fileInput);
+        form.appendChild(fileUploadArea);
+        form.appendChild(fileNameSection);
         form.appendChild(submitBtn);
         
         // Add event listeners
         fileInput.addEventListener('change', () => {
-            const fileName = fileInput.files[0]?.name || 'No file selected';
-            fileStatus.textContent = fileName;
+            const file = fileInput.files[0];
+            if (file) {
+                fileStatus.className = 'mt-4 text-center';
+                fileStatus.innerHTML = `
+                    <div class="alert alert-info">
+                        <span>📄 Selected: <strong>${file.name}</strong></span>
+                        <span class="text-sm">(${formatFileSize(file.size)})</span>
+                    </div>
+                `;
+            } else {
+                fileStatus.className = 'mt-4 text-center hidden';
+            }
         });
-        
-        form.addEventListener('submit', handleUpload);
         
         return form;
     }
     
-    // Handle file upload
-    async function handleUpload(e) {
-        e.preventDefault();
-        
+    // Handle file upload with enhanced feedback
+    async function handleUpload() {
         const fileInput = document.getElementById('file-upload');
         const customName = document.getElementById('file-name').value;
         
@@ -375,40 +423,20 @@ export function UploadTabContent() {
                 // Check if the file was uploaded to IPFS
                 if (data.file && data.file.ipfsHash) {
                     console.log(`File uploaded to IPFS successfully: ${data.file.ipfsHash}`);
-                    showToast('File uploaded to IPFS successfully', 'success');
+                    showToast('✅ File uploaded to IPFS successfully!', 'success');
                 } else {
-                    showToast('File uploaded successfully', 'success');
+                    showToast('✅ File uploaded successfully!', 'success');
                 }
                 
-                // Ensure the file data is complete
-                const completeFileData = {
-                    id: data.file.id || `file-${Date.now()}`,
-                    originalName: data.file.originalName || file.name,
-                    name: data.file.name || data.file.originalName || file.name,
-                    mimeType: data.file.mimeType || data.file.mimetype || file.type,
-                    size: data.file.size || file.size,
-                    fileUrl: data.file.fileUrl || data.file.url || '#',
-                    ipfsHash: data.file.ipfsHash || null,
-                    ipfsUrl: data.file.ipfsUrl || (data.file.ipfsHash ? `${ipfsStatus?.config?.gateway || 'https://ipfs.io/ipfs'}/${data.file.ipfsHash}` : null),
-                    timestamp: data.file.timestamp || Date.now()
-                };
+                // Clear form
+                fileInput.value = '';
+                document.getElementById('file-name').value = '';
+                document.getElementById('file-upload-status').className = 'mt-4 text-center hidden';
                 
-                // Log detailed file info for debugging
-                console.log('Upload result complete file data:', completeFileData);
-                
-                // Store the completed file data both in signal and localStorage for redundancy
-                localStorage.setItem('lastUploadResult', JSON.stringify(completeFileData));
-                
-                // Clear file form after successful upload
-                e.target.reset();
-                
-                // Reload files list with cache busting
+                // Reload files list
                 try {
-                    // First clear the existing files to avoid showing stale data
                     localStorage.setItem('files-data', JSON.stringify([]));
-                    _setFiles([]);
-                    
-                    // Load files with cache busting
+                    setFiles([]);
                     loadFiles();
                 } catch (refreshError) {
                     console.error("Error refreshing files after upload:", refreshError);
@@ -417,7 +445,7 @@ export function UploadTabContent() {
                 throw new Error(data.error || "Unknown error");
             }
         } catch (error) {
-            showToast(`Upload error: ${error.message}`, 'error');
+            showToast(`❌ Upload error: ${error.message}`, 'error');
             console.error("Error uploading file:", error);
         } finally {
             setIsLoading(false);
@@ -431,418 +459,561 @@ export function UploadTabContent() {
  * Settings Tab Content Component
  */
 export function SettingsTabContent() {
-    const tabContent = h('div', { id: 'settings-tab', class: 'tab-content' });
-    
-    // Settings state
-    const [getIpfsSwitch, setIpfsSwitch] = setSignal(false, { key: 'ipfs-switch-state' });
-    const [getIpfsService, setIpfsService] = setSignal('IPFS-CLIENT', { key: 'ipfs-service' });
-    const [getIpfsNodeUrl, setIpfsNodeUrl] = setSignal('http://localhost:5001', { key: 'ipfs-node-url' });
-    const [getIpfsGateway, setIpfsGateway] = setSignal('https://ipfs.io/ipfs', { key: 'ipfs-gateway' });
-    const [getPinataJwt, setPinataJwt] = setSignal('', { key: 'pinata-jwt' });
-    
-    // Track if we've already checked IPFS on this tab activation
-    let ipfsCheckedOnActivation = false;
-    
-    // Using global connection status now
-    
-    // Update settings from global state
-    setEffect(() => {
-        const ipfsStatus = getIpfsStatus();
-        setIpfsSwitch(ipfsStatus.enabled);
-        setIpfsService(ipfsStatus.service || 'IPFS-CLIENT');
-        setIpfsNodeUrl(ipfsStatus.nodeUrl || 'http://localhost:5001');
-        setIpfsGateway(ipfsStatus.gateway || 'https://ipfs.io/ipfs');
+    const tabContent = h('div', { 
+        class: 'space-y-6 p-4',
+        id: 'settings-tab'
     });
-    
-    // Effect to update the tab content based on active state
-    setEffect(() => {
-        const isActive = getActiveTab() === 'settings';
-        tabContent.className = isActive ? 'tab-content active' : 'tab-content';
+
+    // State for configuration display only (read-only)
+    let currentConfig = {};
+
+    // Function to load configuration from server (READ-ONLY)
+    async function loadConfiguration() {
+        try {
+            const response = await fetch('/api/config', {
+                headers: {
+                    'Authorization': `Bearer ${getAuthToken()}`
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                currentConfig = data.config;
+                
+                // Re-render the configuration display
+                renderConfigurationDisplay();
+                
+                showToast('✅ Configuration loaded from file', 'success');
+            } else {
+                showToast('❌ Failed to load configuration', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading configuration:', error);
+            showToast(`❌ Error loading configuration: ${error.message}`, 'error');
+        }
+    }
+
+    // Function to reload configuration from file 
+    async function reloadConfigurationFromFile() {
+        try {
+            const response = await fetch('/api/config/reload', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getAuthToken()}`
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                showToast(`✅ ${data.message}`, 'success');
+                
+                // After reloading from file, refresh the display
+                await loadConfiguration();
+            } else {
+                const error = await response.json();
+                showToast(`❌ Failed to reload configuration: ${error.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error reloading configuration:', error);
+            showToast(`❌ Error reloading configuration: ${error.message}`, 'error');
+        }
+    }
+
+    // Function to render the configuration display (READ-ONLY)
+    function renderConfigurationDisplay() {
+        tabContent.innerHTML = '';
         
-        if (isActive) {
-            tabContent.innerHTML = '';
-            
-            // Card header
-            const cardHeader = h('div', { class: 'card-header' },
-                h('h3', { class: 'card-title' }, 'Settings')
-            );
-            
-            // IPFS Settings Group
-            const ipfsSettingsGroup = h('div', { class: 'settings-group' },
-                h('h4', {}, 'IPFS'),
-                // IPFS Toggle
-                h('div', { class: 'setting-item' },
-                    h('label', { for: 'ipfs-switch' }, 'Enable IPFS storage'),
-                    h('div', { class: 'switch-container' },
-                        h('label', { class: 'switch' },
-                            h('input', { 
-                                type: 'checkbox', 
-                                id: 'ipfs-switch',
-                                checked: getIpfsSwitch(),
-                                onchange: handleIpfsToggle
-                            }),
-                            h('span', { class: 'slider round' })
-                        ),
-                        h('span', { id: 'ipfs-status' }, 
-                            () => getIpfsSwitch() ? 'Active' : 'Disabled'
+        // Card header
+        const cardHeader = h('div', { class: 'flex justify-between items-center mb-6' },
+            h('h3', { class: 'text-2xl font-bold text-base-content flex items-center gap-2' }, 
+                '📋 Server Configuration (Read-Only)'
+            ),
+            h('div', { class: 'flex gap-2' },
+                h('button', {
+                    class: 'btn btn-outline btn-sm',
+                    onclick: reloadConfigurationFromFile,
+                    title: 'Reload configuration from config.json file'
+                }, '🔄 Reload From File'),
+                h('button', {
+                    class: 'btn btn-outline btn-sm',
+                    onclick: loadConfiguration,
+                    title: 'Refresh display from server'
+                }, '↻ Refresh Display')
+            )
+        );
+
+        // Info message
+        const infoMessage = h('div', { class: 'alert alert-info mb-6' },
+            h('svg', { class: 'stroke-current shrink-0 h-6 w-6', fill: 'none', viewBox: '0 0 24 24' },
+                h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' })
+            ),
+            h('div', {},
+                h('h4', { class: 'font-bold' }, 'Configuration Management'),
+                h('div', { class: 'text-sm' }, 'This dashboard shows the current configuration loaded from config.json. To modify settings, edit the config.json file and click "Reload From File".')
+            )
+        );
+
+        // Core Server Settings
+        const coreSettingsCard = h('div', { class: 'card bg-base-200 shadow-lg mb-6' },
+            h('div', { class: 'card-body' },
+                h('h4', { class: 'card-title text-lg mb-4' }, '🖥️ Core Server Settings'),
+                h('div', { class: 'grid grid-cols-1 md:grid-cols-2 gap-4' },
+                    // Environment
+                    h('div', { class: 'form-control' },
+                        h('label', { class: 'label' }, h('span', { class: 'label-text font-medium' }, 'Environment')),
+                        h('div', { class: 'input input-bordered flex items-center' }, currentConfig.NODE_ENV || 'development')
+                    ),
+                    // Port
+                    h('div', { class: 'form-control' },
+                        h('label', { class: 'label' }, h('span', { class: 'label-text font-medium' }, 'Port')),
+                        h('div', { class: 'input input-bordered flex items-center' }, currentConfig.PORT || 8765)
+                    ),
+                    // HTTPS Port
+                    h('div', { class: 'form-control' },
+                        h('label', { class: 'label' }, h('span', { class: 'label-text font-medium' }, 'HTTPS Port')),
+                        h('div', { class: 'input input-bordered flex items-center' }, currentConfig.HTTPS_PORT || 8443)
+                    ),
+                    // Allowed Origins
+                    h('div', { class: 'form-control' },
+                        h('label', { class: 'label' }, h('span', { class: 'label-text font-medium' }, 'Allowed Origins')),
+                        h('div', { class: 'input input-bordered flex items-center' }, currentConfig.ALLOWED_ORIGINS || 'Not set')
+                    )
+                )
+            )
+        );
+
+        // Security Settings
+        const securitySettingsCard = h('div', { class: 'card bg-base-200 shadow-lg mb-6' },
+            h('div', { class: 'card-body' },
+                h('h4', { class: 'card-title text-lg mb-4' }, '🔒 Security Settings'),
+                h('div', { class: 'grid grid-cols-1 md:grid-cols-2 gap-4' },
+                    // Disable CORS
+                    h('div', { class: 'form-control' },
+                        h('label', { class: 'label' }, h('span', { class: 'label-text font-medium' }, 'CORS Disabled')),
+                        h('div', { class: `badge ${currentConfig.DISABLE_CORS ? 'badge-warning' : 'badge-success'}` }, 
+                            currentConfig.DISABLE_CORS ? 'Yes' : 'No'
+                        )
+                    ),
+                    // Disable Gun Auth
+                    h('div', { class: 'form-control' },
+                        h('label', { class: 'label' }, h('span', { class: 'label-text font-medium' }, 'Gun Auth Disabled')),
+                        h('div', { class: `badge ${currentConfig.DISABLE_GUN_AUTH ? 'badge-warning' : 'badge-success'}` }, 
+                            currentConfig.DISABLE_GUN_AUTH ? 'Yes' : 'No'
+                        )
+                    ),
+                    // Onchain Membership
+                    h('div', { class: 'form-control' },
+                        h('label', { class: 'label' }, h('span', { class: 'label-text font-medium' }, 'Onchain Membership')),
+                        h('div', { class: `badge ${currentConfig.ONCHAIN_MEMBERSHIP_ENABLED ? 'badge-success' : 'badge-neutral'}` }, 
+                            currentConfig.ONCHAIN_MEMBERSHIP_ENABLED ? 'Enabled' : 'Disabled'
+                        )
+                    ),
+                    // Type Validation
+                    h('div', { class: 'form-control' },
+                        h('label', { class: 'label' }, h('span', { class: 'label-text font-medium' }, 'Type Validation')),
+                        h('div', { class: `badge ${currentConfig.TYPE_VALIDATION_ENABLED ? 'badge-success' : 'badge-neutral'}` }, 
+                            currentConfig.TYPE_VALIDATION_ENABLED ? 'Enabled' : 'Disabled'
+                        )
+                    ),
+                    // Strict Validation
+                    h('div', { class: 'form-control' },
+                        h('label', { class: 'label' }, h('span', { class: 'label-text font-medium' }, 'Strict Validation')),
+                        h('div', { class: `badge ${currentConfig.TYPE_VALIDATION_STRICT ? 'badge-warning' : 'badge-neutral'}` }, 
+                            currentConfig.TYPE_VALIDATION_STRICT ? 'Strict' : 'Normal'
                         )
                     )
+                )
+            )
+        );
+
+        // IPFS Settings
+        const ipfsSettingsCard = h('div', { class: 'card bg-base-200 shadow-lg mb-6' },
+            h('div', { class: 'card-body' },
+                h('h4', { class: 'card-title text-lg mb-4' }, '📁 IPFS Settings'),
+                h('div', { class: 'grid grid-cols-1 md:grid-cols-2 gap-4' },
+                    // IPFS Enabled
+                    h('div', { class: 'form-control' },
+                        h('label', { class: 'label' }, h('span', { class: 'label-text font-medium' }, 'IPFS Status')),
+                        h('div', { class: `badge ${currentConfig.IPFS_ENABLED ? 'badge-success' : 'badge-neutral'}` }, 
+                            currentConfig.IPFS_ENABLED ? 'Enabled' : 'Disabled'
+                        )
+                    ),
+                    // IPFS Service
+                    h('div', { class: 'form-control' },
+                        h('label', { class: 'label' }, h('span', { class: 'label-text font-medium' }, 'IPFS Service')),
+                        h('div', { class: 'input input-bordered flex items-center' }, currentConfig.IPFS_SERVICE || 'IPFS-CLIENT')
+                    ),
+                    // Node URL
+                    h('div', { class: 'form-control' },
+                        h('label', { class: 'label' }, h('span', { class: 'label-text font-medium' }, 'Node URL')),
+                        h('div', { class: 'input input-bordered flex items-center text-sm' }, currentConfig.IPFS_NODE_URL || 'Not set')
+                    ),
+                    // Gateway
+                    h('div', { class: 'form-control' },
+                        h('label', { class: 'label' }, h('span', { class: 'label-text font-medium' }, 'Gateway')),
+                        h('div', { class: 'input input-bordered flex items-center text-sm' }, currentConfig.IPFS_GATEWAY || 'Not set')
+                    )
+                )
+            )
+        );
+
+        // S3 Settings
+        const s3SettingsCard = h('div', { class: 'card bg-base-200 shadow-lg mb-6' },
+            h('div', { class: 'card-body' },
+                h('h4', { class: 'card-title text-lg mb-4' }, '☁️ S3 Storage Settings'),
+                h('div', { class: 'grid grid-cols-1 md:grid-cols-2 gap-4' },
+                    // S3 Bucket
+                    h('div', { class: 'form-control' },
+                        h('label', { class: 'label' }, h('span', { class: 'label-text font-medium' }, 'S3 Bucket')),
+                        h('div', { class: 'input input-bordered flex items-center' }, currentConfig.S3_BUCKET || 'Not configured')
+                    ),
+                    // S3 Region
+                    h('div', { class: 'form-control' },
+                        h('label', { class: 'label' }, h('span', { class: 'label-text font-medium' }, 'S3 Region')),
+                        h('div', { class: 'input input-bordered flex items-center' }, currentConfig.S3_REGION || 'us-east-1')
+                    ),
+                    // S3 Endpoint
+                    h('div', { class: 'form-control' },
+                        h('label', { class: 'label' }, h('span', { class: 'label-text font-medium' }, 'S3 Endpoint')),
+                        h('div', { class: 'input input-bordered flex items-center text-sm' }, currentConfig.S3_ENDPOINT || 'Not set')
+                    ),
+                    // S3 Port
+                    h('div', { class: 'form-control' },
+                        h('label', { class: 'label' }, h('span', { class: 'label-text font-medium' }, 'S3 Port')),
+                        h('div', { class: 'input input-bordered flex items-center' }, currentConfig.S3_PORT || 4569)
+                    )
+                )
+            )
+        );
+
+        // Peers Configuration
+        const peersCard = h('div', { class: 'card bg-base-200 shadow-lg mb-6' },
+            h('div', { class: 'card-body' },
+                h('h4', { class: 'card-title text-lg mb-4' }, '🌐 Configured Peers'),
+                h('div', { class: 'space-y-2' },
+                    ...(currentConfig.PEERS && currentConfig.PEERS.length > 0 ? 
+                        currentConfig.PEERS.map(peer => 
+                            h('div', { class: 'alert alert-info text-sm' },
+                                h('span', { class: 'font-mono' }, peer)
+                            )
+                        ) : 
+                        [h('div', { class: 'alert alert-warning' }, 'No peers configured')]
+                    )
+                )
+            )
+        );
+
+        // Raw Configuration (collapsible)
+        const rawConfigCard = h('div', { class: 'card bg-base-200 shadow-lg' },
+            h('div', { class: 'card-body' },
+                h('div', { class: 'collapse collapse-arrow' },
+                    h('input', { type: 'checkbox' }),
+                    h('div', { class: 'collapse-title text-lg font-medium' }, '🔍 Raw Configuration (JSON)'),
+                    h('div', { class: 'collapse-content' },
+                        h('pre', { class: 'bg-base-300 p-4 rounded-lg text-sm overflow-auto max-h-96' },
+                            JSON.stringify(currentConfig, null, 2)
+                        )
+                    )
+                )
+            )
+        );
+
+        // Add all components to tab content
+        tabContent.appendChild(cardHeader);
+        tabContent.appendChild(infoMessage);
+        tabContent.appendChild(coreSettingsCard);
+        tabContent.appendChild(securitySettingsCard);
+        tabContent.appendChild(ipfsSettingsCard);
+        tabContent.appendChild(s3SettingsCard);
+        tabContent.appendChild(peersCard);
+        tabContent.appendChild(rawConfigCard);
+    }
+    
+    setEffect(() => {
+        const isActive = getActiveTab() === 'settings';
+        tabContent.style.display = isActive ? 'block' : 'none';
+        
+        if (isActive && Object.keys(currentConfig).length === 0) {
+            // Load configuration when tab becomes active for the first time
+            loadConfiguration();
+        }
+    });
+    
+    return tabContent;
+}
+
+/**
+ * Network Tab Content Component
+ */
+export function NetworkTabContent() {
+    const tabContent = h('div', { 
+        id: 'network-tab', 
+        class: 'tab-content',
+        style: 'display: none;' 
+    });
+    
+    setEffect(() => {
+        const isActive = getActiveTab() === 'network';
+        tabContent.style.display = isActive ? 'block' : 'none';
+        
+        if (isActive && !networkTabActive) {
+            networkTabActive = true;
+            
+            // Clear any existing timeout
+            if (networkUpdateTimeout) {
+                clearTimeout(networkUpdateTimeout);
+                networkUpdateTimeout = null;
+            }
+            
+            tabContent.innerHTML = '';
+            
+            // Card header with network status
+            const networkStatus = getNetworkStatus();
+            const networkStatusBadge = h('div', { 
+                class: `badge ${networkStatus.peerCount > 1 ? 'badge-success' : 'badge-warning'} gap-2`
+            }, 
+                h('span', {}, networkStatus.peerCount > 1 ? '🟢' : '🟡'),
+                h('span', {}, `${networkStatus.peerCount} Peers`)
+            );
+            
+            const cardHeader = h('div', { class: 'flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6' },
+                h('div', { class: 'flex items-center gap-3' },
+                    h('h3', { class: 'text-2xl font-bold text-base-content' }, '🌐 Network & Peer Management'),
+                    networkStatusBadge
                 ),
-                
-                // IPFS Connection Status
-                h('div', { id: 'ipfs-connection-status', class: 'connection-status' },
-                    h('span', { class: 'status-label' }, 'Connection status:'),
-                    h('span', { 
-                        id: 'ipfs-status-indicator', 
-                        class: () => `status-${getIpfsConnectionStatus().status}`
-                    }, () => getIpfsConnectionStatus().message),
-                    h('button', { 
-                        id: 'ipfs-check-connection', 
-                        class: 'btn-small',
-                        onclick: async () => {
-                            const status = await checkIpfsConnection();
-                            setIpfsConnectionStatus(status);
+                h('button', { 
+                    id: 'refresh-network',
+                    class: 'btn btn-primary btn-sm',
+                    onclick: () => {
+                        // Debounce the refresh to avoid multiple calls
+                        if (networkUpdateTimeout) {
+                            clearTimeout(networkUpdateTimeout);
                         }
-                    }, 'Check'),
-                    h('button', { 
-                        id: 'ipfs-reconnect', 
-                        class: 'btn-small btn-warning',
-                        style: () => getIpfsConnectionStatus().status === 'error' ? '' : 'display:none;',
-                        onclick: reconnectIpfs
-                    }, 'Reconnect')
-                ),
-                
-                // IPFS Service dropdown
-                h('div', { class: 'form-group' },
-                    h('label', { for: 'ipfs-service' }, 'IPFS Service'),
-                    h('select', { 
-                        id: 'ipfs-service', 
-                        class: 'form-control',
-                        value: getIpfsService(),
-                        onchange: (e) => {
-                            setIpfsService(e.target.value);
-                            // Toggle conditional config forms
-                            document.getElementById('ipfs-client-config').style.display = 
-                                e.target.value === 'IPFS-CLIENT' ? 'block' : 'none';
-                            document.getElementById('pinata-config').style.display = 
-                                e.target.value === 'PINATA' ? 'block' : 'none';
-                        }
-                    },
-                        h('option', { value: 'IPFS-CLIENT' }, 'IPFS Client (Local)'),
-                        h('option', { value: 'PINATA' }, 'Pinata Cloud')
+                        
+                        networkUpdateTimeout = setTimeout(() => {
+                            updatePeerStatus();
+                            showToast('🔄 Refreshing network status...', 'info');
+                            networkUpdateTimeout = null;
+                        }, 500);
+                    }
+                }, '🔄 Refresh Network')
+            );
+            
+            // Network statistics (static content to avoid reactive loops)
+            const networkStatsCard = h('div', { class: 'card bg-base-200 shadow-lg mb-6' },
+                h('div', { class: 'card-body' },
+                    h('h4', { class: 'card-title mb-4' }, '📊 Network Statistics'),
+                    h('div', { class: 'stats stats-horizontal w-full' },
+                        h('div', { class: 'stat' },
+                            h('div', { class: 'stat-figure text-primary' },
+                                h('div', { class: 'text-2xl' }, '🌐')
+                            ),
+                            h('div', { class: 'stat-title' }, 'Total Peers'),
+                            h('div', { 
+                                class: 'stat-value text-primary',
+                                id: 'total-peers-count'
+                            }, getPeers().length.toString()),
+                            h('div', { class: 'stat-desc' }, 'Configured peers')
+                        ),
+                        h('div', { class: 'stat' },
+                            h('div', { class: 'stat-figure text-success' },
+                                h('div', { class: 'text-2xl' }, '✅')
+                            ),
+                            h('div', { class: 'stat-title' }, 'Connected'),
+                            h('div', { 
+                                class: 'stat-value text-success',
+                                id: 'connected-peers-count'
+                            }, (() => {
+                                const connections = getPeerConnections();
+                                const connected = Object.values(connections).filter(conn => conn.connected);
+                                return connected.length.toString();
+                            })()),
+                            h('div', { class: 'stat-desc' }, 'Active connections')
+                        ),
+                        h('div', { class: 'stat' },
+                            h('div', { class: 'stat-figure text-info' },
+                                h('div', { class: 'text-2xl' }, '📡')
+                            ),
+                            h('div', { class: 'stat-title' }, 'Status'),
+                            h('div', { 
+                                class: 'stat-value text-info text-sm',
+                                id: 'network-status-text'
+                            }, networkStatus.status),
+                            h('div', { class: 'stat-desc' }, 'Network state')
+                        )
                     )
                 )
             );
             
-            // IPFS Client Config Form
-            const ipfsClientConfig = h('div', { 
-                id: 'ipfs-client-config', 
-                class: 'conditional-config',
-                style: () => getIpfsService() === 'IPFS-CLIENT' ? '' : 'display: none;'
-            },
-                h('div', { class: 'form-group' },
-                    h('label', { for: 'ipfs-node-url' }, 'IPFS Node URL'),
-                    h('input', { 
-                        type: 'text', 
-                        id: 'ipfs-node-url', 
-                        class: 'form-control',
-                        placeholder: 'http://localhost:5001',
-                        value: getIpfsNodeUrl(),
-                        oninput: (e) => setIpfsNodeUrl(e.target.value)
-                    })
+            // Add peer form
+            const addPeerCard = createAddPeerForm();
+            
+            // Peer list container
+            const peerListCard = h('div', { class: 'card bg-base-200 shadow-lg' },
+                h('div', { class: 'card-body' },
+                    h('h4', { class: 'card-title mb-4' }, '🔗 Connected Peers'),
+                    h('div', { class: 'space-y-4', id: 'peer-list' })
                 )
             );
             
-            // Pinata Config Form
-            const pinataConfig = h('div', { 
-                id: 'pinata-config', 
-                class: 'conditional-config',
-                style: () => getIpfsService() === 'PINATA' ? '' : 'display: none;'
-            },
-                h('div', { class: 'form-group' },
-                    h('label', { for: 'pinata-jwt' }, 'Pinata JWT'),
-                    h('input', { 
-                        type: 'text', 
-                        id: 'pinata-jwt', 
-                        class: 'form-control',
-                        placeholder: 'JWT Token',
-                        value: getPinataJwt(),
-                        oninput: (e) => setPinataJwt(e.target.value)
-                    })
-                )
-            );
-            
-            // Gateway Config
-            const gatewayConfig = h('div', { class: 'form-group' },
-                h('label', { for: 'ipfs-gateway' }, 'IPFS Gateway'),
-                h('input', { 
-                    type: 'text', 
-                    id: 'ipfs-gateway', 
-                    class: 'form-control',
-                    placeholder: 'https://ipfs.io/ipfs',
-                    value: getIpfsGateway(),
-                    oninput: (e) => setIpfsGateway(e.target.value)
-                })
-            );
-            
-            // Save button
-            const saveButton = h('button', { 
-                id: 'save-ipfs-config', 
-                class: 'btn primary',
-                onclick: saveIpfsConfig
-            }, 'Save Configuration');
-            
-            // Config status message
-            const configStatus = h('div', { id: 'ipfs-config-status', class: 'status' });
-            
-            // Authentication section
-            const authSection = h('div', {},
-                h('h4', { style: 'margin-top: 20px' }, 'Authentication'),
-                h('div', { class: 'setting-item' },
-                    h('label', { for: 'auth-token' }, 'Authentication Token'),
-                    h('div', { style: 'display: flex; gap: 10px' },
-                        h('input', {
-                            type: 'password',
-                            id: 'auth-token',
-                            class: 'form-control',
-                            placeholder: 'Enter authentication token'
-                        }),
-                        h('button', {
-                            id: 'save-token',
-                            class: 'btn primary',
-                            onclick: () => {
-                                const token = document.getElementById('auth-token').value;
-                                if (token) {
-                                    localStorage.setItem('authToken', token);
-                                    showToast('Authentication token saved', 'success');
-                                    
-                                    // Show status message
-                                    document.getElementById('auth-status').innerHTML = 
-                                        '<div class="success">Token saved successfully</div>';
-                                    
-                                    // Clear input
-                                    document.getElementById('auth-token').value = '';
-                                } else {
-                                    showToast('Please enter a token', 'warning');
-                                }
-                            }
-                        }, 'Save')
-                    ),
-                    h('div', { id: 'auth-status', class: 'status' })
-                )
-            );
-            
-            // Add config forms to IPFS settings group
-            ipfsSettingsGroup.appendChild(ipfsClientConfig);
-            ipfsSettingsGroup.appendChild(pinataConfig);
-            ipfsSettingsGroup.appendChild(gatewayConfig);
-            ipfsSettingsGroup.appendChild(saveButton);
-            ipfsSettingsGroup.appendChild(configStatus);
-            ipfsSettingsGroup.appendChild(authSection);
-            
-            // Add all elements to the tab content
+            // Add these elements to tab content
             tabContent.appendChild(cardHeader);
-            tabContent.appendChild(ipfsSettingsGroup);
+            tabContent.appendChild(networkStatsCard);
+            tabContent.appendChild(addPeerCard);
+            tabContent.appendChild(peerListCard);
             
-            // Check IPFS status on tab activation, but only once
-            if (getIpfsSwitch() && !ipfsCheckedOnActivation) {
-                // Set the flag to prevent multiple checks
-                ipfsCheckedOnActivation = true;
-                
-                // Use a timeout to avoid too many simultaneous checks
-                setTimeout(() => {
-                    checkIpfsConnection().catch(err => {
-                        console.error("Error checking IPFS connection on tab activation:", err);
-                    });
-                }, 1000);
+            // Initialize peer list ONCE when tab becomes active
+            updatePeerListOnce();
+            
+            // Update peer status ONCE with debouncing
+            if (networkUpdateTimeout) {
+                clearTimeout(networkUpdateTimeout);
+            }
+            
+            networkUpdateTimeout = setTimeout(() => {
+                updatePeerStatus().then(() => {
+                    updatePeerListOnce();
+                    networkUpdateTimeout = null;
+                });
+            }, 1000);
+        }
+        
+        // Reset flag when tab becomes inactive
+        if (!isActive && networkTabActive) {
+            networkTabActive = false;
+            
+            // Clear any pending timeouts
+            if (networkUpdateTimeout) {
+                clearTimeout(networkUpdateTimeout);
+                networkUpdateTimeout = null;
             }
         }
     });
     
-    // Handle IPFS toggle
-    async function handleIpfsToggle() {
-        try {
-            // Get current state
-            const currentState = getIpfsSwitch();
-            const newState = !currentState;
-            
-            // Show a loading indicator in the UI
-            showToast(`${newState ? 'Enabling' : 'Disabling'} IPFS...`, 'info');
-            
-            // Optimistically update the UI
-            setIpfsSwitch(newState);
-            
-            const response = await fetch('/api/ipfs/toggle', {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${getAuthToken()}`
-                }
-            });
-            
-            if (!response.ok) {
-                throw new Error(`Server error: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                // Update UI with new state
-                await updateIpfsStatus();
+    /**
+     * Create add peer form with DaisyUI styling
+     */
+    function createAddPeerForm() {
+        const card = h('div', { class: 'card bg-base-200 shadow-lg mb-6' },
+            h('div', { class: 'card-body' },
+                h('h4', { class: 'card-title mb-4' }, '➕ Add New Peer'),
                 
-                // If enabling, check connection
-                if (newState) {
-                    showToast('IPFS enabled. Checking connection...', 'info');
-                    
-                    // Give the server a moment to initialize
-                    setTimeout(() => {
-                        checkIpfsConnection();
-                    }, 500);
-                } else {
-                    showToast('IPFS disabled successfully', 'success');
-                }
-            } else {
-                // Reset switch to previous state
-                setIpfsSwitch(currentState);
+                // URL input
+                h('div', { class: 'form-control mb-4' },
+                    h('label', { class: 'label' },
+                        h('span', { class: 'label-text' }, 'Peer URL')
+                    ),
+                    h('div', { class: 'join w-full' },
+                        h('input', { 
+                            type: 'text', 
+                            id: 'peer-url-input', 
+                            placeholder: 'Enter peer URL (e.g., http://localhost:8765/gun)',
+                            class: 'input input-bordered join-item flex-1'
+                        }),
+                        h('button', { 
+                            type: 'button',
+                            class: 'btn btn-outline join-item',
+                            onclick: async () => {
+                                const url = document.getElementById('peer-url-input').value.trim();
+                                if (!url) {
+                                    showToast('Please enter a peer URL', 'warning');
+                                    return;
+                                }
+                                await testPeerConnection(url);
+                            }
+                        }, '🔍 Test'),
+                        h('button', { 
+                            type: 'button',
+                            class: 'btn btn-primary join-item',
+                            onclick: async () => {
+                                const url = document.getElementById('peer-url-input').value.trim();
+                                if (!url) {
+                                    showToast('Please enter a peer URL', 'warning');
+                                    return;
+                                }
+                                
+                                const success = await addPeer(url);
+                                if (success) {
+                                    document.getElementById('peer-url-input').value = '';
+                                    updatePeerListOnce();
+                                }
+                            }
+                        }, '➕ Add Peer')
+                    ),
+                    h('label', { class: 'label' },
+                        h('span', { class: 'label-text-alt' }, 'Enter the full URL of a Gun peer (e.g., http://peer.example.com:8765/gun)')
+                    )
+                ),
                 
-                const errorMsg = data.error || 'Unknown error';
-                showToast(`Failed to ${newState ? 'enable' : 'disable'} IPFS: ${errorMsg}`, 'error');
-                console.error(`IPFS toggle error:`, data);
-            }
-        } catch (error) {
-            // Reset switch to previous state
-            setIpfsSwitch(!getIpfsSwitch());
-            
-            showToast(`IPFS toggle error: ${error.message}`, 'error');
-            console.error('IPFS toggle error:', error);
-        }
-    }
-    
-    // Reconnect IPFS
-    async function reconnectIpfs() {
-        try {
-            // Show reconnecting status
-            setIpfsConnectionStatus({
-                status: 'checking',
-                message: 'Reconnecting...'
-            });
-            
-            // Make API call to reinitialize connection
-            const response = await fetch('/api/ipfs/reinitialize', {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${getAuthToken()}`
-                }
-            });
-            
-            const data = await response.json();
-            
-            // Update status based on API response
-            if (data.success) {
-                setIpfsConnectionStatus({
-                    status: 'connected',
-                    message: 'Connected'
-                });
-                showToast('IPFS connection restored successfully', 'success');
-                
-                // Refresh configuration UI
-                updateIpfsStatus();
-            } else {
-                setIpfsConnectionStatus({
-                    status: 'error',
-                    message: 'Reconnection error'
-                });
-                showToast(`Unable to restore connection: ${data.message}`, 'error');
-            }
-        } catch (error) {
-            setIpfsConnectionStatus({
-                status: 'error',
-                message: 'Network error'
-            });
-            showToast(`Network error: ${error.message}`, 'error');
-        }
-    }
-    
-    // Save IPFS configuration
-    async function saveIpfsConfig() {
-        const configStatus = document.getElementById('ipfs-config-status');
-        configStatus.innerHTML = '<div class="info">Saving configuration...</div>';
+                // Preset peer buttons
+                h('div', { class: 'space-y-2' },
+                    h('div', { class: 'text-sm font-medium text-base-content/70' }, 'Quick add presets:'),
+                    h('div', { class: 'flex flex-wrap gap-2' },
+                        ['http://localhost:8765/gun', 'http://localhost:3000/gun', 'ws://localhost:8765/gun'].map(peerUrl => 
+                            h('button', {
+                                type: 'button',
+                                class: 'btn btn-outline btn-sm',
+                                onclick: () => {
+                                    document.getElementById('peer-url-input').value = peerUrl;
+                                }
+                            }, peerUrl.replace('http://', '').replace('ws://', '').split('/')[0])
+                        )
+                    )
+                )
+            )
+        );
         
-        try {
-            // Get the current IPFS status first
-            const currentStatus = getIpfsStatus();
-            
-            // Prepare the new configuration
-            const config = {
-                service: getIpfsService(),
-                nodeUrl: getIpfsNodeUrl(),
-                gateway: getIpfsGateway(),
-                // Preserve current enabled status to avoid toggling it
-                enabled: currentStatus.enabled
-            };
-            
-            // Add Pinata JWT conditionally
-            if (getIpfsService() === 'PINATA') {
-                const pinataJwt = getPinataJwt();
-                if (pinataJwt && pinataJwt.length > 0) {
-                    config.pinataJwt = pinataJwt;
-                } else if (!currentStatus.pinataJwt) {
-                    configStatus.innerHTML = '<div class="error">Pinata JWT is required for Pinata service</div>';
-                    showToast('Pinata JWT is required for Pinata service', 'error');
-                    return;
-                }
-            }
-            
-            console.log('Sending IPFS config update:', JSON.stringify(config, null, 2));
-            
-            // First save the configuration
-            const response = await fetch('/api/ipfs/config', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${getAuthToken()}`
-                },
-                body: JSON.stringify(config)
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                configStatus.innerHTML = '<div class="success">Configuration saved successfully</div>';
-                
-                // Update IPFS status with the new configuration
-                await updateIpfsStatus();
-                
-                // Check connection if IPFS is enabled
-                if (currentStatus.enabled) {
-                    // Show connection checking message
-                    configStatus.innerHTML = '<div class="info">Testing IPFS connection...</div>';
-                    
-                    // Test connection
-                    const healthResponse = await fetch('/api/ipfs/health-check', {
-                        headers: {
-                            Authorization: `Bearer ${getAuthToken()}`
-                        }
-                    });
-                    
-                    const healthData = await healthResponse.json();
-                    
-                    if (healthData.success) {
-                        configStatus.innerHTML = '<div class="success">Configuration saved and connection verified</div>';
-                    } else {
-                        configStatus.innerHTML = '<div class="warning">Configuration saved but connection test failed</div>';
-                        showToast('IPFS configuration saved but connection test failed. Check your settings.', 'warning');
-                    }
-                } else {
-                    showToast('IPFS configuration updated successfully', 'success');
-                }
-            } else {
-                configStatus.innerHTML = `<div class="error">Error: ${data.error}</div>`;
-                showToast(`Error: ${data.error}`, 'error');
-            }
-        } catch (error) {
-            configStatus.innerHTML = `<div class="error">Error: ${error.message}</div>`;
-            showToast(`Error: ${error.message}`, 'error');
+        return card;
+    }
+    
+    // Function to update peer list ONCE when tab becomes active
+    function updatePeerListOnce() {
+        const container = document.getElementById('peer-list');
+        if (!container) return;
+        
+        const peers = getPeers();
+        const peerConnections = getPeerConnections();
+        const isLoading = getIsLoading();
+        
+        // Show loading state
+        if (isLoading) {
+            container.innerHTML = '';
+            container.appendChild(LoadingState('Loading peers...'));
+            return;
         }
+        
+        // Clear container
+        container.innerHTML = '';
+        
+        if (!peers || peers.length === 0) {
+            container.appendChild(EmptyState('No peers configured. Add a peer above to get started.'));
+            return;
+        }
+        
+        // Combine peer data with connection info
+        const enrichedPeers = peers.map(peerUrl => {
+            const connectionInfo = peerConnections[peerUrl] || {};
+            return {
+                url: peerUrl,
+                connected: connectionInfo.connected || false,
+                status: connectionInfo.status || 'unknown',
+                latency: connectionInfo.latency || null,
+                lastSeen: connectionInfo.lastSeen || null
+            };
+        });
+        
+        // Sort by connection status (connected first)
+        enrichedPeers.sort((a, b) => {
+            if (a.connected && !b.connected) return -1;
+            if (!a.connected && b.connected) return 1;
+            return 0;
+        });
+        
+        // Add each peer
+        enrichedPeers.forEach(peer => {
+            const peerEl = PeerItem(peer);
+            container.appendChild(peerEl);
+        });
     }
     
     return tabContent;

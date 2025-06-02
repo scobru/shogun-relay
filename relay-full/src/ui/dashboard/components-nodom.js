@@ -14,15 +14,23 @@ import {
     deleteFile,
     loadFiles,
     toggleTheme,
-    getTheme
+    getTheme,
+    getFiles,
+    getIpfsStatus,
+    getIpfsConnectionStatus,
+    testPeerConnection,
+    reconnectToPeer,
+    removePeer
 } from './app-nodom.js';
 
 /**
  * Header Component
  */
 export function Header() {
-    return h('header', {}, 
-        h('h1', {}, 'Shogun Relay Dashboard')
+    return h('header', { class: 'navbar bg-primary text-primary-content shadow-lg' }, 
+        h('div', { class: 'navbar-start' },
+            h('h1', { class: 'text-xl font-bold' }, '🛡️ Shogun Relay Dashboard')
+        )
     );
 }
 
@@ -30,57 +38,92 @@ export function Header() {
  * Navbar Component
  */
 export function Navbar() {
-    return h('div', { class: 'navbar' },
-        h('div', { class: 'nav-links' },
-            h('a', { href: '#', class: 'active' }, 'Dashboard'),
-            h('a', { href: '#', id: 'debug-command-btn', style: 'color: #ff3366;' }, 'Debug')
+    return h('div', { class: 'navbar bg-base-200 shadow-md' },
+        h('div', { class: 'navbar-start' },
+            h('div', { class: 'flex gap-2' },
+                h('button', { class: 'btn btn-ghost btn-sm' }, 'Dashboard'),
+                h('button', { 
+                    id: 'debug-command-btn', 
+                    class: 'btn btn-ghost btn-sm text-error'
+                }, '🐛 Debug')
+            )
         ),
-        h('div', { class: 'nav-actions' },
+        h('div', { class: 'navbar-end gap-2' },
             h('button', { 
                 id: 'theme-toggle-btn', 
-                class: 'theme-toggle-btn',
-                onclick: toggleTheme
+                class: 'btn btn-circle btn-ghost',
+                onclick: toggleTheme,
+                title: 'Toggle theme'
             }, () => getTheme() === 'dark' ? '☀️' : '🌙'),
             h('button', { 
                 id: 'logout-btn', 
-                class: 'logout-btn',
+                class: 'btn btn-error btn-sm',
                 onclick: handleLogout
-            }, 'Logout')
+            }, '🚪 Logout')
         )
     );
 }
 
 /**
- * Toast Container Component
+ * Toast Container Component - Enhanced with DaisyUI
  */
 export function ToastContainer() {
-    const toastContainer = h('div', { id: 'toast-container', class: 'toast-container' });
+    const toastContainer = h('div', { 
+        id: 'toast-container', 
+        class: 'toast toast-top toast-end z-50'
+    });
     
     setEffect(() => {
-        // Get current toasts
         const toasts = getToasts();
-        
-        // Clear existing content
         toastContainer.innerHTML = '';
         
-        // Add toasts
-        toasts.forEach(toast => {
-            const toastEl = document.createElement('div');
-            toastEl.className = `toast toast-${toast.type}`;
+        // Se ci sono più di 3 toast, aggiungi un pulsante per cancellare tutto
+        if (toasts.length > 3) {
+            const clearAllButton = h('div', { 
+                class: 'alert alert-warning shadow-lg mb-2' 
+            },
+                h('div', { class: 'flex items-center justify-between w-full' },
+                    h('span', { class: 'text-sm' }, `${toasts.length} notifications`),
+                    h('button', { 
+                        class: 'btn btn-error btn-xs',
+                        onclick: () => {
+                            localStorage.removeItem('app-toasts');
+                            setToasts([]);
+                        }
+                    }, '🗑️ Clear All')
+                )
+            );
+            toastContainer.appendChild(clearAllButton);
+        }
+        
+        toasts.forEach((toast, index) => {
+            const alertClass = {
+                'success': 'alert-success',
+                'error': 'alert-error', 
+                'warning': 'alert-warning',
+                'info': 'alert-info'
+            }[toast.type] || 'alert-info';
             
-            const content = document.createElement('div');
-            content.textContent = toast.message;
+            const toastEl = h('div', { 
+                class: `alert ${alertClass} shadow-lg mb-2`,
+                style: `animation: slideInRight 0.3s ease-out ${index * 0.1}s both;`
+            },
+                h('div', { class: 'flex items-center justify-between w-full' },
+                    h('span', { class: 'flex-1 text-sm' }, toast.message),
+                    h('button', { 
+                        class: 'btn btn-circle btn-ghost btn-xs ml-2',
+                        onclick: (e) => {
+                            e.stopPropagation();
+                            // Animazione di uscita
+                            toastEl.style.animation = 'slideOutRight 0.3s ease-out forwards';
+                            setTimeout(() => {
+                                setToasts(prev => prev.filter(t => t.id !== toast.id));
+                            }, 300);
+                        }
+                    }, '✕')
+                )
+            );
             
-            const closeBtn = document.createElement('button');
-            closeBtn.className = 'toast-close';
-            closeBtn.innerHTML = '✕';
-            closeBtn.addEventListener('click', () => {
-                // Remove this toast
-                setToasts(prev => prev.filter(t => t.id !== toast.id));
-            });
-            
-            toastEl.appendChild(content);
-            toastEl.appendChild(closeBtn);
             toastContainer.appendChild(toastEl);
         });
     });
@@ -92,15 +135,21 @@ export function ToastContainer() {
  * Loading Overlay Component
  */
 export function LoadingOverlay() {
-    const overlay = h('div', { id: 'loading-overlay', class: 'loading-overlay' },
-        h('div', { class: 'loading-spinner' })
+    const overlay = h('div', { 
+        id: 'loading-overlay', 
+        class: 'fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center'
+    },
+        h('div', { class: 'bg-base-100 rounded-lg p-8 shadow-xl flex items-center gap-4' },
+            h('span', { class: 'loading loading-spinner loading-lg text-primary' }),
+            h('span', { class: 'text-lg font-medium' }, 'Loading...')
+        )
     );
     
     setEffect(() => {
         const isLoading = getIsLoading();
         overlay.className = isLoading 
-            ? 'loading-overlay active' 
-            : 'loading-overlay';
+            ? 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center' 
+            : 'fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center';
     });
     
     return overlay;
@@ -110,10 +159,22 @@ export function LoadingOverlay() {
  * Dashboard Header Component
  */
 export function DashboardHeader() {
-    return h('div', { class: 'dashboard-header' },
-        h('h2', { class: 'dashboard-title' }, 'System Overview'),
-        h('div', { class: 'dashboard-actions' },
-            h('button', { id: 'refresh-all' }, 'Refresh Data')
+    return h('div', { class: 'flex justify-between items-center mb-6' },
+        h('h2', { class: 'text-2xl font-bold text-base-content' }, 'System Overview'),
+        h('div', { class: 'flex gap-2' },
+            h('button', { 
+                id: 'clear-notifications',
+                class: 'btn btn-warning btn-sm',
+                onclick: () => {
+                    localStorage.removeItem('app-toasts');
+                    setToasts([]);
+                    showToast('🧹 All notifications cleared', 'success', 2000);
+                }
+            }, '🗑️ Clear Notifications'),
+            h('button', { 
+                id: 'refresh-all',
+                class: 'btn btn-primary btn-sm'
+            }, '🔄 Refresh Data')
         )
     );
 }
@@ -122,32 +183,50 @@ export function DashboardHeader() {
  * Stats Grid Component
  */
 export function StatsGrid() {
-    const grid = h('div', { class: 'grid' },
+    const grid = h('div', { class: 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-6' },
         // Server Status Card
-        h('div', { class: 'stat-card' },
-            h('div', { class: 'stat-label' }, 'Server Status'),
-            h('div', { class: 'stat-value', id: 'server-status' }, () => getServerStatus().status),
-            h('div', { class: 'stat-label' },
+        h('div', { class: 'stat bg-base-200 rounded-lg shadow' },
+            h('div', { class: 'stat-figure text-secondary' },
+                h('div', { class: 'text-2xl' }, '🖥️')
+            ),
+            h('div', { class: 'stat-title' }, 'Server Status'),
+            h('div', { 
+                class: 'stat-value text-sm',
+                id: 'server-status' 
+            }, () => getServerStatus().status),
+            h('div', { class: 'stat-desc' },
                 'Port: ',
                 h('span', { id: 'server-port' }, () => getServerStatus().port)
             )
         ),
         
         // GunDB Connections Card
-        h('div', { class: 'stat-card' },
-            h('div', { class: 'stat-label' }, 'GunDB Connections'),
-            h('div', { class: 'stat-value', id: 'peer-count' }, () => getNetworkStatus().peerCount),
-            h('div', { class: 'stat-label' },
+        h('div', { class: 'stat bg-base-200 rounded-lg shadow' },
+            h('div', { class: 'stat-figure text-secondary' },
+                h('div', { class: 'text-2xl' }, '🔗')
+            ),
+            h('div', { class: 'stat-title' }, 'GunDB Connections'),
+            h('div', { 
+                class: 'stat-value text-primary',
+                id: 'peer-count' 
+            }, () => getNetworkStatus().peerCount),
+            h('div', { class: 'stat-desc' },
                 'Status: ',
                 h('span', { id: 'network-status' }, () => getNetworkStatus().status)
             )
         ),
         
         // Files Stats Card
-        h('div', { class: 'stat-card' },
-            h('div', { class: 'stat-label' }, 'Files Uploaded'),
-            h('div', { class: 'stat-value', id: 'file-count' }, () => getFileStats().count),
-            h('div', { class: 'stat-label' },
+        h('div', { class: 'stat bg-base-200 rounded-lg shadow' },
+            h('div', { class: 'stat-figure text-secondary' },
+                h('div', { class: 'text-2xl' }, '📁')
+            ),
+            h('div', { class: 'stat-title' }, 'Files Uploaded'),
+            h('div', { 
+                class: 'stat-value text-accent',
+                id: 'file-count' 
+            }, () => getFileStats().count),
+            h('div', { class: 'stat-desc' },
                 'Total: ',
                 h('span', { id: 'total-size' }, () => formatFileSize(getFileStats().totalSize))
             )
@@ -161,91 +240,248 @@ export function StatsGrid() {
  * Server Info Card Component
  */
 export function ServerInfoCard() {
-    return h('div', { class: 'card' },
-        h('div', { class: 'card-header' },
-            h('h3', { class: 'card-title' }, 'Server Information'),
-            h('div', { class: 'card-actions' },
-                h('button', { id: 'debug-command-btn', class: 'btn-small' }, 'Debug')
-            )
-        ),
-        h('p', {},
-            'Gun server active on ',
-            h('code', {}, h('span', { id: 'origin' }, window.location.origin))
-        ),
-        h('p', {},
-            'WebSocket on ',
-            h('code', {}, h('span', { id: 'ws' }, window.location.origin.replace(/^http/, 'ws') + '/gun'))
-        ),
-        h('div', { id: 'network-info' },
-            h('span', { class: 'node-info' },
-                'Peers: ',
-                h('strong', { id: 'peer-count-detail' }, () => getNetworkStatus().peerCount)
+    return h('div', { class: 'card bg-base-200 shadow-xl mb-6' },
+        h('div', { class: 'card-body' },
+            h('div', { class: 'flex justify-between items-center' },
+                h('h3', { class: 'card-title' }, '📡 Server Information'),
+                h('button', { 
+                    id: 'debug-command-btn', 
+                    class: 'btn btn-outline btn-sm'
+                }, '🔍 Debug')
             ),
-            h('span', { class: 'node-info' },
-                'Status: ',
-                h('strong', { id: 'network-status-detail' }, () => getNetworkStatus().status)
-            )
-        ),
-        h('div', { 
-            id: 'log-container', 
-            class: 'log-container', 
-            style: 'display: none'
-        })
+            h('div', { class: 'space-y-2' },
+                h('p', { class: 'text-sm' },
+                    'Gun server active on ',
+                    h('code', { class: 'bg-base-300 px-2 py-1 rounded' }, 
+                        h('span', { id: 'origin' }, window.location.origin)
+                    )
+                ),
+                h('p', { class: 'text-sm' },
+                    'WebSocket on ',
+                    h('code', { class: 'bg-base-300 px-2 py-1 rounded' }, 
+                        h('span', { id: 'ws' }, window.location.origin.replace(/^http/, 'ws') + '/gun')
+                    )
+                )
+            ),
+            h('div', { id: 'network-info', class: 'flex gap-4 mt-4' },
+                h('div', { class: 'badge badge-primary badge-lg' },
+                    'Peers: ',
+                    h('strong', { id: 'peer-count-detail' }, () => getNetworkStatus().peerCount)
+                ),
+                h('div', { class: 'badge badge-secondary badge-lg' },
+                    'Status: ',
+                    h('strong', { id: 'network-status-detail' }, () => getNetworkStatus().status)
+                )
+            ),
+            h('div', { 
+                id: 'log-container', 
+                class: 'mockup-code mt-4 hidden max-h-64 overflow-y-auto'
+            })
+        )
     );
 }
 
 /**
- * Tabs Component
+ * Enhanced Tabs Component with DaisyUI styling
  */
-export function Tabs() {
-    const tabs = [
-        { id: 'files', label: 'Files' },
-        { id: 'upload', label: 'Upload File' },
-        { id: 'settings', label: 'Settings' }
+export function EnhancedTabs() {
+    const tabsContainer = h('div', { 
+        class: 'tabs tabs-boxed bg-base-200 p-1 mb-4',
+        role: 'tablist' 
+    });
+    
+    let previousBadgeStates = new Map();
+    
+    const getTabConfig = () => [
+        { 
+            id: 'files', 
+            label: 'Files', 
+            icon: '📁',
+            getBadge: () => {
+                const fileCount = getFileStats().count;
+                return fileCount > 0 ? { text: fileCount.toString(), type: 'info' } : null;
+            },
+            ariaLabel: 'View and manage uploaded files'
+        },
+        { 
+            id: 'upload', 
+            label: 'Upload', 
+            icon: '⬆️',
+            getBadge: () => {
+                const isLoading = getIsLoading();
+                const ipfsStatus = getIpfsStatus();
+                if (isLoading) {
+                    return { text: '●', type: 'warning' };
+                }
+                return ipfsStatus.enabled ? { text: 'IPFS', type: 'success' } : null;
+            },
+            ariaLabel: 'Upload new files to the system'
+        },
+        { 
+            id: 'network', 
+            label: 'Network', 
+            icon: '🌐',
+            getBadge: () => {
+                const networkStatus = getNetworkStatus();
+                const peerCount = networkStatus.peerCount;
+                if (peerCount > 1) {
+                    return { text: peerCount.toString(), type: 'success' };
+                } else if (peerCount === 1) {
+                    return { text: 'LOCAL', type: 'warning' };
+                } else {
+                    return { text: '!', type: 'error' };
+                }
+            },
+            ariaLabel: 'Manage network connections and peers'
+        },
+        { 
+            id: 'settings', 
+            label: 'Settings', 
+            icon: '⚙️',
+            getBadge: () => {
+                const ipfsConnectionStatus = getIpfsConnectionStatus();
+                if (ipfsConnectionStatus.status === 'error') {
+                    return { text: '!', type: 'error' };
+                }
+                return null;
+            },
+            ariaLabel: 'Configure system settings and IPFS'
+        }
     ];
     
-    const tabsEl = h('div', { class: 'tabs' });
-    
     setEffect(() => {
-        tabsEl.innerHTML = '';
+        tabsContainer.innerHTML = '';
         const activeTab = getActiveTab();
+        const tabs = getTabConfig();
         
-        tabs.forEach(tab => {
-            const tabEl = document.createElement('div');
-            tabEl.className = tab.id === activeTab ? 'tab active' : 'tab';
-            tabEl.setAttribute('data-tab', tab.id);
-            tabEl.textContent = tab.label;
+        tabs.forEach((tab, index) => {
+            const isActive = tab.id === activeTab;
+            const badge = tab.getBadge();
             
+            const currentBadgeState = badge ? `${badge.text}-${badge.type}` : 'none';
+            const previousBadgeState = previousBadgeStates.get(tab.id);
+            const badgeChanged = previousBadgeState && previousBadgeState !== currentBadgeState;
+            
+            previousBadgeStates.set(tab.id, currentBadgeState);
+            
+            // Create tab element with DaisyUI classes
+            const tabEl = document.createElement('button');
+            tabEl.className = isActive ? 'tab tab-active flex items-center gap-2' : 'tab flex items-center gap-2';
+            tabEl.setAttribute('data-tab', tab.id);
+            tabEl.setAttribute('role', 'tab');
+            tabEl.setAttribute('aria-selected', isActive.toString());
+            tabEl.setAttribute('aria-controls', `${tab.id}-panel`);
+            tabEl.setAttribute('aria-label', tab.ariaLabel);
+            tabEl.setAttribute('tabindex', isActive ? '0' : '-1');
+            tabEl.id = `tab-${tab.id}`;
+            
+            // Tab content
+            const tabContent = h('div', { class: 'flex items-center gap-2' },
+                h('span', { class: 'text-lg' }, tab.icon),
+                h('span', {}, tab.label)
+            );
+            
+            tabEl.appendChild(tabContent);
+            
+            // Add badge if present
+            if (badge) {
+                const badgeClass = {
+                    'success': 'badge-success',
+                    'error': 'badge-error',
+                    'warning': 'badge-warning', 
+                    'info': 'badge-info'
+                }[badge.type] || 'badge-info';
+                
+                const badgeEl = h('span', { 
+                    class: `badge ${badgeClass} badge-sm ml-1`
+                }, badge.text);
+                
+                if (badgeChanged) {
+                    badgeEl.style.animation = 'pulse 0.6s ease-out';
+                    
+                    if (badge.type === 'error') {
+                        setTimeout(() => {
+                            showToast(`${tab.label}: Error detected`, 'error', 3000);
+                        }, 100);
+                    }
+                }
+                
+                tabEl.appendChild(badgeEl);
+            }
+            
+            // Click handler
             tabEl.addEventListener('click', () => {
                 setActiveTab(tab.id);
+                tabEl.focus();
             });
             
-            tabsEl.appendChild(tabEl);
+            // Keyboard navigation (keeping existing logic)
+            tabEl.addEventListener('keydown', (e) => {
+                let targetIndex = index;
+                
+                switch (e.key) {
+                    case 'ArrowRight':
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        targetIndex = (index + 1) % tabs.length;
+                        break;
+                    case 'ArrowLeft':
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        targetIndex = index === 0 ? tabs.length - 1 : index - 1;
+                        break;
+                    case 'Home':
+                        e.preventDefault();
+                        targetIndex = 0;
+                        break;
+                    case 'End':
+                        e.preventDefault();
+                        targetIndex = tabs.length - 1;
+                        break;
+                    case 'Enter':
+                    case ' ':
+                        e.preventDefault();
+                        setActiveTab(tab.id);
+                        return;
+                    default:
+                        return;
+                }
+                
+                const targetTab = tabs[targetIndex];
+                setActiveTab(targetTab.id);
+                
+                setTimeout(() => {
+                    const targetEl = document.getElementById(`tab-${targetTab.id}`);
+                    if (targetEl) {
+                        targetEl.focus();
+                    }
+                }, 50);
+            });
+            
+            tabsContainer.appendChild(tabEl);
         });
     });
     
-    return tabsEl;
+    return tabsContainer;
 }
 
+// Legacy compatibility
+export function Tabs() {
+    console.warn('Tabs() is deprecated. Use EnhancedTabs() instead.');
+    return EnhancedTabs();
+}
+
+export { EnhancedTabs as ModernTabs };
+
 /**
- * File item component
+ * File item component with DaisyUI styling
  */
 export function FileItem(file) {
-    // Check that file is valid before creating the component
     if (!file || typeof file !== 'object') {
         console.error('Invalid file object:', file);
-        return h('div', { class: 'file-item error' }, 'Invalid file data');
+        return h('div', { class: 'alert alert-error' }, 'Invalid file data');
     }
     
-    // Log the file data to debug IPFS hash issues
-    console.debug('Processing file item for display:', {
-        id: file.id,
-        name: file.name || file.originalName,
-        hasIpfsHash: !!file.ipfsHash,
-        ipfsHash: file.ipfsHash
-    });
-    
-    // Create defensive copy with defaults for missing values
     const safeFile = {
         id: file.id || `file-${Date.now()}`,
         name: file.name || file.originalName || 'Unnamed file',
@@ -258,76 +494,66 @@ export function FileItem(file) {
         timestamp: parseInt(file.timestamp || file.uploadedAt || Date.now(), 10),
     };
     
-    // Format upload date safely
     const uploadDate = new Date(safeFile.timestamp).toLocaleString();
     
-    // Create the file item container
-    const fileItem = h('div', { 
-        class: 'file-item', 
+    // Create file card with DaisyUI
+    const fileCard = h('div', { 
+        class: 'card bg-base-200 shadow-md hover:shadow-lg transition-shadow mb-4',
         id: `file-${safeFile.id}`,
         'data-id': safeFile.id
     });
     
-    // Add IPFS status to the class for styling
-    if (safeFile.ipfsHash) {
-        fileItem.classList.add('ipfs-file');
-    }
+    const cardBody = h('div', { class: 'card-body p-4' });
     
-    // File info section
-    const fileInfo = h('div', { class: 'file-info' });
-    
-    // File name
-    const fileName = h('div', { class: 'file-name' }, safeFile.originalName);
-    
-    // Create IPFS badge with high visibility if it's an IPFS file
-    const ipfsBadge = safeFile.ipfsHash 
-        ? h('span', { class: 'ipfs-badge', style: 'background-color: #6e3fff; color: white; padding: 2px 6px; border-radius: 4px; margin-left: 5px;' }, 'IPFS')
-        : h('span', { class: 'local-badge' }, 'Local');
-            
-    // File metadata
-    const fileMeta = h('div', { class: 'file-meta' },
-        `${formatFileSize(safeFile.size)} • ${safeFile.mimetype} • Uploaded: ${uploadDate} `,
-        ipfsBadge
+    // File header with name and IPFS badge
+    const fileHeader = h('div', { class: 'flex justify-between items-start mb-2' },
+        h('h4', { class: 'card-title text-base font-medium' }, safeFile.originalName),
+        safeFile.ipfsHash 
+            ? h('div', { class: 'badge badge-secondary' }, '🌐 IPFS')
+            : h('div', { class: 'badge badge-outline' }, '💾 Local')
     );
     
-    fileInfo.appendChild(fileName);
-    fileInfo.appendChild(fileMeta);
+    // File metadata
+    const fileMeta = h('div', { class: 'text-sm text-base-content/70 mb-3' },
+        `${formatFileSize(safeFile.size)} • ${safeFile.mimetype}`,
+        h('br'),
+        `Uploaded: ${uploadDate}`
+    );
     
-    // Add IPFS info if available
+    cardBody.appendChild(fileHeader);
+    cardBody.appendChild(fileMeta);
+    
+    // IPFS info if available
     if (safeFile.ipfsHash) {
-        const ipfsInfo = h('div', { class: 'ipfs-info', style: 'margin-top: 5px; font-size: 0.85em; color: #6e3fff;' },
-            h('small', {}, `IPFS Hash: ${safeFile.ipfsHash}`),
-            h('br'),
-            h('small', {}, 
-                'IPFS URL: ',
-                h('a', { 
-                    href: safeFile.ipfsUrl, 
-                    target: '_blank',
-                    style: 'color: #6e3fff; text-decoration: underline;'
-                }, safeFile.ipfsUrl)
-            )
+        const ipfsInfo = h('div', { class: 'bg-base-300 p-3 rounded-lg mb-3 text-xs' },
+            h('div', { class: 'font-medium text-secondary mb-1' }, 'IPFS Details:'),
+            h('div', { class: 'break-all' }, `Hash: ${safeFile.ipfsHash}`),
+            h('a', { 
+                href: safeFile.ipfsUrl, 
+                target: '_blank',
+                class: 'link link-secondary text-xs'
+            }, 'View on IPFS Gateway →')
         );
-        fileInfo.appendChild(ipfsInfo);
+        cardBody.appendChild(ipfsInfo);
     }
     
-    // File actions section
-    const fileActions = h('div', { class: 'file-actions' });
+    // Action buttons
+    const actions = h('div', { class: 'card-actions justify-end gap-2' });
     
     // View file button
     const viewUrl = safeFile.ipfsHash ? safeFile.ipfsUrl : safeFile.fileUrl;
     if (viewUrl && viewUrl !== '#') {
         const viewButton = h('button', { 
-            class: 'view-file',
+            class: 'btn btn-primary btn-sm',
             onclick: () => window.open(viewUrl, '_blank')
-        }, 'View File');
-        fileActions.appendChild(viewButton);
+        }, '👁️ View');
+        actions.appendChild(viewButton);
     }
     
     // Copy IPFS hash button
     if (safeFile.ipfsHash) {
         const copyButton = h('button', { 
-            class: 'copy-hash',
-            style: 'background-color: #6e3fff;',
+            class: 'btn btn-secondary btn-sm',
             onclick: async () => {
                 try {
                     await navigator.clipboard.writeText(safeFile.ipfsHash);
@@ -336,87 +562,78 @@ export function FileItem(file) {
                     showToast(`Error copying: ${error.message}`, 'error');
                 }
             }
-        }, 'Copy Hash');
-        fileActions.appendChild(copyButton);
+        }, '📋 Copy Hash');
+        actions.appendChild(copyButton);
     }
     
     // Delete button
     const deleteButton = h('button', { 
-        class: 'delete-file',
-        style: 'background-color: #ff3366;',
+        class: 'btn btn-error btn-sm',
         onclick: () => {
             deleteFile(safeFile.id, safeFile.originalName);
         }
-    }, 'Delete');
-    fileActions.appendChild(deleteButton);
+    }, '🗑️ Delete');
+    actions.appendChild(deleteButton);
     
-    // Add sections to file item
-    fileItem.appendChild(fileInfo);
-    fileItem.appendChild(fileActions);
+    cardBody.appendChild(actions);
+    fileCard.appendChild(cardBody);
     
-    return fileItem;
+    return fileCard;
 }
 
 /**
- * File search form component
+ * File search form component with DaisyUI
  */
 export function FileSearchForm() {
-    // Create search form container
-    const searchForm = h('div', { class: 'search-form' });
+    const searchForm = h('div', { class: 'card bg-base-200 shadow-md mb-4' },
+        h('div', { class: 'card-body p-4' },
+            h('h4', { class: 'card-title text-base mb-3' }, '🔍 Search Files'),
+            h('div', { class: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4' },
+                h('input', {
+                    type: 'text',
+                    id: 'file-name-search',
+                    placeholder: 'File name',
+                    class: 'input input-bordered input-sm'
+                }),
+                h('input', {
+                    type: 'text',
+                    id: 'file-mimetype-search',
+                    placeholder: 'MIME type',
+                    class: 'input input-bordered input-sm'
+                }),
+                h('input', {
+                    type: 'number',
+                    id: 'file-min-size',
+                    placeholder: 'Min size (bytes)',
+                    class: 'input input-bordered input-sm'
+                }),
+                h('input', {
+                    type: 'number',
+                    id: 'file-max-size',
+                    placeholder: 'Max size (bytes)',
+                    class: 'input input-bordered input-sm'
+                })
+            ),
+            h('button', {
+                id: 'search-files',
+                class: 'btn btn-primary btn-sm',
+                onclick: handleSearch
+            }, '🔎 Search Files')
+        )
+    );
     
-    // Create input fields directly to avoid reactive issues
-    const fileNameInput = h('input', {
-        type: 'text',
-        id: 'file-name-search',
-        placeholder: 'File name'
-    });
-    
-    const mimeTypeInput = h('input', {
-        type: 'text',
-        id: 'file-mimetype-search',
-        placeholder: 'MIME type'
-    });
-    
-    const minSizeInput = h('input', {
-        type: 'number',
-        id: 'file-min-size',
-        placeholder: 'Min size (bytes)'
-    });
-    
-    const maxSizeInput = h('input', {
-        type: 'number',
-        id: 'file-max-size',
-        placeholder: 'Max size (bytes)'
-    });
-    
-    // Create search button
-    const searchButton = h('button', {
-        id: 'search-files',
-        onclick: handleSearch
-    }, 'Search');
-    
-    // Add all elements to form
-    searchForm.appendChild(fileNameInput);
-    searchForm.appendChild(mimeTypeInput);
-    searchForm.appendChild(minSizeInput);
-    searchForm.appendChild(maxSizeInput);
-    searchForm.appendChild(searchButton);
-    
-    // Search handler
     function handleSearch() {
         const nameFilter = document.getElementById('file-name-search')?.value || '';
         const mimetypeFilter = document.getElementById('file-mimetype-search')?.value || '';
         const minSizeFilter = document.getElementById('file-min-size')?.value || '';
         const maxSizeFilter = document.getElementById('file-max-size')?.value || '';
         
-        // Create search params
         const searchParams = {};
         if (nameFilter) searchParams.name = nameFilter;
         if (mimetypeFilter) searchParams.mimetype = mimetypeFilter;
         if (minSizeFilter) searchParams.minSize = minSizeFilter;
         if (maxSizeFilter) searchParams.maxSize = maxSizeFilter;
         
-        // Show toast with search criteria
         let searchMsg = 'Searching for files';
         if (Object.keys(searchParams).length > 0) {
             searchMsg += ' matching: ' + Object.entries(searchParams)
@@ -425,7 +642,6 @@ export function FileSearchForm() {
         }
         showToast(searchMsg, 'info');
         
-        // Load files with search params
         loadFiles(searchParams);
     }
     
@@ -436,12 +652,106 @@ export function FileSearchForm() {
  * Empty state component
  */
 export function EmptyState(message = 'No files found') {
-    return h('div', { class: 'empty-state' }, message);
+    return h('div', { class: 'flex flex-col items-center justify-center py-12 text-center' },
+        h('div', { class: 'text-6xl mb-4' }, '📁'),
+        h('div', { class: 'text-xl font-medium text-base-content/70' }, message)
+    );
 }
 
 /**
  * Loading state component
  */
 export function LoadingState(message = 'Loading...') {
-    return h('div', { class: 'loading' }, message);
+    return h('div', { class: 'flex items-center justify-center py-12' },
+        h('span', { class: 'loading loading-spinner loading-lg text-primary mr-4' }),
+        h('span', { class: 'text-lg' }, message)
+    );
+}
+
+/**
+ * Peer item component with DaisyUI styling
+ */
+export function PeerItem(peer) {
+    if (!peer || typeof peer !== 'object') {
+        console.error('Invalid peer object:', peer);
+        return h('div', { class: 'alert alert-error' }, 'Invalid peer data');
+    }
+    
+    const safePeer = {
+        url: peer.url || peer.peer || 'Unknown URL',
+        connected: peer.connected || false,
+        status: peer.status || 'unknown',
+        latency: peer.latency || null,
+        lastSeen: peer.lastSeen || null
+    };
+    
+    // Create peer card
+    const peerCard = h('div', { 
+        class: `card bg-base-200 shadow-md mb-4 ${safePeer.connected ? 'border-l-4 border-success' : 'border-l-4 border-error'}`,
+        id: `peer-${btoa(safePeer.url)}`,
+        'data-url': safePeer.url
+    });
+    
+    const cardBody = h('div', { class: 'card-body p-4' });
+    
+    // Peer header
+    const peerHeader = h('div', { class: 'flex justify-between items-start mb-2' },
+        h('h4', { class: 'card-title text-base font-medium break-all' }, safePeer.url),
+        h('div', { 
+            class: `badge ${safePeer.connected ? 'badge-success' : 'badge-error'}`
+        }, safePeer.connected ? '🟢 Connected' : '🔴 Disconnected')
+    );
+    
+    // Peer metadata
+    const peerMeta = h('div', { class: 'text-sm text-base-content/70 mb-3' },
+        `Status: ${safePeer.status}`,
+        safePeer.latency ? ` • Latency: ${safePeer.latency}ms` : '',
+        safePeer.lastSeen ? h('br') : '',
+        safePeer.lastSeen ? `Last seen: ${new Date(safePeer.lastSeen).toLocaleString()}` : ''
+    );
+    
+    cardBody.appendChild(peerHeader);
+    cardBody.appendChild(peerMeta);
+    
+    // Action buttons
+    const actions = h('div', { class: 'card-actions justify-end gap-2' });
+    
+    // Test connection button
+    const testButton = h('button', { 
+        class: 'btn btn-outline btn-sm',
+        onclick: async () => {
+            const result = await testPeerConnection(safePeer.url);
+            if (result.success) {
+                showToast(`Connection test successful: ${result.latency}ms`, 'success');
+            }
+        }
+    }, '🔍 Test');
+    actions.appendChild(testButton);
+    
+    // Reconnect button (only if disconnected)
+    if (!safePeer.connected) {
+        const reconnectButton = h('button', { 
+            class: 'btn btn-warning btn-sm',
+            onclick: async () => {
+                await reconnectToPeer(safePeer.url);
+            }
+        }, '🔄 Reconnect');
+        actions.appendChild(reconnectButton);
+    }
+    
+    // Remove button
+    const removeButton = h('button', { 
+        class: 'btn btn-error btn-sm',
+        onclick: async () => {
+            if (confirm(`Are you sure you want to remove peer "${safePeer.url}"?`)) {
+                await removePeer(safePeer.url);
+            }
+        }
+    }, '🗑️ Remove');
+    actions.appendChild(removeButton);
+    
+    cardBody.appendChild(actions);
+    peerCard.appendChild(cardBody);
+    
+    return peerCard;
 } 

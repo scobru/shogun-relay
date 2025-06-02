@@ -16,11 +16,7 @@
     "compile-circuits": "npx circom src/circuit/auth.circom --r1cs --wasm --sym -o src/circuit/build"
   },
   "dependencies": {
-    "@capacitor-community/sqlite": "^7.0.0",
-    "@capacitor/core": "^7.2.0",
     "aws-sdk": "^2.1692.0",
-    "better-sqlite3": "^11.10.0",
-    "bullet-catcher": "^3.0.5",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
     "dotenv": "12.0.3",
@@ -28,7 +24,6 @@
     "express-basic-auth": "^1.2.1",
     "fs": "^0.0.1-security",
     "gun": "^0.2020.1240",
-    "gun-flint": "^0.0.28",
     "http": "^0.0.1-security",
     "https": "^1.0.0",
     "is-fn": "^3.0.0",

@@ -1,243 +1,205 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" data-theme="dark">
 
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Login - Shogun Relay</title>
+    
+    <!-- DaisyUI + Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    
     <style>
-        :root {
-            --primary-color: #008875;
-            --primary-dark: #006655;
-            --secondary-color: #6e56ff;
-            --secondary-dark: #5a45d5;
-            --success-color: #4CAF50;
-            --error-color: #ff3366;
-            --warning-color: #FFC107;
-            --info-color: #2196F3;
-            --light-bg: #f9f9f9;
-            --dark-bg: #333;
-            --text-color: #333;
-            --text-light: #666;
-            --border-color: #ccc;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6;
-            color: var(--text-color);
-            background-color: #f5f5f5;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-
-        .login-container {
-            width: 90%;
-            max-width: 400px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-        }
-
-        .login-header {
-            background-color: var(--primary-color);
-            color: white;
-            padding: 20px;
-            text-align: center;
-        }
-
-        .login-header h1 {
-            font-size: 24px;
-            margin: 0;
-        }
-
-        .login-form {
-            padding: 20px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 500;
-        }
-
-        input[type="password"] {
-            width: 100%;
-            padding: 12px;
-            font-size: 16px;
-            border-radius: 4px;
-            border: 1px solid var(--border-color);
-            transition: border-color 0.3s;
-        }
-
-        input[type="password"]:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 2px rgba(0, 136, 117, 0.2);
-        }
-
-        button {
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 12px 15px;
-            width: 100%;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: background 0.3s;
-        }
-
-        button:hover {
-            background: var(--primary-dark);
-        }
-
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-
-        .error-message {
-            color: var(--error-color);
-            margin-top: 15px;
-            padding: 10px;
-            border-radius: 4px;
-            background-color: rgba(255, 51, 102, 0.1);
-            display: none;
-        }
-
-        .info-text {
-            color: var(--text-light);
-            font-size: 14px;
-            margin-top: 15px;
-            text-align: center;
-        }
-
-        /* Loading spinner */
-        .spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,.3);
-            border-radius: 50%;
-            border-top-color: white;
-            animation: spin 1s ease-in-out infinite;
-            margin-right: 10px;
-            vertical-align: middle;
-            display: none;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+            font-family: 'Inter', sans-serif;
         }
         
-        /* Toast notification */
-        .toast-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            max-width: 300px;
-            z-index: 9999;
+        .login-animation {
+            animation: slideInUp 0.6s ease-out;
         }
         
-        .toast {
-            background-color: #333;
-            color: white;
-            padding: 12px 15px;
-            border-radius: 4px;
-            margin-bottom: 10px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            animation: slidein 0.3s ease-out;
-        }
-        
-        @keyframes slidein {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        
-        .toast-error {
-            background-color: var(--error-color);
-        }
-        
-        .toast-success {
-            background-color: var(--success-color);
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
     </style>
 </head>
 
-<body>
-    <div class="toast-container" id="toast-container"></div>
+<body class="bg-base-200 min-h-screen">
+    <!-- Toast Container -->
+    <div class="toast toast-top toast-end z-50" id="toast-container"></div>
     
-    <div class="login-container">
-        <div class="login-header">
-            <h1>Shogun Relay</h1>
-        </div>
-        <div class="login-form">
-            <div class="form-group">
-                <label for="token">Token di autenticazione</label>
-                <input type="password" id="token" placeholder="Inserisci il token di autenticazione" autocomplete="off">
+    <!-- Main Container -->
+    <div class="min-h-screen flex items-center justify-center p-4">
+        <div class="card w-full max-w-md bg-base-100 shadow-2xl login-animation">
+            <!-- Header -->
+            <div class="card-body text-center">
+                <div class="avatar mb-4">
+                    <div class="w-16 rounded-full bg-primary text-primary-content flex items-center justify-center">
+                        <span class="text-2xl font-bold">🛡️</span>
+                    </div>
+                </div>
+                
+                <h1 class="text-3xl font-bold text-base-content mb-2">Shogun Relay</h1>
+                <p class="text-base-content/60 mb-6">Secure access to your relay dashboard</p>
+                
+                <!-- Login Form -->
+                <div class="form-control w-full">
+                    <label class="label">
+                        <span class="label-text font-medium">🔑 Authentication Token</span>
+                    </label>
+                    <div class="relative">
+                        <input 
+                            type="password" 
+                            id="token" 
+                            placeholder="Enter your authentication token" 
+                            class="input input-bordered w-full pr-12" 
+                            autocomplete="off"
+                        />
+                        <button 
+                            type="button"
+                            id="toggle-visibility"
+                            class="btn btn-ghost btn-sm absolute right-1 top-1/2 transform -translate-y-1/2"
+                            onclick="togglePasswordVisibility()"
+                        >
+                            👁️
+                        </button>
+                    </div>
+                    <label class="label">
+                        <span class="label-text-alt">Provide your relay authentication token</span>
+                    </label>
+                </div>
+                
+                <!-- Login Button -->
+                <button 
+                    id="login-btn" 
+                    class="btn btn-primary btn-lg w-full mt-4"
+                    onclick="doLogin()"
+                >
+                    <span id="login-spinner" class="loading loading-spinner loading-sm hidden"></span>
+                    <span id="login-text">🚀 Access Dashboard</span>
+                </button>
+                
+                <!-- Error Alert -->
+                <div id="error-alert" class="alert alert-error mt-4 hidden">
+                    <span id="error-message">Token non valido. Riprova.</span>
+                </div>
+                
+                <!-- Info -->
+                <div class="mt-6 p-4 bg-base-200 rounded-lg">
+                    <p class="text-sm text-base-content/70">
+                        💡 Need help? Contact your system administrator for access credentials.
+                    </p>
+                </div>
+                
+                <!-- Theme Toggle -->
+                <div class="flex justify-center mt-4">
+                    <button 
+                        id="theme-toggle"
+                        class="btn btn-circle btn-outline btn-sm"
+                        onclick="toggleTheme()"
+                        title="Toggle theme"
+                    >
+                        <span id="theme-icon">🌙</span>
+                    </button>
+                </div>
             </div>
-            <button id="login-btn"><span class="spinner" id="login-spinner"></span>Accedi</button>
-            <div id="error-message" class="error-message">
-                Token non valido. Riprova.
-            </div>
-            <p class="info-text">Inserisci il token di autenticazione per accedere alla dashboard di Shogun Relay.</p>
         </div>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const loginBtn = document.getElementById('login-btn');
-            const tokenInput = document.getElementById('token');
-            const errorMessage = document.getElementById('error-message');
-            const loginSpinner = document.getElementById('login-spinner');
-            const toastContainer = document.getElementById('toast-container');
+        // Theme management
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
             
-            // Toast notification function
-            const showToast = (message, type = 'info', duration = 5000) => {
-                const toast = document.createElement('div');
-                toast.className = `toast toast-${type}`;
-                toast.textContent = message;
-                toastContainer.appendChild(toast);
-                
-                setTimeout(() => {
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('login-theme', newTheme);
+            
+            const icon = document.getElementById('theme-icon');
+            icon.textContent = newTheme === 'dark' ? '🌙' : '☀️';
+            
+            showToast(`${newTheme === 'dark' ? 'Dark' : 'Light'} theme activated`, 'info');
+        }
+        
+        // Initialize theme
+        function initTheme() {
+            const savedTheme = localStorage.getItem('login-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            const icon = document.getElementById('theme-icon');
+            icon.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+        }
+        
+        // Password visibility toggle
+        function togglePasswordVisibility() {
+            const input = document.getElementById('token');
+            const button = document.getElementById('toggle-visibility');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                button.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                button.textContent = '👁️';
+            }
+        }
+        
+        // Toast notification function
+        function showToast(message, type = 'info', duration = 3000) {
+            const container = document.getElementById('toast-container');
+            const alertClass = {
+                'success': 'alert-success',
+                'error': 'alert-error',
+                'warning': 'alert-warning',
+                'info': 'alert-info'
+            }[type] || 'alert-info';
+            
+            const toast = document.createElement('div');
+            toast.className = `alert ${alertClass} shadow-lg`;
+            toast.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <span>${message}</span>
+                    <button class="btn btn-circle btn-ghost btn-xs" onclick="this.parentElement.parentElement.remove()">✕</button>
+                </div>
+            `;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                if (toast.parentElement) {
                     toast.style.opacity = '0';
                     toast.style.transform = 'translateX(100%)';
                     toast.style.transition = 'all 0.3s ease-out';
                     setTimeout(() => toast.remove(), 300);
-                }, duration);
-            };
-            
+                }
+            }, duration);
+        }
         
-            // Check if the user is already authenticated with a valid token
-            const checkExistingToken = async () => {
-                const savedToken = localStorage.getItem('authToken');
-                if (!savedToken) return false;
-                
-                
-                // Verify token with server
-                return await testToken(savedToken);
-            };
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            
+            const loginBtn = document.getElementById('login-btn');
+            const tokenInput = document.getElementById('token');
             
             // Check existing token on page load
             checkExistingToken().then(isValid => {
                 if (isValid) {
-                    showToast('Accesso effettuato con successo!', 'success');
-                    // Redirect to dashboard
-                    window.location.href = '/';
+                    showToast('✅ Access granted! Redirecting...', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 1000);
                 }
             });
 
@@ -247,86 +209,98 @@
                     doLogin();
                 }
             });
+        });
+        
+        // Check if the user is already authenticated
+        async function checkExistingToken() {
+            const savedToken = localStorage.getItem('authToken');
+            if (!savedToken) return false;
+            
+            return await testToken(savedToken);
+        }
 
-            // Login with button click
-            loginBtn.addEventListener('click', doLogin);
-
-            // Login function
-            function doLogin() {
-                const token = tokenInput.value.trim();
-                if (!token) {
-                    showError('Inserisci un token valido');
-                    return;
-                }
-
-                // Disable button and show spinner during verification
-                setLoading(true);
-
-                // Verify token
-                testToken(token).then(isValid => {
-                    console.log('Token valido:', isValid);
-                    console.log('Token:', token);
-                    if (isValid) {
-                        // Token is valid according to the server, save it regardless of format
-                        localStorage.setItem('authToken', token);
-
-                        // Set session
-                        sessionStorage.setItem('shogunSession', 'active');
-                        sessionStorage.setItem('loginTime', Date.now());
-                        
-                        showToast('Accesso effettuato con successo!', 'success');
-
-                        // Redirect to dashboard
-                        window.location.href = '/';
-                    } else {
-                        showError('Token di autenticazione non valido');
-                        setLoading(false);
-                    }
-                }).catch(error => {
-                    showError('Errore di connessione al server');
-                    console.error('Errore durante la verifica del token:', error);
-                    setLoading(false);
-                });
+        // Main login function
+        async function doLogin() {
+            const token = document.getElementById('token').value.trim();
+            if (!token) {
+                showError('🔑 Please enter a valid token');
+                return;
             }
 
-            // Function to test token validity with server
-            function testToken(token) {
-                return fetch('/check-websocket', {
+            setLoading(true);
+
+            try {
+                const isValid = await testToken(token);
+                
+                if (isValid) {
+                    localStorage.setItem('authToken', token);
+                    sessionStorage.setItem('shogunSession', 'active');
+                    sessionStorage.setItem('loginTime', Date.now());
+                    
+                    showToast('✅ Authentication successful! Welcome back.', 'success');
+                    
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 1000);
+                } else {
+                    showError('❌ Invalid authentication token');
+                }
+            } catch (error) {
+                showError('🌐 Connection error. Please try again.');
+                console.error('Authentication error:', error);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // Test token validity with server
+        async function testToken(token) {
+            try {
+                const response = await fetch('/check-websocket', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
-                })
-                .then(response => {
-                    return response.ok;
-                })
-                .catch(error => {
-                    console.error('Errore nella richiesta di verifica token:', error);
-                    return false;
                 });
+                return response.ok;
+            } catch (error) {
+                console.error('Token verification error:', error);
+                return false;
             }
+        }
 
-            // Function to show error messages
-            function showError(message) {
-                errorMessage.textContent = message;
-                errorMessage.style.display = 'block';
-                showToast(message, 'error');
-
-                // Hide message after 5 seconds
-                setTimeout(() => {
-                    errorMessage.style.display = 'none';
-                }, 5000);
-            }
+        // Show error message
+        function showError(message) {
+            const errorAlert = document.getElementById('error-alert');
+            const errorMessage = document.getElementById('error-message');
             
-            // Function to set loading state
-            function setLoading(isLoading) {
-                loginBtn.disabled = isLoading;
-                loginSpinner.style.display = isLoading ? 'inline-block' : 'none';
-                loginBtn.textContent = isLoading ? 'Verifica in corso...' : 'Accedi';
-                if (isLoading) {
-                    loginBtn.prepend(loginSpinner);
-                }
+            errorMessage.textContent = message;
+            errorAlert.classList.remove('hidden');
+            
+            showToast(message, 'error');
+
+            setTimeout(() => {
+                errorAlert.classList.add('hidden');
+            }, 5000);
+        }
+        
+        // Set loading state
+        function setLoading(isLoading) {
+            const loginBtn = document.getElementById('login-btn');
+            const loginSpinner = document.getElementById('login-spinner');
+            const loginText = document.getElementById('login-text');
+            
+            loginBtn.disabled = isLoading;
+            
+            if (isLoading) {
+                loginSpinner.classList.remove('hidden');
+                loginText.textContent = '🔄 Authenticating...';
+                loginBtn.classList.add('loading');
+            } else {
+                loginSpinner.classList.add('hidden');
+                loginText.textContent = '🚀 Access Dashboard';
+                loginBtn.classList.remove('loading');
             }
-        });
+        }
     </script>
 </body>
 

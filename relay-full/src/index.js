@@ -27,6 +27,7 @@ import setupAuthRoutes from "./routes/authRoutes.js"; // Import the new auth rou
 import setupIpfsApiRoutes from "./routes/ipfsApiRoutes.js"; // Import the new IPFS router setup function
 import setupRelayApiRoutes from "./routes/relayApiRoutes.js"; // Import the new relay router setup function
 import setupFileManagerRoutes from "./routes/fileManagerRoutes.js"; // Import the new File Manager router setup function
+import setupNetworkRoutes from "./routes/networkRoutes.js"; // Import the new Network router setup function
 import {
   initializeShogunCore,
   getInitializedShogunCore,
@@ -135,10 +136,69 @@ const getDefaultAllowedOrigins = () => {
   ];
 };
 
-// Define allowedOrigins once
-const allowedOrigins = CONFIG.ALLOWED_ORIGINS
-  ? CONFIG.ALLOWED_ORIGINS.split(",")
-  : getDefaultAllowedOrigins();
+// Dynamic function to get current allowed origins (fixes persistence issue)
+const getCurrentAllowedOrigins = () => {
+  return CONFIG.ALLOWED_ORIGINS
+    ? CONFIG.ALLOWED_ORIGINS.split(",")
+    : getDefaultAllowedOrigins();
+};
+
+/**
+ * Reload configuration from file and update runtime state
+ * This fixes the issue where configurations remain old after reset
+ */
+function reloadConfigurationFromFile() {
+  try {
+    const configPath = path.join(__dirname, "config.json");
+    const configData = fs.readFileSync(configPath, "utf8");
+    const newConfig = JSON.parse(configData);
+    
+    // Update the global CONFIG object
+    Object.assign(CONFIG, newConfig);
+    
+    serverLogger.info("[Server] Configuration reloaded from file successfully ✅");
+    
+    // Update IPFS manager if it exists
+    if (ipfsManager) {
+      try {
+        ipfsManager.updateConfig({
+          enabled: CONFIG.IPFS_ENABLED === true,
+          service: CONFIG.IPFS_SERVICE || "IPFS-CLIENT",
+          nodeUrl: CONFIG.IPFS_NODE_URL || "http://127.0.0.1:5001",
+          gateway: CONFIG.IPFS_GATEWAY || "http://127.0.0.1:8080/ipfs",
+          pinataGateway: CONFIG.PINATA_GATEWAY || "https://gateway.pinata.cloud",
+          pinataJwt: CONFIG.PINATA_JWT || "",
+        });
+        serverLogger.info("[Server] IPFS Manager reloaded with new configuration ✅");
+      } catch (ipfsError) {
+        serverLogger.error("[Server] Error reloading IPFS Manager:", {
+          error: ipfsError.message,
+        });
+      }
+    }
+    
+    // Update type validation configuration
+    try {
+      const { updateValidationConfig } = require("./utils/typeValidation.js");
+      updateValidationConfig({
+        TYPE_VALIDATION_ENABLED: CONFIG.TYPE_VALIDATION_ENABLED,
+        TYPE_VALIDATION_STRICT: CONFIG.TYPE_VALIDATION_STRICT,
+      });
+      serverLogger.info("[Server] Type validation configuration reloaded ✅");
+    } catch (validationError) {
+      serverLogger.error("[Server] Error reloading type validation:", {
+        error: validationError.message,
+      });
+    }
+    
+    return { success: true, message: "Configuration reloaded successfully" };
+  } catch (error) {
+    serverLogger.error("[Server] Error reloading configuration:", {
+      error: error.message,
+    });
+    return { success: false, error: error.message };
+  }
+}
 
 // Initialize ShogunCore and relay components. This will create relayVerifier
 // and update AuthenticationManager with the live instance via its configure method.
@@ -319,6 +379,13 @@ Gun.on("opt", function (ctx) {
       return;
     }
 
+    // Check if Gun authentication is disabled in config
+    if (CONFIG.DISABLE_GUN_AUTH === true || CONFIG.DISABLE_GUN_AUTH === "true") {
+      console.log("⚠️ Gun authentication disabled - allowing all PUT operations");
+      to.next(msg);
+      return;
+    }
+
     // For PUT operations, apply token validation logic
     if (hasValidToken(msg)) {
       console.log(
@@ -395,6 +462,8 @@ async function startServer() {
       SECRET_TOKEN,
       RELAY_CONFIG,
       relayVerifier: null, // Will be set later after initialization
+      BASIC_AUTH_USER: CONFIG.BASIC_AUTH_USER,
+      BASIC_AUTH_PASSWORD: CONFIG.BASIC_AUTH_PASSWORD,
     });
 
     // Initialize IpfsManager
@@ -417,6 +486,8 @@ async function startServer() {
       SECRET_TOKEN,
       RELAY_CONFIG,
       relayVerifier: null, // Will be set after relayVerifier init by initializeRelayComponents
+      BASIC_AUTH_USER: CONFIG.BASIC_AUTH_USER,
+      BASIC_AUTH_PASSWORD: CONFIG.BASIC_AUTH_PASSWORD,
     });
     authLogger.info(
       "AuthenticationManager configured with initial settings. ✅"
@@ -485,6 +556,13 @@ async function startServer() {
       authenticateRequest
     );
     app.use("/files", fileManagerRouter);
+
+    // Set up network management routes
+    const networkRouter = setupNetworkRoutes(
+      authenticateRequest,
+      () => gun // Provide function to get Gun instance
+    );
+    app.use("/api/network", networkRouter);
 
     app.set("gun", gun);
 
@@ -757,7 +835,7 @@ app.use(
         return callback(null, true);
       }
 
-      if (allowedOrigins.indexOf(origin) !== -1) {
+      if (getCurrentAllowedOrigins().indexOf(origin) !== -1) {
         callback(null, true);
       } else {
         serverLogger.warn(`Origin blocked by CORS: ${origin}`);
@@ -807,7 +885,7 @@ app.get("/api/status", (req, res) => {
     timestamp: Date.now(),
     server: {
       version: "1.0.0",
-      cors: corsRestricted ? allowedOrigins : "all origins allowed",
+      cors: corsRestricted ? getCurrentAllowedOrigins() : "all origins allowed",
       corsRestricted: corsRestricted,
     },
     ipfs: {
@@ -980,6 +1058,169 @@ app.post("/api/validation-config", authenticateRequest, (req, res) => {
     res.status(500).json({
       success: false,
       error: "Error updating validation configuration: " + error.message,
+    });
+  }
+});
+
+// Configuration Management Endpoints
+app.get("/api/config", authenticateRequest, (req, res) => {
+  serverLogger.info("[Server] Retrieving current configuration 📋");
+  
+  try {
+    // Return safe configuration with proper defaults
+    const safeConfig = {
+      NODE_ENV: CONFIG.NODE_ENV || "development",
+      PORT: CONFIG.PORT || 8765,
+      HTTPS_PORT: CONFIG.HTTPS_PORT || 8443,
+      DISABLE_CORS: CONFIG.DISABLE_CORS === true || CONFIG.DISABLE_CORS === "true",
+      DISABLE_GUN_AUTH: CONFIG.DISABLE_GUN_AUTH === true || CONFIG.DISABLE_GUN_AUTH === "true",
+      IPFS_ENABLED: CONFIG.IPFS_ENABLED === true || CONFIG.IPFS_ENABLED === "true",
+      IPFS_SERVICE: CONFIG.IPFS_SERVICE || "IPFS-CLIENT",
+      IPFS_NODE_URL: CONFIG.IPFS_NODE_URL || "http://localhost:5001",
+      IPFS_GATEWAY: CONFIG.IPFS_GATEWAY || "http://127.0.0.1:8080/ipfs/",
+      PINATA_GATEWAY: CONFIG.PINATA_GATEWAY || "",
+      PINATA_JWT: CONFIG.PINATA_JWT || "",
+      ONCHAIN_MEMBERSHIP_ENABLED: CONFIG.ONCHAIN_MEMBERSHIP_ENABLED === true || CONFIG.ONCHAIN_MEMBERSHIP_ENABLED === "true",
+      TYPE_VALIDATION_ENABLED: CONFIG.TYPE_VALIDATION_ENABLED !== false && CONFIG.TYPE_VALIDATION_ENABLED !== "false",
+      TYPE_VALIDATION_STRICT: CONFIG.TYPE_VALIDATION_STRICT === true || CONFIG.TYPE_VALIDATION_STRICT === "true",
+      S3_BUCKET: CONFIG.S3_BUCKET || "",
+      S3_REGION: CONFIG.S3_REGION || "us-east-1",
+      S3_ENDPOINT: CONFIG.S3_ENDPOINT || "http://0.0.0.0:4569",
+      S3_ADDRESS: CONFIG.S3_ADDRESS || "0.0.0.0",
+      S3_PORT: CONFIG.S3_PORT || 4569,
+      // Include arrays and safe strings
+      PEERS: CONFIG.PEERS || [],
+      ALLOWED_ORIGINS: CONFIG.ALLOWED_ORIGINS || ""
+    };
+
+    res.json({
+      success: true,
+      config: safeConfig
+    });
+  } catch (error) {
+    serverLogger.error("[Server] Error retrieving configuration:", {
+      error: error.message,
+    });
+    res.status(500).json({
+      success: false,
+      error: "Error retrieving configuration: " + error.message,
+    });
+  }
+});
+
+app.post("/api/config", authenticateRequest, (req, res) => {
+  serverLogger.info("[Server] Processing configuration update request 🔧");
+
+  try {
+    const updates = req.body;
+    
+    // List of allowed configuration keys to update
+    const allowedKeys = [
+      'DISABLE_CORS',
+      'DISABLE_GUN_AUTH', 
+      'IPFS_ENABLED',
+      'IPFS_SERVICE',
+      'IPFS_NODE_URL',
+      'IPFS_GATEWAY',
+      'PINATA_GATEWAY',
+      'PINATA_JWT',
+      'ONCHAIN_MEMBERSHIP_ENABLED',
+      'TYPE_VALIDATION_ENABLED',
+      'TYPE_VALIDATION_STRICT',
+      'S3_BUCKET',
+      'S3_REGION',
+      'S3_ENDPOINT',
+      'S3_ADDRESS',
+      'S3_PORT',
+      'ALLOWED_ORIGINS'
+    ];
+
+    // Validate and update allowed keys
+    const updatedKeys = [];
+    for (const [key, value] of Object.entries(updates)) {
+      if (allowedKeys.includes(key)) {
+        CONFIG[key] = value;
+        updatedKeys.push(key);
+        serverLogger.info(`[Server] Updated config ${key}: ${value}`);
+      } else {
+        serverLogger.warn(`[Server] Attempted to update disallowed config key: ${key}`);
+      }
+    }
+
+    // Write updated configuration back to file
+    const configPath = path.join(__dirname, "config.json");
+    fs.writeFileSync(configPath, JSON.stringify(CONFIG, null, 4));
+    
+    serverLogger.info("[Server] Configuration file updated successfully ✅");
+
+    // If IPFS settings were updated, update the IPFS manager
+    const ipfsKeys = ['IPFS_ENABLED', 'IPFS_SERVICE', 'IPFS_NODE_URL', 'IPFS_GATEWAY', 'PINATA_GATEWAY', 'PINATA_JWT'];
+    if (ipfsKeys.some(key => updatedKeys.includes(key))) {
+      if (ipfsManager) {
+        try {
+          // Reinitialize IPFS manager with new settings
+          ipfsManager.updateConfig({
+            enabled: CONFIG.IPFS_ENABLED === true,
+            service: CONFIG.IPFS_SERVICE || "IPFS-CLIENT",
+            nodeUrl: CONFIG.IPFS_NODE_URL || "http://127.0.0.1:5001",
+            gateway: CONFIG.IPFS_GATEWAY || "http://127.0.0.1:8080/ipfs",
+            pinataGateway: CONFIG.PINATA_GATEWAY || "https://gateway.pinata.cloud",
+            pinataJwt: CONFIG.PINATA_JWT || "",
+          });
+          serverLogger.info("[Server] IPFS Manager configuration updated ✅");
+        } catch (ipfsError) {
+          serverLogger.error("[Server] Error updating IPFS Manager:", {
+            error: ipfsError.message,
+          });
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Configuration updated successfully. Updated keys: ${updatedKeys.join(', ')}`,
+      updatedKeys,
+      requiresRestart: updatedKeys.some(key => ['PORT', 'HTTPS_PORT', 'NODE_ENV'].includes(key))
+    });
+
+  } catch (error) {
+    serverLogger.error("[Server] Error updating configuration:", {
+      error: error.message,
+    });
+    res.status(500).json({
+      success: false,
+      error: "Error updating configuration: " + error.message,
+    });
+  }
+});
+
+// Configuration reload endpoint - fixes persistence issue after reset
+app.post("/api/config/reload", authenticateRequest, (req, res) => {
+  serverLogger.info("[Server] Processing configuration reload request 🔄");
+  
+  try {
+    const result = reloadConfigurationFromFile();
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: result.message,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error,
+        message: "Failed to reload configuration from file"
+      });
+    }
+  } catch (error) {
+    serverLogger.error("[Server] Error in reload endpoint:", {
+      error: error.message,
+    });
+    res.status(500).json({
+      success: false,
+      error: "Error in reload endpoint: " + error.message,
     });
   }
 });
