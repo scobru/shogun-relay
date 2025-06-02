@@ -508,7 +508,7 @@ export function FileItem(file) {
     
     const cardBody = h('div', { class: 'card-body p-4' });
     
-    // File header with name and IPFS badge
+    // File header with name and storage type badge
     const fileHeader = h('div', { class: 'flex justify-between items-start mb-2' },
         h('h4', { class: 'card-title text-base font-medium' }, safeFile.originalName),
         safeFile.ipfsHash 
@@ -541,7 +541,7 @@ export function FileItem(file) {
     }
     
     // Action buttons
-    const actions = h('div', { class: 'card-actions justify-end gap-2' });
+    const actions = h('div', { class: 'card-actions justify-end gap-2 flex-wrap' });
     
     // View file button
     const viewUrl = safeFile.ipfsHash ? safeFile.ipfsUrl : safeFile.fileUrl;
@@ -553,7 +553,18 @@ export function FileItem(file) {
         actions.appendChild(viewButton);
     }
     
-    // Copy IPFS hash button
+    // Upload to IPFS button (for local files only)
+    if (!safeFile.ipfsHash) {
+        const uploadToIpfsButton = h('button', { 
+            class: 'btn btn-secondary btn-sm',
+            onclick: async () => {
+                await uploadFileToIpfs(safeFile);
+            }
+        }, '🌐 Upload to IPFS');
+        actions.appendChild(uploadToIpfsButton);
+    }
+    
+    // Copy IPFS hash button (for IPFS files only)
     if (safeFile.ipfsHash) {
         const copyButton = h('button', { 
             class: 'btn btn-secondary btn-sm',
@@ -577,31 +588,31 @@ export function FileItem(file) {
                 const isPinned = await checkIpfsPinStatus(safeFile.ipfsHash);
                 
                 if (isPinned) {
-                    // Show unpin button
-                    const unpinButton = h('button', {
+                    // Unpin button
+                    const unpinButton = h('button', { 
                         class: 'btn btn-warning btn-sm',
                         onclick: async () => {
                             const success = await unpinFileFromIpfs(safeFile.id, safeFile.ipfsHash);
                             if (success) {
-                                // Refresh the button state
+                                // Recreate the pin button after successful unpin
                                 pinButtonContainer.innerHTML = '';
-                                const newButton = await createPinButton();
-                                pinButtonContainer.appendChild(newButton);
+                                const newPinButton = await createPinButton();
+                                pinButtonContainer.appendChild(newPinButton);
                             }
                         }
                     }, '📌 Unpin');
                     return unpinButton;
                 } else {
-                    // Show pin button
-                    const pinButton = h('button', {
+                    // Pin button
+                    const pinButton = h('button', { 
                         class: 'btn btn-success btn-sm',
                         onclick: async () => {
                             const success = await pinFileToIpfs(safeFile.id, safeFile.ipfsHash);
                             if (success) {
-                                // Refresh the button state
+                                // Recreate the pin button after successful pin
                                 pinButtonContainer.innerHTML = '';
-                                const newButton = await createPinButton();
-                                pinButtonContainer.appendChild(newButton);
+                                const newUnpinButton = await createPinButton();
+                                pinButtonContainer.appendChild(newUnpinButton);
                             }
                         }
                     }, '📍 Pin');
@@ -609,27 +620,19 @@ export function FileItem(file) {
                 }
             } catch (error) {
                 console.error('Error checking pin status:', error);
-                // Default to pin button if status check fails
-                const pinButton = h('button', {
-                    class: 'btn btn-success btn-sm',
-                    onclick: async () => {
-                        const success = await pinFileToIpfs(safeFile.id, safeFile.ipfsHash);
-                        if (success) {
-                            // Refresh the button state
-                            pinButtonContainer.innerHTML = '';
-                            const newButton = await createPinButton();
-                            pinButtonContainer.appendChild(newButton);
-                        }
-                    }
-                }, '📍 Pin');
-                return pinButton;
+                // Return a disabled button with error state
+                return h('button', { 
+                    class: 'btn btn-disabled btn-sm',
+                    title: 'Error checking pin status'
+                }, '❌ Pin Error');
             }
         };
         
-        // Initialize pin button asynchronously
-        createPinButton().then(button => {
-            pinButtonContainer.appendChild(button);
-        });
+        // Initialize pin button
+        (async () => {
+            const pinButton = await createPinButton();
+            pinButtonContainer.appendChild(pinButton);
+        })();
         
         actions.appendChild(pinButtonContainer);
     }
@@ -637,8 +640,15 @@ export function FileItem(file) {
     // Delete button
     const deleteButton = h('button', { 
         class: 'btn btn-error btn-sm',
-        onclick: () => {
-            deleteFile(safeFile.id, safeFile.originalName);
+        onclick: async () => {
+            if (confirm(`Are you sure you want to delete "${safeFile.originalName}"?`)) {
+                try {
+                    await deleteFile(safeFile.id);
+                    document.getElementById(`file-${safeFile.id}`)?.remove();
+                } catch (error) {
+                    showToast(`Error deleting file: ${error.message}`, 'error');
+                }
+            }
         }
     }, '🗑️ Delete');
     actions.appendChild(deleteButton);
@@ -647,6 +657,67 @@ export function FileItem(file) {
     fileCard.appendChild(cardBody);
     
     return fileCard;
+}
+
+/**
+ * Upload a local file to IPFS
+ */
+async function uploadFileToIpfs(file) {
+    try {
+        // Check if IPFS is enabled
+        const ipfsStatus = getIpfsStatus();
+        if (!ipfsStatus.enabled) {
+            showToast('IPFS is not enabled. Please enable IPFS first.', 'warning');
+            return false;
+        }
+        
+        if (confirm(`Upload "${file.originalName}" to IPFS?\n\nThis will make the file available on the IPFS network.`)) {
+            setIsLoading(true);
+            showToast('Uploading file to IPFS...', 'info');
+            
+            // Make API call to upload file to IPFS
+            const response = await fetch('/api/ipfs/upload-existing', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${getAuthToken()}`
+                },
+                body: JSON.stringify({
+                    fileId: file.id,
+                    fileName: file.originalName
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showToast(`File uploaded to IPFS successfully!`, 'success');
+                
+                // Refresh the files list to show updated IPFS info
+                try {
+                    localStorage.setItem('files-data', JSON.stringify([]));
+                    setFiles([]);
+                    loadFiles();
+                } catch (refreshError) {
+                    console.error("Error refreshing files after IPFS upload:", refreshError);
+                }
+                
+                return true;
+            } else {
+                throw new Error(data.error || 'Unknown error');
+            }
+        }
+    } catch (error) {
+        console.error('Error uploading file to IPFS:', error);
+        showToast(`Failed to upload to IPFS: ${error.message}`, 'error');
+        return false;
+    } finally {
+        setIsLoading(false);
+    }
 }
 
 /**

@@ -362,5 +362,148 @@ export default function setupIpfsApiRoutes(ipfsManager, fileManager, authenticat
     }
   });
 
+  // API - UPLOAD EXISTING FILE TO IPFS
+  router.post("/upload-existing", authenticateRequestMiddleware, async (req, res) => {
+    try {
+      const { fileId, fileName } = req.body;
+      
+      if (!fileId) {
+        return res.status(400).json({
+          success: false,
+          error: "File ID is required",
+          message: "Missing required parameter"
+        });
+      }
+      
+      if (!ipfsManager.isEnabled()) {
+        return res.status(400).json({
+          success: false,
+          error: "IPFS not active",
+          message: "IPFS service not enabled"
+        });
+      }
+      
+      console.log(`[IPFS API] Uploading existing file to IPFS: ${fileId}`);
+      
+      // Get file from FileManager first
+      const fileData = await fileManager.getFileById(fileId);
+      if (!fileData) {
+        return res.status(404).json({
+          success: false,
+          error: "File not found",
+          message: `File with ID ${fileId} not found`
+        });
+      }
+      
+      // Check if file already has IPFS hash
+      if (fileData.ipfsHash) {
+        return res.json({
+          success: true,
+          message: "File already exists on IPFS",
+          ipfsHash: fileData.ipfsHash,
+          ipfsUrl: fileData.ipfsUrl,
+          alreadyExists: true
+        });
+      }
+      
+      // Find the local file path
+      let localFilePath = fileData.localPath;
+      
+      // If localPath is not available, try to construct it
+      if (!localFilePath || !fs.existsSync(localFilePath)) {
+        const uploadsDir = fileManager.config?.storageDir || './uploads';
+        
+        // Try different filename patterns
+        const possiblePaths = [
+          path.join(uploadsDir, fileData.name),
+          path.join(uploadsDir, fileData.originalName),
+          path.join(uploadsDir, `${fileData.timestamp}-${fileData.originalName}`),
+          path.join(uploadsDir, `${fileData.timestamp}-${fileData.name}`)
+        ];
+        
+        // Try to find the file in filesystem
+        const files = fs.readdirSync(uploadsDir);
+        for (const file of files) {
+          if (file.includes(fileData.timestamp?.toString()) || 
+              file.includes(fileData.name) || 
+              file.includes(fileData.originalName)) {
+            localFilePath = path.join(uploadsDir, file);
+            break;
+          }
+        }
+        
+        // If still not found, try the possible paths
+        if (!localFilePath || !fs.existsSync(localFilePath)) {
+          for (const possiblePath of possiblePaths) {
+            if (fs.existsSync(possiblePath)) {
+              localFilePath = possiblePath;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (!localFilePath || !fs.existsSync(localFilePath)) {
+        return res.status(404).json({
+          success: false,
+          error: "Local file not found",
+          message: `Local file for ${fileId} not found in filesystem`
+        });
+      }
+      
+      console.log(`[IPFS API] Found local file at: ${localFilePath}`);
+      
+      // Upload to IPFS
+      const result = await ipfsManager.uploadFile(localFilePath, {
+        name: fileName || fileData.originalName || fileData.name,
+        metadata: {
+          size: fileData.size,
+          type: fileData.mimetype || fileData.mimeType,
+          originalFileId: fileId,
+          uploadedAt: Date.now()
+        }
+      });
+      
+      if (result && result.id) {
+        const ipfsHash = result.id;
+        const ipfsUrl = ipfsManager.getGatewayUrl(ipfsHash);
+        
+        // Update file metadata in FileManager
+        const updatedFileData = {
+          ...fileData,
+          ipfsHash: ipfsHash,
+          ipfsUrl: ipfsUrl
+        };
+        
+        // Save updated metadata
+        await fileManager.saveFileMetadata(updatedFileData);
+        
+        // Save IPFS metadata
+        fileManager._saveIpfsMetadata(fileId, ipfsHash);
+        
+        console.log(`[IPFS API] File uploaded to IPFS successfully: ${ipfsHash}`);
+        
+        return res.json({
+          success: true,
+          message: "File uploaded to IPFS successfully",
+          fileId: fileId,
+          ipfsHash: ipfsHash,
+          ipfsUrl: ipfsUrl,
+          result: result
+        });
+      } else {
+        throw new Error("IPFS upload completed but no hash received");
+      }
+      
+    } catch (error) {
+      console.error(`[IPFS API] Error uploading existing file to IPFS: ${error.message}`);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+        message: "Error uploading file to IPFS"
+      });
+    }
+  });
+
   return router;
 } 

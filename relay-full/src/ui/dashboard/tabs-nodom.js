@@ -243,21 +243,16 @@ export function UploadTabContent() {
         if (isActive && tabContent.innerHTML === '') {
             tabContent.innerHTML = '';
             
-            // Card header with IPFS status
-            const ipfsStatus = getIpfsStatus();
-            const ipfsStatusIndicator = h('div', { 
-                class: `badge ${ipfsStatus.enabled ? 'badge-success' : 'badge-error'} gap-2`
-            }, 
-                h('span', {}, ipfsStatus.enabled ? '✅' : '❌'),
-                h('span', {}, ipfsStatus.enabled ? 'IPFS Enabled' : 'IPFS Disabled')
-            );
-            
+            // Card header without IPFS status (since we're not doing direct IPFS upload)
             const cardHeader = h('div', { class: 'flex items-center gap-3 mb-6' },
                 h('h3', { class: 'text-2xl font-bold text-base-content' }, '⬆️ Upload File'),
-                ipfsStatusIndicator
+                h('div', { class: 'badge badge-info gap-2' }, 
+                    h('span', {}, '💾'),
+                    h('span', {}, 'Local Upload')
+                )
             );
             
-            // Upload form with enhanced styling
+            // Upload form for local storage only
             const uploadForm = createUploadForm();
             
             // Results container
@@ -274,7 +269,7 @@ export function UploadTabContent() {
     });
     
     /**
-     * Create enhanced upload form with DaisyUI
+     * Create enhanced upload form for local storage
      */
     function createUploadForm() {
         const form = h('div', { class: 'space-y-6' });
@@ -298,7 +293,7 @@ export function UploadTabContent() {
             h('div', { class: 'text-6xl' }, '📁'),
             h('div', { class: 'space-y-2' },
                 h('p', { class: 'text-lg font-medium' }, 'Click to select file or drag & drop'),
-                h('p', { class: 'text-sm text-base-content/60' }, 'Any file type supported')
+                h('p', { class: 'text-sm text-base-content/60' }, 'Files will be stored locally first')
             ),
             h('button', { 
                 type: 'button',
@@ -368,7 +363,7 @@ export function UploadTabContent() {
         return form;
     }
     
-    // Handle file upload with enhanced feedback
+    // Handle file upload with local storage only
     async function handleUpload() {
         const fileInput = document.getElementById('file-upload');
         const customName = document.getElementById('file-name').value;
@@ -379,21 +374,6 @@ export function UploadTabContent() {
         }
         
         const file = fileInput.files[0];
-        
-        // Check IPFS status first
-        let ipfsStatus = null;
-        try {
-            const ipfsResponse = await fetch("/api/ipfs/status", {
-                headers: { Authorization: `Bearer ${getAuthToken()}` }
-            });
-            
-            if (ipfsResponse.ok) {
-                ipfsStatus = await ipfsResponse.json();
-                console.log("IPFS Status before upload:", ipfsStatus.config);
-            }
-        } catch (error) {
-            console.error("Error checking IPFS status:", error);
-        }
         
         // Show loading
         setIsLoading(true);
@@ -420,13 +400,7 @@ export function UploadTabContent() {
             const data = await response.json();
             
             if (data.success) {
-                // Check if the file was uploaded to IPFS
-                if (data.file && data.file.ipfsHash) {
-                    console.log(`File uploaded to IPFS successfully: ${data.file.ipfsHash}`);
-                    showToast('✅ File uploaded to IPFS successfully!', 'success');
-                } else {
-                    showToast('✅ File uploaded successfully!', 'success');
-                }
+                showToast('✅ File uploaded successfully!', 'success');
                 
                 // Clear form
                 fileInput.value = '';
@@ -445,8 +419,8 @@ export function UploadTabContent() {
                 throw new Error(data.error || "Unknown error");
             }
         } catch (error) {
-            showToast(`❌ Upload error: ${error.message}`, 'error');
-            console.error("Error uploading file:", error);
+            console.error("Upload error:", error);
+            showToast(`Upload failed: ${error.message}`, 'error');
         } finally {
             setIsLoading(false);
         }

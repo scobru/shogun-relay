@@ -62,46 +62,33 @@ class FileManager {
     });
   }
 
-  // Configure multer based on IPFS availability
+  // Configure multer for local storage only
   configureMulter() {
-    const isIpfsEnabled = this.config.ipfsManager?.isEnabled();
+    // Always use diskStorage since we're not doing automatic IPFS uploads anymore
+    const storage = multer.diskStorage({
+      destination: (req, file, cb) => {
+        // Ensure directory exists
+        if (!fs.existsSync(this.config.storageDir)) {
+          fs.mkdirSync(this.config.storageDir, { recursive: true });
+        }
+        cb(null, this.config.storageDir);
+      },
+      filename: (req, file, cb) => {
+        // Generate unique filename
+        const uniqueFilename = `${Date.now()}-${file.originalname.replace(
+          /[^a-zA-Z0-9.-]/g,
+          "_"
+        )}`;
+        cb(null, uniqueFilename);
+      },
+    });
 
-    if (isIpfsEnabled) {
-      // When IPFS is enabled, use memoryStorage to keep buffer in memory
-      const memoryStorage = multer.memoryStorage();
-      this.upload = multer({
-        storage: memoryStorage,
-        limits: {
-          fileSize: this.config.maxFileSize,
-        },
-      });
-    } else {
-      // When IPFS is disabled, use diskStorage to save directly to disk
-      const storage = multer.diskStorage({
-        destination: (req, file, cb) => {
-          // Ensure directory exists
-          if (!fs.existsSync(this.config.storageDir)) {
-            fs.mkdirSync(this.config.storageDir, { recursive: true });
-          }
-          cb(null, this.config.storageDir);
-        },
-        filename: (req, file, cb) => {
-          // Generate unique filename
-          const uniqueFilename = `${Date.now()}-${file.originalname.replace(
-            /[^a-zA-Z0-9.-]/g,
-            "_"
-          )}`;
-          cb(null, uniqueFilename);
-        },
-      });
-
-      this.upload = multer({
-        storage: storage,
-        limits: {
-          fileSize: this.config.maxFileSize,
-        },
-      });
-    }
+    this.upload = multer({
+      storage: storage,
+      limits: {
+        fileSize: this.config.maxFileSize,
+      },
+    });
   }
 
   /**
@@ -164,125 +151,15 @@ class FileManager {
     }
 
     let fileUrl = null;
-    let ipfsHash = null;
     let localPath = null;
 
-    // If IPFS is enabled, upload to IPFS
-    if (this.config.ipfsManager?.isEnabled()) {
-      try {
-        console.log(
-          `Attempting upload to IPFS for file: ${originalName}, size: ${fileSize} bytes, type: ${mimeType}`
-        );
-
-        if (!fileBuffer || fileBuffer.length === 0) {
-          throw new Error("Empty or invalid file buffer");
-        }
-
-        if (!this.config.ipfsManager.shogunIpfs) {
-          throw new Error("IPFS manager not properly initialized");
-        }
-
-        let result;
-
-        // Use the correct method based on file type
-        if (mimeType.startsWith("text/") || mimeType === "application/json") {
-          // For text or JSON files, we can use uploadJson
-          const textContent = fileBuffer.toString("utf-8");
-
-          // Check if it's valid JSON
-          let jsonData;
-          try {
-            jsonData = JSON.parse(textContent);
-          } catch (e) {
-            // If not valid JSON, treat as normal text
-            jsonData = { content: textContent, filename: originalName };
-          }
-
-          result = await this.config.ipfsManager.uploadJson(jsonData, {
-            name: originalName,
-            metadata: {
-              size: fileSize,
-              type: mimeType,
-              customName: req.body.customName || null,
-            },
-          });
-        } else {
-          // For binary files (images, videos, etc.) use uploadFile directly
-          // Create a temporary file
-          const tempFilePath = path.join(
-            this.config.storageDir,
-            `temp_${Date.now()}_${originalName}`
-          );
-          fs.writeFileSync(tempFilePath, fileBuffer);
-
-          console.log(
-            `Created temporary file at ${tempFilePath} for IPFS upload`
-          );
-
-          try {
-            result = await this.config.ipfsManager.uploadFile(tempFilePath, {
-              name: originalName,
-              metadata: {
-                size: fileSize,
-                type: mimeType,
-                customName: req.body.customName || null,
-              },
-            });
-          } catch (uploadError) {
-            console.error(
-              `IPFS upload error for file ${tempFilePath}:`,
-              uploadError
-            );
-            throw uploadError;
-          } finally {
-            // Remove temporary file
-            try {
-              fs.unlinkSync(tempFilePath);
-              console.log(`Removed temporary file: ${tempFilePath}`);
-            } catch (e) {
-              console.warn(
-                `Could not remove temporary file: ${tempFilePath}`,
-                e
-              );
-              /* ignore errors */
-            }
-          }
-        }
-
-        if (result && result.id) {
-          fileUrl = this.config.ipfsManager.getGatewayUrl(result.id);
-          ipfsHash = result.id;
-          console.log(`File uploaded to IPFS successfully. CID: ${result.id}`);
-          
-          // We'll save metadata later when we have the file ID
-        } else {
-          throw new Error("Upload IPFS completed but ID not received");
-        }
-      } catch (ipfsError) {
-        console.error("Error during IPFS upload:", ipfsError);
-        console.error(
-          "Error details:",
-          JSON.stringify(ipfsError.message || ipfsError)
-        );
-        // Fallback to local upload will happen automatically
-        console.log("Falling back to local storage due to IPFS upload failure");
-      }
-    }
-
-    // Fallback to local storage
-    if (!fileUrl) {
-      console.log(
-        `IPFS upload failed or not configured, using local storage for: ${originalName}`
-      );
-      const fileName = `${uploadTimestamp}-${originalName.replace(
-        /[^a-zA-Z0-9.-]/g,
-        "_"
-      )}`;
-      localPath = path.join(this.config.storageDir, fileName);
-      fs.writeFileSync(localPath, fileBuffer);
-      fileUrl = `/uploads/${fileName}`;
-      console.log(`File saved locally successfully: ${localPath}`);
-    }
+    // Always store files locally first (no automatic IPFS upload)
+    console.log(`Storing file locally: ${originalName}`);
+    const fileName = `${uploadTimestamp}-${originalName.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+    localPath = path.join(this.config.storageDir, fileName);
+    fs.writeFileSync(localPath, fileBuffer);
+    fileUrl = `/uploads/${fileName}`;
+    console.log(`File saved locally successfully: ${localPath}`);
 
     // Ensure an ID with proper formatting for GunDB
     const safeId = gunDbKey.replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -297,57 +174,18 @@ class FileManager {
       url: fileUrl,
       fileUrl: fileUrl,
       localPath: localPath,
-      ipfsHash: ipfsHash || null,
-      ipfsUrl: ipfsHash
-        ? this.config.ipfsManager.getGatewayUrl(ipfsHash)
-        : null,
+      ipfsHash: null, // No IPFS hash initially
+      ipfsUrl: null,  // No IPFS URL initially
       timestamp: uploadTimestamp,
       uploadedAt: uploadTimestamp,
       customName: req.body.customName || null,
     };
 
-    // Save metadata to GunDB if available, but don't wait for it to complete
-    if (this.config.gun) {
-      console.log(
-        `[FileManager] Saving file metadata to GunDB with ID: ${safeId}`
-      );
-      // Use Promise.race with a timeout to prevent hanging
-      Promise.race([
-        this.saveFileMetadata(fileData),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("GunDB save timeout")), 10000)
-        ),
-      ])
-        .then((result) => {
-          if (result && result.verified) {
-            console.log(
-              `[FileManager] GunDB save successful for file: ${safeId}`
-            );
-            fileData.verified = true;
-          } else {
-            console.warn(
-              `[FileManager] GunDB save may have failed for file: ${safeId}`
-            );
-            fileData.verified = false;
-          }
-        })
-        .catch((error) => {
-          console.error(
-            `[FileManager] Error saving to GunDB (continuing): ${error.message}`
-          );
-          fileData.verified = false;
-        });
+    // Save metadata to GunDB
+    const savedFile = await this.saveFileMetadata(fileData);
 
-      // Always return the file data without waiting for GunDB
-      fileData.verified = true; // Optimistically assume it will work
-    }
-
-    // Save IPFS metadata to a local file only if we have an IPFS hash
-    if (ipfsHash) {
-      this._saveIpfsMetadata(safeId, ipfsHash);
-    }
-
-    return fileData;
+    console.log(`[FILE-MANAGER] File upload completed: ${savedFile.id}`);
+    return savedFile;
   }
 
   /**
