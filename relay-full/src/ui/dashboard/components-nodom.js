@@ -480,13 +480,19 @@ export function Tabs() {
 export { EnhancedTabs as ModernTabs };
 
 /**
- * File item component with DaisyUI styling
+ * File Item Component with optional checkbox support
  */
-export function FileItem(file) {
+export function FileItem(file, options = {}) {
     if (!file || typeof file !== 'object') {
         console.error('Invalid file object:', file);
         return h('div', { class: 'alert alert-error' }, 'Invalid file data');
     }
+    
+    const {
+        showCheckbox = false,
+        checked = false,
+        onSelectionChange = null
+    } = options;
     
     const safeFile = {
         id: file.id || `file-${Date.now()}`,
@@ -511,13 +517,37 @@ export function FileItem(file) {
     
     const cardBody = h('div', { class: 'card-body p-4' });
     
-    // File header with name and storage type badge
-    const fileHeader = h('div', { class: 'flex justify-between items-start mb-2' },
+    // File header with checkbox (if enabled), name and storage type badge
+    const fileHeaderContent = [];
+    
+    // Add checkbox if enabled
+    if (showCheckbox) {
+        const checkbox = h('input', {
+            type: 'checkbox',
+            id: `file-checkbox-${safeFile.id}`,
+            class: 'checkbox checkbox-primary',
+            checked: checked,
+            onchange: (e) => {
+                if (onSelectionChange) {
+                    onSelectionChange(safeFile.id, e.target.checked);
+                }
+            }
+        });
+        fileHeaderContent.push(h('div', { class: 'flex items-center' }, checkbox));
+    }
+    
+    // File name and badge container
+    const nameAndBadgeContainer = h('div', { class: 'flex justify-between items-start flex-1 ml-2' },
         h('h4', { class: 'card-title text-base font-medium' }, safeFile.originalName),
         safeFile.ipfsHash 
             ? h('div', { class: 'badge badge-secondary' }, '🌐 IPFS')
             : h('div', { class: 'badge badge-outline' }, '💾 Local')
     );
+    fileHeaderContent.push(nameAndBadgeContainer);
+    
+    const fileHeader = h('div', { 
+        class: showCheckbox ? 'flex items-start mb-2' : 'flex justify-between items-start mb-2'
+    }, ...fileHeaderContent);
     
     // File metadata
     const fileMeta = h('div', { class: 'text-sm text-base-content/70 mb-3' },
@@ -640,21 +670,23 @@ export function FileItem(file) {
         actions.appendChild(pinButtonContainer);
     }
     
-    // Delete button
-    const deleteButton = h('button', { 
-        class: 'btn btn-error btn-sm',
-        onclick: async () => {
-            if (confirm(`Are you sure you want to delete "${safeFile.originalName}"?`)) {
-                try {
-                    await deleteFile(safeFile.id);
-                    document.getElementById(`file-${safeFile.id}`)?.remove();
-                } catch (error) {
-                    showToast(`Error deleting file: ${error.message}`, 'error');
+    // Delete button (only show if not in batch mode to avoid confusion)
+    if (!showCheckbox) {
+        const deleteButton = h('button', { 
+            class: 'btn btn-error btn-sm',
+            onclick: async () => {
+                if (confirm(`Are you sure you want to delete "${safeFile.originalName}"?`)) {
+                    try {
+                        await deleteFile(safeFile.id);
+                        document.getElementById(`file-${safeFile.id}`)?.remove();
+                    } catch (error) {
+                        showToast(`Error deleting file: ${error.message}`, 'error');
+                    }
                 }
             }
-        }
-    }, '🗑️ Delete');
-    actions.appendChild(deleteButton);
+        }, '🗑️ Delete');
+        actions.appendChild(deleteButton);
+    }
     
     cardBody.appendChild(actions);
     fileCard.appendChild(cardBody);

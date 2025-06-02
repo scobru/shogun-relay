@@ -41,6 +41,10 @@ export function FilesTabContent() {
         style: 'display: none;' 
     });
     
+    // State for batch selection
+    let selectedFiles = new Set();
+    let isSelectAllChecked = false;
+    
     setEffect(() => {
         const isActive = getActiveTab() === 'files';
         tabContent.style.display = isActive ? 'block' : 'none';
@@ -62,14 +66,22 @@ export function FilesTabContent() {
                     h('h3', { class: 'text-2xl font-bold text-base-content' }, '📁 File Management'),
                     ipfsStatusIndicator
                 ),
-                h('button', { 
-                    id: 'refresh-files',
-                    class: 'btn btn-primary btn-sm',
-                    onclick: () => {
-                        loadFiles();
-                        showToast('Refreshing files...', 'info');
-                    }
-                }, '🔄 Refresh Files')
+                h('div', { class: 'flex gap-2' },
+                    h('button', { 
+                        id: 'refresh-files',
+                        class: 'btn btn-primary btn-sm',
+                        onclick: () => {
+                            loadFiles();
+                            showToast('Refreshing files...', 'info');
+                        }
+                    }, '🔄 Refresh Files'),
+                    h('button', { 
+                        id: 'batch-delete-btn',
+                        class: 'btn btn-error btn-sm',
+                        style: 'display: none;',
+                        onclick: handleBatchDelete
+                    }, '🗑️ Delete Selected')
+                )
             );
             
             // Search form
@@ -150,6 +162,149 @@ export function FilesTabContent() {
         }
     });
     
+    // Function to handle batch deletion
+    async function handleBatchDelete() {
+        if (selectedFiles.size === 0) {
+            showToast('No files selected for deletion', 'warning');
+            return;
+        }
+        
+        const selectedCount = selectedFiles.size;
+        const fileNames = Array.from(selectedFiles).map(fileId => {
+            const files = getFiles();
+            const file = files.find(f => f.id === fileId);
+            return file ? file.originalName : fileId;
+        }).slice(0, 3); // Show first 3 names
+        
+        const displayNames = fileNames.length > 3 
+            ? `${fileNames.join(', ')} and ${selectedCount - 3} more`
+            : fileNames.join(', ');
+        
+        if (confirm(`Are you sure you want to delete ${selectedCount} selected file(s)?\n\n${displayNames}`)) {
+            try {
+                setIsLoading(true);
+                showToast(`Deleting ${selectedCount} files...`, 'info');
+                
+                let successCount = 0;
+                let failureCount = 0;
+                
+                // Delete files one by one
+                for (const fileId of selectedFiles) {
+                    try {
+                        await deleteFile(fileId);
+                        successCount++;
+                    } catch (error) {
+                        console.error(`Error deleting file ${fileId}:`, error);
+                        failureCount++;
+                    }
+                }
+                
+                // Clear selection
+                selectedFiles.clear();
+                updateSelectAllState();
+                updateBatchDeleteButton();
+                
+                // Show results
+                if (failureCount === 0) {
+                    showToast(`✅ Successfully deleted ${successCount} files`, 'success');
+                } else {
+                    showToast(`⚠️ Deleted ${successCount} files, ${failureCount} failed`, 'warning');
+                }
+                
+                // Refresh file list with delay to avoid duplicates
+                setTimeout(() => {
+                    loadFiles();
+                }, 500);
+                
+            } catch (error) {
+                console.error('Error during batch deletion:', error);
+                showToast(`Error during batch deletion: ${error.message}`, 'error');
+            } finally {
+                setIsLoading(false);
+            }
+        }
+    }
+    
+    // Function to update select all checkbox state
+    function updateSelectAllState() {
+        const selectAllCheckbox = document.getElementById('select-all-files');
+        if (selectAllCheckbox) {
+            const files = getFiles();
+            const filteredFiles = getFilteredFiles(files);
+            
+            if (filteredFiles.length === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            } else if (selectedFiles.size === filteredFiles.length) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else if (selectedFiles.size > 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            }
+        }
+    }
+    
+    // Function to update batch delete button visibility
+    function updateBatchDeleteButton() {
+        const batchDeleteBtn = document.getElementById('batch-delete-btn');
+        if (batchDeleteBtn) {
+            if (selectedFiles.size > 0) {
+                batchDeleteBtn.style.display = 'block';
+                batchDeleteBtn.textContent = `🗑️ Delete Selected (${selectedFiles.size})`;
+            } else {
+                batchDeleteBtn.style.display = 'none';
+            }
+        }
+    }
+    
+    // Function to get filtered files based on current filter
+    function getFilteredFiles(files) {
+        const ipfsFilterEnabled = document.getElementById('ipfs-filter')?.checked || false;
+        return ipfsFilterEnabled
+            ? files.filter(file => file && file.ipfsHash)
+            : files;
+    }
+    
+    // Function to handle select all checkbox
+    function handleSelectAll(checked) {
+        const files = getFiles();
+        const filteredFiles = getFilteredFiles(files);
+        
+        if (checked) {
+            // Select all filtered files
+            filteredFiles.forEach(file => selectedFiles.add(file.id));
+        } else {
+            // Deselect all filtered files
+            filteredFiles.forEach(file => selectedFiles.delete(file.id));
+        }
+        
+        // Update individual checkboxes
+        filteredFiles.forEach(file => {
+            const checkbox = document.getElementById(`file-checkbox-${file.id}`);
+            if (checkbox) {
+                checkbox.checked = selectedFiles.has(file.id);
+            }
+        });
+        
+        updateBatchDeleteButton();
+    }
+    
+    // Function to handle individual file selection
+    function handleFileSelection(fileId, checked) {
+        if (checked) {
+            selectedFiles.add(fileId);
+        } else {
+            selectedFiles.delete(fileId);
+        }
+        
+        updateSelectAllState();
+        updateBatchDeleteButton();
+    }
+
     // Function to update file list
     function updateFileList(container) {
         if (!container) return;
@@ -189,14 +344,24 @@ export function FilesTabContent() {
         const currentTimestamp = Date.now();
         container.setAttribute('data-last-update', currentTimestamp);
         
-        // Display summary
+        // Display summary with select all checkbox
         const ipfsCount = files.filter(file => file && file.ipfsHash).length;
         const summary = h('div', { 
             class: 'stats stats-horizontal shadow mb-6',
             'data-update-id': currentTimestamp
         },
             h('div', { class: 'stat' },
-                h('div', { class: 'stat-title' }, 'Total Files'),
+                h('div', { class: 'stat-title flex items-center gap-2' },
+                    h('label', { class: 'label cursor-pointer gap-2' },
+                        h('input', { 
+                            type: 'checkbox',
+                            id: 'select-all-files',
+                            class: 'checkbox checkbox-primary checkbox-sm',
+                            onchange: (e) => handleSelectAll(e.target.checked)
+                        }),
+                        h('span', {}, 'Total Files')
+                    )
+                ),
                 h('div', { class: 'stat-value text-primary' }, filteredFiles.length),
                 h('div', { class: 'stat-desc' }, `of ${files.length} files`)
             ),
@@ -208,7 +373,13 @@ export function FilesTabContent() {
         );
         container.appendChild(summary);
         
-        // Add each file with duplicate prevention
+        // Update select all state after rendering
+        setTimeout(() => {
+            updateSelectAllState();
+            updateBatchDeleteButton();
+        }, 0);
+        
+        // Add each file with duplicate prevention and checkbox
         try {
             // Sort files by timestamp (newest first)
             const sortedFiles = [...filteredFiles].sort((a, b) => {
@@ -221,7 +392,11 @@ export function FilesTabContent() {
                 if (!file || typeof file !== 'object') return;
                 
                 // Add unique identifier to prevent duplicate processing
-                const fileEl = FileItem(file);
+                const fileEl = FileItem(file, {
+                    showCheckbox: true,
+                    checked: selectedFiles.has(file.id),
+                    onSelectionChange: handleFileSelection
+                });
                 fileEl.setAttribute('data-file-index', index);
                 fileEl.setAttribute('data-update-id', currentTimestamp);
                 container.appendChild(fileEl);
@@ -377,7 +552,7 @@ export function UploadTabContent() {
         return form;
     }
     
-    // Handle file upload with local storage only
+    // Handle file upload with improved error handling and duplicate prevention
     async function handleUpload() {
         const fileInput = document.getElementById('file-upload');
         const customName = document.getElementById('file-name').value;
@@ -388,6 +563,12 @@ export function UploadTabContent() {
         }
         
         const file = fileInput.files[0];
+        
+        // Prevent multiple rapid uploads
+        if (getIsLoading()) {
+            showToast('Upload already in progress, please wait...', 'warning');
+            return;
+        }
         
         // Show loading
         setIsLoading(true);
@@ -421,16 +602,19 @@ export function UploadTabContent() {
                 document.getElementById('file-name').value = '';
                 document.getElementById('file-upload-status').className = 'mt-4 text-center hidden';
                 
-                // Reload files list with throttling to prevent duplicates
+                // Reload files list with improved handling to prevent duplicates
                 try {
                     // Clear cache first
                     localStorage.setItem('files-data', JSON.stringify([]));
                     setFiles([]);
                     
                     // Wait a moment before refreshing to allow server to process
+                    // Use a longer delay to prevent race conditions
                     setTimeout(() => {
-                        loadFiles();
-                    }, 1000);
+                        if (!getIsLoading()) { // Only load if not currently loading
+                            loadFiles();
+                        }
+                    }, 1500);
                 } catch (refreshError) {
                     console.error("Error refreshing files after upload:", refreshError);
                 }
