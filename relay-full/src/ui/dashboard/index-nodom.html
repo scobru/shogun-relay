@@ -89,6 +89,7 @@
         setActiveTab,
         handleLogout,
         initTheme,
+        initializeFileEventListeners,
       } from "./app-nodom.js";
       import {
         Header,
@@ -268,6 +269,9 @@
 
           // Initialize theme
           initTheme();
+          
+          // Initialize file event listeners to prevent duplicates
+          initializeFileEventListeners();
 
           // Check authentication
           const isAuthenticated = await checkAuth();

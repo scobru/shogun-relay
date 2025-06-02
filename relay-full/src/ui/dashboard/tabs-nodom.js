@@ -25,7 +25,8 @@ import {
     testPeerConnection,
     getNetworkStatus,
     // Import file management functions
-    deleteFile
+    deleteFile,
+    forceRefreshFileList
 } from './app-nodom.js';
 import { FileSearchForm, FileItem, EmptyState, LoadingState, PeerItem } from './components-nodom.js';
 
@@ -36,6 +37,70 @@ let isSelectAllChecked = false;
 // Debouncing per evitare richieste multiple
 let networkUpdateTimeout = null;
 let networkTabActive = false;
+
+// Add flag to prevent multiple refreshes
+let isRefreshingAfterUpload = false;
+
+// Track recent uploads to prevent immediate duplicates
+let recentUploads = new Map(); // filename -> timestamp
+const uploadCooldownTime = 3000; // 3 seconds cooldown for same file
+
+// Add global flag to prevent double uploads
+let isUploadInProgress = false;
+let uploadClickTimeout = null;
+
+// Client-side content tracking to prevent immediate duplicates
+let clientContentHashes = new Map(); // contentHash -> file info
+const contentHashTimeout = 60000; // 1 minute timeout for content hashes
+
+// Debug function to check upload status
+window.debugUploadStatus = function() {
+    console.log('=== UPLOAD DEBUG STATUS ===');
+    console.log('isUploadInProgress:', isUploadInProgress);
+    console.log('isRefreshingAfterUpload:', isRefreshingAfterUpload);
+    console.log('uploadClickTimeout:', uploadClickTimeout);
+    console.log('recentUploads size:', recentUploads.size);
+    console.log('recentUploads entries:', Array.from(recentUploads.entries()));
+    console.log('clientContentHashes size:', clientContentHashes.size);
+    console.log('clientContentHashes entries:', Array.from(clientContentHashes.entries()));
+    console.log('getIsLoading():', getIsLoading());
+    
+    const uploadBtn = document.getElementById('upload-submit');
+    if (uploadBtn) {
+        console.log('Upload button disabled:', uploadBtn.disabled);
+        console.log('Upload button text:', uploadBtn.textContent);
+    }
+    console.log('=========================');
+    
+    return {
+        isUploadInProgress,
+        isRefreshingAfterUpload,
+        uploadClickTimeout,
+        recentUploadsCount: recentUploads.size,
+        clientContentHashesCount: clientContentHashes.size,
+        isSystemLoading: getIsLoading()
+    };
+};
+
+// Reset function for emergency cases
+window.resetUploadState = function() {
+    console.log('🚨 EMERGENCY: Resetting upload state');
+    isUploadInProgress = false;
+    isRefreshingAfterUpload = false;
+    uploadClickTimeout = null;
+    recentUploads.clear();
+    clientContentHashes.clear();
+    setIsLoading(false);
+    
+    const uploadBtn = document.getElementById('upload-submit');
+    if (uploadBtn) {
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = '🚀 Upload File';
+        uploadBtn.classList.remove('loading');
+    }
+    
+    console.log('✅ Upload state reset completed');
+};
 
 /**
  * Files Tab Content Component
@@ -72,9 +137,16 @@ export function FilesTabContent() {
                     h('button', { 
                         id: 'refresh-files',
                         class: 'btn btn-primary btn-sm',
-                        onclick: () => {
-                            loadFiles();
-                            showToast('Refreshing files...', 'info');
+                        onclick: async () => {
+                            console.log('[RefreshButton] User requested file refresh');
+                            showToast('🔄 Refreshing files...', 'info');
+                            try {
+                                await forceRefreshFileList();
+                                showToast('✅ Files refreshed successfully', 'success');
+                            } catch (error) {
+                                console.error('[RefreshButton] Error during refresh:', error);
+                                showToast('❌ Failed to refresh files', 'error');
+                            }
                         }
                     }, '🔄 Refresh Files'),
                     h('button', { 
@@ -207,31 +279,42 @@ export function FilesTabContent() {
             try {
                 setIsLoading(true);
                 showToast(`Deleting ${selectedCount} files...`, 'info');
+                console.log(`[BatchDelete] Starting deletion of ${selectedCount} files`);
                 
                 let successCount = 0;
                 let failureCount = 0;
                 
-                // Delete files one by one
+                // Delete files one by one using the server API directly
                 for (const fileId of selectedFiles) {
                     try {
-                        await deleteFile(fileId);
-                        successCount++;
+                        const response = await fetch(`/files/${fileId}`, {
+                            method: "DELETE",
+                            headers: {
+                                Authorization: `Bearer ${getAuthToken()}`,
+                            },
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data.success) {
+                                successCount++;
+                                console.log(`[BatchDelete] Successfully deleted file: ${fileId}`);
+                            } else {
+                                failureCount++;
+                                console.error(`[BatchDelete] Server error deleting file ${fileId}:`, data.error);
+                            }
+                        } else {
+                            failureCount++;
+                            console.error(`[BatchDelete] HTTP error deleting file ${fileId}:`, response.status);
+                        }
                     } catch (error) {
-                        console.error(`Error deleting file ${fileId}:`, error);
+                        console.error(`[BatchDelete] Error deleting file ${fileId}:`, error);
                         failureCount++;
                     }
                 }
                 
                 // Clear selection and UI state
                 selectedFiles.clear();
-                
-                // Clear file list display state to force refresh
-                const fileListContainer = document.getElementById('file-list');
-                if (fileListContainer) {
-                    fileListContainer.dataset.lastFileIds = '';
-                    fileListContainer.dataset.updating = 'false';
-                }
-                
                 updateSelectAllState();
                 updateBatchDeleteButton();
                 
@@ -242,29 +325,12 @@ export function FilesTabContent() {
                     showToast(`⚠️ Deleted ${successCount} files, ${failureCount} failed`, 'warning');
                 }
                 
-                // Enhanced refresh logic to prevent duplicates
-                try {
-                    // Clear cache first
-                    localStorage.setItem('files-data', JSON.stringify([]));
-                    setFiles([]);
-                    
-                    // Single delayed refresh with loading check
-                    setTimeout(async () => {
-                        if (!getIsLoading()) {
-                            console.log('[BatchDelete] Refreshing files after deletion...');
-                            await loadFiles();
-                        } else {
-                            console.log('[BatchDelete] Skipping refresh, loading already in progress');
-                        }
-                    }, 1000); // 1 second delay for batch delete
-                    
-                } catch (refreshError) {
-                    console.error('Error refreshing files after batch delete:', refreshError);
-                    showToast('Files deleted but refresh failed. Please refresh manually.', 'warning');
-                }
+                // Force refresh the file list after batch deletion
+                console.log(`[BatchDelete] Forcing refresh after deleting ${successCount} files...`);
+                await forceRefreshFileList();
                 
             } catch (error) {
-                console.error('Error during batch deletion:', error);
+                console.error('[BatchDelete] Error during batch deletion:', error);
                 showToast(`Error during batch deletion: ${error.message}`, 'error');
             } finally {
                 setIsLoading(false);
@@ -614,7 +680,14 @@ export function UploadTabContent() {
         // File upload area with drag & drop styling
         const fileUploadArea = h('div', { 
             class: 'border-2 border-dashed border-base-300 rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer bg-base-50',
-            onclick: () => document.getElementById('file-upload').click()
+            onclick: () => {
+                // Prevent double-click issues
+                if (uploadClickTimeout) return;
+                uploadClickTimeout = setTimeout(() => {
+                    uploadClickTimeout = null;
+                }, 300);
+                document.getElementById('file-upload').click();
+            }
         });
         
         // Hidden file input
@@ -637,6 +710,12 @@ export function UploadTabContent() {
                 class: 'btn btn-primary btn-lg',
                 onclick: (e) => {
                     e.stopPropagation();
+                    e.preventDefault();
+                    // Prevent double-click issues
+                    if (uploadClickTimeout) return;
+                    uploadClickTimeout = setTimeout(() => {
+                        uploadClickTimeout = null;
+                    }, 300);
                     document.getElementById('file-upload').click();
                 }
             }, '📂 Choose File')
@@ -667,12 +746,45 @@ export function UploadTabContent() {
             )
         );
         
-        // Submit button
+        // Submit button with improved double-click prevention
         const submitBtn = h('button', { 
             type: 'button',
             id: 'upload-submit',
             class: 'btn btn-success btn-lg w-full',
-            onclick: handleUpload
+            onclick: (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Prevent double-click and rapid clicking
+                if (isUploadInProgress) {
+                    console.log('[Upload] Upload already in progress, ignoring click');
+                    return;
+                }
+                
+                // Debounce clicks
+                if (uploadClickTimeout) {
+                    console.log('[Upload] Click debounced, ignoring');
+                    return;
+                }
+                
+                uploadClickTimeout = setTimeout(() => {
+                    uploadClickTimeout = null;
+                }, 1000); // 1 second debounce for upload button
+                
+                // Disable button immediately
+                e.target.disabled = true;
+                e.target.textContent = '⏳ Uploading...';
+                
+                // Re-enable button after 3 seconds minimum
+                setTimeout(() => {
+                    if (!isUploadInProgress) {
+                        e.target.disabled = false;
+                        e.target.textContent = '🚀 Upload File';
+                    }
+                }, 3000);
+                
+                handleUpload();
+            }
         }, '🚀 Upload File');
         
         // Add all elements to form
@@ -681,7 +793,7 @@ export function UploadTabContent() {
         form.appendChild(fileNameSection);
         form.appendChild(submitBtn);
         
-        // Add event listeners
+        // Add event listeners - use 'once' option where possible
         fileInput.addEventListener('change', () => {
             const file = fileInput.files[0];
             if (file) {
@@ -692,6 +804,13 @@ export function UploadTabContent() {
                         <span class="text-sm">(${formatFileSize(file.size)})</span>
                     </div>
                 `;
+                
+                // Re-enable upload button if it was disabled
+                const uploadBtn = document.getElementById('upload-submit');
+                if (uploadBtn && !isUploadInProgress) {
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = '🚀 Upload File';
+                }
             } else {
                 fileStatus.className = 'mt-4 text-center hidden';
             }
@@ -702,58 +821,134 @@ export function UploadTabContent() {
     
     // Handle file upload with improved error handling and duplicate prevention
     async function handleUpload() {
-        const fileInput = document.getElementById('file-upload');
-        const customName = document.getElementById('file-name').value;
-        
-        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-            showToast('Please select a file to upload', 'warning');
+        // Immediate protection against double execution
+        if (isUploadInProgress) {
+            console.log('[Upload] Upload already in progress, aborting');
             return;
         }
         
-        const file = fileInput.files[0];
-        
-        // Prevent multiple rapid uploads of the same file
-        if (getIsLoading()) {
-            showToast('Upload already in progress, please wait...', 'warning');
-            return;
-        }
-        
-        // Check if file with same name and size already exists
-        const existingFiles = getFiles();
-        const duplicateCheck = existingFiles.find(existingFile => 
-            existingFile.originalName === file.name && 
-            existingFile.size === file.size &&
-            existingFile.mimetype === file.type
-        );
-        
-        if (duplicateCheck) {
-            const confirmUpload = confirm(
-                `A file with the same name (${file.name}), size (${formatFileSize(file.size)}), and type already exists.\n\n` +
-                `Existing file: ${duplicateCheck.originalName}\n` +
-                `Upload date: ${new Date(duplicateCheck.timestamp || duplicateCheck.uploadedAt).toLocaleString()}\n\n` +
-                `Do you want to upload this file anyway? It will be saved with a unique identifier.`
-            );
-            
-            if (!confirmUpload) {
-                showToast('Upload cancelled - file already exists', 'info');
-                return;
-            }
-        }
-        
-        // Generate unique upload identifier to prevent duplicates
-        const uploadId = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        
-        // Show loading with upload identifier
-        setIsLoading(true);
-        showToast(`Uploading ${file.name}... (${uploadId.substr(-9)})`, 'info');
-        
-        // Set upload timeout
-        const uploadTimeout = setTimeout(() => {
-            setIsLoading(false);
-            showToast('Upload timed out. Please try again.', 'error');
-        }, 60000); // 60 second timeout
+        // Set upload in progress flag
+        isUploadInProgress = true;
         
         try {
+            const fileInput = document.getElementById('file-upload');
+            const customName = document.getElementById('file-name').value;
+            
+            if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+                showToast('Please select a file to upload', 'warning');
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            
+            // Check for recent upload of the same file
+            const fileKey = `${file.name}_${file.size}_${file.lastModified}`;
+            const now = Date.now();
+            const lastUploadTime = recentUploads.get(fileKey);
+            
+            if (lastUploadTime && (now - lastUploadTime) < uploadCooldownTime) {
+                const remainingTime = Math.ceil((uploadCooldownTime - (now - lastUploadTime)) / 1000);
+                showToast(`⏳ Please wait ${remainingTime} seconds before uploading "${file.name}" again`, 'warning');
+                return;
+            }
+            
+            // Additional protection checks
+            if (getIsLoading()) {
+                showToast('System is busy, please wait...', 'warning');
+                return;
+            }
+            
+            if (isRefreshingAfterUpload) {
+                showToast('Please wait for the previous upload to complete...', 'warning');
+                return;
+            }
+            
+            // Client-side content-based duplicate detection
+            console.log('[Upload] Calculating file content hash for duplicate detection...');
+            const contentHash = await calculateFileHash(file);
+            
+            if (contentHash) {
+                // Generate content-based ID like the server would
+                const safeName = file.name.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9.-]/g, "_");
+                const contentBasedId = `${contentHash}-${safeName}`;
+                
+                // Check if we've recently processed this content
+                const recentContentInfo = clientContentHashes.get(contentBasedId);
+                if (recentContentInfo && (now - recentContentInfo.timestamp) < contentHashTimeout) {
+                    console.log(`[Upload] Client detected recent upload of identical content: ${contentBasedId}`);
+                    showToast(`📋 File with identical content was recently uploaded. Use refresh to see existing files.`, 'info');
+                    return;
+                }
+                
+                // Check existing files for this content
+                const existingFiles = getFiles();
+                const existingFile = existingFiles.find(f => f.id === contentBasedId);
+                if (existingFile) {
+                    console.log(`[Upload] Client found existing file with identical content: ${contentBasedId}`);
+                    showToast(`📋 File "${existingFile.originalName}" already exists with identical content.`, 'info');
+                    return;
+                }
+                
+                // Track this content hash
+                clientContentHashes.set(contentBasedId, {
+                    timestamp: now,
+                    fileName: file.name,
+                    contentBasedId: contentBasedId
+                });
+                
+                // Clean up old content hashes
+                for (const [id, info] of clientContentHashes.entries()) {
+                    if (now - info.timestamp > contentHashTimeout) {
+                        clientContentHashes.delete(id);
+                    }
+                }
+                
+                console.log(`[Upload] Client content-based ID generated: ${contentBasedId}`);
+            }
+            
+            // Record this upload attempt
+            recentUploads.set(fileKey, now);
+            
+            // Clean up old entries (older than 30 seconds)
+            for (const [key, timestamp] of recentUploads.entries()) {
+                if (now - timestamp > 30000) {
+                    recentUploads.delete(key);
+                }
+            }
+            
+            // Generate unique upload identifier to prevent duplicates
+            const uploadId = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            console.log(`[Upload] Starting upload of ${file.name} (size: ${file.size}, modified: ${file.lastModified}) with ID: ${uploadId}`);
+            
+            // Show loading with upload identifier
+            setIsLoading(true);
+            showToast(`Uploading ${file.name}... (Content-based deduplication enabled)`, 'info');
+            
+            // Update UI to show upload in progress
+            const uploadBtn = document.getElementById('upload-submit');
+            if (uploadBtn) {
+                uploadBtn.disabled = true;
+                uploadBtn.textContent = '⏳ Uploading...';
+                uploadBtn.classList.add('loading');
+            }
+            
+            // Set upload timeout
+            const uploadTimeout = setTimeout(() => {
+                setIsLoading(false);
+                isRefreshingAfterUpload = false;
+                isUploadInProgress = false; // Reset flag on timeout
+                showToast('Upload timed out. Please try again.', 'error');
+                
+                // Reset button state
+                if (uploadBtn) {
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = '🚀 Upload File';
+                    uploadBtn.classList.remove('loading');
+                }
+            }, 60000);
+            
+            // Prepare form data
             const formData = new FormData();
             formData.append('file', file);
             formData.append('uploadId', uploadId); // Add unique identifier
@@ -774,13 +969,34 @@ export function UploadTabContent() {
             
             if (!response.ok) {
                 const errorText = await response.text();
-                throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                let error;
+                try {
+                    error = JSON.parse(errorText);
+                } catch (e) {
+                    error = { error: errorText };
+                }
+                
+                // Handle specific server-side duplicate detection
+                if (response.status === 409 && error.code === 'DUPLICATE_UPLOAD') {
+                    console.log('[Upload] Server detected duplicate upload, aborting');
+                    showToast('⚠️ Duplicate upload detected by server. Please wait before trying again.', 'warning');
+                    return;
+                }
+                
+                throw new Error(`HTTP error! status: ${response.status}, message: ${error.error || errorText}`);
             }
             
             const data = await response.json();
             
             if (data.success) {
-                showToast(`✅ File "${file.name}" uploaded successfully!`, 'success');
+                // Check if this is a duplicate file
+                if (data.file?.isDuplicate || data.file?.existingFile) {
+                    showToast(`📋 File "${file.name}" already exists with identical content. No duplicate created.`, 'info');
+                    console.log(`[Upload] Duplicate file detected: ${data.file?.id || 'unknown'}`);
+                } else {
+                    showToast(`✅ File "${file.name}" uploaded successfully!`, 'success');
+                    console.log(`[Upload] File uploaded successfully with content-based ID: ${data.file?.id || 'unknown'}`);
+                }
                 
                 // Clear form
                 fileInput.value = '';
@@ -789,7 +1005,8 @@ export function UploadTabContent() {
                 
                 // Enhanced file refresh logic to prevent duplicates
                 try {
-                    console.log(`[Upload] File uploaded successfully with ID: ${data.file?.id || 'unknown'}`);
+                    // Set refresh flag to prevent multiple calls
+                    isRefreshingAfterUpload = true;
                     
                     // Clear cache and selection state first
                     localStorage.setItem('files-data', JSON.stringify([]));
@@ -805,30 +1022,31 @@ export function UploadTabContent() {
                         delete fileListContainer.dataset.updating;
                     }
                     
-                    // Update UI state
-                    updateSelectAllState();
-                    updateBatchDeleteButton();
+                    // Note: UI state updates (updateSelectAllState, updateBatchDeleteButton) 
+                    // are handled automatically by loadFiles() below
                     
                     // Single delayed refresh to allow server processing
                     setTimeout(async () => {
                         // Only refresh if not currently loading and no other refresh is pending
-                        if (!getIsLoading()) {
+                        if (!getIsLoading() && isRefreshingAfterUpload) {
                             console.log(`[Upload] Refreshing files after upload of ${file.name}...`);
                             await loadFiles();
+                            isRefreshingAfterUpload = false; // Reset flag after successful refresh
                         } else {
-                            console.log('[Upload] Skipping refresh, loading already in progress');
+                            console.log('[Upload] Skipping refresh, loading already in progress or refresh already completed');
+                            isRefreshingAfterUpload = false; // Reset flag anyway
                         }
-                    }, 2000); // 2 second delay to ensure server processing is complete
+                    }, 1500); // Increased delay to allow proper server processing
                     
                 } catch (refreshError) {
                     console.error('[Upload] Error during post-upload refresh:', refreshError);
-                    showToast('File uploaded but failed to refresh list. Please refresh manually.', 'warning');
+                    isRefreshingAfterUpload = false; // Reset flag on error
+                    showToast('File processed but failed to refresh list. Please refresh manually.', 'warning');
                 }
             } else {
                 throw new Error(data.error || 'Upload failed with unknown error');
             }
         } catch (error) {
-            clearTimeout(uploadTimeout);
             console.error('[Upload] Upload error:', error);
             
             let errorMessage = 'Upload failed: ';
@@ -844,7 +1062,20 @@ export function UploadTabContent() {
             
             showToast(errorMessage, 'error');
         } finally {
+            // Always reset flags and UI state
             setIsLoading(false);
+            isUploadInProgress = false;
+            isRefreshingAfterUpload = false;
+            
+            // Reset button state
+            const uploadBtn = document.getElementById('upload-submit');
+            if (uploadBtn) {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '🚀 Upload File';
+                uploadBtn.classList.remove('loading');
+            }
+            
+            console.log('[Upload] Upload process completed, flags reset');
         }
     }
     
@@ -1413,5 +1644,23 @@ export function NetworkTabContent() {
     }
     
     return tabContent;
+}
+
+/**
+ * Calculate SHA-256 hash of file content for client-side duplicate detection
+ * @param {File} file - The file to hash
+ * @returns {Promise<string>} The hash string
+ */
+async function calculateFileHash(file) {
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return hashHex.substring(0, 16); // Use first 16 characters like server
+    } catch (error) {
+        console.warn('[Upload] Failed to calculate file hash:', error);
+        return null; // Fallback to server-side processing
+    }
 }
 

@@ -78,6 +78,9 @@ let ipfsCheckInProgress = false;
 // Store gun instance globally for reuse
 let gunInstance = null;
 
+// Track if event listeners are already set up
+let eventListenersSetup = false;
+
 // Initialize debug module
 if (typeof window !== "undefined" && !window.shogunDebug) {
   window.shogunDebug = {
@@ -123,6 +126,59 @@ if (typeof window !== "undefined" && !window.shogunDebug) {
 let isLoadingFiles = false;
 let loadFilesTimeout = null;
 let lastLoadRequest = 0;
+let lastLoadedFileCount = 0; // Track file count to detect unnecessary updates
+
+/**
+ * Initialize event listeners for file management - called once
+ */
+function initializeFileEventListeners() {
+  if (eventListenersSetup) {
+    console.log('[Events] File event listeners already set up, skipping');
+    return;
+  }
+  
+  console.log('[Events] Setting up file event listeners');
+  
+  // Listen for custom filesUpdated events to update UI
+  document.addEventListener('filesUpdated', (event) => {
+    console.log('[Events] Files updated event received:', event.detail);
+    // UI updates are handled by individual components
+  });
+  
+  // Listen for tab changes to refresh files if needed
+  document.addEventListener('tabChanged', (event) => {
+    console.log('[Events] Tab changed event received:', event.detail);
+    if (event.detail.tab === 'files') {
+      // Small delay to allow UI to render
+      setTimeout(() => {
+        const currentFiles = getFiles();
+        if (currentFiles.length === 0) {
+          console.log('[Events] Files tab activated with no files, loading...');
+          loadFiles();
+        }
+      }, 100);
+    }
+  });
+  
+  // Listen for storage changes (for multi-tab sync)
+  window.addEventListener('storage', (event) => {
+    if (event.key === 'files-data' && event.newValue) {
+      try {
+        const newFiles = JSON.parse(event.newValue);
+        if (Array.isArray(newFiles)) {
+          console.log('[Events] Files updated from another tab, syncing...');
+          _setFiles(newFiles);
+          updateFileStats(newFiles);
+        }
+      } catch (err) {
+        console.error('[Events] Error syncing files from storage:', err);
+      }
+    }
+  });
+  
+  eventListenersSetup = true;
+  console.log('[Events] File event listeners setup complete');
+}
 
 /**
  * Load all files - improved with better duplicate prevention
@@ -152,6 +208,8 @@ export async function loadFiles(searchParams = {}) {
   
   isLoadingFiles = true;
   setIsLoading(true);
+  
+  console.log(`[LoadFiles] Starting file load at ${new Date().toISOString()}`);
 
   try {
     // Verify authentication
@@ -210,8 +268,13 @@ export async function loadFiles(searchParams = {}) {
       const seenIds = new Set();
       const seenContent = new Map(); // Track by content to detect duplicates
       
-      fileArray.forEach((file) => {
-        if (!file || typeof file !== 'object') return;
+      console.log(`[LoadFiles] Processing ${fileArray.length} files from API...`);
+      
+      fileArray.forEach((file, index) => {
+        if (!file || typeof file !== 'object') {
+          console.warn(`[LoadFiles] Skipping invalid file at index ${index}:`, file);
+          return;
+        }
         
         // Skip if we've already seen this ID
         if (seenIds.has(file.id)) {
@@ -286,7 +349,10 @@ export async function loadFiles(searchParams = {}) {
       const newFileIds = processedFiles.map(f => f.id).sort();
       const hasChanged = JSON.stringify(currentFileIds) !== JSON.stringify(newFileIds);
       
-      if (!hasChanged && processedFiles.length === currentFiles.length) {
+      // Also check if the count is the same to avoid unnecessary updates
+      const countChanged = processedFiles.length !== lastLoadedFileCount;
+      
+      if (!hasChanged && !countChanged && processedFiles.length === currentFiles.length) {
         console.log("[LoadFiles] No changes detected, skipping update");
         return;
       }
@@ -296,14 +362,18 @@ export async function loadFiles(searchParams = {}) {
       try {
         // Log the file data for debugging
         console.log(
-          `Loaded ${processedFiles.length} unique files from API (${ipfsFiles.length} IPFS files)`
+          `[LoadFiles] Updating files: ${processedFiles.length} unique files from API (${ipfsFiles.length} IPFS files)`
         );
+        console.log(`[LoadFiles] Previous count: ${lastLoadedFileCount}, New count: ${processedFiles.length}`);
 
         // Store files in localStorage first
         localStorage.setItem("files-data", JSON.stringify(processedFiles));
 
         // Then update state (without triggering GunDB save)
         _setFiles(processedFiles);
+        
+        // Update the file count tracker
+        lastLoadedFileCount = processedFiles.length;
 
         // Update file stats
         updateFileStats(processedFiles);
@@ -311,6 +381,8 @@ export async function loadFiles(searchParams = {}) {
         // Trigger UI update
         const event = new CustomEvent('filesUpdated', { detail: { files: processedFiles } });
         document.dispatchEvent(event);
+        
+        console.log(`[LoadFiles] Successfully updated ${processedFiles.length} files`);
         
       } catch (err) {
         console.error("Error updating files:", err);
@@ -326,6 +398,7 @@ export async function loadFiles(searchParams = {}) {
 
       if (processedFiles.length === 0) {
         console.warn("No files found after processing");
+        lastLoadedFileCount = 0;
       }
     } else {
       // Reset files safely
@@ -333,6 +406,7 @@ export async function loadFiles(searchParams = {}) {
         localStorage.setItem("files-data", JSON.stringify([]));
         _setFiles([]);
         updateFileStats([]);
+        lastLoadedFileCount = 0;
       } catch (err) {
         console.error("Error resetting files:", err);
       }
@@ -347,12 +421,14 @@ export async function loadFiles(searchParams = {}) {
       localStorage.setItem("files-data", JSON.stringify([]));
       _setFiles([]);
       updateFileStats([]);
+      lastLoadedFileCount = 0;
     } catch (err) {
       console.error("Error resetting files on error:", err);
     }
   } finally {
     setIsLoading(false);
     isLoadingFiles = false;
+    console.log(`[LoadFiles] Completed file load at ${new Date().toISOString()}`);
   }
 }
 
@@ -507,6 +583,7 @@ export async function deleteFile(fileId, fileName) {
 
     // Show loading
     setIsLoading(true);
+    console.log(`[DeleteFile] Starting deletion of file: ${fileId}`);
 
     const response = await fetch(`/files/${fileId}`, {
       method: "DELETE",
@@ -523,56 +600,110 @@ export async function deleteFile(fileId, fileName) {
 
     if (data.success) {
       showToast("File deleted successfully", "success");
+      console.log(`[DeleteFile] File ${fileId} deleted successfully on server`);
 
-      // First, clear the files array to avoid showing stale data
-      // Use localStorage instead of GunDB to avoid array errors
-      localStorage.setItem("files-data", JSON.stringify([]));
-      _setFiles([]);
-
-      // Wait for a moment to allow the server to process the deletion
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Add a timestamp parameter to avoid caching
-      const timestamp = Date.now();
-      const refreshUrl = `/files/all?_nocache=${timestamp}`;
-
-      // Force a refresh with cache-busting headers
-      const refreshResponse = await fetch(refreshUrl, {
-        headers: {
-          Authorization: `Bearer ${getAuthToken()}`,
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          Pragma: "no-cache",
-          Expires: "0",
-        },
-        token: getAuthToken(),
-      });
-
-      if (refreshResponse.ok) {
-        const refreshData = await refreshResponse.json();
-        if (refreshData.success) {
-          const fileArray = refreshData.files || refreshData.results || [];
-          console.log(`Refreshed ${fileArray.length} files after deletion`);
-
-          // Store in localStorage first
-          localStorage.setItem("files-data", JSON.stringify(fileArray));
-
-          // Update state without GunDB
-          _setFiles(fileArray);
-
-          // Update stats
-          updateFileStats(fileArray);
-        }
-      }
-
-      // Update file list
-      loadFiles();
+      // Force refresh the file list immediately
+      await forceRefreshFileList();
+      
     } else {
       throw new Error(data.error || "Unknown error");
     }
   } catch (error) {
+    console.error(`[DeleteFile] Error deleting file: ${error.message}`);
     showToast(`Error deleting file: ${error.message}`, "error");
   } finally {
     setIsLoading(false);
+  }
+}
+
+/**
+ * Force refresh the file list after deletion or modification
+ */
+async function forceRefreshFileList() {
+  try {
+    console.log('[ForceRefresh] Starting forced file list refresh...');
+    
+    // Clear all local caches first
+    localStorage.setItem("files-data", JSON.stringify([]));
+    _setFiles([]);
+    updateFileStats([]);
+    lastLoadedFileCount = 0;
+    
+    // Clear any pending timeouts to prevent conflicts
+    if (loadFilesTimeout) {
+      clearTimeout(loadFilesTimeout);
+      loadFilesTimeout = null;
+    }
+    
+    // Reset throttling flags temporarily
+    const originalLastLoadRequest = lastLoadRequest;
+    lastLoadRequest = 0; // Reset to allow immediate load
+    
+    // Add cache busting parameter
+    const cacheBuster = Date.now();
+    
+    // Directly fetch from server with cache busting
+    const token = getAuthToken();
+    const response = await fetch(`/files/all?_nocache=${cacheBuster}&_force=true`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+      },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success) {
+        const fileArray = data.files || data.results || [];
+        console.log(`[ForceRefresh] Fetched ${fileArray.length} files from server`);
+
+        // Process files to remove duplicates
+        const processedFiles = [];
+        const seenIds = new Set();
+        
+        fileArray.forEach((file) => {
+          if (file && file.id && !seenIds.has(file.id)) {
+            processedFiles.push(file);
+            seenIds.add(file.id);
+          }
+        });
+
+        // Update localStorage and state
+        localStorage.setItem("files-data", JSON.stringify(processedFiles));
+        _setFiles(processedFiles);
+        updateFileStats(processedFiles);
+        lastLoadedFileCount = processedFiles.length;
+
+        // Trigger UI update event
+        const event = new CustomEvent('filesUpdated', { 
+          detail: { files: processedFiles, source: 'forceRefresh' } 
+        });
+        document.dispatchEvent(event);
+        
+        console.log(`[ForceRefresh] Successfully refreshed with ${processedFiles.length} files`);
+      }
+    } else {
+      console.error('[ForceRefresh] Server returned error:', response.status);
+      // Fallback to loadFiles if direct fetch fails
+      await new Promise(resolve => setTimeout(resolve, 500)); // Small delay
+      lastLoadRequest = 0; // Reset throttling
+      await loadFiles();
+    }
+    
+    // Restore original last load request time (but not too restrictive)
+    lastLoadRequest = Math.max(originalLastLoadRequest, Date.now() - 2000);
+    
+  } catch (error) {
+    console.error('[ForceRefresh] Error during forced refresh:', error);
+    // Fallback to standard loadFiles
+    try {
+      lastLoadRequest = 0; // Reset throttling for fallback
+      await loadFiles();
+    } catch (fallbackError) {
+      console.error('[ForceRefresh] Fallback refresh also failed:', fallbackError);
+    }
   }
 }
 
@@ -1321,6 +1452,126 @@ export async function checkIpfsPinStatus(ipfsHash) {
   }
 }
 
+/**
+ * Toggle between light and dark theme
+ */
+export function toggleTheme() {
+  const currentTheme = getTheme();
+  const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+  
+  // Update theme state
+  setTheme(newTheme);
+  
+  // Update localStorage
+  localStorage.setItem('app-theme', newTheme);
+  
+  // Apply theme to document
+  if (typeof document !== 'undefined') {
+    document.documentElement.setAttribute('data-theme', newTheme);
+    
+    // Also update the body class for additional theme support
+    document.body.className = document.body.className.replace(/theme-\w+/g, '');
+    document.body.classList.add(`theme-${newTheme}`);
+  }
+  
+  console.log(`Theme switched to: ${newTheme}`);
+  showToast(`🎨 Theme changed to ${newTheme} mode`, 'success', 2000);
+}
+
+/**
+ * Initialize GunDB instance with proper configuration
+ */
+export function initGun() {
+  if (gunInstance) {
+    console.log('[GunDB] Using existing Gun instance');
+    return gunInstance;
+  }
+
+  try {
+    // Check if Gun is available globally (loaded via CDN)
+    if (typeof Gun === 'undefined') {
+      throw new Error('Gun library not loaded. Make sure gun.js is included via script tag.');
+    }
+
+    console.log('[GunDB] Initializing Gun instance...');
+
+    // Initialize Gun with proper configuration
+    const gun = new Gun({
+      // Use current server as peer
+      peers: [
+        'http://localhost:8765/gun'
+      ],
+      radisk: false,
+      localStorage: false,
+    });
+
+    // Store globally for access from other parts of the app
+    gunInstance = gun;
+    if (typeof window !== 'undefined') {
+      window.gunInstance = gun;
+    }
+
+    // Set up connection monitoring
+    monitorGunConnection(gun);
+
+    // Test initial connection
+    gun.get('_test').put({ 
+      timestamp: Date.now(),
+      message: 'Gun initialization test' 
+    }, (ack) => {
+      if (ack.err) {
+        console.warn('[GunDB] Initial test failed:', ack.err);
+      } else {
+        console.log('[GunDB] Initial connection test successful');
+      }
+    });
+
+    console.log('[GunDB] Gun instance initialized successfully');
+    showToast('🔫 GunDB connected successfully', 'success', 3000);
+
+    return gun;
+
+  } catch (error) {
+    console.error('[GunDB] Failed to initialize Gun:', error);
+    showToast(`❌ GunDB initialization failed: ${error.message}`, 'error');
+    
+    // Return a mock object to prevent crashes
+    return {
+      get: () => ({ put: () => {}, on: () => {}, val: () => {} }),
+      put: () => {},
+      on: () => {},
+      opt: () => {}
+    };
+  }
+}
+
+/**
+ * Get the current Gun instance
+ */
+export function getGunInstance() {
+  return gunInstance;
+}
+
+/**
+ * Initialize theme on app startup
+ */
+export function initializeTheme() {
+  const savedTheme = localStorage.getItem('app-theme') || 'light';
+  setTheme(savedTheme);
+  
+  if (typeof document !== 'undefined') {
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    document.body.classList.add(`theme-${savedTheme}`);
+  }
+  
+  console.log(`Theme initialized: ${savedTheme}`);
+}
+
+/**
+ * Alias for initializeTheme for backwards compatibility
+ */
+export const initTheme = initializeTheme;
+
 // Export state getters and setters for use in other modules
 export { 
   getIsAuthenticated, 
@@ -1348,7 +1599,9 @@ export {
   getPeers,
   setPeers,
   getPeerConnections,
-  setPeerConnections
+  setPeerConnections,
+  initializeFileEventListeners,
+  forceRefreshFileList
 };
 
 // Alias functions for compatibility
@@ -1409,3 +1662,168 @@ function setFiles(files) {
     console.error("Error setting files:", err);
   }
 }
+
+/**
+ * Get authentication token from localStorage
+ */
+export function getAuthToken() {
+  return localStorage.getItem('authToken');
+}
+
+/**
+ * Check if user is authenticated
+ */
+export async function checkAuth() {
+  const token = getAuthToken();
+  if (!token) {
+    console.log('[Auth] No token found');
+    setIsAuthenticated(false);
+    return false;
+  }
+
+  try {
+    const response = await fetch('/check-websocket', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const isValid = response.ok;
+    setIsAuthenticated(isValid);
+    
+    if (!isValid) {
+      console.log('[Auth] Token validation failed');
+      // Remove invalid token
+      localStorage.removeItem('authToken');
+      sessionStorage.removeItem('shogunSession');
+    }
+    
+    return isValid;
+  } catch (error) {
+    console.error('[Auth] Token verification error:', error);
+    setIsAuthenticated(false);
+    return false;
+  }
+}
+
+/**
+ * Handle user logout
+ */
+export function handleLogout() {
+  localStorage.removeItem('authToken');
+  sessionStorage.removeItem('shogunSession');
+  sessionStorage.removeItem('loginTime');
+  setIsAuthenticated(false);
+  
+  showToast('👋 Logged out successfully', 'info');
+  
+  // Redirect to login page after a brief delay
+  setTimeout(() => {
+    window.location.href = '/login';
+  }, 1000);
+}
+
+/**
+ * Check if token is expired (basic implementation)
+ */
+export function isTokenExpired() {
+  const loginTime = sessionStorage.getItem('loginTime');
+  if (!loginTime) return true;
+  
+  const now = Date.now();
+  const tokenAge = now - parseInt(loginTime);
+  const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+  
+  return tokenAge > maxAge;
+}
+
+/**
+ * Get token data (basic implementation)
+ */
+export function getTokenData() {
+  const token = getAuthToken();
+  if (!token) return null;
+  
+  const loginTime = sessionStorage.getItem('loginTime');
+  return {
+    id: 'user',
+    username: 'relay-user',
+    exp: loginTime ? Math.floor((parseInt(loginTime) + 24 * 60 * 60 * 1000) / 1000) : 0,
+    loginTime: loginTime
+  };
+}
+
+// Debug function to check upload status
+window.debugUploadStatus = function() {
+    console.log('=== UPLOAD DEBUG STATUS ===');
+    console.log('isUploadInProgress:', isUploadInProgress);
+    console.log('isRefreshingAfterUpload:', isRefreshingAfterUpload);
+    console.log('uploadClickTimeout:', uploadClickTimeout);
+    console.log('recentUploads size:', recentUploads.size);
+    console.log('recentUploads entries:', Array.from(recentUploads.entries()));
+    console.log('getIsLoading():', getIsLoading());
+    
+    const uploadBtn = document.getElementById('upload-submit');
+    if (uploadBtn) {
+        console.log('Upload button disabled:', uploadBtn.disabled);
+        console.log('Upload button text:', uploadBtn.textContent);
+    }
+    console.log('=========================');
+    
+    return {
+        isUploadInProgress,
+        isRefreshingAfterUpload,
+        uploadClickTimeout,
+        recentUploadsCount: recentUploads.size,
+        isSystemLoading: getIsLoading()
+    };
+};
+
+// Debug function to check file state
+window.debugFileState = function() {
+    console.log('=== FILE STATE DEBUG ===');
+    const files = getFiles();
+    const localStorageFiles = localStorage.getItem('files-data');
+    
+    console.log('Files from getFiles():', files.length);
+    console.log('Files from localStorage:', localStorageFiles ? JSON.parse(localStorageFiles).length : 'null');
+    console.log('lastLoadedFileCount:', lastLoadedFileCount);
+    console.log('isLoadingFiles:', isLoadingFiles);
+    console.log('lastLoadRequest:', new Date(lastLoadRequest).toLocaleString());
+    
+    console.log('First 3 files from getFiles():');
+    files.slice(0, 3).forEach((file, i) => {
+        console.log(`  ${i}: ${file.id} - ${file.originalName || file.name}`);
+    });
+    
+    console.log('File list container state:');
+    const fileListContainer = document.getElementById('file-list');
+    if (fileListContainer) {
+        console.log('  lastFileIds:', fileListContainer.dataset.lastFileIds);
+        console.log('  updating:', fileListContainer.dataset.updating);
+        console.log('  children count:', fileListContainer.children.length);
+    }
+    
+    console.log('=======================');
+    
+    return {
+        filesCount: files.length,
+        localStorageCount: localStorageFiles ? JSON.parse(localStorageFiles).length : 0,
+        lastLoadedFileCount,
+        isLoadingFiles,
+        lastLoadRequest: new Date(lastLoadRequest).toLocaleString()
+    };
+};
+
+// Force refresh function for emergency cases
+window.forceFileRefresh = async function() {
+    console.log('🚨 EMERGENCY: Forcing file refresh');
+    try {
+        await forceRefreshFileList();
+        console.log('✅ Emergency refresh completed');
+        return true;
+    } catch (error) {
+        console.error('❌ Emergency refresh failed:', error);
+        return false;
+    }
+};

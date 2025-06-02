@@ -35,6 +35,10 @@ class FileManager {
     if (!fs.existsSync(this.config.storageDir)) {
       fs.mkdirSync(this.config.storageDir, { recursive: true });
     }
+    
+    // Add upload mutex to prevent race conditions with duplicate uploads
+    this.uploadMutex = new Map(); // contentHash -> Promise
+    this.processingUploads = new Set(); // Track uploads currently being processed
 
     // Configure multer
     this.configureMulter();
@@ -119,33 +123,52 @@ class FileManager {
   }
 
   /**
-   * Handle file upload request
+   * Generate a content-based hash for a file (similar to IPFS)
+   * @param {Buffer} fileBuffer - File content buffer
+   * @param {string} originalName - Original filename
+   * @returns {string} Content hash as file ID
+   */
+  generateContentHash(fileBuffer, originalName) {
+    // Create SHA-256 hash of file content
+    const contentHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+    
+    // Take first 16 characters of hash for shorter IDs
+    const shortHash = contentHash.substring(0, 16);
+    
+    // Create safe filename without extension for the ID
+    const safeName = originalName.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9.-]/g, "_");
+    
+    // Format: hash-filename (deterministic and unique based on content)
+    const contentBasedId = `${shortHash}-${safeName}`;
+    
+    console.log(`[FileManager] Generated content-based hash: ${shortHash} for file: ${originalName} -> ID: ${contentBasedId}`);
+    
+    return contentBasedId;
+  }
+
+  /**
+   * Handle file upload request with improved duplicate prevention
    * @param {Object} req - Express request object with file from multer
    * @returns {Promise<Object>} File data including URLs and metadata
    */
   async handleFileUpload(req) {
+    const uploadStartTime = Date.now();
+    const uploadRequestId = req.uploadRequestId || `upload_${uploadStartTime}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    console.log(`[FileManager] Starting upload processing (ID: ${uploadRequestId})`);
+    
     if (!req.file && (!req.body.content || !req.body.contentType)) {
       throw new Error("File or content missing");
     }
 
     let gunDbKey, fileBuffer, originalName, mimeType, fileSize, uploadTimestamp;
 
-    // Create a unique timestamp with microsecond precision to prevent duplicates
-    uploadTimestamp = Date.now();
-    const microSeconds = process.hrtime.bigint() % 1000n;
-    const uniqueTimestamp = `${uploadTimestamp}${microSeconds.toString().padStart(3, '0')}`;
+    uploadTimestamp = Date.now(); // Keep for metadata, but not for ID generation
 
     if (req.file) {
       originalName = req.file.originalname;
       mimeType = req.file.mimetype;
       fileSize = req.file.size;
-      
-      // Create a safe key for GunDB by removing problematic characters
-      // Use the same format as filesystem naming to ensure consistency
-      const safeOriginalName = originalName.replace(/[^a-zA-Z0-9.-]/g, "_");
-      
-      // Use consistent ID format with unique timestamp: timestamp-filename
-      gunDbKey = req.body.customName || `${uniqueTimestamp}-${safeOriginalName.replace(/\.[^/.]+$/, "")}`;
 
       // Check if file was uploaded to memory or disk
       if (req.file.buffer) {
@@ -160,8 +183,7 @@ class FileManager {
     } else {
       const content = req.body.content;
       const contentType = req.body.contentType || "text/plain";
-      originalName = req.body.customName || `text-${uniqueTimestamp}.txt`;
-      gunDbKey = req.body.customName || `${uniqueTimestamp}-text`;
+      originalName = req.body.customName || `text-content.txt`;
       mimeType = contentType;
       fileSize = content.length;
       fileBuffer = Buffer.from(content);
@@ -171,41 +193,176 @@ class FileManager {
       throw new Error("File buffer not available");
     }
 
+    // Generate content-based hash ID (same content = same ID)
+    // ALWAYS use content-based hash, ignore customName for ID generation
+    const contentBasedId = this.generateContentHash(fileBuffer, originalName);
+    gunDbKey = contentBasedId;
+
+    console.log(`[FileManager] Generated content-based ID: ${contentBasedId} for file: ${originalName} (Upload ID: ${uploadRequestId})`);
+
+    // Check if this content is already being processed (prevent race conditions)
+    if (this.uploadMutex.has(contentBasedId)) {
+      console.log(`[FileManager] Upload with same content already in progress, waiting... (Upload ID: ${uploadRequestId})`);
+      
+      try {
+        // Wait for the ongoing upload to complete
+        const existingResult = await this.uploadMutex.get(contentBasedId);
+        
+        // Clean up uploaded file if it exists on disk
+        if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+          try {
+            fs.unlinkSync(req.file.path);
+            console.log(`[FileManager] Cleaned up duplicate upload temp file: ${req.file.path}`);
+          } catch (cleanupError) {
+            console.warn(`[FileManager] Error cleaning up duplicate file: ${cleanupError.message}`);
+          }
+        }
+        
+        console.log(`[FileManager] Returning result from concurrent upload: ${contentBasedId} (Upload ID: ${uploadRequestId})`);
+        return {
+          ...existingResult,
+          message: 'File with identical content was being processed concurrently',
+          isDuplicate: true,
+          concurrentUpload: true,
+          uploadRequestId: uploadRequestId
+        };
+      } catch (error) {
+        console.warn(`[FileManager] Concurrent upload failed, proceeding with new upload: ${error.message}`);
+        // Fall through to normal processing if concurrent upload failed
+      }
+    }
+
+    // Create a promise for this upload to prevent concurrent duplicates
+    const uploadPromise = this._processFileUpload(req, {
+      contentBasedId,
+      fileBuffer,
+      originalName,
+      mimeType,
+      fileSize,
+      uploadTimestamp,
+      uploadRequestId,
+      uploadStartTime
+    });
+
+    // Store the promise in the mutex
+    this.uploadMutex.set(contentBasedId, uploadPromise);
+
+    try {
+      const result = await uploadPromise;
+      return result;
+    } finally {
+      // Clean up the mutex entry after processing
+      this.uploadMutex.delete(contentBasedId);
+    }
+  }
+
+  /**
+   * Internal method to process file upload
+   * @private
+   */
+  async _processFileUpload(req, params) {
+    const { contentBasedId, fileBuffer, originalName, mimeType, fileSize, uploadTimestamp, uploadRequestId, uploadStartTime } = params;
+
+    // Enhanced duplicate check - check multiple sources
+    console.log(`[FileManager] Checking for existing file with ID: ${contentBasedId}`);
+    
+    // 1. Check GunDB first
+    const existingFile = await this.getFileById(contentBasedId);
+    if (existingFile) {
+      console.log(`[FileManager] File with identical content already exists in GunDB: ${contentBasedId} (Upload ID: ${uploadRequestId})`);
+      
+      // Clean up uploaded file if it exists on disk
+      if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+        try {
+          fs.unlinkSync(req.file.path);
+          console.log(`[FileManager] Cleaned up duplicate upload temp file: ${req.file.path}`);
+        } catch (cleanupError) {
+          console.warn(`[FileManager] Error cleaning up duplicate file: ${cleanupError.message}`);
+        }
+      }
+      
+      // Return existing file info instead of creating duplicate
+      return {
+        ...existingFile,
+        message: 'File with identical content already exists',
+        isDuplicate: true,
+        existingFile: true,
+        uploadRequestId: uploadRequestId
+      };
+    }
+    
+    // 2. Check filesystem directly to see if file already exists
+    const safeOriginalName = originalName.replace(/[^a-zA-Z0-9.-]/g, "_");
+    const fileExtension = safeOriginalName.split('.').pop() || 'bin';
+    const fileName = `${contentBasedId}.${fileExtension}`;
+    const expectedLocalPath = path.join(this.config.storageDir, fileName);
+    
+    if (fs.existsSync(expectedLocalPath)) {
+      console.log(`[FileManager] File already exists on disk: ${expectedLocalPath} (Upload ID: ${uploadRequestId})`);
+      
+      // File exists on disk but not in GunDB - create file object and save to GunDB
+      const fileStats = fs.statSync(expectedLocalPath);
+      const fileData = {
+        id: contentBasedId,
+        name: originalName,
+        originalName: originalName,
+        mimeType: mimeType,
+        mimetype: mimeType,
+        size: fileStats.size,
+        url: `/uploads/${fileName}`,
+        fileUrl: `/uploads/${fileName}`,
+        localPath: expectedLocalPath,
+        ipfsHash: null,
+        ipfsUrl: null,
+        timestamp: uploadTimestamp,
+        uploadedAt: uploadTimestamp,
+        customName: req.body.customName || null,
+        contentHash: contentBasedId,
+        verified: true,
+        uploadRequestId: uploadRequestId,
+        message: 'File already existed on disk, added to database'
+      };
+      
+      // Save to GunDB for future reference
+      await this.saveFileMetadata(fileData);
+      
+      // Clean up uploaded file if it's different from the existing one
+      if (req.file && req.file.path && req.file.path !== expectedLocalPath && fs.existsSync(req.file.path)) {
+        try {
+          fs.unlinkSync(req.file.path);
+          console.log(`[FileManager] Cleaned up duplicate upload temp file: ${req.file.path}`);
+        } catch (cleanupError) {
+          console.warn(`[FileManager] Error cleaning up duplicate file: ${cleanupError.message}`);
+        }
+      }
+      
+      return fileData;
+    }
+
     let fileUrl = null;
     let localPath = null;
 
-    // Always store files locally first (no automatic IPFS upload)
-    console.log(`Storing file locally: ${originalName}`);
-    const fileName = `${uniqueTimestamp}-${originalName.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-    localPath = path.join(this.config.storageDir, fileName);
+    // Store file locally with content-based naming
+    console.log(`[FileManager] Storing new file locally with content-based name: ${originalName} (Upload ID: ${uploadRequestId})`);
+    localPath = expectedLocalPath;
     
-    // Check if file already exists and generate alternative name if needed
-    let actualLocalPath = localPath;
-    let counter = 1;
-    while (fs.existsSync(actualLocalPath)) {
-      const ext = path.extname(fileName);
-      const basename = path.basename(fileName, ext);
-      actualLocalPath = path.join(this.config.storageDir, `${basename}_${counter}${ext}`);
-      counter++;
-    }
+    // Save new file
+    fs.writeFileSync(localPath, fileBuffer);
+    fileUrl = `/uploads/${fileName}`;
+    console.log(`[FileManager] File saved locally successfully: ${localPath} (Upload ID: ${uploadRequestId})`);
     
-    fs.writeFileSync(actualLocalPath, fileBuffer);
-    fileUrl = `/uploads/${path.basename(actualLocalPath)}`;
-    console.log(`File saved locally successfully: ${actualLocalPath}`);
-
-    // Ensure an ID with proper formatting for GunDB
-    const safeId = gunDbKey.replace(/[^a-zA-Z0-9_-]/g, "_");
-
-    // Check if this file ID already exists in GunDB to prevent duplicates
-    const existingFile = await this.getFileById(safeId);
-    if (existingFile) {
-      console.warn(`[FileManager] File with ID ${safeId} already exists, generating new ID`);
-      const newId = `${safeId}_${counter}`;
-      gunDbKey = newId;
+    // Clean up multer temp file if it's different from our target path
+    if (req.file && req.file.path && req.file.path !== localPath && fs.existsSync(req.file.path)) {
+      try {
+        fs.unlinkSync(req.file.path);
+        console.log(`[FileManager] Cleaned up multer temp file: ${req.file.path}`);
+      } catch (cleanupError) {
+        console.warn(`[FileManager] Error cleaning up multer temp file: ${cleanupError.message}`);
+      }
     }
 
     const fileData = {
-      id: safeId,
+      id: contentBasedId,
       name: originalName,
       originalName: originalName,
       mimeType: mimeType,
@@ -213,19 +370,22 @@ class FileManager {
       size: fileSize,
       url: fileUrl,
       fileUrl: fileUrl,
-      localPath: actualLocalPath,
+      localPath: localPath,
       ipfsHash: null, // No IPFS hash initially
       ipfsUrl: null,  // No IPFS URL initially
       timestamp: uploadTimestamp,
       uploadedAt: uploadTimestamp,
       customName: req.body.customName || null,
-      uploadId: uniqueTimestamp, // Add unique upload identifier
+      contentHash: contentBasedId, // Store the content hash
+      verified: true,
+      uploadRequestId: uploadRequestId,
+      processingTime: Date.now() - uploadStartTime
     };
 
     // Save metadata to GunDB
     const savedFile = await this.saveFileMetadata(fileData);
 
-    console.log(`[FILE-MANAGER] File upload completed: ${savedFile.id}`);
+    console.log(`[FileManager] File upload completed: ${savedFile.id} in ${savedFile.processingTime}ms (Upload ID: ${uploadRequestId})`);
     return savedFile;
   }
 
@@ -306,10 +466,10 @@ class FileManager {
 
     console.log("[FileManager] getAllFiles: Request received for all files");
 
-    // Store valid files and track IDs we've already seen to avoid duplicates
+    // Store valid files and track both IDs and content to avoid duplicates
     const files = [];
-    const seen = new Set();
-    const filesByContent = new Map(); // Track files by content hash to prevent duplicates
+    const seenIds = new Set();
+    const seenContent = new Map(); // Track by content signature to prevent content duplicates
 
     // First fetch the list of deleted files to filter against
     const deletedFileIds = new Set();
@@ -332,79 +492,32 @@ class FileManager {
       console.warn("[FileManager] Error fetching deleted files:", error.message);
     }
 
-    // Helper to process file data into a standardized format with duplicate detection
-    const processFileData = (data, key) => {
-      // Skip if key is null, undefined, or starts with _ (GunDB metadata)
-      if (!key || key.startsWith("_")) return;
+    // Helper function to add a file if it's not a duplicate
+    const addFileIfUnique = (fileObject, source) => {
+      if (!fileObject || !fileObject.id) {
+        console.log(`[FileManager] Skipping invalid file from ${source}`);
+        return false;
+      }
 
       // Skip if this file has been deleted
-      if (deletedFileIds.has(key)) {
-        console.log(`[FileManager] Skipping deleted file: ${key}`);
-        return;
+      if (deletedFileIds.has(fileObject.id)) {
+        console.log(`[FileManager] Skipping deleted file: ${fileObject.id}`);
+        return false;
       }
 
-      // Skip if we've already processed this ID
-      const normalizedId = key.startsWith("/") ? key.substring(1) : key;
-      if (seen.has(normalizedId)) {
-        console.log(`[FileManager] Skipping duplicate key: ${key}`);
-        return;
+      // Check for ID duplicates
+      if (seenIds.has(fileObject.id)) {
+        console.log(`[FileManager] Skipping duplicate ID from ${source}: ${fileObject.id}`);
+        return false;
       }
 
-      // Skip GunDB special properties and metadata
-      if (
-        key === "_" ||
-        key === "#" ||
-        key === "_refreshQuery" ||
-        key === "lastUpdated" ||
-        key === ">" ||
-        key === "undefined"
-      ) {
-        console.log(`[FileManager] Skipping special key: ${key}`);
-        return;
-      }
-
-      console.log(`[FileManager] Processing file data for key: ${key}`);
-
-      try {
-        // Extract file data, handling different data formats
-        let fileObject = {};
-
-        if (data && typeof data === "object") {
-          // Set ID from key if not present
-          fileObject = { ...data, id: data.id || normalizedId };
-
-          // Update IPFS URL if not present but hash is available
-          if (
-            fileObject.ipfsHash &&
-            !fileObject.ipfsUrl &&
-            this.config.ipfsManager
-          ) {
-            fileObject.ipfsUrl = this.config.ipfsManager.getGatewayUrl(
-              fileObject.ipfsHash
-            );
-          }
-          
-          // Add extra debug information for IPFS files
-          if (fileObject.ipfsHash) {
-            console.log(`[FileManager] Found file with IPFS data: ${normalizedId}, hash: ${fileObject.ipfsHash}`);
-          }
-        } else {
-          console.log(`[FileManager] Invalid data for key ${key}: ${data}`);
-          return; // Skip invalid data
-        }
-
-        // Only add valid file entries
-        if (
-          (fileObject.name || fileObject.originalName) &&
-          (fileObject.fileUrl || fileObject.ipfsHash)
-        ) {
-          // Create content identifier for duplicate detection
-          const contentId = `${fileObject.originalName}_${fileObject.size}_${fileObject.mimetype}`;
+      // Create content signature for duplicate detection
+      const contentSignature = `${fileObject.originalName || fileObject.name}_${fileObject.size || 0}_${fileObject.mimetype || fileObject.mimeType || ''}`;
           
           // Check for content duplicates
-          if (filesByContent.has(contentId)) {
-            const existingFile = filesByContent.get(contentId);
-            console.log(`[FileManager] Found content duplicate: ${normalizedId} matches ${existingFile.id}`);
+      if (seenContent.has(contentSignature)) {
+        const existingFile = seenContent.get(contentSignature);
+        console.log(`[FileManager] Found content duplicate from ${source}: ${fileObject.id} matches existing ${existingFile.id}`);
             
             // Keep the newer file (higher timestamp)
             const newTimestamp = parseInt(fileObject.timestamp || fileObject.uploadedAt || 0);
@@ -415,52 +528,45 @@ class FileManager {
               const oldIndex = files.findIndex(f => f.id === existingFile.id);
               if (oldIndex !== -1) {
                 files.splice(oldIndex, 1);
-                console.log(`[FileManager] Replacing older duplicate ${existingFile.id} with ${normalizedId}`);
-              }
-              filesByContent.set(contentId, fileObject);
-            } else {
-              console.log(`[FileManager] Keeping existing file ${existingFile.id}, skipping ${normalizedId}`);
-              return; // Skip this duplicate
-            }
-          } else {
-            filesByContent.set(contentId, fileObject);
+            seenIds.delete(existingFile.id);
+            console.log(`[FileManager] Replacing older duplicate ${existingFile.id} with ${fileObject.id} from ${source}`);
           }
           
+          // Add the new file
+          seenContent.set(contentSignature, fileObject);
+          seenIds.add(fileObject.id);
           files.push(fileObject);
-          seen.add(normalizedId);
-          console.log(
-              `[FileManager] Added file to result set: ID=${normalizedId}`
-          );
-        } else {
-          console.log(
-            `[FileManager] Skipping invalid file data for key: ${key} - Missing required properties`
-          );
-        }
-      } catch (err) {
-        console.error(`[FileManager] Error processing file data: ${err.message}`);
+          console.log(`[FileManager] Added file from ${source}: ${fileObject.id}`);
+          return true;
+            } else {
+          console.log(`[FileManager] Keeping existing file ${existingFile.id}, skipping ${fileObject.id} from ${source}`);
+          return false;
+            }
+          } else {
+        // New unique content
+        seenContent.set(contentSignature, fileObject);
+        seenIds.add(fileObject.id);
+          files.push(fileObject);
+        console.log(`[FileManager] Added unique file from ${source}: ${fileObject.id}`);
+        return true;
       }
     };
 
-    // Main function to get files from GunDB
-    try {
-      console.log("[FileManager] Examining 'files' node in GunDB");
-
-      // Clear any stale GunDB cache with a refresh token
-      this.config.gun.get("files").put({ _refreshToken: Date.now() });
-
-      // Get the files directly from storage first for reliability
-      let filesFromStorage = [];
+    // 1. Get files directly from storage first for reliability
       try {
         if (fs.existsSync(this.config.storageDir)) {
-          filesFromStorage = await this.getFilesFromStorage(deletedFileIds);
+        const filesFromStorage = await this.getFilesFromStorage(deletedFileIds);
           console.log(`[FileManager] Found ${filesFromStorage.length} files in storage`);
+        
+        filesFromStorage.forEach(file => {
+          addFileIfUnique(file, 'storage');
+        });
         }
       } catch (fsErr) {
         console.error(`[FileManager] Error reading storage dir: ${fsErr.message}`);
       }
 
-      // CRITICAL FIX: Load files from IPFS metadata if available
-      let filesFromIpfsMetadata = [];
+    // 2. Load files from IPFS metadata if available
       try {
         const metadataPath = path.join(this.config.storageDir, 'ipfs-metadata.json');
         if (fs.existsSync(metadataPath)) {
@@ -495,61 +601,14 @@ class FileManager {
               verified: true
             };
             
-            filesFromIpfsMetadata.push(ipfsFile);
-            console.log(`[FileManager] Added IPFS file from metadata: ${fileId}`);
+          addFileIfUnique(ipfsFile, 'ipfs-metadata');
           }
-          
-          console.log(`[FileManager] Found ${filesFromIpfsMetadata.length} files from IPFS metadata`);
         }
       } catch (ipfsMetaErr) {
         console.error(`[FileManager] Error reading IPFS metadata: ${ipfsMetaErr.message}`);
       }
 
-      // Combine all files: storage files + IPFS metadata files
-      const allFoundFiles = [...filesFromStorage, ...filesFromIpfsMetadata];
-      
-      // Remove duplicates by ID
-      const uniqueFiles = [];
-      const processedIds = new Set();
-      
-      for (const file of allFoundFiles) {
-        if (!processedIds.has(file.id)) {
-          uniqueFiles.push(file);
-          processedIds.add(file.id);
-        }
-      }
-
-      // If we found files in storage/IPFS metadata, save them to GunDB for synchronization
-      if (uniqueFiles.length > 0) {
-        console.log(`[FileManager] Syncing ${uniqueFiles.length} files to GunDB`);
-        for (const file of uniqueFiles) {
-          // Skip if this file has been deleted
-          if (deletedFileIds.has(file.id)) {
-            console.log(`[FileManager] Not syncing deleted file to GunDB: ${file.id}`);
-            continue;
-          }
-          
-          try {
-            // Save to GunDB asynchronously without waiting
-            this.config.gun.get("files").get(file.id).put(file);
-            console.log(`[FileManager] Synced file to GunDB: ${file.id}`);
-          } catch (syncErr) {
-            console.error(`[FileManager] Error syncing to GunDB: ${syncErr.message}`);
-          }
-        }
-        
-        // Add files to our result
-        for (const file of uniqueFiles) {
-          if (!seen.has(file.id)) {
-            files.push(file);
-            seen.add(file.id);
-          }
-        }
-        
-        console.log(`[FileManager] Added ${uniqueFiles.length} files from storage/IPFS to result`);
-      }
-
-      // Now try to get files from GunDB (this may be empty but we try anyway)
+    // 3. Now try to get files from GunDB (only add if not already present)
       try {
         console.log("[FileManager] Attempting to read from GunDB files node");
         
@@ -564,7 +623,25 @@ class FileManager {
           console.log(`[FileManager] Processing GunDB data with ${Object.keys(gunData).length} keys`);
           
           for (const [key, value] of Object.entries(gunData)) {
-            processFileData(value, key);
+          // Skip GunDB metadata
+          if (!key || key.startsWith("_") || key === "lastUpdated" || key === "_refreshToken" || key === "_deleteToken" || key === "_lastSync") {
+            continue;
+          }
+
+          if (value && typeof value === "object") {
+            // Set ID from key if not present
+            let fileObject = { ...value, id: value.id || key };
+
+            // Update IPFS URL if not present but hash is available
+            if (fileObject.ipfsHash && !fileObject.ipfsUrl && this.config.ipfsManager) {
+              fileObject.ipfsUrl = this.config.ipfsManager.getGatewayUrl(fileObject.ipfsHash);
+            }
+
+            // Only add valid file entries
+            if ((fileObject.name || fileObject.originalName) && (fileObject.fileUrl || fileObject.ipfsHash)) {
+              addFileIfUnique(fileObject, 'gundb');
+            }
+          }
           }
         } else {
           console.log("[FileManager] No data found in GunDB files node");
@@ -573,11 +650,20 @@ class FileManager {
         console.error(`[FileManager] Error reading from GunDB: ${gunErr.message}`);
       }
 
-    } catch (error) {
-      console.error(`[FileManager] Error in getAllFiles: ${error.message}`);
+    // 4. Sync unique files back to GunDB for consistency (only if they're not already there)
+    if (files.length > 0) {
+      console.log(`[FileManager] Syncing ${files.length} unique files to GunDB for consistency`);
+      for (const file of files) {
+        try {
+          // Save to GunDB asynchronously without waiting
+          this.config.gun.get("files").get(file.id).put(file);
+        } catch (syncErr) {
+          console.error(`[FileManager] Error syncing to GunDB: ${syncErr.message}`);
+        }
+      }
     }
 
-    console.log(`[FileManager] Returning ${files.length} files total`);
+    console.log(`[FileManager] Returning ${files.length} unique files total`);
     return files;
   }
 
@@ -622,13 +708,40 @@ class FileManager {
           continue;
         }
         
-        // Generate a file ID based on the filename
-        // Extract timestamp if present in filename (e.g., 1747584045369-originalname.jpg)
-        const timestampMatch = filename.match(/^(\d+)-/);
-        const timestamp = timestampMatch ? parseInt(timestampMatch[1]) : stats.mtimeMs;
+        let fileId;
+        let originalName;
+        let timestamp = stats.mtimeMs;
         
-        // Generate a consistent ID that won't change between restarts
-        const fileId = `${timestamp}-${filename.replace(/\.[^/.]+$/, "")}_${timestamp.toString().substring(7)}`;
+        // Detect file naming pattern and extract ID
+        if (filename.match(/^[a-f0-9]{16}-/)) {
+          // New content-hash based naming: hash-filename.ext
+          const hashMatch = filename.match(/^([a-f0-9]{16})-(.+)$/);
+          if (hashMatch) {
+            fileId = hashMatch[1] + '-' + hashMatch[2].replace(/\.[^/.]+$/, "");
+            originalName = hashMatch[2];
+          } else {
+            // Fallback
+            fileId = filename.replace(/\.[^/.]+$/, "");
+            originalName = filename;
+          }
+        } else if (filename.match(/^\d{13,}-/)) {
+          // Old timestamp-based naming: timestamp-filename.ext
+          const timestampMatch = filename.match(/^(\d+)-(.+)$/);
+          if (timestampMatch) {
+            timestamp = parseInt(timestampMatch[1]);
+            const baseFilename = timestampMatch[2].replace(/\.[^/.]+$/, "");
+            fileId = `${timestamp}-${baseFilename}_${timestamp.toString().substring(7)}`;
+            originalName = timestampMatch[2];
+          } else {
+            // Fallback
+            fileId = filename.replace(/\.[^/.]+$/, "");
+            originalName = filename;
+          }
+        } else {
+          // Unknown naming pattern - use filename as base
+          fileId = filename.replace(/\.[^/.]+$/, "");
+          originalName = filename;
+        }
         
         // Skip if this file has been marked as deleted
         if (deletedFileIds.has(fileId)) {
@@ -636,12 +749,11 @@ class FileManager {
           continue;
         }
         
-        // Also check if any deleted ID contains parts of this filename or vice versa
-        // This handles cases where the ID format changes but refers to the same file
+        // Check for partial matches with deleted IDs
         let isDeleted = false;
         for (const deletedId of deletedFileIds) {
-          // If the deleted ID contains the timestamp or is contained in the filename
-          if (deletedId.includes(timestamp.toString()) || filename.includes(deletedId.split('_')[0])) {
+          if (deletedId.includes(fileId) || fileId.includes(deletedId) || 
+              filename.includes(deletedId.split('_')[0]) || filename.includes(deletedId.split('-')[0])) {
             console.log(`[FileManager] Skipping likely deleted file from filesystem: ${filename} (matches: ${deletedId})`);
             isDeleted = true;
             break;
@@ -650,7 +762,7 @@ class FileManager {
         if (isDeleted) continue;
         
         // Determine MIME type
-        const ext = path.extname(filename).toLowerCase();
+        const ext = path.extname(originalName).toLowerCase();
         let mimeType = 'application/octet-stream';
         
         if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
@@ -658,31 +770,36 @@ class FileManager {
         else if (ext === '.gif') mimeType = 'image/gif';
         else if (ext === '.pdf') mimeType = 'application/pdf';
         else if (ext === '.txt') mimeType = 'text/plain';
+        else if (ext === '.mp4') mimeType = 'video/mp4';
+        else if (ext === '.mp3') mimeType = 'audio/mpeg';
         
         // Build the file URL
         const fileUrl = `/uploads/${filename}`;
 
-        // Create file object and check for IPFS metadata
+        // Create file object
         const fileObject = {
           id: fileId,
-          name: filename,
-          originalName: filename,
+          name: originalName,
+          originalName: originalName,
           mimetype: mimeType,
+          mimeType: mimeType,
           size: stats.size,
           fileUrl: fileUrl,
           url: fileUrl,
           timestamp: timestamp,
           uploadedAt: timestamp,
           localPath: filePath,
+          verified: true,
         };
         
-        // Check if we have IPFS metadata for this file
-        const metadataKey = fileId;
-        if (ipfsMetadata[metadataKey]) {
-          const metadata = ipfsMetadata[metadataKey];
+        // Check if we have IPFS metadata for this file using enhanced matching
+        let ipfsMetadataFound = false;
+        
+        // Direct match first
+        if (ipfsMetadata[fileId]) {
+          const metadata = ipfsMetadata[fileId];
           fileObject.ipfsHash = metadata.ipfsHash;
           
-          // Add IPFS URL
           if (fileObject.ipfsHash && this.config.ipfsManager) {
             fileObject.ipfsUrl = this.config.ipfsManager.getGatewayUrl(fileObject.ipfsHash);
           } else if (fileObject.ipfsHash) {
@@ -690,35 +807,20 @@ class FileManager {
           }
           
           console.log(`[FileManager] Added IPFS data to file ${fileId}: hash=${fileObject.ipfsHash}`);
-        } else {
-          // Try enhanced metadata matching with multiple strategies
-          let ipfsMetadataFound = false;
-          
-          // Strategy 1: Check alternateIds in each metadata entry
+          ipfsMetadataFound = true;
+        }
+        
+        // Enhanced matching if direct match not found
+        if (!ipfsMetadataFound) {
           for (const [metaKey, metadata] of Object.entries(ipfsMetadata)) {
             if (metadata.alternateIds && Array.isArray(metadata.alternateIds)) {
-              // Check if any alternate ID matches our file patterns
               const matches = metadata.alternateIds.some(altId => {
-                // Direct match
-                if (altId === fileId) return true;
-                
-                // Filename without extension match
-                const filenameNoExt = filename.replace(/\.[^/.]+$/, '');
-                if (altId === filenameNoExt) return true;
-                
-                // Check if filename starts with the alternate ID
-                if (filename.startsWith(altId)) return true;
-                
-                // Check timestamp-based matching
-                if (altId.includes(timestamp.toString())) return true;
-                
-                return false;
+                return altId === fileId || filename.includes(altId) || altId.includes(originalName.replace(/\.[^/.]+$/, ''));
               });
               
               if (matches) {
                 fileObject.ipfsHash = metadata.ipfsHash;
                 
-                // Add IPFS URL
                 if (fileObject.ipfsHash && this.config.ipfsManager) {
                   fileObject.ipfsUrl = this.config.ipfsManager.getGatewayUrl(fileObject.ipfsHash);
                 } else if (fileObject.ipfsHash) {
@@ -731,57 +833,10 @@ class FileManager {
               }
             }
           }
-          
-          // Strategy 2: If no alternateIds match, try the original logic with enhancements
-          if (!ipfsMetadataFound) {
-            for (const [key, metadata] of Object.entries(ipfsMetadata)) {
-              // Extract filename components for comparison
-              const baseFilenameNoExt = filename.replace(/\.[^/.]+$/, '').replace(/^\d+-/, '');
-              const keyBaseNoExt = key.replace(/\.[^/.]+$/, '').replace(/^\d+-/, '');
-              
-              // Enhanced matching logic
-              const conditions = [
-                // Timestamp match
-                key.includes(timestamp.toString()),
-                // Base filename match
-                key.includes(baseFilenameNoExt),
-                filename.includes(keyBaseNoExt),
-                // Partial key match
-                baseFilenameNoExt.includes(key.split('_')[0]),
-                // Direct partial match (useful for simple names)
-                filename.includes(key) || key.includes(filename.replace(/\.[^/.]+$/, '')),
-                // Check against stored base filename
-                metadata.baseFilename && (
-                  baseFilenameNoExt.includes(metadata.baseFilename) ||
-                  metadata.baseFilename.includes(baseFilenameNoExt)
-                ),
-                // Check against stored original filename
-                metadata.originalFilename && (
-                  filename.includes(metadata.originalFilename) ||
-                  metadata.originalFilename.includes(baseFilenameNoExt)
-                )
-              ];
-              
-              if (conditions.some(condition => condition)) {
-                fileObject.ipfsHash = metadata.ipfsHash;
-                
-                // Add IPFS URL
-                if (fileObject.ipfsHash && this.config.ipfsManager) {
-                  fileObject.ipfsUrl = this.config.ipfsManager.getGatewayUrl(fileObject.ipfsHash);
-                } else if (fileObject.ipfsHash) {
-                  fileObject.ipfsUrl = `https://ipfs.io/ipfs/${fileObject.ipfsHash}`;
-                }
-                
-                console.log(`[FileManager] Added IPFS data to file ${fileId} using enhanced matching with ${key}: hash=${fileObject.ipfsHash}`);
-                ipfsMetadataFound = true;
-                break;
-              }
-            }
-          }
-          
-          if (!ipfsMetadataFound) {
-            console.log(`[FileManager] No IPFS metadata found for file ${fileId} (checked ${Object.keys(ipfsMetadata).length} metadata entries)`);
-          }
+        }
+        
+        if (!ipfsMetadataFound) {
+          console.log(`[FileManager] No IPFS metadata found for file ${fileId}`);
         }
 
         // Add to results
@@ -860,6 +915,9 @@ class FileManager {
    * @returns {Promise<Object>} Result of the operation
    */
   async deleteFile(fileId) {
+    const deleteStartTime = Date.now();
+    const deleteRequestId = `del_${deleteStartTime}_${Math.random().toString(36).substr(2, 9)}`;
+    
     if (!this.config.gun) {
       throw new Error("Gun instance not available");
     }
@@ -868,7 +926,7 @@ class FileManager {
       throw new Error("File ID is required");
     }
 
-    console.log(`Request to delete file: ${fileId}`);
+    console.log(`[FileManager] Request to delete file: ${fileId} (Delete ID: ${deleteRequestId})`);
 
     // Get file data from GunDB
     const fileNode = this.config.gun.get("files").get(fileId);
@@ -882,6 +940,8 @@ class FileManager {
     // If no file data in GunDB, try to find a matching file in the filesystem
     // This is important because we might have filesystem files not yet in GunDB
     if (!fileData) {
+      console.log(`[FileManager] File not found in GunDB, searching filesystem (Delete ID: ${deleteRequestId})`);
+      
       // Try to identify the file in the filesystem by the ID prefix
       const idParts = fileId.split('_');
       if (idParts.length > 0) {
@@ -890,66 +950,80 @@ class FileManager {
         // Check if a file with this prefix exists in the storage directory
         if (fs.existsSync(this.config.storageDir)) {
           const files = fs.readdirSync(this.config.storageDir);
-          const matchingFile = files.find(filename => filename.startsWith(filePrefix));
+          const matchingFile = files.find(filename => filename.startsWith(filePrefix) || filename.includes(fileId));
           
           if (matchingFile) {
             const filePath = path.join(this.config.storageDir, matchingFile);
-            console.log(`Found matching file in filesystem: ${filePath}`);
+            console.log(`[FileManager] Found matching file in filesystem: ${filePath} (Delete ID: ${deleteRequestId})`);
             
             // Create a minimal fileData object
             fileData = {
               id: fileId,
-              localPath: filePath
+              localPath: filePath,
+              name: matchingFile
             };
           }
         }
       }
     }
 
+    let deletionResults = {
+      fileSystemDeleted: false,
+      gunDbDeleted: false,
+      ipfsUnpinned: false
+    };
+
     // If we found file data (from GunDB or filesystem), try to delete the actual file
     if (fileData) {
+      console.log(`[FileManager] Found file data for deletion: ${fileId} (Delete ID: ${deleteRequestId})`);
+      
       // Delete local file if path exists
       const localPath = fileData.localPath;
       if (localPath && fs.existsSync(localPath)) {
         try {
           fs.unlinkSync(localPath);
-          console.log(`File deleted from local filesystem: ${localPath}`);
+          deletionResults.fileSystemDeleted = true;
+          console.log(`[FileManager] File deleted from local filesystem: ${localPath} (Delete ID: ${deleteRequestId})`);
         } catch (fsError) {
-          console.error("Error deleting file from filesystem:", fsError);
+          console.error(`[FileManager] Error deleting file from filesystem: ${fsError.message} (Delete ID: ${deleteRequestId})`);
           // Continue with database deletion anyway
         }
-      } else if (fileData.originalName) {
+      } else if (fileData.originalName || fileData.name) {
         // If localPath is missing but we have originalName, try to find and delete the file
         const potentialFilenames = [
           fileData.originalName,
           fileData.name,
           fileId
-        ];
+        ].filter(Boolean);
+        
+        console.log(`[FileManager] Searching for file to delete using potential names: ${potentialFilenames.join(', ')} (Delete ID: ${deleteRequestId})`);
         
         for (const filename of potentialFilenames) {
           if (!filename) continue;
           
           // Try different versions of the filename in the storage dir
-          const potentialPaths = [
-            path.join(this.config.storageDir, filename),
-            path.join(this.config.storageDir, filename.replace(/[^a-zA-Z0-9.-]/g, "_")),
-            // Include timestamp-prefixed versions
-            ...fs.readdirSync(this.config.storageDir)
-              .filter(f => f.includes(filename) || (fileId && f.includes(fileId)))
-              .map(f => path.join(this.config.storageDir, f))
-          ];
+          const storageFiles = fs.existsSync(this.config.storageDir) ? fs.readdirSync(this.config.storageDir) : [];
+          const matchingFiles = storageFiles.filter(f => 
+            f.includes(filename) || 
+            (fileId && f.includes(fileId)) ||
+            f.includes(filename.replace(/[^a-zA-Z0-9.-]/g, "_"))
+          );
           
-          for (const filePath of potentialPaths) {
+          for (const matchingFile of matchingFiles) {
+            const filePath = path.join(this.config.storageDir, matchingFile);
             try {
               if (fs.existsSync(filePath)) {
                 fs.unlinkSync(filePath);
-                console.log(`File deleted from local filesystem: ${filePath}`);
+                deletionResults.fileSystemDeleted = true;
+                console.log(`[FileManager] File deleted from local filesystem: ${filePath} (Delete ID: ${deleteRequestId})`);
                 break;
               }
             } catch (e) {
-              console.error(`Error deleting potential file: ${e.message}`);
+              console.error(`[FileManager] Error deleting potential file: ${e.message} (Delete ID: ${deleteRequestId})`);
             }
           }
+          
+          if (deletionResults.fileSystemDeleted) break;
         }
       }
 
@@ -957,17 +1031,20 @@ class FileManager {
       if (fileData.ipfsHash && this.config.ipfsManager?.isEnabled()) {
         try {
           await this.config.ipfsManager.unpin(fileData.ipfsHash);
-          console.log(`File unpinned from IPFS: ${fileData.ipfsHash}`);
+          deletionResults.ipfsUnpinned = true;
+          console.log(`[FileManager] File unpinned from IPFS: ${fileData.ipfsHash} (Delete ID: ${deleteRequestId})`);
         } catch (ipfsError) {
-          console.error("Error unpinning from IPFS:", ipfsError);
+          console.error(`[FileManager] Error unpinning from IPFS: ${ipfsError.message} (Delete ID: ${deleteRequestId})`);
           // Continue with database deletion anyway
         }
       }
+    } else {
+      console.log(`[FileManager] No file data found for deletion: ${fileId} (Delete ID: ${deleteRequestId})`);
     }
 
     // Try multiple approaches to delete from GunDB to ensure it's fully removed
     try {
-      console.log("Deleting file from all known paths in GunDB");
+      console.log(`[FileManager] Deleting file from all known paths in GunDB: ${fileId} (Delete ID: ${deleteRequestId})`);
 
       // First, try with a direct put null
       this.config.gun.get("files").get(fileId).put(null);
@@ -975,16 +1052,18 @@ class FileManager {
       // Also mark as deleted in the deletedFiles collection
       this.config.gun.get("deletedFiles").get(fileId).put({
         id: fileId,
-        deletedAt: Date.now()
+        deletedAt: Date.now(),
+        deleteRequestId: deleteRequestId
       });
       
       // Then, try with the classic approach with acknowledgement
       await this.gunPromiseWithTimeout((resolve) => {
         this.config.gun.get("files").get(fileId).put(null, (ack) => {
             if (ack.err) {
-              console.error(`Error deleting from main path: ${ack.err}`);
+              console.error(`[FileManager] Error deleting from main path: ${ack.err} (Delete ID: ${deleteRequestId})`);
             } else {
-              console.log(`File deleted from main GunDB path for ${fileId}`);
+              console.log(`[FileManager] File deleted from main GunDB path for ${fileId} (Delete ID: ${deleteRequestId})`);
+              deletionResults.gunDbDeleted = true;
             }
             resolve();
           });
@@ -1004,12 +1083,13 @@ class FileManager {
       // Try to force a sync by writing to the root node
       this.config.gun.put({ _lastSync: Date.now() });
 
-      console.log(`File deletion completed for ${fileId}`);
+      console.log(`[FileManager] File deletion completed for ${fileId} in ${Date.now() - deleteStartTime}ms (Delete ID: ${deleteRequestId})`);
+      console.log(`[FileManager] Deletion results: ${JSON.stringify(deletionResults)} (Delete ID: ${deleteRequestId})`);
       
       // Force a delay before continuing to allow GunDB to process the change
       await new Promise(resolve => setTimeout(resolve, 500));
     } catch (error) {
-      console.error(`Error during file deletion: ${error.message}`);
+      console.error(`[FileManager] Error during file deletion: ${error.message} (Delete ID: ${deleteRequestId})`);
       // Even with errors, we'll still return success since we tried our best
     }
 
@@ -1017,6 +1097,9 @@ class FileManager {
       success: true,
       message: "File deletion process completed",
       id: fileId,
+      deleteRequestId: deleteRequestId,
+      results: deletionResults,
+      processingTime: Date.now() - deleteStartTime
     };
   }
 
