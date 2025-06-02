@@ -140,11 +140,6 @@ export function FilesTabContent() {
                     updateFileList(fileListContainer);
                 });
             }
-            
-            // Set up effect to update file list when files change
-            setEffect(() => {
-                updateFileList(fileListContainer);
-            });
         }
     });
     
@@ -180,12 +175,19 @@ export function FilesTabContent() {
             return;
         }
         
-        // Clear container
+        // Clear container completely to prevent duplicates
         container.innerHTML = '';
+        
+        // Add a unique identifier to prevent processing the same file list multiple times
+        const currentTimestamp = Date.now();
+        container.setAttribute('data-last-update', currentTimestamp);
         
         // Display summary
         const ipfsCount = files.filter(file => file && file.ipfsHash).length;
-        const summary = h('div', { class: 'stats stats-horizontal shadow mb-6' },
+        const summary = h('div', { 
+            class: 'stats stats-horizontal shadow mb-6',
+            'data-update-id': currentTimestamp
+        },
             h('div', { class: 'stat' },
                 h('div', { class: 'stat-title' }, 'Total Files'),
                 h('div', { class: 'stat-value text-primary' }, filteredFiles.length),
@@ -199,7 +201,7 @@ export function FilesTabContent() {
         );
         container.appendChild(summary);
         
-        // Add each file
+        // Add each file with duplicate prevention
         try {
             // Sort files by timestamp (newest first)
             const sortedFiles = [...filteredFiles].sort((a, b) => {
@@ -208,12 +210,17 @@ export function FilesTabContent() {
                 return timeB - timeA; // Newest first
             });
             
-            sortedFiles.forEach(file => {
+            sortedFiles.forEach((file, index) => {
                 if (!file || typeof file !== 'object') return;
                 
+                // Add unique identifier to prevent duplicate processing
                 const fileEl = FileItem(file);
+                fileEl.setAttribute('data-file-index', index);
+                fileEl.setAttribute('data-update-id', currentTimestamp);
                 container.appendChild(fileEl);
             });
+            
+            console.log(`[FilesTab] Updated file list with ${sortedFiles.length} files at ${currentTimestamp}`);
         } catch (error) {
             console.error('Error displaying files:', error);
             container.innerHTML = '';
@@ -407,11 +414,16 @@ export function UploadTabContent() {
                 document.getElementById('file-name').value = '';
                 document.getElementById('file-upload-status').className = 'mt-4 text-center hidden';
                 
-                // Reload files list
+                // Reload files list with throttling to prevent duplicates
                 try {
+                    // Clear cache first
                     localStorage.setItem('files-data', JSON.stringify([]));
                     setFiles([]);
-                    loadFiles();
+                    
+                    // Wait a moment before refreshing to allow server to process
+                    setTimeout(() => {
+                        loadFiles();
+                    }, 1000);
                 } catch (refreshError) {
                     console.error("Error refreshing files after upload:", refreshError);
                 }

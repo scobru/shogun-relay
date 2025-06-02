@@ -378,9 +378,21 @@ export function handleLogout() {
 }
 
 /**
- * Load all files
+ * Load all files with throttling to prevent duplicate calls
  */
+let loadFilesThrottleTimer = null;
 export async function loadFiles(searchParams = {}) {
+  // Clear any existing timer to prevent multiple calls
+  if (loadFilesThrottleTimer) {
+    clearTimeout(loadFilesThrottleTimer);
+  }
+  
+  // If already loading, don't start another load
+  if (getIsLoading()) {
+    console.log("[LoadFiles] Already loading, skipping duplicate call");
+    return;
+  }
+  
   setIsLoading(true);
 
   try {

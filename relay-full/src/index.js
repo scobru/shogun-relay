@@ -519,8 +519,8 @@ async function startServer() {
     fileManager = new ShogunFileManager({
       gun,
       ipfsManager,
-      storagePath: STORAGE_DIR,
-      maxFileSize: CONFIG.MAX_FILE_SIZE || "50mb",
+      storageDir: STORAGE_DIR,
+      maxFileSize: CONFIG.MAX_FILE_SIZE || "500mb",
     });
     serverLogger.info("File Manager initialized inside startServer. ✅");
 
@@ -869,8 +869,8 @@ if (!fs.existsSync(LOGS_DIR)) {
 }
 
 // Middlewares
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use(express.json({ limit: "500mb" }));
+app.use(express.urlencoded({ extended: true, limit: "500mb" }));
 app.use("/uploads", express.static(STORAGE_DIR));
 app.use(Gun.serve);
 

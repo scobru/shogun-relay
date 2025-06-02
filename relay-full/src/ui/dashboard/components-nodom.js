@@ -701,10 +701,16 @@ async function uploadFileToIpfs(file) {
                 showToast(`File uploaded to IPFS successfully!`, 'success');
                 
                 // Refresh the files list to show updated IPFS info
+                // Use a throttled approach to prevent multiple rapid refreshes
                 try {
+                    // Clear localStorage cache
                     localStorage.setItem('files-data', JSON.stringify([]));
                     setFiles([]);
-                    loadFiles();
+                    
+                    // Wait a moment before refreshing to allow server to process
+                    setTimeout(() => {
+                        loadFiles();
+                    }, 1000);
                 } catch (refreshError) {
                     console.error("Error refreshing files after IPFS upload:", refreshError);
                 }

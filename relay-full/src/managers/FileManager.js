@@ -5,9 +5,28 @@ import crypto from "crypto";
 
 class FileManager {
   constructor(config) {
+    // Helper function to parse size strings like "500mb" to bytes
+    const parseSize = (sizeStr) => {
+      if (typeof sizeStr === 'number') return sizeStr;
+      if (typeof sizeStr !== 'string') return 500 * 1024 * 1024; // 500MB default
+      
+      const units = {
+        'b': 1,
+        'kb': 1024,
+        'mb': 1024 * 1024,
+        'gb': 1024 * 1024 * 1024
+      };
+      
+      const match = sizeStr.toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb)$/);
+      if (!match) return 500 * 1024 * 1024; // 500MB default
+      
+      const [, number, unit] = match;
+      return Math.floor(parseFloat(number) * units[unit]);
+    };
+
     this.config = {
       storageDir: config.storageDir || "./uploads",
-      maxFileSize: config.maxFileSize || 50 * 1024 * 1024, // 50MB
+      maxFileSize: parseSize(config.maxFileSize) || 500 * 1024 * 1024, // 500MB default
       ipfsManager: config.ipfsManager || null,
       gun: config.gun || null,
     };
