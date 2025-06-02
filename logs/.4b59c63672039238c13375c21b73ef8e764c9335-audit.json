@@ -9,6 +9,11 @@
             "date": 1748781464403,
             "name": "D:\\shogun-2\\test-env\\logs\\backup-2025-06-01.log",
             "hash": "5f6e0fd2809c0b186f932267a76a59e896548970a6bd7c742eba8dc83e81d628"
+        },
+        {
+            "date": 1748859073064,
+            "name": "D:\\shogun-2\\test-env\\logs\\backup-2025-06-02.log",
+            "hash": "1bcd66974268cbd0031d634cc7c6140664d366e7d01239c563afb1b93b03724a"
         }
     ],
     "hashType": "sha256"

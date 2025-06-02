@@ -246,6 +246,29 @@ const debugGunMessages = (msg) => {
 };
 
 function hasValidToken(msg) {
+  // Special case: allow authentication messages from Gun.js internal operations
+  if (msg && msg.put) {
+    const keys = Object.keys(msg.put);
+    // Allow user authentication messages (they start with ~@)
+    if (keys.some(key => key.startsWith('~@'))) {
+      console.log("WRITING - User authentication message allowed");
+      return true;
+    }
+    // Allow user data messages (they contain user pub keys)
+    if (keys.some(key => key.match(/^~[A-Za-z0-9_\-\.]+$/))) {
+      console.log("WRITING - User data message allowed");
+      return true;
+    }
+  }
+
+  console.log("🔍 Token validation for message:", {
+    hasHeaders: !!(msg && msg.headers),
+    hasToken: !!(msg && msg.token),
+    headerToken: msg?.headers?.token ? msg.headers.token.substring(0, 10) + '...' : 'none',
+    directToken: msg?.token ? msg.token.substring(0, 10) + '...' : 'none',
+    expectedToken: SECRET_TOKEN ? SECRET_TOKEN.substring(0, 10) + '...' : 'none'
+  });
+
   const valid =
     (msg &&
       msg.headers &&
@@ -255,15 +278,36 @@ function hasValidToken(msg) {
 
   if (valid) {
     console.log("WRITING - Valid token found");
+  } else {
+    console.log("❌ Token validation failed");
   }
 
   return valid;
 }
 
+
 Gun.on("opt", function (ctx) {
   if (ctx.once) {
     return;
   }
+
+  // Add outgoing token injection for this instance
+  ctx.on("out", function (msg) {
+    const to = this.to;
+    
+    // Always add token to outgoing messages from server
+    if (!msg.headers) msg.headers = {};
+    msg.headers.token = SECRET_TOKEN;
+    msg.token = SECRET_TOKEN;
+    msg.headers.Authorization = `Bearer ${SECRET_TOKEN}`;
+    
+    console.log("📤 Adding token to outgoing message:", {
+      type: msg.put ? 'PUT' : msg.get ? 'GET' : 'OTHER',
+      hasToken: !!msg.token
+    });
+    
+    to.next(msg);
+  });
 
   // Check all incoming traffic
   ctx.on("in", function (msg) {
@@ -382,14 +426,8 @@ async function startServer() {
     gun = Gun(gunOptions);
     gunLogger.info("GunDB initialized. ✅");
 
-    // Add debug middleware after initialization
-    Gun.on("opt", function (ctx) {
-      if (ctx.once) return;
-      ctx.on("in", function (msg) {
-        debugGunMessages(msg);
-        this.to.next(msg);
-      });
-    });
+    // Debug middleware is already handled in Gun.on("opt") above
+    // Removed duplicate debug middleware to avoid conflicts
 
     gun.on("out", { get: { "#": { "*": "" } } });
 
