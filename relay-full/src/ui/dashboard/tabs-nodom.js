@@ -155,11 +155,32 @@ export function FilesTabContent() {
                 });
             }
             
-            // Re-add the effect to update file list when files change
-            // This is needed to refresh the UI when data changes
+            // Enhanced reactive effect to update file list when files change
+            // This is needed to refresh the UI when data changes, but with duplicate prevention
+            let lastFilesChecksum = '';
+            let lastFilterState = false;
+            
             setEffect(() => {
                 const files = getFiles();
-                updateFileList(fileListContainer);
+                const ipfsFilterEnabled = document.getElementById('ipfs-filter')?.checked || false;
+                
+                // Create a checksum of current state to detect actual changes
+                const currentFilesChecksum = JSON.stringify(files.map(f => ({ id: f.id, ipfsHash: f.ipfsHash })));
+                const currentFilterState = ipfsFilterEnabled;
+                
+                // Only update if there's an actual change in files or filter state
+                if (currentFilesChecksum !== lastFilesChecksum || currentFilterState !== lastFilterState) {
+                    console.log('[FilesTab] Files or filter changed, updating list...');
+                    lastFilesChecksum = currentFilesChecksum;
+                    lastFilterState = currentFilterState;
+                    
+                    // Small delay to prevent rapid updates
+                    setTimeout(() => {
+                        updateFileList(fileListContainer);
+                    }, 100);
+                } else {
+                    console.log('[FilesTab] No changes detected in files or filter, skipping update');
+                }
             });
         }
     });
@@ -201,8 +222,16 @@ export function FilesTabContent() {
                     }
                 }
                 
-                // Clear selection
+                // Clear selection and UI state
                 selectedFiles.clear();
+                
+                // Clear file list display state to force refresh
+                const fileListContainer = document.getElementById('file-list');
+                if (fileListContainer) {
+                    fileListContainer.dataset.lastFileIds = '';
+                    fileListContainer.dataset.updating = 'false';
+                }
+                
                 updateSelectAllState();
                 updateBatchDeleteButton();
                 
@@ -213,10 +242,26 @@ export function FilesTabContent() {
                     showToast(`⚠️ Deleted ${successCount} files, ${failureCount} failed`, 'warning');
                 }
                 
-                // Refresh file list with delay to avoid duplicates
-                setTimeout(() => {
-                    loadFiles();
-                }, 500);
+                // Enhanced refresh logic to prevent duplicates
+                try {
+                    // Clear cache first
+                    localStorage.setItem('files-data', JSON.stringify([]));
+                    setFiles([]);
+                    
+                    // Single delayed refresh with loading check
+                    setTimeout(async () => {
+                        if (!getIsLoading()) {
+                            console.log('[BatchDelete] Refreshing files after deletion...');
+                            await loadFiles();
+                        } else {
+                            console.log('[BatchDelete] Skipping refresh, loading already in progress');
+                        }
+                    }, 1000); // 1 second delay for batch delete
+                    
+                } catch (refreshError) {
+                    console.error('Error refreshing files after batch delete:', refreshError);
+                    showToast('Files deleted but refresh failed. Please refresh manually.', 'warning');
+                }
                 
             } catch (error) {
                 console.error('Error during batch deletion:', error);
@@ -311,6 +356,16 @@ export function FilesTabContent() {
     function updateFileList(container) {
         if (!container) return;
         
+        // Enhanced duplicate prevention - check if we're already updating this container
+        const updateId = `update-${Date.now()}`;
+        if (container.dataset.updating === 'true') {
+            console.log(`[FilesTab] Container already updating, skipping duplicate update`);
+            return;
+        }
+        
+        // Mark as updating
+        container.dataset.updating = 'true';
+        
         const files = getFiles();
         const isLoading = getIsLoading();
         const ipfsFilterEnabled = document.getElementById('ipfs-filter')?.checked || false;
@@ -319,12 +374,14 @@ export function FilesTabContent() {
         if (isLoading) {
             container.innerHTML = '';
             container.appendChild(LoadingState('Loading files...'));
+            container.dataset.updating = 'false';
             return;
         }
         
         if (!files || !Array.isArray(files) || files.length === 0) {
             container.innerHTML = '';
             container.appendChild(EmptyState('No files found'));
+            container.dataset.updating = 'false';
             return;
         }
         
@@ -336,21 +393,36 @@ export function FilesTabContent() {
         if (filteredFiles.length === 0) {
             container.innerHTML = '';
             container.appendChild(EmptyState(`No ${ipfsFilterEnabled ? 'IPFS ' : ''}files found`));
+            container.dataset.updating = 'false';
             return;
         }
+        
+        // Check if we need to update - compare with last known state
+        const currentFileIds = filteredFiles.map(f => f.id).sort().join(',');
+        const lastFileIds = container.dataset.lastFileIds || '';
+        
+        if (currentFileIds === lastFileIds && container.children.length > 0) {
+            console.log(`[FilesTab] No changes detected, skipping update`);
+            container.dataset.updating = 'false';
+            return;
+        }
+        
+        // Store current state
+        container.dataset.lastFileIds = currentFileIds;
         
         // Clear container completely to prevent duplicates
         container.innerHTML = '';
         
-        // Add a unique identifier to prevent processing the same file list multiple times
-        const currentTimestamp = Date.now();
-        container.setAttribute('data-last-update', currentTimestamp);
+        // Add update identifier to prevent processing the same file list multiple times
+        container.setAttribute('data-last-update', updateId);
+        
+        console.log(`[FilesTab] Updating file list with ${filteredFiles.length} files (update ID: ${updateId})`);
         
         // Display summary with select all checkbox
         const ipfsCount = files.filter(file => file && file.ipfsHash).length;
         const summary = h('div', { 
             class: 'stats stats-horizontal shadow mb-6',
-            'data-update-id': currentTimestamp
+            'data-update-id': updateId
         },
             h('div', { class: 'stat' },
                 h('div', { class: 'stat-title flex items-center gap-2' },
@@ -390,8 +462,18 @@ export function FilesTabContent() {
                 return timeB - timeA; // Newest first
             });
             
+            // Create a Set to track processed file IDs
+            const processedFileIds = new Set();
+            
             sortedFiles.forEach((file, index) => {
                 if (!file || typeof file !== 'object') return;
+                
+                // Skip if we've already processed this file ID
+                if (processedFileIds.has(file.id)) {
+                    console.warn(`[FilesTab] Skipping duplicate file ID: ${file.id}`);
+                    return;
+                }
+                processedFileIds.add(file.id);
                 
                 // Add unique identifier to prevent duplicate processing
                 const fileEl = FileItem(file, {
@@ -400,17 +482,21 @@ export function FilesTabContent() {
                     onSelectionChange: handleFileSelection
                 });
                 fileEl.setAttribute('data-file-index', index);
-                fileEl.setAttribute('data-update-id', currentTimestamp);
+                fileEl.setAttribute('data-update-id', updateId);
+                fileEl.setAttribute('data-file-id', file.id); // Add for debugging
                 container.appendChild(fileEl);
             });
             
-            console.log(`[FilesTab] Updated file list with ${sortedFiles.length} files at ${currentTimestamp}`);
+            console.log(`[FilesTab] Successfully updated file list with ${sortedFiles.length} unique files at ${updateId}`);
         } catch (error) {
             console.error('Error displaying files:', error);
             container.innerHTML = '';
             container.appendChild(h('div', { class: 'alert alert-error' }, 
                 `Error displaying files: ${error.message}`
             ));
+        } finally {
+            // Mark as no longer updating
+            container.dataset.updating = 'false';
         }
     }
     
@@ -604,23 +690,38 @@ export function UploadTabContent() {
                 document.getElementById('file-name').value = '';
                 document.getElementById('file-upload-status').className = 'mt-4 text-center hidden';
                 
-                // Improved file refresh logic to prevent duplicates
+                // Enhanced file refresh logic to prevent duplicates
                 try {
-                    // Clear cache and selection state
+                    // Clear cache and selection state first
                     localStorage.setItem('files-data', JSON.stringify([]));
                     setFiles([]);
                     selectedFiles.clear();
+                    
+                    // Clear any existing file list display state
+                    const fileListContainer = document.getElementById('file-list');
+                    if (fileListContainer) {
+                        fileListContainer.dataset.lastFileIds = '';
+                        fileListContainer.dataset.updating = 'false';
+                    }
+                    
+                    // Update UI state
                     updateSelectAllState();
                     updateBatchDeleteButton();
                     
-                    // Wait longer and check loading state before refreshing
-                    setTimeout(() => {
+                    // Single delayed refresh to allow server processing
+                    setTimeout(async () => {
+                        // Only refresh if not currently loading and no other refresh is pending
                         if (!getIsLoading()) {
-                            loadFiles();
+                            console.log('[Upload] Refreshing files after upload...');
+                            await loadFiles();
+                        } else {
+                            console.log('[Upload] Skipping refresh, loading already in progress');
                         }
-                    }, 2000); // Increased delay to 2 seconds
+                    }, 2000); // 2 second delay to ensure server processing is complete
+                    
                 } catch (refreshError) {
                     console.error("Error refreshing files after upload:", refreshError);
+                    showToast('File uploaded but refresh failed. Please refresh manually.', 'warning');
                 }
             } else {
                 throw new Error(data.error || "Unknown error");
