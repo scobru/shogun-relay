@@ -1291,4 +1291,226 @@ export async function reconnectToPeer(peerUrl) {
     }
   } catch (error) {
     console.error(`Error reconnecting to peer: ${error.message}`);
-    showToast(`
+    showToast(`Failed to reconnect to peer: ${error.message}`, "error");
+    return false;
+  } finally {
+    setIsLoading(false);
+  }
+}
+
+/**
+ * Test connection to a specific peer
+ */
+export async function testPeerConnection(peerUrl) {
+  try {
+    setIsLoading(true);
+    showToast(`Testing connection to: ${peerUrl}`, "info");
+
+    const response = await fetch(
+      `/api/network/peers/${encodeURIComponent(peerUrl)}/test`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${getAuthToken()}`,
+        },
+        signal: AbortSignal.timeout(10000),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.success) {
+      showToast(`✅ Connection test successful: ${peerUrl}`, "success");
+      return true;
+    } else {
+      showToast(`❌ Connection test failed: ${data.error || "Unknown error"}`, "error");
+      return false;
+    }
+  } catch (error) {
+    console.error(`Error testing peer connection: ${error.message}`);
+    showToast(`❌ Connection test failed: ${error.message}`, "error");
+    return false;
+  } finally {
+    setIsLoading(false);
+  }
+}
+
+/**
+ * Pin a file to IPFS
+ */
+export async function pinFileToIpfs(fileId) {
+  try {
+    setIsLoading(true);
+    showToast("📌 Pinning file to IPFS...", "info");
+
+    const response = await fetch(`/api/ipfs/pin/${fileId}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${getAuthToken()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.success) {
+      showToast("✅ File pinned to IPFS successfully!", "success");
+      
+      // Refresh files to show updated pin status
+      setTimeout(() => {
+        loadFiles();
+      }, 1000);
+      
+      return true;
+    } else {
+      throw new Error(data.error || "Unknown error");
+    }
+  } catch (error) {
+    console.error("Error pinning file to IPFS:", error);
+    showToast(`❌ Failed to pin file: ${error.message}`, "error");
+    return false;
+  } finally {
+    setIsLoading(false);
+  }
+}
+
+/**
+ * Unpin a file from IPFS
+ */
+export async function unpinFileFromIpfs(fileId) {
+  try {
+    setIsLoading(true);
+    showToast("📌 Unpinning file from IPFS...", "info");
+
+    const response = await fetch(`/api/ipfs/unpin/${fileId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${getAuthToken()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.success) {
+      showToast("✅ File unpinned from IPFS successfully!", "success");
+      
+      // Refresh files to show updated pin status
+      setTimeout(() => {
+        loadFiles();
+      }, 1000);
+      
+      return true;
+    } else {
+      throw new Error(data.error || "Unknown error");
+    }
+  } catch (error) {
+    console.error("Error unpinning file from IPFS:", error);
+    showToast(`❌ Failed to unpin file: ${error.message}`, "error");
+    return false;
+  } finally {
+    setIsLoading(false);
+  }
+}
+
+/**
+ * Check IPFS pin status for a file
+ */
+export async function checkIpfsPinStatus(fileId) {
+  try {
+    const response = await fetch(`/api/ipfs/pin-status/${fileId}`, {
+      headers: {
+        Authorization: `Bearer ${getAuthToken()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.success ? data.pinned : false;
+  } catch (error) {
+    console.error("Error checking IPFS pin status:", error);
+    return false;
+  }
+}
+
+// Export state getters and setters for use in other modules
+export { 
+  getIsAuthenticated, 
+  setIsAuthenticated,
+  getIsLoading,
+  setIsLoading,
+  getActiveTab,
+  setActiveTab,
+  getToasts,
+  setToasts,
+  getServerStatus,
+  setServerStatus,
+  getNetworkStatus,
+  setNetworkStatus,
+  getFileStats,
+  setFileStats,
+  getFiles,
+  setFiles,
+  getIpfsStatus,
+  setIpfsStatus,
+  getIpfsConnectionStatus,
+  setIpfsConnectionStatus,
+  getTheme,
+  setTheme,
+  getPeers,
+  setPeers,
+  getPeerConnections,
+  setPeerConnections
+};
+
+// Alias functions for compatibility
+function getToasts() {
+  try {
+    const storedToasts = localStorage.getItem("app-toasts");
+    return storedToasts ? JSON.parse(storedToasts) : [];
+  } catch (err) {
+    console.error("Error getting toasts:", err);
+    return [];
+  }
+}
+
+function setToasts(toasts) {
+  try {
+    localStorage.setItem("app-toasts", JSON.stringify(toasts));
+    _setToasts(toasts);
+  } catch (err) {
+    console.error("Error setting toasts:", err);
+  }
+}
+
+function getFiles() {
+  try {
+    const storedFiles = localStorage.getItem("files-data");
+    return storedFiles ? JSON.parse(storedFiles) : [];
+  } catch (err) {
+    console.error("Error getting files:", err);
+    return [];
+  }
+}
+
+function setFiles(files) {
+  try {
+    localStorage.setItem("files-data", JSON.stringify(files));
+    _setFiles(files);
+  } catch (err) {
+    console.error("Error setting files:", err);
+  }
+}
