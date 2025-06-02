@@ -119,277 +119,30 @@ if (typeof window !== "undefined" && !window.shogunDebug) {
   console.log("Debug module initialized");
 }
 
-/**
- * Cambia tema tra dark e light usando DaisyUI
- */
-export function toggleTheme() {
-  const currentTheme = getTheme();
-  const newTheme = currentTheme === "dark" ? "light" : "dark";
-
-  // Aggiorna tema nel localStorage
-  localStorage.setItem("app-theme", newTheme);
-
-  // Aggiorna signal del tema
-  setTheme(newTheme);
-
-  // Applica tema al document usando DaisyUI
-  document.documentElement.setAttribute("data-theme", newTheme);
-
-  showToast(
-    `🎨 ${newTheme === "dark" ? "Dark" : "Light"} theme activated`,
-    "success",
-    2000
-  );
-}
-
-/**
- * Inizializza il tema al caricamento dell'app usando DaisyUI
- */
-export function initTheme() {
-  const savedTheme = localStorage.getItem("app-theme") || "dark";
-  document.documentElement.setAttribute("data-theme", savedTheme);
-  setTheme(savedTheme);
-}
-
-/**
- * Initialize the Gun database
- */
-export function initGun() {
-  try {
-    const token = getAuthToken();
-
-    if (!token) {
-      console.error("No auth token found. Gun init aborted.");
-      return null;
-    }
-
-    // Initialize Gun with the current host
-    const peers = [window.location.origin + "/gun"];
-    console.log(`Initializing Gun with peers: ${peers.join(", ")}`);
-
-    // Create Gun instance with peers and LocalStorage support
-    const gun = Gun({
-      peers: peers,
-      localStorage: false,
-      radisk: false, // Disable Radisk to prevent storage issues
-    });
-
-    // Store it in the global variable for reuse
-    gunInstance = gun;
-    window.gunInstance = gun;
-
-    // Set up connection monitoring
-    monitorGunConnection(gun);
-
-    // Update server status on initialization
-    updateServerStatus();
-
-    return gun;
-  } catch (error) {
-    console.error(`Error initializing Gun: ${error.message}`);
-    return null;
-  }
-}
-
-/**
- * Setup Gun connection event listeners
- */
-function setupGunConnectionListeners() {
-  gunInstance.on("hi", (peer) => {
-    const currentStatus = getNetworkStatus();
-    setNetworkStatus({
-      peerCount: currentStatus.peerCount + 1,
-      status: "Connected",
-    });
-    console.log(`Connected to peer:`, peer);
-
-    // Load files when connected
-    setTimeout(() => loadFiles(), 1000);
-  });
-
-  gunInstance.on("bye", (peer) => {
-    const currentStatus = getNetworkStatus();
-    const newPeerCount = Math.max(0, currentStatus.peerCount - 1);
-    setNetworkStatus({
-      peerCount: newPeerCount,
-      status: newPeerCount === 0 ? "Disconnected" : "Connected",
-    });
-    console.log(`Disconnected from peer:`, peer);
-  });
-
-  // Force an initial connection attempt
-  setTimeout(() => {
-    if (getNetworkStatus().status === "Disconnected") {
-      gunInstance.get("_").put({ ping: Date.now() });
-
-      // If still disconnected, assume local connection
-      if (getNetworkStatus().status === "Disconnected") {
-        setNetworkStatus({
-          peerCount: 0,
-          status: "Connected (Local Only)",
-        });
-
-        // Load files with local connection
-        loadFiles();
-      }
-    }
-  }, 3000);
-}
-
-/**
- * Auth token management functions
- */
-export function getAuthToken() {
-  return localStorage.getItem("authToken");
-}
-
-export function isTokenExpired() {
-  const tokenData = getTokenData();
-  if (!tokenData || !tokenData.exp) return true;
-
-  // Admin token never expires
-  const token = getAuthToken();
-  if (token === "thisIsTheTokenForReals") return false;
-
-  return tokenData.exp * 1000 < Date.now();
-}
-
-function getTokenData() {
-  const token = getAuthToken();
-  if (!token) return null;
-
-  // Admin token is always valid
-  if (token === "thisIsTheTokenForReals") {
-    return {
-      exp: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
-    };
-  }
-
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-
-    const payload = JSON.parse(atob(parts[1]));
-    return payload;
-  } catch (e) {
-    console.error("Error parsing token:", e);
-    return null;
-  }
-}
-
-/**
- * Check authentication status
- */
-export async function checkAuth() {
-  const token = getAuthToken();
-  if (!token) {
-    setIsAuthenticated(false);
-    return false;
-  }
-
-  // Admin token is always valid
-  if (token === "thisIsTheTokenForReals") {
-    setIsAuthenticated(true);
-    return true;
-  }
-
-  // Check JWT token expiration
-  if (token.split(".").length === 3) {
-    if (isTokenExpired()) {
-      const refreshed = await refreshToken();
-      if (!refreshed) {
-        localStorage.removeItem("authToken");
-        setIsAuthenticated(false);
-        return false;
-      }
-    }
-  }
-
-  setIsAuthenticated(true);
-  return true;
-}
-
-/**
- * Refresh authentication token
- */
-export async function refreshToken() {
-  try {
-    setIsLoading(true);
-
-    const token = getAuthToken();
-
-    // Skip refresh for admin token
-    if (token === "thisIsTheTokenForReals") {
-      return true;
-    }
-
-    // Only try to refresh actual JWT tokens
-    if (!token || token.split(".").length !== 3) {
-      return true;
-    }
-
-    const response = await fetch("/api/auth/refresh-token", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${getAuthToken()}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error("Token refresh failed");
-    }
-
-    const data = await response.json();
-    if (data.token) {
-      localStorage.setItem("authToken", data.token);
-      showToast("Session renewed", "success");
-      return true;
-    }
-    return false;
-  } catch (error) {
-    console.error("Error refreshing token:", error);
-    showToast("Unable to renew session. Please try logging in again.", "error");
-    return false;
-  } finally {
-    setIsLoading(false);
-  }
-}
-
-/**
- * Handle user logout
- */
-export function handleLogout() {
-  try {
-    // Remove auth tokens
-    localStorage.removeItem("authToken");
-    sessionStorage.removeItem("authToken");
-
-    // Show logout message
-    showToast("Logout in corso...", "info", 1000);
-
-    // Wait briefly before redirecting
-    setTimeout(() => {
-      window.location.replace("/login?logout=true");
-    }, 500);
-  } catch (error) {
-    console.error("Errore durante il logout:", error);
-    window.location.href = "/login";
-  }
-}
-
 // Throttling for file loading to prevent duplicates
 let isLoadingFiles = false;
 let loadFilesTimeout = null;
+let lastLoadRequest = 0;
 
 /**
  * Load all files - improved with better duplicate prevention
  */
 export async function loadFiles(searchParams = {}) {
-  // Enhanced duplicate prevention
+  const now = Date.now();
+  
+  // Enhanced duplicate prevention with time-based throttling
   if (isLoadingFiles || getIsLoading()) {
     console.log("[LoadFiles] Already loading, skipping duplicate call");
     return;
   }
+  
+  // Prevent rapid successive calls (less than 1 second apart)
+  if (now - lastLoadRequest < 1000) {
+    console.log("[LoadFiles] Request too soon after last one, throttling");
+    return;
+  }
+  
+  lastLoadRequest = now;
   
   // Clear any pending load timeout
   if (loadFilesTimeout) {
@@ -408,10 +161,9 @@ export async function loadFiles(searchParams = {}) {
       return;
     }
 
-    // Force refresh of files data
-    // Use localStorage instead of GunDB to avoid array errors
-    localStorage.setItem("files-data", JSON.stringify([]));
-    _setFiles([]);
+    // Get current files for comparison to prevent unnecessary updates
+    const currentFiles = getFiles();
+    const currentFileIds = currentFiles.map(f => f.id).sort();
 
     // Construct URL with search parameters
     let url = "/files/all";
@@ -433,6 +185,8 @@ export async function loadFiles(searchParams = {}) {
       headers: {
         Authorization: `Bearer ${token}`,
         "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
       },
     });
 
@@ -451,8 +205,46 @@ export async function loadFiles(searchParams = {}) {
       console.log("DEBUG: File array length:", fileArray.length);
       console.log("DEBUG: First few files:", fileArray.slice(0, 3));
 
-      // Process files to ensure IPFS files are properly identified
-      const processedFiles = fileArray.map((file) => {
+      // Process files to ensure IPFS files are properly identified and remove duplicates
+      const processedFiles = [];
+      const seenIds = new Set();
+      const seenContent = new Map(); // Track by content to detect duplicates
+      
+      fileArray.forEach((file) => {
+        if (!file || typeof file !== 'object') return;
+        
+        // Skip if we've already seen this ID
+        if (seenIds.has(file.id)) {
+          console.warn(`[LoadFiles] Skipping duplicate file ID: ${file.id}`);
+          return;
+        }
+        
+        // Create content signature for duplicate detection
+        const contentSignature = `${file.originalName || file.name}_${file.size}_${file.mimetype || file.mimeType}`;
+        
+        // Check for content duplicates
+        if (seenContent.has(contentSignature)) {
+          const existingFile = seenContent.get(contentSignature);
+          console.warn(`[LoadFiles] Found content duplicate: ${file.id} matches ${existingFile.id}`);
+          
+          // Keep the file with the higher timestamp
+          const newTimestamp = parseInt(file.timestamp || file.uploadedAt || 0);
+          const existingTimestamp = parseInt(existingFile.timestamp || existingFile.uploadedAt || 0);
+          
+          if (newTimestamp > existingTimestamp) {
+            // Remove the older file from processed files
+            const oldIndex = processedFiles.findIndex(f => f.id === existingFile.id);
+            if (oldIndex !== -1) {
+              processedFiles.splice(oldIndex, 1);
+              seenIds.delete(existingFile.id);
+              console.log(`[LoadFiles] Replacing older duplicate ${existingFile.id} with ${file.id}`);
+            }
+          } else {
+            console.log(`[LoadFiles] Keeping existing file ${existingFile.id}, skipping ${file.id}`);
+            return; // Skip this duplicate
+          }
+        }
+        
         // Create a clean processed file with all fields preserved
         const processedFile = { ...file };
 
@@ -468,7 +260,9 @@ export async function loadFiles(searchParams = {}) {
             file.ipfsUrl || `${ipfsGateway}/${file.ipfsHash}`;
         }
 
-        return processedFile;
+        processedFiles.push(processedFile);
+        seenIds.add(file.id);
+        seenContent.set(contentSignature, processedFile);
       });
 
       // Debug log file entries with IPFS data
@@ -488,12 +282,21 @@ export async function loadFiles(searchParams = {}) {
         );
       }
 
+      // Check if files have actually changed before updating
+      const newFileIds = processedFiles.map(f => f.id).sort();
+      const hasChanged = JSON.stringify(currentFileIds) !== JSON.stringify(newFileIds);
+      
+      if (!hasChanged && processedFiles.length === currentFiles.length) {
+        console.log("[LoadFiles] No changes detected, skipping update");
+        return;
+      }
+
       // Handle files as a plain JS array, not through Gun
       // Update state - use a safer way to update the files array
       try {
         // Log the file data for debugging
         console.log(
-          `Loaded ${processedFiles.length} files from API (${ipfsFiles.length} IPFS files)`
+          `Loaded ${processedFiles.length} unique files from API (${ipfsFiles.length} IPFS files)`
         );
 
         // Store files in localStorage first
@@ -504,20 +307,25 @@ export async function loadFiles(searchParams = {}) {
 
         // Update file stats
         updateFileStats(processedFiles);
+        
+        // Trigger UI update
+        const event = new CustomEvent('filesUpdated', { detail: { files: processedFiles } });
+        document.dispatchEvent(event);
+        
       } catch (err) {
         console.error("Error updating files:", err);
         // Fallback to direct DOM update if needed
         const fileListEl = document.getElementById("file-list");
         if (fileListEl) {
           fileListEl.innerHTML =
-            fileArray.length === 0
+            processedFiles.length === 0
               ? '<div class="empty-state">No files found</div>'
               : "";
         }
       }
 
       if (processedFiles.length === 0) {
-        console.warn("No files found");
+        console.warn("No files found after processing");
       }
     } else {
       // Reset files safely

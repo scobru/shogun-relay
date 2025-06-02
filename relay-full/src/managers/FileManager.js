@@ -130,8 +130,10 @@ class FileManager {
 
     let gunDbKey, fileBuffer, originalName, mimeType, fileSize, uploadTimestamp;
 
-    // Create a consistent timestamp for the entire upload process
+    // Create a unique timestamp with microsecond precision to prevent duplicates
     uploadTimestamp = Date.now();
+    const microSeconds = process.hrtime.bigint() % 1000n;
+    const uniqueTimestamp = `${uploadTimestamp}${microSeconds.toString().padStart(3, '0')}`;
 
     if (req.file) {
       originalName = req.file.originalname;
@@ -142,8 +144,8 @@ class FileManager {
       // Use the same format as filesystem naming to ensure consistency
       const safeOriginalName = originalName.replace(/[^a-zA-Z0-9.-]/g, "_");
       
-      // Use consistent ID format: timestamp-filename (like filesystem)
-      gunDbKey = req.body.customName || `${uploadTimestamp}-${safeOriginalName.replace(/\.[^/.]+$/, "")}`;
+      // Use consistent ID format with unique timestamp: timestamp-filename
+      gunDbKey = req.body.customName || `${uniqueTimestamp}-${safeOriginalName.replace(/\.[^/.]+$/, "")}`;
 
       // Check if file was uploaded to memory or disk
       if (req.file.buffer) {
@@ -158,8 +160,8 @@ class FileManager {
     } else {
       const content = req.body.content;
       const contentType = req.body.contentType || "text/plain";
-      originalName = req.body.customName || `text-${uploadTimestamp}.txt`;
-      gunDbKey = req.body.customName || `${uploadTimestamp}-text`;
+      originalName = req.body.customName || `text-${uniqueTimestamp}.txt`;
+      gunDbKey = req.body.customName || `${uniqueTimestamp}-text`;
       mimeType = contentType;
       fileSize = content.length;
       fileBuffer = Buffer.from(content);
@@ -174,14 +176,33 @@ class FileManager {
 
     // Always store files locally first (no automatic IPFS upload)
     console.log(`Storing file locally: ${originalName}`);
-    const fileName = `${uploadTimestamp}-${originalName.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+    const fileName = `${uniqueTimestamp}-${originalName.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
     localPath = path.join(this.config.storageDir, fileName);
-    fs.writeFileSync(localPath, fileBuffer);
-    fileUrl = `/uploads/${fileName}`;
-    console.log(`File saved locally successfully: ${localPath}`);
+    
+    // Check if file already exists and generate alternative name if needed
+    let actualLocalPath = localPath;
+    let counter = 1;
+    while (fs.existsSync(actualLocalPath)) {
+      const ext = path.extname(fileName);
+      const basename = path.basename(fileName, ext);
+      actualLocalPath = path.join(this.config.storageDir, `${basename}_${counter}${ext}`);
+      counter++;
+    }
+    
+    fs.writeFileSync(actualLocalPath, fileBuffer);
+    fileUrl = `/uploads/${path.basename(actualLocalPath)}`;
+    console.log(`File saved locally successfully: ${actualLocalPath}`);
 
     // Ensure an ID with proper formatting for GunDB
     const safeId = gunDbKey.replace(/[^a-zA-Z0-9_-]/g, "_");
+
+    // Check if this file ID already exists in GunDB to prevent duplicates
+    const existingFile = await this.getFileById(safeId);
+    if (existingFile) {
+      console.warn(`[FileManager] File with ID ${safeId} already exists, generating new ID`);
+      const newId = `${safeId}_${counter}`;
+      gunDbKey = newId;
+    }
 
     const fileData = {
       id: safeId,
@@ -192,12 +213,13 @@ class FileManager {
       size: fileSize,
       url: fileUrl,
       fileUrl: fileUrl,
-      localPath: localPath,
+      localPath: actualLocalPath,
       ipfsHash: null, // No IPFS hash initially
       ipfsUrl: null,  // No IPFS URL initially
       timestamp: uploadTimestamp,
       uploadedAt: uploadTimestamp,
       customName: req.body.customName || null,
+      uploadId: uniqueTimestamp, // Add unique upload identifier
     };
 
     // Save metadata to GunDB
@@ -287,6 +309,7 @@ class FileManager {
     // Store valid files and track IDs we've already seen to avoid duplicates
     const files = [];
     const seen = new Set();
+    const filesByContent = new Map(); // Track files by content hash to prevent duplicates
 
     // First fetch the list of deleted files to filter against
     const deletedFileIds = new Set();
@@ -309,7 +332,7 @@ class FileManager {
       console.warn("[FileManager] Error fetching deleted files:", error.message);
     }
 
-    // Helper to process file data into a standardized format
+    // Helper to process file data into a standardized format with duplicate detection
     const processFileData = (data, key) => {
       // Skip if key is null, undefined, or starts with _ (GunDB metadata)
       if (!key || key.startsWith("_")) return;
@@ -321,7 +344,6 @@ class FileManager {
       }
 
       // Skip if we've already processed this ID
-      // Normalize ID to match possible variations
       const normalizedId = key.startsWith("/") ? key.substring(1) : key;
       if (seen.has(normalizedId)) {
         console.log(`[FileManager] Skipping duplicate key: ${key}`);
@@ -376,6 +398,34 @@ class FileManager {
           (fileObject.name || fileObject.originalName) &&
           (fileObject.fileUrl || fileObject.ipfsHash)
         ) {
+          // Create content identifier for duplicate detection
+          const contentId = `${fileObject.originalName}_${fileObject.size}_${fileObject.mimetype}`;
+          
+          // Check for content duplicates
+          if (filesByContent.has(contentId)) {
+            const existingFile = filesByContent.get(contentId);
+            console.log(`[FileManager] Found content duplicate: ${normalizedId} matches ${existingFile.id}`);
+            
+            // Keep the newer file (higher timestamp)
+            const newTimestamp = parseInt(fileObject.timestamp || fileObject.uploadedAt || 0);
+            const existingTimestamp = parseInt(existingFile.timestamp || existingFile.uploadedAt || 0);
+            
+            if (newTimestamp > existingTimestamp) {
+              // Remove the older file from results
+              const oldIndex = files.findIndex(f => f.id === existingFile.id);
+              if (oldIndex !== -1) {
+                files.splice(oldIndex, 1);
+                console.log(`[FileManager] Replacing older duplicate ${existingFile.id} with ${normalizedId}`);
+              }
+              filesByContent.set(contentId, fileObject);
+            } else {
+              console.log(`[FileManager] Keeping existing file ${existingFile.id}, skipping ${normalizedId}`);
+              return; // Skip this duplicate
+            }
+          } else {
+            filesByContent.set(contentId, fileObject);
+          }
+          
           files.push(fileObject);
           seen.add(normalizedId);
           console.log(

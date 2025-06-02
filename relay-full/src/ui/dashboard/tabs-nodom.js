@@ -397,8 +397,56 @@ export function FilesTabContent() {
             return;
         }
         
+        // Additional duplicate removal at UI level
+        const uniqueFilteredFiles = [];
+        const seenFileIds = new Set();
+        const seenContentSignatures = new Map();
+        
+        for (const file of filteredFiles) {
+            if (!file || !file.id) continue;
+            
+            // Skip if we've already seen this ID
+            if (seenFileIds.has(file.id)) {
+                console.warn(`[FilesTab] Skipping duplicate file ID in UI: ${file.id}`);
+                continue;
+            }
+            
+            // Create content signature for duplicate detection
+            const contentSignature = `${file.originalName || file.name}_${file.size || 0}_${file.mimetype || file.mimeType || ''}`;
+            
+            // Check for content duplicates
+            if (seenContentSignatures.has(contentSignature)) {
+                const existingFile = seenContentSignatures.get(contentSignature);
+                console.warn(`[FilesTab] Found content duplicate in UI: ${file.id} matches ${existingFile.id}`);
+                
+                // Keep the file with the higher timestamp
+                const newTimestamp = parseInt(file.timestamp || file.uploadedAt || 0);
+                const existingTimestamp = parseInt(existingFile.timestamp || existingFile.uploadedAt || 0);
+                
+                if (newTimestamp > existingTimestamp) {
+                    // Remove the older file from uniqueFilteredFiles
+                    const oldIndex = uniqueFilteredFiles.findIndex(f => f.id === existingFile.id);
+                    if (oldIndex !== -1) {
+                        uniqueFilteredFiles.splice(oldIndex, 1);
+                        seenFileIds.delete(existingFile.id);
+                        console.log(`[FilesTab] Replacing older duplicate in UI: ${existingFile.id} with ${file.id}`);
+                    }
+                    seenContentSignatures.set(contentSignature, file);
+                    uniqueFilteredFiles.push(file);
+                    seenFileIds.add(file.id);
+                } else {
+                    console.log(`[FilesTab] Keeping existing file in UI: ${existingFile.id}, skipping ${file.id}`);
+                    continue; // Skip this duplicate
+                }
+            } else {
+                seenContentSignatures.set(contentSignature, file);
+                uniqueFilteredFiles.push(file);
+                seenFileIds.add(file.id);
+            }
+        }
+        
         // Check if we need to update - compare with last known state
-        const currentFileIds = filteredFiles.map(f => f.id).sort().join(',');
+        const currentFileIds = uniqueFilteredFiles.map(f => f.id).sort().join(',');
         const lastFileIds = container.dataset.lastFileIds || '';
         
         if (currentFileIds === lastFileIds && container.children.length > 0) {
@@ -416,7 +464,7 @@ export function FilesTabContent() {
         // Add update identifier to prevent processing the same file list multiple times
         container.setAttribute('data-last-update', updateId);
         
-        console.log(`[FilesTab] Updating file list with ${filteredFiles.length} files (update ID: ${updateId})`);
+        console.log(`[FilesTab] Updating file list with ${uniqueFilteredFiles.length} unique files (update ID: ${updateId})`);
         
         // Display summary with select all checkbox
         const ipfsCount = files.filter(file => file && file.ipfsHash).length;
@@ -436,7 +484,7 @@ export function FilesTabContent() {
                         h('span', {}, 'Total Files')
                     )
                 ),
-                h('div', { class: 'stat-value text-primary' }, filteredFiles.length),
+                h('div', { class: 'stat-value text-primary' }, uniqueFilteredFiles.length),
                 h('div', { class: 'stat-desc' }, `of ${files.length} files`)
             ),
             h('div', { class: 'stat' },
@@ -456,21 +504,21 @@ export function FilesTabContent() {
         // Add each file with duplicate prevention and checkbox
         try {
             // Sort files by timestamp (newest first)
-            const sortedFiles = [...filteredFiles].sort((a, b) => {
+            const sortedFiles = [...uniqueFilteredFiles].sort((a, b) => {
                 const timeA = parseInt(a.timestamp || a.uploadedAt || 0, 10);
                 const timeB = parseInt(b.timestamp || b.uploadedAt || 0, 10);
                 return timeB - timeA; // Newest first
             });
             
-            // Create a Set to track processed file IDs
+            // Create a Set to track processed file IDs (extra safety check)
             const processedFileIds = new Set();
             
             sortedFiles.forEach((file, index) => {
                 if (!file || typeof file !== 'object') return;
                 
-                // Skip if we've already processed this file ID
+                // Skip if we've already processed this file ID (extra safety)
                 if (processedFileIds.has(file.id)) {
-                    console.warn(`[FilesTab] Skipping duplicate file ID: ${file.id}`);
+                    console.warn(`[FilesTab] Skipping duplicate file ID during rendering: ${file.id}`);
                     return;
                 }
                 processedFileIds.add(file.id);
@@ -499,6 +547,18 @@ export function FilesTabContent() {
             container.dataset.updating = 'false';
         }
     }
+    
+    // Listen for files updated event to refresh the display
+    document.addEventListener('filesUpdated', (event) => {
+        const container = document.getElementById('file-list');
+        if (container && getActiveTab() === 'files') {
+            console.log('[FilesTab] Files updated event received, refreshing display');
+            // Small delay to ensure DOM is ready
+            setTimeout(() => {
+                updateFileList(container);
+            }, 100);
+        }
+    });
     
     return tabContent;
 }
@@ -652,18 +712,51 @@ export function UploadTabContent() {
         
         const file = fileInput.files[0];
         
-        // Prevent multiple rapid uploads
+        // Prevent multiple rapid uploads of the same file
         if (getIsLoading()) {
             showToast('Upload already in progress, please wait...', 'warning');
             return;
         }
         
-        // Show loading
+        // Check if file with same name and size already exists
+        const existingFiles = getFiles();
+        const duplicateCheck = existingFiles.find(existingFile => 
+            existingFile.originalName === file.name && 
+            existingFile.size === file.size &&
+            existingFile.mimetype === file.type
+        );
+        
+        if (duplicateCheck) {
+            const confirmUpload = confirm(
+                `A file with the same name (${file.name}), size (${formatFileSize(file.size)}), and type already exists.\n\n` +
+                `Existing file: ${duplicateCheck.originalName}\n` +
+                `Upload date: ${new Date(duplicateCheck.timestamp || duplicateCheck.uploadedAt).toLocaleString()}\n\n` +
+                `Do you want to upload this file anyway? It will be saved with a unique identifier.`
+            );
+            
+            if (!confirmUpload) {
+                showToast('Upload cancelled - file already exists', 'info');
+                return;
+            }
+        }
+        
+        // Generate unique upload identifier to prevent duplicates
+        const uploadId = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Show loading with upload identifier
         setIsLoading(true);
+        showToast(`Uploading ${file.name}... (${uploadId.substr(-9)})`, 'info');
+        
+        // Set upload timeout
+        const uploadTimeout = setTimeout(() => {
+            setIsLoading(false);
+            showToast('Upload timed out. Please try again.', 'error');
+        }, 60000); // 60 second timeout
         
         try {
             const formData = new FormData();
             formData.append('file', file);
+            formData.append('uploadId', uploadId); // Add unique identifier
             if (customName) {
                 formData.append('customName', customName);
             }
@@ -676,14 +769,18 @@ export function UploadTabContent() {
                 body: formData
             });
             
+            // Clear timeout on response
+            clearTimeout(uploadTimeout);
+            
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorText = await response.text();
+                throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
             }
             
             const data = await response.json();
             
             if (data.success) {
-                showToast('✅ File uploaded successfully!', 'success');
+                showToast(`✅ File "${file.name}" uploaded successfully!`, 'success');
                 
                 // Clear form
                 fileInput.value = '';
@@ -692,6 +789,8 @@ export function UploadTabContent() {
                 
                 // Enhanced file refresh logic to prevent duplicates
                 try {
+                    console.log(`[Upload] File uploaded successfully with ID: ${data.file?.id || 'unknown'}`);
+                    
                     // Clear cache and selection state first
                     localStorage.setItem('files-data', JSON.stringify([]));
                     setFiles([]);
@@ -702,6 +801,8 @@ export function UploadTabContent() {
                     if (fileListContainer) {
                         fileListContainer.dataset.lastFileIds = '';
                         fileListContainer.dataset.updating = 'false';
+                        // Remove the update lock
+                        delete fileListContainer.dataset.updating;
                     }
                     
                     // Update UI state
@@ -712,7 +813,7 @@ export function UploadTabContent() {
                     setTimeout(async () => {
                         // Only refresh if not currently loading and no other refresh is pending
                         if (!getIsLoading()) {
-                            console.log('[Upload] Refreshing files after upload...');
+                            console.log(`[Upload] Refreshing files after upload of ${file.name}...`);
                             await loadFiles();
                         } else {
                             console.log('[Upload] Skipping refresh, loading already in progress');
@@ -720,15 +821,28 @@ export function UploadTabContent() {
                     }, 2000); // 2 second delay to ensure server processing is complete
                     
                 } catch (refreshError) {
-                    console.error("Error refreshing files after upload:", refreshError);
-                    showToast('File uploaded but refresh failed. Please refresh manually.', 'warning');
+                    console.error('[Upload] Error during post-upload refresh:', refreshError);
+                    showToast('File uploaded but failed to refresh list. Please refresh manually.', 'warning');
                 }
             } else {
-                throw new Error(data.error || "Unknown error");
+                throw new Error(data.error || 'Upload failed with unknown error');
             }
         } catch (error) {
-            console.error("Upload error:", error);
-            showToast(`Upload failed: ${error.message}`, 'error');
+            clearTimeout(uploadTimeout);
+            console.error('[Upload] Upload error:', error);
+            
+            let errorMessage = 'Upload failed: ';
+            if (error.message.includes('413')) {
+                errorMessage += 'File too large';
+            } else if (error.message.includes('415')) {
+                errorMessage += 'File type not supported';
+            } else if (error.message.includes('network')) {
+                errorMessage += 'Network error';
+            } else {
+                errorMessage += error.message;
+            }
+            
+            showToast(errorMessage, 'error');
         } finally {
             setIsLoading(false);
         }
