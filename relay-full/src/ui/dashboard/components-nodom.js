@@ -20,7 +20,10 @@ import {
     getIpfsConnectionStatus,
     testPeerConnection,
     reconnectToPeer,
-    removePeer
+    removePeer,
+    pinFileToIpfs,
+    unpinFileFromIpfs,
+    checkIpfsPinStatus
 } from './app-nodom.js';
 
 /**
@@ -564,6 +567,71 @@ export function FileItem(file) {
             }
         }, '📋 Copy Hash');
         actions.appendChild(copyButton);
+
+        // Pin/Unpin buttons for IPFS files
+        const pinButtonContainer = h('div', { class: 'flex gap-1' });
+        
+        // Check pin status and create appropriate button
+        const createPinButton = async () => {
+            try {
+                const isPinned = await checkIpfsPinStatus(safeFile.ipfsHash);
+                
+                if (isPinned) {
+                    // Show unpin button
+                    const unpinButton = h('button', {
+                        class: 'btn btn-warning btn-sm',
+                        onclick: async () => {
+                            const success = await unpinFileFromIpfs(safeFile.id, safeFile.ipfsHash);
+                            if (success) {
+                                // Refresh the button state
+                                pinButtonContainer.innerHTML = '';
+                                const newButton = await createPinButton();
+                                pinButtonContainer.appendChild(newButton);
+                            }
+                        }
+                    }, '📌 Unpin');
+                    return unpinButton;
+                } else {
+                    // Show pin button
+                    const pinButton = h('button', {
+                        class: 'btn btn-success btn-sm',
+                        onclick: async () => {
+                            const success = await pinFileToIpfs(safeFile.id, safeFile.ipfsHash);
+                            if (success) {
+                                // Refresh the button state
+                                pinButtonContainer.innerHTML = '';
+                                const newButton = await createPinButton();
+                                pinButtonContainer.appendChild(newButton);
+                            }
+                        }
+                    }, '📍 Pin');
+                    return pinButton;
+                }
+            } catch (error) {
+                console.error('Error checking pin status:', error);
+                // Default to pin button if status check fails
+                const pinButton = h('button', {
+                    class: 'btn btn-success btn-sm',
+                    onclick: async () => {
+                        const success = await pinFileToIpfs(safeFile.id, safeFile.ipfsHash);
+                        if (success) {
+                            // Refresh the button state
+                            pinButtonContainer.innerHTML = '';
+                            const newButton = await createPinButton();
+                            pinButtonContainer.appendChild(newButton);
+                        }
+                    }
+                }, '📍 Pin');
+                return pinButton;
+            }
+        };
+        
+        // Initialize pin button asynchronously
+        createPinButton().then(button => {
+            pinButtonContainer.appendChild(button);
+        });
+        
+        actions.appendChild(pinButtonContainer);
     }
     
     // Delete button

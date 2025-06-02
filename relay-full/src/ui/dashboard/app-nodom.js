@@ -1330,6 +1330,123 @@ export async function testPeerConnection(peerUrl) {
   }
 }
 
+/**
+ * Pin file to IPFS
+ */
+export async function pinFileToIpfs(fileId, ipfsHash) {
+  try {
+    if (!ipfsHash) {
+      showToast("No IPFS hash available for this file", "error");
+      return false;
+    }
+
+    setIsLoading(true);
+    
+    const response = await fetch("/api/ipfs/pin", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getAuthToken()}`,
+      },
+      body: JSON.stringify({ hash: ipfsHash }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.success) {
+      showToast(`File pinned to IPFS successfully: ${fileId}`, "success");
+      return true;
+    } else {
+      throw new Error(data.error || "Unknown error");
+    }
+  } catch (error) {
+    console.error(`Error pinning file to IPFS: ${error.message}`);
+    showToast(`Failed to pin file: ${error.message}`, "error");
+    return false;
+  } finally {
+    setIsLoading(false);
+  }
+}
+
+/**
+ * Unpin file from IPFS
+ */
+export async function unpinFileFromIpfs(fileId, ipfsHash) {
+  try {
+    if (!ipfsHash) {
+      showToast("No IPFS hash available for this file", "error");
+      return false;
+    }
+
+    // Show confirmation dialog
+    if (!confirm(`Are you sure you want to unpin "${fileId}" from IPFS?\n\nThis will remove the file from your IPFS node but won't delete it from the network.`)) {
+      return false;
+    }
+
+    setIsLoading(true);
+    
+    const response = await fetch("/api/ipfs/unpin", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getAuthToken()}`,
+      },
+      body: JSON.stringify({ hash: ipfsHash }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.success) {
+      showToast(`File unpinned from IPFS: ${fileId}`, "success");
+      return true;
+    } else {
+      throw new Error(data.error || "Unknown error");
+    }
+  } catch (error) {
+    console.error(`Error unpinning file from IPFS: ${error.message}`);
+    showToast(`Failed to unpin file: ${error.message}`, "error");
+    return false;
+  } finally {
+    setIsLoading(false);
+  }
+}
+
+/**
+ * Check if file is pinned to IPFS
+ */
+export async function checkIpfsPinStatus(ipfsHash) {
+  try {
+    if (!ipfsHash) {
+      return false;
+    }
+    
+    const response = await fetch(`/api/ipfs/pin-status/${encodeURIComponent(ipfsHash)}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${getAuthToken()}`,
+      },
+    });
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const data = await response.json();
+    return data.success && data.isPinned;
+  } catch (error) {
+    console.error(`Error checking pin status: ${error.message}`);
+    return false;
+  }
+}
+
 // Export signal getters
 export { getIsAuthenticated, setIsAuthenticated };
 export { getIsLoading, setIsLoading };
