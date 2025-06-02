@@ -663,8 +663,18 @@ export function FileItem(file, options = {}) {
         
         // Initialize pin button
         (async () => {
-            const pinButton = await createPinButton();
-            pinButtonContainer.appendChild(pinButton);
+            try {
+                const pinButton = await createPinButton();
+                pinButtonContainer.appendChild(pinButton);
+            } catch (error) {
+                console.error('Error initializing pin button:', error);
+                // Add fallback disabled button
+                const fallbackButton = h('button', { 
+                    class: 'btn btn-disabled btn-sm',
+                    title: 'Failed to load pin status'
+                }, '❓ Pin Status');
+                pinButtonContainer.appendChild(fallbackButton);
+            }
         })();
         
         actions.appendChild(pinButtonContainer);

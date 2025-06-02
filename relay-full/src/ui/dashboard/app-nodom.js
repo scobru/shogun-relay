@@ -377,22 +377,34 @@ export function handleLogout() {
   }
 }
 
+// Throttling for file loading to prevent duplicates
+let isLoadingFiles = false;
+let loadFilesTimeout = null;
+
 /**
- * Load all files - simplified without throttling to prevent blocking
+ * Load all files - improved with better duplicate prevention
  */
 export async function loadFiles(searchParams = {}) {
-  // If already loading, don't start another load
-  if (getIsLoading()) {
+  // Enhanced duplicate prevention
+  if (isLoadingFiles || getIsLoading()) {
     console.log("[LoadFiles] Already loading, skipping duplicate call");
     return;
   }
   
+  // Clear any pending load timeout
+  if (loadFilesTimeout) {
+    clearTimeout(loadFilesTimeout);
+    loadFilesTimeout = null;
+  }
+  
+  isLoadingFiles = true;
   setIsLoading(true);
 
   try {
     // Verify authentication
     if (!(await checkAuth())) {
       setIsLoading(false);
+      isLoadingFiles = false;
       return;
     }
 
@@ -532,6 +544,7 @@ export async function loadFiles(searchParams = {}) {
     }
   } finally {
     setIsLoading(false);
+    isLoadingFiles = false;
   }
 }
 
@@ -579,21 +592,24 @@ export function showToast(message, type = "info", duration = 5000) {
     }
     
     lastErrorToastTime.set(message, now);
-    
-    // Pulizia delle vecchie entries
-    for (const [msg, time] of lastErrorToastTime.entries()) {
-      if (now - time > errorToastCooldown * 2) {
-        lastErrorToastTime.delete(msg);
-      }
-    }
   }
 
   try {
     // Get current toasts from localStorage
     let currentToasts = [];
     const storedToasts = localStorage.getItem("app-toasts");
-    if (storedToasts) {
-      currentToasts = JSON.parse(storedToasts);
+    if (storedToasts && storedToasts !== "undefined" && storedToasts.trim() !== "") {
+      try {
+        currentToasts = JSON.parse(storedToasts);
+        // Ensure it's an array
+        if (!Array.isArray(currentToasts)) {
+          currentToasts = [];
+        }
+      } catch (parseError) {
+        console.warn("Error parsing stored toasts, resetting:", parseError);
+        currentToasts = [];
+        localStorage.removeItem("app-toasts");
+      }
     }
 
     // Limita il numero massimo di toast a 5
@@ -618,6 +634,14 @@ export function showToast(message, type = "info", duration = 5000) {
     }
   } catch (err) {
     console.error("Error in showToast:", err);
+    // Fallback: clear localStorage and try again with clean state
+    try {
+      localStorage.removeItem("app-toasts");
+      localStorage.setItem("app-toasts", JSON.stringify([newToast]));
+      _setToasts([newToast]);
+    } catch (fallbackErr) {
+      console.error("Error in showToast fallback:", fallbackErr);
+    }
   }
 
   return id;
@@ -631,8 +655,17 @@ function removeToast(id) {
     // Get current toasts from localStorage
     let currentToasts = [];
     const storedToasts = localStorage.getItem("app-toasts");
-    if (storedToasts) {
-      currentToasts = JSON.parse(storedToasts);
+    if (storedToasts && storedToasts !== "undefined" && storedToasts.trim() !== "") {
+      try {
+        currentToasts = JSON.parse(storedToasts);
+        if (!Array.isArray(currentToasts)) {
+          currentToasts = [];
+        }
+      } catch (parseError) {
+        console.warn("Error parsing stored toasts in removeToast, resetting:", parseError);
+        currentToasts = [];
+        localStorage.removeItem("app-toasts");
+      }
     }
 
     // Filter out the toast with the given ID
@@ -1342,16 +1375,29 @@ export async function testPeerConnection(peerUrl) {
 /**
  * Pin a file to IPFS
  */
-export async function pinFileToIpfs(fileId) {
+export async function pinFileToIpfs(fileId, ipfsHash) {
   try {
+    if (!ipfsHash) {
+      // Get file data to extract IPFS hash
+      const files = getFiles();
+      const file = files.find(f => f.id === fileId);
+      if (!file || !file.ipfsHash) {
+        showToast("❌ File does not have an IPFS hash", "error");
+        return false;
+      }
+      ipfsHash = file.ipfsHash;
+    }
+    
     setIsLoading(true);
     showToast("📌 Pinning file to IPFS...", "info");
 
-    const response = await fetch(`/api/ipfs/pin/${fileId}`, {
+    const response = await fetch(`/api/ipfs/pin`, {
       method: "POST",
       headers: {
+        "Content-Type": "application/json",
         Authorization: `Bearer ${getAuthToken()}`,
       },
+      body: JSON.stringify({ hash: ipfsHash })
     });
 
     if (!response.ok) {
@@ -1363,9 +1409,11 @@ export async function pinFileToIpfs(fileId) {
     if (data.success) {
       showToast("✅ File pinned to IPFS successfully!", "success");
       
-      // Refresh files to show updated pin status
-      setTimeout(() => {
-        loadFiles();
+      // Refresh files to show updated pin status with delay to prevent duplicates
+      loadFilesTimeout = setTimeout(() => {
+        if (!isLoadingFiles) {
+          loadFiles();
+        }
       }, 1000);
       
       return true;
@@ -1384,16 +1432,29 @@ export async function pinFileToIpfs(fileId) {
 /**
  * Unpin a file from IPFS
  */
-export async function unpinFileFromIpfs(fileId) {
+export async function unpinFileFromIpfs(fileId, ipfsHash) {
   try {
+    if (!ipfsHash) {
+      // Get file data to extract IPFS hash
+      const files = getFiles();
+      const file = files.find(f => f.id === fileId);
+      if (!file || !file.ipfsHash) {
+        showToast("❌ File does not have an IPFS hash", "error");
+        return false;
+      }
+      ipfsHash = file.ipfsHash;
+    }
+    
     setIsLoading(true);
     showToast("📌 Unpinning file from IPFS...", "info");
 
-    const response = await fetch(`/api/ipfs/unpin/${fileId}`, {
-      method: "DELETE",
+    const response = await fetch(`/api/ipfs/unpin`, {
+      method: "POST",
       headers: {
+        "Content-Type": "application/json",
         Authorization: `Bearer ${getAuthToken()}`,
       },
+      body: JSON.stringify({ hash: ipfsHash })
     });
 
     if (!response.ok) {
@@ -1405,9 +1466,11 @@ export async function unpinFileFromIpfs(fileId) {
     if (data.success) {
       showToast("✅ File unpinned from IPFS successfully!", "success");
       
-      // Refresh files to show updated pin status
-      setTimeout(() => {
-        loadFiles();
+      // Refresh files to show updated pin status with delay to prevent duplicates
+      loadFilesTimeout = setTimeout(() => {
+        if (!isLoadingFiles) {
+          loadFiles();
+        }
       }, 1000);
       
       return true;
@@ -1426,9 +1489,13 @@ export async function unpinFileFromIpfs(fileId) {
 /**
  * Check IPFS pin status for a file
  */
-export async function checkIpfsPinStatus(fileId) {
+export async function checkIpfsPinStatus(ipfsHash) {
   try {
-    const response = await fetch(`/api/ipfs/pin-status/${fileId}`, {
+    if (!ipfsHash) {
+      return false;
+    }
+    
+    const response = await fetch(`/api/ipfs/pin-status/${ipfsHash}`, {
       headers: {
         Authorization: `Bearer ${getAuthToken()}`,
       },
@@ -1439,7 +1506,7 @@ export async function checkIpfsPinStatus(fileId) {
     }
 
     const data = await response.json();
-    return data.success ? data.pinned : false;
+    return data.success ? data.isPinned : false;
   } catch (error) {
     console.error("Error checking IPFS pin status:", error);
     return false;
@@ -1480,15 +1547,25 @@ export {
 function getToasts() {
   try {
     const storedToasts = localStorage.getItem("app-toasts");
-    return storedToasts ? JSON.parse(storedToasts) : [];
+    if (!storedToasts || storedToasts === "undefined" || storedToasts.trim() === "") {
+      return [];
+    }
+    const parsed = JSON.parse(storedToasts);
+    return Array.isArray(parsed) ? parsed : [];
   } catch (err) {
     console.error("Error getting toasts:", err);
+    // Clear corrupted data
+    localStorage.removeItem("app-toasts");
     return [];
   }
 }
 
 function setToasts(toasts) {
   try {
+    if (!Array.isArray(toasts)) {
+      console.warn("setToasts called with non-array:", toasts);
+      toasts = [];
+    }
     localStorage.setItem("app-toasts", JSON.stringify(toasts));
     _setToasts(toasts);
   } catch (err) {
@@ -1499,15 +1576,25 @@ function setToasts(toasts) {
 function getFiles() {
   try {
     const storedFiles = localStorage.getItem("files-data");
-    return storedFiles ? JSON.parse(storedFiles) : [];
+    if (!storedFiles || storedFiles === "undefined" || storedFiles.trim() === "") {
+      return [];
+    }
+    const parsed = JSON.parse(storedFiles);
+    return Array.isArray(parsed) ? parsed : [];
   } catch (err) {
     console.error("Error getting files:", err);
+    // Clear corrupted data
+    localStorage.removeItem("files-data");
     return [];
   }
 }
 
 function setFiles(files) {
   try {
+    if (!Array.isArray(files)) {
+      console.warn("setFiles called with non-array:", files);
+      files = [];
+    }
     localStorage.setItem("files-data", JSON.stringify(files));
     _setFiles(files);
   } catch (err) {

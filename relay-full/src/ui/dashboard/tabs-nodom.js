@@ -29,6 +29,10 @@ import {
 } from './app-nodom.js';
 import { FileSearchForm, FileItem, EmptyState, LoadingState, PeerItem } from './components-nodom.js';
 
+// Global variables for files tab state management
+let selectedFiles = new Set();
+let isSelectAllChecked = false;
+
 // Debouncing per evitare richieste multiple
 let networkUpdateTimeout = null;
 let networkTabActive = false;
@@ -42,10 +46,6 @@ export function FilesTabContent() {
         class: 'tab-content', 
         style: 'display: none;' 
     });
-    
-    // State for batch selection
-    let selectedFiles = new Set();
-    let isSelectAllChecked = false;
     
     setEffect(() => {
         const isActive = getActiveTab() === 'files';
@@ -604,19 +604,21 @@ export function UploadTabContent() {
                 document.getElementById('file-name').value = '';
                 document.getElementById('file-upload-status').className = 'mt-4 text-center hidden';
                 
-                // Reload files list with improved handling to prevent duplicates
+                // Improved file refresh logic to prevent duplicates
                 try {
-                    // Clear cache first
+                    // Clear cache and selection state
                     localStorage.setItem('files-data', JSON.stringify([]));
                     setFiles([]);
+                    selectedFiles.clear();
+                    updateSelectAllState();
+                    updateBatchDeleteButton();
                     
-                    // Wait a moment before refreshing to allow server to process
-                    // Use a longer delay to prevent race conditions
+                    // Wait longer and check loading state before refreshing
                     setTimeout(() => {
-                        if (!getIsLoading()) { // Only load if not currently loading
+                        if (!getIsLoading()) {
                             loadFiles();
                         }
-                    }, 1500);
+                    }, 2000); // Increased delay to 2 seconds
                 } catch (refreshError) {
                     console.error("Error refreshing files after upload:", refreshError);
                 }
