@@ -1,6 +1,7 @@
 import { h, setEffect, setSignal } from './nodom.js';
 import {
     getIsLoading,
+    setIsLoading,
     getToasts,
     setToasts,
     getActiveTab,
@@ -16,6 +17,7 @@ import {
     toggleTheme,
     getTheme,
     getFiles,
+    setFiles,
     getIpfsStatus,
     getIpfsConnectionStatus,
     testPeerConnection,
@@ -23,7 +25,8 @@ import {
     removePeer,
     pinFileToIpfs,
     unpinFileFromIpfs,
-    checkIpfsPinStatus
+    checkIpfsPinStatus,
+    getAuthToken
 } from './app-nodom.js';
 
 /**
