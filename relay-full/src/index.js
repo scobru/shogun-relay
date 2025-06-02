@@ -448,6 +448,7 @@ if (
   );
 }
 
+
 /**
  * Starts the unified relay server
  * Initializes IPFS, configures middleware, and sets up WebSocket handlers
@@ -531,15 +532,14 @@ async function startServer() {
     );
     app.use("/api/auth", authRouter); // THIS LINE SHOULD BE BEFORE app.use("/api", authenticateRequest)
 
-    // espondi ipfs che punta al server ipfs
-    // Configure IPFS gateway proxy to forward requests to the local IPFS node
-    app.use("/ipfs", createProxyMiddleware({
-      target: 'http://127.0.0.1:5001',
-      changeOrigin: true,
-      pathRewrite: {
-        '^/ipfs': '/api/v0/cat'
-      },
-    }));
+
+    function createProxyMiddleware(target, changeOrigin, pathRewrite) {
+      return createProxyMiddleware({
+        target,
+        changeOrigin,
+        pathRewrite,
+      });
+    }
 
     const ipfsApiRouter = setupIpfsApiRoutes(
       ipfsManager,
