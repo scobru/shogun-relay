@@ -17,7 +17,7 @@ export default function setupGatewayRoutes(config, serverLogger) {
       serverLogger.info(`[Gateway] IPFS request received for hash: ${ipfsHash}`);
       
       // Utilizziamo fetch per ottenere il contenuto direttamente
-      const localIpfsGateway = `http://localhost:8080/ipfs/${ipfsHash}`;
+      const localIpfsGateway = `http://127.0.0.1:8080/ipfs/${ipfsHash}`;
       
       const response = await fetch(localIpfsGateway);
       
