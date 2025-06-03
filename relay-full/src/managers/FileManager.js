@@ -471,14 +471,18 @@ class FileManager {
     const seenIds = new Set();
     const seenContent = new Map(); // Track by content signature to prevent content duplicates
 
-    // First fetch the list of deleted files to filter against
+    // First fetch the list of deleted files to filter against with better timeout handling
     const deletedFileIds = new Set();
     try {
+      console.log("[FileManager] Fetching deleted files list...");
       const deletedFilesRaw = await this.gunPromiseWithTimeout((resolve) => {
-        this.config.gun.get("deletedFiles").once(data => resolve(data));
-      }, 3000);
+        this.config.gun.get("deletedFiles").once(data => {
+          console.log(`[FileManager] deletedFiles data received:`, data ? Object.keys(data).length : 'null');
+          resolve(data);
+        });
+      }, 5000); // Increased timeout to 5 seconds
       
-      if (deletedFilesRaw) {
+      if (deletedFilesRaw && typeof deletedFilesRaw === 'object') {
         Object.keys(deletedFilesRaw).forEach(key => {
           // Skip GunDB metadata
           if (!key.startsWith("_")) {
@@ -486,8 +490,10 @@ class FileManager {
             console.log(`[FileManager] Marking file as deleted: ${key}`);
           }
         });
+        console.log(`[FileManager] Found ${deletedFileIds.size} deleted file IDs to filter out`);
+      } else {
+        console.log("[FileManager] No deleted files data found or timed out");
       }
-      console.log(`[FileManager] Found ${deletedFileIds.size} deleted file IDs to filter out`);
     } catch (error) {
       console.warn("[FileManager] Error fetching deleted files:", error.message);
     }
@@ -501,7 +507,7 @@ class FileManager {
 
       // Skip if this file has been deleted
       if (deletedFileIds.has(fileObject.id)) {
-        console.log(`[FileManager] Skipping deleted file: ${fileObject.id}`);
+        console.log(`[FileManager] Skipping deleted file: ${fileObject.id} from ${source}`);
         return false;
       }
 
@@ -566,18 +572,20 @@ class FileManager {
         console.error(`[FileManager] Error reading storage dir: ${fsErr.message}`);
       }
 
-    // 2. Load files from IPFS metadata if available
+    // 2. Load files from IPFS metadata if available (with deleted files filtering)
       try {
         const metadataPath = path.join(this.config.storageDir, 'ipfs-metadata.json');
         if (fs.existsSync(metadataPath)) {
-          console.log(`[FileManager] Loading files from IPFS metadata`);
+          console.log(`[FileManager] Loading files from IPFS metadata with deletion filter`);
           const content = fs.readFileSync(metadataPath, 'utf8');
           const ipfsMetadata = JSON.parse(content);
           
+          let filteredCount = 0;
           for (const [fileId, metadata] of Object.entries(ipfsMetadata)) {
             // Skip if this file has been deleted
             if (deletedFileIds.has(fileId)) {
-              console.log(`[FileManager] Skipping deleted IPFS file: ${fileId}`);
+              console.log(`[FileManager] Skipping deleted IPFS file from metadata: ${fileId}`);
+              filteredCount++;
               continue;
             }
             
@@ -603,6 +611,10 @@ class FileManager {
             
           addFileIfUnique(ipfsFile, 'ipfs-metadata');
           }
+          
+          if (filteredCount > 0) {
+            console.log(`[FileManager] Filtered out ${filteredCount} deleted files from IPFS metadata`);
+          }
         }
       } catch (ipfsMetaErr) {
         console.error(`[FileManager] Error reading IPFS metadata: ${ipfsMetaErr.message}`);
@@ -622,6 +634,7 @@ class FileManager {
         if (gunData && typeof gunData === "object") {
           console.log(`[FileManager] Processing GunDB data with ${Object.keys(gunData).length} keys`);
           
+          let filteredFromGunDB = 0;
           for (const [key, value] of Object.entries(gunData)) {
           // Skip GunDB metadata
           if (!key || key.startsWith("_") || key === "lastUpdated" || key === "_refreshToken" || key === "_deleteToken" || key === "_lastSync") {
@@ -635,6 +648,7 @@ class FileManager {
             // Skip if this file has been marked as deleted
             if (deletedFileIds.has(fileObject.id)) {
               console.log(`[FileManager] Skipping deleted file from GunDB: ${fileObject.id}`);
+              filteredFromGunDB++;
               continue;
             }
 
@@ -648,6 +662,10 @@ class FileManager {
               addFileIfUnique(fileObject, 'gundb');
             }
           }
+          }
+          
+          if (filteredFromGunDB > 0) {
+            console.log(`[FileManager] Filtered out ${filteredFromGunDB} deleted files from GunDB`);
           }
         } else {
           console.log("[FileManager] No data found in GunDB files node");
@@ -674,7 +692,7 @@ class FileManager {
       }
     }
 
-    console.log(`[FileManager] Returning ${files.length} unique files total`);
+    console.log(`[FileManager] Returning ${files.length} unique files total (filtered out ${deletedFileIds.size} deleted files)`);
     return files;
   }
 
@@ -981,7 +999,9 @@ class FileManager {
     let deletionResults = {
       fileSystemDeleted: false,
       gunDbDeleted: false,
-      ipfsUnpinned: false
+      ipfsUnpinned: false,
+      deletedFilesUpdated: false,
+      ipfsMetadataCleaned: false
     };
 
     // If we found file data (from GunDB or filesystem), try to delete the actual file
@@ -1049,56 +1069,123 @@ class FileManager {
           // Continue with database deletion anyway
         }
       }
+
+      // Clean up IPFS metadata if it exists
+      try {
+        const metadataPath = path.join(this.config.storageDir, 'ipfs-metadata.json');
+        if (fs.existsSync(metadataPath)) {
+          const metadataContent = fs.readFileSync(metadataPath, 'utf8');
+          const ipfsMetadata = JSON.parse(metadataContent);
+          
+          // Check if this file exists in IPFS metadata
+          if (ipfsMetadata[fileId]) {
+            delete ipfsMetadata[fileId];
+            
+            // Also check alternate IDs that might reference this file
+            for (const [metaKey, metadata] of Object.entries(ipfsMetadata)) {
+              if (metadata.alternateIds && Array.isArray(metadata.alternateIds)) {
+                if (metadata.alternateIds.includes(fileId)) {
+                  console.log(`[FileManager] Removing file ${fileId} from IPFS metadata using alternate ID match with ${metaKey} (Delete ID: ${deleteRequestId})`);
+                  delete ipfsMetadata[metaKey];
+                  break;
+                }
+              }
+            }
+            
+            // Write back the cleaned metadata
+            fs.writeFileSync(metadataPath, JSON.stringify(ipfsMetadata, null, 2));
+            console.log(`[FileManager] Cleaned up IPFS metadata for file: ${fileId} (Delete ID: ${deleteRequestId})`);
+            deletionResults.ipfsMetadataCleaned = true;
+          }
+        }
+      } catch (metadataError) {
+        console.error(`[FileManager] Error cleaning IPFS metadata: ${metadataError.message} (Delete ID: ${deleteRequestId})`);
+      }
     } else {
       console.log(`[FileManager] No file data found for deletion: ${fileId} (Delete ID: ${deleteRequestId})`);
     }
 
-    // Try multiple approaches to delete from GunDB to ensure it's fully removed
+    // Delete from GunDB with multiple approaches to ensure complete removal
     try {
       console.log(`[FileManager] Deleting file from all known paths in GunDB: ${fileId} (Delete ID: ${deleteRequestId})`);
 
-      // First, try with a direct put null
-      this.config.gun.get("files").get(fileId).put(null);
-      
-      // Also mark as deleted in the deletedFiles collection
-      this.config.gun.get("deletedFiles").get(fileId).put({
+      // First, mark as deleted in the deletedFiles collection with timestamp
+      const deletedEntry = {
         id: fileId,
         deletedAt: Date.now(),
-        deleteRequestId: deleteRequestId
-      });
+        deleteRequestId: deleteRequestId,
+        deletedBy: 'system', // Could be user info if available
+        originalData: fileData ? JSON.stringify(fileData) : null
+      };
       
-      // Then, try with the classic approach with acknowledgement
+      this.config.gun.get("deletedFiles").get(fileId).put(deletedEntry);
+      deletionResults.deletedFilesUpdated = true;
+      console.log(`[FileManager] File marked as deleted in deletedFiles collection: ${fileId} (Delete ID: ${deleteRequestId})`);
+      
+      // Remove from the main files collection
       await this.gunPromiseWithTimeout((resolve) => {
         this.config.gun.get("files").get(fileId).put(null, (ack) => {
             if (ack.err) {
-              console.error(`[FileManager] Error deleting from main path: ${ack.err} (Delete ID: ${deleteRequestId})`);
+              console.error(`[FileManager] Error deleting from main files path: ${ack.err} (Delete ID: ${deleteRequestId})`);
             } else {
-              console.log(`[FileManager] File deleted from main GunDB path for ${fileId} (Delete ID: ${deleteRequestId})`);
+              console.log(`[FileManager] File deleted from main GunDB files path: ${fileId} (Delete ID: ${deleteRequestId})`);
               deletionResults.gunDbDeleted = true;
             }
             resolve();
           });
       });
 
-      // Also try again with a slash prefix in case the key is stored that way
+      // Also try with a slash prefix in case the key is stored that way
       if (fileId && !fileId.startsWith('/')) {
         this.config.gun.get("files").get('/' + fileId).put(null);
+        console.log(`[FileManager] Also deleted with slash prefix: /${fileId} (Delete ID: ${deleteRequestId})`);
       }
 
-      // Force update the parent node to trigger sync
+      // Clean up any potential variations of the file ID
+      const possibleKeys = [
+        fileId,
+        fileId.replace(/-/g, '_'),
+        fileId.replace(/_/g, '-'),
+        fileId.toLowerCase(),
+        fileId.toUpperCase()
+      ];
+
+      for (const key of possibleKeys) {
+        if (key !== fileId) {
+          this.config.gun.get("files").get(key).put(null);
+          console.log(`[FileManager] Cleaned up potential key variation: ${key} (Delete ID: ${deleteRequestId})`);
+        }
+      }
+
+      // Force update the parent files node to trigger sync
       this.config.gun.get("files").put({ 
         lastUpdated: Date.now(),
-        _deleteToken: Date.now() // Special property to force a refresh
+        _deleteToken: deleteRequestId,
+        _lastDeletion: {
+          fileId: fileId,
+          deletedAt: Date.now(),
+          deleteRequestId: deleteRequestId
+        }
       });
       
-      // Try to force a sync by writing to the root node
-      this.config.gun.put({ _lastSync: Date.now() });
+      // Update root node to force sync across peers
+      this.config.gun.put({ 
+        _lastSync: Date.now(),
+        _lastDeletion: deleteRequestId
+      });
 
       console.log(`[FileManager] File deletion completed for ${fileId} in ${Date.now() - deleteStartTime}ms (Delete ID: ${deleteRequestId})`);
       console.log(`[FileManager] Deletion results: ${JSON.stringify(deletionResults)} (Delete ID: ${deleteRequestId})`);
       
-      // Force a delay before continuing to allow GunDB to process the change
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Force a longer delay to allow GunDB to process the change
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Clear any cached file list data to force refresh
+      if (this._cacheData) {
+        this._cacheData = null;
+        console.log(`[FileManager] Cleared cache after deletion (Delete ID: ${deleteRequestId})`);
+      }
+      
     } catch (error) {
       console.error(`[FileManager] Error during file deletion: ${error.message} (Delete ID: ${deleteRequestId})`);
       // Even with errors, we'll still return success since we tried our best

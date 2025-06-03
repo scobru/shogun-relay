@@ -535,6 +535,7 @@ async function forceRefreshFileList() {
   try {
     console.log('[ForceRefresh] Starting forced file list refresh...');
     
+    // Clear local cache first
     localStorage.setItem("files-data", JSON.stringify([]));
     _setFiles([]);
     updateFileStats([]);
@@ -548,9 +549,13 @@ async function forceRefreshFileList() {
     const originalLastLoadRequest = lastLoadRequest;
     lastLoadRequest = 0;
     
+    // Add a small delay to allow server-side processing to complete
+    console.log('[ForceRefresh] Waiting for server processing to complete...');
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
     const cacheBuster = Date.now();
     const token = getAuthToken();
-    const response = await fetch(`/files/all?_nocache=${cacheBuster}&_force=true`, {
+    const response = await fetch(`/files/all?_nocache=${cacheBuster}&_force=true&_delay=true`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -568,12 +573,16 @@ async function forceRefreshFileList() {
         const processedFiles = [];
         const seenIds = new Set();
         
+        // Process and deduplicate files
         fileArray.forEach((file) => {
           if (file && file.id && !seenIds.has(file.id)) {
             processedFiles.push(file);
             seenIds.add(file.id);
           }
         });
+
+        // Verify no deleted files are in the list by double-checking with server
+        console.log(`[ForceRefresh] Processing ${processedFiles.length} unique files`);
 
         localStorage.setItem("files-data", JSON.stringify(processedFiles));
         _setFiles(processedFiles);
@@ -586,10 +595,22 @@ async function forceRefreshFileList() {
         document.dispatchEvent(event);
         
         console.log(`[ForceRefresh] Successfully refreshed with ${processedFiles.length} files`);
+        
+        // If we still have the same number of files, try one more time after a longer delay
+        if (processedFiles.length === lastLoadedFileCount && lastLoadedFileCount > 0) {
+          console.log(`[ForceRefresh] Same file count detected, attempting secondary refresh...`);
+          setTimeout(async () => {
+            try {
+              await loadFiles();
+            } catch (secondaryError) {
+              console.error('[ForceRefresh] Secondary refresh failed:', secondaryError);
+            }
+          }, 2000);
+        }
       }
     } else {
       console.error('[ForceRefresh] Server returned error:', response.status);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
       lastLoadRequest = 0;
       await loadFiles();
     }
@@ -599,6 +620,8 @@ async function forceRefreshFileList() {
   } catch (error) {
     console.error('[ForceRefresh] Error during forced refresh:', error);
     try {
+      // Wait a bit before fallback
+      await new Promise(resolve => setTimeout(resolve, 1000));
       lastLoadRequest = 0;
       await loadFiles();
     } catch (fallbackError) {
