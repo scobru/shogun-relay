@@ -1033,6 +1033,229 @@ export async function loadPeersFromConfig() {
   }
 }
 
+/**
+ * Load IPFS independent files
+ */
+export async function loadIpfsFiles() {
+  try {
+    if (!(await checkAuth())) {
+      return [];
+    }
+
+    const response = await fetch("/api/ipfs/files", {
+      headers: {
+        Authorization: `Bearer ${getAuthToken()}`,
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (data.success) {
+      console.log(`[LoadIpfsFiles] Loaded ${data.files.length} independent IPFS files`);
+      return data.files || [];
+    } else {
+      console.warn("IPFS files API returned success: false");
+      return [];
+    }
+  } catch (error) {
+    console.error(`Error loading IPFS files: ${error.message}`);
+    showToast(`Failed to load IPFS files: ${error.message}`, "error");
+    return [];
+  }
+}
+
+/**
+ * Upload file directly to IPFS (independent)
+ */
+export async function uploadToIpfsDirect(file, customName) {
+  try {
+    if (!(await checkAuth())) {
+      showToast("Authentication required", "error");
+      return false;
+    }
+
+    setIsLoading(true);
+    showToast("🌐 Uploading directly to IPFS...", "info");
+
+    const formData = new FormData();
+    formData.append('file', file);
+    if (customName) {
+      formData.append('customName', customName);
+    }
+
+    const response = await fetch('/api/ipfs/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.success) {
+      showToast(`✅ File uploaded to IPFS: ${data.ipfsHash}`, "success");
+      console.log("[UploadIpfsDirect] Upload successful:", data);
+      
+      // Trigger refresh of both file lists
+      setTimeout(() => {
+        loadAllFiles();
+      }, 1000);
+      
+      return data;
+    } else {
+      throw new Error(data.error || "Upload failed");
+    }
+  } catch (error) {
+    console.error("Error uploading to IPFS direct:", error);
+    showToast(`❌ IPFS upload failed: ${error.message}`, "error");
+    return false;
+  } finally {
+    setIsLoading(false);
+  }
+}
+
+/**
+ * Delete IPFS independent file
+ */
+export async function deleteIpfsFile(ipfsHash, fileName) {
+  try {
+    if (!(await checkAuth())) {
+      showToast("Authentication required", "error");
+      return false;
+    }
+
+    if (!confirm(`Delete IPFS file "${fileName || ipfsHash}"?\n\nThis will remove it from the IPFS network.`)) {
+      return false;
+    }
+
+    setIsLoading(true);
+    console.log(`[DeleteIpfsFile] Deleting IPFS file: ${ipfsHash}`);
+
+    const response = await fetch(`/api/ipfs/files/${ipfsHash}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${getAuthToken()}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.success) {
+      showToast("✅ IPFS file deleted successfully", "success");
+      console.log(`[DeleteIpfsFile] File ${ipfsHash} deleted successfully`);
+      
+      // Refresh combined files list
+      setTimeout(() => {
+        loadAllFiles();
+      }, 500);
+      
+      return true;
+    } else {
+      throw new Error(data.error || "Delete failed");
+    }
+  } catch (error) {
+    console.error(`[DeleteIpfsFile] Error: ${error.message}`);
+    showToast(`❌ Delete failed: ${error.message}`, "error");
+    return false;
+  } finally {
+    setIsLoading(false);
+  }
+}
+
+/**
+ * Enhanced loadFiles that combines both local and IPFS files
+ */
+export async function loadAllFiles(searchParams = {}) {
+  try {
+    setIsLoading(true);
+    console.log(`[LoadAllFiles] Loading combined file lists...`);
+    
+    // Load local files with existing logic
+    await loadFiles(searchParams);
+    const localFiles = getFiles();
+    
+    // Load IPFS independent files
+    const ipfsFiles = await loadIpfsFiles();
+    
+    // Combine and tag files with their source
+    const combinedFiles = [
+      ...localFiles.map(f => ({ 
+        ...f, 
+        storageType: f.ipfsHash ? 'local-with-ipfs' : 'local-only'
+      })),
+      ...ipfsFiles.map(f => ({ 
+        ...f, 
+        storageType: 'ipfs-independent',
+        // Ensure consistent properties
+        originalName: f.originalName || f.name,
+        mimetype: f.mimeType || f.mimetype
+      }))
+    ];
+    
+    // Debug logging for file categorization
+    console.log(`[LoadAllFiles] File categorization debug:`);
+    console.log(`- Local files (${localFiles.length}):`, localFiles.map(f => ({
+      id: f.id,
+      name: f.originalName || f.name,
+      hasIpfsHash: !!f.ipfsHash,
+      assignedType: f.ipfsHash ? 'local-with-ipfs' : 'local-only'
+    })));
+    console.log(`- IPFS files (${ipfsFiles.length}):`, ipfsFiles.map(f => ({
+      id: f.id,
+      name: f.originalName || f.name,
+      independent: f.independent,
+      uploadType: f.uploadType,
+      assignedType: 'ipfs-independent'
+    })));
+    console.log(`- Combined files storage types:`, combinedFiles.map(f => ({
+      id: f.id,
+      name: f.originalName || f.name,
+      storageType: f.storageType
+    })));
+    
+    // Update combined files state
+    _setFiles(combinedFiles);
+    updateFileStats(combinedFiles);
+    
+    console.log(`[LoadAllFiles] Combined ${localFiles.length} local + ${ipfsFiles.length} IPFS independent files = ${combinedFiles.length} total`);
+    
+    const event = new CustomEvent('filesUpdated', { 
+      detail: { 
+        files: combinedFiles, 
+        source: 'loadAllFiles',
+        breakdown: {
+          local: localFiles.length,
+          ipfsIndependent: ipfsFiles.length,
+          total: combinedFiles.length
+        }
+      } 
+    });
+    document.dispatchEvent(event);
+    
+    return combinedFiles;
+  } catch (error) {
+    console.error("Error loading all files:", error);
+    showToast(`Failed to load files: ${error.message}`, "error");
+    return [];
+  } finally {
+    setIsLoading(false);
+  }
+}
+
 // Internal file management functions
 function getFiles() {
   try {

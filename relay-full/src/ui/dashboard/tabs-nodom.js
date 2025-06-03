@@ -25,7 +25,10 @@ import {
     setToasts,
     // Import peer functions
     getPeers,
-    loadPeersFromConfig
+    loadPeersFromConfig,
+    setActiveTab,
+    uploadToIpfsDirect,
+    loadAllFiles
 } from './app-nodom.js';
 import { FileSearchForm, FileItem, EmptyState, LoadingState } from './components-nodom.js';
 
@@ -105,9 +108,12 @@ window.resetUploadState = function() {
  * Files Tab Content Component
  */
 export function FilesTabContent() {
+    // Add storage filter state
+    let storageFilter = 'all'; // 'all', 'local-only', 'local-with-ipfs', 'ipfs-independent'
+    
     const tabContent = h('div', { 
         id: 'files-tab', 
-        class: 'tab-content', 
+        class: 'tab-content',
         style: 'display: none;' 
     });
     
@@ -115,278 +121,191 @@ export function FilesTabContent() {
         const isActive = getActiveTab() === 'files';
         tabContent.style.display = isActive ? 'block' : 'none';
         
-        if (isActive && tabContent.innerHTML === '') {
-            tabContent.innerHTML = '';
-            
-            // Card header with IPFS status indicator
-            const ipfsStatus = getIpfsStatus();
-            const ipfsStatusIndicator = h('div', { 
-                class: `badge ${ipfsStatus.enabled ? 'badge-success' : 'badge-error'} gap-2`
-            }, 
-                h('span', {}, ipfsStatus.enabled ? '✅' : '❌'),
-                h('span', {}, ipfsStatus.enabled ? 'IPFS Active' : 'IPFS Disabled')
-            );
-            
-            const cardHeader = h('div', { class: 'flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6' },
-                h('div', { class: 'flex items-center gap-3' },
-                    h('h3', { class: 'text-2xl font-bold text-base-content' }, '📁 File Management'),
-                    ipfsStatusIndicator
-                ),
-                h('div', { class: 'flex gap-2' },
-                    h('button', { 
-                        id: 'refresh-files',
-                        class: 'btn btn-primary btn-sm',
-                        onclick: async () => {
-                            console.log('[RefreshButton] User requested file refresh');
-                            showToast('🔄 Refreshing files...', 'info');
-                            try {
-                                await forceRefreshFileList();
-                                showToast('✅ Files refreshed successfully', 'success');
-                            } catch (error) {
-                                console.error('[RefreshButton] Error during refresh:', error);
-                                showToast('❌ Failed to refresh files', 'error');
-                            }
-                        }
-                    }, '🔄 Refresh Files'),
-                    h('button', { 
-                        id: 'batch-delete-btn',
-                        class: 'btn btn-error btn-sm',
-                        style: 'display: none;',
-                        onclick: handleBatchDelete
-                    }, '🗑️ Delete Selected')
-                )
-            );
-            
-            // Search form
-            const searchForm = FileSearchForm();
-            
-            // IPFS filter and controls
-            const filterContainer = h('div', { class: 'flex flex-wrap items-center gap-4 mb-6' });
-            
-            // IPFS filter toggle
-            const ipfsFilterContainer = h('div', { class: 'form-control' },
-                h('label', { class: 'label cursor-pointer gap-2' },
-                    h('input', { 
-                        type: 'checkbox', 
-                        id: 'ipfs-filter',
-                        class: 'checkbox checkbox-secondary'
-                    }),
-                    h('span', { class: 'label-text font-medium' }, '🌐 Show only IPFS files')
-                )
-            );
-            
-            // Debug IPFS metadata button
-            const debugIpfsButton = h('button', {
-                class: 'btn btn-outline btn-sm',
-                onclick: async () => {
-                    try {
-                        const response = await fetch('/api/ipfs/metadata', {
-                            headers: {
-                                'Authorization': `Bearer ${getAuthToken()}`
-                            }
-                        });
-                        
-                        if (response.ok) {
-                            const data = await response.json();
-                            console.log('IPFS Metadata:', data);
-                            showToast(`IPFS Metadata: ${data.count} entries found`, 'info');
-                        } else {
-                            showToast('Failed to fetch IPFS metadata', 'error');
-                        }
-                    } catch (error) {
-                        console.error('Error fetching IPFS metadata:', error);
-                        showToast(`Error: ${error.message}`, 'error');
-                    }
-                }
-            }, '🔍 Debug IPFS Metadata');
-            
-            filterContainer.appendChild(ipfsFilterContainer);
-            filterContainer.appendChild(debugIpfsButton);
-            
-            // Create file list container
-            const fileListContainer = h('div', { 
-                class: 'space-y-4', 
-                id: 'file-list' 
-            });
-            
-            // Add these elements to tab content
-            tabContent.appendChild(cardHeader);
-            tabContent.appendChild(searchForm);
-            tabContent.appendChild(filterContainer);
-            tabContent.appendChild(fileListContainer);
-            
-            // Initialize file list
-            updateFileList(fileListContainer);
-            
-            // Add IPFS filter functionality
-            const ipfsFilterCheckbox = document.getElementById('ipfs-filter');
-            if (ipfsFilterCheckbox) {
-                ipfsFilterCheckbox.addEventListener('change', () => {
-                    updateFileList(fileListContainer);
-                });
-            }
-            
-            // Enhanced reactive effect to update file list when files change
-            // This is needed to refresh the UI when data changes, but with duplicate prevention
-            let lastFilesChecksum = '';
-            let lastFilterState = false;
-            
-            setEffect(() => {
-                const files = getFiles();
-                const ipfsFilterEnabled = document.getElementById('ipfs-filter')?.checked || false;
-                
-                // Create a checksum of current state to detect actual changes
-                const currentFilesChecksum = JSON.stringify(files.map(f => ({ id: f.id, ipfsHash: f.ipfsHash })));
-                const currentFilterState = ipfsFilterEnabled;
-                
-                // Only update if there's an actual change in files or filter state
-                if (currentFilesChecksum !== lastFilesChecksum || currentFilterState !== lastFilterState) {
-                    console.log('[FilesTab] Files or filter changed, updating list...');
-                    lastFilesChecksum = currentFilesChecksum;
-                    lastFilterState = currentFilterState;
-                    
-                    // Small delay to prevent rapid updates
-                    setTimeout(() => {
-                        updateFileList(fileListContainer);
-                    }, 100);
-                } else {
-                    console.log('[FilesTab] No changes detected in files or filter, skipping update');
-                }
-            });
+        if (isActive) {
+            // Load combined files when tab becomes active
+            loadAllFiles();
         }
     });
     
-    // Function to handle batch deletion
-    async function handleBatchDelete() {
-        if (selectedFiles.size === 0) {
-            showToast('No files selected for deletion', 'warning');
-            return;
-        }
-        
-        const selectedCount = selectedFiles.size;
-        const fileNames = Array.from(selectedFiles).map(fileId => {
-            const files = getFiles();
-            const file = files.find(f => f.id === fileId);
-            return file ? file.originalName : fileId;
-        }).slice(0, 3); // Show first 3 names
-        
-        const displayNames = fileNames.length > 3 
-            ? `${fileNames.join(', ')} and ${selectedCount - 3} more`
-            : fileNames.join(', ');
-        
-        if (confirm(`Are you sure you want to delete ${selectedCount} selected file(s)?\n\n${displayNames}`)) {
-            try {
-                setIsLoading(true);
-                showToast(`Deleting ${selectedCount} files...`, 'info');
-                console.log(`[BatchDelete] Starting deletion of ${selectedCount} files`);
-                
-                let successCount = 0;
-                let failureCount = 0;
-                
-                // Delete files one by one using the server API directly
-                for (const fileId of selectedFiles) {
-                    try {
-                        const response = await fetch(`/files/${fileId}`, {
-                            method: "DELETE",
-                            headers: {
-                                Authorization: `Bearer ${getAuthToken()}`,
-                            },
-                        });
-
-                        if (response.ok) {
-                            const data = await response.json();
-                            if (data.success) {
-                                successCount++;
-                                console.log(`[BatchDelete] Successfully deleted file: ${fileId}`);
-                            } else {
-                                failureCount++;
-                                console.error(`[BatchDelete] Server error deleting file ${fileId}:`, data.error);
+    // Create enhanced file search form with storage filter
+    const createEnhancedFileSearch = () => {
+        return h('div', { class: 'mb-6' },
+            // Storage type filter
+            h('div', { class: 'flex flex-wrap gap-2 mb-4' },
+                h('div', { class: 'flex items-center gap-2' },
+                    h('span', { class: 'text-sm font-medium' }, '📂 Filter by Storage:'),
+                    h('div', { class: 'join' },
+                        h('button', { 
+                            class: `btn btn-sm join-item ${storageFilter === 'all' ? 'btn-active' : 'btn-outline'}`,
+                            onclick: () => {
+                                storageFilter = 'all';
+                                updateFilterButtons();
+                                // Trigger display update
+                                const filesContainer = document.getElementById('files-display-container');
+                                if (filesContainer) {
+                                    filesContainer.innerHTML = '';
+                                    filesContainer.appendChild(FilesDisplay());
+                                }
                             }
-                        } else {
-                            failureCount++;
-                            console.error(`[BatchDelete] HTTP error deleting file ${fileId}:`, response.status);
-                        }
-                    } catch (error) {
-                        console.error(`[BatchDelete] Error deleting file ${fileId}:`, error);
-                        failureCount++;
-                    }
-                }
-                
-                // Clear selection and UI state
-                selectedFiles.clear();
-                updateSelectAllState();
-                updateBatchDeleteButton();
-                
-                // Show results
-                if (failureCount === 0) {
-                    showToast(`✅ Successfully deleted ${successCount} files`, 'success');
-                } else {
-                    showToast(`⚠️ Deleted ${successCount} files, ${failureCount} failed`, 'warning');
-                }
-                
-                // Force refresh the file list after batch deletion
-                console.log(`[BatchDelete] Forcing refresh after deleting ${successCount} files...`);
-                await forceRefreshFileList();
-                
-            } catch (error) {
-                console.error('[BatchDelete] Error during batch deletion:', error);
-                showToast(`Error during batch deletion: ${error.message}`, 'error');
-            } finally {
-                setIsLoading(false);
-            }
-        }
-    }
-    
-    // Function to update select all checkbox state
-    function updateSelectAllState() {
-        const selectAllCheckbox = document.getElementById('select-all-files');
-        if (selectAllCheckbox) {
-            const files = getFiles();
-            const filteredFiles = getFilteredFiles(files);
+                        }, 'All Files'),
+                        h('button', { 
+                            class: `btn btn-sm join-item ${storageFilter === 'local-only' ? 'btn-active' : 'btn-outline'}`,
+                            onclick: () => {
+                                storageFilter = 'local-only';
+                                updateFilterButtons();
+                                // Trigger display update
+                                const filesContainer = document.getElementById('files-display-container');
+                                if (filesContainer) {
+                                    filesContainer.innerHTML = '';
+                                    filesContainer.appendChild(FilesDisplay());
+                                }
+                            }
+                        }, '💾 Local Only'),
+                        h('button', { 
+                            class: `btn btn-sm join-item ${storageFilter === 'local-with-ipfs' ? 'btn-active' : 'btn-outline'}`,
+                            onclick: () => {
+                                storageFilter = 'local-with-ipfs';
+                                updateFilterButtons();
+                                // Trigger display update
+                                const filesContainer = document.getElementById('files-display-container');
+                                if (filesContainer) {
+                                    filesContainer.innerHTML = '';
+                                    filesContainer.appendChild(FilesDisplay());
+                                }
+                            }
+                        }, '🌐💾 Local+IPFS'),
+                        h('button', { 
+                            class: `btn btn-sm join-item ${storageFilter === 'ipfs-independent' ? 'btn-active' : 'btn-outline'}`,
+                            onclick: () => {
+                                storageFilter = 'ipfs-independent';
+                                updateFilterButtons();
+                                // Trigger display update
+                                const filesContainer = document.getElementById('files-display-container');
+                                if (filesContainer) {
+                                    filesContainer.innerHTML = '';
+                                    filesContainer.appendChild(FilesDisplay());
+                                }
+                            }
+                        }, '🌐⚡ Direct IPFS')
+                    )
+                )
+            ),
             
-            if (filteredFiles.length === 0) {
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.indeterminate = false;
-            } else if (selectedFiles.size === filteredFiles.length) {
-                selectAllCheckbox.checked = true;
-                selectAllCheckbox.indeterminate = false;
-            } else if (selectedFiles.size > 0) {
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.indeterminate = true;
-            } else {
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.indeterminate = false;
-            }
-        }
-    }
+            // Original search form
+            FileSearchForm()
+        );
+    };
     
-    // Function to update batch delete button visibility
-    function updateBatchDeleteButton() {
+    // Function to get display name for filter
+    const getFilterDisplayName = (filter) => {
+        const filterNames = {
+            'all': 'All Files',
+            'local-only': 'Local Only',
+            'local-with-ipfs': 'Local + IPFS',
+            'ipfs-independent': 'Direct IPFS'
+        };
+        return filterNames[filter] || filter;
+    };
+
+    // Function to display filtered files with batch selection
+    const displayFilteredFiles = (files, container) => {
+        container.innerHTML = '';
+        
+        // Add batch selection controls
+        if (files.length > 0) {
+            const batchControls = createBatchControls(files);
+            container.appendChild(batchControls);
+        }
+        
+        files.forEach(file => {
+            const fileElement = FileItem(file, {
+                showCheckbox: true,
+                checked: selectedFiles.has(file.id),
+                onSelectionChange: handleFileSelection
+            });
+            container.appendChild(fileElement);
+        });
+    };
+
+    // Function to create batch controls
+    const createBatchControls = (files) => {
+        return h('div', { class: 'bg-base-200 p-4 rounded-lg mb-4 border border-base-300' },
+            h('div', { class: 'flex justify-between items-center' },
+                h('div', { class: 'flex items-center gap-4' },
+                    h('label', { class: 'label cursor-pointer flex items-center gap-2' },
+                        h('input', {
+                            type: 'checkbox',
+                            id: 'select-all-checkbox',
+                            class: 'checkbox checkbox-primary',
+                            checked: isSelectAllChecked,
+                            onchange: handleSelectAll
+                        }),
+                        h('span', { class: 'label-text font-medium' }, 'Select All')
+                    ),
+                    h('span', { class: 'text-sm text-base-content/70' }, 
+                        `${selectedFiles.size} of ${files.length} files selected`
+                    )
+                ),
+                h('div', { class: 'flex gap-2' },
+                    h('button', {
+                        id: 'batch-delete-btn',
+                        class: `btn btn-error btn-sm ${selectedFiles.size === 0 ? 'btn-disabled' : ''}`,
+                        disabled: selectedFiles.size === 0,
+                        onclick: handleBatchDelete
+                    }, `🗑️ Delete Selected (${selectedFiles.size})`)
+                )
+            )
+        );
+    };
+
+    // Function to handle file selection
+    const handleFileSelection = (fileId, isSelected) => {
+        if (isSelected) {
+            selectedFiles.add(fileId);
+        } else {
+            selectedFiles.delete(fileId);
+        }
+        
+        // Update select all checkbox state
+        const allFiles = getFiles();
+        const filteredFiles = storageFilter === 'all' 
+            ? allFiles 
+            : allFiles.filter(file => file.storageType === storageFilter);
+        
+        isSelectAllChecked = filteredFiles.length > 0 && filteredFiles.every(file => selectedFiles.has(file.id));
+        
+        // Update UI
+        const selectAllCheckbox = document.getElementById('select-all-checkbox');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.checked = isSelectAllChecked;
+        }
+        
         const batchDeleteBtn = document.getElementById('batch-delete-btn');
         if (batchDeleteBtn) {
-            if (selectedFiles.size > 0) {
-                batchDeleteBtn.style.display = 'block';
-                batchDeleteBtn.textContent = `🗑️ Delete Selected (${selectedFiles.size})`;
-            } else {
-                batchDeleteBtn.style.display = 'none';
+            batchDeleteBtn.disabled = selectedFiles.size === 0;
+            batchDeleteBtn.className = `btn btn-error btn-sm ${selectedFiles.size === 0 ? 'btn-disabled' : ''}`;
+            batchDeleteBtn.textContent = `🗑️ Delete Selected (${selectedFiles.size})`;
+        }
+        
+        // Update selection count
+        const fileListContainer = document.getElementById('file-list-container');
+        if (fileListContainer) {
+            const selectionSpan = fileListContainer.querySelector('.text-base-content\\/70');
+            if (selectionSpan) {
+                selectionSpan.textContent = `${selectedFiles.size} of ${filteredFiles.length} files selected`;
             }
         }
-    }
-    
-    // Function to get filtered files based on current filter
-    function getFilteredFiles(files) {
-        const ipfsFilterEnabled = document.getElementById('ipfs-filter')?.checked || false;
-        return ipfsFilterEnabled
-            ? files.filter(file => file && file.ipfsHash)
-            : files;
-    }
-    
-    // Function to handle select all checkbox
-    function handleSelectAll(checked) {
-        const files = getFiles();
-        const filteredFiles = getFilteredFiles(files);
+    };
+
+    // Function to handle select all
+    const handleSelectAll = (e) => {
+        const isChecked = e.target.checked;
+        const allFiles = getFiles();
+        const filteredFiles = storageFilter === 'all' 
+            ? allFiles 
+            : allFiles.filter(file => file.storageType === storageFilter);
         
-        if (checked) {
+        if (isChecked) {
             // Select all filtered files
             filteredFiles.forEach(file => selectedFiles.add(file.id));
         } else {
@@ -394,236 +313,264 @@ export function FilesTabContent() {
             filteredFiles.forEach(file => selectedFiles.delete(file.id));
         }
         
-        // Update individual checkboxes
+        isSelectAllChecked = isChecked;
+        
+        // Update all file checkboxes
         filteredFiles.forEach(file => {
             const checkbox = document.getElementById(`file-checkbox-${file.id}`);
             if (checkbox) {
-                checkbox.checked = selectedFiles.has(file.id);
+                checkbox.checked = isChecked;
             }
         });
         
-        updateBatchDeleteButton();
-    }
-    
-    // Function to handle individual file selection
-    function handleFileSelection(fileId, checked) {
-        if (checked) {
-            selectedFiles.add(fileId);
-        } else {
-            selectedFiles.delete(fileId);
+        // Update batch controls
+        const filesContainer = document.getElementById('files-display-container');
+        if (filesContainer) {
+            filesContainer.innerHTML = '';
+            filesContainer.appendChild(FilesDisplay());
         }
-        
-        updateSelectAllState();
-        updateBatchDeleteButton();
-    }
+    };
 
-    // Function to update file list
-    function updateFileList(container) {
-        if (!container) return;
+    // Function to handle batch delete
+    const handleBatchDelete = async () => {
+        if (selectedFiles.size === 0) return;
         
-        // Enhanced duplicate prevention - check if we're already updating this container
-        const updateId = `update-${Date.now()}`;
-        if (container.dataset.updating === 'true') {
-            console.log(`[FilesTab] Container already updating, skipping duplicate update`);
+        const filesToDelete = Array.from(selectedFiles);
+        const allFiles = getFiles();
+        const fileNames = filesToDelete.map(id => {
+            const file = allFiles.find(f => f.id === id);
+            return file ? file.originalName || file.name : id;
+        }).join(', ');
+        
+        if (!confirm(`Delete ${filesToDelete.length} selected files?\n\nFiles: ${fileNames}\n\nThis action cannot be undone.`)) {
             return;
         }
         
-        // Mark as updating
-        container.dataset.updating = 'true';
+        setIsLoading(true);
+        let successCount = 0;
+        let errorCount = 0;
         
-        const files = getFiles();
-        const isLoading = getIsLoading();
-        const ipfsFilterEnabled = document.getElementById('ipfs-filter')?.checked || false;
+        showToast(`🗑️ Deleting ${filesToDelete.length} files...`, 'info');
         
-        // Show loading state
-        if (isLoading) {
-            container.innerHTML = '';
-            container.appendChild(LoadingState('Loading files...'));
-            container.dataset.updating = 'false';
-            return;
-        }
-        
-        if (!files || !Array.isArray(files) || files.length === 0) {
-            container.innerHTML = '';
-            container.appendChild(EmptyState('No files found'));
-            container.dataset.updating = 'false';
-            return;
-        }
-        
-        // Filter for IPFS files if the filter is enabled
-        const filteredFiles = ipfsFilterEnabled
-            ? files.filter(file => file && file.ipfsHash)
-            : files;
-            
-        if (filteredFiles.length === 0) {
-            container.innerHTML = '';
-            container.appendChild(EmptyState(`No ${ipfsFilterEnabled ? 'IPFS ' : ''}files found`));
-            container.dataset.updating = 'false';
-            return;
-        }
-        
-        // Additional duplicate removal at UI level
-        const uniqueFilteredFiles = [];
-        const seenFileIds = new Set();
-        const seenContentSignatures = new Map();
-        
-        for (const file of filteredFiles) {
-            if (!file || !file.id) continue;
-            
-            // Skip if we've already seen this ID
-            if (seenFileIds.has(file.id)) {
-                console.warn(`[FilesTab] Skipping duplicate file ID in UI: ${file.id}`);
-                continue;
-            }
-            
-            // Create content signature for duplicate detection
-            const contentSignature = `${file.originalName || file.name}_${file.size || 0}_${file.mimetype || file.mimeType || ''}`;
-            
-            // Check for content duplicates
-            if (seenContentSignatures.has(contentSignature)) {
-                const existingFile = seenContentSignatures.get(contentSignature);
-                console.warn(`[FilesTab] Found content duplicate in UI: ${file.id} matches ${existingFile.id}`);
-                
-                // Keep the file with the higher timestamp
-                const newTimestamp = parseInt(file.timestamp || file.uploadedAt || 0);
-                const existingTimestamp = parseInt(existingFile.timestamp || existingFile.uploadedAt || 0);
-                
-                if (newTimestamp > existingTimestamp) {
-                    // Remove the older file from uniqueFilteredFiles
-                    const oldIndex = uniqueFilteredFiles.findIndex(f => f.id === existingFile.id);
-                    if (oldIndex !== -1) {
-                        uniqueFilteredFiles.splice(oldIndex, 1);
-                        seenFileIds.delete(existingFile.id);
-                        console.log(`[FilesTab] Replacing older duplicate in UI: ${existingFile.id} with ${file.id}`);
+        for (const fileId of filesToDelete) {
+            try {
+                const file = allFiles.find(f => f.id === fileId);
+                if (file) {
+                    let result;
+                    if (file.storageType === 'ipfs-independent') {
+                        result = await deleteIpfsFile(file.ipfsHash, file.originalName);
+                    } else {
+                        result = await deleteFile(file.id, file.originalName);
                     }
-                    seenContentSignatures.set(contentSignature, file);
-                    uniqueFilteredFiles.push(file);
-                    seenFileIds.add(file.id);
+                    
+                    if (result) {
+                        successCount++;
+                        selectedFiles.delete(fileId);
+                    } else {
+                        errorCount++;
+                    }
                 } else {
-                    console.log(`[FilesTab] Keeping existing file in UI: ${existingFile.id}, skipping ${file.id}`);
-                    continue; // Skip this duplicate
+                    errorCount++;
                 }
-            } else {
-                seenContentSignatures.set(contentSignature, file);
-                uniqueFilteredFiles.push(file);
-                seenFileIds.add(file.id);
+            } catch (error) {
+                console.error(`Error deleting file ${fileId}:`, error);
+                errorCount++;
             }
         }
         
-        // Check if we need to update - compare with last known state
-        const currentFileIds = uniqueFilteredFiles.map(f => f.id).sort().join(',');
-        const lastFileIds = container.dataset.lastFileIds || '';
+        setIsLoading(false);
         
-        if (currentFileIds === lastFileIds && container.children.length > 0) {
-            console.log(`[FilesTab] No changes detected, skipping update`);
-            container.dataset.updating = 'false';
-            return;
+        // Show result
+        if (errorCount === 0) {
+            showToast(`✅ Successfully deleted ${successCount} files`, 'success');
+        } else if (successCount > 0) {
+            showToast(`⚠️ Deleted ${successCount}/${filesToDelete.length} files. ${errorCount} failed.`, 'warning');
+        } else {
+            showToast(`❌ Failed to delete any files`, 'error');
         }
         
-        // Store current state
-        container.dataset.lastFileIds = currentFileIds;
+        // Clear selections and refresh
+        selectedFiles.clear();
+        isSelectAllChecked = false;
         
-        // Clear container completely to prevent duplicates
-        container.innerHTML = '';
+        // Refresh file lists
+        setTimeout(() => {
+            loadAllFiles();
+        }, 1000);
+    };
+    
+    // Function to update filter button states
+    const updateFilterButtons = () => {
+        // Find all filter buttons by their class and text content
+        const filterButtons = document.querySelectorAll('.join .btn');
         
-        // Add update identifier to prevent processing the same file list multiple times
-        container.setAttribute('data-last-update', updateId);
+        filterButtons.forEach(button => {
+            const text = button.textContent || button.innerText;
+            let shouldBeActive = false;
+            
+            if (text.includes('All Files') && storageFilter === 'all') {
+                shouldBeActive = true;
+            } else if (text.includes('Local Only') && storageFilter === 'local-only') {
+                shouldBeActive = true;
+            } else if (text.includes('Local+IPFS') && storageFilter === 'local-with-ipfs') {
+                shouldBeActive = true;
+            } else if (text.includes('Direct IPFS') && storageFilter === 'ipfs-independent') {
+                shouldBeActive = true;
+            }
+            
+            if (shouldBeActive) {
+                button.className = 'btn btn-sm join-item btn-active';
+            } else {
+                button.className = 'btn btn-sm join-item btn-outline';
+            }
+        });
+    };
+    
+    // Enhanced files display component - NO UPLOAD SECTION HERE
+    const FilesDisplay = () => {
+        const files = getFiles();
         
-        console.log(`[FilesTab] Updating file list with ${uniqueFilteredFiles.length} unique files (update ID: ${updateId})`);
+        if (getIsLoading()) {
+            return LoadingState();
+        }
         
-        // Display summary with select all checkbox
-        const ipfsCount = files.filter(file => file && file.ipfsHash).length;
-        const summary = h('div', { 
-            class: 'stats stats-horizontal shadow mb-6',
-            'data-update-id': updateId
-        },
+        if (!files || files.length === 0) {
+            return EmptyState("No files uploaded yet. Go to the Upload tab to add some files!");
+        }
+        
+        // Apply current filter
+        const filteredFiles = storageFilter === 'all' 
+            ? files 
+            : files.filter(file => file.storageType === storageFilter);
+        
+        // Debug logging for filtering
+        console.log(`[FilesDisplay] Filter debug:`);
+        console.log(`- Current filter: "${storageFilter}"`);
+        console.log(`- Total files: ${files.length}`);
+        console.log(`- All file storage types:`, files.map(f => ({
+            id: f.id,
+            name: f.originalName || f.name,
+            storageType: f.storageType
+        })));
+        console.log(`- Files matching filter "${storageFilter}": ${filteredFiles.length}`);
+        if (storageFilter !== 'all') {
+            console.log(`- Filtered files:`, filteredFiles.map(f => ({
+                id: f.id,
+                name: f.originalName || f.name,
+                storageType: f.storageType
+            })));
+        }
+        
+        if (filteredFiles.length === 0) {
+            return EmptyState(`No files found for filter: ${getFilterDisplayName(storageFilter)}`);
+        }
+        
+        // Create container for filtered files
+        const container = h('div', { class: 'space-y-4' });
+        
+        // Add files count info
+        const fileStats = h('div', { class: 'stats stats-horizontal shadow-sm mb-4' },
             h('div', { class: 'stat' },
-                h('div', { class: 'stat-title flex items-center gap-2' },
-                    h('label', { class: 'label cursor-pointer gap-2' },
-                        h('input', { 
-                            type: 'checkbox',
-                            id: 'select-all-files',
-                            class: 'checkbox checkbox-primary checkbox-sm',
-                            onchange: (e) => handleSelectAll(e.target.checked)
-                        }),
-                        h('span', {}, 'Total Files')
-                    )
-                ),
-                h('div', { class: 'stat-value text-primary' }, uniqueFilteredFiles.length),
-                h('div', { class: 'stat-desc' }, `of ${files.length} files`)
+                h('div', { class: 'stat-title' }, 'Total Files'),
+                h('div', { class: 'stat-value text-primary' }, files.length)
             ),
             h('div', { class: 'stat' },
-                h('div', { class: 'stat-title' }, 'IPFS Files'),
-                h('div', { class: 'stat-value text-secondary' }, ipfsCount),
-                h('div', { class: 'stat-desc' }, 'stored on IPFS')
+                h('div', { class: 'stat-title' }, 'Filtered'),
+                h('div', { class: 'stat-value text-secondary' }, filteredFiles.length)
+            ),
+            h('div', { class: 'stat' },
+                h('div', { class: 'stat-title' }, 'Current Filter'),
+                h('div', { class: 'stat-desc' }, getFilterDisplayName(storageFilter))
             )
         );
-        container.appendChild(summary);
+        container.appendChild(fileStats);
         
-        // Update select all state after rendering
-        setTimeout(() => {
-            updateSelectAllState();
-            updateBatchDeleteButton();
-        }, 0);
+        // Add file items with batch selection
+        const fileList = h('div', { id: 'file-list-container', class: 'space-y-4' });
         
-        // Add each file with duplicate prevention and checkbox
-        try {
-            // Sort files by timestamp (newest first)
-            const sortedFiles = [...uniqueFilteredFiles].sort((a, b) => {
-                const timeA = parseInt(a.timestamp || a.uploadedAt || 0, 10);
-                const timeB = parseInt(b.timestamp || b.uploadedAt || 0, 10);
-                return timeB - timeA; // Newest first
+        // Add batch controls
+        const batchControls = createBatchControls(filteredFiles);
+        fileList.appendChild(batchControls);
+        
+        // Add filtered files with checkboxes
+        filteredFiles.forEach(file => {
+            const fileElement = FileItem(file, {
+                showCheckbox: true,
+                checked: selectedFiles.has(file.id),
+                onSelectionChange: handleFileSelection
             });
-            
-            // Create a Set to track processed file IDs (extra safety check)
-            const processedFileIds = new Set();
-            
-            sortedFiles.forEach((file, index) => {
-                if (!file || typeof file !== 'object') return;
-                
-                // Skip if we've already processed this file ID (extra safety)
-                if (processedFileIds.has(file.id)) {
-                    console.warn(`[FilesTab] Skipping duplicate file ID during rendering: ${file.id}`);
-                    return;
-                }
-                processedFileIds.add(file.id);
-                
-                // Add unique identifier to prevent duplicate processing
-                const fileEl = FileItem(file, {
-                    showCheckbox: true,
-                    checked: selectedFiles.has(file.id),
-                    onSelectionChange: handleFileSelection
-                });
-                fileEl.setAttribute('data-file-index', index);
-                fileEl.setAttribute('data-update-id', updateId);
-                fileEl.setAttribute('data-file-id', file.id); // Add for debugging
-                container.appendChild(fileEl);
-            });
-            
-            console.log(`[FilesTab] Successfully updated file list with ${sortedFiles.length} unique files at ${updateId}`);
-        } catch (error) {
-            console.error('Error displaying files:', error);
-            container.innerHTML = '';
-            container.appendChild(h('div', { class: 'alert alert-error' }, 
-                `Error displaying files: ${error.message}`
-            ));
-        } finally {
-            // Mark as no longer updating
-            container.dataset.updating = 'false';
-        }
-    }
+            fileList.appendChild(fileElement);
+        });
+        
+        container.appendChild(fileList);
+        return container;
+    };
     
-    // Listen for files updated event to refresh the display
+    // Listen for files updated events
     document.addEventListener('filesUpdated', (event) => {
-        const container = document.getElementById('file-list');
-        if (container && getActiveTab() === 'files') {
-            console.log('[FilesTab] Files updated event received, refreshing display');
-            // Small delay to ensure DOM is ready
+        if (getActiveTab() === 'files') {
             setTimeout(() => {
-                updateFileList(container);
+                // Trigger full display refresh
+                const filesContainer = document.getElementById('files-display-container');
+                if (filesContainer) {
+                    filesContainer.innerHTML = '';
+                    filesContainer.appendChild(FilesDisplay());
+                }
             }, 100);
         }
     });
+    
+    // Build tab content
+    setTimeout(() => {
+        tabContent.innerHTML = '';
+        
+        // Tab header with title and refresh button
+        const tabHeader = h('div', { class: 'flex justify-between items-center mb-6' },
+            h('div', { class: 'flex items-center gap-4' },
+                h('h2', { class: 'text-2xl font-bold' }, '📁 File Manager'),
+                h('div', { class: 'badge badge-info' }, 'View & Manage Files Only')
+            ),
+            h('div', { class: 'flex gap-2' },
+                h('button', { 
+                    class: 'btn btn-outline btn-sm',
+                    onclick: () => {
+                        // Clear selections
+                        selectedFiles.clear();
+                        isSelectAllChecked = false;
+                        loadAllFiles();
+                    }
+                }, '🔄 Refresh'),
+                h('button', { 
+                    class: 'btn btn-primary btn-sm',
+                    onclick: () => {
+                        setActiveTab('upload');
+                    }
+                }, '📤 Upload Files')
+            )
+        );
+        
+        tabContent.appendChild(tabHeader);
+        tabContent.appendChild(createEnhancedFileSearch());
+        
+        // Files display container - ONLY FILES, NO UPLOAD SECTION
+        const filesContainer = h('div', { id: 'files-display-container' });
+        tabContent.appendChild(filesContainer);
+        
+        // Initial load
+        loadAllFiles();
+        
+        // Listen for file updates
+        const updateDisplay = () => {
+            filesContainer.innerHTML = '';
+            filesContainer.appendChild(FilesDisplay());
+        };
+        
+        // Initial display
+        updateDisplay();
+        
+        // Listen for state changes
+        setEffect(updateDisplay);
+    }, 0);
     
     return tabContent;
 }
@@ -632,453 +579,180 @@ export function FilesTabContent() {
  * Upload Tab Content Component
  */
 export function UploadTabContent() {
-    const tabContent = h('div', { 
-        id: 'upload-tab', 
-        class: 'tab-content',
-        style: 'display: none;' 
-    });
+    // State for storage type selection
+    let useDirectIpfs = false;
     
-    setEffect(() => {
-        const isActive = getActiveTab() === 'upload';
-        tabContent.style.display = isActive ? 'block' : 'none';
+    const handleFileUpload = async (files) => {
+        if (!files || files.length === 0) return;
         
-        if (isActive && tabContent.innerHTML === '') {
-            tabContent.innerHTML = '';
-            
-            // Card header without IPFS status (since we're not doing direct IPFS upload)
-            const cardHeader = h('div', { class: 'flex items-center gap-3 mb-6' },
-                h('h3', { class: 'text-2xl font-bold text-base-content' }, '⬆️ Upload File'),
-                h('div', { class: 'badge badge-info gap-2' }, 
-                    h('span', {}, '💾'),
-                    h('span', {}, 'Local Upload')
-                )
-            );
-            
-            // Upload form for local storage only
-            const uploadForm = createUploadForm();
-            
-            // Results container
-            const resultsContainer = h('div', { 
-                id: 'upload-results', 
-                class: 'mt-6'
-            });
-            
-            // Add to tab content
-            tabContent.appendChild(cardHeader);
-            tabContent.appendChild(uploadForm);
-            tabContent.appendChild(resultsContainer);
-        }
-    });
-    
-    /**
-     * Create enhanced upload form for local storage
-     */
-    function createUploadForm() {
-        const form = h('div', { class: 'space-y-6' });
+        setIsLoading(true);
+        let totalFiles = files.length;
+        let successCount = 0;
+        let errorCount = 0;
         
-        // File upload area with drag & drop styling
-        const fileUploadArea = h('div', { 
-            class: 'border-2 border-dashed border-base-300 rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer bg-base-50',
-            onclick: () => {
-                // Prevent double-click issues
-                if (uploadClickTimeout) return;
-                uploadClickTimeout = setTimeout(() => {
-                    uploadClickTimeout = null;
-                }, 300);
-                document.getElementById('file-upload').click();
-            }
-        });
+        showToast(`📤 Uploading ${totalFiles} file(s)...`, 'info');
         
-        // Hidden file input
-        const fileInput = h('input', { 
-            type: 'file', 
-            id: 'file-upload', 
-            class: 'hidden',
-            multiple: false
-        });
-        
-        // Upload area content
-        const uploadAreaContent = h('div', { class: 'space-y-4' },
-            h('div', { class: 'text-6xl' }, '📁'),
-            h('div', { class: 'space-y-2' },
-                h('p', { class: 'text-lg font-medium' }, 'Click to select file or drag & drop'),
-                h('p', { class: 'text-sm text-base-content/60' }, 'Files will be stored locally first')
-            ),
-            h('button', { 
-                type: 'button',
-                class: 'btn btn-primary btn-lg',
-                onclick: (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    // Prevent double-click issues
-                    if (uploadClickTimeout) return;
-                    uploadClickTimeout = setTimeout(() => {
-                        uploadClickTimeout = null;
-                    }, 300);
-                    document.getElementById('file-upload').click();
-                }
-            }, '📂 Choose File')
-        );
-        
-        // File status display
-        const fileStatus = h('div', { 
-            id: 'file-upload-status', 
-            class: 'mt-4 text-center hidden'
-        });
-        
-        fileUploadArea.appendChild(uploadAreaContent);
-        fileUploadArea.appendChild(fileStatus);
-        
-        // File name input
-        const fileNameSection = h('div', { class: 'form-control w-full' },
-            h('label', { class: 'label' },
-                h('span', { class: 'label-text font-medium' }, '✏️ Custom file name (optional)')
-            ),
-            h('input', { 
-                type: 'text', 
-                id: 'file-name', 
-                placeholder: 'Enter custom name for the file',
-                class: 'input input-bordered w-full'
-            }),
-            h('label', { class: 'label' },
-                h('span', { class: 'label-text-alt' }, 'Leave empty to use original filename')
-            )
-        );
-        
-        // Submit button with improved double-click prevention
-        const submitBtn = h('button', { 
-            type: 'button',
-            id: 'upload-submit',
-            class: 'btn btn-success btn-lg w-full',
-            onclick: (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                // Prevent double-click and rapid clicking
-                if (isUploadInProgress) {
-                    console.log('[Upload] Upload already in progress, ignoring click');
-                    return;
-                }
-                
-                // Debounce clicks
-                if (uploadClickTimeout) {
-                    console.log('[Upload] Click debounced, ignoring');
-                    return;
-                }
-                
-                uploadClickTimeout = setTimeout(() => {
-                    uploadClickTimeout = null;
-                }, 1000); // 1 second debounce for upload button
-                
-                // Disable button immediately
-                e.target.disabled = true;
-                e.target.textContent = '⏳ Uploading...';
-                
-                // Re-enable button after 3 seconds minimum
-                setTimeout(() => {
-                    if (!isUploadInProgress) {
-                        e.target.disabled = false;
-                        e.target.textContent = '🚀 Upload File';
+        for (const file of files) {
+            try {
+                if (useDirectIpfs) {
+                    // Upload directly to IPFS (independent)
+                    const result = await uploadToIpfsDirect(file);
+                    if (result && result.success) {
+                        successCount++;
+                    } else {
+                        errorCount++;
                     }
-                }, 3000);
-                
-                handleUpload();
-            }
-        }, '🚀 Upload File');
-        
-        // Add all elements to form
-        form.appendChild(fileInput);
-        form.appendChild(fileUploadArea);
-        form.appendChild(fileNameSection);
-        form.appendChild(submitBtn);
-        
-        // Add event listeners - use 'once' option where possible
-        fileInput.addEventListener('change', () => {
-            const file = fileInput.files[0];
-            if (file) {
-                fileStatus.className = 'mt-4 text-center';
-                fileStatus.innerHTML = `
-                    <div class="alert alert-info">
-                        <span>📄 Selected: <strong>${file.name}</strong></span>
-                        <span class="text-sm">(${formatFileSize(file.size)})</span>
-                    </div>
-                `;
-                
-                // Re-enable upload button if it was disabled
-                const uploadBtn = document.getElementById('upload-submit');
-                if (uploadBtn && !isUploadInProgress) {
-                    uploadBtn.disabled = false;
-                    uploadBtn.textContent = '🚀 Upload File';
-                }
-            } else {
-                fileStatus.className = 'mt-4 text-center hidden';
-            }
-        });
-        
-        return form;
-    }
-    
-    // Handle file upload with improved error handling and duplicate prevention
-    async function handleUpload() {
-        // Immediate protection against double execution
-        if (isUploadInProgress) {
-            console.log('[Upload] Upload already in progress, aborting');
-            return;
-        }
-        
-        // Set upload in progress flag
-        isUploadInProgress = true;
-        
-        try {
-            const fileInput = document.getElementById('file-upload');
-            const customName = document.getElementById('file-name').value;
-            
-            if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-                showToast('Please select a file to upload', 'warning');
-                return;
-            }
-            
-            const file = fileInput.files[0];
-            
-            // Check for recent upload of the same file
-            const fileKey = `${file.name}_${file.size}_${file.lastModified}`;
-            const now = Date.now();
-            const lastUploadTime = recentUploads.get(fileKey);
-            
-            if (lastUploadTime && (now - lastUploadTime) < uploadCooldownTime) {
-                const remainingTime = Math.ceil((uploadCooldownTime - (now - lastUploadTime)) / 1000);
-                showToast(`⏳ Please wait ${remainingTime} seconds before uploading "${file.name}" again`, 'warning');
-                return;
-            }
-            
-            // Additional protection checks
-            if (getIsLoading()) {
-                showToast('System is busy, please wait...', 'warning');
-                return;
-            }
-            
-            if (isRefreshingAfterUpload) {
-                showToast('Please wait for the previous upload to complete...', 'warning');
-                return;
-            }
-            
-            // Client-side content-based duplicate detection
-            console.log('[Upload] Calculating file content hash for duplicate detection...');
-            const contentHash = await calculateFileHash(file);
-            
-            if (contentHash) {
-                // Generate content-based ID like the server would
-                const safeName = file.name.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9.-]/g, "_");
-                const contentBasedId = `${contentHash}-${safeName}`;
-                
-                // Check if we've recently processed this content
-                const recentContentInfo = clientContentHashes.get(contentBasedId);
-                if (recentContentInfo && (now - recentContentInfo.timestamp) < contentHashTimeout) {
-                    console.log(`[Upload] Client detected recent upload of identical content: ${contentBasedId}`);
-                    showToast(`📋 File with identical content was recently uploaded. Use refresh to see existing files.`, 'info');
-                    return;
-                }
-                
-                // Check existing files for this content
-                const existingFiles = getFiles();
-                const existingFile = existingFiles.find(f => f.id === contentBasedId);
-                if (existingFile) {
-                    console.log(`[Upload] Client found existing file with identical content: ${contentBasedId}`);
-                    showToast(`📋 File "${existingFile.originalName}" already exists with identical content.`, 'info');
-                    return;
-                }
-                
-                // Track this content hash
-                clientContentHashes.set(contentBasedId, {
-                    timestamp: now,
-                    fileName: file.name,
-                    contentBasedId: contentBasedId
-                });
-                
-                // Clean up old content hashes
-                for (const [id, info] of clientContentHashes.entries()) {
-                    if (now - info.timestamp > contentHashTimeout) {
-                        clientContentHashes.delete(id);
-                    }
-                }
-                
-                console.log(`[Upload] Client content-based ID generated: ${contentBasedId}`);
-            }
-            
-            // Record this upload attempt
-            recentUploads.set(fileKey, now);
-            
-            // Clean up old entries (older than 30 seconds)
-            for (const [key, timestamp] of recentUploads.entries()) {
-                if (now - timestamp > 30000) {
-                    recentUploads.delete(key);
-                }
-            }
-            
-            // Generate unique upload identifier to prevent duplicates
-            const uploadId = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            
-            console.log(`[Upload] Starting upload of ${file.name} (size: ${file.size}, modified: ${file.lastModified}) with ID: ${uploadId}`);
-            
-            // Show loading with upload identifier
-            setIsLoading(true);
-            showToast(`Uploading ${file.name}... (Content-based deduplication enabled)`, 'info');
-            
-            // Update UI to show upload in progress
-            const uploadBtn = document.getElementById('upload-submit');
-            if (uploadBtn) {
-                uploadBtn.disabled = true;
-                uploadBtn.textContent = '⏳ Uploading...';
-                uploadBtn.classList.add('loading');
-            }
-            
-            // Set upload timeout
-            const uploadTimeout = setTimeout(() => {
-                setIsLoading(false);
-                isRefreshingAfterUpload = false;
-                isUploadInProgress = false; // Reset flag on timeout
-                showToast('Upload timed out. Please try again.', 'error');
-                
-                // Reset button state
-                if (uploadBtn) {
-                    uploadBtn.disabled = false;
-                    uploadBtn.textContent = '🚀 Upload File';
-                    uploadBtn.classList.remove('loading');
-                }
-            }, 60000);
-            
-            // Prepare form data
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('uploadId', uploadId); // Add unique identifier
-            if (customName) {
-                formData.append('customName', customName);
-            }
-            
-            const response = await fetch("/upload", {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${getAuthToken()}`
-                },
-                body: formData
-            });
-            
-            // Clear timeout on response
-            clearTimeout(uploadTimeout);
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                let error;
-                try {
-                    error = JSON.parse(errorText);
-                } catch (e) {
-                    error = { error: errorText };
-                }
-                
-                // Handle specific server-side duplicate detection
-                if (response.status === 409 && error.code === 'DUPLICATE_UPLOAD') {
-                    console.log('[Upload] Server detected duplicate upload, aborting');
-                    showToast('⚠️ Duplicate upload detected by server. Please wait before trying again.', 'warning');
-                    return;
-                }
-                
-                throw new Error(`HTTP error! status: ${response.status}, message: ${error.error || errorText}`);
-            }
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                // Check if this is a duplicate file
-                if (data.file?.isDuplicate || data.file?.existingFile) {
-                    showToast(`📋 File "${file.name}" already exists with identical content. No duplicate created.`, 'info');
-                    console.log(`[Upload] Duplicate file detected: ${data.file?.id || 'unknown'}`);
                 } else {
-                    showToast(`✅ File "${file.name}" uploaded successfully!`, 'success');
-                    console.log(`[Upload] File uploaded successfully with content-based ID: ${data.file?.id || 'unknown'}`);
-                }
-                
-                // Clear form
-                fileInput.value = '';
-                document.getElementById('file-name').value = '';
-                document.getElementById('file-upload-status').className = 'mt-4 text-center hidden';
-                
-                // Enhanced file refresh logic to prevent duplicates
-                try {
-                    // Set refresh flag to prevent multiple calls
-                    isRefreshingAfterUpload = true;
+                    // Upload to FileManager (traditional)
+                    const formData = new FormData();
+                    formData.append('file', file);
                     
-                    // Clear cache and selection state first
-                    localStorage.setItem('files-data', JSON.stringify([]));
-                    setFiles([]);
-                    selectedFiles.clear();
+                    const response = await fetch('/api/files/upload', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${getAuthToken()}`
+                        },
+                        body: formData
+                    });
                     
-                    // Clear any existing file list display state
-                    const fileListContainer = document.getElementById('file-list');
-                    if (fileListContainer) {
-                        fileListContainer.dataset.lastFileIds = '';
-                        fileListContainer.dataset.updating = 'false';
-                        // Remove the update lock
-                        delete fileListContainer.dataset.updating;
-                    }
-                    
-                    // Note: UI state updates (updateSelectAllState, updateBatchDeleteButton) 
-                    // are handled automatically by loadFiles() below
-                    
-                    // Single delayed refresh to allow server processing
-                    setTimeout(async () => {
-                        // Only refresh if not currently loading and no other refresh is pending
-                        if (!getIsLoading() && isRefreshingAfterUpload) {
-                            console.log(`[Upload] Refreshing files after upload of ${file.name}...`);
-                            await loadFiles();
-                            isRefreshingAfterUpload = false; // Reset flag after successful refresh
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.success) {
+                            successCount++;
                         } else {
-                            console.log('[Upload] Skipping refresh, loading already in progress or refresh already completed');
-                            isRefreshingAfterUpload = false; // Reset flag anyway
+                            errorCount++;
+                            console.error('Upload failed:', data.error);
                         }
-                    }, 1500); // Increased delay to allow proper server processing
-                    
-                } catch (refreshError) {
-                    console.error('[Upload] Error during post-upload refresh:', refreshError);
-                    isRefreshingAfterUpload = false; // Reset flag on error
-                    showToast('File processed but failed to refresh list. Please refresh manually.', 'warning');
+                    } else {
+                        errorCount++;
+                        console.error('Upload HTTP error:', response.status);
+                    }
                 }
-            } else {
-                throw new Error(data.error || 'Upload failed with unknown error');
+            } catch (error) {
+                errorCount++;
+                console.error('Upload error:', error);
             }
-        } catch (error) {
-            console.error('[Upload] Upload error:', error);
-            
-            let errorMessage = 'Upload failed: ';
-            if (error.message.includes('413')) {
-                errorMessage += 'File too large';
-            } else if (error.message.includes('415')) {
-                errorMessage += 'File type not supported';
-            } else if (error.message.includes('network')) {
-                errorMessage += 'Network error';
-            } else {
-                errorMessage += error.message;
-            }
-            
-            showToast(errorMessage, 'error');
-        } finally {
-            // Always reset flags and UI state
-            setIsLoading(false);
-            isUploadInProgress = false;
-            isRefreshingAfterUpload = false;
-            
-            // Reset button state
-            const uploadBtn = document.getElementById('upload-submit');
-            if (uploadBtn) {
-                uploadBtn.disabled = false;
-                uploadBtn.textContent = '🚀 Upload File';
-                uploadBtn.classList.remove('loading');
-            }
-            
-            console.log('[Upload] Upload process completed, flags reset');
         }
-    }
+        
+        setIsLoading(false);
+        
+        // Show final result
+        if (errorCount === 0) {
+            showToast(`✅ Successfully uploaded ${successCount} file(s) to ${useDirectIpfs ? 'IPFS directly' : 'FileManager'}`, 'success');
+        } else if (successCount > 0) {
+            showToast(`⚠️ Uploaded ${successCount}/${totalFiles} files. ${errorCount} failed.`, 'warning');
+        } else {
+            showToast(`❌ Failed to upload any files. Check console for details.`, 'error');
+        }
+        
+        // Refresh file lists
+        setTimeout(() => {
+            loadAllFiles();
+        }, 1000);
+    };
     
-    return tabContent;
+    return h('div', { class: 'space-y-6' }, 
+        // Upload header with title and storage type selector
+        h('div', { class: 'bg-base-100 p-6 rounded-lg shadow-sm border border-base-300' },
+            h('div', { class: 'flex justify-between items-start mb-4' },
+                h('h2', { class: 'text-xl font-semibold' }, '📤 Upload Files'),
+                h('div', { class: 'form-control' },
+                    h('label', { class: 'label cursor-pointer gap-3' },
+                        h('span', { class: 'label-text font-medium' }, 
+                            h('span', { class: 'flex items-center gap-2' },
+                                h('span', {}, useDirectIpfs ? '🌐⚡' : '💾🌐'),
+                                h('span', {}, useDirectIpfs ? 'Direct IPFS Upload' : 'FileManager Upload')
+                            )
+                        ),
+                        h('input', { 
+                            type: 'checkbox',
+                            class: 'toggle toggle-accent',
+                            checked: useDirectIpfs,
+                            onchange: (e) => {
+                                useDirectIpfs = e.target.checked;
+                                // Update the label text
+                                const labelSpan = e.target.parentElement.querySelector('.label-text span span:last-child');
+                                const iconSpan = e.target.parentElement.querySelector('.label-text span span:first-child');
+                                if (labelSpan && iconSpan) {
+                                    labelSpan.textContent = useDirectIpfs ? 'Direct IPFS Upload' : 'FileManager Upload';
+                                    iconSpan.textContent = useDirectIpfs ? '🌐⚡' : '💾🌐';
+                                }
+                            }
+                        })
+                    )
+                )
+            ),
+            
+            // Storage type explanation
+            h('div', { class: 'alert alert-info mb-4' },
+                h('div', { class: 'flex items-start gap-2' },
+                    h('span', {}, 'ℹ️'),
+                    h('div', {},
+                        h('h4', { class: 'font-semibold mb-1' }, 
+                            useDirectIpfs ? 'Direct IPFS Upload' : 'FileManager Upload'
+                        ),
+                        h('p', { class: 'text-sm' },
+                            useDirectIpfs 
+                                ? 'Files will be uploaded directly to the IPFS network as independent files. Perfect for public content and decentralized sharing.'
+                                : 'Files will be stored in the local FileManager and can optionally be backed up to IPFS later. Recommended for managed content.'
+                        )
+                    )
+                )
+            ),
+            
+            // Drag and drop area
+            h('div', { 
+                class: 'border-2 border-dashed border-base-300 rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer',
+                id: 'upload-drop-zone',
+                ondragover: (e) => {
+                    e.preventDefault();
+                    e.currentTarget.classList.add('border-primary', 'bg-base-200');
+                },
+                ondragleave: (e) => {
+                    e.preventDefault();
+                    e.currentTarget.classList.remove('border-primary', 'bg-base-200');
+                },
+                ondrop: (e) => {
+                    e.preventDefault();
+                    e.currentTarget.classList.remove('border-primary', 'bg-base-200');
+                    const files = Array.from(e.dataTransfer.files);
+                    if (files.length > 0) {
+                        handleFileUpload(files);
+                    }
+                },
+                onclick: () => {
+                    document.getElementById('file-input').click();
+                }
+            },
+                h('div', { class: 'space-y-4' },
+                    h('div', { class: 'text-4xl' }, '📁'),
+                    h('h3', { class: 'text-lg font-medium' }, 'Drop files here or click to select'),
+                    h('p', { class: 'text-sm opacity-70' }, 
+                        `Upload to: ${useDirectIpfs ? 'IPFS Network (Direct)' : 'FileManager (Local)'}`
+                    ),
+                    h('input', { 
+                        type: 'file',
+                        id: 'file-input',
+                        multiple: true,
+                        style: 'display: none;',
+                        onchange: (e) => {
+                            const files = Array.from(e.target.files);
+                            if (files.length > 0) {
+                                handleFileUpload(files);
+                            }
+                        }
+                    }),
+                    h('button', { 
+                        class: 'btn btn-primary btn-outline',
+                        onclick: (e) => {
+                            e.stopPropagation();
+                            document.getElementById('file-input').click();
+                        }
+                    }, '📂 Select Files')
+                )
+            )
+        )
+    );
 }
 
 /**

@@ -456,7 +456,7 @@ class FileManager {
   }
 
   /**
-   * Get all files from GunDB with fallback to direct radata/ reading
+   * Get all files from all sources
    * @returns {Promise<Array>} Array of file objects
    */
   async getAllFiles() {
@@ -608,7 +608,7 @@ class FileManager {
         console.error(`[FileManager] Error reading IPFS metadata: ${ipfsMetaErr.message}`);
       }
 
-    // 3. Now try to get files from GunDB (only add if not already present)
+    // 3. Now try to get files from GunDB (only add if not already present and not deleted)
       try {
         console.log("[FileManager] Attempting to read from GunDB files node");
         
@@ -632,6 +632,12 @@ class FileManager {
             // Set ID from key if not present
             let fileObject = { ...value, id: value.id || key };
 
+            // Skip if this file has been marked as deleted
+            if (deletedFileIds.has(fileObject.id)) {
+              console.log(`[FileManager] Skipping deleted file from GunDB: ${fileObject.id}`);
+              continue;
+            }
+
             // Update IPFS URL if not present but hash is available
             if (fileObject.ipfsHash && !fileObject.ipfsUrl && this.config.ipfsManager) {
               fileObject.ipfsUrl = this.config.ipfsManager.getGatewayUrl(fileObject.ipfsHash);
@@ -650,13 +656,18 @@ class FileManager {
         console.error(`[FileManager] Error reading from GunDB: ${gunErr.message}`);
       }
 
-    // 4. Sync unique files back to GunDB for consistency (only if they're not already there)
+    // 4. Sync unique files to GunDB ONLY if they're not deleted and not already in GunDB
     if (files.length > 0) {
       console.log(`[FileManager] Syncing ${files.length} unique files to GunDB for consistency`);
       for (const file of files) {
         try {
-          // Save to GunDB asynchronously without waiting
-          this.config.gun.get("files").get(file.id).put(file);
+          // Double-check that this file is not marked as deleted before syncing
+          if (!deletedFileIds.has(file.id)) {
+            // Save to GunDB asynchronously without waiting
+            this.config.gun.get("files").get(file.id).put(file);
+          } else {
+            console.log(`[FileManager] Skipping sync of deleted file: ${file.id}`);
+          }
         } catch (syncErr) {
           console.error(`[FileManager] Error syncing to GunDB: ${syncErr.message}`);
         }

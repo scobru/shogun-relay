@@ -161,12 +161,44 @@
         tabsContainer.appendChild(uploadTabContent);
         tabsContainer.appendChild(settingsTabContent);
 
-        // Initialize first tab as visible
+        // Initialize all tabs as hidden initially
         setTimeout(() => {
           const activeTab = getActiveTab();
+          
+          // Hide all tabs first
+          filesTabContent.style.display = 'none';
+          uploadTabContent.style.display = 'none';
+          settingsTabContent.style.display = 'none';
+          
+          // Show only the active tab
           if (activeTab === 'files') {
             filesTabContent.style.display = 'block';
+          } else if (activeTab === 'upload') {
+            uploadTabContent.style.display = 'block';
+          } else if (activeTab === 'settings') {
+            settingsTabContent.style.display = 'block';
           }
+          
+          // Add a global tab switching listener
+          document.addEventListener('tabChanged', (event) => {
+            const newTab = event.detail?.tab || getActiveTab();
+            
+            // Hide all tabs
+            filesTabContent.style.display = 'none';
+            uploadTabContent.style.display = 'none';
+            settingsTabContent.style.display = 'none';
+            
+            // Show the active tab
+            if (newTab === 'files') {
+              filesTabContent.style.display = 'block';
+            } else if (newTab === 'upload') {
+              uploadTabContent.style.display = 'block';
+            } else if (newTab === 'settings') {
+              settingsTabContent.style.display = 'block';
+            }
+            
+            console.log(`[TabSwitch] Switched to tab: ${newTab}`);
+          });
         }, 100);
 
         // Add components to main content

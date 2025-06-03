@@ -383,33 +383,41 @@ export default function setupIpfsApiRoutes(
           };
 
           // Save metadata directly to GunDB (bypass FileManager)
+          let gunSaveSuccess = false;
           try {
             // Get the gun instance directly from config or create connection
             let gun;
             if (fileManager && fileManager.config && fileManager.config.gun) {
               gun = fileManager.config.gun;
+              console.log('[IPFS Independent] Using existing Gun instance from FileManager');
             } else {
               // Create a minimal gun connection if FileManager is not available
               console.warn(
                 "[IPFS Independent] FileManager not available, creating direct Gun connection"
               );
-              gun = new Gun(["http://localhost:8765/gun"]); // Use default gun endpoint
+              gun = new Gun([`http://localhost:${process.env.PORT || 8765}/gun`]); // Use config port
             }
 
-            // Save to GunDB directly
+            // Save to GunDB ipfs-files collection with timeout
+            console.log(`[IPFS Independent] Attempting to save to GunDB: ${ipfsHash}`);
             await new Promise((resolve, reject) => {
+              const timeout = setTimeout(() => {
+                reject(new Error('GunDB save timeout after 5 seconds'));
+              }, 5000);
+              
               gun
                 .get("ipfs-files")
                 .get(ipfsHash)
                 .put(independentFileData, (ack) => {
+                  clearTimeout(timeout);
                   if (ack.err) {
                     console.error(
-                      `[IPFS Independent] Error saving to GunDB: ${ack.err}`
+                      `[IPFS Independent] Error saving to GunDB ipfs-files: ${ack.err}`
                     );
                     reject(new Error(ack.err));
                   } else {
                     console.log(
-                      `[IPFS Independent] Saved to GunDB: ${ipfsHash}`
+                      `[IPFS Independent] Successfully saved to GunDB ipfs-files: ${ipfsHash}`
                     );
                     resolve();
                   }
@@ -418,10 +426,16 @@ export default function setupIpfsApiRoutes(
 
             // Also save to regular files collection for compatibility
             await new Promise((resolve, reject) => {
+              const timeout = setTimeout(() => {
+                console.warn('[IPFS Independent] Timeout saving to files collection, continuing...');
+                resolve(); // Don't fail the whole operation
+              }, 3000);
+              
               gun
                 .get("files")
                 .get(ipfsHash)
                 .put(independentFileData, (ack) => {
+                  clearTimeout(timeout);
                   if (ack.err) {
                     console.warn(
                       `[IPFS Independent] Warning saving to files collection: ${ack.err}`
@@ -436,11 +450,29 @@ export default function setupIpfsApiRoutes(
                   }
                 });
             });
+            
+            gunSaveSuccess = true;
+            console.log(`[IPFS Independent] GunDB save operations completed successfully`);
+            
           } catch (gunError) {
             console.error(
               `[IPFS Independent] GunDB storage error: ${gunError.message}`
             );
-            // Continue anyway since file is on IPFS
+            gunSaveSuccess = false;
+            
+            // FALLBACK: Try to save to a local JSON file for recovery
+            try {
+              const fallbackDir = './radata/ipfs-fallback';
+              if (!fs.existsSync(fallbackDir)) {
+                fs.mkdirSync(fallbackDir, { recursive: true });
+              }
+              
+              const fallbackFile = path.join(fallbackDir, `${ipfsHash}.json`);
+              fs.writeFileSync(fallbackFile, JSON.stringify(independentFileData, null, 2));
+              console.log(`[IPFS Independent] Saved to fallback file: ${fallbackFile}`);
+            } catch (fallbackError) {
+              console.error(`[IPFS Independent] Fallback save also failed: ${fallbackError.message}`);
+            }
           }
 
           // Clean up temporary file immediately after IPFS upload
@@ -762,14 +794,24 @@ export default function setupIpfsApiRoutes(
       let gun;
       if (fileManager && fileManager.config && fileManager.config.gun) {
         gun = fileManager.config.gun;
+        console.log('[IPFS Files] Using existing Gun instance from FileManager');
       } else {
         console.warn(
           "[IPFS Independent] FileManager not available, creating direct Gun connection"
         );
-        gun = new Gun(["http://localhost:8765/gun"]);
+        gun = new Gun([`http://localhost:${process.env.PORT || 8765}/gun`]);
       }
 
+      console.log('[IPFS Files] Fetching files from GunDB...');
+      
+      // Fetch from GunDB with timeout
       await new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          console.warn('[IPFS Files] GunDB fetch timeout after 3 seconds');
+          resolve();
+        }, 3000);
+        
+        let fileCount = 0;
         gun
           .get("ipfs-files")
           .map()
@@ -791,17 +833,66 @@ export default function setupIpfsApiRoutes(
                   independent: data.independent,
                   verified: data.verified,
                   processingTime: data.processingTime,
+                  source: 'gundb'
                 });
+                fileCount++;
               }
+            }
+            
+            // Clear timeout if we get any data
+            if (fileCount === 1) {
+              clearTimeout(timeout);
+              // Give a bit more time for other files to load
+              setTimeout(resolve, 500);
             }
           });
 
-        // Give some time for Gun to return results
-        setTimeout(resolve, 1500);
+        // Fallback timeout
+        setTimeout(() => {
+          clearTimeout(timeout);
+          resolve();
+        }, 2000);
       });
+
+      console.log(`[IPFS Files] Found ${files.length} files from GunDB`);
+
+      // FALLBACK: Also check local fallback files if GunDB didn't return many results
+      try {
+        const fallbackDir = './radata/ipfs-fallback';
+        if (fs.existsSync(fallbackDir)) {
+          const fallbackFiles = fs.readdirSync(fallbackDir);
+          console.log(`[IPFS Files] Checking ${fallbackFiles.length} fallback files...`);
+          
+          for (const fallbackFile of fallbackFiles) {
+            if (fallbackFile.endsWith('.json')) {
+              try {
+                const fallbackPath = path.join(fallbackDir, fallbackFile);
+                const fallbackData = JSON.parse(fs.readFileSync(fallbackPath, 'utf8'));
+                
+                // Check if this file is already in our results from GunDB
+                const existsInGunDB = files.some(f => f.ipfsHash === fallbackData.ipfsHash);
+                
+                if (!existsInGunDB && fallbackData.independent && fallbackData.ipfsHash) {
+                  files.push({
+                    ...fallbackData,
+                    source: 'fallback'
+                  });
+                  console.log(`[IPFS Files] Added file from fallback: ${fallbackData.ipfsHash}`);
+                }
+              } catch (parseError) {
+                console.warn(`[IPFS Files] Error parsing fallback file ${fallbackFile}: ${parseError.message}`);
+              }
+            }
+          }
+        }
+      } catch (fallbackError) {
+        console.warn(`[IPFS Files] Error checking fallback files: ${fallbackError.message}`);
+      }
 
       // Sort by upload time, newest first
       files.sort((a, b) => (b.uploadedAt || 0) - (a.uploadedAt || 0));
+
+      console.log(`[IPFS Files] Returning ${files.length} total files (${files.filter(f => f.source === 'gundb').length} from GunDB, ${files.filter(f => f.source === 'fallback').length} from fallback)`);
 
       return res.json({
         success: true,
@@ -809,6 +900,11 @@ export default function setupIpfsApiRoutes(
         count: files.length,
         message: "Independent IPFS files retrieved successfully",
         source: "ipfs-direct",
+        breakdown: {
+          gundb: files.filter(f => f.source === 'gundb').length,
+          fallback: files.filter(f => f.source === 'fallback').length,
+          total: files.length
+        }
       });
     } catch (error) {
       console.error(
@@ -1127,6 +1223,109 @@ export default function setupIpfsApiRoutes(
       }
     }
   );
+
+  // API - SYNC FALLBACK FILES TO GUNDB
+  router.post("/sync-fallback", authenticateRequestMiddleware, async (req, res) => {
+    try {
+      const fallbackDir = './radata/ipfs-fallback';
+      let syncedCount = 0;
+      let errorCount = 0;
+      const results = [];
+
+      if (!fs.existsSync(fallbackDir)) {
+        return res.json({
+          success: true,
+          message: "No fallback directory found",
+          syncedCount: 0,
+          errorCount: 0,
+          results: []
+        });
+      }
+
+      // Get gun instance
+      let gun;
+      if (fileManager && fileManager.config && fileManager.config.gun) {
+        gun = fileManager.config.gun;
+      } else {
+        gun = new Gun([`http://localhost:${process.env.PORT || 8765}/gun`]);
+      }
+
+      const fallbackFiles = fs.readdirSync(fallbackDir);
+      console.log(`[IPFS Sync] Attempting to sync ${fallbackFiles.length} fallback files to GunDB...`);
+
+      for (const fallbackFile of fallbackFiles) {
+        if (fallbackFile.endsWith('.json')) {
+          try {
+            const fallbackPath = path.join(fallbackDir, fallbackFile);
+            const fallbackData = JSON.parse(fs.readFileSync(fallbackPath, 'utf8'));
+            
+            if (fallbackData.independent && fallbackData.ipfsHash) {
+              // Try to save to GunDB
+              await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                  reject(new Error('Sync timeout'));
+                }, 5000);
+                
+                gun
+                  .get("ipfs-files")
+                  .get(fallbackData.ipfsHash)
+                  .put(fallbackData, (ack) => {
+                    clearTimeout(timeout);
+                    if (ack.err) {
+                      reject(new Error(ack.err));
+                    } else {
+                      resolve();
+                    }
+                  });
+              });
+              
+              // If successful, delete the fallback file
+              fs.unlinkSync(fallbackPath);
+              syncedCount++;
+              results.push({
+                ipfsHash: fallbackData.ipfsHash,
+                name: fallbackData.originalName,
+                status: 'synced'
+              });
+              console.log(`[IPFS Sync] Synced and removed fallback: ${fallbackData.ipfsHash}`);
+              
+            } else {
+              results.push({
+                file: fallbackFile,
+                status: 'skipped',
+                reason: 'Invalid data'
+              });
+            }
+          } catch (syncError) {
+            errorCount++;
+            results.push({
+              file: fallbackFile,
+              status: 'error',
+              error: syncError.message
+            });
+            console.error(`[IPFS Sync] Error syncing ${fallbackFile}: ${syncError.message}`);
+          }
+        }
+      }
+
+      console.log(`[IPFS Sync] Sync completed: ${syncedCount} synced, ${errorCount} errors`);
+
+      return res.json({
+        success: true,
+        message: `Sync completed: ${syncedCount} files synced, ${errorCount} errors`,
+        syncedCount,
+        errorCount,
+        results
+      });
+    } catch (error) {
+      console.error(`[IPFS Sync] Error during sync: ${error.message}`);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+        message: "Error syncing fallback files"
+      });
+    }
+  });
 
   return router;
 }

@@ -21,7 +21,9 @@ import {
     deleteFile,
     checkIpfsPinStatus,
     pinFileToIpfs,
-    unpinFileFromIpfs
+    unpinFileFromIpfs,
+    deleteIpfsFile,
+    loadAllFiles
 } from './app-nodom.js';
 
 /**
@@ -380,6 +382,12 @@ export function EnhancedTabs() {
             tabEl.addEventListener('click', () => {
                 setActiveTab(tab.id);
                 tabEl.focus();
+                
+                // Emit tab changed event
+                const event = new CustomEvent('tabChanged', { 
+                    detail: { tab: tab.id, previousTab: activeTab } 
+                });
+                document.dispatchEvent(event);
             });
             
             // Keyboard navigation (keeping existing logic)
@@ -409,6 +417,12 @@ export function EnhancedTabs() {
                     case ' ':
                         e.preventDefault();
                         setActiveTab(tab.id);
+                        
+                        // Emit tab changed event
+                        const enterEvent = new CustomEvent('tabChanged', { 
+                            detail: { tab: tab.id, previousTab: activeTab } 
+                        });
+                        document.dispatchEvent(enterEvent);
                         return;
                     default:
                         return;
@@ -416,6 +430,12 @@ export function EnhancedTabs() {
                 
                 const targetTab = tabs[targetIndex];
                 setActiveTab(targetTab.id);
+                
+                // Emit tab changed event for arrow navigation
+                const arrowEvent = new CustomEvent('tabChanged', { 
+                    detail: { tab: targetTab.id, previousTab: activeTab } 
+                });
+                document.dispatchEvent(arrowEvent);
                 
                 setTimeout(() => {
                     const targetEl = document.getElementById(`tab-${targetTab.id}`);
@@ -465,6 +485,7 @@ export function FileItem(file, options = {}) {
         ipfsHash: file.ipfsHash || null,
         ipfsUrl: file.ipfsUrl || (file.ipfsHash ? `https://ipfs.io/ipfs/${file.ipfsHash}` : null),
         timestamp: parseInt(file.timestamp || file.uploadedAt || Date.now(), 10),
+        storageType: file.storageType || (file.ipfsHash ? 'ipfs-independent' : 'local-only'),
     };
     
     const uploadDate = new Date(safeFile.timestamp).toLocaleString();
@@ -497,12 +518,44 @@ export function FileItem(file, options = {}) {
         fileHeaderContent.push(h('div', { class: 'flex items-center' }, checkbox));
     }
     
+    // Enhanced storage type badge function
+    const getStorageBadge = () => {
+        switch (safeFile.storageType) {
+            case 'ipfs-independent':
+                return h('div', { class: 'badge badge-accent gap-1' }, 
+                    h('span', {}, '🌐⚡'),
+                    h('span', {}, 'Direct IPFS')
+                );
+            case 'local-with-ipfs':
+                return h('div', { class: 'badge badge-secondary gap-1' }, 
+                    h('span', {}, '🌐💾'),
+                    h('span', {}, 'Local + IPFS')
+                );
+            case 'local-only':
+                return h('div', { class: 'badge badge-outline gap-1' }, 
+                    h('span', {}, '💾'),
+                    h('span', {}, 'Local')
+                );
+            default:
+                // Fallback for legacy files
+                if (safeFile.ipfsHash) {
+                    return h('div', { class: 'badge badge-secondary gap-1' }, 
+                        h('span', {}, '🌐'),
+                        h('span', {}, 'IPFS')
+                    );
+                } else {
+                    return h('div', { class: 'badge badge-outline gap-1' }, 
+                        h('span', {}, '💾'),
+                        h('span', {}, 'Local')
+                    );
+                }
+        }
+    };
+    
     // File name and badge container
     const nameAndBadgeContainer = h('div', { class: 'flex justify-between items-start flex-1 ml-2' },
         h('h4', { class: 'card-title text-base font-medium' }, safeFile.originalName),
-        safeFile.ipfsHash 
-            ? h('div', { class: 'badge badge-secondary' }, '🌐 IPFS')
-            : h('div', { class: 'badge badge-outline' }, '💾 Local')
+        getStorageBadge()
     );
     fileHeaderContent.push(nameAndBadgeContainer);
     
@@ -633,166 +686,105 @@ export function FileItem(file, options = {}) {
     }
     
     // Action buttons
+    const actionButtons = [];
+    
+    // Different actions based on storage type
+    if (safeFile.storageType === 'ipfs-independent') {
+        // For IPFS independent files - only delete and view/download
+        if (safeFile.ipfsHash) {
+            actionButtons.push(h('button', {
+                class: 'btn btn-sm btn-outline btn-accent',
+                onclick: () => window.open(`https://ipfs.io/ipfs/${safeFile.ipfsHash}`, '_blank'),
+                title: 'View on IPFS'
+            }, '🌐 View'));
+        }
+        
+        actionButtons.push(h('button', {
+            class: 'btn btn-sm btn-outline btn-error',
+            onclick: async () => {
+                const result = await deleteIpfsFile(safeFile.ipfsHash, safeFile.originalName);
+                if (result) {
+                    // Refresh will be handled by deleteIpfsFile
+                }
+            },
+            title: 'Delete from IPFS network'
+        }, '🗑️ Delete'));
+        
+    } else {
+        // For local files (with or without IPFS backup)
+        
+        // Download button (always available for local files)
+        actionButtons.push(h('button', {
+            class: 'btn btn-sm btn-outline btn-primary',
+            onclick: () => {
+                const url = `/api/files/download/${safeFile.id}?token=${getAuthToken()}`;
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = safeFile.originalName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            },
+            title: 'Download file'
+        }, '📥 Download'));
+        
+        // IPFS actions for local files
+        if (safeFile.ipfsHash) {
+            // File is already on IPFS
+            actionButtons.push(h('button', {
+                class: 'btn btn-sm btn-outline btn-accent',
+                onclick: () => window.open(`https://ipfs.io/ipfs/${safeFile.ipfsHash}`, '_blank'),
+                title: 'View on IPFS'
+            }, '🌐 View'));
+            
+            actionButtons.push(h('button', {
+                class: 'btn btn-sm btn-outline btn-warning',
+                onclick: async () => {
+                    setIsLoading(true);
+                    try {
+                        await unpinFileFromIpfs(safeFile.id);
+                        await loadAllFiles();
+                    } finally {
+                        setIsLoading(false);
+                    }
+                },
+                title: 'Remove from IPFS (keep local copy)'
+            }, '📌 Unpin'));
+        } else {
+            // File not on IPFS yet
+            actionButtons.push(h('button', {
+                class: 'btn btn-sm btn-outline btn-secondary',
+                onclick: async () => {
+                    setIsLoading(true);
+                    try {
+                        await pinFileToIpfs(safeFile.id);
+                        await loadAllFiles();
+                    } finally {
+                        setIsLoading(false);
+                    }
+                },
+                title: 'Upload to IPFS network'
+            }, '🌐 Pin to IPFS'));
+        }
+        
+        // Delete local file
+        actionButtons.push(h('button', {
+            class: 'btn btn-sm btn-outline btn-error',
+            onclick: async () => {
+                const result = await deleteFile(safeFile.id);
+                if (result) {
+                    await loadAllFiles();
+                }
+            },
+            title: 'Delete file completely'
+        }, '🗑️ Delete'));
+    }
+    
     const actions = h('div', { class: 'card-actions justify-end gap-2 flex-wrap' });
     
-    // View file button
-    const viewUrl = safeFile.ipfsHash ? safeFile.ipfsUrl : safeFile.fileUrl;
-    if (viewUrl && viewUrl !== '#') {
-        const viewButton = h('button', { 
-            class: 'btn btn-primary btn-sm',
-            onclick: async () => {
-                // For IPFS files, open directly
-                if (safeFile.ipfsHash) {
-                    window.open(viewUrl, '_blank');
-                } else {
-                    // For local files, fetch with auth and create blob URL
-                    try {
-                        showToast('Loading file...', 'info', 2000);
-                        const response = await fetch(viewUrl, {
-                            headers: {
-                                'Authorization': `Bearer ${getAuthToken()}`
-                            }
-                        });
-                        
-                        if (response.ok) {
-                            const blob = await response.blob();
-                            const blobUrl = URL.createObjectURL(blob);
-                            
-                            // Open in new tab
-                            const newWindow = window.open(blobUrl, '_blank');
-                            
-                            // Clean up blob URL after some time
-                            setTimeout(() => {
-                                URL.revokeObjectURL(blobUrl);
-                            }, 60000); // Clean up after 1 minute
-                            
-                            if (!newWindow) {
-                                showToast('Popup blocked. Please allow popups for this site.', 'warning');
-                            }
-                        } else {
-                            throw new Error(`HTTP ${response.status}`);
-                        }
-                    } catch (error) {
-                        console.error('Error opening file:', error);
-                        showToast(`Error opening file: ${error.message}`, 'error');
-                    }
-                }
-            }
-        }, '👁️ View');
-        actions.appendChild(viewButton);
-    }
-    
-    // Upload to IPFS button (for local files only)
-    if (!safeFile.ipfsHash) {
-        const uploadToIpfsButton = h('button', { 
-            class: 'btn btn-secondary btn-sm',
-            onclick: async () => {
-                await uploadFileToIpfs(safeFile);
-            }
-        }, '🌐 Upload to IPFS');
-        actions.appendChild(uploadToIpfsButton);
-    }
-    
-    // Copy IPFS hash button (for IPFS files only)
-    if (safeFile.ipfsHash) {
-        const copyButton = h('button', { 
-            class: 'btn btn-secondary btn-sm',
-            onclick: async () => {
-                try {
-                    await navigator.clipboard.writeText(safeFile.ipfsHash);
-                    showToast('IPFS hash copied to clipboard', 'success');
-                } catch (error) {
-                    showToast(`Error copying: ${error.message}`, 'error');
-                }
-            }
-        }, '📋 Copy Hash');
-        actions.appendChild(copyButton);
-
-        // Pin/Unpin buttons for IPFS files
-        const pinButtonContainer = h('div', { class: 'flex gap-1' });
-        
-        // Check pin status and create appropriate button
-        const createPinButton = async () => {
-            try {
-                const isPinned = await checkIpfsPinStatus(safeFile.ipfsHash);
-                
-                if (isPinned) {
-                    // Unpin button
-                    const unpinButton = h('button', { 
-                        class: 'btn btn-warning btn-sm',
-                        onclick: async () => {
-                            const success = await unpinFileFromIpfs(safeFile.id, safeFile.ipfsHash);
-                            if (success) {
-                                // Recreate the pin button after successful unpin
-                                pinButtonContainer.innerHTML = '';
-                                const newPinButton = await createPinButton();
-                                pinButtonContainer.appendChild(newPinButton);
-                            }
-                        }
-                    }, '📌 Unpin');
-                    return unpinButton;
-                } else {
-                    // Pin button
-                    const pinButton = h('button', { 
-                        class: 'btn btn-success btn-sm',
-                        onclick: async () => {
-                            const success = await pinFileToIpfs(safeFile.id, safeFile.ipfsHash);
-                            if (success) {
-                                // Recreate the pin button after successful pin
-                                pinButtonContainer.innerHTML = '';
-                                const newUnpinButton = await createPinButton();
-                                pinButtonContainer.appendChild(newUnpinButton);
-                            }
-                        }
-                    }, '📍 Pin');
-                    return pinButton;
-                }
-            } catch (error) {
-                console.error('Error checking pin status:', error);
-                // Return a disabled button with error state
-                return h('button', { 
-                    class: 'btn btn-disabled btn-sm',
-                    title: 'Error checking pin status'
-                }, '❌ Pin Error');
-            }
-        };
-        
-        // Initialize pin button
-        (async () => {
-            try {
-                const pinButton = await createPinButton();
-                pinButtonContainer.appendChild(pinButton);
-            } catch (error) {
-                console.error('Error initializing pin button:', error);
-                // Add fallback disabled button
-                const fallbackButton = h('button', { 
-                    class: 'btn btn-disabled btn-sm',
-                    title: 'Failed to load pin status'
-                }, '❓ Pin Status');
-                pinButtonContainer.appendChild(fallbackButton);
-            }
-        })();
-        
-        actions.appendChild(pinButtonContainer);
-    }
-    
-    // Delete button (only show if not in batch mode to avoid confusion)
-    if (!showCheckbox) {
-        const deleteButton = h('button', { 
-            class: 'btn btn-error btn-sm',
-            onclick: async () => {
-                if (confirm(`Are you sure you want to delete "${safeFile.originalName}"?`)) {
-                    try {
-                        await deleteFile(safeFile.id);
-                        document.getElementById(`file-${safeFile.id}`)?.remove();
-                    } catch (error) {
-                        showToast(`Error deleting file: ${error.message}`, 'error');
-                    }
-                }
-            }
-        }, '🗑️ Delete');
-        actions.appendChild(deleteButton);
-    }
+    actionButtons.forEach((button) => {
+        actions.appendChild(button);
+    });
     
     cardBody.appendChild(actions);
     fileCard.appendChild(cardBody);
