@@ -15,20 +15,23 @@ import {
     getIpfsConnectionStatus,
     setIpfsConnectionStatus,
     setFiles,
+    deleteFile,
+    forceRefreshFileList,
     // Import peer management functions
     getPeers,
     getPeerConnections,
     updatePeerStatus,
-    addPeer,
-    removePeer,
-    reconnectToPeer,
     testPeerConnection,
+    reconnectToPeer,
     getNetworkStatus,
-    // Import file management functions
-    deleteFile,
-    forceRefreshFileList
+    pinFileToIpfs,
+    unpinFileFromIpfs,
+    checkIpfsPinStatus,
+    // Import toast management functions
+    getToasts,
+    setToasts
 } from './app-nodom.js';
-import { FileSearchForm, FileItem, EmptyState, LoadingState, PeerItem } from './components-nodom.js';
+import { FileSearchForm, FileItem, EmptyState, LoadingState, PeerItem, PeerItemReadOnly } from './components-nodom.js';
 
 // Global variables for files tab state management
 let selectedFiles = new Set();
@@ -1405,7 +1408,7 @@ export function NetworkTabContent() {
             
             const cardHeader = h('div', { class: 'flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6' },
                 h('div', { class: 'flex items-center gap-3' },
-                    h('h3', { class: 'text-2xl font-bold text-base-content' }, '🌐 Network & Peer Management'),
+                    h('h3', { class: 'text-2xl font-bold text-base-content' }, '🌐 Network Status & Configured Peers'),
                     networkStatusBadge
                 ),
                 h('button', { 
@@ -1435,12 +1438,12 @@ export function NetworkTabContent() {
                             h('div', { class: 'stat-figure text-primary' },
                                 h('div', { class: 'text-2xl' }, '🌐')
                             ),
-                            h('div', { class: 'stat-title' }, 'Total Peers'),
+                            h('div', { class: 'stat-title' }, 'Configured Peers'),
                             h('div', { 
                                 class: 'stat-value text-primary',
                                 id: 'total-peers-count'
                             }, getPeers().length.toString()),
-                            h('div', { class: 'stat-desc' }, 'Configured peers')
+                            h('div', { class: 'stat-desc' }, 'From config.json')
                         ),
                         h('div', { class: 'stat' },
                             h('div', { class: 'stat-figure text-success' },
@@ -1472,13 +1475,27 @@ export function NetworkTabContent() {
                 )
             );
             
-            // Add peer form
-            const addPeerCard = createAddPeerForm();
+            // Info card about peer management
+            const infoCard = h('div', { class: 'alert alert-info mb-6' },
+                h('div', { class: 'flex items-start gap-3' },
+                    h('div', { class: 'text-2xl' }, 'ℹ️'),
+                    h('div', {},
+                        h('h4', { class: 'font-bold mb-2' }, 'About Peer Configuration'),
+                        h('p', { class: 'text-sm' }, 
+                            'The peers shown below are configured in the ', 
+                            h('code', { class: 'bg-base-300 px-1 rounded' }, 'config.json'), 
+                            ' file. To add or remove peers, modify the ', 
+                            h('code', { class: 'bg-base-300 px-1 rounded' }, 'PEERS'), 
+                            ' array in the configuration file and restart the server.'
+                        )
+                    )
+                )
+            );
             
             // Peer list container
             const peerListCard = h('div', { class: 'card bg-base-200 shadow-lg' },
                 h('div', { class: 'card-body' },
-                    h('h4', { class: 'card-title mb-4' }, '🔗 Connected Peers'),
+                    h('h4', { class: 'card-title mb-4' }, '🔗 Configured Peers'),
                     h('div', { class: 'space-y-4', id: 'peer-list' })
                 )
             );
@@ -1486,7 +1503,7 @@ export function NetworkTabContent() {
             // Add these elements to tab content
             tabContent.appendChild(cardHeader);
             tabContent.appendChild(networkStatsCard);
-            tabContent.appendChild(addPeerCard);
+            tabContent.appendChild(infoCard);
             tabContent.appendChild(peerListCard);
             
             // Initialize peer list ONCE when tab becomes active
@@ -1517,82 +1534,6 @@ export function NetworkTabContent() {
         }
     });
     
-    /**
-     * Create add peer form with DaisyUI styling
-     */
-    function createAddPeerForm() {
-        const card = h('div', { class: 'card bg-base-200 shadow-lg mb-6' },
-            h('div', { class: 'card-body' },
-                h('h4', { class: 'card-title mb-4' }, '➕ Add New Peer'),
-                
-                // URL input
-                h('div', { class: 'form-control mb-4' },
-                    h('label', { class: 'label' },
-                        h('span', { class: 'label-text' }, 'Peer URL')
-                    ),
-                    h('div', { class: 'join w-full' },
-                        h('input', { 
-                            type: 'text', 
-                            id: 'peer-url-input', 
-                            placeholder: 'Enter peer URL (e.g., http://localhost:8765/gun)',
-                            class: 'input input-bordered join-item flex-1'
-                        }),
-                        h('button', { 
-                            type: 'button',
-                            class: 'btn btn-outline join-item',
-                            onclick: async () => {
-                                const url = document.getElementById('peer-url-input').value.trim();
-                                if (!url) {
-                                    showToast('Please enter a peer URL', 'warning');
-                                    return;
-                                }
-                                await testPeerConnection(url);
-                            }
-                        }, '🔍 Test'),
-                        h('button', { 
-                            type: 'button',
-                            class: 'btn btn-primary join-item',
-                            onclick: async () => {
-                                const url = document.getElementById('peer-url-input').value.trim();
-                                if (!url) {
-                                    showToast('Please enter a peer URL', 'warning');
-                                    return;
-                                }
-                                
-                                const success = await addPeer(url);
-                                if (success) {
-                                    document.getElementById('peer-url-input').value = '';
-                                    updatePeerListOnce();
-                                }
-                            }
-                        }, '➕ Add Peer')
-                    ),
-                    h('label', { class: 'label' },
-                        h('span', { class: 'label-text-alt' }, 'Enter the full URL of a Gun peer (e.g., http://peer.example.com:8765/gun)')
-                    )
-                ),
-                
-                // Preset peer buttons
-                h('div', { class: 'space-y-2' },
-                    h('div', { class: 'text-sm font-medium text-base-content/70' }, 'Quick add presets:'),
-                    h('div', { class: 'flex flex-wrap gap-2' },
-                        ['http://localhost:8765/gun', 'http://localhost:3000/gun', 'ws://localhost:8765/gun'].map(peerUrl => 
-                            h('button', {
-                                type: 'button',
-                                class: 'btn btn-outline btn-sm',
-                                onclick: () => {
-                                    document.getElementById('peer-url-input').value = peerUrl;
-                                }
-                            }, peerUrl.replace('http://', '').replace('ws://', '').split('/')[0])
-                        )
-                    )
-                )
-            )
-        );
-        
-        return card;
-    }
-    
     // Function to update peer list ONCE when tab becomes active
     function updatePeerListOnce() {
         const container = document.getElementById('peer-list');
@@ -1613,7 +1554,7 @@ export function NetworkTabContent() {
         container.innerHTML = '';
         
         if (!peers || peers.length === 0) {
-            container.appendChild(EmptyState('No peers configured. Add a peer above to get started.'));
+            container.appendChild(EmptyState('No peers configured in config.json. Add peers to the PEERS array in the configuration file.'));
             return;
         }
         
@@ -1636,9 +1577,9 @@ export function NetworkTabContent() {
             return 0;
         });
         
-        // Add each peer
+        // Add each peer (usando PeerItemReadOnly invece di PeerItem)
         enrichedPeers.forEach(peer => {
-            const peerEl = PeerItem(peer);
+            const peerEl = PeerItemReadOnly(peer);
             container.appendChild(peerEl);
         });
     }

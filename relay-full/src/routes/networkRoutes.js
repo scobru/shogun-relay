@@ -1,5 +1,22 @@
 import express from 'express';
 import { serverLogger } from '../utils/logger.js';
+import WebSocket from 'ws';
+import fs from 'fs';
+
+// Cache for config to avoid reading file multiple times
+let configCache = null;
+
+function getConfig() {
+  if (!configCache) {
+    try {
+      configCache = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
+    } catch (error) {
+      serverLogger.error('[NetworkRoutes] Failed to load config.json:', error.message);
+      configCache = { PEERS: [] };
+    }
+  }
+  return configCache;
+}
 
 /**
  * Setup network management routes
@@ -30,29 +47,55 @@ function setupNetworkRoutes(authenticateRequest, getGunInstance) {
         });
       }
 
-      // Get configured peers from Gun options
+      // Get configured peers from config.json (always include these)
+      const config = getConfig();
+      const configuredPeers = config.PEERS || [];
+      
+      // Get Gun's current peer information
       const gunOptions = gun._.opt || {};
-      const configuredPeers = Object.keys(gunOptions.peers || {});
+      const gunPeers = gunOptions.peers || {};
       
       // Create peer info structure
       const peerInfo = {};
       const peers = [];
 
-      // Process each configured peer
+      // Process configured peers from config.json (these should always be shown)
       configuredPeers.forEach(peerUrl => {
-        peers.push(peerUrl);
-        
-        // Check if peer is in Gun's peer list (indicates connection)
-        const peerData = gunOptions.peers[peerUrl];
-        const isConnected = peerData && peerData.wire && peerData.wire.readyState === 1;
-        
-        peerInfo[peerUrl] = {
-          url: peerUrl,
-          connected: isConnected,
-          status: isConnected ? 'connected' : 'disconnected',
-          lastSeen: peerData?.last || Date.now(),
-          latency: peerData?.latency || null
-        };
+        if (typeof peerUrl === 'string' && peerUrl.trim()) {
+          peers.push(peerUrl);
+          
+          // Check if peer is in Gun's peer list (indicates connection attempt/status)
+          const peerData = gunPeers[peerUrl];
+          const isConnected = peerData && peerData.wire && peerData.wire.readyState === 1;
+          
+          peerInfo[peerUrl] = {
+            url: peerUrl,
+            connected: isConnected,
+            status: isConnected ? 'connected' : 'disconnected',
+            lastSeen: peerData?.last || Date.now(),
+            latency: peerData?.latency || null,
+            source: 'config' // Mark as configured peer
+          };
+        }
+      });
+
+      // Also include any additional peers that Gun has but aren't in config
+      Object.keys(gunPeers).forEach(peerUrl => {
+        if (!peers.includes(peerUrl) && peerUrl !== 'local') {
+          peers.push(peerUrl);
+          
+          const peerData = gunPeers[peerUrl];
+          const isConnected = peerData && peerData.wire && peerData.wire.readyState === 1;
+          
+          peerInfo[peerUrl] = {
+            url: peerUrl,
+            connected: isConnected,
+            status: isConnected ? 'connected' : 'disconnected',
+            lastSeen: peerData?.last || Date.now(),
+            latency: peerData?.latency || null,
+            source: 'runtime' // Mark as runtime-added peer
+          };
+        }
       });
 
       // Add local peer info
@@ -61,7 +104,8 @@ function setupNetworkRoutes(authenticateRequest, getGunInstance) {
         connected: true,
         status: 'local',
         lastSeen: Date.now(),
-        latency: 0
+        latency: 0,
+        source: 'local'
       };
       
       peerInfo.local = localPeer;
@@ -72,10 +116,11 @@ function setupNetworkRoutes(authenticateRequest, getGunInstance) {
         peerInfo: peerInfo,
         totalPeers: peers.length,
         connectedPeers: Object.values(peerInfo).filter(p => p.connected).length,
+        configuredPeers: configuredPeers.length,
         timestamp: Date.now()
       };
 
-      serverLogger.info(`[NetworkRoutes] Returning ${peers.length} peers (${response.connectedPeers} connected)`);
+      serverLogger.info(`[NetworkRoutes] Returning ${peers.length} peers (${response.connectedPeers} connected, ${configuredPeers.length} configured)`);
       res.json(response);
 
     } catch (error) {
@@ -212,8 +257,11 @@ function setupNetworkRoutes(authenticateRequest, getGunInstance) {
    * Reconnect to a specific peer
    */
   router.post('/peers/:peerUrl/reconnect', async (req, res) => {
+    const startTime = Date.now();
+    let peerUrl;
+    
     try {
-      const peerUrl = decodeURIComponent(req.params.peerUrl);
+      peerUrl = decodeURIComponent(req.params.peerUrl);
 
       if (!peerUrl) {
         return res.status(400).json({
@@ -222,7 +270,7 @@ function setupNetworkRoutes(authenticateRequest, getGunInstance) {
         });
       }
 
-      serverLogger.info(`[NetworkRoutes] Reconnecting to peer: ${peerUrl}`);
+      serverLogger.info(`[NetworkRoutes] Attempting to reconnect to peer: ${peerUrl}`);
 
       // Get Gun instance
       const gun = getGunInstance();
@@ -233,40 +281,381 @@ function setupNetworkRoutes(authenticateRequest, getGunInstance) {
         });
       }
 
-      // Disconnect and reconnect to the peer
-      const gunOptions = gun._.opt || {};
-      if (gunOptions.peers && gunOptions.peers[peerUrl]) {
-        const peerData = gunOptions.peers[peerUrl];
-        
-        // Close existing connection if any
-        if (peerData.wire && typeof peerData.wire.close === 'function') {
-          peerData.wire.close();
-        }
-        
-        // Remove and re-add peer to force reconnection
-        delete gunOptions.peers[peerUrl];
+      // Validate URL format
+      try {
+        new URL(peerUrl);
+      } catch (urlError) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid peer URL format'
+        });
       }
 
-      // Re-add the peer to trigger reconnection
-      gun.opt({ peers: [peerUrl] });
+      // Step 1: Clean disconnect from existing peer
+      const gunOptions = gun._.opt || {};
+      let oldPeerData = null;
+      
+      if (gunOptions.peers && gunOptions.peers[peerUrl]) {
+        oldPeerData = gunOptions.peers[peerUrl];
+        
+        // Close existing connection gracefully
+        if (oldPeerData.wire) {
+          try {
+            if (typeof oldPeerData.wire.close === 'function') {
+              oldPeerData.wire.close();
+            }
+            // Also try to terminate WebSocket if it exists
+            if (oldPeerData.wire.readyState === 1) {
+              oldPeerData.wire.terminate && oldPeerData.wire.terminate();
+            }
+          } catch (closeError) {
+            serverLogger.warn(`[NetworkRoutes] Error closing existing connection to ${peerUrl}:`, closeError.message);
+          }
+        }
+        
+        // Remove peer from Gun's peer list
+        delete gunOptions.peers[peerUrl];
+        serverLogger.debug(`[NetworkRoutes] Cleaned up existing connection to: ${peerUrl}`);
+      }
 
-      // Give Gun time to attempt reconnection
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Step 2: Wait for clean disconnect
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-      serverLogger.info(`[NetworkRoutes] Reconnection initiated for peer: ${peerUrl}`);
+      // Step 3: Test connectivity before attempting reconnection
+      let testSuccessful = false;
+      try {
+        const testResult = await testPeerConnectivity(peerUrl, 3000); // 3 second timeout
+        testSuccessful = testResult.success;
+        if (!testSuccessful) {
+          serverLogger.warn(`[NetworkRoutes] Pre-connection test failed for ${peerUrl}: ${testResult.error}`);
+        }
+      } catch (testError) {
+        serverLogger.warn(`[NetworkRoutes] Pre-connection test threw error for ${peerUrl}:`, testError.message);
+      }
 
-      res.json({
-        success: true,
-        message: 'Reconnection initiated',
-        peer: peerUrl,
-        timestamp: Date.now()
-      });
+      // Step 4: Attempt reconnection with Gun
+      try {
+        // Use Gun's built-in peer management
+        gun.opt({ peers: [peerUrl] });
+        serverLogger.info(`[NetworkRoutes] Initiated Gun reconnection to: ${peerUrl}`);
+      } catch (gunError) {
+        throw new Error(`Gun reconnection failed: ${gunError.message}`);
+      }
+
+      // Step 5: Monitor connection establishment with timeout
+      const connectionTimeout = 5000; // 5 seconds
+      const checkInterval = 250; // Check every 250ms
+      const maxChecks = connectionTimeout / checkInterval;
+      let currentCheck = 0;
+      let connectionEstablished = false;
+
+      while (currentCheck < maxChecks && !connectionEstablished) {
+        await new Promise(resolve => setTimeout(resolve, checkInterval));
+        
+        const currentPeerData = (gun._.opt.peers || {})[peerUrl];
+        if (currentPeerData && currentPeerData.wire) {
+          // Check WebSocket readyState (1 = OPEN)
+          if (currentPeerData.wire.readyState === 1) {
+            connectionEstablished = true;
+            break;
+          }
+        }
+        
+        currentCheck++;
+      }
+
+      const totalTime = Date.now() - startTime;
+
+      if (connectionEstablished) {
+        serverLogger.info(`[NetworkRoutes] Successfully reconnected to peer: ${peerUrl} in ${totalTime}ms`);
+        
+        // Verify connection with a simple Gun operation
+        try {
+          const testKey = `_connection_test_${Date.now()}`;
+          await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('Verification timeout')), 2000);
+            gun.get(testKey).put({ test: true }, (ack) => {
+              clearTimeout(timeout);
+              if (ack.err) {
+                reject(new Error(`Gun verification failed: ${ack.err}`));
+              } else {
+                resolve();
+              }
+            });
+          });
+          
+          res.json({
+            success: true,
+            message: 'Peer reconnected and verified successfully',
+            peer: peerUrl,
+            status: 'connected',
+            latency: totalTime,
+            preTestPassed: testSuccessful
+          });
+        } catch (verifyError) {
+          serverLogger.warn(`[NetworkRoutes] Connection established but verification failed for ${peerUrl}: ${verifyError.message}`);
+          res.json({
+            success: true,
+            message: 'Peer reconnected but verification inconclusive',
+            peer: peerUrl,
+            status: 'connected-unverified',
+            latency: totalTime,
+            preTestPassed: testSuccessful,
+            warning: verifyError.message
+          });
+        }
+      } else {
+        serverLogger.warn(`[NetworkRoutes] Connection timeout for peer: ${peerUrl} after ${totalTime}ms`);
+        
+        // Provide more specific error message based on pre-test results
+        let errorMessage = 'Connection timeout';
+        if (!testSuccessful) {
+          errorMessage = 'Peer is unreachable - failed basic connectivity test';
+        } else {
+          errorMessage = 'Gun connection establishment timeout - peer may not support Gun protocol';
+        }
+        
+        res.json({
+          success: false,
+          message: errorMessage,
+          peer: peerUrl,
+          status: 'timeout',
+          latency: totalTime,
+          preTestPassed: testSuccessful,
+          error: errorMessage
+        });
+      }
 
     } catch (error) {
-      serverLogger.error('[NetworkRoutes] Error reconnecting to peer:', { error: error.message });
+      const totalTime = Date.now() - startTime;
+      
+      // Provide more specific error messages
+      let errorMessage = 'Unknown error';
+      let errorType = 'unknown';
+      
+      if (error.message.includes('Gun reconnection failed')) {
+        errorMessage = error.message;
+        errorType = 'gun';
+      } else if (error.message.includes('Invalid peer URL')) {
+        errorMessage = 'Invalid peer URL format';
+        errorType = 'url';
+      } else if (error.message.includes('timeout')) {
+        errorMessage = 'Connection timeout';
+        errorType = 'timeout';
+      } else if (error.message.includes('ENOTFOUND')) {
+        errorMessage = 'DNS resolution failed - hostname not found';
+        errorType = 'dns';
+      } else if (error.message.includes('ECONNREFUSED')) {
+        errorMessage = 'Connection refused - peer is not accepting connections';
+        errorType = 'refused';
+      } else if (error.message.includes('EHOSTUNREACH')) {
+        errorMessage = 'Host unreachable - network or firewall issue';
+        errorType = 'unreachable';
+      } else {
+        errorMessage = error.message || 'Unknown reconnection error';
+        errorType = 'network';
+      }
+      
+      serverLogger.error(`[NetworkRoutes] Error during peer reconnection to ${peerUrl}:`, { 
+        error: error.message, 
+        stack: error.stack,
+        duration: totalTime,
+        type: errorType
+      });
+      
       res.status(500).json({
         success: false,
-        error: 'Error reconnecting to peer: ' + error.message
+        error: errorMessage,
+        errorType: errorType,
+        peer: peerUrl || 'unknown',
+        latency: totalTime,
+        details: error.message
+      });
+    }
+  });
+
+  /**
+   * Helper function to test peer connectivity before attempting Gun connection
+   */
+  async function testPeerConnectivity(peerUrl, timeout = 3000) {
+    try {
+      let testUrl = peerUrl;
+      
+      // Convert WebSocket URLs to HTTP for testing
+      if (peerUrl.startsWith('ws://')) {
+        testUrl = peerUrl.replace('ws://', 'http://');
+      } else if (peerUrl.startsWith('wss://')) {
+        testUrl = peerUrl.replace('wss://', 'https://');
+      }
+      
+      // Ensure /gun endpoint
+      if (!testUrl.includes('/gun')) {
+        testUrl = testUrl.endsWith('/') ? testUrl + 'gun' : testUrl + '/gun';
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      try {
+        const response = await fetch(testUrl, {
+          method: 'GET',
+          signal: controller.signal,
+          headers: {
+            'Accept': '*/*',
+            'User-Agent': 'Gun-Relay-Test/1.0'
+          }
+        });
+
+        clearTimeout(timeoutId);
+        
+        // Gun relays typically return 200 or other non-5xx status
+        if (response.status < 500) {
+          return { success: true, status: response.status };
+        } else {
+          return { success: false, error: `Server error: ${response.status}` };
+        }
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        return { success: false, error: fetchError.message };
+      }
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * POST /api/network/peers/:peerUrl/test
+   * Simple test for Gun relay peers - just check if they're online
+   */
+  router.post('/peers/:peerUrl/test', async (req, res) => {
+    const rawPeerUrl = req.params.peerUrl;
+    let peerUrl;
+    try {
+      peerUrl = decodeURIComponent(rawPeerUrl);
+    } catch (e) {
+      serverLogger.error('[NetworkRoutes] Failed to decode peer URL for test:', { rawPeerUrl, error: e.message });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid peer URL format: URL encoding error' 
+      });
+    }
+
+    if (!peerUrl) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Peer URL is required for testing' 
+      });
+    }
+
+    serverLogger.info(`[NetworkRoutes] Testing Gun relay: ${peerUrl}`);
+
+    try {
+      const startTime = Date.now();
+      
+      // Simple HTTP test for Gun relays
+      let testUrl = peerUrl;
+      
+      // Convert WebSocket URLs to HTTP for testing
+      if (peerUrl.includes('/gun')) {
+        // Already has /gun endpoint
+        testUrl = peerUrl.replace('ws://', 'http://').replace('wss://', 'https://');
+      } else {
+        // Add /gun endpoint for testing
+        const baseUrl = peerUrl.replace('ws://', 'http://').replace('wss://', 'https://');
+        testUrl = baseUrl.endsWith('/') ? baseUrl + 'gun' : baseUrl + '/gun';
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // Increased timeout
+
+      try {
+        const response = await fetch(testUrl, {
+          method: 'GET', // Use GET instead of HEAD to get Gun response
+          signal: controller.signal,
+          headers: {
+            'Accept': '*/*',
+            'User-Agent': 'Gun-Relay-Test/1.0'
+          }
+        });
+
+        clearTimeout(timeoutId);
+        const latency = Date.now() - startTime;
+
+        // Gun relays typically return various status codes but if they respond, they're online
+        if (response.status < 500) { // Accept anything except server errors
+          serverLogger.info(`[NetworkRoutes] Gun relay test successful: ${peerUrl} (${latency}ms, status: ${response.status})`);
+          res.json({ 
+            success: true, 
+            message: `Gun relay is online (HTTP ${response.status})`,
+            method: 'HTTP',
+            latency: latency,
+            status: response.status,
+            testUrl: testUrl
+          });
+        } else {
+          const errorMsg = `Server error: HTTP ${response.status}`;
+          serverLogger.warn(`[NetworkRoutes] Gun relay test failed: ${peerUrl} - ${errorMsg}`);
+          res.json({ 
+            success: false, 
+            error: errorMsg,
+            method: 'HTTP',
+            latency: latency,
+            status: response.status,
+            testUrl: testUrl
+          });
+        }
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        const latency = Date.now() - startTime;
+        
+        // Provide more specific error messages
+        let errorMessage = 'Unknown connection error';
+        let errorType = 'network';
+        
+        if (fetchError.name === 'AbortError') {
+          errorMessage = 'Connection timeout - peer may be offline or unreachable';
+          errorType = 'timeout';
+        } else if (fetchError.message.includes('ENOTFOUND')) {
+          errorMessage = 'DNS resolution failed - hostname not found';
+          errorType = 'dns';
+        } else if (fetchError.message.includes('ECONNREFUSED')) {
+          errorMessage = 'Connection refused - peer is not accepting connections';
+          errorType = 'refused';
+        } else if (fetchError.message.includes('EHOSTUNREACH')) {
+          errorMessage = 'Host unreachable - network or firewall issue';
+          errorType = 'unreachable';
+        } else if (fetchError.message.includes('certificate')) {
+          errorMessage = 'SSL certificate error - invalid or expired certificate';
+          errorType = 'ssl';
+        } else {
+          errorMessage = `Network error: ${fetchError.message}`;
+          errorType = 'network';
+        }
+        
+        serverLogger.warn(`[NetworkRoutes] Gun relay test failed: ${peerUrl} (${latency}ms) - ${errorMessage}`, {
+          error: fetchError.message,
+          type: errorType,
+          testUrl: testUrl
+        });
+        
+        res.json({ 
+          success: false, 
+          error: errorMessage,
+          errorType: errorType,
+          method: 'HTTP',
+          latency: latency,
+          testUrl: testUrl,
+          details: fetchError.message
+        });
+      }
+
+    } catch (err) {
+      serverLogger.error(`[NetworkRoutes] Error testing Gun relay ${peerUrl}:`, { error: err.message });
+      res.status(500).json({ 
+        success: false, 
+        error: `Test failed: ${err.message}`,
+        method: 'HTTP',
+        details: err.stack
       });
     }
   });

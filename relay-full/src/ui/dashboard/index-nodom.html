@@ -90,6 +90,7 @@
         handleLogout,
         initTheme,
         initializeFileEventListeners,
+        initializePeers,
       } from "./app-nodom.js";
       import {
         Header,
@@ -249,6 +250,7 @@
             updateServerStatus(),
             loadFiles(),
             updateIpfsStatus(),
+            initializePeers(),
           ]);
 
           console.log("Data refresh complete");
@@ -303,6 +305,7 @@
             updateServerStatus(),
             loadFiles(),
             updateIpfsStatus(),
+            initializePeers(),
           ]);
 
           // Render app

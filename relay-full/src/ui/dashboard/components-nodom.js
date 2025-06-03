@@ -549,6 +549,103 @@ export function FileItem(file, options = {}) {
         class: showCheckbox ? 'flex items-start mb-2' : 'flex justify-between items-start mb-2'
     }, ...fileHeaderContent);
     
+    // Add image preview if it's an image file
+    if (safeFile.mimetype && safeFile.mimetype.startsWith('image/')) {
+        const previewUrl = safeFile.ipfsUrl || safeFile.fileUrl;
+        if (previewUrl && previewUrl !== '#') {
+            // Create a container for the image preview
+            const imageContainer = h('div', {
+                class: 'my-3 flex justify-center'
+            });
+            
+            // For local files (protected), we need to fetch with auth and create a blob URL
+            if (!safeFile.ipfsUrl && safeFile.fileUrl) {
+                // This is a local file, fetch it with authentication
+                const imagePreview = h('div', {
+                    class: 'loading loading-spinner loading-md',
+                    style: 'max-width: 150px; max-height: 150px;'
+                });
+                imageContainer.appendChild(imagePreview);
+                
+                // Fetch the image with authentication and create blob URL
+                (async () => {
+                    try {
+                        const response = await fetch(previewUrl, {
+                            headers: {
+                                'Authorization': `Bearer ${getAuthToken()}`
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            const blob = await response.blob();
+                            const blobUrl = URL.createObjectURL(blob);
+                            
+                            const imgElement = h('img', {
+                                src: blobUrl,
+                                alt: `Preview of ${safeFile.originalName}`,
+                                class: 'rounded object-cover',
+                                style: 'max-width: 150px; max-height: 150px;',
+                                onload: () => {
+                                    // Replace loading spinner with actual image
+                                    imageContainer.innerHTML = '';
+                                    imageContainer.appendChild(imgElement);
+                                },
+                                onerror: () => {
+                                    // Replace loading spinner with error message
+                                    imageContainer.innerHTML = '';
+                                    const errorMsg = h('div', {
+                                        class: 'text-error text-sm'
+                                    }, '❌ Preview failed');
+                                    imageContainer.appendChild(errorMsg);
+                                    console.warn(`Failed to load preview for ${safeFile.originalName}`);
+                                }
+                            });
+                            
+                            // Add the image to container so it starts loading
+                            // The onload event will handle replacing the loading spinner
+                            imageContainer.appendChild(imgElement);
+                            
+                            // Clean up blob URL after some time to free memory
+                            setTimeout(() => {
+                                URL.revokeObjectURL(blobUrl);
+                            }, 60000); // Clean up after 1 minute
+                            
+                        } else {
+                            throw new Error(`HTTP ${response.status}`);
+                        }
+                    } catch (error) {
+                        // Replace loading spinner with error message
+                        imageContainer.innerHTML = '';
+                        const errorMsg = h('div', {
+                            class: 'text-error text-sm'
+                        }, '❌ Preview failed');
+                        imageContainer.appendChild(errorMsg);
+                        console.warn(`Failed to load preview for ${safeFile.originalName}: ${error.message}`);
+                    }
+                })();
+            } else {
+                // For IPFS files, we can use the URL directly since they're public
+                const imagePreview = h('img', {
+                    src: previewUrl,
+                    alt: `Preview of ${safeFile.originalName}`,
+                    class: 'rounded object-cover',
+                    style: 'max-width: 150px; max-height: 150px;',
+                    onerror: (e) => { 
+                        e.target.style.display = 'none';
+                        const errorMsg = h('div', {
+                            class: 'text-error text-sm'
+                        }, '❌ Preview failed');
+                        imageContainer.appendChild(errorMsg);
+                        console.warn(`Failed to load IPFS preview for ${safeFile.originalName} from ${previewUrl}`);
+                    }
+                });
+                imageContainer.appendChild(imagePreview);
+            }
+            
+            cardBody.appendChild(imageContainer);
+        }
+    }
+    
     // File metadata
     const fileMeta = h('div', { class: 'text-sm text-base-content/70 mb-3' },
         `${formatFileSize(safeFile.size)} • ${safeFile.mimetype}`,
@@ -557,6 +654,7 @@ export function FileItem(file, options = {}) {
     );
     
     cardBody.appendChild(fileHeader);
+    
     cardBody.appendChild(fileMeta);
     
     // IPFS info if available
@@ -581,7 +679,44 @@ export function FileItem(file, options = {}) {
     if (viewUrl && viewUrl !== '#') {
         const viewButton = h('button', { 
             class: 'btn btn-primary btn-sm',
-            onclick: () => window.open(viewUrl, '_blank')
+            onclick: async () => {
+                // For IPFS files, open directly
+                if (safeFile.ipfsHash) {
+                    window.open(viewUrl, '_blank');
+                } else {
+                    // For local files, fetch with auth and create blob URL
+                    try {
+                        showToast('Loading file...', 'info', 2000);
+                        const response = await fetch(viewUrl, {
+                            headers: {
+                                'Authorization': `Bearer ${getAuthToken()}`
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            const blob = await response.blob();
+                            const blobUrl = URL.createObjectURL(blob);
+                            
+                            // Open in new tab
+                            const newWindow = window.open(blobUrl, '_blank');
+                            
+                            // Clean up blob URL after some time
+                            setTimeout(() => {
+                                URL.revokeObjectURL(blobUrl);
+                            }, 60000); // Clean up after 1 minute
+                            
+                            if (!newWindow) {
+                                showToast('Popup blocked. Please allow popups for this site.', 'warning');
+                            }
+                        } else {
+                            throw new Error(`HTTP ${response.status}`);
+                        }
+                    } catch (error) {
+                        console.error('Error opening file:', error);
+                        showToast(`Error opening file: ${error.message}`, 'error');
+                    }
+                }
+            }
         }, '👁️ View');
         actions.appendChild(viewButton);
     }
@@ -911,8 +1046,14 @@ export function PeerItem(peer) {
         class: 'btn btn-outline btn-sm',
         onclick: async () => {
             const result = await testPeerConnection(safePeer.url);
-            if (result.success) {
-                showToast(`Connection test successful: ${result.latency}ms`, 'success');
+            if (result && result.success) {
+                const method = result.method || 'unknown';
+                const latency = result.latency || 'unknown';
+                showToast(`✅ Connection test successful via ${method} (${latency}ms)`, 'success');
+            } else {
+                const error = result?.error || 'Unknown error';
+                const method = result?.method || 'unknown';
+                showToast(`❌ Connection test failed via ${method}: ${error}`, 'error');
             }
         }
     }, '🔍 Test');
@@ -939,6 +1080,97 @@ export function PeerItem(peer) {
         }
     }, '🗑️ Remove');
     actions.appendChild(removeButton);
+    
+    cardBody.appendChild(actions);
+    peerCard.appendChild(cardBody);
+    
+    return peerCard;
+}
+
+/**
+ * Read-only peer item component (no remove button)
+ * Shows configured peers from config.json with test and reconnect options only
+ */
+export function PeerItemReadOnly(peer) {
+    if (!peer || typeof peer !== 'object') {
+        console.error('Invalid peer object:', peer);
+        return h('div', { class: 'alert alert-error' }, 'Invalid peer data');
+    }
+    
+    const safePeer = {
+        url: peer.url || peer.peer || 'Unknown URL',
+        connected: peer.connected || false,
+        status: peer.status || 'unknown',
+        latency: peer.latency || null,
+        lastSeen: peer.lastSeen || null
+    };
+    
+    // Create peer card
+    const peerCard = h('div', { 
+        class: `card bg-base-200 shadow-md mb-4 ${safePeer.connected ? 'border-l-4 border-success' : 'border-l-4 border-error'}`,
+        id: `peer-${btoa(safePeer.url)}`,
+        'data-url': safePeer.url
+    });
+    
+    const cardBody = h('div', { class: 'card-body p-4' });
+    
+    // Peer header with config badge
+    const peerHeader = h('div', { class: 'flex justify-between items-start mb-2' },
+        h('div', { class: 'flex flex-col gap-2' },
+            h('h4', { class: 'card-title text-base font-medium break-all' }, safePeer.url),
+            h('div', { class: 'flex gap-2' },
+                h('div', { 
+                    class: `badge ${safePeer.connected ? 'badge-success' : 'badge-error'}`
+                }, safePeer.connected ? '🟢 Connected' : '🔴 Disconnected'),
+                h('div', { 
+                    class: 'badge badge-info'
+                }, '⚙️ Configured')
+            )
+        )
+    );
+    
+    // Peer metadata
+    const peerMeta = h('div', { class: 'text-sm text-base-content/70 mb-3' },
+        `Status: ${safePeer.status}`,
+        safePeer.latency ? ` • Latency: ${safePeer.latency}ms` : '',
+        safePeer.lastSeen ? h('br') : '',
+        safePeer.lastSeen ? `Last seen: ${new Date(safePeer.lastSeen).toLocaleString()}` : ''
+    );
+    
+    cardBody.appendChild(peerHeader);
+    cardBody.appendChild(peerMeta);
+    
+    // Action buttons (senza Remove)
+    const actions = h('div', { class: 'card-actions justify-end gap-2' });
+    
+    // Test connection button
+    const testButton = h('button', { 
+        class: 'btn btn-outline btn-sm',
+        onclick: async () => {
+            const result = await testPeerConnection(safePeer.url);
+            if (result && result.success) {
+                const method = result.method || 'unknown';
+                const latency = result.latency || 'unknown';
+                showToast(`✅ Connection test successful via ${method} (${latency}ms)`, 'success');
+            } else {
+                const error = result?.error || 'Unknown error';
+                const method = result?.method || 'unknown';
+                showToast(`❌ Connection test failed via ${method}: ${error}`, 'error');
+            }
+        }
+    }, '🔍 Test');
+    actions.appendChild(testButton);
+    
+    // Reconnect button (only if disconnected)
+    if (!safePeer.connected) {
+        const reconnectButton = h('button', { 
+            class: 'btn btn-warning btn-sm',
+            onclick: async () => {
+                await reconnectToPeer(safePeer.url);
+            }
+        }, '🔄 Reconnect');
+        actions.appendChild(reconnectButton);
+    }
     
     cardBody.appendChild(actions);
     peerCard.appendChild(cardBody);

@@ -507,6 +507,16 @@ const globalUploadTracker = {
 };
 
 /**
+ * Enhanced token validation middleware that supports both system and user tokens
+ * @param {Object} req - Express request
+ * @param {Object} res - Express response
+ * @param {Function} next - Next middleware
+ */
+const authenticateRequest = async (req, res, next) => {
+  return AuthenticationManager.authenticateRequest(req, res, next);
+};
+
+/**
  * Starts the unified relay server
  * Initializes IPFS, configures middleware, and sets up WebSocket handlers
  * @returns {Promise<void>}
@@ -554,6 +564,36 @@ async function startServer() {
     // Initialize Gun first
     gun = new Gun(gunOptions);
     gunLogger.info("GunDB initialized. ✅");
+
+    // Force Gun to actively connect to configured peers
+    if (CONFIG.PEERS && Array.isArray(CONFIG.PEERS) && CONFIG.PEERS.length > 0) {
+      gunLogger.info(`[Gun] Attempting to connect to ${CONFIG.PEERS.length} configured peers...`);
+      
+      // Force Gun to opt into each peer to establish connections
+      CONFIG.PEERS.forEach((peerUrl, index) => {
+        if (typeof peerUrl === 'string' && peerUrl.trim()) {
+          gunLogger.info(`[Gun] Connecting to peer ${index + 1}/${CONFIG.PEERS.length}: ${peerUrl}`);
+          try {
+            gun.opt({ peers: [peerUrl] });
+          } catch (error) {
+            gunLogger.warn(`[Gun] Failed to connect to peer ${peerUrl}:`, error.message);
+          }
+        }
+      });
+
+      // Give Gun a moment to process peer connections
+      setTimeout(() => {
+        const connectedPeers = Object.keys(gun._.opt.peers || {});
+        gunLogger.info(`[Gun] Peer connection status: ${connectedPeers.length} peers in Gun's peer list`);
+        connectedPeers.forEach(peer => {
+          const peerData = gun._.opt.peers[peer];
+          const status = peerData && peerData.wire && peerData.wire.readyState === 1 ? 'connected' : 'connecting';
+          gunLogger.info(`[Gun]   - ${peer}: ${status}`);
+        });
+      }, 2000);
+    } else {
+      gunLogger.info("[Gun] No peers configured in CONFIG.PEERS");
+    }
 
     // Debug middleware is already handled in Gun.on("opt") above
     // Removed duplicate debug middleware to avoid conflicts
@@ -1128,18 +1168,94 @@ if (!fs.existsSync(LOGS_DIR)) {
 // Middlewares
 app.use(express.json({ limit: "500mb" }));
 app.use(express.urlencoded({ extended: true, limit: "500mb" }));
-app.use("/uploads", express.static(STORAGE_DIR));
-app.use(Gun.serve);
+// Remove unsecured static file serving
+// app.use("/uploads", express.static(STORAGE_DIR));
 
-/**
- * Enhanced token validation middleware that supports both system and user tokens
- * @param {Object} req - Express request
- * @param {Object} res - Express response
- * @param {Function} next - Next middleware
- */
-const authenticateRequest = async (req, res, next) => {
-  return AuthenticationManager.authenticateRequest(req, res, next);
-};
+// Add protected file serving endpoint
+app.get("/uploads/:filename", authenticateRequest, (req, res) => {
+  try {
+    const filename = req.params.filename;
+    
+    // Validate filename to prevent directory traversal attacks
+    if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid filename"
+      });
+    }
+    
+    const filePath = path.join(STORAGE_DIR, filename);
+    
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        error: "File not found"
+      });
+    }
+    
+    // Get file stats
+    const stats = fs.statSync(filePath);
+    if (!stats.isFile()) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid file"
+      });
+    }
+    
+    // Determine content type based on file extension
+    const ext = path.extname(filename).toLowerCase();
+    const mimeTypes = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.pdf': 'application/pdf',
+      '.txt': 'text/plain',
+      '.html': 'text/html',
+      '.css': 'text/css',
+      '.js': 'application/javascript',
+      '.json': 'application/json',
+      '.mp4': 'video/mp4',
+      '.mp3': 'audio/mpeg',
+      '.wav': 'audio/wav'
+    };
+    
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
+    
+    // Set appropriate headers
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Length', stats.size);
+    res.setHeader('Cache-Control', 'private, max-age=3600'); // Cache for 1 hour but mark as private
+    
+    // Log the file access
+    serverLogger.info(`[FileAccess] User accessed file: ${filename} (${contentType})`);
+    
+    // Stream the file
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+    
+    fileStream.on('error', (error) => {
+      serverLogger.error(`[FileAccess] Error streaming file ${filename}:`, { error: error.message });
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: "Error reading file"
+        });
+      }
+    });
+    
+  } catch (error) {
+    serverLogger.error(`[FileAccess] Error serving file:`, { error: error.message });
+    res.status(500).json({
+      success: false,
+      error: "Internal server error"
+    });
+  }
+});
+
+app.use(Gun.serve);
 
 // API - STATUS CORS
 app.get("/api/status", (req, res) => {

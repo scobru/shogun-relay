@@ -462,106 +462,129 @@ export function formatFileSize(bytes) {
  * Show toast notification with spam protection
  */
 export function showToast(message, type = "info", duration = 5000) {
-  const id = Date.now();
-  const newToast = { id, message, type, timestamp: Date.now() };
-
-  // Sistema anti-spam per errori
-  if (type === 'error') {
-    const now = Date.now();
-    const lastTime = lastErrorToastTime.get(message) || 0;
-    
-    if (now - lastTime < errorToastCooldown) {
-      console.log(`Toast error spam blocked: ${message}`);
-      return id; // Non mostrare il toast se è troppo recente
-    }
-    
-    lastErrorToastTime.set(message, now);
-  }
-
   try {
-    // Get current toasts from localStorage
+    // Get current toasts from localStorage - ensure it's always an array
     let currentToasts = [];
-    const storedToasts = localStorage.getItem("app-toasts");
-    if (storedToasts && storedToasts !== "undefined" && storedToasts.trim() !== "") {
-      try {
-        currentToasts = JSON.parse(storedToasts);
-        // Ensure it's an array
-        if (!Array.isArray(currentToasts)) {
-          currentToasts = [];
-        }
-      } catch (parseError) {
-        console.warn("Error parsing stored toasts, resetting:", parseError);
-        currentToasts = [];
-        localStorage.removeItem("app-toasts");
+    try {
+      const storedToasts = localStorage.getItem("app-toasts");
+      if (storedToasts && storedToasts !== "undefined" && storedToasts.trim() !== "") {
+        const parsed = JSON.parse(storedToasts);
+        currentToasts = Array.isArray(parsed) ? parsed : [];
       }
+    } catch (parseError) {
+      console.warn("Error parsing stored toasts in showToast, resetting:", parseError);
+      localStorage.removeItem("app-toasts");
+      currentToasts = [];
     }
 
-    // Limita il numero massimo di toast a 5
-    if (currentToasts.length >= 5) {
-      currentToasts = currentToasts.slice(-4); // Mantieni solo gli ultimi 4
+    // Create toast object
+    const toast = {
+      id: Date.now() + Math.random(),
+      message,
+      type,
+      timestamp: Date.now(),
+    };
+
+    // Prevent spam for similar error messages within a short timeframe
+    const recentSimilarToast = currentToasts.find(
+      (t) =>
+        t.message === message &&
+        Date.now() - t.timestamp < 2000 && // Within 2 seconds
+        t.type === type
+    );
+
+    if (recentSimilarToast && type === "error") {
+      console.log("Toast error spam blocked:", message);
+      return; // Don't show duplicate error messages quickly
+    }
+
+    // Remove old toasts (keep only last 10)
+    if (currentToasts.length >= 10) {
+      currentToasts = currentToasts.slice(-9); // Keep last 9, add 1 new = 10 total
     }
 
     // Add new toast
-    currentToasts.push(newToast);
+    currentToasts.push(toast);
 
-    // Save to localStorage (not GunDB)
+    // Ensure we always pass an array to setToasts
+    if (!Array.isArray(currentToasts)) {
+      console.error("Current toasts is not an array, resetting:", currentToasts);
+      currentToasts = [toast];
+    }
+
+    // Update localStorage and state
     localStorage.setItem("app-toasts", JSON.stringify(currentToasts));
-
-    // Update state (without storing in GunDB)
     _setToasts(currentToasts);
 
-    // Auto-remove toast after duration
+    // Auto-remove after duration
     if (duration > 0) {
       setTimeout(() => {
-        removeToast(id);
+        removeToast(toast.id);
       }, duration);
     }
-  } catch (err) {
-    console.error("Error in showToast:", err);
-    // Fallback: clear localStorage and try again with clean state
+  } catch (error) {
+    console.error("Error in showToast:", error);
+    // Fallback: try to show a basic toast
     try {
-      localStorage.removeItem("app-toasts");
-      localStorage.setItem("app-toasts", JSON.stringify([newToast]));
-      _setToasts([newToast]);
-    } catch (fallbackErr) {
-      console.error("Error in showToast fallback:", fallbackErr);
+      const fallbackToast = {
+        id: Date.now(),
+        message: message || "Unknown message",
+        type: type || "info",
+        timestamp: Date.now(),
+      };
+      localStorage.setItem("app-toasts", JSON.stringify([fallbackToast]));
+      _setToasts([fallbackToast]);
+      
+      if (duration > 0) {
+        setTimeout(() => {
+          removeToast(fallbackToast.id);
+        }, duration);
+      }
+    } catch (fallbackError) {
+      console.error("Critical error in toast fallback:", fallbackError);
     }
   }
-
-  return id;
 }
 
-/**
- * Remove a toast by ID
- */
 function removeToast(id) {
   try {
-    // Get current toasts from localStorage
+    // Get current toasts from localStorage - ensure it's always an array
     let currentToasts = [];
-    const storedToasts = localStorage.getItem("app-toasts");
-    if (storedToasts && storedToasts !== "undefined" && storedToasts.trim() !== "") {
-      try {
-        currentToasts = JSON.parse(storedToasts);
-        if (!Array.isArray(currentToasts)) {
-          currentToasts = [];
-        }
-      } catch (parseError) {
-        console.warn("Error parsing stored toasts in removeToast, resetting:", parseError);
-        currentToasts = [];
-        localStorage.removeItem("app-toasts");
+    try {
+      const storedToasts = localStorage.getItem("app-toasts");
+      if (storedToasts && storedToasts !== "undefined" && storedToasts.trim() !== "") {
+        const parsed = JSON.parse(storedToasts);
+        currentToasts = Array.isArray(parsed) ? parsed : [];
       }
+    } catch (parseError) {
+      console.warn("Error parsing stored toasts in removeToast, resetting:", parseError);
+      localStorage.removeItem("app-toasts");
+      currentToasts = [];
     }
 
     // Filter out the toast with the given ID
-    const updatedToasts = currentToasts.filter((toast) => toast.id !== id);
+    const updatedToasts = currentToasts.filter((toast) => toast && toast.id !== id);
 
-    // Save to localStorage
+    // Ensure we always pass an array
+    if (!Array.isArray(updatedToasts)) {
+      console.error("Updated toasts is not an array, resetting:", updatedToasts);
+      localStorage.setItem("app-toasts", JSON.stringify([]));
+      _setToasts([]);
+      return;
+    }
+
+    // Save to localStorage and update state
     localStorage.setItem("app-toasts", JSON.stringify(updatedToasts));
-
-    // Update state
     _setToasts(updatedToasts);
   } catch (err) {
     console.error("Error in removeToast:", err);
+    // Fallback: clear all toasts
+    try {
+      localStorage.setItem("app-toasts", JSON.stringify([]));
+      _setToasts([]);
+    } catch (fallbackError) {
+      console.error("Critical error in removeToast fallback:", fallbackError);
+    }
   }
 }
 
@@ -1231,6 +1254,7 @@ export async function removePeer(peerUrl) {
 export async function reconnectToPeer(peerUrl) {
   try {
     setIsLoading(true);
+    showToast(`🔄 Reconnecting to peer: ${peerUrl}`, "info");
 
     const response = await fetch(
       `/api/network/peers/${encodeURIComponent(peerUrl)}/reconnect`,
@@ -1239,31 +1263,78 @@ export async function reconnectToPeer(peerUrl) {
         headers: {
           Authorization: `Bearer ${getAuthToken()}`,
         },
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(20000), // Increased timeout for reconnection
       }
     );
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`HTTP ${response.status}: Server error`);
     }
 
     const data = await response.json();
 
     if (data.success) {
-      showToast(`Reconnecting to peer: ${peerUrl}`, "info");
+      const latencyInfo = data.latency ? ` (${data.latency}ms)` : '';
+      const preTestInfo = data.preTestPassed ? ' ✅' : data.preTestPassed === false ? ' ⚠️' : '';
+      
+      switch (data.status) {
+        case 'connected':
+          showToast(`✅ Successfully reconnected to peer${latencyInfo}${preTestInfo}`, "success");
+          break;
+        case 'connected-unverified':
+          showToast(`🟡 Reconnected but verification inconclusive${latencyInfo}${preTestInfo}`, "warning");
+          if (data.warning) {
+            console.warn(`Verification warning for ${peerUrl}:`, data.warning);
+          }
+          break;
+        default:
+          showToast(`🔄 Reconnection initiated${latencyInfo}${preTestInfo}`, "info");
+      }
 
-      // Wait a moment then update status
+      // Wait a moment then update peer status
       setTimeout(() => {
         updatePeerStatus();
       }, 2000);
 
       return true;
     } else {
-      throw new Error(data.error || "Unknown error");
+      // Handle failure case with detailed error from backend
+      const errorMsg = data.error || "Unknown reconnection error";
+      const latencyInfo = data.latency ? ` (${data.latency}ms)` : '';
+      const errorTypeInfo = data.errorType ? ` [${data.errorType}]` : '';
+      
+      // Provide user-friendly messages based on error type
+      let userMessage = errorMsg;
+      if (data.errorType === 'timeout') {
+        userMessage = "Connection timeout - peer may be offline or overloaded";
+      } else if (data.errorType === 'dns') {
+        userMessage = "DNS resolution failed - check the peer hostname";
+      } else if (data.errorType === 'refused') {
+        userMessage = "Connection refused - peer is not accepting connections";
+      } else if (data.errorType === 'unreachable') {
+        userMessage = "Host unreachable - network or firewall issue";
+      } else if (data.errorType === 'ssl') {
+        userMessage = "SSL certificate error - peer has invalid certificates";
+      }
+      
+      throw new Error(`${userMessage}${latencyInfo}${errorTypeInfo}`);
     }
   } catch (error) {
-    console.error(`Error reconnecting to peer: ${error.message}`);
-    showToast(`Failed to reconnect to peer: ${error.message}`, "error");
+    console.error(`Error reconnecting to peer:`, error);
+    
+    // Provide more helpful error messages
+    let userMessage = error.message;
+    if (error.name === 'AbortError' || error.message.includes('timeout')) {
+      userMessage = "Reconnection timeout - peer may be offline or unreachable";
+    } else if (error.message.includes('NetworkError') || error.message.includes('fetch')) {
+      userMessage = "Network error - check your internet connection";
+    } else if (error.message.includes('HTTP 500')) {
+      userMessage = "Server error during reconnection - please try again";
+    } else if (error.message.includes('HTTP 400')) {
+      userMessage = "Invalid peer URL format";
+    }
+    
+    showToast(`❌ Failed to reconnect: ${userMessage}`, "error");
     return false;
   } finally {
     setIsLoading(false);
@@ -1276,7 +1347,7 @@ export async function reconnectToPeer(peerUrl) {
 export async function testPeerConnection(peerUrl) {
   try {
     setIsLoading(true);
-    showToast(`Testing connection to: ${peerUrl}`, "info");
+    showToast(`🔍 Testing connection to: ${peerUrl}`, "info");
 
     const response = await fetch(
       `/api/network/peers/${encodeURIComponent(peerUrl)}/test`,
@@ -1290,22 +1361,60 @@ export async function testPeerConnection(peerUrl) {
     );
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`HTTP ${response.status}: Server error`);
     }
 
     const data = await response.json();
 
     if (data.success) {
-      showToast(`✅ Connection test successful: ${peerUrl}`, "success");
-      return true;
+      const latencyInfo = data.latency ? ` (${data.latency}ms)` : '';
+      const methodInfo = data.method ? ` via ${data.method}` : '';
+      showToast(`✅ Connection test successful${latencyInfo}${methodInfo}`, "success");
+      return {
+        success: true,
+        method: data.method,
+        latency: data.latency,
+        status: data.status,
+        message: data.message
+      };
     } else {
-      showToast(`❌ Connection test failed: ${data.error || "Unknown error"}`, "error");
-      return false;
+      // Use specific error message from backend
+      const errorMsg = data.error || "Unknown connection error";
+      const latencyInfo = data.latency ? ` (${data.latency}ms)` : '';
+      const methodInfo = data.method ? ` via ${data.method}` : '';
+      
+      showToast(`❌ Connection test failed${methodInfo}: ${errorMsg}${latencyInfo}`, "error");
+      return {
+        success: false,
+        error: errorMsg,
+        errorType: data.errorType,
+        method: data.method,
+        latency: data.latency,
+        details: data.details
+      };
     }
   } catch (error) {
-    console.error(`Error testing peer connection: ${error.message}`);
-    showToast(`❌ Connection test failed: ${error.message}`, "error");
-    return false;
+    console.error(`Error testing peer connection:`, error);
+    
+    // Provide more helpful error messages
+    let userMessage = error.message;
+    if (error.name === 'AbortError' || error.message.includes('timeout')) {
+      userMessage = "Test timeout - peer may be offline or unreachable";
+    } else if (error.message.includes('NetworkError') || error.message.includes('fetch')) {
+      userMessage = "Network error - check your internet connection";
+    } else if (error.message.includes('HTTP 500')) {
+      userMessage = "Server error - please try again later";
+    } else if (error.message.includes('HTTP 400')) {
+      userMessage = "Invalid peer URL format";
+    }
+    
+    showToast(`❌ Connection test failed: ${userMessage}`, "error");
+    return {
+      success: false,
+      error: userMessage,
+      method: 'client-error',
+      originalError: error.message
+    };
   } finally {
     setIsLoading(false);
   }
@@ -1604,36 +1713,7 @@ export {
   forceRefreshFileList
 };
 
-// Alias functions for compatibility
-function getToasts() {
-  try {
-    const storedToasts = localStorage.getItem("app-toasts");
-    if (!storedToasts || storedToasts === "undefined" || storedToasts.trim() === "") {
-      return [];
-    }
-    const parsed = JSON.parse(storedToasts);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (err) {
-    console.error("Error getting toasts:", err);
-    // Clear corrupted data
-    localStorage.removeItem("app-toasts");
-    return [];
-  }
-}
-
-function setToasts(toasts) {
-  try {
-    if (!Array.isArray(toasts)) {
-      console.warn("setToasts called with non-array:", toasts);
-      toasts = [];
-    }
-    localStorage.setItem("app-toasts", JSON.stringify(toasts));
-    _setToasts(toasts);
-  } catch (err) {
-    console.error("Error setting toasts:", err);
-  }
-}
-
+// Internal file management functions (not exported)
 function getFiles() {
   try {
     const storedFiles = localStorage.getItem("files-data");
@@ -1660,6 +1740,36 @@ function setFiles(files) {
     _setFiles(files);
   } catch (err) {
     console.error("Error setting files:", err);
+  }
+}
+
+// Internal toast management functions (not exported separately - use the ones from export above)
+function getToasts() {
+  try {
+    const storedToasts = localStorage.getItem("app-toasts");
+    if (!storedToasts || storedToasts === "undefined" || storedToasts.trim() === "") {
+      return [];
+    }
+    const parsed = JSON.parse(storedToasts);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.error("Error getting toasts:", err);
+    // Clear corrupted data
+    localStorage.removeItem("app-toasts");
+    return [];
+  }
+}
+
+function setToasts(toasts) {
+  try {
+    if (!Array.isArray(toasts)) {
+      console.warn("setToasts called with non-array:", toasts);
+      toasts = [];
+    }
+    localStorage.setItem("app-toasts", JSON.stringify(toasts));
+    _setToasts(toasts);
+  } catch (err) {
+    console.error("Error setting toasts:", err);
   }
 }
 
@@ -1827,3 +1937,170 @@ window.forceFileRefresh = async function() {
         return false;
     }
 };
+
+/**
+ * Initialize peer status and load configured peers from server
+ */
+export async function initializePeers() {
+  try {
+    console.log('[Peers] Initializing peer connections...');
+    
+    // Update peer status to get the current configured peers
+    await updatePeerStatus();
+    
+    const peers = getPeers();
+    console.log(`[Peers] Loaded ${peers.length} configured peers:`, peers);
+    
+    if (peers.length > 0) {
+      showToast(`🌐 Loaded ${peers.length} configured Gun relays`, 'info', 3000);
+      
+      // Validate peer configuration and provide suggestions
+      const validation = validatePeerConfiguration(peers);
+      if (validation.warnings.length > 0) {
+        console.warn('[Peers] Configuration warnings:', validation.warnings);
+        validation.warnings.forEach(warning => {
+          showToast(`⚠️ ${warning}`, 'warning', 8000);
+        });
+      }
+      if (validation.suggestions.length > 0) {
+        console.info('[Peers] Configuration suggestions:', validation.suggestions);
+      }
+      
+      // Initialize peer monitoring system
+      await initializePeerMonitoring();
+    } else {
+      console.log('[Peers] No peers configured in server config');
+      showToast('⚠️ No peers configured - running in offline mode', 'warning', 5000);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('[Peers] Failed to initialize peers:', error);
+    showToast('❌ Failed to load peer configuration', 'error');
+    return false;
+  }
+}
+
+/**
+ * Initialize peer monitoring system
+ */
+export async function initializePeerMonitoring() {
+  try {
+    // Get current peer status
+    await updatePeerStatus();
+    
+    // Set up periodic peer health checks
+    setInterval(async () => {
+      try {
+        await checkPeerHealth();
+      } catch (error) {
+        console.warn('Peer health check failed:', error);
+      }
+    }, 30000); // Check every 30 seconds
+    
+    console.log('[Peers] Peer monitoring system initialized');
+  } catch (error) {
+    console.error('[Peers] Failed to initialize peer monitoring:', error);
+  }
+}
+
+/**
+ * Check health of all configured peers
+ */
+async function checkPeerHealth() {
+  try {
+    const response = await fetch('/api/network/status', {
+      headers: {
+        Authorization: `Bearer ${getAuthToken()}`,
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (data.peers && Array.isArray(data.peers)) {
+      const disconnectedPeers = data.peers.filter(peer => !peer.connected);
+      
+      // If we have disconnected peers, try to reconnect to them
+      if (disconnectedPeers.length > 0) {
+        console.log(`[Peers] Found ${disconnectedPeers.length} disconnected peers`);
+        
+        // Don't spam reconnections - only try once every few minutes
+        const now = Date.now();
+        const reconnectInterval = 5 * 60 * 1000; // 5 minutes
+        
+        for (const peer of disconnectedPeers) {
+          const lastReconnectKey = `last_reconnect_${btoa(peer.url || peer.peer)}`;
+          const lastReconnect = parseInt(localStorage.getItem(lastReconnectKey) || '0');
+          
+          if (now - lastReconnect > reconnectInterval) {
+            console.log(`[Peers] Auto-reconnecting to ${peer.url || peer.peer}`);
+            localStorage.setItem(lastReconnectKey, now.toString());
+            
+            // Don't await - let it run in background
+            reconnectToPeer(peer.url || peer.peer).catch(error => {
+              console.warn(`[Peers] Auto-reconnect failed for ${peer.url || peer.peer}:`, error.message);
+            });
+          }
+        }
+      }
+    }
+  } catch (error) {
+    // Don't log as error - health checks can fail normally
+    console.debug('[Peers] Health check failed:', error.message);
+  }
+}
+
+/**
+ * Validate and suggest improvements for peer configuration
+ */
+export function validatePeerConfiguration(peers) {
+  const suggestions = [];
+  const warnings = [];
+  
+  if (!peers || peers.length === 0) {
+    warnings.push('No peers configured - the application will work offline only');
+    suggestions.push('Add at least one reliable peer for data synchronization');
+    return { suggestions, warnings };
+  }
+  
+  // Check for peer diversity
+  const domains = new Set();
+  const protocols = new Set();
+  
+  peers.forEach(peer => {
+    try {
+      const url = new URL(peer.url || peer);
+      domains.add(url.hostname);
+      protocols.add(url.protocol);
+    } catch (error) {
+      warnings.push(`Invalid peer URL: ${peer.url || peer}`);
+    }
+  });
+  
+  if (domains.size === 1) {
+    suggestions.push('Consider adding peers from different domains for better redundancy');
+  }
+  
+  if (protocols.size === 1) {
+    const protocol = Array.from(protocols)[0];
+    if (protocol === 'ws:') {
+      suggestions.push('Consider adding HTTPS/WSS peers for secure connections');
+    }
+  }
+  
+  if (peers.length === 1) {
+    suggestions.push('Add more peers for better network resilience');
+  }
+  
+  if (peers.length > 10) {
+    warnings.push('Too many peers may cause performance issues');
+    suggestions.push('Consider reducing to 3-5 reliable peers');
+  }
+  
+  return { suggestions, warnings };
+}
