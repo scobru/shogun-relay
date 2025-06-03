@@ -1,6 +1,12 @@
 // Restricted Gun server
+import { Gun, SEA } from "./min";
+import "gun/lib/then";
+import "gun/lib/radix";
+import "gun/lib/radisk";
+import "gun/lib/store";
+import "gun/lib/rindexed";
+import "gun/lib/webrtc";
 
-import Gun from "gun";
 import fs from "fs";
 import path from "path";
 import { createServer } from "http";
@@ -123,6 +129,7 @@ if (
     secretAccessKey: CONFIG.S3_SECRET_ACCESS_KEY,
     endpoint: CONFIG.S3_ENDPOINT || "http://0.0.0.0:4569",
     s3ForcePathStyle: true,
+    // override config
     address: CONFIG.S3_ADDRESS || "0.0.0.0",
     port: CONFIG.S3_PORT || 4569,
     key: CONFIG.S3_ACCESS_KEY_ID,

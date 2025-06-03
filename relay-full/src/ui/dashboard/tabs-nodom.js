@@ -17,21 +17,17 @@ import {
     setFiles,
     deleteFile,
     forceRefreshFileList,
-    // Import peer management functions
-    getPeers,
-    getPeerConnections,
-    updatePeerStatus,
-    testPeerConnection,
-    reconnectToPeer,
-    getNetworkStatus,
     pinFileToIpfs,
     unpinFileFromIpfs,
     checkIpfsPinStatus,
     // Import toast management functions
     getToasts,
-    setToasts
+    setToasts,
+    // Import peer functions
+    getPeers,
+    loadPeersFromConfig
 } from './app-nodom.js';
-import { FileSearchForm, FileItem, EmptyState, LoadingState, PeerItem, PeerItemReadOnly } from './components-nodom.js';
+import { FileSearchForm, FileItem, EmptyState, LoadingState } from './components-nodom.js';
 
 // Global variables for files tab state management
 let selectedFiles = new Set();
@@ -1319,15 +1315,31 @@ export function SettingsTabContent() {
         // Peers Configuration
         const peersCard = h('div', { class: 'card bg-base-200 shadow-lg mb-6' },
             h('div', { class: 'card-body' },
-                h('h4', { class: 'card-title text-lg mb-4' }, '🌐 Configured Peers'),
+                h('h4', { class: 'card-title text-lg mb-4' }, '🌐 Configured Relay Peers'),
                 h('div', { class: 'space-y-2' },
                     ...(currentConfig.PEERS && currentConfig.PEERS.length > 0 ? 
                         currentConfig.PEERS.map(peer => 
-                            h('div', { class: 'alert alert-info text-sm' },
-                                h('span', { class: 'font-mono' }, peer)
+                            h('div', { class: 'card bg-base-300 shadow-sm' },
+                                h('div', { class: 'card-body p-4' },
+                                    h('div', { class: 'flex justify-between items-center' },
+                                        h('div', {},
+                                            h('p', { class: 'font-mono text-sm break-all' }, peer),
+                                            h('div', { class: 'flex gap-2 mt-2' },
+                                                h('div', { class: 'badge badge-info badge-sm' }, '⚙️ Configured'),
+                                                h('div', { class: 'badge badge-neutral badge-sm' }, '🔗 Relay')
+                                            )
+                                        ),
+                                        h('div', { class: 'text-2xl opacity-50' }, '📡')
+                                    )
+                                )
                             )
                         ) : 
-                        [h('div', { class: 'alert alert-warning' }, 'No peers configured')]
+                        [h('div', { class: 'alert alert-warning' }, 
+                            h('div', { class: 'flex items-center gap-2' },
+                                h('span', {}, '⚠️'),
+                                h('span', {}, 'No relay peers configured. Add peers to the PEERS array in config.json to enable peer-to-peer connectivity.')
+                            )
+                        )]
                     )
                 )
             )
@@ -1366,223 +1378,10 @@ export function SettingsTabContent() {
         if (isActive && Object.keys(currentConfig).length === 0) {
             // Load configuration when tab becomes active for the first time
             loadConfiguration();
+            // Also load peers from server configuration
+            loadPeersFromConfig();
         }
     });
-    
-    return tabContent;
-}
-
-/**
- * Network Tab Content Component
- */
-export function NetworkTabContent() {
-    const tabContent = h('div', { 
-        id: 'network-tab', 
-        class: 'tab-content',
-        style: 'display: none;' 
-    });
-    
-    setEffect(() => {
-        const isActive = getActiveTab() === 'network';
-        tabContent.style.display = isActive ? 'block' : 'none';
-        
-        if (isActive && !networkTabActive) {
-            networkTabActive = true;
-            
-            // Clear any existing timeout
-            if (networkUpdateTimeout) {
-                clearTimeout(networkUpdateTimeout);
-                networkUpdateTimeout = null;
-            }
-            
-            tabContent.innerHTML = '';
-            
-            // Card header with network status
-            const networkStatus = getNetworkStatus();
-            const networkStatusBadge = h('div', { 
-                class: `badge ${networkStatus.peerCount > 1 ? 'badge-success' : 'badge-warning'} gap-2`
-            }, 
-                h('span', {}, networkStatus.peerCount > 1 ? '🟢' : '🟡'),
-                h('span', {}, `${networkStatus.peerCount} Peers`)
-            );
-            
-            const cardHeader = h('div', { class: 'flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6' },
-                h('div', { class: 'flex items-center gap-3' },
-                    h('h3', { class: 'text-2xl font-bold text-base-content' }, '🌐 Network Status & Configured Peers'),
-                    networkStatusBadge
-                ),
-                h('button', { 
-                    id: 'refresh-network',
-                    class: 'btn btn-primary btn-sm',
-                    onclick: () => {
-                        // Debounce the refresh to avoid multiple calls
-                        if (networkUpdateTimeout) {
-                            clearTimeout(networkUpdateTimeout);
-                        }
-                        
-                        networkUpdateTimeout = setTimeout(() => {
-                            updatePeerStatus();
-                            showToast('🔄 Refreshing network status...', 'info');
-                            networkUpdateTimeout = null;
-                        }, 500);
-                    }
-                }, '🔄 Refresh Network')
-            );
-            
-            // Network statistics (static content to avoid reactive loops)
-            const networkStatsCard = h('div', { class: 'card bg-base-200 shadow-lg mb-6' },
-                h('div', { class: 'card-body' },
-                    h('h4', { class: 'card-title mb-4' }, '📊 Network Statistics'),
-                    h('div', { class: 'stats stats-horizontal w-full' },
-                        h('div', { class: 'stat' },
-                            h('div', { class: 'stat-figure text-primary' },
-                                h('div', { class: 'text-2xl' }, '🌐')
-                            ),
-                            h('div', { class: 'stat-title' }, 'Configured Peers'),
-                            h('div', { 
-                                class: 'stat-value text-primary',
-                                id: 'total-peers-count'
-                            }, getPeers().length.toString()),
-                            h('div', { class: 'stat-desc' }, 'From config.json')
-                        ),
-                        h('div', { class: 'stat' },
-                            h('div', { class: 'stat-figure text-success' },
-                                h('div', { class: 'text-2xl' }, '✅')
-                            ),
-                            h('div', { class: 'stat-title' }, 'Connected'),
-                            h('div', { 
-                                class: 'stat-value text-success',
-                                id: 'connected-peers-count'
-                            }, (() => {
-                                const connections = getPeerConnections();
-                                const connected = Object.values(connections).filter(conn => conn.connected);
-                                return connected.length.toString();
-                            })()),
-                            h('div', { class: 'stat-desc' }, 'Active connections')
-                        ),
-                        h('div', { class: 'stat' },
-                            h('div', { class: 'stat-figure text-info' },
-                                h('div', { class: 'text-2xl' }, '📡')
-                            ),
-                            h('div', { class: 'stat-title' }, 'Status'),
-                            h('div', { 
-                                class: 'stat-value text-info text-sm',
-                                id: 'network-status-text'
-                            }, networkStatus.status),
-                            h('div', { class: 'stat-desc' }, 'Network state')
-                        )
-                    )
-                )
-            );
-            
-            // Info card about peer management
-            const infoCard = h('div', { class: 'alert alert-info mb-6' },
-                h('div', { class: 'flex items-start gap-3' },
-                    h('div', { class: 'text-2xl' }, 'ℹ️'),
-                    h('div', {},
-                        h('h4', { class: 'font-bold mb-2' }, 'About Peer Configuration'),
-                        h('p', { class: 'text-sm' }, 
-                            'The peers shown below are configured in the ', 
-                            h('code', { class: 'bg-base-300 px-1 rounded' }, 'config.json'), 
-                            ' file. To add or remove peers, modify the ', 
-                            h('code', { class: 'bg-base-300 px-1 rounded' }, 'PEERS'), 
-                            ' array in the configuration file and restart the server.'
-                        )
-                    )
-                )
-            );
-            
-            // Peer list container
-            const peerListCard = h('div', { class: 'card bg-base-200 shadow-lg' },
-                h('div', { class: 'card-body' },
-                    h('h4', { class: 'card-title mb-4' }, '🔗 Configured Peers'),
-                    h('div', { class: 'space-y-4', id: 'peer-list' })
-                )
-            );
-            
-            // Add these elements to tab content
-            tabContent.appendChild(cardHeader);
-            tabContent.appendChild(networkStatsCard);
-            tabContent.appendChild(infoCard);
-            tabContent.appendChild(peerListCard);
-            
-            // Initialize peer list ONCE when tab becomes active
-            updatePeerListOnce();
-            
-            // Update peer status ONCE with debouncing
-            if (networkUpdateTimeout) {
-                clearTimeout(networkUpdateTimeout);
-            }
-            
-            networkUpdateTimeout = setTimeout(() => {
-                updatePeerStatus().then(() => {
-                    updatePeerListOnce();
-                    networkUpdateTimeout = null;
-                });
-            }, 1000);
-        }
-        
-        // Reset flag when tab becomes inactive
-        if (!isActive && networkTabActive) {
-            networkTabActive = false;
-            
-            // Clear any pending timeouts
-            if (networkUpdateTimeout) {
-                clearTimeout(networkUpdateTimeout);
-                networkUpdateTimeout = null;
-            }
-        }
-    });
-    
-    // Function to update peer list ONCE when tab becomes active
-    function updatePeerListOnce() {
-        const container = document.getElementById('peer-list');
-        if (!container) return;
-        
-        const peers = getPeers();
-        const peerConnections = getPeerConnections();
-        const isLoading = getIsLoading();
-        
-        // Show loading state
-        if (isLoading) {
-            container.innerHTML = '';
-            container.appendChild(LoadingState('Loading peers...'));
-            return;
-        }
-        
-        // Clear container
-        container.innerHTML = '';
-        
-        if (!peers || peers.length === 0) {
-            container.appendChild(EmptyState('No peers configured in config.json. Add peers to the PEERS array in the configuration file.'));
-            return;
-        }
-        
-        // Combine peer data with connection info
-        const enrichedPeers = peers.map(peerUrl => {
-            const connectionInfo = peerConnections[peerUrl] || {};
-            return {
-                url: peerUrl,
-                connected: connectionInfo.connected || false,
-                status: connectionInfo.status || 'unknown',
-                latency: connectionInfo.latency || null,
-                lastSeen: connectionInfo.lastSeen || null
-            };
-        });
-        
-        // Sort by connection status (connected first)
-        enrichedPeers.sort((a, b) => {
-            if (a.connected && !b.connected) return -1;
-            if (!a.connected && b.connected) return 1;
-            return 0;
-        });
-        
-        // Add each peer (usando PeerItemReadOnly invece di PeerItem)
-        enrichedPeers.forEach(peer => {
-            const peerEl = PeerItemReadOnly(peer);
-            container.appendChild(peerEl);
-        });
-    }
     
     return tabContent;
 }

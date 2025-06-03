@@ -6,6 +6,7 @@ import fs from "fs";
 import express from "express";
 import { RelayVerifier } from "shogun-core";
 import Gun from "gun";
+import "gun/lib/verify.js";
 import path from "path";
 import http from "http";
 
@@ -27,7 +28,7 @@ import setupAuthRoutes from "./routes/authRoutes.js"; // Import the new auth rou
 import setupIpfsApiRoutes from "./routes/ipfsApiRoutes.js"; // Import the new IPFS router setup function
 import setupRelayApiRoutes from "./routes/relayApiRoutes.js"; // Import the new relay router setup function
 import setupFileManagerRoutes from "./routes/fileManagerRoutes.js"; // Import the new File Manager router setup function
-import setupNetworkRoutes from "./routes/networkRoutes.js"; // Import the new Network router setup function
+import setupGatewayRoutes from "./routes/gatewayRoutes.js"; // Import the new Gateway router setup function
 import {
   initializeShogunCore,
   getInitializedShogunCore,
@@ -152,12 +153,14 @@ function reloadConfigurationFromFile() {
     const configPath = path.join(__dirname, "config.json");
     const configData = fs.readFileSync(configPath, "utf8");
     const newConfig = JSON.parse(configData);
-    
+
     // Update the global CONFIG object
     Object.assign(CONFIG, newConfig);
-    
-    serverLogger.info("[Server] Configuration reloaded from file successfully ✅");
-    
+
+    serverLogger.info(
+      "[Server] Configuration reloaded from file successfully ✅"
+    );
+
     // Update IPFS manager if it exists
     if (ipfsManager) {
       try {
@@ -166,17 +169,20 @@ function reloadConfigurationFromFile() {
           service: CONFIG.IPFS_SERVICE || "IPFS-CLIENT",
           nodeUrl: CONFIG.IPFS_NODE_URL || "http://127.0.0.1:5001",
           gateway: CONFIG.IPFS_GATEWAY || "http://127.0.0.1:8080/ipfs",
-          pinataGateway: CONFIG.PINATA_GATEWAY || "https://gateway.pinata.cloud",
+          pinataGateway:
+            CONFIG.PINATA_GATEWAY || "https://gateway.pinata.cloud",
           pinataJwt: CONFIG.PINATA_JWT || "",
         });
-        serverLogger.info("[Server] IPFS Manager reloaded with new configuration ✅");
+        serverLogger.info(
+          "[Server] IPFS Manager reloaded with new configuration ✅"
+        );
       } catch (ipfsError) {
         serverLogger.error("[Server] Error reloading IPFS Manager:", {
           error: ipfsError.message,
         });
       }
     }
-    
+
     // Update type validation configuration
     try {
       const { updateValidationConfig } = require("./utils/typeValidation.js");
@@ -190,7 +196,7 @@ function reloadConfigurationFromFile() {
         error: validationError.message,
       });
     }
-    
+
     return { success: true, message: "Configuration reloaded successfully" };
   } catch (error) {
     serverLogger.error("[Server] Error reloading configuration:", {
@@ -310,24 +316,16 @@ function hasValidToken(msg) {
   if (msg && msg.put) {
     const keys = Object.keys(msg.put);
     // Allow user authentication messages (they start with ~@)
-    if (keys.some(key => key.startsWith('~@'))) {
+    if (keys.some((key) => key.startsWith("~@"))) {
       console.log("WRITING - User authentication message allowed");
       return true;
     }
     // Allow user data messages (they contain user pub keys)
-    if (keys.some(key => key.match(/^~[A-Za-z0-9_\-\.]+$/))) {
+    if (keys.some((key) => key.match(/^~[A-Za-z0-9_\-\.]+$/))) {
       console.log("WRITING - User data message allowed");
       return true;
     }
   }
-
-  console.log("🔍 Token validation for message:", {
-    hasHeaders: !!(msg && msg.headers),
-    hasToken: !!(msg && msg.token),
-    headerToken: msg?.headers?.token ? msg.headers.token.substring(0, 10) + '...' : 'none',
-    directToken: msg?.token ? msg.token.substring(0, 10) + '...' : 'none',
-    expectedToken: SECRET_TOKEN ? SECRET_TOKEN.substring(0, 10) + '...' : 'none'
-  });
 
   const valid =
     (msg &&
@@ -336,15 +334,8 @@ function hasValidToken(msg) {
       msg.headers.token === SECRET_TOKEN) ||
     (msg && msg.token && msg.token === SECRET_TOKEN);
 
-  if (valid) {
-    console.log("WRITING - Valid token found");
-  } else {
-    console.log("❌ Token validation failed");
-  }
-
   return valid;
 }
-
 
 Gun.on("opt", function (ctx) {
   if (ctx.once) {
@@ -354,18 +345,13 @@ Gun.on("opt", function (ctx) {
   // Add outgoing token injection for this instance
   ctx.on("out", function (msg) {
     const to = this.to;
-    
+
     // Always add token to outgoing messages from server
     if (!msg.headers) msg.headers = {};
     msg.headers.token = SECRET_TOKEN;
     msg.token = SECRET_TOKEN;
     msg.headers.Authorization = `Bearer ${SECRET_TOKEN}`;
-    
-    console.log("📤 Adding token to outgoing message:", {
-      type: msg.put ? 'PUT' : msg.get ? 'GET' : 'OTHER',
-      hasToken: !!msg.token
-    });
-    
+
     to.next(msg);
   });
 
@@ -380,27 +366,23 @@ Gun.on("opt", function (ctx) {
     }
 
     // Check if Gun authentication is disabled in config
-    if (CONFIG.DISABLE_GUN_AUTH === true || CONFIG.DISABLE_GUN_AUTH === "true") {
-      console.log("⚠️ Gun authentication disabled - allowing all PUT operations");
+    if (
+      CONFIG.DISABLE_GUN_AUTH === true ||
+      CONFIG.DISABLE_GUN_AUTH === "true"
+    ) {
+      console.log(
+        "⚠️ Gun authentication disabled - allowing all PUT operations"
+      );
       to.next(msg);
       return;
     }
 
     // For PUT operations, apply token validation logic
     if (hasValidToken(msg)) {
-      console.log(
-        "WRITING - Valid token found",
-        JSON.stringify(msg).slice(0, 100) + "..."
-      );
       to.next(msg);
       return;
     }
 
-    // Block everything else
-    console.log(
-      "BLOCKED - PUT without valid token:",
-      JSON.stringify(msg.put).slice(0, 100) + "..."
-    );
     // Don't forward unauthorized puts
   });
 });
@@ -411,7 +393,13 @@ let gunOptions = {
   peers: CONFIG.PEERS,
   localStorage: false,
   radisk: true,
-  file: 'data.json'
+  file: "data.json",
+  verify: {
+    check: function () {
+      console.log("PEER CONNECTED");
+      return true;
+    },
+  },
 };
 
 // Add S3 configuration if available in CONFIG
@@ -462,48 +450,52 @@ const globalUploadTracker = {
   activeUploads: new Map(), // requestId -> upload info
   completedUploads: new Map(), // requestId -> completion info
   maxHistory: 100, // Keep last 100 uploads for debugging
-  
-  startUpload: function(requestId, uploadInfo) {
+
+  startUpload: function (requestId, uploadInfo) {
     this.activeUploads.set(requestId, {
       ...uploadInfo,
-      startTime: Date.now()
+      startTime: Date.now(),
     });
-    
-    console.log(`[GlobalTracker] Started upload: ${requestId} for file: ${uploadInfo.filename}`);
+
+    console.log(
+      `[GlobalTracker] Started upload: ${requestId} for file: ${uploadInfo.filename}`
+    );
   },
-  
-  completeUpload: function(requestId, result) {
+
+  completeUpload: function (requestId, result) {
     const uploadInfo = this.activeUploads.get(requestId);
     if (uploadInfo) {
       const completionInfo = {
         ...uploadInfo,
         result: result,
         endTime: Date.now(),
-        duration: Date.now() - uploadInfo.startTime
+        duration: Date.now() - uploadInfo.startTime,
       };
-      
+
       this.activeUploads.delete(requestId);
       this.completedUploads.set(requestId, completionInfo);
-      
+
       // Keep only the last maxHistory uploads
       if (this.completedUploads.size > this.maxHistory) {
         const oldestKey = this.completedUploads.keys().next().value;
         this.completedUploads.delete(oldestKey);
       }
-      
-      console.log(`[GlobalTracker] Completed upload: ${requestId} in ${completionInfo.duration}ms`);
+
+      console.log(
+        `[GlobalTracker] Completed upload: ${requestId} in ${completionInfo.duration}ms`
+      );
     }
   },
-  
-  getStatus: function() {
+
+  getStatus: function () {
     return {
       activeUploads: Array.from(this.activeUploads.entries()),
       completedUploads: Array.from(this.completedUploads.entries()),
       recentUploadIds: Array.from(recentUploadIds.entries()),
       contentBasedUploads: Array.from(contentBasedUploads.keys()),
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
-  }
+  },
 };
 
 /**
@@ -524,6 +516,57 @@ const authenticateRequest = async (req, res, next) => {
 async function startServer() {
   try {
     serverLogger.info("Starting unified relay server... 🚀");
+
+    // CORS Configuration - MUST BE FIRST
+    app.use(
+      cors({
+        origin: function (origin, callback) {
+          // Allow requests without origin (like mobile apps or curl)
+          if (!origin) return callback(null, true);
+
+          // Check if CORS restrictions are disabled via environment variable
+          if (
+            CONFIG.DISABLE_CORS === true ||
+            CONFIG.DISABLE_CORS === "true" ||
+            process.env.DISABLE_CORS === "true"
+          ) {
+            serverLogger.info(
+              `CORS restrictions disabled - allowing all origins`
+            );
+            return callback(null, true);
+          }
+
+          // Enable all origins in development mode
+          if (CONFIG.NODE_ENV === "development") {
+            return callback(null, true);
+          }
+
+          if (getCurrentAllowedOrigins().indexOf(origin) !== -1) {
+            callback(null, true);
+          } else {
+            serverLogger.warn(`Origin blocked by CORS: ${origin}`);
+            callback(null, false);
+          }
+        },
+        credentials: true,
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allowedHeaders: [
+          "Content-Type",
+          "Authorization",
+          "X-Requested-With",
+          "token",
+        ],
+      })
+    );
+
+    // Create logs directory if it doesn't exist
+    if (!fs.existsSync(LOGS_DIR)) {
+      fs.mkdirSync(LOGS_DIR, { recursive: true });
+    }
+
+    // Essential middlewares - MUST BE BEFORE ROUTES
+    app.use(express.json({ limit: "500mb" }));
+    app.use(express.urlencoded({ extended: true, limit: "500mb" }));
 
     // Configure the AuthenticationManager with our variables
     configure({
@@ -566,17 +609,30 @@ async function startServer() {
     gunLogger.info("GunDB initialized. ✅");
 
     // Force Gun to actively connect to configured peers
-    if (CONFIG.PEERS && Array.isArray(CONFIG.PEERS) && CONFIG.PEERS.length > 0) {
-      gunLogger.info(`[Gun] Attempting to connect to ${CONFIG.PEERS.length} configured peers...`);
-      
+    if (
+      CONFIG.PEERS &&
+      Array.isArray(CONFIG.PEERS) &&
+      CONFIG.PEERS.length > 0
+    ) {
+      gunLogger.info(
+        `[Gun] Attempting to connect to ${CONFIG.PEERS.length} configured peers...`
+      );
+
       // Force Gun to opt into each peer to establish connections
       CONFIG.PEERS.forEach((peerUrl, index) => {
-        if (typeof peerUrl === 'string' && peerUrl.trim()) {
-          gunLogger.info(`[Gun] Connecting to peer ${index + 1}/${CONFIG.PEERS.length}: ${peerUrl}`);
+        if (typeof peerUrl === "string" && peerUrl.trim()) {
+          gunLogger.info(
+            `[Gun] Connecting to peer ${index + 1}/${
+              CONFIG.PEERS.length
+            }: ${peerUrl}`
+          );
           try {
             gun.opt({ peers: [peerUrl] });
           } catch (error) {
-            gunLogger.warn(`[Gun] Failed to connect to peer ${peerUrl}:`, error.message);
+            gunLogger.warn(
+              `[Gun] Failed to connect to peer ${peerUrl}:`,
+              error.message
+            );
           }
         }
       });
@@ -584,10 +640,15 @@ async function startServer() {
       // Give Gun a moment to process peer connections
       setTimeout(() => {
         const connectedPeers = Object.keys(gun._.opt.peers || {});
-        gunLogger.info(`[Gun] Peer connection status: ${connectedPeers.length} peers in Gun's peer list`);
-        connectedPeers.forEach(peer => {
+        gunLogger.info(
+          `[Gun] Peer connection status: ${connectedPeers.length} peers in Gun's peer list`
+        );
+        connectedPeers.forEach((peer) => {
           const peerData = gun._.opt.peers[peer];
-          const status = peerData && peerData.wire && peerData.wire.readyState === 1 ? 'connected' : 'connecting';
+          const status =
+            peerData && peerData.wire && peerData.wire.readyState === 1
+              ? "connected"
+              : "connecting";
           gunLogger.info(`[Gun]   - ${peer}: ${status}`);
         });
       }, 2000);
@@ -629,7 +690,6 @@ async function startServer() {
     );
     app.use("/api/auth", authRouter); // THIS LINE SHOULD BE BEFORE app.use("/api", authenticateRequest)
 
-
     function createProxyMiddleware(target, changeOrigin, pathRewrite) {
       return createProxyMiddleware({
         target,
@@ -644,6 +704,9 @@ async function startServer() {
       authenticateRequest
     );
     app.use("/api/ipfs", ipfsApiRouter);
+
+    const gatewayRouter = setupGatewayRoutes(CONFIG, serverLogger);
+    app.use("/gateway", gatewayRouter);
 
     // Set up relay API routes
     const relayApiRouter = setupRelayApiRoutes(
@@ -664,14 +727,186 @@ async function startServer() {
     );
     app.use("/files", fileManagerRouter);
 
-    // Set up network management routes
-    const networkRouter = setupNetworkRoutes(
-      authenticateRequest,
-      () => gun // Provide function to get Gun instance
-    );
-    app.use("/api/network", networkRouter);
-
     app.set("gun", gun);
+
+    // Add Gun.serve middleware
+    app.use(Gun.serve);
+
+    // Add protected file serving endpoint
+    app.get("/uploads/:filename", authenticateRequest, (req, res) => {
+      try {
+        const filename = req.params.filename;
+
+        // Validate filename to prevent directory traversal attacks
+        if (
+          !filename ||
+          filename.includes("..") ||
+          filename.includes("/") ||
+          filename.includes("\\")
+        ) {
+          return res.status(400).json({
+            success: false,
+            error: "Invalid filename",
+          });
+        }
+
+        const filePath = path.join(STORAGE_DIR, filename);
+
+        // Check if file exists
+        if (!fs.existsSync(filePath)) {
+          return res.status(404).json({
+            success: false,
+            error: "File not found",
+          });
+        }
+
+        // Get file stats
+        const stats = fs.statSync(filePath);
+        if (!stats.isFile()) {
+          return res.status(400).json({
+            success: false,
+            error: "Invalid file",
+          });
+        }
+
+        // Determine content type based on file extension
+        const ext = path.extname(filename).toLowerCase();
+        const mimeTypes = {
+          ".jpg": "image/jpeg",
+          ".jpeg": "image/jpeg",
+          ".png": "image/png",
+          ".gif": "image/gif",
+          ".webp": "image/webp",
+          ".pdf": "application/pdf",
+          ".txt": "text/plain",
+          ".html": "text/html",
+          ".css": "text/css",
+          ".js": "application/javascript",
+          ".json": "application/json",
+          ".mp4": "video/mp4",
+          ".mp3": "audio/mpeg",
+          ".wav": "audio/wav",
+        };
+
+        const contentType = mimeTypes[ext] || "application/octet-stream";
+
+        // Set appropriate headers
+        res.setHeader("Content-Type", contentType);
+        res.setHeader("Content-Length", stats.size);
+        res.setHeader("Cache-Control", "private, max-age=3600"); // Cache for 1 hour but mark as private
+
+        // Log the file access
+        serverLogger.info(
+          `[FileAccess] User accessed file: ${filename} (${contentType})`
+        );
+
+        // Stream the file
+        const fileStream = fs.createReadStream(filePath);
+        fileStream.pipe(res);
+
+        fileStream.on("error", (error) => {
+          serverLogger.error(`[FileAccess] Error streaming file ${filename}:`, {
+            error: error.message,
+          });
+          if (!res.headersSent) {
+            res.status(500).json({
+              success: false,
+              error: "Error reading file",
+            });
+          }
+        });
+      } catch (error) {
+        serverLogger.error(`[FileAccess] Error serving file:`, {
+          error: error.message,
+        });
+        res.status(500).json({
+          success: false,
+          error: "Internal server error",
+        });
+      }
+    });
+
+    // API - STATUS CORS
+    app.get("/api/status", (req, res) => {
+      const corsRestricted = !(
+        CONFIG.DISABLE_CORS === true ||
+        CONFIG.DISABLE_CORS === "true" ||
+        process.env.DISABLE_CORS === "true"
+      );
+
+      res.json({
+        status: "online",
+        timestamp: Date.now(),
+        server: {
+          version: "1.0.0",
+          cors: corsRestricted
+            ? getCurrentAllowedOrigins()
+            : "all origins allowed",
+          corsRestricted: corsRestricted,
+        },
+        ipfs: {
+          enabled: ipfsManager.isEnabled(),
+          service: ipfsManager.getConfig().service,
+          gateway: ipfsManager.getConfig().gateway,
+        },
+      });
+    });
+
+    // Configuration Management Endpoints
+    app.get("/api/config", authenticateRequest, (req, res) => {
+      serverLogger.info("[Server] Retrieving current configuration 📋");
+
+      try {
+        // Return safe configuration with proper defaults
+        const safeConfig = {
+          NODE_ENV: CONFIG.NODE_ENV || "development",
+          PORT: CONFIG.PORT || 8765,
+          HTTPS_PORT: CONFIG.HTTPS_PORT || 8443,
+          DISABLE_CORS:
+            CONFIG.DISABLE_CORS === true || CONFIG.DISABLE_CORS === "true",
+          DISABLE_GUN_AUTH:
+            CONFIG.DISABLE_GUN_AUTH === true ||
+            CONFIG.DISABLE_GUN_AUTH === "true",
+          IPFS_ENABLED:
+            CONFIG.IPFS_ENABLED === true || CONFIG.IPFS_ENABLED === "true",
+          IPFS_SERVICE: CONFIG.IPFS_SERVICE || "IPFS-CLIENT",
+          IPFS_NODE_URL: CONFIG.IPFS_NODE_URL || "http://localhost:5001",
+          IPFS_GATEWAY: CONFIG.IPFS_GATEWAY || "http://127.0.0.1:8080/ipfs/",
+          PINATA_GATEWAY: CONFIG.PINATA_GATEWAY || "",
+          PINATA_JWT: CONFIG.PINATA_JWT || "",
+          ONCHAIN_MEMBERSHIP_ENABLED:
+            CONFIG.ONCHAIN_MEMBERSHIP_ENABLED === true ||
+            CONFIG.ONCHAIN_MEMBERSHIP_ENABLED === "true",
+          TYPE_VALIDATION_ENABLED:
+            CONFIG.TYPE_VALIDATION_ENABLED !== false &&
+            CONFIG.TYPE_VALIDATION_ENABLED !== "false",
+          TYPE_VALIDATION_STRICT:
+            CONFIG.TYPE_VALIDATION_STRICT === true ||
+            CONFIG.TYPE_VALIDATION_STRICT === "true",
+          S3_BUCKET: CONFIG.S3_BUCKET || "",
+          S3_REGION: CONFIG.S3_REGION || "us-east-1",
+          S3_ENDPOINT: CONFIG.S3_ENDPOINT || "http://0.0.0.0:4569",
+          S3_ADDRESS: CONFIG.S3_ADDRESS || "0.0.0.0",
+          S3_PORT: CONFIG.S3_PORT || 4569,
+          // Include arrays and safe strings
+          PEERS: CONFIG.PEERS || [],
+          ALLOWED_ORIGINS: CONFIG.ALLOWED_ORIGINS || "",
+        };
+
+        res.json({
+          success: true,
+          config: safeConfig,
+        });
+      } catch (error) {
+        serverLogger.error("[Server] Error retrieving configuration:", {
+          error: error.message,
+        });
+        res.status(500).json({
+          success: false,
+          error: "Error retrieving configuration: " + error.message,
+        });
+      }
+    });
 
     app.use(
       "/shogun-core.js",
@@ -766,43 +1001,54 @@ async function startServer() {
       fileManager.getUploadMiddleware().single("file"),
       async (req, res) => {
         // Generate a unique request ID for this upload attempt
-        const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        
+        const requestId = `req_${Date.now()}_${Math.random()
+          .toString(36)
+          .substr(2, 9)}`;
+
         try {
-          serverLogger.info(`[Server] Processing file upload request 🚀 (Request ID: ${requestId})`);
-          
+          serverLogger.info(
+            `[Server] Processing file upload request 🚀 (Request ID: ${requestId})`
+          );
+
           // Start tracking this upload
           globalUploadTracker.startUpload(requestId, {
-            filename: req.file ? req.file.originalname : 'text-content',
+            filename: req.file ? req.file.originalname : "text-content",
             uploadId: req.body.uploadId,
-            size: req.file ? req.file.size : (req.body.content ? req.body.content.length : 0),
+            size: req.file
+              ? req.file.size
+              : req.body.content
+              ? req.body.content.length
+              : 0,
             ip: req.ip,
-            userAgent: req.get('User-Agent')
+            userAgent: req.get("User-Agent"),
           });
-          
+
           // Server-side duplicate upload prevention by upload ID
           const uploadId = req.body.uploadId;
           const now = Date.now();
-          
+
           if (uploadId) {
             // Check if this uploadId was recently processed
             if (recentUploadIds.has(uploadId)) {
               const lastProcessTime = recentUploadIds.get(uploadId);
               const timeDiff = now - lastProcessTime;
-              
+
               if (timeDiff < uploadIdTimeout) {
-                serverLogger.warn(`[Server] Duplicate upload ID detected: ${uploadId} (${timeDiff}ms ago) ⚠️`);
+                serverLogger.warn(
+                  `[Server] Duplicate upload ID detected: ${uploadId} (${timeDiff}ms ago) ⚠️`
+                );
                 return res.status(409).json({
                   success: false,
-                  error: "Duplicate upload detected. Please wait before trying again.",
-                  code: "DUPLICATE_UPLOAD"
+                  error:
+                    "Duplicate upload detected. Please wait before trying again.",
+                  code: "DUPLICATE_UPLOAD",
                 });
               }
             }
-            
+
             // Track this upload ID immediately
             recentUploadIds.set(uploadId, now);
-            
+
             // Clean up old upload IDs (older than timeout)
             for (const [id, timestamp] of recentUploadIds.entries()) {
               if (now - timestamp > uploadIdTimeout) {
@@ -822,60 +1068,77 @@ async function startServer() {
           // Content-based duplicate prevention (happens before processing)
           let contentHash = null;
           let contentBasedId = null;
-          
+
           if (req.file) {
             // Calculate content hash immediately
             const crypto = await import("crypto");
             let fileBuffer;
-            
+
             if (req.file.buffer) {
               fileBuffer = req.file.buffer;
             } else if (req.file.path) {
               const fs = await import("fs");
               fileBuffer = fs.default.readFileSync(req.file.path);
             }
-            
+
             if (fileBuffer) {
               // Generate the same content hash as FileManager would
-              contentHash = crypto.default.createHash('sha256').update(fileBuffer).digest('hex').substring(0, 16);
-              const safeName = req.file.originalname.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9.-]/g, "_");
+              contentHash = crypto.default
+                .createHash("sha256")
+                .update(fileBuffer)
+                .digest("hex")
+                .substring(0, 16);
+              const safeName = req.file.originalname
+                .replace(/\.[^/.]+$/, "")
+                .replace(/[^a-zA-Z0-9.-]/g, "_");
               contentBasedId = `${contentHash}-${safeName}`;
-              
-              serverLogger.info(`[Server] Pre-calculated content-based ID: ${contentBasedId} for file: ${req.file.originalname} (Request ID: ${requestId})`);
-              
+
+              serverLogger.info(
+                `[Server] Pre-calculated content-based ID: ${contentBasedId} for file: ${req.file.originalname} (Request ID: ${requestId})`
+              );
+
               // Check if this content is already being processed
               if (contentBasedUploads.has(contentBasedId)) {
-                serverLogger.info(`[Server] Content-based upload already in progress, waiting: ${contentBasedId} (Request ID: ${requestId})`);
-                
+                serverLogger.info(
+                  `[Server] Content-based upload already in progress, waiting: ${contentBasedId} (Request ID: ${requestId})`
+                );
+
                 try {
                   // Wait for the ongoing upload to complete
-                  const existingResult = await contentBasedUploads.get(contentBasedId);
-                  
+                  const existingResult = await contentBasedUploads.get(
+                    contentBasedId
+                  );
+
                   // Clean up the uploaded file
                   if (req.file.path && fs.default.existsSync(req.file.path)) {
                     try {
                       fs.default.unlinkSync(req.file.path);
-                      serverLogger.info(`[Server] Cleaned up concurrent upload file: ${req.file.path} (Request ID: ${requestId})`);
+                      serverLogger.info(
+                        `[Server] Cleaned up concurrent upload file: ${req.file.path} (Request ID: ${requestId})`
+                      );
                     } catch (cleanupError) {
-                      serverLogger.warn(`[Server] Error cleaning up concurrent file: ${cleanupError.message} (Request ID: ${requestId})`);
+                      serverLogger.warn(
+                        `[Server] Error cleaning up concurrent file: ${cleanupError.message} (Request ID: ${requestId})`
+                      );
                     }
                   }
-                  
+
                   // Track concurrent detection
                   globalUploadTracker.completeUpload(requestId, {
                     success: true,
                     fileId: existingResult.id,
                     isDuplicate: true,
-                    message: 'Concurrent upload detected at server level'
+                    message: "Concurrent upload detected at server level",
                   });
-                  
+
                   return res.json({
                     success: true,
                     file: {
                       ...existingResult,
-                      message: 'File with identical content was being processed concurrently',
+                      message:
+                        "File with identical content was being processed concurrently",
                       isDuplicate: true,
-                      concurrentUpload: true
+                      concurrentUpload: true,
                     },
                     fileInfo: {
                       originalName: existingResult.originalName,
@@ -890,41 +1153,51 @@ async function startServer() {
                     requestId: requestId,
                   });
                 } catch (error) {
-                  serverLogger.warn(`[Server] Concurrent upload failed, proceeding: ${error.message} (Request ID: ${requestId})`);
+                  serverLogger.warn(
+                    `[Server] Concurrent upload failed, proceeding: ${error.message} (Request ID: ${requestId})`
+                  );
                   // Fall through to normal processing
                 }
               }
-              
+
               // Check if this exact content already exists
-              const existingFile = await fileManager.getFileById(contentBasedId);
+              const existingFile = await fileManager.getFileById(
+                contentBasedId
+              );
               if (existingFile) {
-                serverLogger.info(`[Server] File with identical content already exists: ${contentBasedId} ⚠️ (Request ID: ${requestId})`);
-                
+                serverLogger.info(
+                  `[Server] File with identical content already exists: ${contentBasedId} ⚠️ (Request ID: ${requestId})`
+                );
+
                 // Clean up the uploaded file if it's a disk storage
                 if (req.file.path && fs.default.existsSync(req.file.path)) {
                   try {
                     fs.default.unlinkSync(req.file.path);
-                    serverLogger.info(`[Server] Cleaned up duplicate upload file: ${req.file.path} (Request ID: ${requestId})`);
+                    serverLogger.info(
+                      `[Server] Cleaned up duplicate upload file: ${req.file.path} (Request ID: ${requestId})`
+                    );
                   } catch (cleanupError) {
-                    serverLogger.warn(`[Server] Error cleaning up duplicate file: ${cleanupError.message} (Request ID: ${requestId})`);
+                    serverLogger.warn(
+                      `[Server] Error cleaning up duplicate file: ${cleanupError.message} (Request ID: ${requestId})`
+                    );
                   }
                 }
-                
+
                 // Track duplicate detection
                 globalUploadTracker.completeUpload(requestId, {
                   success: true,
                   fileId: existingFile.id,
                   isDuplicate: true,
-                  message: 'Duplicate detected by server pre-check'
+                  message: "Duplicate detected by server pre-check",
                 });
-                
+
                 return res.json({
                   success: true,
                   file: {
                     ...existingFile,
-                    message: 'File with identical content already exists',
+                    message: "File with identical content already exists",
                     isDuplicate: true,
-                    existingFile: true
+                    existingFile: true,
                   },
                   fileInfo: {
                     originalName: existingFile.originalName,
@@ -960,7 +1233,7 @@ async function startServer() {
           if (contentBasedId) {
             uploadPromise = fileManager.handleFileUpload(req);
             contentBasedUploads.set(contentBasedId, uploadPromise);
-            
+
             // Clean up after timeout
             setTimeout(() => {
               contentBasedUploads.delete(contentBasedId);
@@ -968,7 +1241,9 @@ async function startServer() {
           }
 
           // Process the upload
-          let fileData = uploadPromise ? await uploadPromise : await fileManager.handleFileUpload(req);
+          let fileData = uploadPromise
+            ? await uploadPromise
+            : await fileManager.handleFileUpload(req);
 
           // Add request tracking to the file data
           fileData.requestId = requestId;
@@ -983,7 +1258,7 @@ async function startServer() {
           } catch (validationError) {
             serverLogger.error(`[Server] File data validation error:`, {
               error: validationError.message,
-              requestId: requestId
+              requestId: requestId,
             });
             // Continue without validation if it fails - for backward compatibility
           }
@@ -1019,24 +1294,27 @@ async function startServer() {
           if (!res.headersSent) {
             // res.json(validatedResponse);
             res.json(response); // Sending raw response for testing
-            
+
             // Track successful completion
             globalUploadTracker.completeUpload(requestId, {
               success: true,
               fileId: fileData.id,
-              isDuplicate: fileData.isDuplicate || false
+              isDuplicate: fileData.isDuplicate || false,
             });
           }
         } catch (error) {
-          serverLogger.error(`[Server] File upload error: ❌ (Request ID: ${requestId})`, {
-            error: error.message,
-            requestId: requestId
-          });
+          serverLogger.error(
+            `[Server] File upload error: ❌ (Request ID: ${requestId})`,
+            {
+              error: error.message,
+              requestId: requestId,
+            }
+          );
 
           // Track failed completion
           globalUploadTracker.completeUpload(requestId, {
             success: false,
-            error: error.message
+            error: error.message,
           });
 
           // Send error response if not already sent
@@ -1047,6 +1325,657 @@ async function startServer() {
               requestId: requestId,
             });
           }
+        }
+      }
+    );
+
+    // GunDB Test Endpoint
+    app.get("/api/test-gundb", (req, res) => {
+      gunLogger.info(
+        "GUNDB_TEST_ENDPOINT: Starting test at " + new Date().toISOString()
+      );
+
+      // Generate a unique test key
+      const testKey = `test_key_${Date.now()}`;
+      gunLogger.info(`GUNDB_TEST_ENDPOINT: Using test key: ${testKey} 🔑`);
+
+      const testData = {
+        message: "Test data from endpoint",
+        timestamp: Date.now(),
+      };
+
+      const results = {
+        testKey,
+        startTime: new Date().toISOString(),
+        putCallbackFired: false,
+        onceCallbackFired: false,
+        putError: null,
+        onceError: null,
+        retrievedData: null,
+        dataMatches: false,
+      };
+
+      // Using a promise with timeout to handle async operations with a time limit
+      const runTestWithTimeout = new Promise((resolve) => {
+        const testNode = gun.get(testKey);
+        gunLogger.info(
+          `GUNDB_TEST_ENDPOINT: Attempting .put() with data:`,
+          testData
+        );
+
+        // Set overall timeout for the entire test
+        const testTimeout = setTimeout(() => {
+          gunLogger.error(`GUNDB_TEST_ENDPOINT: Test timed out after 10s ❌`);
+          resolve(results);
+        }, 10000);
+
+        testNode.put(testData, (putAck) => {
+          results.putCallbackFired = true;
+          gunLogger.info(
+            `GUNDB_TEST_ENDPOINT: .put() callback fired with:`,
+            putAck
+          );
+
+          if (putAck.err) {
+            gunLogger.error(`GUNDB_TEST_ENDPOINT: .put() failed:`, {
+              error: putAck.err,
+            });
+            results.putError = putAck.err;
+          } else {
+            gunLogger.info(`GUNDB_TEST_ENDPOINT: .put() successful ✅`);
+
+            // Try to read back the data
+            gunLogger.info(
+              `GUNDB_TEST_ENDPOINT: Attempting .once() to read back data 🔑`
+            );
+
+            testNode.once((readData, readKey) => {
+              results.onceCallbackFired = true;
+              gunLogger.info(
+                `GUNDB_TEST_ENDPOINT: .once() callback fired. Key: ${readKey}`,
+                { data: readData }
+              );
+
+              results.retrievedData = readData;
+              if (readData && readData.message === testData.message) {
+                gunLogger.info(
+                  `GUNDB_TEST_ENDPOINT: Data read back matches put data!`
+                );
+                results.dataMatches = true;
+              } else {
+                gunLogger.error(
+                  `GUNDB_TEST_ENDPOINT: Data mismatch or no data from .once()`
+                );
+              }
+
+              // Test completed successfully, clear timeout and resolve
+              clearTimeout(testTimeout);
+              results.endTime = new Date().toISOString();
+              resolve(results);
+            });
+          }
+        });
+      });
+
+      // Wait for the test to complete (or time out) then return results
+      runTestWithTimeout.then((results) => {
+        gunLogger.info(`GUNDB_TEST_ENDPOINT: Test completed`, { results });
+        res.json(results);
+      });
+    });
+
+    // Endpoint per verificare la configurazione WebSocket
+    app.get("/check-websocket", authenticateRequest, (req, res) => {
+      serverLogger.info("[Server] Checking WebSocket connection 📡");
+      res.json({
+        serverInfo: {
+          port: PORT,
+          websocketUrl: `ws://${req.headers.host}/gun`,
+          ok: true,
+        },
+      });
+    });
+
+    // Serve l'interfaccia web di base
+    app.get("/", (req, res) => {
+      res.sendFile(path.join(__dirname, "src/ui/dashboard/index-nodom.html"));
+    });
+
+    // Serve la pagina di login html
+    app.get("/login", (req, res) => {
+      res.sendFile(path.join(__dirname, "src/ui/dashboard/login.html"));
+    });
+
+    // Endpoint to handle /debug command explicitly
+    app.get("/debug", (req, res) => {
+      serverLogger.info(
+        "[Server] Debug command received via dedicated endpoint"
+      );
+
+      try {
+        // Extract debug information
+        const debugInfo = {
+          timestamp: new Date().toISOString(),
+          server: {
+            version: "1.0.0",
+            uptime: process.uptime(),
+            memory: process.memoryUsage(),
+            node: process.version,
+          },
+          gundb: {
+            status: gun ? "initialized" : "not initialized",
+            peers: gun ? Object.keys(gun._.opt.peers || {}).length : 0,
+          },
+          ipfs: ipfsManager
+            ? {
+                enabled: ipfsManager.isEnabled(),
+                service: ipfsManager.getConfig().service,
+                gateway: ipfsManager.getConfig().gateway,
+              }
+            : "not initialized",
+          success: true,
+          message: "Debug mode activated successfully",
+        };
+
+        // Log the debug info
+        serverLogger.info("[Server] Debug information generated:", debugInfo);
+
+        // Record this debug session in the logs directory
+        try {
+          const debugLogPath = path.join(LOGS_DIR, `debug_${Date.now()}.json`);
+          fs.writeFileSync(debugLogPath, JSON.stringify(debugInfo, null, 2));
+          serverLogger.info(`Debug log written to ${debugLogPath}`);
+        } catch (logError) {
+          serverLogger.error("Error writing debug log:", {
+            error: logError.message,
+          });
+        }
+
+        // Return debug info to client
+        res.json(debugInfo);
+      } catch (error) {
+        serverLogger.error("Error processing debug command:", {
+          error: error.message,
+        });
+        res.status(500).json({
+          success: false,
+          error: `Error processing debug command: ${error.message}`,
+        });
+      }
+    });
+
+    // Upload debug endpoint
+    app.get("/api/upload-debug", authenticateRequest, (req, res) => {
+      try {
+        const uploadStatus = globalUploadTracker.getStatus();
+
+        res.json({
+          success: true,
+          uploadTracking: uploadStatus,
+          statistics: {
+            activeUploadCount: uploadStatus.activeUploads.length,
+            completedUploadCount: uploadStatus.completedUploads.length,
+            recentUploadIdCount: uploadStatus.recentUploadIds.length,
+            duplicateDetections: uploadStatus.completedUploads.filter(
+              ([, info]) => info.result?.isDuplicate
+            ).length,
+          },
+          message: "Upload debug information retrieved successfully",
+        });
+      } catch (error) {
+        serverLogger.error("[Server] Error retrieving upload debug info:", {
+          error: error.message,
+        });
+        res.status(500).json({
+          success: false,
+          error: "Error retrieving upload debug information: " + error.message,
+        });
+      }
+    });
+
+    // Add relay/peer status endpoints for dashboard visualization
+    app.get("/api/relay/peers", authenticateRequest, (req, res) => {
+      try {
+        serverLogger.info("[Server] Dashboard requesting peer information 🌐");
+
+        // Get configured peers from config
+        const configuredPeers = CONFIG.PEERS || [];
+
+        // Get real Gun peer status if available
+        let realPeerConnections = {};
+        let gunStatus = "not_available";
+
+        if (gun) {
+          try {
+            // Get real peer connections from Gun using back() method
+            const gunPeers = gun.back("opt.peers");
+            gunStatus = "available";
+
+            if (gunPeers && typeof gunPeers === "object") {
+              Object.keys(gunPeers).forEach((peerUrl) => {
+                const peerData = gunPeers[peerUrl];
+
+                let isConnected = false;
+                let connectionStatus = "unknown";
+                let additionalInfo = {};
+
+                if (peerData) {
+                  // Check various indicators of connection status
+                  if (peerData.wire) {
+                    // WebSocket connection exists
+                    isConnected = peerData.wire.readyState === 1; // WebSocket.OPEN
+                    connectionStatus = isConnected
+                      ? "connected"
+                      : "disconnected";
+                    additionalInfo.wireState = peerData.wire.readyState;
+                    additionalInfo.wireUrl = peerData.wire.url;
+                  } else if (peerData.webrtc) {
+                    // WebRTC connection
+                    isConnected =
+                      peerData.webrtc.connectionState === "connected";
+                    connectionStatus =
+                      peerData.webrtc.connectionState || "unknown";
+                    additionalInfo.webrtcState =
+                      peerData.webrtc.connectionState;
+                  } else if (peerData.readyState !== undefined) {
+                    // Direct readyState check
+                    isConnected = peerData.readyState === 1;
+                    connectionStatus = isConnected
+                      ? "connected"
+                      : "disconnected";
+                    additionalInfo.readyState = peerData.readyState;
+                  } else {
+                    // Fallback: if peer object exists, assume some level of connection
+                    isConnected = true;
+                    connectionStatus = "assumed_connected";
+                    additionalInfo.fallback = true;
+                  }
+
+                  // Additional connection info
+                  if (peerData.id) additionalInfo.peerId = peerData.id;
+                  if (peerData.last)
+                    additionalInfo.lastActivity = peerData.last;
+                }
+
+                realPeerConnections[peerUrl] = {
+                  connected: isConnected,
+                  status: connectionStatus,
+                  lastChecked: Date.now(),
+                  details: additionalInfo,
+                };
+              });
+
+              serverLogger.info(
+                `[Server] Found ${
+                  Object.keys(realPeerConnections).length
+                } Gun peers`
+              );
+            }
+          } catch (gunError) {
+            serverLogger.warn("[Server] Error reading Gun peer status:", {
+              error: gunError.message,
+            });
+            gunStatus = "error";
+          }
+        }
+
+        // Combine configured peers with real connection status
+        const peersWithStatus = configuredPeers.map((peerUrl) => {
+          const realConnection = realPeerConnections[peerUrl];
+          return {
+            url: peerUrl,
+            configured: true,
+            connected: realConnection ? realConnection.connected : false,
+            status: realConnection ? realConnection.status : "unknown",
+            lastChecked: realConnection ? realConnection.lastChecked : null,
+            details: realConnection ? realConnection.details : {},
+          };
+        });
+
+        // Add any Gun peers not in config (discovered peers)
+        Object.keys(realPeerConnections).forEach((peerUrl) => {
+          if (!configuredPeers.includes(peerUrl)) {
+            const realConnection = realPeerConnections[peerUrl];
+            peersWithStatus.push({
+              url: peerUrl,
+              configured: false,
+              connected: realConnection.connected,
+              status: realConnection.status,
+              lastChecked: realConnection.lastChecked,
+              details: realConnection.details,
+              discovered: true,
+            });
+          }
+        });
+
+        const connectedCount = peersWithStatus.filter(
+          (p) => p.connected
+        ).length;
+
+        res.json({
+          success: true,
+          peers: peersWithStatus,
+          summary: {
+            total: peersWithStatus.length,
+            configured: configuredPeers.length,
+            connected: connectedCount,
+            discovered: peersWithStatus.filter((p) => p.discovered).length,
+          },
+          relay: {
+            gunStatus: gunStatus,
+            serverPort: PORT,
+            serverHost: HOST,
+            lastUpdated: Date.now(),
+          },
+        });
+      } catch (error) {
+        serverLogger.error("[Server] Error getting peer information:", {
+          error: error.message,
+        });
+        res.status(500).json({
+          success: false,
+          error: "Error retrieving peer information: " + error.message,
+        });
+      }
+    });
+
+    // Relay network status endpoint
+    app.get("/api/relay/network-status", authenticateRequest, (req, res) => {
+      try {
+        serverLogger.info("[Server] Dashboard requesting network status 📊");
+
+        // Basic server info
+        const serverInfo = {
+          port: PORT,
+          host: HOST,
+          uptime: process.uptime(),
+          nodeVersion: process.version,
+          platform: process.platform,
+          memory: process.memoryUsage(),
+        };
+
+        // Gun status
+        let gunInfo = {
+          initialized: !!gun,
+          status: gun ? "active" : "not_initialized",
+        };
+
+        if (gun) {
+          try {
+            // Get Gun peers info
+            const gunPeers = gun.back("opt.peers");
+            const peerCount = gunPeers ? Object.keys(gunPeers).length : 0;
+            const connectedPeers = gunPeers
+              ? Object.values(gunPeers).filter((peer) => {
+                  if (peer.wire && peer.wire.readyState === 1) return true;
+                  if (
+                    peer.webrtc &&
+                    peer.webrtc.connectionState === "connected"
+                  )
+                    return true;
+                  if (peer.readyState === 1) return true;
+                  return false;
+                }).length
+              : 0;
+
+            gunInfo = {
+              ...gunInfo,
+              totalPeers: peerCount,
+              connectedPeers: connectedPeers,
+              peerUrls: gunPeers ? Object.keys(gunPeers) : [],
+            };
+          } catch (gunError) {
+            gunInfo.error = gunError.message;
+          }
+        }
+
+        // Configuration info
+        const configInfo = {
+          nodeEnv: CONFIG.NODE_ENV || "development",
+          corsDisabled:
+            CONFIG.DISABLE_CORS === true || CONFIG.DISABLE_CORS === "true",
+          gunAuthDisabled:
+            CONFIG.DISABLE_GUN_AUTH === true ||
+            CONFIG.DISABLE_GUN_AUTH === "true",
+          ipfsEnabled: CONFIG.IPFS_ENABLED === true,
+          onchainMembership: CONFIG.ONCHAIN_MEMBERSHIP_ENABLED === true,
+          configuredPeers: CONFIG.PEERS ? CONFIG.PEERS.length : 0,
+        };
+
+        // Network status summary
+        const networkStatus = {
+          status: gunInfo.connectedPeers > 0 ? "connected" : "local_only",
+          peerCount: (gunInfo.connectedPeers || 0) + 1, // +1 for local
+          lastChecked: Date.now(),
+        };
+
+        res.json({
+          success: true,
+          server: serverInfo,
+          gun: gunInfo,
+          config: configInfo,
+          network: networkStatus,
+          timestamp: Date.now(),
+        });
+      } catch (error) {
+        serverLogger.error("[Server] Error getting network status:", {
+          error: error.message,
+        });
+        res.status(500).json({
+          success: false,
+          error: "Error retrieving network status: " + error.message,
+        });
+      }
+    });
+
+    // Test peer connection endpoint
+    app.post(
+      "/api/relay/peers/:peerUrl/test",
+      authenticateRequest,
+      async (req, res) => {
+        try {
+          const peerUrl = decodeURIComponent(req.params.peerUrl);
+          serverLogger.info(
+            `[Server] Dashboard requesting peer test: ${peerUrl} 🔍`
+          );
+
+          // Validate peer URL
+          if (!peerUrl || typeof peerUrl !== "string") {
+            return res.status(400).json({
+              success: false,
+              error: "Invalid peer URL",
+            });
+          }
+
+          // Test peer connection using Gun instance
+          let testResult = {
+            success: false,
+            method: "server-side-test",
+            error: "No test performed",
+            latency: 0,
+          };
+
+          if (gun) {
+            try {
+              // Create a test Gun instance to test the peer
+              const testStartTime = Date.now();
+
+              // Simple connection test - try to create a temporary Gun instance with this peer
+              const testGun = new Gun({
+                peers: [peerUrl],
+                radisk: false,
+                localStorage: false,
+                retry: 1,
+                timeout: 5000,
+              });
+
+              // Wait a bit for connection attempt
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+
+              // Check if peer appears in the test Gun instance
+              const testPeers = testGun.back("opt.peers");
+              const peerExists = testPeers && testPeers[peerUrl];
+
+              if (peerExists) {
+                const latency = Date.now() - testStartTime;
+                testResult = {
+                  success: true,
+                  method: "gun-instance-test",
+                  latency: latency,
+                  status: "reachable",
+                };
+              } else {
+                testResult = {
+                  success: false,
+                  method: "gun-instance-test",
+                  error: "Peer not reachable or connection failed",
+                  latency: Date.now() - testStartTime,
+                };
+              }
+
+              // Cleanup test instance
+              if (testGun.off) testGun.off();
+            } catch (gunTestError) {
+              testResult = {
+                success: false,
+                method: "gun-instance-test",
+                error: gunTestError.message,
+                latency: 0,
+              };
+            }
+          } else {
+            testResult = {
+              success: false,
+              method: "no-gun-instance",
+              error: "Gun instance not available on server",
+              latency: 0,
+            };
+          }
+
+          res.json({
+            success: true,
+            peerUrl: peerUrl,
+            test: testResult,
+            timestamp: Date.now(),
+          });
+        } catch (error) {
+          serverLogger.error("[Server] Error testing peer connection:", {
+            error: error.message,
+          });
+          res.status(500).json({
+            success: false,
+            error: "Error testing peer connection: " + error.message,
+          });
+        }
+      }
+    );
+
+    // Duplicate files cleanup endpoint
+    app.post(
+      "/api/cleanup-duplicates",
+      authenticateRequest,
+      async (req, res) => {
+        try {
+          serverLogger.info("[Server] Starting duplicate cleanup process...");
+
+          // Get all files
+          const allFiles = await fileManager.getAllFiles();
+
+          // Group files by content characteristics (size + name without timestamp)
+          const contentGroups = new Map();
+
+          allFiles.forEach((file) => {
+            const baseName = file.originalName || file.name || "unknown";
+            const cleanName = baseName.replace(/^\d+-/, ""); // Remove timestamp prefix
+            const contentKey = `${file.size}_${cleanName}_${
+              file.mimetype || file.mimeType
+            }`;
+
+            if (!contentGroups.has(contentKey)) {
+              contentGroups.set(contentKey, []);
+            }
+            contentGroups.get(contentKey).push(file);
+          });
+
+          // Find duplicates
+          const duplicateGroups = [];
+          const filesToDelete = [];
+
+          for (const [contentKey, files] of contentGroups.entries()) {
+            if (files.length > 1) {
+              // Sort by timestamp, keep the newest one
+              files.sort(
+                (a, b) =>
+                  (b.timestamp || b.uploadedAt || 0) -
+                  (a.timestamp || a.uploadedAt || 0)
+              );
+
+              const keepFile = files[0]; // Newest
+              const deleteFiles = files.slice(1); // Older duplicates
+
+              duplicateGroups.push({
+                contentKey,
+                keepFile: keepFile.id,
+                deleteFiles: deleteFiles.map((f) => f.id),
+                fileCount: files.length,
+              });
+
+              filesToDelete.push(...deleteFiles);
+            }
+          }
+
+          let deletionResults = [];
+
+          // Delete duplicate files if requested
+          if (req.body.performCleanup === true) {
+            serverLogger.info(
+              `[Server] Deleting ${filesToDelete.length} duplicate files...`
+            );
+
+            for (const file of filesToDelete) {
+              try {
+                const result = await fileManager.deleteFile(file.id);
+                deletionResults.push({
+                  fileId: file.id,
+                  fileName: file.originalName || file.name,
+                  success: result.success,
+                  processingTime: result.processingTime,
+                });
+              } catch (error) {
+                deletionResults.push({
+                  fileId: file.id,
+                  fileName: file.originalName || file.name,
+                  success: false,
+                  error: error.message,
+                });
+              }
+            }
+          }
+
+          res.json({
+            success: true,
+            analysis: {
+              totalFiles: allFiles.length,
+              uniqueContentGroups: contentGroups.size,
+              duplicateGroups: duplicateGroups.length,
+              totalDuplicateFiles: filesToDelete.length,
+            },
+            duplicateGroups: duplicateGroups,
+            deletionResults: deletionResults,
+            performedCleanup: req.body.performCleanup === true,
+            message:
+              req.body.performCleanup === true
+                ? "Duplicate cleanup completed"
+                : "Duplicate analysis completed (no cleanup performed)",
+          });
+        } catch (error) {
+          serverLogger.error("[Server] Error in duplicate cleanup:", {
+            error: error.message,
+          });
+          res.status(500).json({
+            success: false,
+            error: "Error during duplicate cleanup: " + error.message,
+          });
         }
       }
     );
@@ -1120,788 +2049,6 @@ startServer().catch((err) => {
     stack: err.stack,
   });
   process.exit(1);
-});
-
-// CORS Configuration
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Allow requests without origin (like mobile apps or curl)
-      if (!origin) return callback(null, true);
-
-      // Check if CORS restrictions are disabled via environment variable
-      if (CONFIG.DISABLE_CORS === true || 
-          CONFIG.DISABLE_CORS === "true" || 
-          process.env.DISABLE_CORS === "true") {
-        serverLogger.info(`CORS restrictions disabled - allowing all origins`);
-        return callback(null, true);
-      }
-
-      // Enable all origins in development mode
-      if (CONFIG.NODE_ENV === "development") {
-        return callback(null, true);
-      }
-
-      if (getCurrentAllowedOrigins().indexOf(origin) !== -1) {
-        callback(null, true);
-      } else {
-        serverLogger.warn(`Origin blocked by CORS: ${origin}`);
-        callback(null, false);
-      }
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "X-Requested-With",
-      "token",
-    ],
-  })
-);
-
-// Create logs directory if it doesn't exist
-if (!fs.existsSync(LOGS_DIR)) {
-  fs.mkdirSync(LOGS_DIR, { recursive: true });
-}
-
-// Middlewares
-app.use(express.json({ limit: "500mb" }));
-app.use(express.urlencoded({ extended: true, limit: "500mb" }));
-// Remove unsecured static file serving
-// app.use("/uploads", express.static(STORAGE_DIR));
-
-// Add protected file serving endpoint
-app.get("/uploads/:filename", authenticateRequest, (req, res) => {
-  try {
-    const filename = req.params.filename;
-    
-    // Validate filename to prevent directory traversal attacks
-    if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid filename"
-      });
-    }
-    
-    const filePath = path.join(STORAGE_DIR, filename);
-    
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
-        success: false,
-        error: "File not found"
-      });
-    }
-    
-    // Get file stats
-    const stats = fs.statSync(filePath);
-    if (!stats.isFile()) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid file"
-      });
-    }
-    
-    // Determine content type based on file extension
-    const ext = path.extname(filename).toLowerCase();
-    const mimeTypes = {
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.gif': 'image/gif',
-      '.webp': 'image/webp',
-      '.pdf': 'application/pdf',
-      '.txt': 'text/plain',
-      '.html': 'text/html',
-      '.css': 'text/css',
-      '.js': 'application/javascript',
-      '.json': 'application/json',
-      '.mp4': 'video/mp4',
-      '.mp3': 'audio/mpeg',
-      '.wav': 'audio/wav'
-    };
-    
-    const contentType = mimeTypes[ext] || 'application/octet-stream';
-    
-    // Set appropriate headers
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Length', stats.size);
-    res.setHeader('Cache-Control', 'private, max-age=3600'); // Cache for 1 hour but mark as private
-    
-    // Log the file access
-    serverLogger.info(`[FileAccess] User accessed file: ${filename} (${contentType})`);
-    
-    // Stream the file
-    const fileStream = fs.createReadStream(filePath);
-    fileStream.pipe(res);
-    
-    fileStream.on('error', (error) => {
-      serverLogger.error(`[FileAccess] Error streaming file ${filename}:`, { error: error.message });
-      if (!res.headersSent) {
-        res.status(500).json({
-          success: false,
-          error: "Error reading file"
-        });
-      }
-    });
-    
-  } catch (error) {
-    serverLogger.error(`[FileAccess] Error serving file:`, { error: error.message });
-    res.status(500).json({
-      success: false,
-      error: "Internal server error"
-    });
-  }
-});
-
-app.use(Gun.serve);
-
-// API - STATUS CORS
-app.get("/api/status", (req, res) => {
-  const corsRestricted = !(CONFIG.DISABLE_CORS === true || 
-                          CONFIG.DISABLE_CORS === "true" || 
-                          process.env.DISABLE_CORS === "true");
-  
-  res.json({
-    status: "online",
-    timestamp: Date.now(),
-    server: {
-      version: "1.0.0",
-      cors: corsRestricted ? getCurrentAllowedOrigins() : "all origins allowed",
-      corsRestricted: corsRestricted,
-    },
-    ipfs: {
-      enabled: ipfsManager.isEnabled(),
-      service: ipfsManager.getConfig().service,
-      gateway: ipfsManager.getConfig().gateway,
-    },
-  });
-});
-
-// Mityli Type Validation Test Endpoint
-app.get("/api/test-mityli", (req, res) => {
-  serverLogger.info("MITYLI_TEST: Starting validation test 🔑");
-
-  // Sample data with both valid and invalid variants
-  const samples = {
-    validFileData: {
-      id: "valid_file_123",
-      name: "valid.jpg",
-      originalName: "valid.jpg",
-      mimeType: "image/jpeg",
-      mimetype: "image/jpeg",
-      size: 12345,
-      url: "/uploads/valid.jpg",
-      fileUrl: "/uploads/valid.jpg",
-      localPath: "/path/to/valid.jpg",
-      ipfsHash: "QmValidHash123",
-      ipfsUrl: "https://gateway.ipfs.io/ipfs/QmValidHash123",
-      timestamp: Date.now(),
-      uploadedAt: Date.now(),
-      customName: "my-valid-name",
-      verified: true,
-    },
-    invalidFileData: {
-      id: "invalid_file_123",
-      name: "invalid.jpg",
-      // Missing required fields
-      size: "not-a-number", // Wrong type
-      timestamp: "not-a-timestamp", // Wrong type
-    },
-  };
-
-  const results = {
-    testTime: new Date().toISOString(),
-    validationResults: {},
-  };
-
-  // Test validation for valid data
-  try {
-    const validParsed = validateFileData(samples.validFileData);
-    results.validationResults.validData = {
-      success: true,
-      message: "Valid data validated successfully",
-      data: validParsed,
-    };
-  } catch (error) {
-    results.validationResults.validData = {
-      success: false,
-      message: "Validation of valid data failed unexpectedly: " + error.message,
-    };
-  }
-
-  // Test validation for invalid data
-  try {
-    const invalidParsed = validateFileData(samples.invalidFileData);
-    results.validationResults.invalidData = {
-      success: true, // This should not happen
-      message: "Invalid data unexpectedly validated successfully",
-      data: invalidParsed,
-    };
-  } catch (error) {
-    results.validationResults.invalidData = {
-      success: false,
-      message: "Invalid data correctly failed validation: " + error.message,
-    };
-  }
-
-  // Test assignment validation with Proxy
-  try {
-    const validParsed = validateFileData(samples.validFileData);
-
-    // Test valid assignment
-    validParsed.size = 54321; // Should work (same type)
-    results.validationResults.validAssignment = {
-      success: true,
-      message: "Valid assignment passed",
-      newSize: validParsed.size,
-    };
-
-    // Test invalid assignment (might throw)
-    try {
-      validParsed.size = "invalid-size"; // Should throw (wrong type)
-      results.validationResults.invalidAssignment = {
-        success: false,
-        message: "Invalid assignment unexpectedly succeeded",
-      };
-    } catch (assignError) {
-      results.validationResults.invalidAssignment = {
-        success: true,
-        message:
-          "Invalid assignment correctly threw error: " + assignError.message,
-      };
-    }
-  } catch (error) {
-    results.validationResults.assignment = {
-      success: false,
-      message: "Assignment validation test failed: " + error.message,
-    };
-  }
-
-  // Add current validation configuration
-  results.configuration = {
-    validationEnabled: isValidationEnabled(),
-    strictValidation: isStrictValidationEnabled(),
-  };
-
-  // Return all results
-  res.json(results);
-});
-
-// Type Validation Configuration Endpoint
-app.post("/api/validation-config", authenticateRequest, (req, res) => {
-  serverLogger.info("[Server] Processing validation config update request 🔑");
-
-  // Extract configuration from request
-  const { enabled, strict } = req.body;
-
-  // Validate input
-  if (typeof enabled !== "boolean" && typeof strict !== "boolean") {
-    return res.status(400).json({
-      success: false,
-      error:
-        "Invalid configuration. Expected 'enabled' and/or 'strict' boolean parameters.",
-    });
-  }
-
-  try {
-    const {
-      updateValidationConfig,
-      isValidationEnabled,
-      isStrictValidationEnabled,
-    } = require("./utils/typeValidation.js");
-
-    // Update configuration
-    updateValidationConfig({
-      TYPE_VALIDATION_ENABLED:
-        typeof enabled === "boolean" ? enabled : undefined,
-      TYPE_VALIDATION_STRICT: typeof strict === "boolean" ? strict : undefined,
-    });
-
-    // Get current configuration
-    const currentConfig = {
-      enabled: isValidationEnabled(),
-      strict: isStrictValidationEnabled(),
-    };
-
-    // Return success response
-    res.json({
-      success: true,
-      message: "Validation configuration updated successfully",
-      config: currentConfig,
-    });
-    serverLogger.info(
-      "[Server] Validation configuration updated successfully ✅"
-    );
-  } catch (error) {
-    serverLogger.error("[Server] Error updating validation configuration:", {
-      error: error.message,
-    });
-    res.status(500).json({
-      success: false,
-      error: "Error updating validation configuration: " + error.message,
-    });
-  }
-});
-
-// Configuration Management Endpoints
-app.get("/api/config", authenticateRequest, (req, res) => {
-  serverLogger.info("[Server] Retrieving current configuration 📋");
-  
-  try {
-    // Return safe configuration with proper defaults
-    const safeConfig = {
-      NODE_ENV: CONFIG.NODE_ENV || "development",
-      PORT: CONFIG.PORT || 8765,
-      HTTPS_PORT: CONFIG.HTTPS_PORT || 8443,
-      DISABLE_CORS: CONFIG.DISABLE_CORS === true || CONFIG.DISABLE_CORS === "true",
-      DISABLE_GUN_AUTH: CONFIG.DISABLE_GUN_AUTH === true || CONFIG.DISABLE_GUN_AUTH === "true",
-      IPFS_ENABLED: CONFIG.IPFS_ENABLED === true || CONFIG.IPFS_ENABLED === "true",
-      IPFS_SERVICE: CONFIG.IPFS_SERVICE || "IPFS-CLIENT",
-      IPFS_NODE_URL: CONFIG.IPFS_NODE_URL || "http://localhost:5001",
-      IPFS_GATEWAY: CONFIG.IPFS_GATEWAY || "http://127.0.0.1:8080/ipfs/",
-      PINATA_GATEWAY: CONFIG.PINATA_GATEWAY || "",
-      PINATA_JWT: CONFIG.PINATA_JWT || "",
-      ONCHAIN_MEMBERSHIP_ENABLED: CONFIG.ONCHAIN_MEMBERSHIP_ENABLED === true || CONFIG.ONCHAIN_MEMBERSHIP_ENABLED === "true",
-      TYPE_VALIDATION_ENABLED: CONFIG.TYPE_VALIDATION_ENABLED !== false && CONFIG.TYPE_VALIDATION_ENABLED !== "false",
-      TYPE_VALIDATION_STRICT: CONFIG.TYPE_VALIDATION_STRICT === true || CONFIG.TYPE_VALIDATION_STRICT === "true",
-      S3_BUCKET: CONFIG.S3_BUCKET || "",
-      S3_REGION: CONFIG.S3_REGION || "us-east-1",
-      S3_ENDPOINT: CONFIG.S3_ENDPOINT || "http://0.0.0.0:4569",
-      S3_ADDRESS: CONFIG.S3_ADDRESS || "0.0.0.0",
-      S3_PORT: CONFIG.S3_PORT || 4569,
-      // Include arrays and safe strings
-      PEERS: CONFIG.PEERS || [],
-      ALLOWED_ORIGINS: CONFIG.ALLOWED_ORIGINS || ""
-    };
-
-    res.json({
-      success: true,
-      config: safeConfig
-    });
-  } catch (error) {
-    serverLogger.error("[Server] Error retrieving configuration:", {
-      error: error.message,
-    });
-    res.status(500).json({
-      success: false,
-      error: "Error retrieving configuration: " + error.message,
-    });
-  }
-});
-
-app.post("/api/config", authenticateRequest, (req, res) => {
-  serverLogger.info("[Server] Processing configuration update request 🔧");
-
-  try {
-    const updates = req.body;
-    
-    // List of allowed configuration keys to update
-    const allowedKeys = [
-      'DISABLE_CORS',
-      'DISABLE_GUN_AUTH', 
-      'IPFS_ENABLED',
-      'IPFS_SERVICE',
-      'IPFS_NODE_URL',
-      'IPFS_GATEWAY',
-      'PINATA_GATEWAY',
-      'PINATA_JWT',
-      'ONCHAIN_MEMBERSHIP_ENABLED',
-      'TYPE_VALIDATION_ENABLED',
-      'TYPE_VALIDATION_STRICT',
-      'S3_BUCKET',
-      'S3_REGION',
-      'S3_ENDPOINT',
-      'S3_ADDRESS',
-      'S3_PORT',
-      'ALLOWED_ORIGINS'
-    ];
-
-    // Validate and update allowed keys
-    const updatedKeys = [];
-    for (const [key, value] of Object.entries(updates)) {
-      if (allowedKeys.includes(key)) {
-        CONFIG[key] = value;
-        updatedKeys.push(key);
-        serverLogger.info(`[Server] Updated config ${key}: ${value}`);
-      } else {
-        serverLogger.warn(`[Server] Attempted to update disallowed config key: ${key}`);
-      }
-    }
-
-    // Write updated configuration back to file
-    const configPath = path.join(__dirname, "config.json");
-    fs.writeFileSync(configPath, JSON.stringify(CONFIG, null, 4));
-    
-    serverLogger.info("[Server] Configuration file updated successfully ✅");
-
-    // If IPFS settings were updated, update the IPFS manager
-    const ipfsKeys = ['IPFS_ENABLED', 'IPFS_SERVICE', 'IPFS_NODE_URL', 'IPFS_GATEWAY', 'PINATA_GATEWAY', 'PINATA_JWT'];
-    if (ipfsKeys.some(key => updatedKeys.includes(key))) {
-      if (ipfsManager) {
-        try {
-          // Reinitialize IPFS manager with new settings
-          ipfsManager.updateConfig({
-            enabled: CONFIG.IPFS_ENABLED === true,
-            service: CONFIG.IPFS_SERVICE || "IPFS-CLIENT",
-            nodeUrl: CONFIG.IPFS_NODE_URL || "http://127.0.0.1:5001",
-            gateway: CONFIG.IPFS_GATEWAY || "http://127.0.0.1:8080/ipfs",
-            pinataGateway: CONFIG.PINATA_GATEWAY || "https://gateway.pinata.cloud",
-            pinataJwt: CONFIG.PINATA_JWT || "",
-          });
-          serverLogger.info("[Server] IPFS Manager configuration updated ✅");
-        } catch (ipfsError) {
-          serverLogger.error("[Server] Error updating IPFS Manager:", {
-            error: ipfsError.message,
-          });
-        }
-      }
-    }
-
-    res.json({
-      success: true,
-      message: `Configuration updated successfully. Updated keys: ${updatedKeys.join(', ')}`,
-      updatedKeys,
-      requiresRestart: updatedKeys.some(key => ['PORT', 'HTTPS_PORT', 'NODE_ENV'].includes(key))
-    });
-
-  } catch (error) {
-    serverLogger.error("[Server] Error updating configuration:", {
-      error: error.message,
-    });
-    res.status(500).json({
-      success: false,
-      error: "Error updating configuration: " + error.message,
-    });
-  }
-});
-
-// Configuration reload endpoint - fixes persistence issue after reset
-app.post("/api/config/reload", authenticateRequest, (req, res) => {
-  serverLogger.info("[Server] Processing configuration reload request 🔄");
-  
-  try {
-    const result = reloadConfigurationFromFile();
-    
-    if (result.success) {
-      res.json({
-        success: true,
-        message: result.message,
-        timestamp: new Date().toISOString()
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        error: result.error,
-        message: "Failed to reload configuration from file"
-      });
-    }
-  } catch (error) {
-    serverLogger.error("[Server] Error in reload endpoint:", {
-      error: error.message,
-    });
-    res.status(500).json({
-      success: false,
-      error: "Error in reload endpoint: " + error.message,
-    });
-  }
-});
-
-// GunDB Test Endpoint
-app.get("/api/test-gundb", (req, res) => {
-  gunLogger.info(
-    "GUNDB_TEST_ENDPOINT: Starting test at " + new Date().toISOString()
-  );
-
-  // Generate a unique test key
-  const testKey = `test_key_${Date.now()}`;
-  gunLogger.info(`GUNDB_TEST_ENDPOINT: Using test key: ${testKey} 🔑`);
-
-  const testData = {
-    message: "Test data from endpoint",
-    timestamp: Date.now(),
-  };
-
-  const results = {
-    testKey,
-    startTime: new Date().toISOString(),
-    putCallbackFired: false,
-    onceCallbackFired: false,
-    putError: null,
-    onceError: null,
-    retrievedData: null,
-    dataMatches: false,
-  };
-
-  // Using a promise with timeout to handle async operations with a time limit
-  const runTestWithTimeout = new Promise((resolve) => {
-    const testNode = gun.get(testKey);
-    gunLogger.info(
-      `GUNDB_TEST_ENDPOINT: Attempting .put() with data:`,
-      testData
-    );
-
-    // Set overall timeout for the entire test
-    const testTimeout = setTimeout(() => {
-      gunLogger.error(`GUNDB_TEST_ENDPOINT: Test timed out after 10s ❌`);
-      resolve(results);
-    }, 10000);
-
-    testNode.put(testData, (putAck) => {
-      results.putCallbackFired = true;
-      gunLogger.info(
-        `GUNDB_TEST_ENDPOINT: .put() callback fired with:`,
-        putAck
-      );
-
-      if (putAck.err) {
-        gunLogger.error(`GUNDB_TEST_ENDPOINT: .put() failed:`, {
-          error: putAck.err,
-        });
-        results.putError = putAck.err;
-      } else {
-        gunLogger.info(`GUNDB_TEST_ENDPOINT: .put() successful ✅`);
-
-        // Try to read back the data
-        gunLogger.info(
-          `GUNDB_TEST_ENDPOINT: Attempting .once() to read back data 🔑`
-        );
-
-        testNode.once((readData, readKey) => {
-          results.onceCallbackFired = true;
-          gunLogger.info(
-            `GUNDB_TEST_ENDPOINT: .once() callback fired. Key: ${readKey}`,
-            { data: readData }
-          );
-
-          results.retrievedData = readData;
-          if (readData && readData.message === testData.message) {
-            gunLogger.info(
-              `GUNDB_TEST_ENDPOINT: Data read back matches put data!`
-            );
-            results.dataMatches = true;
-          } else {
-            gunLogger.error(
-              `GUNDB_TEST_ENDPOINT: Data mismatch or no data from .once()`
-            );
-          }
-
-          // Test completed successfully, clear timeout and resolve
-          clearTimeout(testTimeout);
-          results.endTime = new Date().toISOString();
-          resolve(results);
-        });
-      }
-    });
-  });
-
-  // Wait for the test to complete (or time out) then return results
-  runTestWithTimeout.then((results) => {
-    gunLogger.info(`GUNDB_TEST_ENDPOINT: Test completed`, { results });
-    res.json(results);
-  });
-});
-
-// Endpoint per verificare la configurazione WebSocket
-app.get("/check-websocket", authenticateRequest, (req, res) => {
-  serverLogger.info("[Server] Checking WebSocket connection 📡");
-  res.json({
-    serverInfo: {
-      port: PORT,
-      websocketUrl: `ws://${req.headers.host}/gun`,
-      ok: true,
-    },
-  });
-});
-
-// Serve l'interfaccia web di base
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "src/ui/dashboard/index-nodom.html"));
-});
-
-// Serve la pagina di login html
-app.get("/login", (req, res) => {
-  res.sendFile(path.join(__dirname, "src/ui/dashboard/login.html"));
-});
-
-// Endpoint to handle /debug command explicitly
-app.get("/debug", (req, res) => {
-  serverLogger.info("[Server] Debug command received via dedicated endpoint");
-
-  try {
-    // Extract debug information
-    const debugInfo = {
-      timestamp: new Date().toISOString(),
-      server: {
-        version: "1.0.0",
-        uptime: process.uptime(),
-        memory: process.memoryUsage(),
-        node: process.version,
-      },
-      gundb: {
-        status: gun ? "initialized" : "not initialized",
-        peers: gun ? Object.keys(gun._.opt.peers || {}).length : 0,
-      },
-      ipfs: ipfsManager
-        ? {
-            enabled: ipfsManager.isEnabled(),
-            service: ipfsManager.getConfig().service,
-            gateway: ipfsManager.getConfig().gateway,
-          }
-        : "not initialized",
-      success: true,
-      message: "Debug mode activated successfully",
-    };
-
-    // Log the debug info
-    serverLogger.info("[Server] Debug information generated:", debugInfo);
-
-    // Record this debug session in the logs directory
-    try {
-      const debugLogPath = path.join(LOGS_DIR, `debug_${Date.now()}.json`);
-      fs.writeFileSync(debugLogPath, JSON.stringify(debugInfo, null, 2));
-      serverLogger.info(`Debug log written to ${debugLogPath}`);
-    } catch (logError) {
-      serverLogger.error("Error writing debug log:", {
-        error: logError.message,
-      });
-    }
-
-    // Return debug info to client
-    res.json(debugInfo);
-  } catch (error) {
-    serverLogger.error("Error processing debug command:", {
-      error: error.message,
-    });
-    res.status(500).json({
-      success: false,
-      error: `Error processing debug command: ${error.message}`,
-    });
-  }
-});
-
-// Upload debug endpoint
-app.get("/api/upload-debug", authenticateRequest, (req, res) => {
-  try {
-    const uploadStatus = globalUploadTracker.getStatus();
-    
-    res.json({
-      success: true,
-      uploadTracking: uploadStatus,
-      statistics: {
-        activeUploadCount: uploadStatus.activeUploads.length,
-        completedUploadCount: uploadStatus.completedUploads.length,
-        recentUploadIdCount: uploadStatus.recentUploadIds.length,
-        duplicateDetections: uploadStatus.completedUploads.filter(([,info]) => info.result?.isDuplicate).length
-      },
-      message: "Upload debug information retrieved successfully"
-    });
-  } catch (error) {
-    serverLogger.error("[Server] Error retrieving upload debug info:", {
-      error: error.message,
-    });
-    res.status(500).json({
-      success: false,
-      error: "Error retrieving upload debug information: " + error.message,
-    });
-  }
-});
-
-// Duplicate files cleanup endpoint
-app.post("/api/cleanup-duplicates", authenticateRequest, async (req, res) => {
-  try {
-    serverLogger.info("[Server] Starting duplicate cleanup process...");
-    
-    // Get all files
-    const allFiles = await fileManager.getAllFiles();
-    
-    // Group files by content characteristics (size + name without timestamp)
-    const contentGroups = new Map();
-    
-    allFiles.forEach(file => {
-      const baseName = file.originalName || file.name || 'unknown';
-      const cleanName = baseName.replace(/^\d+-/, ''); // Remove timestamp prefix
-      const contentKey = `${file.size}_${cleanName}_${file.mimetype || file.mimeType}`;
-      
-      if (!contentGroups.has(contentKey)) {
-        contentGroups.set(contentKey, []);
-      }
-      contentGroups.get(contentKey).push(file);
-    });
-    
-    // Find duplicates
-    const duplicateGroups = [];
-    const filesToDelete = [];
-    
-    for (const [contentKey, files] of contentGroups.entries()) {
-      if (files.length > 1) {
-        // Sort by timestamp, keep the newest one
-        files.sort((a, b) => (b.timestamp || b.uploadedAt || 0) - (a.timestamp || a.uploadedAt || 0));
-        
-        const keepFile = files[0]; // Newest
-        const deleteFiles = files.slice(1); // Older duplicates
-        
-        duplicateGroups.push({
-          contentKey,
-          keepFile: keepFile.id,
-          deleteFiles: deleteFiles.map(f => f.id),
-          fileCount: files.length
-        });
-        
-        filesToDelete.push(...deleteFiles);
-      }
-    }
-    
-    let deletionResults = [];
-    
-    // Delete duplicate files if requested
-    if (req.body.performCleanup === true) {
-      serverLogger.info(`[Server] Deleting ${filesToDelete.length} duplicate files...`);
-      
-      for (const file of filesToDelete) {
-        try {
-          const result = await fileManager.deleteFile(file.id);
-          deletionResults.push({
-            fileId: file.id,
-            fileName: file.originalName || file.name,
-            success: result.success,
-            processingTime: result.processingTime
-          });
-        } catch (error) {
-          deletionResults.push({
-            fileId: file.id,
-            fileName: file.originalName || file.name,
-            success: false,
-            error: error.message
-          });
-        }
-      }
-    }
-    
-    res.json({
-      success: true,
-      analysis: {
-        totalFiles: allFiles.length,
-        uniqueContentGroups: contentGroups.size,
-        duplicateGroups: duplicateGroups.length,
-        totalDuplicateFiles: filesToDelete.length
-      },
-      duplicateGroups: duplicateGroups,
-      deletionResults: deletionResults,
-      performedCleanup: req.body.performCleanup === true,
-      message: req.body.performCleanup === true ? "Duplicate cleanup completed" : "Duplicate analysis completed (no cleanup performed)"
-    });
-    
-  } catch (error) {
-    serverLogger.error("[Server] Error in duplicate cleanup:", {
-      error: error.message,
-    });
-    res.status(500).json({
-      success: false,
-      error: "Error during duplicate cleanup: " + error.message,
-    });
-  }
 });
 
 // Graceful shutdown handling

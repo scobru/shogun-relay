@@ -1,32 +1,27 @@
 import { h, setEffect, setSignal } from './nodom.js';
 import {
-    getIsLoading,
-    setIsLoading,
-    getToasts,
-    setToasts,
     getActiveTab,
     setActiveTab,
     getServerStatus,
-    getNetworkStatus,
     getFileStats,
     formatFileSize,
-    handleLogout,
+    getIsLoading,
+    setIsLoading,
     showToast,
-    deleteFile,
+    getAuthToken,
     loadFiles,
-    toggleTheme,
+    getToasts,
+    setToasts,
     getTheme,
-    getFiles,
-    setFiles,
-    getIpfsStatus,
+    toggleTheme,
     getIpfsConnectionStatus,
-    testPeerConnection,
-    reconnectToPeer,
-    removePeer,
-    pinFileToIpfs,
-    unpinFileFromIpfs,
+    getIpfsStatus,
+    handleLogout,
+    setFiles,
+    deleteFile,
     checkIpfsPinStatus,
-    getAuthToken
+    pinFileToIpfs,
+    unpinFileFromIpfs
 } from './app-nodom.js';
 
 /**
@@ -93,8 +88,20 @@ export function ToastContainer() {
                     h('button', { 
                         class: 'btn btn-error btn-xs',
                         onclick: () => {
-                            localStorage.removeItem('app-toasts');
-                            setToasts([]);
+                            try {
+                                // Clear localStorage
+                                localStorage.removeItem('app-toasts');
+                                // Clear state
+                                setToasts([]);
+                                // Show confirmation message with short duration
+                                setTimeout(() => {
+                                    showToast('🧹 All notifications cleared', 'success', 2000);
+                                }, 100);
+                                console.log('[ToastContainer] All notifications cleared via Clear All button');
+                            } catch (error) {
+                                console.error('[ToastContainer] Error clearing notifications:', error);
+                                showToast('❌ Error clearing notifications', 'error', 2000);
+                            }
                         }
                     }, '🗑️ Clear All')
                 )
@@ -169,6 +176,13 @@ export function DashboardHeader() {
         h('h2', { class: 'text-2xl font-bold text-base-content' }, 'System Overview'),
         h('div', { class: 'flex gap-2' },
             h('button', { 
+                id: 'debug-ipfs-endpoints',
+                class: 'btn btn-info btn-sm',
+                onclick: () => {
+                    debugIpfsEndpoints();
+                }
+            }, '🔍 Debug IPFS'),
+            h('button', { 
                 id: 'clear-notifications',
                 class: 'btn btn-warning btn-sm',
                 onclick: () => {
@@ -186,60 +200,38 @@ export function DashboardHeader() {
 }
 
 /**
- * Stats Grid Component
+ * Overview Statistics Component - simplified without network stats
  */
-export function StatsGrid() {
-    const grid = h('div', { class: 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-6' },
-        // Server Status Card
-        h('div', { class: 'stat bg-base-200 rounded-lg shadow' },
-            h('div', { class: 'stat-figure text-secondary' },
-                h('div', { class: 'text-2xl' }, '🖥️')
-            ),
-            h('div', { class: 'stat-title' }, 'Server Status'),
-            h('div', { 
-                class: 'stat-value text-sm',
-                id: 'server-status' 
-            }, () => getServerStatus().status),
-            h('div', { class: 'stat-desc' },
-                'Port: ',
-                h('span', { id: 'server-port' }, () => getServerStatus().port)
-            )
-        ),
-        
-        // GunDB Connections Card
-        h('div', { class: 'stat bg-base-200 rounded-lg shadow' },
-            h('div', { class: 'stat-figure text-secondary' },
-                h('div', { class: 'text-2xl' }, '🔗')
-            ),
-            h('div', { class: 'stat-title' }, 'GunDB Connections'),
-            h('div', { 
-                class: 'stat-value text-primary',
-                id: 'peer-count' 
-            }, () => getNetworkStatus().peerCount),
-            h('div', { class: 'stat-desc' },
-                'Status: ',
-                h('span', { id: 'network-status' }, () => getNetworkStatus().status)
-            )
-        ),
-        
-        // Files Stats Card
-        h('div', { class: 'stat bg-base-200 rounded-lg shadow' },
-            h('div', { class: 'stat-figure text-secondary' },
-                h('div', { class: 'text-2xl' }, '📁')
-            ),
-            h('div', { class: 'stat-title' }, 'Files Uploaded'),
-            h('div', { 
-                class: 'stat-value text-accent',
-                id: 'file-count' 
-            }, () => getFileStats().count),
-            h('div', { class: 'stat-desc' },
-                'Total: ',
-                h('span', { id: 'total-size' }, () => formatFileSize(getFileStats().totalSize))
+export function OverviewStats() {
+    const overview = h('div', { class: 'card bg-base-200 shadow-lg mb-6' },
+        h('div', { class: 'card-body' },
+            h('h3', { class: 'card-title text-lg mb-4' }, '📊 System Overview'),
+            h('div', { class: 'grid grid-cols-1 md:grid-cols-2 gap-4' },
+                h('div', { class: 'space-y-2' },
+                    h('div', { class: 'flex justify-between' },
+                        h('span', { class: 'text-sm' }, 'Server Status:'),
+                        h('strong', { class: 'text-sm', id: 'server-status-detail' }, () => getServerStatus().status)
+                    ),
+                    h('div', { class: 'flex justify-between' },
+                        h('span', { class: 'text-sm' }, 'Files Stored:'),
+                        h('strong', { class: 'text-sm', id: 'file-count-detail' }, () => getFileStats().count)
+                    )
+                ),
+                h('div', { class: 'space-y-2' },
+                    h('div', { class: 'flex justify-between' },
+                        h('span', { class: 'text-sm' }, 'Total Size:'),
+                        h('strong', { class: 'text-sm', id: 'total-size-detail' }, () => formatFileSize(getFileStats().totalSize))
+                    ),
+                    h('div', { class: 'flex justify-between' },
+                        h('span', { class: 'text-sm' }, 'System Theme:'),
+                        h('strong', { class: 'text-sm' }, () => getTheme())
+                    )
+                )
             )
         )
     );
     
-    return grid;
+    return overview;
 }
 
 /**
@@ -269,16 +261,6 @@ export function ServerInfoCard() {
                     )
                 )
             ),
-            h('div', { id: 'network-info', class: 'flex gap-4 mt-4' },
-                h('div', { class: 'badge badge-primary badge-lg' },
-                    'Peers: ',
-                    h('strong', { id: 'peer-count-detail' }, () => getNetworkStatus().peerCount)
-                ),
-                h('div', { class: 'badge badge-secondary badge-lg' },
-                    'Status: ',
-                    h('strong', { id: 'network-status-detail' }, () => getNetworkStatus().status)
-                )
-            ),
             h('div', { 
                 id: 'log-container', 
                 class: 'mockup-code mt-4 hidden max-h-64 overflow-y-auto'
@@ -304,8 +286,8 @@ export function EnhancedTabs() {
             label: 'Files', 
             icon: '📁',
             getBadge: () => {
-                const fileCount = getFileStats().count;
-                return fileCount > 0 ? { text: fileCount.toString(), type: 'info' } : null;
+                const fileStats = getFileStats();
+                return fileStats.count > 0 ? { text: fileStats.count.toString(), type: 'info' } : null;
             },
             ariaLabel: 'View and manage uploaded files'
         },
@@ -315,30 +297,9 @@ export function EnhancedTabs() {
             icon: '⬆️',
             getBadge: () => {
                 const isLoading = getIsLoading();
-                const ipfsStatus = getIpfsStatus();
-                if (isLoading) {
-                    return { text: '●', type: 'warning' };
-                }
-                return ipfsStatus.enabled ? { text: 'IPFS', type: 'success' } : null;
+                return isLoading ? { text: '...', type: 'warning' } : null;
             },
             ariaLabel: 'Upload new files to the system'
-        },
-        { 
-            id: 'network', 
-            label: 'Network', 
-            icon: '🌐',
-            getBadge: () => {
-                const networkStatus = getNetworkStatus();
-                const peerCount = networkStatus.peerCount;
-                if (peerCount > 1) {
-                    return { text: peerCount.toString(), type: 'success' };
-                } else if (peerCount === 1) {
-                    return { text: 'LOCAL', type: 'warning' };
-                } else {
-                    return { text: '!', type: 'error' };
-                }
-            },
-            ariaLabel: 'Manage network connections and peers'
         },
         { 
             id: 'settings', 
@@ -855,54 +816,105 @@ async function uploadFileToIpfs(file) {
             setIsLoading(true);
             showToast('Uploading file to IPFS...', 'info');
             
-            // Make API call to upload file to IPFS
-            const response = await fetch('/api/ipfs/upload-existing', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${getAuthToken()}`
-                },
-                body: JSON.stringify({
-                    fileId: file.id,
-                    fileName: file.originalName
-                })
-            });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                showToast(`File uploaded to IPFS successfully!`, 'success');
+            try {
+                // First try the main upload-existing endpoint
+                const response = await fetch('/api/ipfs/upload-existing', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${getAuthToken()}`
+                    },
+                    body: JSON.stringify({
+                        fileId: file.id,
+                        fileName: file.originalName || file.name
+                    })
+                });
                 
-                // Refresh the files list to show updated IPFS info
-                // Use a throttled approach to prevent multiple rapid refreshes
-                try {
-                    // Clear localStorage cache
-                    localStorage.setItem('files-data', JSON.stringify([]));
-                    setFiles([]);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        showToast(`✅ File uploaded to IPFS: ${data.ipfsHash}`, 'success');
+                        // Refresh file list to show updated IPFS status
+                        setTimeout(() => loadFiles(), 1000);
+                        return true;
+                    } else {
+                        throw new Error(data.error || 'Upload failed');
+                    }
+                } else if (response.status === 404) {
+                    // Main endpoint not available, try fallback method
+                    console.error('The /api/ipfs/upload-existing endpoint returned 404. This might indicate:');
+                    console.error('1. Server needs to be restarted');
+                    console.error('2. IPFS routes are not properly mounted');
+                    console.error('3. Server configuration issue');
                     
-                    // Wait a moment before refreshing to allow server to process
-                    setTimeout(() => {
-                        loadFiles();
-                    }, 1000);
-                } catch (refreshError) {
-                    console.error("Error refreshing files after IPFS upload:", refreshError);
+                    showToast('❌ Main upload endpoint unavailable, trying alternative method...', 'warning');
+                    
+                    // FALLBACK METHOD: Fetch file and re-upload via direct upload endpoint
+                    console.log('🔄 Attempting alternative upload method...');
+                    showToast('🔄 Attempting alternative upload method...', 'info');
+                    
+                    // Try to fetch the original file
+                    const fileUrl = file.fileUrl || `/uploads/${file.name}`;
+                    console.log(`Fetching file from: ${fileUrl}`);
+                    
+                    const fileResponse = await fetch(fileUrl, {
+                        headers: {
+                            'Authorization': `Bearer ${getAuthToken()}`
+                        }
+                    });
+                    
+                    if (!fileResponse.ok) {
+                        throw new Error(`Failed to fetch original file: ${fileResponse.status}`);
+                    }
+                    
+                    // Convert response to blob
+                    const fileBlob = await fileResponse.blob();
+                    
+                    // Create FormData for the alternative upload
+                    const formData = new FormData();
+                    formData.append('file', fileBlob, file.originalName || file.name);
+                    formData.append('customName', file.originalName || file.name);
+                    
+                    // Upload via direct IPFS upload endpoint
+                    const alternativeResponse = await fetch('/api/ipfs/upload', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${getAuthToken()}`
+                        },
+                        body: formData
+                    });
+                    
+                    if (alternativeResponse.ok) {
+                        const alternativeData = await alternativeResponse.json();
+                        if (alternativeData.success) {
+                            showToast(`✅ File uploaded to IPFS using alternative method: ${alternativeData.ipfsHash}`, 'success');
+                            console.log('✅ Alternative upload method succeeded:', alternativeData);
+                            
+                            // Refresh file list to show updated IPFS status
+                            setTimeout(() => loadFiles(), 1000);
+                            return true;
+                        } else {
+                            throw new Error(alternativeData.error || 'Alternative upload failed');
+                        }
+                    } else {
+                        throw new Error(`Alternative upload endpoint also failed: ${alternativeResponse.status}`);
+                    }
+                } else {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                
-                return true;
-            } else {
-                throw new Error(data.error || 'Unknown error');
+            } catch (error) {
+                console.error('Upload to IPFS failed:', error);
+                showToast(`❌ Failed to upload file to IPFS: ${error.message}`, 'error');
+                return false;
+            } finally {
+                setIsLoading(false);
             }
         }
     } catch (error) {
-        console.error('Error uploading file to IPFS:', error);
-        showToast(`Failed to upload to IPFS: ${error.message}`, 'error');
-        return false;
-    } finally {
+        console.error('Error in uploadFileToIpfs:', error);
+        showToast(`❌ Error: ${error.message}`, 'error');
         setIsLoading(false);
+        return false;
     }
 }
 
@@ -994,186 +1006,56 @@ export function LoadingState(message = 'Loading...') {
 }
 
 /**
- * Peer item component with DaisyUI styling
+ * Debug function to test IPFS endpoints
  */
-export function PeerItem(peer) {
-    if (!peer || typeof peer !== 'object') {
-        console.error('Invalid peer object:', peer);
-        return h('div', { class: 'alert alert-error' }, 'Invalid peer data');
-    }
+async function debugIpfsEndpoints() {
+    const endpoints = [
+        { name: 'IPFS Status', url: '/api/ipfs/status', method: 'GET' },
+        { name: 'IPFS Health Check', url: '/api/ipfs/health-check', method: 'GET' },
+        { name: 'IPFS Upload Existing', url: '/api/ipfs/upload-existing', method: 'POST' },
+        { name: 'IPFS Upload Direct', url: '/api/ipfs/upload', method: 'POST' },
+        { name: 'IPFS Metadata', url: '/api/ipfs/metadata', method: 'GET' }
+    ];
     
-    const safePeer = {
-        url: peer.url || peer.peer || 'Unknown URL',
-        connected: peer.connected || false,
-        status: peer.status || 'unknown',
-        latency: peer.latency || null,
-        lastSeen: peer.lastSeen || null
-    };
+    console.log('🔍 Testing IPFS endpoints...');
+    showToast('🔍 Testing IPFS endpoints...', 'info', 3000);
     
-    // Create peer card
-    const peerCard = h('div', { 
-        class: `card bg-base-200 shadow-md mb-4 ${safePeer.connected ? 'border-l-4 border-success' : 'border-l-4 border-error'}`,
-        id: `peer-${btoa(safePeer.url)}`,
-        'data-url': safePeer.url
-    });
-    
-    const cardBody = h('div', { class: 'card-body p-4' });
-    
-    // Peer header
-    const peerHeader = h('div', { class: 'flex justify-between items-start mb-2' },
-        h('h4', { class: 'card-title text-base font-medium break-all' }, safePeer.url),
-        h('div', { 
-            class: `badge ${safePeer.connected ? 'badge-success' : 'badge-error'}`
-        }, safePeer.connected ? '🟢 Connected' : '🔴 Disconnected')
-    );
-    
-    // Peer metadata
-    const peerMeta = h('div', { class: 'text-sm text-base-content/70 mb-3' },
-        `Status: ${safePeer.status}`,
-        safePeer.latency ? ` • Latency: ${safePeer.latency}ms` : '',
-        safePeer.lastSeen ? h('br') : '',
-        safePeer.lastSeen ? `Last seen: ${new Date(safePeer.lastSeen).toLocaleString()}` : ''
-    );
-    
-    cardBody.appendChild(peerHeader);
-    cardBody.appendChild(peerMeta);
-    
-    // Action buttons
-    const actions = h('div', { class: 'card-actions justify-end gap-2' });
-    
-    // Test connection button
-    const testButton = h('button', { 
-        class: 'btn btn-outline btn-sm',
-        onclick: async () => {
-            const result = await testPeerConnection(safePeer.url);
-            if (result && result.success) {
-                const method = result.method || 'unknown';
-                const latency = result.latency || 'unknown';
-                showToast(`✅ Connection test successful via ${method} (${latency}ms)`, 'success');
-            } else {
-                const error = result?.error || 'Unknown error';
-                const method = result?.method || 'unknown';
-                showToast(`❌ Connection test failed via ${method}: ${error}`, 'error');
+    for (const endpoint of endpoints) {
+        try {
+            const options = {
+                method: endpoint.method,
+                headers: {
+                    'Authorization': `Bearer ${getAuthToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            };
+            
+            // Add test body for POST requests
+            if (endpoint.method === 'POST') {
+                if (endpoint.url.includes('upload-existing')) {
+                    options.body = JSON.stringify({ fileId: 'test-id', fileName: 'test.txt' });
+                } else if (endpoint.url.includes('/upload')) {
+                    // Skip direct upload test as it needs multipart data
+                    console.log(`⏭️ Skipping ${endpoint.name} - requires multipart form data`);
+                    continue;
+                }
             }
+            
+            const response = await fetch(endpoint.url, options);
+            const statusText = response.ok ? '✅' : '❌';
+            
+            console.log(`${statusText} ${endpoint.name}: ${response.status} ${response.statusText}`);
+            
+            if (!response.ok && endpoint.url.includes('upload-existing')) {
+                console.error(`❌ ${endpoint.name} failed - this is the problematic endpoint!`);
+                showToast(`❌ Upload to IPFS endpoint not working (${response.status})`, 'error', 5000);
+            }
+            
+        } catch (error) {
+            console.error(`❌ ${endpoint.name}: ${error.message}`);
         }
-    }, '🔍 Test');
-    actions.appendChild(testButton);
-    
-    // Reconnect button (only if disconnected)
-    if (!safePeer.connected) {
-        const reconnectButton = h('button', { 
-            class: 'btn btn-warning btn-sm',
-            onclick: async () => {
-                await reconnectToPeer(safePeer.url);
-            }
-        }, '🔄 Reconnect');
-        actions.appendChild(reconnectButton);
     }
     
-    // Remove button
-    const removeButton = h('button', { 
-        class: 'btn btn-error btn-sm',
-        onclick: async () => {
-            if (confirm(`Are you sure you want to remove peer "${safePeer.url}"?`)) {
-                await removePeer(safePeer.url);
-            }
-        }
-    }, '🗑️ Remove');
-    actions.appendChild(removeButton);
-    
-    cardBody.appendChild(actions);
-    peerCard.appendChild(cardBody);
-    
-    return peerCard;
-}
-
-/**
- * Read-only peer item component (no remove button)
- * Shows configured peers from config.json with test and reconnect options only
- */
-export function PeerItemReadOnly(peer) {
-    if (!peer || typeof peer !== 'object') {
-        console.error('Invalid peer object:', peer);
-        return h('div', { class: 'alert alert-error' }, 'Invalid peer data');
-    }
-    
-    const safePeer = {
-        url: peer.url || peer.peer || 'Unknown URL',
-        connected: peer.connected || false,
-        status: peer.status || 'unknown',
-        latency: peer.latency || null,
-        lastSeen: peer.lastSeen || null
-    };
-    
-    // Create peer card
-    const peerCard = h('div', { 
-        class: `card bg-base-200 shadow-md mb-4 ${safePeer.connected ? 'border-l-4 border-success' : 'border-l-4 border-error'}`,
-        id: `peer-${btoa(safePeer.url)}`,
-        'data-url': safePeer.url
-    });
-    
-    const cardBody = h('div', { class: 'card-body p-4' });
-    
-    // Peer header with config badge
-    const peerHeader = h('div', { class: 'flex justify-between items-start mb-2' },
-        h('div', { class: 'flex flex-col gap-2' },
-            h('h4', { class: 'card-title text-base font-medium break-all' }, safePeer.url),
-            h('div', { class: 'flex gap-2' },
-                h('div', { 
-                    class: `badge ${safePeer.connected ? 'badge-success' : 'badge-error'}`
-                }, safePeer.connected ? '🟢 Connected' : '🔴 Disconnected'),
-                h('div', { 
-                    class: 'badge badge-info'
-                }, '⚙️ Configured')
-            )
-        )
-    );
-    
-    // Peer metadata
-    const peerMeta = h('div', { class: 'text-sm text-base-content/70 mb-3' },
-        `Status: ${safePeer.status}`,
-        safePeer.latency ? ` • Latency: ${safePeer.latency}ms` : '',
-        safePeer.lastSeen ? h('br') : '',
-        safePeer.lastSeen ? `Last seen: ${new Date(safePeer.lastSeen).toLocaleString()}` : ''
-    );
-    
-    cardBody.appendChild(peerHeader);
-    cardBody.appendChild(peerMeta);
-    
-    // Action buttons (senza Remove)
-    const actions = h('div', { class: 'card-actions justify-end gap-2' });
-    
-    // Test connection button
-    const testButton = h('button', { 
-        class: 'btn btn-outline btn-sm',
-        onclick: async () => {
-            const result = await testPeerConnection(safePeer.url);
-            if (result && result.success) {
-                const method = result.method || 'unknown';
-                const latency = result.latency || 'unknown';
-                showToast(`✅ Connection test successful via ${method} (${latency}ms)`, 'success');
-            } else {
-                const error = result?.error || 'Unknown error';
-                const method = result?.method || 'unknown';
-                showToast(`❌ Connection test failed via ${method}: ${error}`, 'error');
-            }
-        }
-    }, '🔍 Test');
-    actions.appendChild(testButton);
-    
-    // Reconnect button (only if disconnected)
-    if (!safePeer.connected) {
-        const reconnectButton = h('button', { 
-            class: 'btn btn-warning btn-sm',
-            onclick: async () => {
-                await reconnectToPeer(safePeer.url);
-            }
-        }, '🔄 Reconnect');
-        actions.appendChild(reconnectButton);
-    }
-    
-    cardBody.appendChild(actions);
-    peerCard.appendChild(cardBody);
-    
-    return peerCard;
+    console.log('🔍 IPFS endpoint testing complete');
+    showToast('🔍 Check console for detailed results', 'info', 3000);
 }

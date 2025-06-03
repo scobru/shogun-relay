@@ -77,12 +77,10 @@
     <script type="module">
       import { h, setEffect } from "./nodom.js";
       import {
-        initGun,
         checkAuth,
         loadFiles,
         updateIpfsStatus,
         updateServerStatus,
-        handleDebugCommand,
         getIsLoading,
         setIsLoading,
         getActiveTab,
@@ -90,7 +88,7 @@
         handleLogout,
         initTheme,
         initializeFileEventListeners,
-        initializePeers,
+        showToast,
       } from "./app-nodom.js";
       import {
         Header,
@@ -98,14 +96,13 @@
         ToastContainer,
         LoadingOverlay,
         DashboardHeader,
-        StatsGrid,
+        OverviewStats,
         ServerInfoCard,
         EnhancedTabs,
       } from "./components-nodom.js";
       import {
         FilesTabContent,
         UploadTabContent,
-        NetworkTabContent,
         SettingsTabContent,
       } from "./tabs-nodom.js";
 
@@ -124,7 +121,7 @@
         const mainContent = h("div", { class: "container mx-auto px-4 py-6 max-w-7xl" });
         
         const dashboardHeader = DashboardHeader();
-        const statsGrid = StatsGrid();
+        const overviewStats = OverviewStats();
         const serverInfoCard = ServerInfoCard();
 
         // Create tabs container with DaisyUI card styling
@@ -140,7 +137,6 @@
         // Tab content components with proper ARIA attributes
         const filesTabContent = FilesTabContent();
         const uploadTabContent = UploadTabContent();
-        const networkTabContent = NetworkTabContent();
         const settingsTabContent = SettingsTabContent();
 
         // Add ARIA attributes to tab panels
@@ -154,11 +150,6 @@
         uploadTabContent.setAttribute('aria-labelledby', 'tab-upload');
         uploadTabContent.classList.add('p-6');
 
-        networkTabContent.setAttribute('role', 'tabpanel');
-        networkTabContent.setAttribute('id', 'network-panel');
-        networkTabContent.setAttribute('aria-labelledby', 'tab-network');
-        networkTabContent.classList.add('p-6');
-
         settingsTabContent.setAttribute('role', 'tabpanel');
         settingsTabContent.setAttribute('id', 'settings-panel');
         settingsTabContent.setAttribute('aria-labelledby', 'tab-settings');
@@ -168,7 +159,6 @@
         tabsContainer.appendChild(enhancedTabs);
         tabsContainer.appendChild(filesTabContent);
         tabsContainer.appendChild(uploadTabContent);
-        tabsContainer.appendChild(networkTabContent);
         tabsContainer.appendChild(settingsTabContent);
 
         // Initialize first tab as visible
@@ -181,7 +171,7 @@
 
         // Add components to main content
         mainContent.appendChild(dashboardHeader);
-        mainContent.appendChild(statsGrid);
+        mainContent.appendChild(overviewStats);
         mainContent.appendChild(serverInfoCard);
         mainContent.appendChild(tabsContainer);
 
@@ -213,7 +203,7 @@
 
               // Execute debug command when showing the panel
               if (logContainer.style.display === "block") {
-                handleDebugCommand();
+                console.log('[Debug] Debug panel opened - network functionality removed');
               }
             }
           }
@@ -237,20 +227,13 @@
       async function refreshAllData() {
         try {
           setIsLoading(true);
-          console.log("Global data refresh...");
+          console.log("Global data refresh via server API...");
 
-          // Force Gun ping to test connection
-          const gun = window.gunInstance;
-          if (gun) {
-            gun.get("_ping").put({ timestamp: Date.now() });
-          }
-
-          // Update server status, files and IPFS status
+          // Update server status, files and IPFS status via server API
           await Promise.all([
             updateServerStatus(),
             loadFiles(),
             updateIpfsStatus(),
-            initializePeers(),
           ]);
 
           console.log("Data refresh complete");
@@ -283,43 +266,58 @@
             return;
           }
 
-          // Initialize Gun
-          const gun = initGun();
-
-          let authToken = localStorage.getItem("authToken");
-
-          gun.on("out", function (msg) {
-            if (msg.put) {
-              msg.token = authToken;
-              // o
-              msg.auth = { token: authToken };
-              msg.headers = {
-                token: authToken,
-              };
-            }
-            this.to.next(msg);
-          });
-
           // Initialize server data
           await Promise.all([
             updateServerStatus(),
             loadFiles(),
             updateIpfsStatus(),
-            initializePeers(),
           ]);
 
+          // Update UI
+          showDashboard();
+
+        } catch (error) {
+          console.error("Error initializing app:", error);
+          showToast(`❌ Initialization error: ${error.message}`, "error");
+        } finally {
+          setIsLoading(false);
+        }
+      }
+
+      // Show dashboard UI
+      function showDashboard() {
+        try {
           // Render app
           const app = App();
           document.getElementById("app").appendChild(app);
-
           console.log("NoDom app initialized successfully");
         } catch (error) {
-          console.error("Error initializing app:", error);
-          document.getElementById(
-            "app"
-          ).innerHTML = `<div style="text-align: center; margin-top: 100px; color: var(--error-color);">
-                        Error initializing app: ${error.message}
-                    </div>`;
+          console.error("Error showing dashboard:", error);
+          document.getElementById("app").innerHTML = `
+            <div style="text-align: center; margin-top: 100px; color: var(--error-color);">
+              Error showing dashboard: ${error.message}
+            </div>
+          `;
+        }
+      }
+
+      // Data refresh function (no Gun needed)
+      async function refreshData() {
+        console.log("Refreshing data from server API...");
+        
+        try {
+          setIsLoading(true);
+
+          // Update server status, files and IPFS status via server API
+          await Promise.all([
+            updateServerStatus(),
+            loadFiles(),
+            updateIpfsStatus(),
+          ]);
+
+          console.log("Data refresh complete");
+        } catch (error) {
+          console.error(`Data refresh error: ${error.message}`);
         } finally {
           setIsLoading(false);
         }
