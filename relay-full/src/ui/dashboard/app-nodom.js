@@ -1287,7 +1287,25 @@ function getFiles() {
       return [];
     }
     const parsed = JSON.parse(storedFiles);
-    return Array.isArray(parsed) ? parsed : [];
+    const files = Array.isArray(parsed) ? parsed : [];
+    
+    // Ensure all files have a storageType property for filtering
+    return files.map(file => {
+      if (!file.storageType) {
+        // Assign storageType based on file properties
+        if (file.independent === true || file.uploadType === 'ipfs-direct') {
+          file.storageType = 'ipfs-independent';
+        } else if (file.ipfsHash && (file.localPath || file.fileUrl)) {
+          file.storageType = 'local-with-ipfs';
+        } else if (file.ipfsHash && !file.localPath && !file.fileUrl) {
+          file.storageType = 'ipfs-independent';
+        } else {
+          file.storageType = 'local-only';
+        }
+        console.log(`[GetFiles] Assigned storageType "${file.storageType}" to file: ${file.id} (${file.originalName || file.name})`);
+      }
+      return file;
+    });
   } catch (err) {
     console.error("Error getting files:", err);
     localStorage.removeItem("files-data");

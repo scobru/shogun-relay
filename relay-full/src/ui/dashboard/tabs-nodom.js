@@ -450,7 +450,12 @@ export function FilesTabContent() {
         console.log(`- All file storage types:`, files.map(f => ({
             id: f.id,
             name: f.originalName || f.name,
-            storageType: f.storageType
+            storageType: f.storageType,
+            ipfsHash: f.ipfsHash,
+            independent: f.independent,
+            uploadType: f.uploadType,
+            localPath: f.localPath,
+            fileUrl: f.fileUrl
         })));
         console.log(`- Files matching filter "${storageFilter}": ${filteredFiles.length}`);
         if (storageFilter !== 'all') {
@@ -459,6 +464,15 @@ export function FilesTabContent() {
                 name: f.originalName || f.name,
                 storageType: f.storageType
             })));
+        }
+        
+        // Additional debug for filter logic
+        if (storageFilter !== 'all' && files.length > 0) {
+            console.log(`[FilesDisplay] Filter logic debug:`);
+            files.forEach(file => {
+                const matches = file.storageType === storageFilter;
+                console.log(`- File "${file.originalName || file.name}" (${file.id}): storageType="${file.storageType}", filter="${storageFilter}", matches=${matches}`);
+            });
         }
         
         if (filteredFiles.length === 0) {
