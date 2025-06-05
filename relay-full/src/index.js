@@ -705,7 +705,10 @@ async function startServer() {
     );
     app.use("/api/ipfs", ipfsApiRouter);
 
-    const gatewayRouter = setupGatewayRoutes(CONFIG, serverLogger);
+    const gatewayRouter = setupGatewayRoutes(
+      authenticateRequest,
+      serverLogger
+    );
     app.use("/gateway", gatewayRouter);
 
     // Set up relay API routes
@@ -725,7 +728,7 @@ async function startServer() {
       fileManager,
       authenticateRequest
     );
-    app.use("/files", fileManagerRouter);
+    app.use("/api/files", fileManagerRouter);
 
     app.set("gun", gun);
 
@@ -983,6 +986,11 @@ async function startServer() {
     app.use(
       "/tabs-nodom.js",
       express.static(path.join(__dirname, "src/ui/dashboard/tabs-nodom.js"))
+    );
+
+    app.use(
+      "/debug-files.js",
+      express.static(path.join(__dirname, "src/ui/dashboard/debug-files.js"))
     );
 
     app.use(

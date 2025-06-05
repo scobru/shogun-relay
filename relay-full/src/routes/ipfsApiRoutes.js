@@ -1076,7 +1076,7 @@ export default function setupIpfsApiRoutes(
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   }
 
-  // ===== FILE HASH INFO & TEMPORARY LINKS ENDPOINTS =====
+  // ===== FILE HASH INFO ENDPOINTS =====
 
   // API - GET FILE HASH INFORMATION
   router.get(
@@ -1168,57 +1168,6 @@ export default function setupIpfsApiRoutes(
           success: false,
           error: error.message,
           message: "Error retrieving file hash information",
-        });
-      }
-    }
-  );
-
-  // API - CREATE TEMPORARY ACCESS LINK (using GunDB/SEA encryption)
-  router.post(
-    "/create-temp-link",
-    authenticateRequestMiddleware,
-    async (req, res) => {
-      try {
-        const {
-          fileId,
-          expiresIn = 3600,
-          password,
-          allowedDownloads = 1,
-        } = req.body; // Default 1 hour expiration
-
-        if (!fileId) {
-          return res.status(400).json({
-            success: false,
-            error: "File ID is required",
-            message: "Missing required parameter",
-          });
-        }
-
-        // Get file from FileManager
-        const fileData = await fileManager.getFileById(fileId);
-        if (!fileData) {
-          return res.status(404).json({
-            success: false,
-            error: "File not found",
-            message: `File with ID ${fileId} not found`,
-          });
-        }
-
-        // Generate temporary token with SEA-like encryption concept
-        // TODO: Implement temporary link functionality
-        return res.status(501).json({
-          success: false,
-          error: "Not implemented",
-          message: "Temporary link functionality not yet implemented",
-        });
-      } catch (error) {
-        console.error(
-          `[IPFS API] Error creating temporary link: ${error.message}`
-        );
-        return res.status(500).json({
-          success: false,
-          error: error.message,
-          message: "Error creating temporary access link",
         });
       }
     }

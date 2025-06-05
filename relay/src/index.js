@@ -50,7 +50,6 @@ function hasValidToken(msg) {
   return valid;
 }
 
-// Add listener
 Gun.on("opt", function (ctx) {
   if (ctx.once) {
     return;
@@ -59,18 +58,13 @@ Gun.on("opt", function (ctx) {
   // Add outgoing token injection for this instance
   ctx.on("out", function (msg) {
     const to = this.to;
-    
+
     // Always add token to outgoing messages from server
     if (!msg.headers) msg.headers = {};
     msg.headers.token = authToken;
     msg.token = authToken;
     msg.headers.Authorization = `Bearer ${authToken}`;
-    
-    console.log("📤 Adding token to outgoing message:", {
-      type: msg.put ? 'PUT' : msg.get ? 'GET' : 'OTHER',
-      hasToken: !!msg.token
-    });
-    
+
     to.next(msg);
   });
 
@@ -84,24 +78,28 @@ Gun.on("opt", function (ctx) {
       return;
     }
 
-    // For PUT operations, apply token validation logic
-    if (hasValidToken(msg)) {
+    // Check if Gun authentication is disabled in config
+    if (
+      CONFIG.DISABLE_GUN_AUTH === true ||
+      CONFIG.DISABLE_GUN_AUTH === "true"
+    ) {
       console.log(
-        "WRITING - Valid token found",
-        JSON.stringify(msg).slice(0, 100) + "..."
+        "⚠️ Gun authentication disabled - allowing all PUT operations"
       );
       to.next(msg);
       return;
     }
 
-    // Block everything else
-    console.log(
-      "BLOCKED - PUT without valid token:",
-      JSON.stringify(msg.put).slice(0, 100) + "..."
-    );
+    // For PUT operations, apply token validation logic
+    if (hasValidToken(msg)) {
+      to.next(msg);
+      return;
+    }
+
     // Don't forward unauthorized puts
   });
 });
+
 
 const server = createServer(Gun.serve("data.json"));
 

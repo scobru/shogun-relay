@@ -121,7 +121,25 @@ function initializeFileEventListeners() {
   console.log('[Events] Setting up file event listeners');
   
   document.addEventListener('filesUpdated', (event) => {
-    console.log('[Events] Files updated event received:', event.detail);
+    console.log('[Events] Files updated event received:', {
+      source: event.detail?.source,
+      fileCount: event.detail?.files?.length,
+      breakdown: event.detail?.breakdown,
+      timestamp: event.detail?.timestamp
+    });
+    
+    // Force UI refresh if needed
+    const activeTab = getActiveTab();
+    if (activeTab === 'files') {
+      // Small delay to let state settle
+      setTimeout(() => {
+        const filesContainer = document.getElementById('files-display-container');
+        if (filesContainer && typeof window.refreshFilesDisplay === 'function') {
+          console.log('[Events] Triggering files display refresh');
+          window.refreshFilesDisplay();
+        }
+      }, 100);
+    }
   });
   
   document.addEventListener('tabChanged', (event) => {
@@ -129,9 +147,17 @@ function initializeFileEventListeners() {
     if (event.detail.tab === 'files') {
       setTimeout(() => {
         const currentFiles = getFiles();
+        console.log(`[Events] Files tab activated, current file count: ${currentFiles.length}`);
         if (currentFiles.length === 0) {
           console.log('[Events] Files tab activated with no files, loading...');
-          loadFiles();
+          loadAllFiles();
+        } else {
+          // Trigger a refresh to ensure display is current
+          const filesContainer = document.getElementById('files-display-container');
+          if (filesContainer && typeof window.refreshFilesDisplay === 'function') {
+            console.log('[Events] Refreshing existing files display');
+            window.refreshFilesDisplay();
+          }
         }
       }, 100);
     }
@@ -145,6 +171,16 @@ function initializeFileEventListeners() {
           console.log('[Events] Files updated from another tab, syncing...');
           _setFiles(newFiles);
           updateFileStats(newFiles);
+          
+          // Dispatch update event for consistency
+          const updateEvent = new CustomEvent('filesUpdated', { 
+            detail: { 
+              files: newFiles, 
+              source: 'storage-sync',
+              timestamp: Date.now()
+            } 
+          });
+          document.dispatchEvent(updateEvent);
         }
       } catch (err) {
         console.error('[Events] Error syncing files from storage:', err);
@@ -160,57 +196,24 @@ function initializeFileEventListeners() {
  * Load all files
  */
 export async function loadFiles(searchParams = {}) {
-  const now = Date.now();
-  
-  if (isLoadingFiles || getIsLoading()) {
-    console.log("[LoadFiles] Already loading, skipping duplicate call");
-    return;
-  }
-  
-  if (now - lastLoadRequest < 1000) {
-    console.log("[LoadFiles] Request too soon after last one, throttling");
-    return;
-  }
-  
-  lastLoadRequest = now;
-  
-  if (loadFilesTimeout) {
-    clearTimeout(loadFilesTimeout);
-    loadFilesTimeout = null;
-  }
-  
-  isLoadingFiles = true;
-  setIsLoading(true);
-  
-  console.log(`[LoadFiles] Starting file load at ${new Date().toISOString()}`);
+  console.log("[LoadFiles] Starting file load process...");
 
   try {
-    if (!(await checkAuth())) {
-      setIsLoading(false);
-      isLoadingFiles = false;
-      return;
-    }
+    const { searchQuery = "", currentTab = "all" } = searchParams;
+    
+    const authToken = getAuthToken();
+    let url = "/api/files/all";
 
-    const currentFiles = getFiles();
-    const currentFileIds = currentFiles.map(f => f.id).sort();
-
-    let url = "/files/all";
-    if (Object.keys(searchParams).length > 0) {
-      const queryParams = new URLSearchParams();
-      for (const key in searchParams) {
-        if (searchParams[key]) {
-          queryParams.append(key, searchParams[key]);
-        }
-      }
-      url = `/files/search?${queryParams.toString()}`;
+    if (searchQuery?.trim()) {
+      const searchParam = encodeURIComponent(searchQuery.trim());
+      url = `/api/files/search?name=${searchParam}`;
     }
 
     url += (url.includes("?") ? "&" : "?") + "_t=" + Date.now();
 
-    const token = getAuthToken();
     const response = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${authToken}`,
         "Cache-Control": "no-cache, no-store, must-revalidate",
         "Pragma": "no-cache",
         "Expires": "0",
@@ -298,6 +301,8 @@ export async function loadFiles(searchParams = {}) {
       }
 
       const newFileIds = processedFiles.map(f => f.id).sort();
+      const currentFiles = getFiles();
+      const currentFileIds = currentFiles.map(f => f.id).sort();
       const hasChanged = JSON.stringify(currentFileIds) !== JSON.stringify(newFileIds);
       const countChanged = processedFiles.length !== lastLoadedFileCount;
       
@@ -555,7 +560,7 @@ async function forceRefreshFileList() {
     
     const cacheBuster = Date.now();
     const token = getAuthToken();
-    const response = await fetch(`/files/all?_nocache=${cacheBuster}&_force=true&_delay=true`, {
+    const response = await fetch(`/api/files/all?_nocache=${cacheBuster}&_force=true&_delay=true`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -1203,79 +1208,198 @@ export async function deleteIpfsFile(ipfsHash, fileName) {
  * Enhanced loadFiles that combines both local and IPFS files
  */
 export async function loadAllFiles(searchParams = {}) {
+  const now = Date.now();
+  
+  if (isLoadingFiles) {
+    console.log("[LoadAllFiles] Already loading files, skipping duplicate call");
+    return getFiles();
+  }
+  
+  if (now - lastLoadRequest < 1000) {
+    console.log("[LoadAllFiles] Request too soon after last one, throttling");
+    return getFiles();
+  }
+  
+  lastLoadRequest = now;
+  isLoadingFiles = true;
+  setIsLoading(true);
+  
   try {
-    setIsLoading(true);
-    console.log(`[LoadAllFiles] Loading combined file lists...`);
+    console.log(`[LoadAllFiles] Starting combined file load at ${new Date().toISOString()}`);
     
-    // Load local files with existing logic
-    await loadFiles(searchParams);
-    const localFiles = getFiles();
+    // Load local files first (without setting them to global state yet)
+    const localFilesResponse = await loadFilesRaw(searchParams);
+    const localFiles = Array.isArray(localFilesResponse) ? localFilesResponse : [];
     
     // Load IPFS independent files
     const ipfsFiles = await loadIpfsFiles();
     
-    // Combine and tag files with their source
-    const combinedFiles = [
-      ...localFiles.map(f => ({ 
-        ...f, 
-        storageType: f.ipfsHash ? 'local-with-ipfs' : 'local-only'
-      })),
-      ...ipfsFiles.map(f => ({ 
-        ...f, 
+    console.log(`[LoadAllFiles] Raw data loaded: ${localFiles.length} local, ${ipfsFiles.length} IPFS`);
+    
+    // Create a Set to track IDs and prevent duplicates
+    const seenIds = new Set();
+    const combinedFiles = [];
+    
+    // Process local files with proper storageType assignment
+    localFiles.forEach(file => {
+      if (!file || !file.id || seenIds.has(file.id)) {
+        return;
+      }
+      
+      // Determine correct storage type for local files
+      let storageType = 'local-only';
+      if (file.ipfsHash) {
+        // Local file that has been uploaded to IPFS
+        storageType = 'local-with-ipfs';
+      }
+      
+      const processedFile = {
+        ...file,
+        storageType,
+        source: 'local',
+        // Ensure consistent naming
+        originalName: file.originalName || file.name,
+        mimetype: file.mimetype || file.mimeType
+      };
+      
+      combinedFiles.push(processedFile);
+      seenIds.add(file.id);
+    });
+    
+    // Process IPFS independent files
+    ipfsFiles.forEach(file => {
+      if (!file || !file.id || seenIds.has(file.id)) {
+        return;
+      }
+      
+      const processedFile = {
+        ...file,
         storageType: 'ipfs-independent',
+        source: 'ipfs',
         // Ensure consistent properties
-        originalName: f.originalName || f.name,
-        mimetype: f.mimeType || f.mimetype
-      }))
-    ];
+        originalName: file.originalName || file.name,
+        mimetype: file.mimeType || file.mimetype,
+        // Mark as independent for clarity
+        independent: true,
+        uploadType: file.uploadType || 'ipfs-direct'
+      };
+      
+      combinedFiles.push(processedFile);
+      seenIds.add(file.id);
+    });
+    
+    // Sort files by timestamp (newest first)
+    combinedFiles.sort((a, b) => {
+      const aTime = parseInt(a.timestamp || a.uploadedAt || 0);
+      const bTime = parseInt(b.timestamp || b.uploadedAt || 0);
+      return bTime - aTime;
+    });
     
     // Debug logging for file categorization
     console.log(`[LoadAllFiles] File categorization debug:`);
-    console.log(`- Local files (${localFiles.length}):`, localFiles.map(f => ({
-      id: f.id,
-      name: f.originalName || f.name,
-      hasIpfsHash: !!f.ipfsHash,
-      assignedType: f.ipfsHash ? 'local-with-ipfs' : 'local-only'
-    })));
-    console.log(`- IPFS files (${ipfsFiles.length}):`, ipfsFiles.map(f => ({
-      id: f.id,
-      name: f.originalName || f.name,
-      independent: f.independent,
-      uploadType: f.uploadType,
-      assignedType: 'ipfs-independent'
-    })));
-    console.log(`- Combined files storage types:`, combinedFiles.map(f => ({
-      id: f.id,
-      name: f.originalName || f.name,
-      storageType: f.storageType
-    })));
+    console.log(`- Local files (${localFiles.length}):`);
+    localFiles.forEach(f => {
+      console.log(`  * ${f.originalName || f.name} (${f.id}): hasIpfs=${!!f.ipfsHash}`);
+    });
+    console.log(`- IPFS files (${ipfsFiles.length}):`);
+    ipfsFiles.forEach(f => {
+      console.log(`  * ${f.originalName || f.name} (${f.id}): independent=${f.independent}`);
+    });
+    console.log(`- Combined files (${combinedFiles.length}) by storage type:`);
+    const typeGroups = combinedFiles.reduce((acc, f) => {
+      acc[f.storageType] = (acc[f.storageType] || 0) + 1;
+      return acc;
+    }, {});
+    Object.entries(typeGroups).forEach(([type, count]) => {
+      console.log(`  * ${type}: ${count} files`);
+    });
     
-    // Update combined files state
+    // Update global state
+    localStorage.setItem("files-data", JSON.stringify(combinedFiles));
     _setFiles(combinedFiles);
     updateFileStats(combinedFiles);
+    lastLoadedFileCount = combinedFiles.length;
     
-    console.log(`[LoadAllFiles] Combined ${localFiles.length} local + ${ipfsFiles.length} IPFS independent files = ${combinedFiles.length} total`);
+    console.log(`[LoadAllFiles] Successfully loaded ${combinedFiles.length} total files`);
     
+    // Dispatch update event
     const event = new CustomEvent('filesUpdated', { 
       detail: { 
         files: combinedFiles, 
         source: 'loadAllFiles',
         breakdown: {
-          local: localFiles.length,
-          ipfsIndependent: ipfsFiles.length,
+          localOnly: typeGroups['local-only'] || 0,
+          localWithIpfs: typeGroups['local-with-ipfs'] || 0,
+          ipfsIndependent: typeGroups['ipfs-independent'] || 0,
           total: combinedFiles.length
-        }
+        },
+        timestamp: now
       } 
     });
     document.dispatchEvent(event);
     
     return combinedFiles;
   } catch (error) {
-    console.error("Error loading all files:", error);
+    console.error("[LoadAllFiles] Error loading files:", error);
     showToast(`Failed to load files: ${error.message}`, "error");
+    
+    // Reset state on error
+    localStorage.setItem("files-data", JSON.stringify([]));
+    _setFiles([]);
+    updateFileStats([]);
+    lastLoadedFileCount = 0;
+    
     return [];
   } finally {
     setIsLoading(false);
+    isLoadingFiles = false;
+    console.log(`[LoadAllFiles] Completed at ${new Date().toISOString()}`);
+  }
+}
+
+/**
+ * Raw file loading function (doesn't update global state)
+ */
+async function loadFilesRaw(searchParams = {}) {
+  try {
+    const { searchQuery = "", currentTab = "all" } = searchParams;
+    
+    const authToken = getAuthToken();
+    let url = "/api/files/all";
+
+    if (searchQuery?.trim()) {
+      const searchParam = encodeURIComponent(searchQuery.trim());
+      url = `/api/files/search?name=${searchParam}`;
+    }
+
+    url += (url.includes("?") ? "&" : "?") + "_t=" + Date.now();
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.success) {
+      const fileArray = data.files || data.results || [];
+      console.log(`[LoadFilesRaw] Loaded ${fileArray.length} local files from API`);
+      return fileArray.filter(file => file && typeof file === 'object' && file.id);
+    } else {
+      console.warn("[LoadFilesRaw] API returned success: false");
+      return [];
+    }
+  } catch (error) {
+    console.error(`[LoadFilesRaw] Error loading files: ${error.message}`);
+    throw error;
   }
 }
 
@@ -1293,17 +1417,27 @@ function getFiles() {
     return files.map(file => {
       if (!file.storageType) {
         // Assign storageType based on file properties
-        if (file.independent === true || file.uploadType === 'ipfs-direct') {
+        if (file.source === 'ipfs' || file.independent === true || file.uploadType === 'ipfs-direct') {
           file.storageType = 'ipfs-independent';
-        } else if (file.ipfsHash && (file.localPath || file.fileUrl)) {
+        } else if (file.ipfsHash && (file.localPath || file.fileUrl || file.source === 'local')) {
           file.storageType = 'local-with-ipfs';
-        } else if (file.ipfsHash && !file.localPath && !file.fileUrl) {
+        } else if (file.ipfsHash && !file.localPath && !file.fileUrl && !file.source) {
+          // Legacy IPFS-only files without proper source tagging
           file.storageType = 'ipfs-independent';
         } else {
           file.storageType = 'local-only';
         }
-        console.log(`[GetFiles] Assigned storageType "${file.storageType}" to file: ${file.id} (${file.originalName || file.name})`);
+        console.log(`[GetFiles] Auto-assigned storageType "${file.storageType}" to file: ${file.id} (${file.originalName || file.name}) - ipfsHash: ${!!file.ipfsHash}, source: ${file.source}, independent: ${file.independent}`);
       }
+      
+      // Ensure consistent property names
+      if (!file.originalName && file.name) {
+        file.originalName = file.name;
+      }
+      if (!file.mimetype && file.mimeType) {
+        file.mimetype = file.mimeType;
+      }
+      
       return file;
     });
   } catch (err) {

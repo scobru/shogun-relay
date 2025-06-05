@@ -7,8 +7,6 @@ const server = createNodeServer(8765, ['http://localhost:8765/gun'],{
      radiskPath: 'radata'
 });
 
-console.log(server);
-
 console.log('GUN server started on port 8765');
 
 

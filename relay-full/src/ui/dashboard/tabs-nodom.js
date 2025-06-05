@@ -16,6 +16,7 @@ import {
     setIpfsConnectionStatus,
     setFiles,
     deleteFile,
+    deleteIpfsFile,
     forceRefreshFileList,
     pinFileToIpfs,
     unpinFileFromIpfs,
@@ -123,9 +124,20 @@ export function FilesTabContent() {
         
         if (isActive) {
             // Load combined files when tab becomes active
+            console.log('[FilesTab] Tab activated, loading all files...');
             loadAllFiles();
         }
     });
+    
+    // Global refresh function
+    window.refreshFilesDisplay = () => {
+        console.log('[FilesTab] Refreshing files display...');
+        const filesContainer = document.getElementById('files-display-container');
+        if (filesContainer) {
+            filesContainer.innerHTML = '';
+            filesContainer.appendChild(FilesDisplay());
+        }
+    };
     
     // Create enhanced file search form with storage filter
     const createEnhancedFileSearch = () => {
@@ -134,57 +146,41 @@ export function FilesTabContent() {
             h('div', { class: 'flex flex-wrap gap-2 mb-4' },
                 h('div', { class: 'flex items-center gap-2' },
                     h('span', { class: 'text-sm font-medium' }, '📂 Filter by Storage:'),
-                    h('div', { class: 'join' },
+                    h('div', { class: 'join', id: 'storage-filter-buttons' },
                         h('button', { 
                             class: `btn btn-sm join-item ${storageFilter === 'all' ? 'btn-active' : 'btn-outline'}`,
+                            'data-filter': 'all',
                             onclick: () => {
                                 storageFilter = 'all';
                                 updateFilterButtons();
-                                // Trigger display update
-                                const filesContainer = document.getElementById('files-display-container');
-                                if (filesContainer) {
-                                    filesContainer.innerHTML = '';
-                                    filesContainer.appendChild(FilesDisplay());
-                                }
+                                window.refreshFilesDisplay();
                             }
                         }, 'All Files'),
                         h('button', { 
                             class: `btn btn-sm join-item ${storageFilter === 'local-only' ? 'btn-active' : 'btn-outline'}`,
+                            'data-filter': 'local-only',
                             onclick: () => {
                                 storageFilter = 'local-only';
                                 updateFilterButtons();
-                                // Trigger display update
-                                const filesContainer = document.getElementById('files-display-container');
-                                if (filesContainer) {
-                                    filesContainer.innerHTML = '';
-                                    filesContainer.appendChild(FilesDisplay());
-                                }
+                                window.refreshFilesDisplay();
                             }
                         }, '💾 Local Only'),
                         h('button', { 
                             class: `btn btn-sm join-item ${storageFilter === 'local-with-ipfs' ? 'btn-active' : 'btn-outline'}`,
+                            'data-filter': 'local-with-ipfs',
                             onclick: () => {
                                 storageFilter = 'local-with-ipfs';
                                 updateFilterButtons();
-                                // Trigger display update
-                                const filesContainer = document.getElementById('files-display-container');
-                                if (filesContainer) {
-                                    filesContainer.innerHTML = '';
-                                    filesContainer.appendChild(FilesDisplay());
-                                }
+                                window.refreshFilesDisplay();
                             }
                         }, '🌐💾 Local+IPFS'),
                         h('button', { 
                             class: `btn btn-sm join-item ${storageFilter === 'ipfs-independent' ? 'btn-active' : 'btn-outline'}`,
+                            'data-filter': 'ipfs-independent',
                             onclick: () => {
                                 storageFilter = 'ipfs-independent';
                                 updateFilterButtons();
-                                // Trigger display update
-                                const filesContainer = document.getElementById('files-display-container');
-                                if (filesContainer) {
-                                    filesContainer.innerHTML = '';
-                                    filesContainer.appendChild(FilesDisplay());
-                                }
+                                window.refreshFilesDisplay();
                             }
                         }, '🌐⚡ Direct IPFS')
                     )
@@ -198,35 +194,33 @@ export function FilesTabContent() {
     
     // Function to get display name for filter
     const getFilterDisplayName = (filter) => {
-        const filterNames = {
-            'all': 'All Files',
-            'local-only': 'Local Only',
-            'local-with-ipfs': 'Local + IPFS',
-            'ipfs-independent': 'Direct IPFS'
-        };
-        return filterNames[filter] || filter;
-    };
-
-    // Function to display filtered files with batch selection
-    const displayFilteredFiles = (files, container) => {
-        container.innerHTML = '';
-        
-        // Add batch selection controls
-        if (files.length > 0) {
-            const batchControls = createBatchControls(files);
-            container.appendChild(batchControls);
+        switch (filter) {
+            case 'all': return 'All Files';
+            case 'local-only': return 'Local Only';
+            case 'local-with-ipfs': return 'Local + IPFS';
+            case 'ipfs-independent': return 'Direct IPFS';
+            default: return 'Unknown Filter';
         }
-        
-        files.forEach(file => {
-            const fileElement = FileItem(file, {
-                showCheckbox: true,
-                checked: selectedFiles.has(file.id),
-                onSelectionChange: handleFileSelection
-            });
-            container.appendChild(fileElement);
-        });
     };
-
+    
+    // Update filter button states
+    const updateFilterButtons = () => {
+        const filterContainer = document.getElementById('storage-filter-buttons');
+        if (filterContainer) {
+            const buttons = filterContainer.querySelectorAll('button[data-filter]');
+            buttons.forEach(button => {
+                const filter = button.getAttribute('data-filter');
+                if (filter === storageFilter) {
+                    button.classList.remove('btn-outline');
+                    button.classList.add('btn-active');
+                } else {
+                    button.classList.remove('btn-active');
+                    button.classList.add('btn-outline');
+                }
+            });
+        }
+    };
+    
     // Function to create batch controls
     const createBatchControls = (files) => {
         return h('div', { class: 'bg-base-200 p-4 rounded-lg mb-4 border border-base-300' },
@@ -272,14 +266,68 @@ export function FilesTabContent() {
             ? allFiles 
             : allFiles.filter(file => file.storageType === storageFilter);
         
-        isSelectAllChecked = filteredFiles.length > 0 && filteredFiles.every(file => selectedFiles.has(file.id));
+        // Check if all filtered files are now selected
+        const allFilteredSelected = filteredFiles.length > 0 && filteredFiles.every(file => selectedFiles.has(file.id));
+        isSelectAllChecked = allFilteredSelected;
         
-        // Update UI
+        console.log(`[FileSelection] File ${fileId} ${isSelected ? 'selected' : 'deselected'}. Total selected: ${selectedFiles.size}/${filteredFiles.length}. All selected: ${allFilteredSelected}`);
+        
+        // Update UI using the new function
+        updateBatchControlsUI(filteredFiles);
+    };
+
+    // Function to handle select all
+    const handleSelectAll = (e) => {
+        const isChecked = e.target.checked;
+        const allFiles = getFiles();
+        const filteredFiles = storageFilter === 'all' 
+            ? allFiles 
+            : allFiles.filter(file => file.storageType === storageFilter);
+        
+        console.log(`[SelectAll] Checkbox clicked: ${isChecked}, filteredFiles: ${filteredFiles.length}`);
+        
+        if (isChecked) {
+            // Select all filtered files
+            console.log(`[SelectAll] Selecting all ${filteredFiles.length} files`);
+            filteredFiles.forEach(file => selectedFiles.add(file.id));
+        } else {
+            // Deselect all filtered files
+            console.log(`[SelectAll] Deselecting all ${filteredFiles.length} files`);
+            filteredFiles.forEach(file => selectedFiles.delete(file.id));
+        }
+        
+        isSelectAllChecked = isChecked;
+        
+        // Update all file checkboxes immediately
+        filteredFiles.forEach(file => {
+            const checkbox = document.getElementById(`file-checkbox-${file.id}`);
+            if (checkbox) {
+                checkbox.checked = isChecked;
+            }
+        });
+        
+        // Update batch controls immediately without full refresh
+        updateBatchControlsUI(filteredFiles);
+        
+        console.log(`[SelectAll] Result: ${selectedFiles.size} files selected, isSelectAllChecked: ${isSelectAllChecked}`);
+    };
+
+    // Function to update batch controls UI without full refresh
+    const updateBatchControlsUI = (filteredFiles = null) => {
+        if (!filteredFiles) {
+            const allFiles = getFiles();
+            filteredFiles = storageFilter === 'all' 
+                ? allFiles 
+                : allFiles.filter(file => file.storageType === storageFilter);
+        }
+        
+        // Update Select All checkbox
         const selectAllCheckbox = document.getElementById('select-all-checkbox');
         if (selectAllCheckbox) {
             selectAllCheckbox.checked = isSelectAllChecked;
         }
         
+        // Update batch delete button
         const batchDeleteBtn = document.getElementById('batch-delete-btn');
         if (batchDeleteBtn) {
             batchDeleteBtn.disabled = selectedFiles.size === 0;
@@ -294,40 +342,6 @@ export function FilesTabContent() {
             if (selectionSpan) {
                 selectionSpan.textContent = `${selectedFiles.size} of ${filteredFiles.length} files selected`;
             }
-        }
-    };
-
-    // Function to handle select all
-    const handleSelectAll = (e) => {
-        const isChecked = e.target.checked;
-        const allFiles = getFiles();
-        const filteredFiles = storageFilter === 'all' 
-            ? allFiles 
-            : allFiles.filter(file => file.storageType === storageFilter);
-        
-        if (isChecked) {
-            // Select all filtered files
-            filteredFiles.forEach(file => selectedFiles.add(file.id));
-        } else {
-            // Deselect all filtered files
-            filteredFiles.forEach(file => selectedFiles.delete(file.id));
-        }
-        
-        isSelectAllChecked = isChecked;
-        
-        // Update all file checkboxes
-        filteredFiles.forEach(file => {
-            const checkbox = document.getElementById(`file-checkbox-${file.id}`);
-            if (checkbox) {
-                checkbox.checked = isChecked;
-            }
-        });
-        
-        // Update batch controls
-        const filesContainer = document.getElementById('files-display-container');
-        if (filesContainer) {
-            filesContainer.innerHTML = '';
-            filesContainer.appendChild(FilesDisplay());
         }
     };
 
@@ -399,34 +413,6 @@ export function FilesTabContent() {
         }, 1000);
     };
     
-    // Function to update filter button states
-    const updateFilterButtons = () => {
-        // Find all filter buttons by their class and text content
-        const filterButtons = document.querySelectorAll('.join .btn');
-        
-        filterButtons.forEach(button => {
-            const text = button.textContent || button.innerText;
-            let shouldBeActive = false;
-            
-            if (text.includes('All Files') && storageFilter === 'all') {
-                shouldBeActive = true;
-            } else if (text.includes('Local Only') && storageFilter === 'local-only') {
-                shouldBeActive = true;
-            } else if (text.includes('Local+IPFS') && storageFilter === 'local-with-ipfs') {
-                shouldBeActive = true;
-            } else if (text.includes('Direct IPFS') && storageFilter === 'ipfs-independent') {
-                shouldBeActive = true;
-            }
-            
-            if (shouldBeActive) {
-                button.className = 'btn btn-sm join-item btn-active';
-            } else {
-                button.className = 'btn btn-sm join-item btn-outline';
-            }
-        });
-    };
-    
-    // Enhanced files display component - NO UPLOAD SECTION HERE
     const FilesDisplay = () => {
         const files = getFiles();
         
@@ -441,60 +427,60 @@ export function FilesTabContent() {
         // Apply current filter
         const filteredFiles = storageFilter === 'all' 
             ? files 
-            : files.filter(file => file.storageType === storageFilter);
+            : files.filter(file => {
+                const matches = file.storageType === storageFilter;
+                return matches;
+            });
         
         // Debug logging for filtering
         console.log(`[FilesDisplay] Filter debug:`);
         console.log(`- Current filter: "${storageFilter}"`);
         console.log(`- Total files: ${files.length}`);
-        console.log(`- All file storage types:`, files.map(f => ({
-            id: f.id,
-            name: f.originalName || f.name,
-            storageType: f.storageType,
-            ipfsHash: f.ipfsHash,
-            independent: f.independent,
-            uploadType: f.uploadType,
-            localPath: f.localPath,
-            fileUrl: f.fileUrl
-        })));
-        console.log(`- Files matching filter "${storageFilter}": ${filteredFiles.length}`);
-        if (storageFilter !== 'all') {
-            console.log(`- Filtered files:`, filteredFiles.map(f => ({
-                id: f.id,
-                name: f.originalName || f.name,
-                storageType: f.storageType
-            })));
-        }
         
-        // Additional debug for filter logic
-        if (storageFilter !== 'all' && files.length > 0) {
-            console.log(`[FilesDisplay] Filter logic debug:`);
-            files.forEach(file => {
-                const matches = file.storageType === storageFilter;
-                console.log(`- File "${file.originalName || file.name}" (${file.id}): storageType="${file.storageType}", filter="${storageFilter}", matches=${matches}`);
-            });
-        }
+        // Group files by storage type for summary
+        const typeBreakdown = files.reduce((acc, f) => {
+            const type = f.storageType || 'unknown';
+            acc[type] = (acc[type] || 0) + 1;
+            return acc;
+        }, {});
+        
+        console.log(`- Storage type breakdown:`, typeBreakdown);
+        console.log(`- Files matching filter "${storageFilter}": ${filteredFiles.length}`);
         
         if (filteredFiles.length === 0) {
-            return EmptyState(`No files found for filter: ${getFilterDisplayName(storageFilter)}`);
+            return h('div', { class: 'text-center py-8' },
+                h('div', { class: 'alert alert-info max-w-md mx-auto' },
+                    h('div', { class: 'flex flex-col items-center gap-2' },
+                        h('span', { class: 'text-lg' }, '🔍'),
+                        h('span', { class: 'font-medium' }, `No files found for filter: ${getFilterDisplayName(storageFilter)}`),
+                        h('span', { class: 'text-sm opacity-75' }, `Total files available: ${files.length}`)
+                    )
+                )
+            );
         }
         
         // Create container for filtered files
         const container = h('div', { class: 'space-y-4' });
         
-        // Add files count info
+        // Add files count info with storage breakdown
         const fileStats = h('div', { class: 'stats stats-horizontal shadow-sm mb-4' },
             h('div', { class: 'stat' },
                 h('div', { class: 'stat-title' }, 'Total Files'),
-                h('div', { class: 'stat-value text-primary' }, files.length)
+                h('div', { class: 'stat-value text-primary' }, files.length),
+                h('div', { class: 'stat-desc' }, 'All storage types')
             ),
             h('div', { class: 'stat' },
-                h('div', { class: 'stat-title' }, 'Filtered'),
-                h('div', { class: 'stat-value text-secondary' }, filteredFiles.length)
-            ),
-            h('div', { class: 'stat' },
-                h('div', { class: 'stat-title' }, 'Current Filter'),
+                h('div', { class: 'stat-title' }, 'Showing'),
+                h('div', { class: 'stat-value text-secondary' }, filteredFiles.length),
                 h('div', { class: 'stat-desc' }, getFilterDisplayName(storageFilter))
+            ),
+            h('div', { class: 'stat' },
+                h('div', { class: 'stat-title' }, 'Storage Types'),
+                h('div', { class: 'stat-desc text-xs' }, 
+                    Object.entries(typeBreakdown).map(([type, count]) => 
+                        h('div', {}, `${type}: ${count}`)
+                    )
+                )
             )
         );
         container.appendChild(fileStats);
@@ -523,13 +509,9 @@ export function FilesTabContent() {
     // Listen for files updated events
     document.addEventListener('filesUpdated', (event) => {
         if (getActiveTab() === 'files') {
+            console.log('[FilesTab] Files updated event received, refreshing display');
             setTimeout(() => {
-                // Trigger full display refresh
-                const filesContainer = document.getElementById('files-display-container');
-                if (filesContainer) {
-                    filesContainer.innerHTML = '';
-                    filesContainer.appendChild(FilesDisplay());
-                }
+                window.refreshFilesDisplay();
             }, 100);
         }
     });
@@ -542,15 +524,17 @@ export function FilesTabContent() {
         const tabHeader = h('div', { class: 'flex justify-between items-center mb-6' },
             h('div', { class: 'flex items-center gap-4' },
                 h('h2', { class: 'text-2xl font-bold' }, '📁 File Manager'),
-                h('div', { class: 'badge badge-info' }, 'View & Manage Files Only')
+                h('div', { class: 'badge badge-info' }, 'View & Manage Files')
             ),
             h('div', { class: 'flex gap-2' },
                 h('button', { 
                     class: 'btn btn-outline btn-sm',
                     onclick: () => {
+                        console.log('[FilesTab] Manual refresh triggered');
                         // Clear selections
                         selectedFiles.clear();
                         isSelectAllChecked = false;
+                        // Force reload
                         loadAllFiles();
                     }
                 }, '🔄 Refresh'),
@@ -571,19 +555,18 @@ export function FilesTabContent() {
         tabContent.appendChild(filesContainer);
         
         // Initial load
-        loadAllFiles();
+        console.log('[FilesTab] Initial load starting...');
+        loadAllFiles().then(() => {
+            console.log('[FilesTab] Initial load completed, refreshing display');
+            window.refreshFilesDisplay();
+        });
         
-        // Listen for file updates
-        const updateDisplay = () => {
-            filesContainer.innerHTML = '';
-            filesContainer.appendChild(FilesDisplay());
-        };
-        
-        // Initial display
-        updateDisplay();
-        
-        // Listen for state changes
-        setEffect(updateDisplay);
+        // Listen for state changes with effect
+        setEffect(() => {
+            if (getActiveTab() === 'files') {
+                window.refreshFilesDisplay();
+            }
+        });
     }, 0);
     
     return tabContent;
@@ -597,72 +580,178 @@ export function UploadTabContent() {
     let useDirectIpfs = false;
     
     const handleFileUpload = async (files) => {
-        if (!files || files.length === 0) return;
-        
+        if (!files || files.length === 0) {
+            showToast("❌ No files selected", "error");
+            return;
+        }
+
+        console.log(`[UploadTab] Starting upload of ${files.length} files`);
         setIsLoading(true);
-        let totalFiles = files.length;
+
         let successCount = 0;
         let errorCount = 0;
-        
-        showToast(`📤 Uploading ${totalFiles} file(s)...`, 'info');
-        
-        for (const file of files) {
+        const uploadResults = [];
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const uploadId = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
             try {
+                console.log(`[UploadTab] Uploading file ${i + 1}/${files.length}: ${file.name} (${file.size} bytes)`);
+                showToast(`📤 Uploading ${file.name}...`, "info", 3000);
+
+                let result;
+                
                 if (useDirectIpfs) {
-                    // Upload directly to IPFS (independent)
-                    const result = await uploadToIpfsDirect(file);
+                    // Upload directly to IPFS
+                    console.log(`[UploadTab] Using direct IPFS upload for ${file.name}`);
+                    result = await uploadToIpfsDirect(file, file.name);
+                    
                     if (result && result.success) {
                         successCount++;
+                        uploadResults.push({
+                            fileName: file.name,
+                            success: true,
+                            ipfsHash: result.ipfsHash,
+                            ipfsUrl: result.ipfsUrl,
+                            storageType: 'ipfs-independent'
+                        });
+                        console.log(`[UploadTab] File uploaded successfully to IPFS: ${result.ipfsHash} - ${file.name}`);
                     } else {
-                        errorCount++;
+                        throw new Error(result?.error || "IPFS upload failed");
                     }
                 } else {
-                    // Upload to FileManager (traditional)
+                    // Upload to FileManager (local storage)
+                    console.log(`[UploadTab] Using FileManager upload for ${file.name}`);
                     const formData = new FormData();
                     formData.append('file', file);
-                    
-                    const response = await fetch('/api/files/upload', {
+                    formData.append('uploadId', uploadId);
+                    formData.append('customName', file.name);
+
+                    const response = await fetch('/upload', {
                         method: 'POST',
                         headers: {
                             'Authorization': `Bearer ${getAuthToken()}`
                         },
                         body: formData
                     });
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.success) {
-                            successCount++;
-                        } else {
-                            errorCount++;
-                            console.error('Upload failed:', data.error);
-                        }
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    result = await response.json();
+                    console.log(`[UploadTab] Upload result for ${file.name}:`, result);
+
+                    if (result.success) {
+                        successCount++;
+                        uploadResults.push({
+                            fileName: file.name,
+                            success: true,
+                            fileId: result.file?.id,
+                            fileUrl: result.file?.fileUrl,
+                            isDuplicate: result.file?.isDuplicate,
+                            processingTime: result.file?.processingTime,
+                            storageType: 'local-only'
+                        });
+                        
+                        const duplicateMsg = result.file?.isDuplicate ? " (duplicate detected)" : "";
+                        showToast(`✅ ${file.name} uploaded successfully${duplicateMsg}`, "success", 4000);
+                        
+                        console.log(`[UploadTab] File uploaded successfully: ${result.file?.id} - ${file.name}`);
                     } else {
-                        errorCount++;
-                        console.error('Upload HTTP error:', response.status);
+                        throw new Error(result.error || "Upload failed");
                     }
                 }
+
             } catch (error) {
+                console.error(`[UploadTab] Upload error for ${file.name}:`, error);
                 errorCount++;
-                console.error('Upload error:', error);
+                uploadResults.push({
+                    fileName: file.name,
+                    success: false,
+                    error: error.message
+                });
+                showToast(`❌ Failed to upload ${file.name}: ${error.message}`, "error", 6000);
             }
         }
-        
+
         setIsLoading(false);
-        
-        // Show final result
+
+        // Show final summary
         if (errorCount === 0) {
-            showToast(`✅ Successfully uploaded ${successCount} file(s) to ${useDirectIpfs ? 'IPFS directly' : 'FileManager'}`, 'success');
+            showToast(`🎉 All ${successCount} files uploaded successfully!`, "success", 5000);
         } else if (successCount > 0) {
-            showToast(`⚠️ Uploaded ${successCount}/${totalFiles} files. ${errorCount} failed.`, 'warning');
+            showToast(`⚠️ ${successCount} files uploaded, ${errorCount} failed`, "warning", 6000);
         } else {
-            showToast(`❌ Failed to upload any files. Check console for details.`, 'error');
+            showToast(`❌ All uploads failed`, "error", 6000);
         }
-        
-        // Refresh file lists
-        setTimeout(() => {
-            loadAllFiles();
-        }, 1000);
+
+        console.log(`[UploadTab] Upload batch completed: ${successCount} success, ${errorCount} errors`);
+        console.log(`[UploadTab] Upload results:`, uploadResults);
+
+        // Force immediate refresh of file list if any uploads were successful
+        if (successCount > 0) {
+            console.log(`[UploadTab] Triggering immediate file list refresh...`);
+            
+            // Clear any existing file cache
+            localStorage.removeItem("files-data");
+            
+            // Force reload files with longer delay to ensure server has processed everything
+            setTimeout(async () => {
+                try {
+                    console.log(`[UploadTab] Executing loadAllFiles refresh...`);
+                    const updatedFiles = await loadAllFiles();
+                    console.log(`[UploadTab] Refresh completed, got ${updatedFiles.length} files`);
+                    
+                    // Force UI refresh if we're on the files tab
+                    const activeTab = getActiveTab();
+                    if (activeTab === 'files' && typeof window.refreshFilesDisplay === 'function') {
+                        console.log(`[UploadTab] Triggering UI refresh since we're on files tab`);
+                        window.refreshFilesDisplay();
+                    }
+                    
+                    // Also dispatch a custom event to ensure all components are notified
+                    const refreshEvent = new CustomEvent('filesUpdated', { 
+                        detail: { 
+                            files: updatedFiles, 
+                            source: 'post-upload-refresh',
+                            uploadResults: uploadResults,
+                            timestamp: Date.now()
+                        } 
+                    });
+                    document.dispatchEvent(refreshEvent);
+                    
+                    showToast(`🔄 File list refreshed (${updatedFiles.length} files)`, "info", 3000);
+                } catch (refreshError) {
+                    console.error(`[UploadTab] Error during refresh:`, refreshError);
+                    showToast(`⚠️ Upload completed but refresh failed. Please manually refresh.`, "warning", 5000);
+                }
+            }, 2000); // Wait 2 seconds for server processing
+            
+            // Also trigger an immediate partial refresh for responsiveness
+            setTimeout(() => {
+                const currentFiles = getFiles();
+                console.log(`[UploadTab] Quick check: ${currentFiles.length} files currently in state`);
+                
+                // If files tab is active, force a display refresh anyway
+                if (getActiveTab() === 'files' && typeof window.refreshFilesDisplay === 'function') {
+                    window.refreshFilesDisplay();
+                }
+            }, 500);
+        }
+
+        // Clear the file input
+        const fileInput = document.getElementById('file-input');
+        if (fileInput) {
+            fileInput.value = '';
+        }
+
+        // Reset drag and drop area
+        const dropArea = document.querySelector('.drop-area');
+        if (dropArea) {
+            dropArea.classList.remove('drag-over');
+        }
     };
     
     return h('div', { class: 'space-y-6' }, 
