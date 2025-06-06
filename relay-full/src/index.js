@@ -911,6 +911,35 @@ async function startServer() {
       }
     });
 
+    // Configuration reload endpoint
+    app.post("/api/config/reload", authenticateRequest, (req, res) => {
+      serverLogger.info("[Server] Reloading configuration from file 🔄");
+
+      try {
+        const result = reloadConfigurationFromFile();
+        
+        if (result.success) {
+          res.json({
+            success: true,
+            message: result.message,
+          });
+        } else {
+          res.status(500).json({
+            success: false,
+            error: result.error,
+          });
+        }
+      } catch (error) {
+        serverLogger.error("[Server] Error in config reload endpoint:", {
+          error: error.message,
+        });
+        res.status(500).json({
+          success: false,
+          error: "Error reloading configuration: " + error.message,
+        });
+      }
+    });
+
     app.use(
       "/shogun-core.js",
       express.static(path.join(__dirname, "src/ui/messenger/shogun-core.js"))

@@ -465,7 +465,6 @@ The following endpoints are available for debugging:
 - `GET /api/status`: Overall server status
 - `GET /api/test-gundb`: Test GunDB connectivity
 - `GET /check-websocket`: Check WebSocket configuration
-- `GET /api/test-mityli`: Test type validation system
 - `POST /debug`: Generate detailed debug information
 
 ### Debugging Tools
