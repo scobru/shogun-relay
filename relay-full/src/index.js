@@ -1475,7 +1475,7 @@ async function startServer() {
 
     // Serve l'interfaccia web di base
     app.get("/", (req, res) => {
-      res.sendFile(path.join(__dirname, "src/ui/dashboard/index-nodom.html"));
+      res.sendFile(path.join(__dirname, "src/ui/dashboard/index-react.html"));
     });
 
     // Serve la pagina di login html
