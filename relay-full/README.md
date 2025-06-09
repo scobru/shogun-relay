@@ -11,20 +11,42 @@ Il Shogun Relay è un server Node.js che combina:
 - **Blockchain Authentication**: Verifica on-chain delle autorizzazioni
 - **File Management**: Sistema completo di gestione file con link condivisi
 
-## 🛠️ Installazione e Avvio
+## 🚀 Avvio Rapido
+
+### 1. Configurazione
+
+Copia il file di configurazione di esempio:
+```bash
+cp config.example.json config.json
+```
+
+Modifica `config.json` con le tue impostazioni:
+- `SECRET_TOKEN`: Token di autenticazione per l'accesso al relay
+- `PORT`: Porta del server (default: 8765)
+- Altri parametri secondo le tue necessità
+
+### 2. Installazione Dipendenze
 
 ```bash
-# Installa dipendenze
 npm install
+```
 
-# Configura il server
-cp config.example.json config.json
+### 3. Avvio del Server
 
-# Avvia il server
+**Dalla directory `test-env/relay-full/`:**
+
+```bash
+# Avvio normale
 npm start
 
-# Modalità sviluppo
+# Avvio in modalità sviluppo (con auto-reload)
 npm run dev
+```
+
+**IMPORTANTE**: Assicurati di essere nella directory corretta:
+```bash
+cd test-env/relay-full
+node src/index.js
 ```
 
 ## 🌐 API Endpoints

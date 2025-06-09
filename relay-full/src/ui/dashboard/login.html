@@ -256,12 +256,24 @@
         // Test token validity with server
         async function testToken(token) {
             try {
-                const response = await fetch('/check-websocket', {
+                // First check if server is reachable
+                const healthResponse = await fetch('/check-websocket');
+                if (!healthResponse.ok) {
+                    throw new Error('Server not reachable');
+                }
+
+                // Then test the token
+                const response = await fetch('/api/auth/test-token', {
+                    method: 'POST',
                     headers: {
+                        'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
-                    }
+                    },
+                    body: JSON.stringify({ token: token })
                 });
-                return response.ok;
+
+                const result = await response.json();
+                return result.success && result.valid;
             } catch (error) {
                 console.error('Token verification error:', error);
                 return false;

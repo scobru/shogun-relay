@@ -6,9 +6,9 @@ import fs from "fs";
 import express from "express";
 import { RelayVerifier } from "shogun-core";
 import Gun from "gun";
-import "gun/lib/verify.js";
 import path from "path";
 import http from "http";
+import https from "https";
 
 import {
   validateFileData,
@@ -148,7 +148,7 @@ const getCurrentAllowedOrigins = () => {
  * Reload configuration from file and update runtime state
  * This fixes the issue where configurations remain old after reset
  */
-function reloadConfigurationFromFile() {
+async function reloadConfigurationFromFile() {
   try {
     const configPath = path.join(__dirname, "config.json");
     const configData = fs.readFileSync(configPath, "utf8");
@@ -185,7 +185,7 @@ function reloadConfigurationFromFile() {
 
     // Update type validation configuration
     try {
-      const { updateValidationConfig } = require("./utils/typeValidation.js");
+      const { updateValidationConfig } = await import("./utils/typeValidation.js");
       updateValidationConfig({
         TYPE_VALIDATION_ENABLED: CONFIG.TYPE_VALIDATION_ENABLED,
         TYPE_VALIDATION_STRICT: CONFIG.TYPE_VALIDATION_STRICT,
@@ -393,7 +393,7 @@ let gunOptions = {
   peers: CONFIG.PEERS,
   localStorage: false,
   radisk: true,
-  file: "data.json",
+  file: "radata",
   verify: {
     check: function () {
       console.log("PEER CONNECTED");
@@ -724,7 +724,7 @@ async function startServer() {
     app.use("/api/relay", relayApiRouter);
 
     // Set up file manager routes
-    const fileManagerRouter = setupFileManagerRoutes(
+    const fileManagerRouter = await setupFileManagerRoutes(
       fileManager,
       authenticateRequest
     );
@@ -829,6 +829,17 @@ async function startServer() {
       }
     });
 
+    // WebSocket/Connection check endpoint (for login page)
+    app.get("/check-websocket", (req, res) => {
+      res.json({
+        success: true,
+        websocket: true,
+        server: "online",
+        timestamp: Date.now(),
+        message: "WebSocket connection check successful"
+      });
+    });
+
     // API - STATUS CORS
     app.get("/api/status", (req, res) => {
       const corsRestricted = !(
@@ -912,11 +923,11 @@ async function startServer() {
     });
 
     // Configuration reload endpoint
-    app.post("/api/config/reload", authenticateRequest, (req, res) => {
+    app.post("/api/config/reload", authenticateRequest, async (req, res) => {
       serverLogger.info("[Server] Reloading configuration from file 🔄");
 
       try {
-        const result = reloadConfigurationFromFile();
+        const result = await reloadConfigurationFromFile();
         
         if (result.success) {
           res.json({
@@ -1031,514 +1042,72 @@ async function startServer() {
       })
     );
 
-    // Set up the upload route separately
-    app.post(
-      "/upload",
-      authenticateRequest,
-      fileManager.getUploadMiddleware().single("file"),
-      async (req, res) => {
-        // Generate a unique request ID for this upload attempt
-        const requestId = `req_${Date.now()}_${Math.random()
-          .toString(36)
-          .substr(2, 9)}`;
-
-        try {
-          serverLogger.info(
-            `[Server] Processing file upload request 🚀 (Request ID: ${requestId})`
-          );
-
-          // Start tracking this upload
-          globalUploadTracker.startUpload(requestId, {
-            filename: req.file ? req.file.originalname : "text-content",
-            uploadId: req.body.uploadId,
-            size: req.file
-              ? req.file.size
-              : req.body.content
-              ? req.body.content.length
-              : 0,
-            ip: req.ip,
-            userAgent: req.get("User-Agent"),
-          });
-
-          // Server-side duplicate upload prevention by upload ID
-          const uploadId = req.body.uploadId;
-          const now = Date.now();
-
-          if (uploadId) {
-            // Check if this uploadId was recently processed
-            if (recentUploadIds.has(uploadId)) {
-              const lastProcessTime = recentUploadIds.get(uploadId);
-              const timeDiff = now - lastProcessTime;
-
-              if (timeDiff < uploadIdTimeout) {
-                serverLogger.warn(
-                  `[Server] Duplicate upload ID detected: ${uploadId} (${timeDiff}ms ago) ⚠️`
-                );
-                return res.status(409).json({
-                  success: false,
-                  error:
-                    "Duplicate upload detected. Please wait before trying again.",
-                  code: "DUPLICATE_UPLOAD",
-                });
-              }
-            }
-
-            // Track this upload ID immediately
-            recentUploadIds.set(uploadId, now);
-
-            // Clean up old upload IDs (older than timeout)
-            for (const [id, timestamp] of recentUploadIds.entries()) {
-              if (now - timestamp > uploadIdTimeout) {
-                recentUploadIds.delete(id);
-              }
-            }
-          }
-
-          // Check if there's actually a file to upload
-          if (!req.file && (!req.body.content || !req.body.contentType)) {
-            return res.status(400).json({
-              success: false,
-              error: "No file or content provided",
-            });
-          }
-
-          // Content-based duplicate prevention (happens before processing)
-          let contentHash = null;
-          let contentBasedId = null;
-
-          if (req.file) {
-            // Calculate content hash immediately
-            const crypto = await import("crypto");
-            let fileBuffer;
-
-            if (req.file.buffer) {
-              fileBuffer = req.file.buffer;
-            } else if (req.file.path) {
-              const fs = await import("fs");
-              fileBuffer = fs.default.readFileSync(req.file.path);
-            }
-
-            if (fileBuffer) {
-              // Generate the same content hash as FileManager would
-              contentHash = crypto.default
-                .createHash("sha256")
-                .update(fileBuffer)
-                .digest("hex")
-                .substring(0, 16);
-              const safeName = req.file.originalname
-                .replace(/\.[^/.]+$/, "")
-                .replace(/[^a-zA-Z0-9.-]/g, "_");
-              contentBasedId = `${contentHash}-${safeName}`;
-
-              serverLogger.info(
-                `[Server] Pre-calculated content-based ID: ${contentBasedId} for file: ${req.file.originalname} (Request ID: ${requestId})`
-              );
-
-              // Check if this content is already being processed
-              if (contentBasedUploads.has(contentBasedId)) {
-                serverLogger.info(
-                  `[Server] Content-based upload already in progress, waiting: ${contentBasedId} (Request ID: ${requestId})`
-                );
-
-                try {
-                  // Wait for the ongoing upload to complete
-                  const existingResult = await contentBasedUploads.get(
-                    contentBasedId
-                  );
-
-                  // Clean up the uploaded file
-                  if (req.file.path && fs.default.existsSync(req.file.path)) {
-                    try {
-                      fs.default.unlinkSync(req.file.path);
-                      serverLogger.info(
-                        `[Server] Cleaned up concurrent upload file: ${req.file.path} (Request ID: ${requestId})`
-                      );
-                    } catch (cleanupError) {
-                      serverLogger.warn(
-                        `[Server] Error cleaning up concurrent file: ${cleanupError.message} (Request ID: ${requestId})`
-                      );
-                    }
-                  }
-
-                  // Track concurrent detection
-                  globalUploadTracker.completeUpload(requestId, {
-                    success: true,
-                    fileId: existingResult.id,
-                    isDuplicate: true,
-                    message: "Concurrent upload detected at server level",
-                  });
-
-                  return res.json({
-                    success: true,
-                    file: {
-                      ...existingResult,
-                      message:
-                        "File with identical content was being processed concurrently",
-                      isDuplicate: true,
-                      concurrentUpload: true,
-                    },
-                    fileInfo: {
-                      originalName: existingResult.originalName,
-                      size: existingResult.size,
-                      mimetype: existingResult.mimetype,
-                      fileUrl: existingResult.fileUrl,
-                      ipfsHash: existingResult.ipfsHash,
-                      ipfsUrl: existingResult.ipfsUrl,
-                      customName: existingResult.customName,
-                    },
-                    verified: existingResult.verified,
-                    requestId: requestId,
-                  });
-                } catch (error) {
-                  serverLogger.warn(
-                    `[Server] Concurrent upload failed, proceeding: ${error.message} (Request ID: ${requestId})`
-                  );
-                  // Fall through to normal processing
-                }
-              }
-
-              // Check if this exact content already exists
-              const existingFile = await fileManager.getFileById(
-                contentBasedId
-              );
-              if (existingFile) {
-                serverLogger.info(
-                  `[Server] File with identical content already exists: ${contentBasedId} ⚠️ (Request ID: ${requestId})`
-                );
-
-                // Clean up the uploaded file if it's a disk storage
-                if (req.file.path && fs.default.existsSync(req.file.path)) {
-                  try {
-                    fs.default.unlinkSync(req.file.path);
-                    serverLogger.info(
-                      `[Server] Cleaned up duplicate upload file: ${req.file.path} (Request ID: ${requestId})`
-                    );
-                  } catch (cleanupError) {
-                    serverLogger.warn(
-                      `[Server] Error cleaning up duplicate file: ${cleanupError.message} (Request ID: ${requestId})`
-                    );
-                  }
-                }
-
-                // Track duplicate detection
-                globalUploadTracker.completeUpload(requestId, {
-                  success: true,
-                  fileId: existingFile.id,
-                  isDuplicate: true,
-                  message: "Duplicate detected by server pre-check",
-                });
-
-                return res.json({
-                  success: true,
-                  file: {
-                    ...existingFile,
-                    message: "File with identical content already exists",
-                    isDuplicate: true,
-                    existingFile: true,
-                  },
-                  fileInfo: {
-                    originalName: existingFile.originalName,
-                    size: existingFile.size,
-                    mimetype: existingFile.mimetype,
-                    fileUrl: existingFile.fileUrl,
-                    ipfsHash: existingFile.ipfsHash,
-                    ipfsUrl: existingFile.ipfsUrl,
-                    customName: existingFile.customName,
-                  },
-                  verified: existingFile.verified,
-                  requestId: requestId,
-                });
-              }
-            }
-          }
-
-          // Set a timeout to prevent hanging uploads
-          const uploadTimeout = setTimeout(() => {
-            serverLogger.error(
-              `[Server] File upload processing timeout after 30s ❌ (Request ID: ${requestId})`
-            );
-            if (!res.headersSent) {
-              res.status(500).json({
-                success: false,
-                error: "Upload timed out",
-              });
-            }
-          }, 30000); // 30 second timeout
-
-          // Create a promise for the upload processing if we have a content-based ID
-          let uploadPromise;
-          if (contentBasedId) {
-            uploadPromise = fileManager.handleFileUpload(req);
-            contentBasedUploads.set(contentBasedId, uploadPromise);
-
-            // Clean up after timeout
-            setTimeout(() => {
-              contentBasedUploads.delete(contentBasedId);
-            }, uploadCleanupTimeout);
-          }
-
-          // Process the upload
-          let fileData = uploadPromise
-            ? await uploadPromise
-            : await fileManager.handleFileUpload(req);
-
-          // Add request tracking to the file data
-          fileData.requestId = requestId;
-          fileData.processedAt = now;
-
-          // Validate the file data using Mityli
-          try {
-            fileData = validateFileData(fileData);
-            serverLogger.info(
-              `[Server] File data validated successfully with Mityli ✅ (Request ID: ${requestId})`
-            );
-          } catch (validationError) {
-            serverLogger.error(`[Server] File data validation error:`, {
-              error: validationError.message,
-              requestId: requestId,
-            });
-            // Continue without validation if it fails - for backward compatibility
-          }
-
-          // Clear the timeout since we completed successfully
-          clearTimeout(uploadTimeout);
-
-          serverLogger.info(
-            `[Server] File upload completed successfully: ${fileData.id} ✅ (Request ID: ${requestId})`
-          );
-
-          // Prepare response
-          const response = {
-            success: true,
-            file: fileData,
-            fileInfo: {
-              originalName: fileData.originalName,
-              size: fileData.size,
-              mimetype: fileData.mimetype,
-              fileUrl: fileData.fileUrl,
-              ipfsHash: fileData.ipfsHash,
-              ipfsUrl: fileData.ipfsUrl,
-              customName: fileData.customName,
-            },
-            verified: fileData.verified,
-            requestId: requestId,
-          };
-
-          // Validate response with Mityli before sending
-          // const validatedResponse = validateUploadResponse(response); // Bypassing Mityli for testing
-
-          // Send response if not already sent
-          if (!res.headersSent) {
-            // res.json(validatedResponse);
-            res.json(response); // Sending raw response for testing
-
-            // Track successful completion
-            globalUploadTracker.completeUpload(requestId, {
-              success: true,
-              fileId: fileData.id,
-              isDuplicate: fileData.isDuplicate || false,
-            });
-          }
-        } catch (error) {
-          serverLogger.error(
-            `[Server] File upload error: ❌ (Request ID: ${requestId})`,
-            {
-              error: error.message,
-              requestId: requestId,
-            }
-          );
-
-          // Track failed completion
-          globalUploadTracker.completeUpload(requestId, {
-            success: false,
-            error: error.message,
-          });
-
-          // Send error response if not already sent
-          if (!res.headersSent) {
-            res.status(500).json({
-              success: false,
-              error: "Error during upload: " + error.message,
-              requestId: requestId,
-            });
-          }
-        }
-      }
-    );
-
-    // GunDB Test Endpoint
-    app.get("/api/test-gundb", (req, res) => {
-      gunLogger.info(
-        "GUNDB_TEST_ENDPOINT: Starting test at " + new Date().toISOString()
-      );
-
-      // Generate a unique test key
-      const testKey = `test_key_${Date.now()}`;
-      gunLogger.info(`GUNDB_TEST_ENDPOINT: Using test key: ${testKey} 🔑`);
-
-      const testData = {
-        message: "Test data from endpoint",
-        timestamp: Date.now(),
-      };
-
-      const results = {
-        testKey,
-        startTime: new Date().toISOString(),
-        putCallbackFired: false,
-        onceCallbackFired: false,
-        putError: null,
-        onceError: null,
-        retrievedData: null,
-        dataMatches: false,
-      };
-
-      // Using a promise with timeout to handle async operations with a time limit
-      const runTestWithTimeout = new Promise((resolve) => {
-        const testNode = gun.get(testKey);
-        gunLogger.info(
-          `GUNDB_TEST_ENDPOINT: Attempting .put() with data:`,
-          testData
-        );
-
-        // Set overall timeout for the entire test
-        const testTimeout = setTimeout(() => {
-          gunLogger.error(`GUNDB_TEST_ENDPOINT: Test timed out after 10s ❌`);
-          resolve(results);
-        }, 10000);
-
-        testNode.put(testData, (putAck) => {
-          results.putCallbackFired = true;
-          gunLogger.info(
-            `GUNDB_TEST_ENDPOINT: .put() callback fired with:`,
-            putAck
-          );
-
-          if (putAck.err) {
-            gunLogger.error(`GUNDB_TEST_ENDPOINT: .put() failed:`, {
-              error: putAck.err,
-            });
-            results.putError = putAck.err;
-          } else {
-            gunLogger.info(`GUNDB_TEST_ENDPOINT: .put() successful ✅`);
-
-            // Try to read back the data
-            gunLogger.info(
-              `GUNDB_TEST_ENDPOINT: Attempting .once() to read back data 🔑`
-            );
-
-            testNode.once((readData, readKey) => {
-              results.onceCallbackFired = true;
-              gunLogger.info(
-                `GUNDB_TEST_ENDPOINT: .once() callback fired. Key: ${readKey}`,
-                { data: readData }
-              );
-
-              results.retrievedData = readData;
-              if (readData && readData.message === testData.message) {
-                gunLogger.info(
-                  `GUNDB_TEST_ENDPOINT: Data read back matches put data!`
-                );
-                results.dataMatches = true;
-              } else {
-                gunLogger.error(
-                  `GUNDB_TEST_ENDPOINT: Data mismatch or no data from .once()`
-                );
-              }
-
-              // Test completed successfully, clear timeout and resolve
-              clearTimeout(testTimeout);
-              results.endTime = new Date().toISOString();
-              resolve(results);
-            });
-          }
-        });
-      });
-
-      // Wait for the test to complete (or time out) then return results
-      runTestWithTimeout.then((results) => {
-        gunLogger.info(`GUNDB_TEST_ENDPOINT: Test completed`, { results });
-        res.json(results);
-      });
-    });
-
-    // Endpoint per verificare la configurazione WebSocket
-    app.get("/check-websocket", authenticateRequest, (req, res) => {
-      serverLogger.info("[Server] Checking WebSocket connection 📡");
-      res.json({
-        serverInfo: {
-          port: PORT,
-          websocketUrl: `ws://${req.headers.host}/gun`,
-          ok: true,
-        },
-      });
-    });
-
-    // Serve l'interfaccia web di base
+    // Serve the React dashboard as the main page
     app.get("/", (req, res) => {
+      console.log('📍 Root route accessed!');
+      console.log('📂 __dirname:', __dirname);
+      console.log('📄 Attempting to serve:', path.join(__dirname, "src/ui/dashboard/index-react.html"));
+      console.log('📋 File exists:', fs.existsSync(path.join(__dirname, "src/ui/dashboard/index-react.html")));
       res.sendFile(path.join(__dirname, "src/ui/dashboard/index-react.html"));
     });
 
-    // Serve la pagina di login html
+    // Test route for debugging
+    app.get("/test", (req, res) => {
+      res.json({
+        message: "Server is working!",
+        dirname: __dirname,
+        htmlPath: path.join(__dirname, "src/ui/dashboard/index-react.html"),
+        htmlExists: fs.existsSync(path.join(__dirname, "src/ui/dashboard/index-react.html")),
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    // Also serve it explicitly at /dashboard
+    app.get("/dashboard", (req, res) => {
+      res.sendFile(path.join(__dirname, "src/ui/dashboard/index-react.html"));
+    });
+
+    // Serve the login page
     app.get("/login", (req, res) => {
       res.sendFile(path.join(__dirname, "src/ui/dashboard/login.html"));
     });
 
-    // Endpoint to handle /debug command explicitly
-    app.get("/debug", (req, res) => {
-      serverLogger.info(
-        "[Server] Debug command received via dedicated endpoint"
-      );
+    // Token test endpoint (for login page)
+    app.post("/api/auth/test-token", (req, res) => {
+      const token = req.headers.authorization?.startsWith("Bearer ")
+        ? req.headers.authorization.substring(7)
+        : req.headers.authorization || req.query.token || req.body?.token || req.headers.token;
 
-      try {
-        // Extract debug information
-        const debugInfo = {
-          timestamp: new Date().toISOString(),
-          server: {
-            version: "1.0.0",
-            uptime: process.uptime(),
-            memory: process.memoryUsage(),
-            node: process.version,
-          },
-          gundb: {
-            status: gun ? "initialized" : "not initialized",
-            peers: gun ? Object.keys(gun._.opt.peers || {}).length : 0,
-          },
-          ipfs: ipfsManager
-            ? {
-                enabled: ipfsManager.isEnabled(),
-                service: ipfsManager.getConfig().service,
-                gateway: ipfsManager.getConfig().gateway,
-              }
-            : "not initialized",
-          success: true,
-          message: "Debug mode activated successfully",
-        };
-
-        // Log the debug info
-        serverLogger.info("[Server] Debug information generated:", debugInfo);
-
-        // Record this debug session in the logs directory
-        try {
-          const debugLogPath = path.join(LOGS_DIR, `debug_${Date.now()}.json`);
-          fs.writeFileSync(debugLogPath, JSON.stringify(debugInfo, null, 2));
-          serverLogger.info(`Debug log written to ${debugLogPath}`);
-        } catch (logError) {
-          serverLogger.error("Error writing debug log:", {
-            error: logError.message,
-          });
-        }
-
-        // Return debug info to client
-        res.json(debugInfo);
-      } catch (error) {
-        serverLogger.error("Error processing debug command:", {
-          error: error.message,
-        });
-        res.status(500).json({
+      if (!token) {
+        return res.status(401).json({
           success: false,
-          error: `Error processing debug command: ${error.message}`,
+          valid: false,
+          error: "No token provided"
         });
       }
+
+      if (token === SECRET_TOKEN) {
+        return res.json({
+          success: true,
+          valid: true,
+          message: "Token is valid"
+        });
+      } else {
+        return res.status(401).json({
+          success: false,
+          valid: false,
+          error: "Invalid token"
+        });
+      }
+    });
+
+    // Logout endpoint
+    app.post("/api/auth/logout", (req, res) => {
+      res.json({
+        success: true,
+        message: "Logout successful",
+        timestamp: Date.now()
+      });
     });
 
     // Upload debug endpoint

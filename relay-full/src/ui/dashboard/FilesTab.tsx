@@ -13,6 +13,22 @@ interface FileItem {
   isPinned?: boolean;
 }
 
+interface SharedLinkItem {
+  token: string;
+  fileName: string;
+  hasPassword: boolean;
+  expiresAt: number | null; // Unix timestamp in milliseconds
+  maxDownloads: number;
+  downloadCount: number;
+  description: string | null;
+  createdAt: number; // Unix timestamp in milliseconds
+  remainingDownloads: number;
+  shareUrl: string;
+  isExhausted: boolean;
+  exhaustedAt: number | null;
+  status: 'active' | 'expired' | 'exhausted';
+}
+
 interface FilesTabProps {
   onFileStatsUpdate: (stats: { count: number; totalSize: number }) => void;
   isLoading: boolean;
@@ -31,6 +47,12 @@ const formatDate = (dateString: string): string => {
   return new Date(dateString).toLocaleDateString() + " " + new Date(dateString).toLocaleTimeString();
 };
 
+const formatTimestamp = (timestamp: number | null): string => {
+  if (!timestamp) return "Never";
+  const date = new Date(timestamp);
+  return date.toLocaleDateString() + " " + date.toLocaleTimeString();
+};
+
 const getFileIcon = (type: string): string => {
   if (type.startsWith("image/")) return "🖼️";
   if (type.startsWith("video/")) return "🎥";
@@ -43,57 +65,101 @@ const getFileIcon = (type: string): string => {
 
 const FilesTab = ({ onFileStatsUpdate, isLoading, setIsLoading }: FilesTabProps) => {
   const [files, setFiles] = useState<FileItem[]>([]);
+  const [sharedLinks, setSharedLinks] = useState<SharedLinkItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<"name" | "size" | "date">("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
 
-  // Load files from mock data for now
+  // Load files from API
   const loadFiles = async () => {
     setIsLoading(true);
     try {
-      // Mock data for development
-      const mockFiles: FileItem[] = [
-        {
-          id: "1",
-          name: "document.pdf",
-          size: 1024000,
-          type: "application/pdf",
-          uploadDate: new Date().toISOString(),
-          ipfsHash: "QmHash123",
-          isPinned: true
-        },
-        {
-          id: "2",
-          name: "image.jpg",
-          size: 512000,
-          type: "image/jpeg",
-          uploadDate: new Date(Date.now() - 86400000).toISOString(),
-          ipfsHash: "QmHash456",
-          isPinned: false
-        },
-        {
-          id: "3",
-          name: "video.mp4",
-          size: 10240000,
-          type: "video/mp4",
-          uploadDate: new Date(Date.now() - 172800000).toISOString()
+      console.log("[FilesTab] Loading files from API...");
+      
+      // Call the real API endpoint
+      const response = await fetch('/api/files/list', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`
         }
-      ];
-      
-      setFiles(mockFiles);
-      
-      // Update file stats
-      const totalSize = mockFiles.reduce((sum, file) => sum + file.size, 0);
-      onFileStatsUpdate({
-        count: mockFiles.length,
-        totalSize
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.files) {
+        // Transform API data to match our interface
+        const transformedFiles: FileItem[] = data.files.map((file: any) => ({
+          id: file.id,
+          name: file.originalName || file.name,
+          size: file.size || 0,
+          type: file.mimetype || file.mimeType || 'application/octet-stream',
+          uploadDate: new Date(file.timestamp || file.uploadedAt || Date.now()).toISOString(),
+          ipfsHash: file.ipfsHash || undefined,
+          isPinned: file.ipfsHash ? true : false
+        }));
+        
+        setFiles(transformedFiles);
+        console.log(`[FilesTab] Loaded ${transformedFiles.length} files from API`);
+        
+        // Update file stats
+        const totalSize = transformedFiles.reduce((sum, file) => sum + file.size, 0);
+        onFileStatsUpdate({
+          count: transformedFiles.length,
+          totalSize
+        });
+      } else {
+        console.warn("[FilesTab] API returned no files or error:", data);
+        setFiles([]);
+        onFileStatsUpdate({ count: 0, totalSize: 0 });
+      }
     } catch (error) {
-      console.error("Error loading files:", error);
-      toast.error("Error loading files");
+      console.error("[FilesTab] Error loading files:", error);
+      toast.error(`Error loading files: ${error.message}`);
+      
+      // Fallback to empty state
+      setFiles([]);
+      onFileStatsUpdate({ count: 0, totalSize: 0 });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Load shared links from API
+  const loadSharedLinks = async () => {
+    try {
+      console.log("[FilesTab] Loading shared links from API...");
+      
+      const response = await fetch('/api/files/shared-links', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.sharedLinks) {
+        setSharedLinks(data.sharedLinks);
+        console.log(`[FilesTab] Loaded ${data.sharedLinks.length} shared links from API`);
+      } else {
+        console.warn("[FilesTab] API returned no shared links or error:", data);
+        setSharedLinks([]);
+      }
+    } catch (error) {
+      console.error("[FilesTab] Error loading shared links:", error);
+      toast.error(`Error loading shared links: ${error.message}`);
+      setSharedLinks([]);
     }
   };
 
@@ -102,27 +168,99 @@ const FilesTab = ({ onFileStatsUpdate, isLoading, setIsLoading }: FilesTabProps)
     if (!confirm(`Are you sure you want to delete "${fileName}"?`)) return;
 
     try {
-      // Mock deletion
-      setFiles(prevFiles => prevFiles.filter(f => f.id !== fileId));
-      toast.success("File deleted successfully");
+      console.log(`[FilesTab] Deleting file: ${fileId}`);
       
-      // Update stats
-      const remainingFiles = files.filter(f => f.id !== fileId);
-      const totalSize = remainingFiles.reduce((sum, file) => sum + file.size, 0);
-      onFileStatsUpdate({
-        count: remainingFiles.length,
-        totalSize
+      const response = await fetch(`/api/files/delete/${fileId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`
+        }
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Remove file from local state
+        setFiles(prevFiles => prevFiles.filter(f => f.id !== fileId));
+        toast.success("File deleted successfully");
+        
+        // Update stats
+        const remainingFiles = files.filter(f => f.id !== fileId);
+        const totalSize = remainingFiles.reduce((sum, file) => sum + file.size, 0);
+        onFileStatsUpdate({
+          count: remainingFiles.length,
+          totalSize
+        });
+        
+        console.log(`[FilesTab] File deleted successfully: ${fileId}`);
+      } else {
+        throw new Error(data.error || 'Delete failed');
+      }
     } catch (error) {
-      console.error("Error deleting file:", error);
-      toast.error("Error deleting file");
+      console.error("[FilesTab] Error deleting file:", error);
+      toast.error(`Error deleting file: ${error.message}`);
+    }
+  };
+
+  // Revoke shared link
+  const revokeSharedLink = async (token: string, fileName: string) => {
+    if (!confirm(`Are you sure you want to revoke the shared link for "${fileName}"?`)) return;
+
+    try {
+      console.log(`[FilesTab] Revoking shared link: ${token}`);
+      
+      const response = await fetch(`/api/files/share/${token}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Remove link from local state
+        setSharedLinks(prevLinks => prevLinks.filter(link => link.token !== token));
+        toast.success("Shared link revoked successfully");
+        console.log(`[FilesTab] Shared link revoked successfully: ${token}`);
+      } else {
+        throw new Error(data.error || 'Revoke failed');
+      }
+    } catch (error) {
+      console.error("[FilesTab] Error revoking shared link:", error);
+      toast.error(`Error revoking shared link: ${error.message}`);
     }
   };
 
   // Download file
   const downloadFile = (fileId: string, fileName: string) => {
-    toast.success(`Downloading ${fileName}...`);
-    // In real implementation, this would trigger a download
+    try {
+      console.log(`[FilesTab] Downloading file: ${fileId}`);
+      
+      // Create download link
+      const downloadUrl = `/uploads/${fileName}?token=${localStorage.getItem('authToken') || ''}`;
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success(`Downloading ${fileName}...`);
+    } catch (error) {
+      console.error("[FilesTab] Error downloading file:", error);
+      toast.error(`Error downloading file: ${error.message}`);
+    }
   };
 
   // Toggle file selection
@@ -196,6 +334,7 @@ const FilesTab = ({ onFileStatsUpdate, isLoading, setIsLoading }: FilesTabProps)
 
   useEffect(() => {
     loadFiles();
+    loadSharedLinks();
   }, []);
 
   return (
@@ -356,6 +495,106 @@ const FilesTab = ({ onFileStatsUpdate, isLoading, setIsLoading }: FilesTabProps)
         {isLoading && (
           <div className="flex justify-center py-12">
             <div className="loading loading-spinner loading-lg"></div>
+          </div>
+        )}
+      </div>
+
+      {/* Shared Links Section */}
+      <div className="divider"></div>
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <h2 className="text-2xl font-bold">Shared Links</h2>
+        <button 
+          onClick={loadSharedLinks}
+          className="btn btn-circle btn-ghost"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="table table-zebra w-full">
+          <thead>
+            <tr>
+              <th>File Name</th>
+              <th>Status</th>
+              <th>Downloads</th>
+              <th>Expires</th>
+              <th>Password</th>
+              <th>Created At</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sharedLinks.map((link) => (
+              <tr key={link.token} className="hover">
+                <td>
+                  <a href={link.shareUrl} target="_blank" rel="noopener noreferrer" className="link link-primary">
+                    {link.fileName}
+                  </a>
+                  <div className="text-sm text-base-content/70 truncate" title={link.token}>{link.token}</div>
+                </td>
+                <td>
+                  <span className={`badge ${
+                    link.status === 'active' ? 'badge-success' :
+                    link.status === 'expired' ? 'badge-error' :
+                    'badge-warning'
+                  }`}>
+                    {link.status}
+                  </span>
+                </td>
+                <td>{link.downloadCount}/{link.maxDownloads}</td>
+                <td>{formatTimestamp(link.expiresAt)}</td>
+                <td>
+                  {link.hasPassword ? (
+                    <span className="badge badge-info">Yes</span>
+                  ) : (
+                    <span className="badge badge-ghost">No</span>
+                  )}
+                </td>
+                <td>{formatTimestamp(link.createdAt)}</td>
+                <td>
+                  <div className="flex gap-2">
+                    <a 
+                      href={link.shareUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="btn btn-ghost btn-sm"
+                      title="Open Link"
+                    >
+                      🔗
+                    </a>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(link.shareUrl).then(() => toast.success("Link copied!"))}
+                      className="btn btn-ghost btn-sm"
+                      title="Copy Link"
+                    >
+                      📋
+                    </button>
+                    <button
+                      onClick={() => revokeSharedLink(link.token, link.fileName)}
+                      className="btn btn-ghost btn-sm text-error"
+                      title="Revoke Link"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {sharedLinks.length === 0 && (
+          <div className="text-center py-12">
+            <div className="text-6xl mb-4">🔗</div>
+            <h3 className="text-lg font-medium mb-2">No shared links found</h3>
+            <p className="text-base-content/70">
+              Create a shared link to see it here.
+            </p>
           </div>
         )}
       </div>

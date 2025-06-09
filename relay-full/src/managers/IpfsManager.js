@@ -315,10 +315,35 @@ class IpfsManager {
    * @returns {Promise<Object>} Upload result
    */
   async uploadFile(filePathOrBuffer, options = {}) {
-    return this._safeOperation(
-      () => this.shogunIpfs.uploadFile(filePathOrBuffer, options),
-      "Error uploading file to IPFS"
-    );
+    if (!this.isEnabled()) {
+      throw new Error("IPFS not enabled or not initialized");
+    }
+    
+    try {
+      console.log(`[IpfsManager] Starting IPFS upload with options:`, {
+        name: options.name,
+        service: this.config.service,
+        hasMetadata: !!options.metadata
+      });
+      
+      const result = await this.shogunIpfs.uploadFile(filePathOrBuffer, options);
+      
+      if (result && result.id) {
+        console.log(`[IpfsManager] IPFS upload successful: ${result.id}`);
+        return result;
+      } else {
+        throw new Error("Upload completed but no hash received");
+      }
+    } catch (error) {
+      console.error(`[IpfsManager] IPFS upload failed:`, {
+        error: error.message,
+        service: this.config.service,
+        enabled: this.config.enabled
+      });
+      
+      // Re-throw with more context
+      throw new Error(`IPFS upload failed (${this.config.service}): ${error.message}`);
+    }
   }
   
   /**
@@ -359,6 +384,79 @@ class IpfsManager {
       return await this.shogunIpfs.isPinned(hash);
     } catch (error) {
       return false;
+    }
+  }
+  
+  /**
+   * Check if a file exists in IPFS
+   * @param {string} hash - IPFS hash/CID to check
+   * @returns {Promise<boolean>} True if file exists
+   */
+  async fileExists(hash) {
+    if (!this.isEnabled()) {
+      return false;
+    }
+    
+    try {
+      // Try to fetch the file metadata or content to check existence
+      const gatewayUrl = this.getGatewayUrl(hash);
+      const client = gatewayUrl.startsWith("https") ? https : http;
+      
+      return new Promise((resolve) => {
+        const req = client.request(gatewayUrl, { method: 'HEAD' }, (res) => {
+          resolve(res.statusCode === 200);
+        });
+        
+        req.on('error', () => {
+          resolve(false);
+        });
+        
+        req.setTimeout(5000, () => {
+          req.destroy();
+          resolve(false);
+        });
+        
+        req.end();
+      });
+    } catch (error) {
+      console.error(`[IpfsManager] Error checking file existence for ${hash}:`, error.message);
+      return false;
+    }
+  }
+  
+  /**
+   * Get file information from IPFS
+   * @param {string} hash - IPFS hash/CID to get info for
+   * @returns {Promise<Object|null>} File information or null if not found
+   */
+  async getFileInfo(hash) {
+    if (!this.isEnabled()) {
+      return null;
+    }
+    
+    try {
+      // Check if file exists first
+      const exists = await this.fileExists(hash);
+      if (!exists) {
+        return null;
+      }
+      
+      // Try to get additional information
+      const isPinned = await this.isPinned(hash);
+      const gatewayUrl = this.getGatewayUrl(hash);
+      
+      return {
+        hash,
+        exists: true,
+        isPinned,
+        gatewayUrl,
+        service: this.config.service,
+        gateway: this.getDefaultGateway(),
+        timestamp: Date.now()
+      };
+    } catch (error) {
+      console.error(`[IpfsManager] Error getting file info for ${hash}:`, error.message);
+      return null;
     }
   }
   

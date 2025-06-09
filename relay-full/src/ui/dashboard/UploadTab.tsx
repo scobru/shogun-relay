@@ -51,46 +51,92 @@ const UploadTab = ({ onFileStatsUpdate, isLoading, setIsLoading }: UploadTabProp
     setIsLoading(true);
     
     for (const file of files) {
+      const fileId = Math.random().toString(36).substr(2, 9);
+      
       try {
-        // Simulate upload progress
-        const fileId = Math.random().toString(36).substr(2, 9);
+        console.log(`[UploadTab] Starting upload: ${file.name} (${file.size} bytes)`);
+        
+        // Initialize progress tracking
         setUploadProgress(prev => ({ ...prev, [fileId]: 0 }));
 
-        // Simulate progressive upload
-        for (let progress = 0; progress <= 100; progress += 20) {
-          setUploadProgress(prev => ({ ...prev, [fileId]: progress }));
-          await new Promise(resolve => setTimeout(resolve, 200));
+        // Create FormData for file upload
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('uploadId', fileId);
+        if (file.name) {
+          formData.append('customName', file.name);
         }
 
-        // Mock file upload
-        console.log(`Uploading ${file.name} (${file.size} bytes)`);
+        // Choose upload endpoint based on IPFS setting
+        const uploadEndpoint = uploadToIpfs ? '/api/ipfs/upload' : '/api/files/upload';
         
-        if (uploadToIpfs) {
-          toast.success(`${file.name} uploaded to IPFS successfully!`);
-        } else {
-          toast.success(`${file.name} uploaded successfully!`);
+        console.log(`[UploadTab] Uploading to: ${uploadEndpoint}`);
+
+        // Upload file with progress tracking
+        const response = await fetch(uploadEndpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`
+          },
+          body: formData
+        });
+
+        // Simulate progress updates during upload
+        for (let progress = 20; progress <= 90; progress += 20) {
+          setUploadProgress(prev => ({ ...prev, [fileId]: progress }));
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
 
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        
+        // Complete progress
+        setUploadProgress(prev => ({ ...prev, [fileId]: 100 }));
+        
+        if (result.success) {
+          console.log(`[UploadTab] Upload successful:`, result);
+          
+          if (uploadToIpfs && result.ipfsHash) {
+            toast.success(`${file.name} uploaded to IPFS successfully! Hash: ${result.ipfsHash.substring(0, 8)}...`);
+          } else {
+            toast.success(`${file.name} uploaded successfully!`);
+          }
+          
+          // Update file stats
+          onFileStatsUpdate({
+            count: 1, // Increment by 1
+            totalSize: file.size
+          });
+        } else {
+          throw new Error(result.error || 'Upload failed');
+        }
+
+        // Remove from progress tracking after a delay
+        setTimeout(() => {
+          setUploadProgress(prev => {
+            const newProgress = { ...prev };
+            delete newProgress[fileId];
+            return newProgress;
+          });
+        }, 2000);
+
+      } catch (error) {
+        console.error(`[UploadTab] Upload error for ${file.name}:`, error);
+        toast.error(`Failed to upload ${file.name}: ${error.message}`);
+        
         // Remove from progress tracking
         setUploadProgress(prev => {
           const newProgress = { ...prev };
           delete newProgress[fileId];
           return newProgress;
         });
-
-      } catch (error) {
-        console.error("Upload error:", error);
-        toast.error(`Failed to upload ${file.name}`);
       }
     }
 
     setIsLoading(false);
-    
-    // Update file stats (mock)
-    onFileStatsUpdate({
-      count: 5, // Mock count
-      totalSize: 15360000 // Mock total size
-    });
   };
 
   const formatFileSize = (bytes: number): string => {
