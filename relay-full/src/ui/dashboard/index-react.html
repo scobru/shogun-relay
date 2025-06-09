@@ -97,6 +97,10 @@
         background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
       }
       
+      .gradient-purple {
+        background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+      }
+      
       /* Hover effects */
       .hover-lift {
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -362,6 +366,15 @@
         const [uploadProgress, setUploadProgress] = useState({});
         const [uploadTarget, setUploadTarget] = useState("auto"); // "local", "ipfs", "auto"
         const [fileFilter, setFileFilter] = useState("all"); // "all", "local", "ipfs"
+        const [gunStats, setGunStats] = useState({
+          peers: { count: 0, time: 0 },
+          nodes: { count: 0 },
+          uptime: { time: 0 },
+          memory: { heapTotal: 0 },
+          dam: { in: { count: 0, done: 0 }, out: { count: 0, done: 0 } },
+          cpu: { stack: 0 },
+          block: 0
+        });
 
         // File action functions
         const handleFileDownload = async (file) => {
@@ -928,6 +941,56 @@
           return validFiles;
         };
 
+        // Function to load Gun statistics
+        const loadGunStats = async () => {
+          try {
+            console.log('📊 Loading Gun statistics...');
+            const response = await fetch('/gun/stats.radata', {
+              method: 'GET',
+              mode: 'cors'
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              console.log('📊 Gun stats loaded:', data);
+              
+              setGunStats({
+                peers: {
+                  count: data.peers?.count || 0,
+                  time: data.peers?.time || 0
+                },
+                nodes: {
+                  count: data.node?.count || 0
+                },
+                uptime: {
+                  time: data.up?.time || 0
+                },
+                memory: {
+                  heapTotal: data.memory?.heapTotal || 0
+                },
+                dam: {
+                  in: {
+                    count: data.dam?.in?.count || 0,
+                    done: data.dam?.in?.done || 0
+                  },
+                  out: {
+                    count: data.dam?.out?.count || 0,
+                    done: data.dam?.out?.done || 0
+                  }
+                },
+                cpu: {
+                  stack: data.cpu?.stack || 0
+                },
+                block: data.block || 0
+              });
+            } else {
+              console.warn('⚠️ Gun stats endpoint not available');
+            }
+          } catch (error) {
+            console.warn('⚠️ Error loading Gun stats:', error);
+          }
+        };
+
         // Function to load combined files (local + IPFS independent)
         const loadRealData = async () => {
           console.log('🔄 Loading combined data from APIs (local + IPFS)...');
@@ -1243,10 +1306,18 @@
             
             // Load real data from APIs
             await loadRealData();
+            await loadGunStats();
           };
           
           // Small delay for UI then load real data
           setTimeout(initializeDashboard, 500);
+          
+          // Set up periodic Gun stats updates
+          const gunStatsInterval = setInterval(loadGunStats, 5000); // Every 5 seconds
+          
+          return () => {
+            clearInterval(gunStatsInterval);
+          };
         }, []);
         
         useEffect(() => {
@@ -1294,14 +1365,9 @@
                 <button onClick={toggleTheme} className="btn btn-ghost btn-circle">
                   {theme === "dark" ? "🌞" : "🌙"}
                 </button>
-                <div className="dropdown dropdown-end">
-                  <div tabIndex={0} className="btn btn-ghost btn-circle avatar">
-                    <div className="w-8 rounded-full bg-primary flex items-center justify-center">👤</div>
-                  </div>
-                  <ul tabIndex={0} className="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
-                    <li><a href="/profile">Profile</a></li>
-                    <li><button className="text-error" onClick={() => toast.warning('Logout clicked')}>Logout</button></li>
-                  </ul>
+                <div className="flex items-center gap-3">
+                  <div className="badge badge-success">Online</div>
+                  <div className="text-sm text-base-content/70">Port: 8765</div>
                 </div>
               </div>
             </header>
@@ -1460,6 +1526,187 @@
                     {ipfsConnectionStatus && ipfsConnectionStatus.message ? 
                      ipfsConnectionStatus.message : 
                      "IPFS service status"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Gun.js Network Statistics */}
+              <div className="glass-card-dark rounded-3xl p-8 mb-8 relative overflow-hidden border border-white/20">
+                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-purple-500/10 via-blue-500/10 to-green-500/10"></div>
+                <div className="absolute top-4 right-4 w-40 h-40 bg-white/5 rounded-full -translate-y-8 translate-x-8"></div>
+                <div className="absolute bottom-4 left-4 w-28 h-28 bg-white/5 rounded-full translate-y-8 -translate-x-8"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="text-5xl file-icon">🔗</div>
+                    <div>
+                      <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-purple-400 via-blue-400 to-green-400 bg-clip-text text-transparent drop-shadow-lg">
+                        Gun.js Network Statistics
+                      </h2>
+                      <p className="text-lg text-white/80">Real-time peer-to-peer network metrics</p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    {/* Peers Connected */}
+                    <div className="stat glass-card hover-lift rounded-xl border border-white/20 text-center">
+                      <div className="stat-figure text-purple-400 text-3xl file-icon">👥</div>
+                      <div className="stat-title text-white/60 text-sm font-medium">Peers</div>
+                      <div className="stat-value text-white text-2xl font-bold">
+                        {gunStats.peers.count}
+                      </div>
+                      <div className="stat-desc text-white/50 text-xs">
+                        <span className="status-dot status-online"></span>Connected
+                      </div>
+                    </div>
+
+                    {/* Peer Time */}
+                    <div className="stat glass-card hover-lift rounded-xl border border-white/20 text-center">
+                      <div className="stat-figure text-blue-400 text-3xl file-icon">⏱️</div>
+                      <div className="stat-title text-white/60 text-sm font-medium">Peer Time</div>
+                      <div className="stat-value text-white text-xl font-bold">
+                        {Math.round(gunStats.peers.time / 1000 / 60)}m
+                      </div>
+                      <div className="stat-desc text-white/50 text-xs">
+                        <span className="status-dot status-info"></span>Duration
+                      </div>
+                    </div>
+
+                    {/* Nodes */}
+                    <div className="stat glass-card hover-lift rounded-xl border border-white/20 text-center">
+                      <div className="stat-figure text-green-400 text-3xl file-icon">🌐</div>
+                      <div className="stat-title text-white/60 text-sm font-medium">Nodes</div>
+                      <div className="stat-value text-white text-2xl font-bold">
+                        {gunStats.nodes.count}
+                      </div>
+                      <div className="stat-desc text-white/50 text-xs">
+                        <span className="status-dot status-online"></span>Active
+                      </div>
+                    </div>
+
+                    {/* Uptime */}
+                    <div className="stat glass-card hover-lift rounded-xl border border-white/20 text-center">
+                      <div className="stat-figure text-yellow-400 text-3xl file-icon">⏰</div>
+                      <div className="stat-title text-white/60 text-sm font-medium">Uptime</div>
+                      <div className="stat-value text-white text-xl font-bold">
+                        {(gunStats.uptime.time / 60 / 60).toFixed(1)}h
+                      </div>
+                      <div className="stat-desc text-white/50 text-xs">
+                        <span className="status-dot status-online"></span>Hours
+                      </div>
+                    </div>
+
+                    {/* Memory */}
+                    <div className="stat glass-card hover-lift rounded-xl border border-white/20 text-center">
+                      <div className="stat-figure text-red-400 text-3xl file-icon">🧠</div>
+                      <div className="stat-title text-white/60 text-sm font-medium">Memory</div>
+                      <div className="stat-value text-white text-lg font-bold">
+                        {(gunStats.memory.heapTotal / 1024 / 1024).toFixed(0)}MB
+                      </div>
+                      <div className="stat-desc text-white/50 text-xs">
+                        <span className="status-dot status-warning"></span>Heap
+                      </div>
+                    </div>
+
+                    {/* Block Time */}
+                    <div className="stat glass-card hover-lift rounded-xl border border-white/20 text-center">
+                      <div className="stat-figure text-indigo-400 text-3xl file-icon">⚡</div>
+                      <div className="stat-title text-white/60 text-sm font-medium">Block</div>
+                      <div className="stat-value text-white text-lg font-bold">
+                        {gunStats.block.toFixed(1)}s
+                      </div>
+                      <div className="stat-desc text-white/50 text-xs">
+                        <span className="status-dot status-info"></span>Avg Time
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* DAM (Data Access Module) Statistics */}
+                  <div className="mt-6 pt-6 border-t border-white/20">
+                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                      <span className="file-icon text-2xl">📡</span>
+                      DAM Network Activity
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* DAM In Count */}
+                      <div className="stat glass-card hover-lift rounded-xl border border-white/20 text-center">
+                        <div className="stat-figure text-cyan-400 text-2xl file-icon">📥</div>
+                        <div className="stat-title text-white/60 text-sm font-medium">In Count</div>
+                        <div className="stat-value text-white text-lg font-bold">
+                          {gunStats.dam.in.count}
+                        </div>
+                        <div className="stat-desc text-white/50 text-xs">
+                          <span className="status-dot status-online"></span>Messages
+                        </div>
+                      </div>
+
+                      {/* DAM In Size */}
+                      <div className="stat glass-card hover-lift rounded-xl border border-white/20 text-center">
+                        <div className="stat-figure text-teal-400 text-2xl file-icon">📊</div>
+                        <div className="stat-title text-white/60 text-sm font-medium">In Size</div>
+                        <div className="stat-value text-white text-lg font-bold">
+                          {(gunStats.dam.in.done / 1024 / 1024).toFixed(1)}MB
+                        </div>
+                        <div className="stat-desc text-white/50 text-xs">
+                          <span className="status-dot status-online"></span>Received
+                        </div>
+                      </div>
+
+                      {/* DAM Out Count */}
+                      <div className="stat glass-card hover-lift rounded-xl border border-white/20 text-center">
+                        <div className="stat-figure text-orange-400 text-2xl file-icon">📤</div>
+                        <div className="stat-title text-white/60 text-sm font-medium">Out Count</div>
+                        <div className="stat-value text-white text-lg font-bold">
+                          {gunStats.dam.out.count}
+                        </div>
+                        <div className="stat-desc text-white/50 text-xs">
+                          <span className="status-dot status-online"></span>Messages
+                        </div>
+                      </div>
+
+                      {/* DAM Out Size */}
+                      <div className="stat glass-card hover-lift rounded-xl border border-white/20 text-center">
+                        <div className="stat-figure text-pink-400 text-2xl file-icon">📈</div>
+                        <div className="stat-title text-white/60 text-sm font-medium">Out Size</div>
+                        <div className="stat-value text-white text-lg font-bold">
+                          {(gunStats.dam.out.done / 1024 / 1024).toFixed(1)}MB
+                        </div>
+                        <div className="stat-desc text-white/50 text-xs">
+                          <span className="status-dot status-online"></span>Sent
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick Actions for Gun Stats */}
+                  <div className="mt-6 flex gap-3">
+                    <button 
+                      className="btn btn-enhanced gradient-purple text-white border-0 hover-lift"
+                      onClick={loadGunStats}
+                    >
+                      <span className="file-icon text-xl">🔄</span>
+                      <span className="font-semibold">Refresh Gun Stats</span>
+                    </button>
+                    <button 
+                      className="btn btn-enhanced glass-card border border-white/20 text-white/80 hover:text-white hover:gradient-info"
+                      onClick={() => {
+                        const statsDetails = `
+Gun.js Network Statistics:
+- Peers Connected: ${gunStats.peers.count}
+- Peer Time: ${Math.round(gunStats.peers.time / 1000 / 60)} minutes
+- Active Nodes: ${gunStats.nodes.count}
+- Uptime: ${(gunStats.uptime.time / 60 / 60).toFixed(1)} hours
+- Memory Usage: ${(gunStats.memory.heapTotal / 1024 / 1024).toFixed(1)} MB
+- DAM In: ${gunStats.dam.in.count} messages (${(gunStats.dam.in.done / 1024 / 1024).toFixed(1)} MB)
+- DAM Out: ${gunStats.dam.out.count} messages (${(gunStats.dam.out.done / 1024 / 1024).toFixed(1)} MB)
+                        `.trim();
+                        
+                        navigator.clipboard.writeText(statsDetails);
+                        toast.success('📋 Gun stats copied to clipboard!');
+                      }}
+                    >
+                      <span className="file-icon text-xl">📋</span>
+                      <span className="font-semibold">Copy Stats</span>
+                    </button>
                   </div>
                 </div>
               </div>
