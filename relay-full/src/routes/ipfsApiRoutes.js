@@ -78,7 +78,7 @@ export default function setupIpfsApiRoutes(
         }
 
         // Test the connection
-        console.log("[IPFS API] Running IPFS connection test");
+        // IPFS connection test
         const testResult = await ipfsManager.testConnection();
 
         return res.json({
@@ -327,9 +327,7 @@ export default function setupIpfsApiRoutes(
         const customName = req.body.customName || file.originalname;
         const uploadStartTime = Date.now();
 
-        console.log(
-          `[IPFS Independent] Direct upload to IPFS starting: ${customName} (${file.size} bytes)`
-        );
+        // Direct upload to IPFS starting
 
         // Calculate file hash for content verification
         const fileBuffer = fs.readFileSync(file.path);
@@ -389,7 +387,7 @@ export default function setupIpfsApiRoutes(
             let gun;
             if (fileManager && fileManager.config && fileManager.config.gun) {
               gun = fileManager.config.gun;
-              console.log('[IPFS Independent] Using existing Gun instance from FileManager');
+              // Using existing Gun instance
             } else {
               // Create a minimal gun connection if FileManager is not available
               console.warn(
@@ -399,7 +397,7 @@ export default function setupIpfsApiRoutes(
             }
 
             // ENHANCED: Save to GunDB with improved retry mechanism and immediate fallback
-            console.log(`[IPFS Independent] Attempting to save to GunDB: ${ipfsHash}`);
+            // Attempting to save to GunDB
             
             let saveAttempts = 0;
             const maxAttempts = 2; // Reduced attempts for faster fallback
@@ -407,7 +405,7 @@ export default function setupIpfsApiRoutes(
             
             while (saveAttempts < maxAttempts && !saveSuccessful) {
               saveAttempts++;
-              console.log(`[IPFS Independent] Save attempt ${saveAttempts}/${maxAttempts}`);
+              // Save attempt
               
               try {
                 // Save to ipfs-files collection with shorter timeout for faster fallback

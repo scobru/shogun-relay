@@ -1,21 +1,23 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+import { Gun, SEA } from "shogun-core";
+
 import cors from "cors";
 import fs from "fs";
 import express from "express";
-import { RelayVerifier } from "shogun-core";
-import Gun from "gun";
+
+import "gun/sea.js";
+import "gun/axe.js";
+import "gun/lib/radisk.js";
+import "gun/lib/webrtc.js";
+
 import path from "path";
 import http from "http";
 import https from "https";
 
 import {
-  validateFileData,
-  validateUploadResponse,
   validateConfig,
-  isValidationEnabled,
-  isStrictValidationEnabled,
 } from "./utils/typeValidation.js";
 
 import {
@@ -32,9 +34,7 @@ import setupGatewayRoutes from "./routes/gatewayRoutes.js"; // Import the new Ga
 import {
   initializeShogunCore,
   getInitializedShogunCore,
-  ensureShogunCoreInitialized,
-  initializeRelayContracts,
-  createRelayVerifier,
+  ensureShogunCoreInitialized
 } from "./utils/shogunCoreUtils.js"; // Import ShogunCore utility functions
 import { setupGunIpfsMiddleware } from "./utils/gunIpfsUtils.js";
 import StorageLog from "./utils/storageLog.js";
@@ -104,9 +104,8 @@ const LOGS_DIR = path.join(__dirname, "logs");
 
 // Declare global variables for important instances
 // These will be initialized in startServer
-let gun = null;
+let gun = null; // Single Gun instance for all operations
 let shogunCore = null;
-let relayVerifier = null;
 let fileManager = null;
 let ipfsManager = null;
 
@@ -206,8 +205,6 @@ async function reloadConfigurationFromFile() {
   }
 }
 
-// Initialize ShogunCore and relay components. This will create relayVerifier
-// and update AuthenticationManager with the live instance via its configure method.
 
 /**
  * Initialize shogun-core relay components
@@ -216,63 +213,6 @@ async function reloadConfigurationFromFile() {
 async function initializeRelayComponents() {
   try {
     const shogunCoreInstance = getInitializedShogunCore();
-
-    // Create a wallet if Ethereum private key is provided
-    let signer = null;
-    if (CONFIG.ETHEREUM_PRIVATE_KEY) {
-      try {
-        const { ethers } = await import("ethers");
-        // Remove '0x' prefix if present
-        const privateKey = CONFIG.ETHEREUM_PRIVATE_KEY.startsWith("0x")
-          ? CONFIG.ETHEREUM_PRIVATE_KEY
-          : `0x${CONFIG.ETHEREUM_PRIVATE_KEY}`;
-
-        // Create provider
-        const provider = new ethers.JsonRpcProvider(
-          RELAY_CONFIG.relay.providerUrl
-        );
-
-        // Create wallet with private key and provider
-        signer = new ethers.Wallet(privateKey, provider);
-        serverLogger.info(
-          `Ethereum wallet created with address: ${await signer.getAddress()} 💰`
-        );
-      } catch (error) {
-        serverLogger.error("Error creating Ethereum wallet:", {
-          error: error.message,
-        });
-        serverLogger.warn("Continuing without signer for write operations");
-      }
-    }
-
-    // Initialize RelayVerifier if enabled
-    if (RELAY_CONFIG.relay.onchainMembership) {
-      try {
-        // Initialize the relay contracts using the utility function
-        const relayContracts = await initializeRelayContracts(
-          RELAY_CONFIG,
-          shogunCoreInstance,
-          signer
-        );
-
-        // Create a unified relay verifier using the contracts
-        relayVerifier = createRelayVerifier(relayContracts);
-
-        serverLogger.info(
-          "Relay verification components initialized successfully ✅"
-        );
-      } catch (error) {
-        serverLogger.error(
-          "Error initializing relay verification components:",
-          { error: error.message }
-        );
-      }
-
-      // Update relayVerifier in AuthenticationManager if we have one
-      if (relayVerifier) {
-        configure({ relayVerifier });
-      }
-    }
 
     return true;
   } catch (error) {
@@ -283,31 +223,26 @@ async function initializeRelayComponents() {
   }
 }
 
+
 /**
- * Get the RelayVerifier instance
- * @returns {RelayVerifier|null} The RelayVerifier instance or null if not initialized
+ * Get the Gun instance
+ * @returns {Gun|null} The Gun instance or null if not initialized
  */
-function getRelayVerifier() {
-  return relayVerifier;
+function getGun() {
+  return gun;
 }
 
-// Add debug middleware to inspect all incoming Gun messages
+// Debug middleware for Gun messages (only in debug mode)
 const debugGunMessages = (msg) => {
-  console.log("🔍 INCOMING MESSAGE INSPECTION:");
-
-  // Check headers in all possible locations
-  console.log(
-    `- URL token: ${
-      msg.url ? new URL(msg.url).searchParams.get("token") : "n/a"
-    }`
-  );
-  console.log(`- Headers: ${JSON.stringify(msg.headers || {})}`);
-  console.log(`- Direct token: ${msg.token || "undefined"}`);
-  console.log(
-    `- Internal token: ${msg._ && msg._.token ? msg._.token : "undefined"}`
-  );
-  console.log(`- Message type: ${msg.put ? "PUT" : msg.get ? "GET" : "OTHER"}`);
-
+  if (CONFIG.LOG_LEVEL === 'debug') {
+    gunLogger.debug("Gun message inspection", {
+      urlToken: msg.url ? new URL(msg.url).searchParams.get("token") : "n/a",
+      headers: msg.headers || {},
+      token: msg.token || "undefined",
+      internalToken: msg._ && msg._.token ? msg._.token : "undefined",
+      messageType: msg.put ? "PUT" : msg.get ? "GET" : "OTHER"
+    });
+  }
   return msg;
 };
 
@@ -317,12 +252,16 @@ function hasValidToken(msg) {
     const keys = Object.keys(msg.put);
     // Allow user authentication messages (they start with ~@)
     if (keys.some((key) => key.startsWith("~@"))) {
-      console.log("WRITING - User authentication message allowed");
+      if (CONFIG.LOG_LEVEL === 'debug') {
+        gunLogger.debug("User authentication message allowed");
+      }
       return true;
     }
     // Allow user data messages (they contain user pub keys)
     if (keys.some((key) => key.match(/^~[A-Za-z0-9_\-\.]+$/))) {
-      console.log("WRITING - User data message allowed");
+      if (CONFIG.LOG_LEVEL === 'debug') {
+        gunLogger.debug("User data message allowed");
+      }
       return true;
     }
   }
@@ -337,56 +276,6 @@ function hasValidToken(msg) {
   return valid;
 }
 
-Gun.on("opt", function (ctx) {
-  if (ctx.once) {
-    return;
-  }
-
-  // Add outgoing token injection for this instance
-  ctx.on("out", function (msg) {
-    const to = this.to;
-
-    // Always add token to outgoing messages from server
-    if (!msg.headers) msg.headers = {};
-    msg.headers.token = SECRET_TOKEN;
-    msg.token = SECRET_TOKEN;
-    msg.headers.Authorization = `Bearer ${SECRET_TOKEN}`;
-
-    to.next(msg);
-  });
-
-  // Check all incoming traffic
-  ctx.on("in", function (msg) {
-    const to = this.to;
-
-    // Allow all operations that aren't PUTs
-    if (!msg.put) {
-      to.next(msg);
-      return;
-    }
-
-    // Check if Gun authentication is disabled in config
-    if (
-      CONFIG.DISABLE_GUN_AUTH === true ||
-      CONFIG.DISABLE_GUN_AUTH === "true"
-    ) {
-      console.log(
-        "⚠️ Gun authentication disabled - allowing all PUT operations"
-      );
-      to.next(msg);
-      return;
-    }
-
-    // For PUT operations, apply token validation logic
-    if (hasValidToken(msg)) {
-      to.next(msg);
-      return;
-    }
-
-    // Don't forward unauthorized puts
-  });
-});
-
 // Fix the isValid function to properly handle authorization
 let gunOptions = {
   web: server,
@@ -394,12 +283,6 @@ let gunOptions = {
   localStorage: false,
   radisk: true,
   file: "radata",
-  verify: {
-    check: function () {
-      console.log("PEER CONNECTED");
-      return true;
-    },
-  },
 };
 
 // Add S3 configuration if available in CONFIG
@@ -457,9 +340,9 @@ const globalUploadTracker = {
       startTime: Date.now(),
     });
 
-    console.log(
-      `[GlobalTracker] Started upload: ${requestId} for file: ${uploadInfo.filename}`
-    );
+          if (CONFIG.LOG_LEVEL === 'debug') {
+        serverLogger.debug(`Started upload: ${requestId} for file: ${uploadInfo.filename}`);
+      }
   },
 
   completeUpload: function (requestId, result) {
@@ -481,9 +364,9 @@ const globalUploadTracker = {
         this.completedUploads.delete(oldestKey);
       }
 
-      console.log(
-        `[GlobalTracker] Completed upload: ${requestId} in ${completionInfo.duration}ms`
-      );
+      if (CONFIG.LOG_LEVEL === 'debug') {
+        serverLogger.debug(`Completed upload: ${requestId} in ${completionInfo.duration}ms`);
+      }
     }
   },
 
@@ -572,7 +455,6 @@ async function startServer() {
     configure({
       SECRET_TOKEN,
       RELAY_CONFIG,
-      relayVerifier: null, // Will be set later after initialization
       BASIC_AUTH_USER: CONFIG.BASIC_AUTH_USER,
       BASIC_AUTH_PASSWORD: CONFIG.BASIC_AUTH_PASSWORD,
     });
@@ -596,7 +478,6 @@ async function startServer() {
     configure({
       SECRET_TOKEN,
       RELAY_CONFIG,
-      relayVerifier: null, // Will be set after relayVerifier init by initializeRelayComponents
       BASIC_AUTH_USER: CONFIG.BASIC_AUTH_USER,
       BASIC_AUTH_PASSWORD: CONFIG.BASIC_AUTH_PASSWORD,
     });
@@ -604,9 +485,9 @@ async function startServer() {
       "AuthenticationManager configured with initial settings. ✅"
     );
 
-    // Initialize Gun first
+    // Initialize Gun instance
     gun = new Gun(gunOptions);
-    gunLogger.info("GunDB initialized. ✅");
+    gunLogger.info("GunDB instance initialized. ✅");
 
     // Force Gun to actively connect to configured peers
     if (
@@ -661,8 +542,20 @@ async function startServer() {
 
     gun.on("out", { get: { "#": { "*": "" } } });
 
-    // Initialize StorageLog
-    new StorageLog(Gun, gun);
+    // Initialize StorageLog with performance optimizations
+    const storageLogOptions = {
+      enabled: CONFIG.STORAGE_LOG_ENABLED !== false, // Can be disabled via config
+      logLevel: CONFIG.LOG_LEVEL || 'info',
+      maxLogsPerSecond: CONFIG.MAX_LOGS_PER_SECOND || 5, // Reduced default for performance
+      logGets: CONFIG.LOG_GUN_GETS === true, // Default disabled for performance
+      logPuts: CONFIG.LOG_GUN_PUTS !== false, // Default enabled
+      useAsyncLogging: CONFIG.ASYNC_LOGGING !== false, // Default enabled
+    };
+
+    const storageLog = new StorageLog(Gun, gun, storageLogOptions);
+    storageLog.init()
+
+    gunLogger.info("StorageLog initialized for Gun instance. ✅");
 
     // Initialize ShogunCore and relay components
     serverLogger.info("Initializing ShogunCore with Gun instance 🚀");
@@ -673,9 +566,9 @@ async function startServer() {
       "Relay initialized, AuthenticationManager updated with live verifiers. ✅"
     );
 
-    // Initialize File Manager now that gun and ipfsManager are available
+    // Initialize File Manager with Gun instance for metadata storage
     fileManager = new ShogunFileManager({
-      gun,
+      gun: gun, // Use Gun instance for file metadata and shared links
       ipfsManager,
       storageDir: STORAGE_DIR,
       maxFileSize: CONFIG.MAX_FILE_SIZE || "500mb",
@@ -714,7 +607,6 @@ async function startServer() {
     // Set up relay API routes
     const relayApiRouter = setupRelayApiRoutes(
       RELAY_CONFIG,
-      getRelayVerifier,
       authenticateRequest,
       getInitializedShogunCore,
       initializeRelayComponents,
@@ -1044,10 +936,13 @@ async function startServer() {
 
     // Serve the React dashboard as the main page
     app.get("/", (req, res) => {
-      console.log('📍 Root route accessed!');
-      console.log('📂 __dirname:', __dirname);
-      console.log('📄 Attempting to serve:', path.join(__dirname, "src/ui/dashboard/index-react.html"));
-      console.log('📋 File exists:', fs.existsSync(path.join(__dirname, "src/ui/dashboard/index-react.html")));
+      if (CONFIG.LOG_LEVEL === 'debug') {
+        serverLogger.debug('Root route accessed', {
+          dirname: __dirname,
+          htmlPath: path.join(__dirname, "src/ui/dashboard/index-react.html"),
+          htmlExists: fs.existsSync(path.join(__dirname, "src/ui/dashboard/index-react.html"))
+        });
+      }
       res.sendFile(path.join(__dirname, "src/ui/dashboard/index-react.html"));
     });
 
@@ -1108,6 +1003,54 @@ async function startServer() {
         message: "Logout successful",
         timestamp: Date.now()
       });
+    });
+
+    // Storage log control endpoint
+    app.get("/api/storage-log/status", authenticateRequest, (req, res) => {
+      try {
+        res.json({
+          success: true,
+          gun: storageLog ? storageLog.getStats() : null,
+          timestamp: Date.now(),
+        });
+      } catch (error) {
+        serverLogger.error("[Server] Error getting storage log status:", {
+          error: error.message,
+        });
+        res.status(500).json({
+          success: false,
+          error: "Error retrieving storage log status: " + error.message,
+        });
+      }
+    });
+
+    // Storage log configuration endpoint
+    app.post("/api/storage-log/configure", authenticateRequest, (req, res) => {
+      try {
+        const { options } = req.body;
+        
+        if (storageLog) {
+          storageLog.updateOptions(options);
+          res.json({
+            success: true,
+            message: "Storage log configuration updated",
+            timestamp: Date.now(),
+          });
+        } else {
+          return res.status(400).json({
+            success: false,
+            error: "Storage log instance not available",
+          });
+        }
+      } catch (error) {
+        serverLogger.error("[Server] Error configuring storage log:", {
+          error: error.message,
+        });
+        res.status(500).json({
+          success: false,
+          error: "Error configuring storage log: " + error.message,
+        });
+      }
     });
 
     // Upload debug endpoint
@@ -1304,6 +1247,7 @@ async function startServer() {
         let gunInfo = {
           initialized: !!gun,
           status: gun ? "active" : "not_initialized",
+          type: "unified",
         };
 
         if (gun) {
@@ -1698,4 +1642,8 @@ server.listen(PORT, HOST, () => {
   );
 });
 
-export { app as default, RELAY_CONFIG };
+export { 
+  app as default, 
+  RELAY_CONFIG, 
+  getGun, 
+};

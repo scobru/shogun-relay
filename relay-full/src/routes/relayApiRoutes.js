@@ -3,7 +3,7 @@ import { formatKeyForBlockchain } from "../managers/AuthenticationManager.js";
 import { ethers } from "ethers";
 
 
-export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, getRelayVerifierInstance, authenticateRequestMiddleware, shogunCoreInstance, reinitializeRelayCallback, SECRET_TOKEN_PARAM, AuthenticationManagerInstance) {
+export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, authenticateRequestMiddleware, shogunCoreInstance, reinitializeRelayCallback, SECRET_TOKEN_PARAM, AuthenticationManagerInstance) {
   const router = express.Router();
 
   /**
@@ -119,90 +119,6 @@ export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, getRelayVerifier
       res.json(_standardResponse(true, "Relays retrieved successfully", { relays }));
     } catch (error) {
       res.status(500).json(_standardResponse(false, "Error getting all relays", {}, error.message));
-    }
-  });
-
-  // API - Check if user is subscribed to a relay
-  router.get("/check-subscription/:relayAddress/:userAddress", authenticateRequestMiddleware, async (req, res) => {
-    try {
-      const { relayAddress, userAddress } = req.params;
-      const relayVerifier = getRelayVerifierInstance();
-      
-      if (!RELAY_CONFIG_PARAM.relay.onchainMembership || !relayVerifier) {
-        return res.status(503).json(_standardResponse(false, "Relay services not available", {}, "Relay services not available"));
-      }
-      
-      const isSubscribed = await relayVerifier.isUserSubscribedToRelay(relayAddress, userAddress);
-      res.json(_standardResponse(
-        true, 
-        `User ${isSubscribed ? "is" : "is not"} subscribed to relay`,
-        { relayAddress, userAddress, isSubscribed }
-      ));
-    } catch (error) {
-      res.status(500).json(_standardResponse(false, "Error checking subscription", {}, error.message));
-    }
-  });
-
-  // API - Get user's active relays
-  router.get("/user-active-relays/:userAddress", authenticateRequestMiddleware, async (req, res) => {
-    try {
-      const { userAddress } = req.params;
-      const relayVerifier = getRelayVerifierInstance();
-      
-      if (!RELAY_CONFIG_PARAM.relay.onchainMembership || !relayVerifier) {
-        return res.status(503).json(_standardResponse(false, "Relay services not available", {}, "Relay services not available"));
-      }
-      
-      const relayAddresses = await relayVerifier.getUserActiveRelays(userAddress);
-      const relays = [];
-      
-      for (const address of relayAddresses) {
-        try {
-          const relayInfo = await relayVerifier.getRelayInfo(address);
-          if (relayInfo) {
-            relays.push(relayInfo);
-          }
-        } catch (error) {
-          // Continue to next relay
-        }
-      }
-      
-      res.json(_standardResponse(true, "User active relays retrieved", { userAddress, relays }));
-    } catch (error) {
-      res.status(500).json(_standardResponse(false, "Error getting active relays", {}, error.message));
-    }
-  });
-
-  // API - Get user subscription info for a specific relay
-  router.get("/subscription-info/:relayAddress/:userAddress", authenticateRequestMiddleware, async (req, res) => {
-    try {
-      const { relayAddress, userAddress } = req.params;
-      const relayVerifier = getRelayVerifierInstance();
-      
-      if (!RELAY_CONFIG_PARAM.relay.onchainMembership || !relayVerifier) {
-        return res.status(503).json(_standardResponse(false, "Relay services not available", {}, "Relay services not available"));
-      }
-      
-      const subscriptionInfo = await relayVerifier.getUserSubscriptionInfo(relayAddress, userAddress);
-      if (!subscriptionInfo) {
-        return res.status(404).json(_standardResponse(false, "User subscription not found", {}, "User subscription not found"));
-      }
-      
-      res.json(_standardResponse(
-        true,
-        "Subscription information retrieved",
-        {
-          relayAddress,
-          userAddress,
-          subscriptionInfo: {
-            expires: subscriptionInfo.expires.toString(), // Ensure BigInt is converted
-            pubKey: subscriptionInfo.pubKey,
-            active: subscriptionInfo.active,
-          }
-        }
-      ));
-    } catch (error) {
-      res.status(500).json(_standardResponse(false, "Error getting subscription info", {}, error.message));
     }
   });
 

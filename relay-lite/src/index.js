@@ -1,155 +1,83 @@
-// Restricted Gun server
-import { Gun, SEA } from "./min";
-import "gun/lib/then";
-import "gun/lib/radix";
-import "gun/lib/radisk";
-import "gun/lib/store";
-import "gun/lib/rindexed";
-import "gun/lib/webrtc";
+// Simple Gun unauthenticated server
+import { gun, namespace } from './gun.js'
+import express from 'express'
+import path from 'path'
+import fs from 'fs'
+import { fileURLToPath } from 'url'
 
-import fs from "fs";
-import path from "path";
-import { createServer } from "http";
+// ES Module equivalent for __dirname
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
-// Load configuration from config.json
-let CONFIG = {};
-try {
-  const configPath = path.resolve("./config.json");
-  const configData = fs.readFileSync(configPath, "utf8");
-  CONFIG = JSON.parse(configData);
-  console.log("Configuration loaded from config.json ✅");
-} catch (error) {
-  console.error("Error loading config.json:", error.message);
-  console.log("Using default configuration");
-  // Default configuration
-  CONFIG = {
-    PORT: 8000,
-    AUTH_TOKEN: "automa25",
-    PEERS: [
-      "https://gun-manhattan.herokuapp.com/gun",
-      "https://peer.wallie.io/gun",
-    ],
-  };
+const app = express()
+const PORT = process.env.PORT || 3000
+const publicPath = path.resolve(__dirname, 'public')
+const indexPath = path.resolve(publicPath, 'index.html')
+
+// static resources should just be served as they are
+app.use(express.static(publicPath))
+
+const cleanReturnString = value => {
+   if (!value) return ''
+   return value.replace(/"/g, `'`)
 }
 
-const port = CONFIG.PORT || 8000;
-let authToken = CONFIG.AUTH_TOKEN || "automa25";
+app.get('/blog/:id', (req, res) => {
+   const htmlData = fs.readFileSync(indexPath, 'utf8')
+   console.log('blog/:id', req.params.id)
+   let numberOfTries = 0
+   const chain = gun
+      .get(`${namespace}/post`)
+      .get(req.params.id)
+      .on(post => {
+         console.log('post', post)
+         numberOfTries++
+         if (!post) {
+            if (numberOfTries > 1) {
+               chain.off()
+               return res.sendStatus(404)
+            }
+            return
+         }
+         if (res.writableEnded) {
+            chain.off()
+            return
+         }
+         // Replace the placeholder in public/index.html with the post content
+         const finalHtml = `
+            <!DOCTYPE html>
+            <html>
+               <head>
+                  <title>${post.title || 'Blog Post'}</title>
+                  <meta name="description" content="${cleanReturnString(
+                     post.description || ''
+                  )}" />
+               </head>
+               <body>
+                  ${post.content}
+               </body>
+            </html>
+         `
+         return res.send(finalHtml)
+      })
+   setTimeout(() => {
+      chain.off()
+      if (res.writableEnded) {
+         return
+      }
+      res.sendStatus(408)
+   }, 5000)
+})
 
-function hasValidToken(msg) {
-  const valid =
-    (msg &&
-      msg.headers &&
-      msg.headers.token &&
-      msg.headers.token === authToken) ||
-    (msg && msg.token && msg.token === authToken);
+app.get('/*', (req, res) => {
+   res.sendFile(indexPath)
+})
 
-  if (valid) {
-    console.log("WRITING - Valid token found");
-  }
-
-  return valid;
-}
-
-Gun.on("opt", function (ctx) {
-  if (ctx.once) {
-    return;
-  }
-
-  // Add outgoing token injection for this instance
-  ctx.on("out", function (msg) {
-    const to = this.to;
-
-    // Always add token to outgoing messages from server
-    if (!msg.headers) msg.headers = {};
-    msg.headers.token = authToken;
-    msg.token = authToken;
-    msg.headers.Authorization = `Bearer ${authToken}`;
-
-    to.next(msg);
-  });
-
-  // Check all incoming traffic
-  ctx.on("in", function (msg) {
-    const to = this.to;
-
-    // Allow all operations that aren't PUTs
-    if (!msg.put) {
-      to.next(msg);
-      return;
-    }
-
-    // Check if Gun authentication is disabled in config
-    if (
-      CONFIG.DISABLE_GUN_AUTH === true ||
-      CONFIG.DISABLE_GUN_AUTH === "true"
-    ) {
-      console.log(
-        "⚠️ Gun authentication disabled - allowing all PUT operations"
-      );
-      to.next(msg);
-      return;
-    }
-
-    // For PUT operations, apply token validation logic
-    if (hasValidToken(msg)) {
-      to.next(msg);
-      return;
-    }
-
-    // Don't forward unauthorized puts
-  });
-});
+app.listen(PORT, error => {
+   if (error) {
+      return console.log('Error during app startup', error)
+   }
+   console.log('listening on ' + PORT + '...')
+})
 
 
-const server = createServer(Gun.serve("data.json"));
-
-// Configure Gun options
-let gunOptions = {
-  web: server,
-  peers: CONFIG.PEERS || [
-    "https://gun-manhattan.herokuapp.com/gun",
-    "https://peer.wallie.io/gun",
-  ],
-};
-
-// Add S3 configuration if available in CONFIG
-if (
-  CONFIG.S3_ACCESS_KEY_ID &&
-  CONFIG.S3_SECRET_ACCESS_KEY &&
-  CONFIG.S3_BUCKET
-) {
-  console.log("S3 configuration found in config, adding to Gun options 🪣");
-
-  gunOptions.s3 = {
-    bucket: CONFIG.S3_BUCKET,
-    region: CONFIG.S3_REGION || "us-east-1",
-    accessKeyId: CONFIG.S3_ACCESS_KEY_ID,
-    secretAccessKey: CONFIG.S3_SECRET_ACCESS_KEY,
-    endpoint: CONFIG.S3_ENDPOINT || "http://0.0.0.0:4569",
-    s3ForcePathStyle: true,
-    // override config
-    address: CONFIG.S3_ADDRESS || "0.0.0.0",
-    port: CONFIG.S3_PORT || 4569,
-    key: CONFIG.S3_ACCESS_KEY_ID,
-    secret: CONFIG.S3_SECRET_ACCESS_KEY,
-  };
-
-  console.log("S3 configuration added to Gun options:", {
-    bucket: gunOptions.s3.bucket,
-    endpoint: gunOptions.s3.endpoint,
-    address: gunOptions.s3.address,
-    port: gunOptions.s3.port,
-  });
-} else {
-  console.log("S3 configuration not found in config, using default storage 💽");
-}
-
-const gun = Gun(gunOptions);
-
-// Sync everything
-gun.on("out", { get: { "#": { "*": "" } } });
-
-server.listen(port);
-
-console.log(`GUN server (restricted put) started on port ${port}`);
-console.log("Use CTRL + C to stop it");

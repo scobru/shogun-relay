@@ -141,7 +141,7 @@ class FileManager {
     // Format: hash-filename (deterministic and unique based on content)
     const contentBasedId = `${shortHash}-${safeName}`;
     
-    console.log(`[FileManager] Generated content-based hash: ${shortHash} for file: ${originalName} -> ID: ${contentBasedId}`);
+    // Generated content-based hash silently for performance
     
     return contentBasedId;
   }
@@ -155,7 +155,7 @@ class FileManager {
     const uploadStartTime = Date.now();
     const uploadRequestId = req.uploadRequestId || `upload_${uploadStartTime}_${Math.random().toString(36).substr(2, 9)}`;
     
-    console.log(`[FileManager] Starting upload processing (ID: ${uploadRequestId})`);
+    // Debug logging removed for performance
     
     if (!req.file && (!req.body.content || !req.body.contentType)) {
       throw new Error("File or content missing");
@@ -198,11 +198,11 @@ class FileManager {
     const contentBasedId = this.generateContentHash(fileBuffer, originalName);
     gunDbKey = contentBasedId;
 
-    console.log(`[FileManager] Generated content-based ID: ${contentBasedId} for file: ${originalName} (Upload ID: ${uploadRequestId})`);
+    // Content-based ID generated silently
 
     // Check if this content is already being processed (prevent race conditions)
     if (this.uploadMutex.has(contentBasedId)) {
-      console.log(`[FileManager] Upload with same content already in progress, waiting... (Upload ID: ${uploadRequestId})`);
+      // Waiting for concurrent upload to complete
       
       try {
         // Wait for the ongoing upload to complete
@@ -212,13 +212,13 @@ class FileManager {
         if (req.file && req.file.path && fs.existsSync(req.file.path)) {
           try {
             fs.unlinkSync(req.file.path);
-            console.log(`[FileManager] Cleaned up duplicate upload temp file: ${req.file.path}`);
+            // Cleaned up duplicate temp file
           } catch (cleanupError) {
             console.warn(`[FileManager] Error cleaning up duplicate file: ${cleanupError.message}`);
           }
         }
         
-        console.log(`[FileManager] Returning result from concurrent upload: ${contentBasedId} (Upload ID: ${uploadRequestId})`);
+        // Returning result from concurrent upload
         return {
           ...existingResult,
           message: 'File with identical content was being processed concurrently',
@@ -264,18 +264,18 @@ class FileManager {
     const { contentBasedId, fileBuffer, originalName, mimeType, fileSize, uploadTimestamp, uploadRequestId, uploadStartTime } = params;
 
     // Enhanced duplicate check - check multiple sources
-    console.log(`[FileManager] Checking for existing file with ID: ${contentBasedId}`);
+    // Checking for existing file with same content
     
     // 1. Check GunDB first
     const existingFile = await this.getFileById(contentBasedId);
     if (existingFile && existingFile.localPath && fs.existsSync(existingFile.localPath)) {
-      console.log(`[FileManager] File with identical content already exists in GunDB and on disk: ${contentBasedId} (Upload ID: ${uploadRequestId})`);
+      // File already exists in GunDB and on disk
       
       // Clean up uploaded file if it exists on disk and is different from existing
       if (req.file && req.file.path && fs.existsSync(req.file.path) && req.file.path !== existingFile.localPath) {
         try {
           fs.unlinkSync(req.file.path);
-          console.log(`[FileManager] Cleaned up duplicate upload temp file: ${req.file.path}`);
+          // Cleaned up duplicate temp file
         } catch (cleanupError) {
           console.warn(`[FileManager] Error cleaning up duplicate file: ${cleanupError.message}`);
         }
@@ -299,14 +299,14 @@ class FileManager {
 
     // Use the file already saved by multer instead of creating a new one
     if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-      console.log(`[FileManager] Using file saved by multer: ${req.file.path} (Upload ID: ${uploadRequestId})`);
+      // Using file saved by multer
       localPath = req.file.path;
       fileName = path.basename(req.file.path);
       fileUrl = `/uploads/${fileName}`;
-      console.log(`[FileManager] File kept from multer: ${localPath} (Upload ID: ${uploadRequestId})`);
+      // File kept from multer
     } else {
       // Fallback: create file manually (for non-multer uploads)
-      console.log(`[FileManager] Creating file manually (no multer file): ${originalName} (Upload ID: ${uploadRequestId})`);
+      // Creating file manually (no multer file)
       const safeOriginalName = originalName.replace(/[^a-zA-Z0-9.-]/g, "_");
       const fileExtension = safeOriginalName.split('.').pop() || 'bin';
       fileName = `${contentBasedId}.${fileExtension}`;
@@ -315,13 +315,13 @@ class FileManager {
       // Save new file
       fs.writeFileSync(localPath, fileBuffer);
       fileUrl = `/uploads/${fileName}`;
-      console.log(`[FileManager] File saved manually: ${localPath} (Upload ID: ${uploadRequestId})`);
+      // File saved manually
     }
 
     // Try to upload to IPFS automatically if enabled
     if (this.config.ipfsManager && this.config.ipfsManager.isEnabled()) {
       try {
-        console.log(`[FileManager] Attempting automatic IPFS upload for: ${contentBasedId} (Upload ID: ${uploadRequestId})`);
+        // Attempting automatic IPFS upload
         
         const ipfsResult = await this.config.ipfsManager.uploadFile(localPath, {
           name: originalName,
@@ -342,7 +342,7 @@ class FileManager {
           // Save IPFS metadata
           this._saveIpfsMetadata(contentBasedId, ipfsHash);
           
-          console.log(`[FileManager] File automatically uploaded to IPFS: ${ipfsHash} (Upload ID: ${uploadRequestId})`);
+          // File automatically uploaded to IPFS
         }
       } catch (ipfsError) {
         console.warn(`[FileManager] Automatic IPFS upload failed (continuing with local storage): ${ipfsError.message} (Upload ID: ${uploadRequestId})`);

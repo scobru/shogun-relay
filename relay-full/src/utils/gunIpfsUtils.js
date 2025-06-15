@@ -9,11 +9,11 @@ import Gun from "gun";
  */
 export function setupGunIpfsMiddleware(ipfsManager) {
   if (!ipfsManager || !ipfsManager.isEnabled()) {
-    console.log("IPFS not enabled, middleware not configured");
+    // IPFS middleware not configured (disabled)
     return;
   }
 
-  console.log("Configuring Gun-IPFS middleware...");
+  // Configuring Gun-IPFS middleware
 
   // Simplified version: we don't intercept PUTs anymore
   // IPFS uploads will be handled client-side
@@ -26,7 +26,7 @@ export function setupGunIpfsMiddleware(ipfsManager) {
       return;
     }
 
-    console.log("[IPFS-MIDDLEWARE] Gun-IPFS middleware configured successfully (simplified mode)");
+    // Gun-IPFS middleware configured successfully
 
     // Check if the response message contains data
     if (replyMsg.put && Object.keys(replyMsg.put).length > 0) {
