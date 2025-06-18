@@ -381,7 +381,7 @@
           try {
             console.log('⬇️ Downloading file:', file.originalName);
             
-            const authToken = window.localStorage.getItem('shogun_token') || 'shogun2025';
+            const authToken = window.localStorage.getItem('authToken') ;
             let downloadUrl = null;
             let needsAuth = false;
             
@@ -470,7 +470,7 @@
             console.log('🗑️ Deleting file:', fileName, 'ID:', file.id);
             setDataLoading(true);
             
-            const authToken = window.localStorage.getItem('shogun_token') || 'shogun2025';
+            const authToken = window.localStorage.getItem('authToken') ;
             let deleteUrl = null;
             
             // Determine delete endpoint based on file type
@@ -550,7 +550,7 @@
           try {
             console.log('👁️ Viewing file:', file.originalName);
             
-            const authToken = window.localStorage.getItem('shogun_token') || 'shogun2025';
+            const authToken = window.localStorage.getItem('authToken') ;
             let viewUrl = null;
             
             // Determine view URL based on file type
@@ -621,7 +621,7 @@
           try {
             console.log('🔗 Creating shareable link for:', file.originalName);
             
-            const authToken = window.localStorage.getItem('shogun_token') || 'shogun2025';
+            const authToken = window.localStorage.getItem('authToken') ;
             
             // Show modal for share options
             const password = prompt('🔒 Enter password for the link (optional, leave empty for no password):');
@@ -702,7 +702,7 @@
           try {
             const ipfsStatusResponse = await fetch('/api/ipfs/status', {
               headers: {
-                'Authorization': `Bearer ${window.localStorage.getItem('shogun_token') || 'shogun2025'}`
+                'Authorization': `Bearer ${window.localStorage.getItem('authToken')}`
               }
             });
             
@@ -758,7 +758,7 @@
                   response = await fetch('/api/ipfs/upload', {
                     method: 'POST',
                     headers: {
-                      'Authorization': `Bearer ${window.localStorage.getItem('shogun_token') || 'shogun2025'}`
+                      'Authorization': `Bearer ${window.localStorage.getItem('authToken') }`
                     },
                     body: formData
                   });
@@ -768,7 +768,7 @@
                   response = await fetch('/api/files/upload', {
                     method: 'POST',
                     headers: {
-                      'Authorization': `Bearer ${window.localStorage.getItem('shogun_token') || 'shogun2025'}`
+                      'Authorization': `Bearer ${window.localStorage.getItem('authToken') }`
                     },
                     body: formData
                   });
@@ -997,7 +997,7 @@
           setDataLoading(true);
           
           try {
-            const authToken = window.localStorage.getItem('shogun_token') || 'shogun2025';
+            const authToken = window.localStorage.getItem('authToken') ;
             
             // Load local files and IPFS independent files in parallel with better error handling
             const [localFilesResponse, ipfsFilesResponse] = await Promise.allSettled([
@@ -1787,7 +1787,7 @@ Gun.js Network Statistics:
                             onClick={async () => {
                               try {
                                 toast.info('🔄 Checking for files to recover...');
-                                const authToken = window.localStorage.getItem('shogun_token') || 'shogun2025';
+                                const authToken = window.localStorage.getItem('authToken') ;
                                 
                                 // First check if there are fallback files
                                 const checkResponse = await fetch('/api/ipfs/fallback-files', {
@@ -2355,7 +2355,7 @@ Gun.js Network Statistics:
                                   toast.info('🔄 Checking IPFS status...');
                                   try {
                                     const response = await fetch('/api/ipfs/status', {
-                                      headers: { 'Authorization': `Bearer ${window.localStorage.getItem('shogun_token') || 'shogun2025'}` }
+                                      headers: { 'Authorization': `Bearer ${window.localStorage.getItem('authToken') }` }
                                     });
                                     const data = await response.json();
                                     if (data.success && data.status?.enabled) {
@@ -2392,7 +2392,7 @@ Gun.js Network Statistics:
                                       try {
                                         toast.info('Loading shared links...');
                                         const response = await fetch('/api/files/shared-links', {
-                                          headers: { 'Authorization': `Bearer ${window.localStorage.getItem('shogun_token') || 'shogun2025'}` }
+                                          headers: { 'Authorization': `Bearer ${window.localStorage.getItem('authToken') }` }
                                         });
                                         
                                         if (!response.ok) {
@@ -2418,7 +2418,7 @@ Gun.js Network Statistics:
                                             toast.info('No links found, trying to reload from database...');
                                             const reloadResponse = await fetch('/api/files/shared-links/reload', {
                                               method: 'POST',
-                                              headers: { 'Authorization': `Bearer ${window.localStorage.getItem('shogun_token') || 'shogun2025'}` }
+                                              headers: { 'Authorization': `Bearer ${window.localStorage.getItem('authToken') }` }
                                             });
                                             
                                             if (reloadResponse.ok) {
@@ -2428,7 +2428,7 @@ Gun.js Network Statistics:
                                                 // Retry fetching links
                                                 setTimeout(async () => {
                                                   const retryResponse = await fetch('/api/files/shared-links', {
-                                                    headers: { 'Authorization': `Bearer ${window.localStorage.getItem('shogun_token') || 'shogun2025'}` }
+                                                    headers: { 'Authorization': `Bearer ${window.localStorage.getItem('authToken') }` }
                                                   });
                                                   const retryData = await retryResponse.json();
                                                   if (retryData.success && retryData.sharedLinks.length > 0) {
@@ -2469,7 +2469,7 @@ Gun.js Network Statistics:
                                         toast.info('🔄 Reloading shared links from database...');
                                         const response = await fetch('/api/files/shared-links/reload', {
                                           method: 'POST',
-                                          headers: { 'Authorization': `Bearer ${window.localStorage.getItem('shogun_token') || 'shogun2025'}` }
+                                          headers: { 'Authorization': `Bearer ${window.localStorage.getItem('authToken') }` }
                                         });
                                         
                                         if (!response.ok) {
