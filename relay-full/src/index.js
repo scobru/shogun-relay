@@ -12,6 +12,8 @@ import "gun/axe.js";
 import "gun/lib/radisk.js";
 import "gun/lib/webrtc.js";
 
+import "bullet-catcher"
+
 import path from "path";
 import http from "http";
 import https from "https";
@@ -246,26 +248,7 @@ const debugGunMessages = (msg) => {
   return msg;
 };
 
-function hasValidToken(msg) {
-  // Special case: allow authentication messages from Gun.js internal operations
-  if (msg && msg.put) {
-    const keys = Object.keys(msg.put);
-    // Allow user authentication messages (they start with ~@)
-    if (keys.some((key) => key.startsWith("~@"))) {
-      if (CONFIG.LOG_LEVEL === 'debug') {
-        gunLogger.debug("User authentication message allowed");
-      }
-      return true;
-    }
-    // Allow user data messages (they contain user pub keys)
-    if (keys.some((key) => key.match(/^~[A-Za-z0-9_\-\.]+$/))) {
-      if (CONFIG.LOG_LEVEL === 'debug') {
-        gunLogger.debug("User data message allowed");
-      }
-      return true;
-    }
-  }
-
+function hasValidToken(msg) {  
   const valid =
     (msg &&
       msg.headers &&
@@ -283,6 +266,7 @@ let gunOptions = {
   localStorage: false,
   radisk: true,
   file: "radata",
+  isValid: hasValidToken,
 };
 
 // Add S3 configuration if available in CONFIG

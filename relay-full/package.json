@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "aws-sdk": "^2.1692.0",
+    "bullet-catcher": "^3.0.5",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
     "dotenv": "12.0.3",
@@ -35,8 +36,8 @@
     "path": "^0.12.7",
     "request": "^2.88.2",
     "rxjs": "^7.8.2",
-    "shogun-core": "file:../../shogun-core",
-    "shogun-ipfs": "^1.0.0",
+    "shogun-core": "latest",
+    "shogun-ipfs": "latest",
     "url": "^0.11.4",
     "valibot": "^1.1.0",
     "winston": "^3.17.0",

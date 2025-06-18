@@ -11,6 +11,6 @@ const gun = createNodeServer(port, peers, {
 
 console.log(`GUN server started on port ${port}`);
 
-const namespace = `wallie2.1`
+const namespace = `hal9000`
 
 export { gun, namespace }

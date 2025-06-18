@@ -481,8 +481,9 @@ minimatch@^3.1.2:
     brace-expansion "^1.1.7"
 
 mityli@^1.0.1, "mityli@file:../../mityli":
-  version "1.0.1"
+  version "1.0.2"
   dependencies:
+    typescript "^5.8.3"
     valibot "^0.24.0"
 
 ms@2.0.0:
@@ -651,11 +652,14 @@ setprototypeof@1.2.0:
   resolved "https://registry.yarnpkg.com/setprototypeof/-/setprototypeof-1.2.0.tgz#66c9a24a73f9fc28cbe66b09fed3d33dcaf1b424"
   integrity sha512-E5LDX7Wrp85Kil5bhZv46j8jOeboKq5JMmYM3gVGdGH8xFpPWXUMsNrlODCrkoxMEeNi/XZIwuRvY4XNwYMJpw==
 
-"shogun-create@file:../../shogun-create":
-  version "1.0.4"
+shogun-create@^1.0.5:
+  version "1.0.5"
+  resolved "https://registry.yarnpkg.com/shogun-create/-/shogun-create-1.0.5.tgz#4b99d2d78788969493ac654f001d904dd8c74118"
+  integrity sha512-4tWX0mHBWViMITV0R+gr6n+i2VTqYTCGAknYQkEoyBzFNysc+lle9IgbSuAJQ3m8kkcWEbzTTSAfmIqeMbNTMw==
   dependencies:
     gun "^0.2020.1239"
     mityli "^1.0.1"
+    typescript "^5.8.3"
 
 side-channel-list@^1.0.0:
   version "1.0.0"
@@ -745,6 +749,11 @@ type-is@~1.6.18:
   dependencies:
     media-typer "0.3.0"
     mime-types "~2.1.24"
+
+typescript@^5.8.3:
+  version "5.8.3"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.8.3.tgz#92f8a3e5e3cf497356f4178c34cd65a7f5e8440e"
+  integrity sha512-p1diW6TqL9L07nNxvRMM7hMMw4c5XOo/1ibL4aAIGmSAt9slTE1Xgw5KWuof2uTOvCg9BY7ZRi+GaF+7sfgPeQ==
 
 undefsafe@^2.0.5:
   version "2.0.5"

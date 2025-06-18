@@ -10,7 +10,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const app = express()
-const PORT = process.env.PORT || 3000
+const PORT = process.env.PORT || 3001
 const publicPath = path.resolve(__dirname, 'public')
 const indexPath = path.resolve(publicPath, 'index.html')
 
@@ -72,6 +72,7 @@ app.get('/blog/:id', (req, res) => {
 app.get('/*', (req, res) => {
    res.sendFile(indexPath)
 })
+
 
 app.listen(PORT, error => {
    if (error) {
