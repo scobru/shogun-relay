@@ -353,7 +353,7 @@ gopd@^1.2.0:
   resolved "https://registry.yarnpkg.com/gopd/-/gopd-1.2.0.tgz#89f56b8217bdbc8802bd299df6d7f1081d7e51a1"
   integrity sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==
 
-gun@^0.2020.1235, gun@^0.2020.1239:
+gun@^0.2020.1235, gun@^0.2020.1240:
   version "0.2020.1240"
   resolved "https://registry.yarnpkg.com/gun/-/gun-0.2020.1240.tgz#759ad9a736bc41eaaa5801e0b83a9e106684e098"
   integrity sha512-uhnyadZTywn0HHgBjS2DePqpcdwLeVm6nFeSZZBPJRltm9O8MjFPyltaxk2PBKS+O8wSZac9qlbCIriJDgQQog==
@@ -652,12 +652,10 @@ setprototypeof@1.2.0:
   resolved "https://registry.yarnpkg.com/setprototypeof/-/setprototypeof-1.2.0.tgz#66c9a24a73f9fc28cbe66b09fed3d33dcaf1b424"
   integrity sha512-E5LDX7Wrp85Kil5bhZv46j8jOeboKq5JMmYM3gVGdGH8xFpPWXUMsNrlODCrkoxMEeNi/XZIwuRvY4XNwYMJpw==
 
-shogun-create@^1.0.5:
+"shogun-create@file:../../shogun-create":
   version "1.0.5"
-  resolved "https://registry.yarnpkg.com/shogun-create/-/shogun-create-1.0.5.tgz#4b99d2d78788969493ac654f001d904dd8c74118"
-  integrity sha512-4tWX0mHBWViMITV0R+gr6n+i2VTqYTCGAknYQkEoyBzFNysc+lle9IgbSuAJQ3m8kkcWEbzTTSAfmIqeMbNTMw==
   dependencies:
-    gun "^0.2020.1239"
+    gun "^0.2020.1240"
     mityli "^1.0.1"
     typescript "^5.8.3"
 

@@ -23,8 +23,8 @@
   "dependencies": {
     "express": "^4.18.2",
     "gun": "^0.2020.1235",
-    "mityli": "latest",
-    "shogun-create": "^1.0.5",
+    "mityli": "file:../../mityli",
+    "shogun-create": "file:../../shogun-create",
     "ws": "^8.14.2"
   },
   "devDependencies": {
