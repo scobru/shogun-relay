@@ -11,26 +11,14 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
     
     <style>
         body {
             font-family: 'Inter', sans-serif;
         }
-        
-        .login-animation {
-            animation: slideInUp 0.6s ease-out;
-        }
-        
-        @keyframes slideInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
         }
     </style>
 </head>
@@ -41,29 +29,25 @@
     
     <!-- Main Container -->
     <div class="min-h-screen flex items-center justify-center p-4">
-        <div class="card w-full max-w-md bg-base-100 shadow-2xl login-animation">
+        <div class="card w-full max-w-sm bg-base-100 shadow-xl border border-base-300">
             <!-- Header -->
-            <div class="card-body text-center">
-                <div class="avatar mb-4">
-                    <div class="w-16 rounded-full bg-primary text-primary-content flex items-center justify-center">
-                        <span class="text-2xl font-bold">🛡️</span>
-                    </div>
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <h1 class="text-2xl font-bold">Shogun Relay</h1>
+                    <p class="text-base-content/60">Dashboard Access</p>
                 </div>
-                
-                <h1 class="text-3xl font-bold text-base-content mb-2">Shogun Relay</h1>
-                <p class="text-base-content/60 mb-6">Secure access to your relay dashboard</p>
                 
                 <!-- Login Form -->
                 <div class="form-control w-full">
                     <label class="label">
-                        <span class="label-text font-medium">🔑 Authentication Token</span>
+                        <span class="label-text">Authentication Token</span>
                     </label>
                     <div class="relative">
                         <input 
                             type="password" 
                             id="token" 
-                            placeholder="Enter your authentication token" 
-                            class="input input-bordered w-full pr-12" 
+                            placeholder="Enter token" 
+                            class="input input-bordered w-full pr-12 mono" 
                             autocomplete="off"
                         />
                         <button 
@@ -75,70 +59,31 @@
                             👁️
                         </button>
                     </div>
-                    <label class="label">
-                        <span class="label-text-alt">Provide your relay authentication token</span>
-                    </label>
                 </div>
                 
                 <!-- Login Button -->
                 <button 
                     id="login-btn" 
-                    class="btn btn-primary btn-lg w-full mt-4"
+                    class="btn btn-primary w-full mt-6"
                     onclick="doLogin()"
                 >
                     <span id="login-spinner" class="loading loading-spinner loading-sm hidden"></span>
-                    <span id="login-text">🚀 Access Dashboard</span>
+                    <span id="login-text">Access Dashboard</span>
                 </button>
                 
                 <!-- Error Alert -->
-                <div id="error-alert" class="alert alert-error mt-4 hidden">
+                <div id="error-alert" class="alert alert-error mt-4 hidden text-xs p-2">
                     <span id="error-message">Token non valido. Riprova.</span>
-                </div>
-                
-                <!-- Info -->
-                <div class="mt-6 p-4 bg-base-200 rounded-lg">
-                    <p class="text-sm text-base-content/70">
-                        💡 Need help? Contact your system administrator for access credentials.
-                    </p>
-                </div>
-                
-                <!-- Theme Toggle -->
-                <div class="flex justify-center mt-4">
-                    <button 
-                        id="theme-toggle"
-                        class="btn btn-circle btn-outline btn-sm"
-                        onclick="toggleTheme()"
-                        title="Toggle theme"
-                    >
-                        <span id="theme-icon">🌙</span>
-                    </button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Theme management
-        function toggleTheme() {
-            const html = document.documentElement;
-            const currentTheme = html.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            
-            html.setAttribute('data-theme', newTheme);
-            localStorage.setItem('login-theme', newTheme);
-            
-            const icon = document.getElementById('theme-icon');
-            icon.textContent = newTheme === 'dark' ? '🌙' : '☀️';
-            
-            showToast(`${newTheme === 'dark' ? 'Dark' : 'Light'} theme activated`, 'info');
-        }
-        
-        // Initialize theme
+        // Theme management (simplified, no toggle on login)
         function initTheme() {
             const savedTheme = localStorage.getItem('login-theme') || 'dark';
             document.documentElement.setAttribute('data-theme', savedTheme);
-            const icon = document.getElementById('theme-icon');
-            icon.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
         }
         
         // Password visibility toggle

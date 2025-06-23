@@ -1,0 +1,101 @@
+version: "3.8"
+
+services:
+  shogun-relay-dev:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: shogun-relay-dev
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+      - "8443:8443"
+      - "9229:9229"  # Node.js debugger port
+    volumes:
+      # Mount source code for hot reload
+      - .:/app
+      - /app/node_modules
+      # Mount persistent data directories
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+      - ./radata:/app/radata
+      # Mount configuration
+      - ./config.json:/app/config.json:ro
+      # Mount SSL certificates if available
+      - ./keys:/app/keys:ro
+    environment:
+      # Development Environment
+      - NODE_ENV=development
+      - PORT=8765
+      - HTTPS_PORT=8443
+      - HOST=0.0.0.0
+      
+      # Authentication & Security (Development values)
+      - SECRET_TOKEN=dev-token-change-in-production
+      - BASIC_AUTH_USER=admin
+      - BASIC_AUTH_PASSWORD=admin
+      
+      # CORS Configuration (Permissive for development)
+      - DISABLE_CORS=true
+      - ALLOWED_ORIGINS=*
+      
+      # IPFS Configuration
+      - IPFS_ENABLED=false
+      - IPFS_SERVICE=IPFS-CLIENT
+      - IPFS_NODE_URL=http://host.docker.internal:5001
+      - IPFS_GATEWAY=http://host.docker.internal:8080/ipfs
+      - PINATA_GATEWAY=https://gateway.pinata.cloud
+      - PINATA_JWT=
+      
+      # Debug & Logging
+      - LOG_LEVEL=debug
+      - TYPE_VALIDATION_ENABLED=true
+      - TYPE_VALIDATION_STRICT=true
+      - STORAGE_LOG_ENABLED=true
+      
+      # Development features
+      - DISABLE_GUN_AUTH=true
+      - MAX_FILE_SIZE=100mb
+      
+      # Blockchain/Relay (Disabled for local development)
+      - ONCHAIN_MEMBERSHIP_ENABLED=false
+      - ETHEREUM_PROVIDER_URL=https://opt-sepolia.g.alchemy.com/v2/demo
+      
+    command: npm run dev
+    
+    # Development specific networks
+    networks:
+      - shogun-dev-network
+    
+    # Labels for development
+    labels:
+      - "dev.shogun.type=relay-server"
+      - "dev.shogun.environment=development"
+
+  # Optional: Add a local IPFS node for testing
+  ipfs-node:
+    image: ipfs/kubo:latest
+    container_name: ipfs-dev
+    ports:
+      - "4001:4001"
+      - "5001:5001"
+      - "8080:8080"
+    volumes:
+      - ipfs-data:/data/ipfs
+    environment:
+      - IPFS_PROFILE=server
+    networks:
+      - shogun-dev-network
+    profiles:
+      - ipfs  # Use: docker-compose --profile ipfs up
+
+networks:
+  shogun-dev-network:
+    driver: bridge
+
+volumes:
+  ipfs-data:
+  shogun-dev-uploads:
+  shogun-dev-logs:
+  shogun-dev-radata: 

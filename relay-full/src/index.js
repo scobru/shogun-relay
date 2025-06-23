@@ -923,11 +923,11 @@ async function startServer() {
       if (CONFIG.LOG_LEVEL === 'debug') {
         serverLogger.debug('Root route accessed', {
           dirname: __dirname,
-          htmlPath: path.join(__dirname, "src/ui/dashboard/index-react.html"),
-          htmlExists: fs.existsSync(path.join(__dirname, "src/ui/dashboard/index-react.html"))
+          htmlPath: path.join(__dirname, "src/ui/dashboard/index.html"),
+          htmlExists: fs.existsSync(path.join(__dirname, "src/ui/dashboard/index.html"))
         });
       }
-      res.sendFile(path.join(__dirname, "src/ui/dashboard/index-react.html"));
+      res.sendFile(path.join(__dirname, "src/ui/dashboard/index.html"));
     });
 
     // Test route for debugging
@@ -935,15 +935,15 @@ async function startServer() {
       res.json({
         message: "Server is working!",
         dirname: __dirname,
-        htmlPath: path.join(__dirname, "src/ui/dashboard/index-react.html"),
-        htmlExists: fs.existsSync(path.join(__dirname, "src/ui/dashboard/index-react.html")),
+        htmlPath: path.join(__dirname, "src/ui/dashboard/index.html"),
+        htmlExists: fs.existsSync(path.join(__dirname, "src/ui/dashboard/index.html")),
         timestamp: new Date().toISOString()
       });
     });
 
     // Also serve it explicitly at /dashboard
     app.get("/dashboard", (req, res) => {
-      res.sendFile(path.join(__dirname, "src/ui/dashboard/index-react.html"));
+      res.sendFile(path.join(__dirname, "src/ui/dashboard/index.html"));
     });
 
     // Serve the login page

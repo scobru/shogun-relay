@@ -1,9 +1,78 @@
+# Dependencies
 node_modules/
-dist/
-.env
-.DS_Store 
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
 radata/
 uploads/
-logs
+logs/
+*.log
+
+# Environment and config files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 config.json
+
+# SSL certificates and keys
 keys/
+*.key
+*.pem
+*.crt
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Docker files
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+*.md
+
+# Test files
+test/
+tests/
+*.test.js
+*.spec.js
+
+# Build artifacts
+dist/
+build/
+*.tgz
+*.tar.gz
+
+# Temporary files
+*.tmp
+*.temp
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# Runtime cache
+.npm
+.cache

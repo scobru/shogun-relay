@@ -62,31 +62,28 @@ export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, authenticateRequ
   // API - Check relay status
   router.get("/status", authenticateRequestMiddleware, async (req, res) => {
     try {
-      const relayVerifier = getRelayVerifierInstance();
-      if (!RELAY_CONFIG_PARAM.relay.onchainMembership || !relayVerifier) {
+      // Check if onchain membership is enabled
+      if (!RELAY_CONFIG_PARAM.relay.onchainMembership) {
         return res.status(503).json(_standardResponse(
           false,
-          "Relay services not available",
+          "Relay services not available - onchain membership disabled",
           {
             config: {
-              enabled: RELAY_CONFIG_PARAM.relay.onchainMembership,
+              enabled: false,
               registryAddress: RELAY_CONFIG_PARAM.relay.registryAddress || "Not configured",
             }
           },
-          "Relay services not available"
+          "Onchain membership is disabled"
         ));
       }
-      
-      const allRelays = await relayVerifier.getAllRelays();
+
+      // Basic relay status - service is running
       res.json(_standardResponse(
         true,
         "Relay status retrieved successfully",
         {
-          config: {
-            enabled: RELAY_CONFIG_PARAM.relay.onchainMembership,
-            registryAddress: RELAY_CONFIG_PARAM.relay.registryAddress,
-          },
-          relaysCount: allRelays.length
+          status: "active",
+          timestamp: Date.now()
         }
       ));
     } catch (error) {
@@ -97,24 +94,17 @@ export default function setupRelayApiRoutes(RELAY_CONFIG_PARAM, authenticateRequ
   // API - Get all relays
   router.get("/all", authenticateRequestMiddleware, async (req, res) => {
     try {
-      const relayVerifier = getRelayVerifierInstance();
-      if (!RELAY_CONFIG_PARAM.relay.onchainMembership || !relayVerifier) {
-        return res.status(503).json(_standardResponse(false, "Relay services not available", {}, "Relay services not available"));
+      if (!RELAY_CONFIG_PARAM.relay.onchainMembership) {
+        return res.status(503).json(_standardResponse(false, "Relay services not available - onchain membership disabled", {}, "Onchain membership is disabled"));
       }
       
-      const relayAddresses = await relayVerifier.getAllRelays();
-      const relays = [];
-      
-      for (const address of relayAddresses) {
-        try {
-          const relayInfo = await relayVerifier.getRelayInfo(address);
-          if (relayInfo) {
-            relays.push(relayInfo);
-          }
-        } catch (error) {
-          // Continue to next relay
-        }
-      }
+      // Return basic relay information without RelayVerifier
+      const relays = [{
+        address: RELAY_CONFIG_PARAM.relay.individualRelayAddress || "Not configured",
+        registryAddress: RELAY_CONFIG_PARAM.relay.registryAddress || "Not configured",
+        entryPointAddress: RELAY_CONFIG_PARAM.relay.entryPointAddress || "Not configured",
+        status: "configured"
+      }];
       
       res.json(_standardResponse(true, "Relays retrieved successfully", { relays }));
     } catch (error) {
