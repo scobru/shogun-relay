@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gun Relay Stats</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { background-color: #222; color: #eee; font-family: "Menlo", "Consolas", monospace; line-height: 1.6; margin: 2em; }
+        h1 { border-bottom: 1px solid #555; padding-bottom: 10px; }
+        a { color: #8af; text-decoration: none; }
+        a:hover { background-color: #333; }
+        .stats-container { display: grid; grid-template-columns: 1fr 2fr; gap: 1em 2em; }
+        .stats-container dt { font-weight: bold; text-align: right; color: #aaa; }
+        .error { background-color: #533; color: #f88; border-left: 3px solid #c00; padding: 10px; margin-top: 1em; display: none; }
+        #lastUpdated { margin-top: 2em; color: #888; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <a href="/">&larr; Back to Control Panel</a>
+    <h1>Gun Relay Live Stats</h1>
+    <dl id="statsContainer" class="stats-container">
+        <!-- Stats will be injected here -->
+    </dl>
+    <div id="error" class="error"></div>
+    <p id="lastUpdated"></p>
+
+    <script>
+        const statsContainer = document.getElementById('statsContainer');
+        const errorEl = document.getElementById('error');
+        const lastUpdatedEl = document.getElementById('lastUpdated');
+
+        function updateStat(dt, dd) {
+            const dtTerm = document.createElement('dt');
+            dtTerm.textContent = dt;
+            const ddDesc = document.createElement('dd');
+            ddDesc.textContent = dd;
+            statsContainer.appendChild(dtTerm);
+            statsContainer.appendChild(ddDesc);
+        }
+
+        function formatBytes(bytes, decimals = 2) {
+            if (!bytes || bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+        
+        async function fetchStats() {
+            try {
+                const response = await fetch('/api/stats');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const result = await response.json();
+
+                if (result.success && result.stats) {
+                    errorEl.style.display = 'none';
+                    statsContainer.innerHTML = '';
+
+                    const { peers, node, rad } = result.stats;
+                    
+                    updateStat('Connected Peers', peers?.count || 0);
+
+                    let uptime = 'N/A';
+                    if (node?.up?.time) {
+                        const totalSeconds = Math.floor(node.up.time / 1000);
+                        const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+                        const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+                        const seconds = String(totalSeconds % 60).padStart(2, '0');
+                        uptime = `${hours}:${minutes}:${seconds}`;
+                    }
+                    updateStat('Uptime', uptime);
+                    
+                    updateStat('Memory Usage', node?.memory?.heapUsed ? formatBytes(node.memory.heapUsed) : 'N/A');
+                    updateStat('GET Requests', rad?.get?.count || 0);
+                    updateStat('PUT Requests', rad?.put?.count || 0);
+                    
+                    lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+
+                } else {
+                    throw new Error(result.error || 'Failed to fetch stats.');
+                }
+            } catch (err) {
+                errorEl.textContent = `Error fetching stats: ${err.message}`;
+                errorEl.style.display = 'block';
+            }
+        }
+
+        fetchStats();
+        setInterval(fetchStats, 5000); // Refresh every 5 seconds
+    </script>
+</body>
+</html> 

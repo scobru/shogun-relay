@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GunDB Data Viewer</title>
+    <style>
+        body { background-color: #222; color: #eee; font-family: "Menlo", "Consolas", monospace; line-height: 1.6; margin: 2em; }
+        h1, h2 { border-bottom: 1px solid #555; padding-bottom: 10px; margin-top: 1.5em; }
+        a { color: #8af; text-decoration: none; }
+        a:hover { background-color: #333; }
+        input, button { background-color: #444; color: #eee; border: 1px solid #666; padding: 8px; font-family: inherit; width: 100%; box-sizing: border-box; margin-top: 10px; }
+        button { cursor: pointer; width: auto; }
+        button:hover { background-color: #666; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group { margin-bottom: 1em; }
+        pre { background-color: #333; padding: 1em; white-space: pre-wrap; word-wrap: break-word; border: 1px solid #444; }
+        .error { background-color: #533; color: #f88; border-left: 3px solid #c00; padding: 10px; display: none; }
+        .toolbar { margin: 1em 0; }
+        .toolbar button { background-color: #353; }
+        .toolbar button:hover { background-color: #464; }
+    </style>
+</head>
+<body>
+    <a href="/">&larr; Back to Control Panel</a>
+    <h1>GunDB Data Viewer</h1>
+
+    <h2>Authentication</h2>
+    <div class="form-group">
+        <label for="authToken">Auth Token:</label>
+        <input type="password" id="authToken" placeholder="Enter your token">
+    </div>
+
+    <h2>Query Node</h2>
+    <div class="form-group">
+        <label for="nodePath">Node Path:</label>
+        <input type="text" id="nodePath" placeholder="e.g., test/data">
+    </div>
+    <button id="viewBtn">View Data</button>
+
+    <div id="resultArea" style="display:none;">
+        <h2>Result for: <span id="resultPath"></span></h2>
+        <div class="toolbar">
+             <button id="editBtn">Edit Node</button>
+        </div>
+        <pre id="resultData"></pre>
+    </div>
+    <div id="error" class="error"></div>
+
+    <script>
+        const viewBtn = document.getElementById('viewBtn');
+        const editBtn = document.getElementById('editBtn');
+        const nodePathInput = document.getElementById('nodePath');
+        const resultArea = document.getElementById('resultArea');
+        const resultPath = document.getElementById('resultPath');
+        const resultData = document.getElementById('resultData');
+        const errorEl = document.getElementById('error');
+        const authTokenInput = document.getElementById('authToken');
+
+        const fetchData = async () => {
+            resultArea.style.display = 'none';
+            errorEl.style.display = 'none';
+            const path = nodePathInput.value.trim();
+            if (!path) {
+                errorEl.textContent = 'Error: Node Path is required.';
+                errorEl.style.display = 'block';
+                return;
+            }
+            try {
+                const response = await fetch(`/node/${path}`, {
+                    headers: { 'Authorization': `Bearer ${authTokenInput.value}` }
+                });
+                const result = await response.json();
+                if (result.success) {
+                    resultPath.textContent = result.path;
+                    resultData.textContent = result.data ? JSON.stringify(result.data, null, 2) : 'null (No data at this node)';
+                    resultArea.style.display = 'block';
+                } else {
+                    errorEl.textContent = `Error: ${result.error || response.statusText}`;
+                    errorEl.style.display = 'block';
+                }
+            } catch (err) {
+                errorEl.textContent = `Network or fetch error: ${err.message}`;
+                errorEl.style.display = 'block';
+            }
+        };
+        viewBtn.addEventListener('click', fetchData);
+        nodePathInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') fetchData();
+        });
+        editBtn.addEventListener('click', () => {
+            const path = nodePathInput.value.trim();
+            if (path) window.open(`/edit?path=${encodeURIComponent(path)}`, '_blank');
+        });
+    </script>
+</body>
+</html> 

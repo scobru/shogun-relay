@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bullet-Catcher Test</title>
+</head>
+<body>
+    <h1>Test Bullet-Catcher</h1>
+    <button onclick="testPutWithToken()">Test PUT con Token</button>
+    <button onclick="testPutWithoutToken()">Test PUT senza Token</button>
+    <button onclick="testGet()">Test GET</button>
+    <div id="output"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+    
+    <script>
+        const output = document.getElementById('output');
+        
+        function log(message) {
+            output.innerHTML += '<p>' + new Date().toISOString() + ': ' + message + '</p>';
+            console.log(message);
+        }
+
+        // Test con token
+        function testPutWithToken() {
+            log('=== Test PUT con token ===');
+            
+            Gun.on("opt", function (ctx) {
+                if (ctx.once) {
+                    return;
+                }
+                ctx.on("out", function (msg) {
+                    var to = this.to;
+                    log('Client sending message: ' + JSON.stringify(msg));
+                    // Adds headers for put
+                    msg.headers = {
+                        token: "shogun2025",
+                    };
+                    log('Client message with token: ' + JSON.stringify(msg));
+                    to.next(msg); // pass to next middleware
+                });
+            });
+
+            const gun = new Gun({
+                peers: ['http://localhost:8765/gun'],
+                radisk: false,
+                localStorage: false,
+            });
+
+            gun.get('test').put({
+                message: 'Hello with token',
+                timestamp: Date.now()
+            }, function(ack) {
+                log('PUT with token result: ' + JSON.stringify(ack));
+            });
+        }
+
+        // Test senza token
+        function testPutWithoutToken() {
+            log('=== Test PUT senza token ===');
+            
+            const gun2 = new Gun({
+                peers: ['http://localhost:8765/gun'],
+                radisk: false,
+                localStorage: false,
+            });
+
+            gun2.get('test2').put({
+                message: 'Hello without token',
+                timestamp: Date.now()
+            }, function(ack) {
+                log('PUT without token result: ' + JSON.stringify(ack));
+            });
+        }
+
+        // Test GET
+        function testGet() {
+            log('=== Test GET ===');
+            
+            const gun3 = new Gun({
+                peers: ['http://localhost:8765/gun'],
+                radisk: false,
+                localStorage: false,
+            });
+
+            gun3.get('test').once(function(data) {
+                log('GET result: ' + JSON.stringify(data));
+            });
+        }
+    </script>
+</body>
+</html> 

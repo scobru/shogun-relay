@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GunDB Data Editor</title>
+    <style>
+        body { background-color: #222; color: #eee; font-family: "Menlo", "Consolas", monospace; line-height: 1.6; margin: 2em; }
+        h1, h2 { border-bottom: 1px solid #555; padding-bottom: 10px; margin-top: 1.5em; }
+        a { color: #8af; text-decoration: none; }
+        a:hover { background-color: #333; }
+        input, textarea, button { background-color: #444; color: #eee; border: 1px solid #666; padding: 8px; font-family: inherit; width: 100%; box-sizing: border-box; margin-top: 10px; }
+        textarea { height: 300px; }
+        button { cursor: pointer; width: auto; }
+        button:hover { background-color: #666; }
+        #deleteBtn { background-color: #833; }
+        #deleteBtn:hover { background-color: #944; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group { margin-bottom: 1em; }
+        .message { padding: 10px; margin-top: 1em; display: none; border-left: 3px solid; }
+        .message.success { background-color: #353; color: #8f8; border-color: #0c0; }
+        .message.error { background-color: #533; color: #f88; border-color: #c00; }
+    </style>
+</head>
+<body>
+    <a href="/">&larr; Back to Control Panel</a>
+    <h1>GunDB Data Editor</h1>
+
+    <h2>Authentication</h2>
+    <div class="form-group">
+        <label for="authToken">Auth Token:</label>
+        <input type="password" id="authToken" placeholder="Enter your token">
+    </div>
+
+    <h2>Editing Node: <span id="nodePathDisplay"></span></h2>
+    <div class="form-group">
+        <label for="dataArea">Data (JSON format):</label>
+        <textarea id="dataArea"></textarea>
+    </div>
+    <button id="saveBtn">Save Changes</button>
+    <button id="deleteBtn">Delete Node</button>
+    <div id="message" class="message"></div>
+
+    <script>
+        const nodePathDisplay = document.getElementById('nodePathDisplay');
+        const dataArea = document.getElementById('dataArea');
+        const saveBtn = document.getElementById('saveBtn');
+        const deleteBtn = document.getElementById('deleteBtn');
+        const messageEl = document.getElementById('message');
+        const authTokenInput = document.getElementById('authToken');
+        let nodePath = '';
+
+        const showMessage = (text, type = 'error') => {
+            messageEl.textContent = text;
+            messageEl.className = `message ${type}`;
+            messageEl.style.display = 'block';
+        };
+
+        const getAuthHeader = () => ({ 'Authorization': `Bearer ${authTokenInput.value}` });
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const params = new URLSearchParams(window.location.search);
+            nodePath = params.get('path');
+            if (!nodePath) {
+                nodePathDisplay.textContent = 'No path provided!';
+                showMessage('Please specify a path in the URL, e.g., ?path=your/node');
+                return;
+            }
+            nodePathDisplay.textContent = nodePath;
+            try {
+                const response = await fetch(`/node/${nodePath}`, { headers: getAuthHeader() });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error ${response.status}: ${errorText}`);
+                }
+                const result = await response.json();
+                if (result.success) {
+                    dataArea.value = result.data ? JSON.stringify(result.data, null, 2) : 'null';
+                } else {
+                    showMessage(`Failed to load data: ${result.error}`);
+                }
+            } catch (err) {
+                showMessage(`Load error: ${err.message}`);
+            }
+        });
+
+        saveBtn.addEventListener('click', async () => {
+            let data;
+            try { data = JSON.parse(dataArea.value); } catch (e) { showMessage('Invalid JSON format.'); return; }
+            try {
+                const response = await fetch(`/node/${nodePath}`, {
+                    method: 'POST',
+                    headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error ${response.status}: ${errorText}`);
+                }
+                const result = await response.json();
+                if (result.success) {
+                    showMessage('Data saved successfully!', 'success');
+                } else {
+                    showMessage(`Save failed: ${result.error}`);
+                }
+            } catch (err) {
+                showMessage(`Save error: ${err.message}`);
+            }
+        });
+
+        deleteBtn.addEventListener('click', async () => {
+            if (!confirm(`Are you sure you want to delete the node at "${nodePath}"?`)) return;
+            try {
+                const response = await fetch(`/node/${nodePath}`, {
+                    method: 'DELETE',
+                    headers: getAuthHeader()
+                });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error ${response.status}: ${errorText}`);
+                }
+                const result = await response.json();
+                if (result.success) {
+                    showMessage('Node deleted successfully!', 'success');
+                    dataArea.value = 'null';
+                } else {
+                    showMessage(`Delete failed: ${result.error}`);
+                }
+            } catch (err) {
+                showMessage(`Delete error: ${err.message}`);
+            }
+        });
+    </script>
+</body>
+</html> 

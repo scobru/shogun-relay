@@ -1,0 +1,177 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1" name="viewport" />
+    <title>Minimal Message Server</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/eventemitter3@4.0.0/index.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bugout@0.0.13/docs/bugout.min.js"></script>
+    <script src="./lib/bugoff.js"></script>
+    <script src="//cdn.jsdelivr.net/npm/qrcode@latest/build/qrcode.min.js"></script>
+    
+    <style>
+      body { 
+        background-color: #333; 
+        font-family: 'Courier New', monospace;
+        color: #eee;
+        padding: 1em;
+      }
+      pre { 
+        white-space: pre-wrap; 
+        word-wrap: break-word; 
+        line-height: 1.2em;
+      }
+      #qrcode-container {
+        margin-top: 1em;
+        background: white;
+        padding: 1em;
+        display: inline-block;
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="log"></pre>
+    <div id="qrcode-container" style="display: none;">
+      <canvas id="qrcode"></canvas>
+    </div>
+
+    <script>
+      const logEl = document.getElementById("log");
+      const qrcodeContainerEl = document.getElementById("qrcode-container");
+      const qrcodeEl = document.getElementById("qrcode");
+      
+      let messages = [];
+      let clientUrl = '';
+
+      function log(...args) {
+        const logMessage = args.map(arg => 
+          typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+        ).join(' ');
+        
+        console.log(...args);
+        logEl.textContent += logMessage + '\n';
+        window.scrollTo(0, document.body.scrollHeight);
+      }
+
+      function generateQRCode(url) {
+        if (!url) return;
+        
+        qrcodeContainerEl.style.display = 'inline-block';
+        QRCode.toCanvas(
+          qrcodeEl,
+          url,
+          {
+            width: 200,
+            margin: 2,
+            color: {
+              dark: "#333",
+              light: "#ffffff",
+            },
+          },
+          (error) => {
+            if (error) {
+              log("❌ QR code generation error", error);
+            }
+          }
+        );
+      }
+
+      function initServer() {
+        log("🚀 STARTING MESSAGE SERVER");
+        
+        let seed = localStorage["bugout-messageboard-seed"];
+        
+        try {
+          if (typeof Bugoff !== 'function') {
+            log("❌ ERROR: Bugoff library not found");
+            return;
+          }
+          
+          let b;
+          if (seed) {
+            log("🔑 Using existing seed:", seed.substring(0, 10) + "...");
+            b = new Bugoff({ seed: seed });
+          } else {
+            log("🆕 No seed found, creating new instance");
+            b = new Bugoff();
+          }
+          
+          localStorage["bugout-messageboard-seed"] = b.seed;
+          log("💾 Seed saved to browser");
+          
+          const address = b.address();
+          log("🏠 Server address:", address);
+          
+          clientUrl = `${window.location.href.replace('server', 'client')}#${address}`;
+          generateQRCode(clientUrl);
+          log("🔗 Client URL:", clientUrl);
+          
+          b.SEA()
+            .then(() => log("🔐 Encryption initialized"))
+            .catch((err) => log("❌ Encryption init error:", err));
+          
+          if (localStorage["bugout-messageboard"]) {
+            try {
+              messages = JSON.parse(localStorage["bugout-messageboard"]);
+              log("📥 Loaded", messages.length, "messages from browser");
+            } catch (e) {
+              log("❌ Error loading messages:", e);
+              messages = [];
+            }
+          }
+          
+          b.register("post", (address, message, cb) => {
+            if (typeof message == "string" && message.length < 500) {
+              const m = { 
+                address: address, 
+                m: message, 
+                t: new Date().getTime() 
+              };
+              
+              log("💬 New message:", m);
+              messages.push(m);
+              messages = messages.slice(-20); // Keep last 20
+              localStorage["bugout-messageboard"] = JSON.stringify(messages);
+              
+              b.send("refresh");
+              cb(true);
+            } else {
+              cb(false);
+            }
+          });
+          
+          b.register("list", (address, args, cb) => {
+            cb(messages.slice().reverse());
+          });
+          
+          b.on("connections", (count) => {
+            log(`👥 Connections: ${count}`);
+            if (count > 0) {
+                log("🎉 Server ready for connections");
+                log("\n🔗 " + clientUrl + "\n");
+            }
+          });
+
+          b.on("seen", (address) => {
+            log("👋 Seen:", address);
+          });
+          
+          b.on("error", (error) => {
+            log("❌ Bugout Error:", error);
+          });
+
+          log("✅ Server initialized successfully, waiting for connections...");
+          
+        } catch (error) {
+          log("❌ FATAL: Server initialization failed:", error);
+        }
+      }
+
+      initServer();
+    </script>
+  </body>
+</html>

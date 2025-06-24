@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shogun Key Derivation</title>
+    <style>
+        body { background-color: #222; color: #eee; font-family: "Menlo", "Consolas", monospace; line-height: 1.6; margin: 2em; }
+        h1, h2 { border-bottom: 1px solid #555; padding-bottom: 10px; margin-top: 1.5em; }
+        a { color: #8af; text-decoration: none; }
+        a:hover { background-color: #333; }
+        input, button { background-color: #444; color: #eee; border: 1px solid #666; padding: 8px; font-family: inherit; width: 100%; box-sizing: border-box; margin-top: 10px; }
+        button { cursor: pointer; width: auto; }
+        button:hover { background-color: #666; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group { margin-bottom: 1em; }
+        .checkbox-group label { display: inline-block; margin-right: 15px; font-weight: normal; }
+        .result-header { display: flex; align-items: center; gap: 20px; margin-top: 1.5em; }
+        #avatar { border: 1px solid #555; }
+        .pub-key { font-size: 0.9em; word-break: break-all; }
+        .key-section { margin: 1.5em 0; }
+        .key-item { display: grid; grid-template-columns: 150px 1fr auto; gap: 1em; align-items: center; font-size: 0.85em; word-break: break-all; margin-bottom: 5px; }
+        .key-item .label { font-weight: bold; color: #aaa; text-align: right; }
+        .copy-btn { font-size: 0.8em; padding: 2px 6px; width: auto; margin: 0; }
+        .error { background-color: #533; color: #f88; border-left: 3px solid #c00; padding: 10px; display: none; margin-top: 1em;}
+    </style>
+</head>
+<body>
+    <a href="/">&larr; Back to Control Panel</a>
+    <h1>Shogun Key Derivation</h1>
+
+    <div class="form-group">
+        <label for="password">Password / Seed:</label>
+        <input type="password" id="password" placeholder="Enter a password or seed phrase">
+    </div>
+    <div class="form-group">
+        <label for="extra">Extra Entropy (optional, comma-separated):</label>
+        <input type="text" id="extra" placeholder="e.g., user-id, device-name">
+    </div>
+    <div class="form-group">
+        <label>Key Types to Generate:</label>
+        <div class="checkbox-group">
+            <label><input type="checkbox" id="includeP256" checked> P-256 (Gun.SEA)</label>
+            <label><input type="checkbox" id="includeBitcoin"> Bitcoin</label>
+            <label><input type="checkbox" id="includeEthereum"> Ethereum</label>
+        </div>
+    </div>
+    <button id="deriveBtn">Derive Keys</button>
+
+    <div id="resultContainer" style="display:none;">
+        <div class="result-header">
+            <img id="avatar" />
+            <div class="pub-key" id="pubKeyDisplay"></div>
+        </div>
+        <div id="keyDetails"></div>
+    </div>
+    <pre id="error" class="error"></pre>
+    
+    <script>
+        function generateCustomAvatar(pubKey, size = 100) {
+            let hash = 0;
+            for (let i = 0; i < pubKey.length; i++) { hash = ((hash << 5) - hash) + pubKey.charCodeAt(i); hash |= 0; }
+            const random = (seed) => { let x = Math.sin(seed) * 10000; return x - Math.floor(x); };
+            const baseHue = Math.abs(hash % 360);
+            const palette = {
+                bg1: `hsl(${baseHue}, 30%, 25%)`, bg2: `hsl(${(baseHue + 30) % 360}, 30%, 20%)`,
+                pattern: `hsl(${(baseHue + 60) % 360}, 20%, 40%)`, shape1: `hsl(${(baseHue + 180) % 360}, 50%, 75%)`,
+                shape2: `hsl(${(baseHue + 210) % 360}, 65%, 80%)`, accent: `hsl(${(baseHue + 90) % 360}, 80%, 85%)`,
+            };
+            const center = size / 2;
+            const gradientAngle = Math.abs(random(hash >> 1) * 360);
+            let elements = `<defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="0%" gradientTransform="rotate(${gradientAngle})"><stop offset="0%" stop-color="${palette.bg1}" /><stop offset="100%" stop-color="${palette.bg2}" /></linearGradient></defs><rect width="${size}" height="${size}" fill="url(#bg)" />`;
+            const numRings = 2 + Math.floor(random(hash >> 2) * 3);
+            for (let i = 0; i < numRings; i++) { elements += `<circle cx="${center}" cy="${center}" r="${center * (0.9 - i * 0.2)}" stroke="${palette.pattern}" stroke-width="${1 + random(hash + i) * 2}" fill="none" opacity="0.5" />`; }
+            const centralShapeSides = 3 + Math.floor(random(hash >> 3) * 6);
+            const centralRadius = size * (0.2 + random(hash >> 4) * 0.1);
+            const angleStep = (Math.PI * 2) / centralShapeSides;
+            let points = "";
+            for (let i = 0; i < centralShapeSides; i++) { points += `${center + centralRadius * Math.cos(i * angleStep)},${center + centralRadius * Math.sin(i * angleStep)} `; }
+            elements += `<polygon points="${points.trim()}" fill="${palette.shape1}" transform="rotate(${hash % 360}, ${center}, ${center})" />`;
+            const numOrbits = 2 + Math.floor(random(hash >> 5) * 2);
+            for (let i = 0; i < numOrbits; i++) {
+                const orbitRadius = center * (0.6 + i * 0.15);
+                const orbitAngle = random(hash >> (6 + i)) * 360;
+                const planetSize = size * (0.05 + random(hash >> (8 + i)) * 0.05);
+                const x = center + orbitRadius * Math.cos(orbitAngle * Math.PI / 180);
+                const y = center + orbitRadius * Math.sin(orbitAngle * Math.PI / 180);
+                elements += `<circle cx="${x}" cy="${y}" r="${planetSize}" fill="${i % 2 === 0 ? palette.shape2 : palette.accent}" opacity="0.9" />`;
+            }
+            const svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">${elements}</svg>`;
+            return `data:image/svg+xml;base64,${btoa(svg)}`;
+        }
+
+        function displayResults(derivedKeys) {
+            const resultContainer = document.getElementById('resultContainer');
+            const keyDetails = document.getElementById('keyDetails');
+            const avatarImg = document.getElementById('avatar');
+            const pubKeyDisplay = document.getElementById('pubKeyDisplay');
+            const errorEl = document.getElementById('error');
+            keyDetails.innerHTML = '';
+            errorEl.style.display = 'none';
+            if (derivedKeys.pub) {
+                avatarImg.src = generateCustomAvatar(derivedKeys.pub);
+                pubKeyDisplay.textContent = derivedKeys.pub;
+                const p256Section = createKeySection('P-256 (Gun.SEA)', [
+                    { label: 'Public', value: derivedKeys.pub }, { label: 'Private', value: derivedKeys.priv, isPrivate: true },
+                    { label: 'Public Encrypt', value: derivedKeys.epub }, { label: 'Private Encrypt', value: derivedKeys.epriv, isPrivate: true },
+                ]);
+                keyDetails.appendChild(p256Section);
+            }
+            if (derivedKeys.secp256k1Bitcoin) {
+                const btcSection = createKeySection('Bitcoin', [
+                    { label: 'Address', value: derivedKeys.secp256k1Bitcoin.address }, { label: 'Public Key', value: derivedKeys.secp256k1Bitcoin.publicKey },
+                    { label: 'Private Key', value: derivedKeys.secp256k1Bitcoin.privateKey, isPrivate: true },
+                ]);
+                keyDetails.appendChild(btcSection);
+            }
+            if (derivedKeys.secp256k1Ethereum) {
+                const ethSection = createKeySection('Ethereum', [
+                    { label: 'Address', value: derivedKeys.secp256k1Ethereum.address }, { label: 'Public Key', value: derivedKeys.secp256k1Ethereum.publicKey },
+                    { label: 'Private Key', value: derivedKeys.secp256k1Ethereum.privateKey, isPrivate: true },
+                ]);
+                keyDetails.appendChild(ethSection);
+            }
+            resultContainer.style.display = 'block';
+        }
+
+        function createKeySection(title, items) {
+            const section = document.createElement('div');
+            section.className = 'key-section';
+            const h2 = document.createElement('h2');
+            h2.textContent = title;
+            section.appendChild(h2);
+            items.forEach(item => section.appendChild(createKeyItem(item.label, item.value, item.isPrivate)));
+            return section;
+        }
+
+        function createKeyItem(label, value, isPrivate = false) {
+            const item = document.createElement('div');
+            item.className = 'key-item';
+            const labelSpan = document.createElement('span');
+            labelSpan.className = 'label';
+            labelSpan.textContent = label + ':';
+            const valueSpan = document.createElement('span');
+            valueSpan.textContent = isPrivate ? '•'.repeat(value.length) : value;
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'copy-btn';
+            copyBtn.textContent = 'Copy';
+            copyBtn.onclick = () => {
+                navigator.clipboard.writeText(value).then(() => {
+                    copyBtn.textContent = 'Copied!';
+                    setTimeout(() => copyBtn.textContent = 'Copy', 2000);
+                });
+            };
+            item.appendChild(labelSpan);
+            item.appendChild(valueSpan);
+            item.appendChild(copyBtn);
+            return item;
+        }
+
+        document.getElementById('deriveBtn').addEventListener('click', async () => {
+            document.getElementById('resultContainer').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+            const password = document.getElementById('password').value;
+            const extraInput = document.getElementById('extra').value;
+            const includeP256 = document.getElementById('includeP256').checked;
+            const includeBitcoin = document.getElementById('includeBitcoin').checked;
+            const includeEthereum = document.getElementById('includeEthereum').checked;
+            if (!password) {
+                const errorEl = document.getElementById('error');
+                errorEl.textContent = 'Error: Password is required';
+                errorEl.style.display = 'block';
+                return;
+            }
+            const extra = extraInput ? extraInput.split(',').map(item => item.trim()) : null;
+            const options = { includeP256, includeSecp256k1Bitcoin: includeBitcoin, includeSecp256k1Ethereum: includeEthereum };
+            try {
+                const response = await fetch('/api/derive', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password, extra, options })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    displayResults(result.derivedKeys);
+                } else {
+                    const errorEl = document.getElementById('error');
+                    errorEl.textContent = `Error: ${result.error}`;
+                    errorEl.style.display = 'block';
+                }
+            } catch (error) {
+                const errorEl = document.getElementById('error');
+                errorEl.textContent = `Error: ${error.message}`;
+                errorEl.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html> 

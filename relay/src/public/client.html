@@ -1,0 +1,242 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1" name="viewport" />
+    <title>Minimal Messenger</title>
+    <script src="https://cdn.jsdelivr.net/npm/eventemitter3@4.0.0/index.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bugout@0.0.13/docs/bugout.min.js"></script>
+    <script src="./lib/bugoff.js"></script>
+
+    <style>
+      body { 
+        background-color: #333; 
+        font-family: 'Courier New', monospace;
+        color: #eee;
+        padding: 1em;
+      }
+      pre { 
+        background-color: #2a2a2a;
+        white-space: pre-wrap; 
+        word-wrap: break-word; 
+        line-height: 1.2em;
+      }
+      input, button {
+        background-color: #555;
+        color: #eee;
+        border: 1px solid #777;
+        padding: 5px;
+      }
+      button:disabled {
+        opacity: 0.5;
+      }
+      hr {
+        border-color: #555;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+        Server Address: <input type="text" id="serverAddress" size="50">
+        <button id="connectBtn">Connect</button>
+    </div>
+    <hr>
+    <pre id="messages" style="height: 400px; overflow-y: scroll; border: 1px solid #555; padding: 0.5em;"></pre>
+    <hr>
+    <div>
+        Username: <input type="text" id="username" placeholder="Your name">
+        Message: <input type="text" id="messageInput" placeholder="Type message..." size="50" disabled>
+        <button id="sendBtn" disabled>Send</button>
+    </div>
+    <hr>
+    <h3>Log:</h3>
+    <pre id="log" style="height: 150px; overflow-y: scroll; border: 1px solid #555; padding: 0.5em;"></pre>
+
+    <script>
+        const serverAddressInput = document.getElementById('serverAddress');
+        const connectBtn = document.getElementById('connectBtn');
+        const messagesEl = document.getElementById('messages');
+        const usernameInput = document.getElementById('username');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const logEl = document.getElementById('log');
+
+        let bugout = null;
+        let connected = false;
+
+        function log(...args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] ${args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ')}`;
+            console.log(...args);
+            logEl.textContent += logMessage + '\n';
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function updateUI() {
+            connectBtn.textContent = connected ? 'Disconnect' : 'Connect';
+            messageInput.disabled = !connected;
+            sendBtn.disabled = !connected;
+            if (connected) {
+                messageInput.placeholder = "Type message...";
+            } else {
+                messageInput.placeholder = "Connect to start chatting...";
+            }
+        }
+
+        function initClient() {
+            if (bugout) {
+                bugout.destroy();
+                bugout = null;
+                connected = false;
+                updateUI();
+                log("🔌 Disconnected.");
+                return;
+            }
+
+            const serverAddress = serverAddressInput.value.trim();
+            if (!serverAddress) {
+                log("⚠️ Please enter a server address.");
+                return;
+            }
+            
+            log("🔄 Connecting to chat server...", serverAddress);
+
+            try {
+                if (typeof Bugoff !== 'function') throw new Error("Bugoff library not available");
+
+                bugout = new Bugoff(serverAddress);
+
+                bugout.on("server", () => {
+                    log("✅ Connected to server");
+                    connected = true;
+                    updateUI();
+                    refreshMessages();
+                });
+
+                bugout.on("message", (address, message) => {
+                    if (message === "refresh") {
+                        refreshMessages();
+                    }
+                });
+
+                bugout.on("decrypted", (address, pubkeys, message) => {
+                    log("🤫 Decrypted message received");
+                    if (message === "refresh") {
+                        refreshMessages();
+                    }
+                });
+
+                bugout.on("wireseen", (count) => {
+                    log(`🔗 ${count} peer(s) connected`);
+                    connected = count > 0;
+                    updateUI();
+                });
+
+                bugout.on("wireleft", (count) => {
+                    log(`👋 Peer disconnected. ${count} remaining`);
+                    connected = count > 0;
+                    if (!connected) {
+                        log("❌ Connection lost");
+                        if (bugout) bugout.destroy();
+                        bugout = null;
+                    }
+                    updateUI();
+                });
+
+                bugout.on("close", () => {
+                    log("❌ Connection closed");
+                    connected = false;
+                    bugout = null;
+                    updateUI();
+                });
+
+                bugout.on("error", (error) => {
+                    log("🚫 Connection error:", error.message || error);
+                    connected = false;
+                    if (bugout) bugout.destroy();
+                    bugout = null;
+                    updateUI();
+                });
+            } catch (error) {
+                log("💥 Failed to initialize:", error.message);
+                connected = false;
+                bugout = null;
+                updateUI();
+            }
+        }
+
+        function sendMessage() {
+            if (!connected || !messageInput.value.trim()) return;
+
+            const user = usernameInput.value.trim() || "Anonymous";
+            localStorage.setItem("bugout-username", user);
+
+            const formattedMessage = `${user}: ${messageInput.value.trim()}`;
+            log("📤 Sending:", formattedMessage);
+
+            try {
+                bugout.rpc("post", formattedMessage, (ok) => {
+                    if (ok) {
+                        log("✅ Message sent successfully");
+                        messageInput.value = "";
+                        messageInput.focus();
+                        refreshMessages(); // Refresh after sending
+                    } else {
+                        log("❌ Failed to send message");
+                    }
+                });
+            } catch (error) {
+                log("💥 Send error:", error.message);
+            }
+        }
+
+        function refreshMessages() {
+            if (!connected || !bugout) {
+                messagesEl.textContent = 'Not connected.';
+                return;
+            }
+
+            try {
+                bugout.rpc("list", null, (messageList) => {
+                    if (!Array.isArray(messageList)) {
+                        log("⚠️ Invalid message list received");
+                        return;
+                    }
+
+                    log(`📨 Loaded ${messageList.length} messages`);
+                    
+                    const formattedMessages = messageList.map((m) => {
+                        const time = new Date(m.t).toLocaleTimeString();
+                        return `[${time}] ${m.m || ''}`;
+                    });
+
+                    messagesEl.textContent = formattedMessages.join('\n');
+                    messagesEl.scrollTop = messagesEl.scrollHeight;
+                });
+            } catch (error) {
+                log("💥 Refresh error:", error.message);
+            }
+        }
+
+        // Event Listeners
+        connectBtn.addEventListener('click', initClient);
+        sendBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Initial setup
+        serverAddressInput.value = window.location.hash.substr(1) || "";
+        usernameInput.value = localStorage.getItem("bugout-username") || "";
+        log("🦄 Minimal Messenger initialized.");
+        log("Enter server address and click 'Connect'.");
+
+    </script>
+  </body>
+</html>
