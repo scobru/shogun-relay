@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Gun Graph Explorer</title>
+    <style>
+        body { 
+            background-color: #222; 
+            color: #eee; 
+            font-family: "Menlo", "Consolas", monospace; 
+            line-height: 1.6; 
+            margin: 2em; 
+        }
+        h1 { 
+            border-bottom: 1px solid #555; 
+            padding-bottom: 10px; 
+        }
+        a { 
+            color: #8af; 
+            text-decoration: none; 
+        }
+        a:hover { 
+            background-color: #333; 
+        }
+        .graph-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1em;
+            margin-top: 1em;
+        }
+        .node-item {
+            background-color: #2a2a2a;
+            border: 1px solid #555;
+            border-radius: 5px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+        .node-header {
+            padding: 12px 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background-color: #333;
+            border-bottom: 1px solid #555;
+        }
+        .node-header:hover {
+            background-color: #444;
+        }
+        .node-id {
+            font-weight: bold;
+            word-break: break-all;
+        }
+        .node-id.user-key {
+            color: #8af;
+        }
+        .toggle-icon {
+            font-size: 12px;
+            transition: transform 0.2s ease;
+        }
+        .toggle-icon.expanded {
+            transform: rotate(90deg);
+        }
+        .node-content {
+            display: none;
+            padding: 15px;
+        }
+        .node-content.show {
+            display: block;
+            animation: fadeIn 0.2s ease;
+        }
+        .property {
+            margin-bottom: 10px;
+            padding: 8px;
+            background-color: #2a2a2a;
+            border-radius: 3px;
+            border-left: 3px solid #8af;
+        }
+        .property-key {
+            font-weight: bold;
+            color: #8af;
+            margin-bottom: 5px;
+        }
+        .property-value {
+            color: #ccc;
+            font-family: inherit;
+            word-break: break-all;
+        }
+        .stats {
+            margin-bottom: 1em;
+            padding: 10px;
+            background-color: #2a2a2a;
+            border-radius: 5px;
+            border: 1px solid #555;
+        }
+        .error {
+            background-color: #533;
+            color: #f88;
+            border-left: 3px solid #c00;
+            padding: 10px;
+            margin-top: 1em;
+            border-radius: 3px;
+            display: none;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <a href="/">&larr; Back to Control Panel</a>
+    <h1>Live Gun Graph Explorer</h1>
+    
+    <div class="stats">
+        <strong>Graph Stats:</strong> 
+        <span id="nodeCount">0</span> nodes | 
+        Last updated: <span id="lastUpdate">Never</span>
+        <button onclick="loadExistingData()" style="margin-left: 15px; padding: 5px 10px; background-color: #333; color: #eee; border: 1px solid #555; border-radius: 3px; cursor: pointer;">
+            Refresh Data
+        </button>
+    </div>
+    
+    <div id="error" class="error"></div>
+    <div id="graphContainer" class="graph-container">
+        <!-- Graph nodes will be injected here -->
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script>
+        const graphContainer = document.getElementById('graphContainer');
+        const nodeCountEl = document.getElementById('nodeCount');
+        const lastUpdateEl = document.getElementById('lastUpdate');
+        const errorEl = document.getElementById('error');
+        
+        let gun;
+        let currentGraph = {};
+        let expandedNodes = new Set();
+
+        // Initialize Gun connection
+        function initGun() {
+            const peer = `${window.location.protocol}//${window.location.host}/gun`
+            try {
+                gun =  Gun({peers: [peer], localStorage: false});
+                console.log('Gun initialized successfully', peer);
+                errorEl.style.display = 'none';
+
+                console.log(gun);
+                
+                // Wait for connection then load data
+                setTimeout(loadExistingData, 1000);
+                
+            } catch (error) {
+                console.error('Failed to initialize Gun:', error);
+                showError('Failed to connect to Gun database: ' + error.message);
+            }
+        }
+
+        function loadExistingData() {
+            console.log('Loading all data from server...');
+            
+            fetch('/api/alldata')
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        console.log('Loaded data from server:', result);
+                        
+                        // Update our current graph with the server data
+                        currentGraph = result.data || {};
+                        
+                        // Render immediately
+                        renderGraph();
+                        
+                        console.log(`Loaded ${result.nodeCount} nodes (${result.rawSize} bytes raw data)`);
+                    } else {
+                        showError('Failed to load data: ' + result.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                    showError('Error fetching data: ' + error.message);
+                });
+        }
+
+        function showError(message) {
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+        }
+
+        function formatNodeId(nodeId) {
+            // Check if it's a user key (starts with ~)
+            if (nodeId.startsWith('~')) {
+                return {
+                    isUser: true,
+                    display: nodeId.substring(88) || '[root]',
+                    full: nodeId
+                };
+            }
+            return {
+                isUser: false,
+                display: nodeId,
+                full: nodeId
+            };
+        }
+
+        function createNodeElement(nodeId, nodeData) {
+            const nodeInfo = formatNodeId(nodeId);
+            const isExpanded = expandedNodes.has(nodeId);
+
+            const nodeEl = document.createElement('div');
+            nodeEl.className = 'node-item';
+            
+            // Filter out metadata and empty values
+            const properties = Object.entries(nodeData).filter(([key, value]) => 
+                key !== '_' && value != null && value !== ''
+            );
+
+            nodeEl.innerHTML = `
+                <div class="node-header" onclick="toggleNode('${nodeId}')">
+                    <span class="toggle-icon ${isExpanded ? 'expanded' : ''}">▶</span>
+                    <span class="node-id ${nodeInfo.isUser ? 'user-key' : ''}" title="${nodeInfo.full}">
+                        ${nodeInfo.display}
+                    </span>
+                    <span style="margin-left: auto; color: #666; font-size: 0.9em;">
+                        ${properties.length} properties
+                    </span>
+                </div>
+                <div class="node-content ${isExpanded ? 'show' : ''}">
+                    ${properties.map(([key, value]) => `
+                        <div class="property">
+                            <div class="property-key">${key}</div>
+                            <div class="property-value">${
+                                typeof value === 'object' && value['#'] 
+                                    ? `→ ${value['#']}` 
+                                    : String(value)
+                            }</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            return nodeEl;
+        }
+
+        function toggleNode(nodeId) {
+            if (expandedNodes.has(nodeId)) {
+                expandedNodes.delete(nodeId);
+            } else {
+                expandedNodes.add(nodeId);
+            }
+            renderGraph();
+        }
+
+        function renderGraph() {
+            try {
+                // Use our currentGraph instead of gun._.graph
+                if (!currentGraph || Object.keys(currentGraph).length === 0) {
+                    console.log('No data in currentGraph');
+                    nodeCountEl.textContent = '0';
+                    lastUpdateEl.textContent = new Date().toLocaleTimeString();
+                    return;
+                }
+
+                // Clear container
+                graphContainer.innerHTML = '';
+
+                // Convert to array and sort
+                const nodes = Object.entries(currentGraph)
+                    .sort(([a], [b]) => {
+                        // Sort user keys first, then alphabetically
+                        const aIsUser = a.startsWith('~');
+                        const bIsUser = b.startsWith('~');
+                        if (aIsUser && !bIsUser) return -1;
+                        if (!aIsUser && bIsUser) return 1;
+                        return a.localeCompare(b);
+                    });
+
+                // Render each node
+                nodes.forEach(([nodeId, nodeData]) => {
+                    const nodeEl = createNodeElement(nodeId, nodeData);
+                    graphContainer.appendChild(nodeEl);
+                });
+
+                // Update stats
+                nodeCountEl.textContent = nodes.length;
+                lastUpdateEl.textContent = new Date().toLocaleTimeString();
+
+            } catch (error) {
+                console.error('Error rendering graph:', error);
+                showError('Error rendering graph: ' + error.message);
+            }
+        }
+
+        // Make functions available globally
+        window.toggleNode = toggleNode;
+        window.loadExistingData = loadExistingData;
+
+        // Initialize and start updating
+        initGun();
+        
+        // Update every second
+        const updateInterval = setInterval(renderGraph, 1000);
+
+        // Initial render
+        setTimeout(renderGraph, 500);
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            clearInterval(updateInterval);
+        });
+    </script>
+</body>
+</html>
