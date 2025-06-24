@@ -1,0 +1,258 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gun Relay Advanced Stats</title>
+<style>
+	body {
+		font-family: "Menlo", "Consolas", monospace;
+		background-color: rgb(25,25,25);
+		color: rgb(80,135,25) !important;
+		text-shadow: 1px 1px 20px rgb(80,150,25);
+		margin: 2em;
+		line-height: 1.6;
+	}
+
+	h1 {
+		border-bottom: 1px solid #555;
+		padding-bottom: 10px;
+		color: rgb(80,135,25);
+	}
+
+	a {
+		color: #8af;
+		text-decoration: none;
+	}
+
+	a:hover {
+		background-color: #333;
+	}
+
+	.center {
+		text-align: center;
+		margin: 1em 0;
+	}
+
+	.shout {
+		color: rgb(250,50,50);
+		font-weight: bold;
+		font-size: 1.2em;
+		text-shadow: 1px 1px 10px rgb(250,50,50);
+	}
+
+	.label {
+		position: absolute;
+		left: 0.5em;
+		top: 1.75em;
+		color: rgb(80,135,25);
+		font-size: 0.9em;
+	}
+
+	.input {
+		height: 30px;
+		padding: 10px;
+		background-color: rgb(50,50,50);
+		color: rgb(250,50,50);
+		border: 1px solid #555;
+		margin: 10px 0;
+		width: 100%;
+		max-width: 600px;
+	}
+
+	.tall { 
+		height: 200px; 
+		width: 100%;
+	}
+
+	.charts {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+		gap: 20px;
+		margin-top: 20px;
+	}
+
+	.chart {
+		position: relative;
+		border: 1px solid #555;
+		background-color: rgb(40,40,40);
+		padding: 10px;
+		margin: 10px 0;
+	}
+
+	.chart canvas {
+		width: 100% !important;
+		height: 200px !important;
+	}
+
+	.model {
+		display: none;
+	}
+
+	.topbar {
+		background-color: rgb(40,40,40);
+		padding: 15px;
+		border: 1px solid #555;
+		margin-bottom: 20px;
+	}
+
+	.status {
+		margin-top: 10px;
+		font-size: 12px;
+		color: #666;
+	}
+</style>
+</head>
+<body>
+
+<a href="/">&larr; Back to Control Panel</a>
+<h1>📊 Gun Relay Advanced Stats Dashboard</h1>
+
+<div class="center">
+	<span class="shout" id="peers">0</span> peers 
+	<span class="shout" id="time">0</span> min 
+	<span class="shout" id="nodes">0</span> nodes 
+	<span class="shout" id="hours">0</span> hours 
+	<span class="shout" id="block">0</span> ms avg 
+	<span class="shout" id="stack">0</span> gets/s
+</div>
+
+<div class="topbar">
+	<label for="url">Stats Source URL:</label><br>
+	<input id="url" class="input" placeholder="Enter custom stats source URL (optional)" value="">
+	<div class="status" id="status">Connecting to local stats...</div>
+</div>
+
+<div class="charts" id="charts">
+</div>
+
+<div class="model">
+	<div class="chart"><span class="label"></span><canvas class="tall"></canvas></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/smoothie@1.36.1/smoothie.min.js"></script>
+<script>
+  var up, br = 0, bt = 0, tmp;
+
+  var fetchData = async function(){
+    var requestStart = +new Date;
+    
+    try {
+      var url = document.getElementById('url').value || (location.origin + '/stats.json');
+      var data = await (await fetch(url, {method: 'GET', mode: 'cors'})).json();
+      
+      var requestEnd = +new Date;
+      var requestTime = requestEnd - requestStart;
+      
+      $('#block').text(((br += requestTime) / ++bt).toFixed(1));
+      
+      data.over = (data.over/1000) || 5;
+      $('#peers').text(data.peers.count || 0);
+      $('#time').text(((data.peers.time || 0) / 1000 / 60).toFixed(0));
+      $('#nodes').text(data.node.count || 0);
+      $('#hours').text(((data.up.time || 0) / 60 / 60 / 1000).toFixed(1));
+      
+      var getRate = data.dam?.in?.rate || 0;
+      $('#stack').text(getRate.toFixed(1));
+      
+      if(data.up.time === up){ 
+        console.log("Up time same as before"); 
+      } 
+      up = data.up.time;
+
+      $('#status').text(`Connected • Last update: ${new Date().toLocaleTimeString()} • Request: ${requestTime}ms`);
+
+      Stats('peers#').line.append(requestEnd, data.peers.count || 0);
+      Stats('memory MB').line.append(requestEnd, (data.memory?.heapUsed || 0) / 1024 / 1024);
+      
+      if (data.dam) {
+        Stats('GET requests/s').line.append(requestEnd, data.dam.in?.rate || 0);
+        Stats('PUT requests/s').line.append(requestEnd, data.dam.out?.rate || 0);
+        Stats('Total GETs').line.append(requestEnd, data.dam.in?.count || 0);
+        Stats('Total PUTs').line.append(requestEnd, data.dam.out?.count || 0);
+      }
+
+      console.log('Stats data:', data);
+
+      if (data.all) {
+        $.each(data.all, function(key, arr){
+          if (arr && arr.length > 0) {
+            var chart = Stats(key);
+            // Add the latest data point from the server
+            var latestPoint = arr[arr.length - 1];
+            if (latestPoint && latestPoint.length >= 2 && !isNaN(latestPoint[1])) {
+              chart.line.append(latestPoint[0], latestPoint[1]);
+            }
+          }
+        });
+      }
+
+    } catch(error) {
+      console.error('Error fetching stats:', error);
+      $('#status').text(`Error: ${error.message}`).css('color', '#ff0000');
+    }
+  }
+
+  setInterval(fetchData, 5000);
+  fetchData();
+
+  function Stats(key, chart){
+    if(chart = Stats[key]){
+      return chart;
+    }
+    
+    chart = Stats[key] = new SmoothieChart({
+      millisPerPixel: 200,
+      limitFPS: 30,
+      responsive: true,
+      minValue: 0,
+      grid: {
+        strokeStyle: 'rgba(80,135,25,0.3)',
+        fillStyle: 'transparent',
+        lineWidth: 1,
+        millisPerLine: 30000,
+        verticalSections: 5
+      },
+      labels: {
+        fontSize: 12,
+        fillStyle: 'rgb(80,135,25)',
+        precision: 2
+      },
+      interpolation: 'linear',
+      maxValue: undefined,
+      minValue: 0
+    });
+    
+    chart.line = new TimeSeries();
+    
+    var hash = 0;
+    for (var i = 0; i < key.length; i++) {
+      hash = ((hash << 5) - hash + key.charCodeAt(i)) & 0xffffffff;
+    }
+    var r = Math.max(100, (hash & 0xFF0000) >> 16);
+    var g = Math.max(100, (hash & 0x00FF00) >> 8);
+    var b = Math.max(100, hash & 0x0000FF);
+    
+    chart.addTimeSeries(chart.line, {
+      strokeStyle: `rgb(${r}, ${g}, ${b})`,
+      lineWidth: 2
+    });
+    
+    chart.canvas = $('.model').find('.chart').clone(true).appendTo('#charts');
+    chart.canvas.find('.label').text(key);
+    chart.canvas.show();
+    
+    chart.streamTo(chart.canvas.find('canvas').get(0), 5000);
+    chart.line.append(Date.now(), 0);
+    
+    return chart;
+  }
+
+  $('#url').on('change', function() {
+    $('#status').text('Switching to custom URL...');
+    fetchData();
+  });
+
+</script>
+</body>
+</html> 

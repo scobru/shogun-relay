@@ -54,17 +54,18 @@
                 }
                 const result = await response.json();
 
-                if (result.success && result.stats) {
+                if (result.success) {
                     errorEl.style.display = 'none';
                     statsContainer.innerHTML = '';
 
-                    const { peers, node, rad } = result.stats;
+                    // The data is now directly in result, not nested under result.stats
+                    const { peers, node, rad, up } = result;
                     
                     updateStat('Connected Peers', peers?.count || 0);
 
                     let uptime = 'N/A';
-                    if (node?.up?.time) {
-                        const totalSeconds = Math.floor(node.up.time / 1000);
+                    if (up?.time) {
+                        const totalSeconds = Math.floor(up.time / 1000);
                         const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
                         const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
                         const seconds = String(totalSeconds % 60).padStart(2, '0');
@@ -75,6 +76,11 @@
                     updateStat('Memory Usage', node?.memory?.heapUsed ? formatBytes(node.memory.heapUsed) : 'N/A');
                     updateStat('GET Requests', rad?.get?.count || 0);
                     updateStat('PUT Requests', rad?.put?.count || 0);
+                    
+                    // Add some additional stats that are now available
+                    updateStat('GET Rate (req/s)', result.dam?.in?.rate ? result.dam.in.rate.toFixed(2) : '0.00');
+                    updateStat('PUT Rate (req/s)', result.dam?.out?.rate ? result.dam.out.rate.toFixed(2) : '0.00');
+                    updateStat('Total Memory', node?.memory?.heapTotal ? formatBytes(node.memory.heapTotal) : 'N/A');
                     
                     lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
 

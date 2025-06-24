@@ -26,6 +26,9 @@ import "gun/lib/server.js";
 import "gun/lib/yson.js";
 import "gun/lib/rindexed.js";
 import "gun/lib/webrtc.js";
+import "gun/lib/rfs.js";
+import "gun/lib/rs3.js";
+import "gun/lib/multicast.js";
 
 import ShogunCoreModule from "shogun-core";
 const { derive } = ShogunCoreModule;
@@ -57,12 +60,46 @@ async function initializeServer() {
   console.clear();
   console.log("=== GUN-VUE RELAY SERVER ===\n");
 
-  // Custom stats tracking
+  // Enhanced stats tracking with time-series data
   let customStats = {
     getRequests: 0,
     putRequests: 0,
-    startTime: Date.now()
+    startTime: Date.now(),
+    timeSeries: {
+      // Store last 100 data points for each metric
+      maxPoints: 100,
+      data: {
+        "peers#": [],
+        memory: [],
+        "gets/s": [],
+        "puts/s": [],
+        "cpu%": [],
+      },
+    },
   };
+
+  // Function to add time-series data point
+  function addTimeSeriesPoint(key, value) {
+    const timestamp = Date.now();
+    const series = customStats.timeSeries.data[key];
+    if (!series) {
+      customStats.timeSeries.data[key] = [];
+    }
+
+    customStats.timeSeries.data[key].push([timestamp, value]);
+
+    // Keep only the last maxPoints
+    if (
+      customStats.timeSeries.data[key].length > customStats.timeSeries.maxPoints
+    ) {
+      customStats.timeSeries.data[key].shift();
+    }
+  }
+
+  // Track rates per second
+  let lastGetCount = 0;
+  let lastPutCount = 0;
+  let lastTimestamp = Date.now();
 
   // Add listener based on the provided example
   Gun.on("opt", function (ctx) {
@@ -100,21 +137,14 @@ async function initializeServer() {
       customStats.putRequests++;
 
       // If we're here, it's a `put` from a peer that MUST be authenticated.
-      const valid =
-        msg.headers.token && msg.headers.token === "shogun2025";
+      const valid = msg.headers.token && msg.headers.token === "shogun2025";
 
       if (valid) {
-        console.log(
-          "PEER PUT ALLOWED (valid token):",
-          Object.keys(msg.put)
-        );
+        console.log("PEER PUT ALLOWED (valid token):", Object.keys(msg.put));
         return to.next(msg);
       } else {
         const error = "Unauthorized: Invalid or missing token.";
-        console.log(
-          "PEER PUT REJECTED (invalid token):",
-          Object.keys(msg.put)
-        );
+        console.log("PEER PUT REJECTED (invalid token):", Object.keys(msg.put));
         return to.next({
           "@": msg["@"],
           err: error,
@@ -200,6 +230,8 @@ async function initializeServer() {
     web: server,
     localStorage: false,
     uuid: "shogun-relay",
+    wire: true,
+    axe: true,
   });
 
   gun.on("hi", () => {
@@ -225,6 +257,33 @@ async function initializeServer() {
   setSelfAdjustingInterval(() => {
     db?.get("pulse").put(Date.now());
   }, 10000);
+
+  // Collect time-series data every 5 seconds
+  setSelfAdjustingInterval(() => {
+    const now = Date.now();
+    const timeDiff = (now - lastTimestamp) / 1000; // seconds
+
+    // Calculate rates per second
+    const getRate = Math.max(
+      0,
+      (customStats.getRequests - lastGetCount) / timeDiff
+    );
+    const putRate = Math.max(
+      0,
+      (customStats.putRequests - lastPutCount) / timeDiff
+    );
+
+    // Update time-series data
+    addTimeSeriesPoint("peers#", activeWires);
+    addTimeSeriesPoint("memory", process.memoryUsage().heapUsed / 1024 / 1024); // MB
+    addTimeSeriesPoint("gets/s", getRate);
+    addTimeSeriesPoint("puts/s", putRate);
+
+    // Update counters
+    lastGetCount = customStats.getRequests;
+    lastPutCount = customStats.putRequests;
+    lastTimestamp = now;
+  }, 5000);
 
   // Store relay information
   const link = "http://" + host + (port ? ":" + port : "");
@@ -259,9 +318,9 @@ async function initializeServer() {
         path.resolve(__dirname, "radata", "!"),
         path.resolve(process.cwd(), "radata", "!"),
         path.resolve(__dirname, "..", "radata", "!"),
-        path.resolve("radata", "!")
+        path.resolve("radata", "!"),
       ];
-      
+
       let actualPath = null;
       for (const testPath of possiblePaths) {
         if (fs.existsSync(testPath)) {
@@ -269,21 +328,25 @@ async function initializeServer() {
           break;
         }
       }
-      
+
       if (!actualPath) {
-        return res.json({ success: true, data: {}, message: "No data file found" });
+        return res.json({
+          success: true,
+          data: {},
+          message: "No data file found",
+        });
       }
       const rawData = fs.readFileSync(actualPath, "utf8");
       const parsedData = JSON.parse(rawData);
-      
+
       // Convert Gun's internal format to a more readable format
       const convertedData = {};
-      
+
       function convertNode(obj, path = "") {
         if (!obj || typeof obj !== "object") return obj;
-        
+
         const result = {};
-        
+
         for (const [key, value] of Object.entries(obj)) {
           if (key === "" && value && typeof value === "object" && value[":"]) {
             // This is a Gun value object with metadata
@@ -295,63 +358,140 @@ async function initializeServer() {
             }
           }
         }
-        
+
         return Object.keys(result).length > 0 ? result : undefined;
       }
-      
+
       for (const [nodeId, nodeData] of Object.entries(parsedData)) {
         const converted = convertNode(nodeData);
         if (converted) {
           convertedData[nodeId] = converted;
         }
       }
-      
-      res.json({ 
-        success: true, 
+
+      res.json({
+        success: true,
         data: convertedData,
         rawSize: rawData.length,
-        nodeCount: Object.keys(convertedData).length
+        nodeCount: Object.keys(convertedData).length,
       });
-      
     } catch (error) {
       console.error("Error reading radata:", error);
-      res.status(500).json({ 
-        success: false, 
-        error: "Failed to read data: " + error.message 
+      res.status(500).json({
+        success: false,
+        error: "Failed to read data: " + error.message,
       });
     }
   });
 
-  // Enhanced stats endpoint
+  // Enhanced stats endpoint with time-series data
   app.get("/api/stats", (req, res) => {
     try {
-      const rawStats = gun._.stats;
-      if (rawStats) {
-        // Use our custom stats instead of Gun's internal ones
-        const cleanStats = {
-          peers: {
-            count: activeWires,
+      const now = Date.now();
+      const uptime = now - customStats.startTime;
+      const memUsage = process.memoryUsage();
+
+      // Calculate current rates
+      const timeDiff = Math.max(1, (now - lastTimestamp) / 1000);
+      const currentGetRate =
+        (customStats.getRequests - lastGetCount) / timeDiff;
+      const currentPutRate =
+        (customStats.putRequests - lastPutCount) / timeDiff;
+
+      const cleanStats = {
+        peers: {
+          count: activeWires,
+          time: uptime / 1000 / 60, // minutes
+        },
+        node: {
+          count: Object.keys(customStats.timeSeries.data).length,
+          memory: {
+            heapUsed: memUsage.heapUsed,
+            heapTotal: memUsage.heapTotal,
+            external: memUsage.external,
           },
-          node: {
-            up: {
-              time: Date.now() - customStats.startTime,
-            },
-            memory: process.memoryUsage(),
+        },
+        up: {
+          time: uptime,
+        },
+        memory: memUsage.heapUsed,
+        dam: {
+          in: {
+            count: customStats.getRequests,
+            rate: currentGetRate,
           },
-          rad: {
-            get: { count: customStats.getRequests },
-            put: { count: customStats.putRequests },
+          out: {
+            count: customStats.putRequests,
+            rate: currentPutRate,
           },
-        };
-        res.json({ success: true, stats: cleanStats });
-      } else {
-        res.status(404).json({ success: false, error: "Stats not available." });
-      }
+        },
+        rad: {
+          get: { count: customStats.getRequests },
+          put: { count: customStats.putRequests },
+        },
+        // Time-series data for charts
+        all: customStats.timeSeries.data,
+        over: 5, // Update interval in seconds
+      };
+
+      res.json({ success: true, ...cleanStats });
     } catch (error) {
       console.error("Error in /api/stats:", error);
       res
         .status(500)
         .json({ success: false, error: "Failed to retrieve stats." });
+    }
+  });
+
+  // Stats endpoint compatible with the advanced HTML dashboard
+  app.get("/stats.json", (req, res) => {
+    try {
+      const now = Date.now();
+      const uptime = now - customStats.startTime;
+      const memUsage = process.memoryUsage();
+
+      // Calculate current rates
+      const timeDiff = Math.max(1, (now - lastTimestamp) / 1000);
+      const currentGetRate =
+        (customStats.getRequests - lastGetCount) / timeDiff;
+      const currentPutRate =
+        (customStats.putRequests - lastPutCount) / timeDiff;
+
+      const statsResponse = {
+        peers: {
+          count: activeWires,
+          time: uptime,
+        },
+        node: {
+          count: Object.keys(customStats.timeSeries.data).length,
+        },
+        up: {
+          time: uptime,
+        },
+        memory: {
+          heapUsed: memUsage.heapUsed,
+          heapTotal: memUsage.heapTotal,
+          external: memUsage.external,
+        },
+        dam: {
+          in: {
+            count: customStats.getRequests,
+            done: customStats.getRequests * 1024, // Estimate bytes
+          },
+          out: {
+            count: customStats.putRequests,
+            done: customStats.putRequests * 1024, // Estimate bytes
+          },
+        },
+        // Time-series data for charts - each entry is [timestamp, value]
+        all: customStats.timeSeries.data,
+        over: 5000, // Update interval in milliseconds
+      };
+
+      res.json(statsResponse);
+    } catch (error) {
+      console.error("Error in /stats.json:", error);
+      res.status(500).json({ error: "Failed to retrieve stats." });
     }
   });
 
@@ -529,6 +669,9 @@ async function initializeServer() {
   });
   app.get("/stats", (req, res) => {
     res.sendFile(path.resolve(publicPath, "stats.html"));
+  });
+  app.get("/charts", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "charts.html"));
   });
   app.get("/create", (req, res) => {
     res.sendFile(path.resolve(publicPath, "create.html"));
