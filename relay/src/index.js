@@ -30,57 +30,6 @@ import "gun/lib/webrtc.js";
 import ShogunCoreModule from "shogun-core";
 const { derive } = ShogunCoreModule;
 
-// Add listener based on the provided example
-Gun.on("opt", function (ctx) {
-  if (ctx.once) {
-    return;
-  }
-  // Check all incoming traffic
-  ctx.on("in", function (msg) {
-    const to = this.to;
-
-    // First, let any message that is not a write (`put`) pass through.
-    // This includes `get` requests and acknowledgements.
-    if (!msg.put) {
-      return to.next(msg);
-    }
-
-    // Now we know it's a `put` message. We need to determine if it's
-    // from an external peer or from the relay's internal storage.
-
-    // Internal puts (from radisk) will NOT have a `headers` object.
-    if (!msg.headers) {
-      console.log(
-        "INTERNAL PUT ALLOWED (from storage):",
-        Object.keys(msg.put)
-      );
-      return to.next(msg);
-    }
-
-    // If we're here, it's a `put` from a peer that MUST be authenticated.
-    const valid =
-      msg.headers.token && msg.headers.token === "shogun2025";
-
-    if (valid) {
-      console.log(
-        "PEER PUT ALLOWED (valid token):",
-        Object.keys(msg.put)
-      );
-      return to.next(msg);
-    } else {
-      const error = "Unauthorized: Invalid or missing token.";
-      console.log(
-        "PEER PUT REJECTED (invalid token):",
-        Object.keys(msg.put)
-      );
-      return to.next({
-        "@": msg["@"],
-        err: error,
-      });
-    }
-  });
-});
-
 // ES Module equivalent for __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -107,6 +56,72 @@ let showQr = process.env.RELAY_QR !== "false";
 async function initializeServer() {
   console.clear();
   console.log("=== GUN-VUE RELAY SERVER ===\n");
+
+  // Custom stats tracking
+  let customStats = {
+    getRequests: 0,
+    putRequests: 0,
+    startTime: Date.now()
+  };
+
+  // Add listener based on the provided example
+  Gun.on("opt", function (ctx) {
+    if (ctx.once) {
+      return;
+    }
+    // Check all incoming traffic
+    ctx.on("in", function (msg) {
+      const to = this.to;
+
+      // Track requests in our custom stats
+      if (msg.get) {
+        customStats.getRequests++;
+      }
+
+      // First, let any message that is not a write (`put`) pass through.
+      // This includes `get` requests and acknowledgements.
+      if (!msg.put) {
+        return to.next(msg);
+      }
+
+      // Now we know it's a `put` message. We need to determine if it's
+      // from an external peer or from the relay's internal storage.
+
+      // Internal puts (from radisk) will NOT have a `headers` object.
+      if (!msg.headers) {
+        console.log(
+          "INTERNAL PUT ALLOWED (from storage):",
+          Object.keys(msg.put)
+        );
+        return to.next(msg);
+      }
+
+      // Track PUT requests from peers
+      customStats.putRequests++;
+
+      // If we're here, it's a `put` from a peer that MUST be authenticated.
+      const valid =
+        msg.headers.token && msg.headers.token === "shogun2025";
+
+      if (valid) {
+        console.log(
+          "PEER PUT ALLOWED (valid token):",
+          Object.keys(msg.put)
+        );
+        return to.next(msg);
+      } else {
+        const error = "Unauthorized: Invalid or missing token.";
+        console.log(
+          "PEER PUT REJECTED (invalid token):",
+          Object.keys(msg.put)
+        );
+        return to.next({
+          "@": msg["@"],
+          err: error,
+        });
+      }
+    });
+  });
 
   const app = express();
   const publicPath = path.resolve(__dirname, path_public);
@@ -187,7 +202,6 @@ async function initializeServer() {
     uuid: "shogun-relay",
   });
 
-  // Connection tracking
   gun.on("hi", () => {
     totalConnections += 1;
     activeWires += 1;
@@ -237,26 +251,96 @@ async function initializeServer() {
     });
   });
 
+  // All data endpoint - reads directly from radata
+  app.get("/api/alldata", (req, res) => {
+    try {
+      // Try multiple possible paths for the radata file
+      const possiblePaths = [
+        path.resolve(__dirname, "radata", "!"),
+        path.resolve(process.cwd(), "radata", "!"),
+        path.resolve(__dirname, "..", "radata", "!"),
+        path.resolve("radata", "!")
+      ];
+      
+      let actualPath = null;
+      for (const testPath of possiblePaths) {
+        if (fs.existsSync(testPath)) {
+          actualPath = testPath;
+          break;
+        }
+      }
+      
+      if (!actualPath) {
+        return res.json({ success: true, data: {}, message: "No data file found" });
+      }
+      const rawData = fs.readFileSync(actualPath, "utf8");
+      const parsedData = JSON.parse(rawData);
+      
+      // Convert Gun's internal format to a more readable format
+      const convertedData = {};
+      
+      function convertNode(obj, path = "") {
+        if (!obj || typeof obj !== "object") return obj;
+        
+        const result = {};
+        
+        for (const [key, value] of Object.entries(obj)) {
+          if (key === "" && value && typeof value === "object" && value[":"]) {
+            // This is a Gun value object with metadata
+            return value[":"];
+          } else if (typeof value === "object" && value !== null) {
+            const converted = convertNode(value, path ? `${path}/${key}` : key);
+            if (converted !== undefined && converted !== null) {
+              result[key] = converted;
+            }
+          }
+        }
+        
+        return Object.keys(result).length > 0 ? result : undefined;
+      }
+      
+      for (const [nodeId, nodeData] of Object.entries(parsedData)) {
+        const converted = convertNode(nodeData);
+        if (converted) {
+          convertedData[nodeId] = converted;
+        }
+      }
+      
+      res.json({ 
+        success: true, 
+        data: convertedData,
+        rawSize: rawData.length,
+        nodeCount: Object.keys(convertedData).length
+      });
+      
+    } catch (error) {
+      console.error("Error reading radata:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: "Failed to read data: " + error.message 
+      });
+    }
+  });
+
   // Enhanced stats endpoint
   app.get("/api/stats", (req, res) => {
     try {
       const rawStats = gun._.stats;
       if (rawStats) {
-        // Manually create a clean object to align with stats.html and avoid circular refs
+        // Use our custom stats instead of Gun's internal ones
         const cleanStats = {
           peers: {
-            count: activeWires, // Using our reliable connection count
+            count: activeWires,
           },
           node: {
             up: {
-              time: process.uptime() * 1000,
+              time: Date.now() - customStats.startTime,
             },
             memory: process.memoryUsage(),
           },
           rad: {
-            // The stats module places GET/PUT counts inside the `rad` object.
-            get: rawStats.rad?.get || { count: 0 },
-            put: rawStats.rad?.put || { count: 0 },
+            get: { count: customStats.getRequests },
+            put: { count: customStats.putRequests },
           },
         };
         res.json({ success: true, stats: cleanStats });
@@ -457,6 +541,9 @@ async function initializeServer() {
   });
   app.get("/visualGraph", (req, res) => {
     res.sendFile(path.resolve(publicPath, "visualGraph/visualGraph.html"));
+  });
+  app.get("/graph", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "graph.html"));
   });
 
   // Fallback to index.html
