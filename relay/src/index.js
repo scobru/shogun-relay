@@ -78,18 +78,16 @@ function hasValidToken(msg) {
     return true;
   }
   
-  // For PUT operations with headers, require valid token
-  if (msg.put && msg.headers) {
-    console.log('Token validation result: true (PUT with headers allowed)', msg.put);
+  // For PUT operations, REQUIRE headers with valid token
+  if (msg.put) {
+    if (!msg.headers || !msg.headers.token) {
+      console.log('Token validation result: false (PUT without headers/token rejected)');
+      return false;
+    }
+    
     const isValid = msg.headers.token === process.env.ADMIN_PASSWORD;
-    console.log('Token validation result:', isValid);
+    console.log('Token validation result:', isValid, 'for token:', msg.headers.token);
     return isValid;
-  }
-  
-  // Allow PUT operations without headers (internal Gun messages)
-  if (msg.put && !msg.headers) {
-    console.log('Token validation result: true (internal PUT allowed)');
-    return true;
   }
   
   console.log('Token validation result: true (default allow)');
