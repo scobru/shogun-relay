@@ -30,11 +30,31 @@ import "gun/lib/multicast.js";
 import "gun/lib/rs3.js";
 
 import ShogunCoreModule from "shogun-core";
-const { derive } = ShogunCoreModule;
+const { derive, SEA } = ShogunCoreModule;
 import http from "http";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import multer from "multer";
 import FormData from "form-data";
+
+// --- Garbage Collection Configuration ---
+const GC_ENABLED = process.env.GC_ENABLED === 'true';
+// Namespaces to protect from garbage collection.
+const GC_EXCLUDED_NAMESPACES = [
+  // --- CRITICAL GUN METADATA ---
+  '~', // Protects all user spaces, including user data and aliases (~@username).
+  '!', // Protects the root node, often used for system-level pointers.
+  'relays', // Protects relay server health-check data.
+
+  // --- APPLICATION DATA ---
+  // Add other persistent application namespaces here.
+  'public-chat',
+  'admin',
+  'hal9000' // Example: protect blog posts
+];
+// Data older than this will be deleted (milliseconds). Default: 24 hours.
+const EXPIRATION_AGE = process.env.GC_EXPIRATION_AGE || 24 * 60 * 60 * 1000;
+// How often to run the garbage collector (milliseconds). Default: 1 hour.
+const GC_INTERVAL = process.env.GC_INTERVAL || 60 * 60 * 1000;
 
 // ES Module equivalent for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -104,6 +124,52 @@ async function initializeServer() {
   let lastPutCount = 0;
   let lastTimestamp = Date.now();
 
+  // --- Garbage Collection Service ---
+  function runGarbageCollector() {
+    if (!GC_ENABLED) {
+      console.log('🗑️ Garbage Collector is disabled.');
+      return;
+    }
+    console.log('🗑️ Running Garbage Collector...');
+    let cleanedCount = 0;
+    const now = Date.now();
+    const graph = gun._.graph;
+
+    for (const soul in graph) {
+      if (Object.prototype.hasOwnProperty.call(graph, soul)) {
+        // Check if the soul is in a protected namespace
+        const isProtected = GC_EXCLUDED_NAMESPACES.some(ns => soul.startsWith(ns));
+
+        if (isProtected) {
+          continue; // Skip protected data
+        }
+
+        const node = graph[soul];
+        // Check for expiration timestamp on non-protected data
+        if (node && node.createdAt && (now - node.createdAt > EXPIRATION_AGE)) {
+          // Nullify the node to delete it from Gun
+          gun.get(soul).put(null);
+          cleanedCount++;
+          console.log(`🗑️ Cleaned up expired node: ${soul}`);
+        }
+      }
+    }
+
+    if (cleanedCount > 0) {
+      console.log(`🗑️ Garbage Collector finished. Cleaned ${cleanedCount} expired nodes.`);
+    } else {
+      console.log('🗑️ Garbage Collector finished. No expired nodes found.');
+    }
+  }
+
+  // Schedule the garbage collector to run periodically
+  if (GC_ENABLED) {
+    setInterval(runGarbageCollector, GC_INTERVAL);
+    console.log(`✅ Garbage Collector scheduled to run every ${GC_INTERVAL / 1000 / 60} minutes.`);
+    // Run once on startup after a delay
+    setTimeout(runGarbageCollector, 30 * 1000); // Run 30s after start
+  }
+
   // Add listener based on the provided example
   Gun.on("opt", function (ctx) {
     if (ctx.once) {
@@ -119,10 +185,26 @@ async function initializeServer() {
       }
 
       // First, let any message that is not a write (`put`) pass through.
-      // This includes `get` requests and acknowledgements.
       if (!msg.put) {
         return to.next(msg);
       }
+
+      // --- Garbage Collection Timestamping ---
+      // For every incoming write, check if it's for a protected namespace.
+      // If not, inject a `createdAt` timestamp so it can be cleaned up later.
+      if (GC_ENABLED) {
+        Object.keys(msg.put).forEach(soul => {
+            const isProtected = GC_EXCLUDED_NAMESPACES.some(ns => soul.startsWith(ns));
+            if (!isProtected) {
+                // This is ephemeral data, stamp it for future garbage collection.
+                const node = msg.put[soul];
+                if (node && typeof node === 'object' && !node.createdAt) {
+                    node.createdAt = Date.now();
+                }
+            }
+        });
+      }
+      // --- End Garbage Collection Timestamping ---
 
       // Now we know it's a `put` message. We need to determine if it's
       // from an external peer or from the relay's internal storage.
@@ -1271,6 +1353,8 @@ async function initializeServer() {
   // Add route to fetch and display IPFS content
   app.get("/ipfs-content/:cid", async (req, res) => {
     const { cid } = req.params;
+    const { token } = req.query;
+
     if (!cid) {
       return res.status(400).json({
         success: false,
@@ -1288,14 +1372,48 @@ async function initializeServer() {
       };
 
       const ipfsReq = http.get(requestOptions, (ipfsRes) => {
-        // Forward the content-type header
-        res.setHeader(
-          "Content-Type",
-          ipfsRes.headers["content-type"] || "application/octet-stream"
-        );
+        // If no token, just stream the response
+        if (!token) {
+          res.setHeader(
+            "Content-Type",
+            ipfsRes.headers["content-type"] || "application/octet-stream"
+          );
+          ipfsRes.pipe(res);
+          return;
+        }
 
-        // Stream the response directly to the client
-        ipfsRes.pipe(res);
+        // If token is provided, buffer the response to decrypt it
+        let body = "";
+        ipfsRes.on("data", (chunk) => (body += chunk));
+        ipfsRes.on("end", async () => {
+          try {
+            const decrypted = await SEA.decrypt(body, token);
+
+            if (decrypted) {
+              // It's a Base64 data URL, e.g., "data:image/png;base64,iVBORw0KGgo..."
+              const parts = decrypted.match(/^data:(.+);base64,(.+)$/);
+              if (parts) {
+                const mimeType = parts[1];
+                const fileContents = Buffer.from(parts[2], 'base64');
+                res.setHeader('Content-Type', mimeType);
+                res.send(fileContents);
+              } else {
+                // Not a data URL, just plain text
+                res.setHeader('Content-Type', 'text/plain');
+                res.send(decrypted);
+              }
+            } else {
+              // Decryption failed, send raw content
+              res.setHeader('Content-Type', ipfsRes.headers['content-type'] || 'application/octet-stream');
+              res.send(body);
+            }
+          } catch (e) {
+            console.error("Decryption error:", e);
+            // Decryption failed, send raw content
+            res.setHeader('Content-Type', ipfsRes.headers['content-type'] || 'application/octet-stream');
+            res.send(body);
+          }
+        });
 
         ipfsRes.on("error", (err) => {
           console.error(`❌ Error streaming IPFS content: ${err.message}`);

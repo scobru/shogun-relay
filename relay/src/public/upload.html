@@ -37,12 +37,15 @@
         <div id="message" class="message"></div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
     <script>
         const fileInput = document.getElementById('fileInput');
         const uploadBtn = document.getElementById('uploadBtn');
         const messageEl = document.getElementById('message');
         const loaderEl = document.getElementById('loader');
         const adminTokenInput = document.getElementById('adminToken');
+        const encryptCheck = document.getElementById('encryptCheck');
 
         const showMessage = (text, type = 'error') => {
             messageEl.innerHTML = text; // Use innerHTML to render links
@@ -68,8 +71,29 @@
             uploadBtn.disabled = true;
             messageEl.style.display = 'none';
 
+            let fileToUpload = file;
+
+            if (encryptCheck.checked) {
+                try {
+                    const base64data = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve(e.target.result);
+                        reader.onerror = (err) => reject(err);
+                        reader.readAsDataURL(file);
+                    });
+
+                    const encryptedData = await SEA.encrypt(base64data, token);
+                    fileToUpload = new File([encryptedData], file.name + ".enc", { type: 'text/plain' });
+                } catch (err) {
+                    showMessage(`Encryption failed: ${err.message}`);
+                    loaderEl.style.display = 'none';
+                    uploadBtn.disabled = false;
+                    return;
+                }
+            }
+
             const formData = new FormData();
-            formData.append('file', file);
+            formData.append('file', fileToUpload);
 
             try {
                 const response = await fetch('/ipfs-upload', {
@@ -89,11 +113,14 @@
 
                 if (result.success && result.file) {
                     const { hash, ipfsUrl, gatewayUrl, publicGateway } = result.file;
+                    const isEncrypted = encryptCheck.checked;
+                    const finalIpfsUrl = isEncrypted ? `${ipfsUrl}?token=${encodeURIComponent(token)}` : ipfsUrl;
+
                     const successMessage = `
                         <strong>File uploaded successfully!</strong>
                         <p>Hash: ${hash}</p>
                         <p>
-                            <a href="${ipfsUrl}" target="_blank">Relay URL</a> | 
+                            <a href="${finalIpfsUrl}" target="_blank">Relay URL ${isEncrypted ? '(decrypted)' : ''}</a> | 
                             <a href="${gatewayUrl}" target="_blank">Local Gateway</a> | 
                             <a href="${publicGateway}" target="_blank">Public Gateway</a>
                         </p>
