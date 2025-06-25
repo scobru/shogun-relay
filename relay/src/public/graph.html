@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Live Gun Graph Explorer</title>
+    <link rel="stylesheet" href="dharma-style/dharma.css">
     <style>
         body { 
             background-color: #222; 
@@ -122,16 +123,21 @@
     
     <div class="stats">
         <strong>Authentication:</strong>
-        <input type="password" id="authToken" placeholder="Admin Token" onchange="loadExistingData()" style="padding: 5px; background-color: #333; color: #eee; border: 1px solid #555; margin-left: 10px;">
+        <input type="password" id="authToken" placeholder="Admin Token" style="padding: 5px; background-color: #333; color: #eee; border: 1px solid #555; margin-left: 10px;">
+    </div>
+
+    <div class="stats">
+        <strong>Graph Explorer:</strong>
+        <input type="text" id="soulInput" placeholder="Enter node soul (or leave empty to see all)" style="padding: 5px; background-color: #333; color: #eee; border: 1px solid #555; margin-left: 10px; width: 300px;">
+        <button onclick="loadNodeFromInput()" style="margin-left: 15px; padding: 5px 10px; background-color: #333; color: #eee; border: 1px solid #555; border-radius: 3px; cursor: pointer;">
+            Load
+        </button>
     </div>
 
     <div class="stats">
         <strong>Graph Stats:</strong> 
-        <span id="nodeCount">0</span> nodes | 
+        <span id="nodeCount">0</span> nodes loaded | 
         Last updated: <span id="lastUpdate">Never</span>
-        <button onclick="loadExistingData()" style="margin-left: 15px; padding: 5px 10px; background-color: #333; color: #eee; border: 1px solid #555; border-radius: 3px; cursor: pointer;">
-            Refresh Data
-        </button>
     </div>
     
     <div id="error" class="error"></div>
@@ -149,6 +155,7 @@
         let gun;
         let currentGraph = {};
         let expandedNodes = new Set();
+        let requestedSouls = new Set();
 
         function formatValue(value) {
             if (value === null) {
@@ -179,10 +186,15 @@
         }
 
         function navigateToNode(nodeId) {
+            if (!currentGraph.hasOwnProperty(nodeId)) {
+                loadNode(nodeId);
+            }
+
             if (!expandedNodes.has(nodeId)) {
                 expandedNodes.add(nodeId);
+                renderGraph(); // Re-render to show expanded state
             }
-            renderGraph();
+            
             // After re-render, find the element and scroll to it.
             setTimeout(() => {
                 const element = document.querySelector(`[data-node-id="${nodeId}"]`);
@@ -206,22 +218,52 @@
                 gun =  Gun({peers: [peer], localStorage: false});
                 console.log('Gun initialized successfully', peer);
                 errorEl.style.display = 'none';
-
-                console.log(gun);
-                
-                // Wait for connection then load data
-                setTimeout(loadExistingData, 1000);
-                
             } catch (error) {
                 console.error('Failed to initialize Gun:', error);
                 showError('Failed to connect to Gun database: ' + error.message);
             }
         }
 
-        function loadExistingData() {
+        function loadNode(soul) {
+            if (!soul || requestedSouls.has(soul)) {
+                return;
+            }
+            console.log(`Requesting node: ${soul}`);
+            requestedSouls.add(soul);
+            showError('');
+
+            // Use .once() to get the data for a soul
+            gun.get(soul).once((data, key) => {
+                console.log(`Received data for ${key}:`, data);
+                if (data) {
+                    // Clean metadata before storing
+                    const cleanData = { ...data };
+                    delete cleanData._;
+                    currentGraph[key] = cleanData;
+                } else {
+                    // If data is null or undefined, store it to indicate we've checked.
+                    currentGraph[key] = null; 
+                }
+                renderGraph();
+            });
+        }
+        
+        function loadNodeFromInput() {
+            const soul = document.getElementById('soulInput').value;
+            if (soul) {
+                // Clear the graph for a focused view
+                currentGraph = {};
+                requestedSouls = new Set();
+                loadNode(soul);
+            } else {
+                loadAllNodes();
+            }
+        }
+
+        function loadAllNodes() {
             const token = document.getElementById('authToken').value;
             if (!token) {
-                showError('Admin Token is required to load graph data.');
+                showError('Admin Token is required to load all graph data.');
                 return;
             }
             showError(''); // Clear previous errors
@@ -245,6 +287,7 @@
                     if (result.success) {
                         console.log('Loaded data from server:', result);
                         currentGraph = result.data || {};
+                        requestedSouls = new Set(Object.keys(currentGraph)); // Mark all as requested
                         renderGraph();
                         console.log(`Loaded ${result.nodeCount} nodes (${result.rawSize} bytes raw data)`);
                     } else {
@@ -253,7 +296,6 @@
                 })
                 .catch(error => {
                     console.error('Error fetching data:', error);
-                    // Avoid showing the error twice if we already handled the HTTP status
                     if (!error.message.startsWith('HTTP')) {
                         showError('Error fetching data: ' + error.message);
                     }
@@ -350,34 +392,31 @@
 
         function renderGraph() {
             try {
-                // Use our currentGraph instead of gun._.graph
-                if (!currentGraph || Object.keys(currentGraph).length === 0) {
-                    console.log('No data in currentGraph');
-                    nodeCountEl.textContent = '0';
-                    lastUpdateEl.textContent = new Date().toLocaleTimeString();
-                    graphContainer.innerHTML = ''; // Clear "loading" message
-                    return;
-                }
-
                 // Clear container
                 graphContainer.innerHTML = '';
 
-                // Convert to array and sort
-                const nodes = Object.entries(currentGraph)
-                    .sort(([a], [b]) => {
-                        // Sort user keys first, then alphabetically
-                        const aIsUser = a.startsWith('~');
-                        const bIsUser = b.startsWith('~');
-                        if (aIsUser && !bIsUser) return -1;
-                        if (!aIsUser && bIsUser) return 1;
-                        return a.localeCompare(b);
-                    });
+                const nodes = Object.entries(currentGraph);
 
-                // Render each node
-                nodes.forEach(([nodeId, nodeData]) => {
-                    const nodeEl = createNodeElement(nodeId, nodeData);
-                    graphContainer.appendChild(nodeEl);
-                });
+                if (nodes.length === 0) {
+                    graphContainer.innerHTML = '<div>No data loaded. Enter a node soul to begin.</div>';
+                } else {
+                    // Sort nodes
+                    nodes.sort(([a], [b]) => {
+                            // Sort user keys first, then alphabetically
+                            const aIsUser = a.startsWith('~');
+                            const bIsUser = b.startsWith('~');
+                            if (aIsUser && !bIsUser) return -1;
+                            if (!aIsUser && bIsUser) return 1;
+                            return a.localeCompare(b);
+                        });
+
+                    // Render each node
+                    nodes.forEach(([nodeId, nodeData]) => {
+                        const nodeEl = createNodeElement(nodeId, nodeData);
+                        graphContainer.appendChild(nodeEl);
+                    });
+                }
+
 
                 // Update stats
                 nodeCountEl.textContent = nodes.length;
@@ -391,7 +430,8 @@
 
         // Make functions available globally
         window.toggleNode = toggleNode;
-        window.loadExistingData = loadExistingData;
+        window.loadNodeFromInput = loadNodeFromInput;
+        window.loadAllNodes = loadAllNodes;
 
         // Initialize and start updating
         initGun();

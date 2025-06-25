@@ -12,6 +12,8 @@ import ip from "ip";
 import qr from "qr";
 import setSelfAdjustingInterval from "self-adjusting-interval";
 import AWS from "aws-sdk";
+import FormData from "form-data";
+import fetch from 'node-fetch';
 
 dotenv.config();
 
@@ -34,7 +36,11 @@ const { derive, SEA } = ShogunCoreModule;
 import http from "http";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import multer from "multer";
-import FormData from "form-data";
+
+const namespace = "shogun-relay";
+
+// --- IPFS Configuration ---
+const IPFS_API_URL = process.env.IPFS_API_URL || 'http://127.0.0.1:5001';
 
 // --- Garbage Collection Configuration ---
 const GC_ENABLED = process.env.GC_ENABLED === 'true';
@@ -49,7 +55,9 @@ const GC_EXCLUDED_NAMESPACES = [
   // Add other persistent application namespaces here.
   'public-chat',
   'admin',
-  'hal9000' // Example: protect blog posts
+  'hal9000', // Example: protect blog posts
+  'shogun-relay',
+  'shogun-wormhole',
 ];
 // Data older than this will be deleted (milliseconds). Default: 24 hours.
 const EXPIRATION_AGE = process.env.GC_EXPIRATION_AGE || 24 * 60 * 60 * 1000;
@@ -243,14 +251,281 @@ async function initializeServer() {
   const publicPath = path.resolve(__dirname, path_public);
   const indexPath = path.resolve(publicPath, "index.html");
 
-  // Explicit root route handling
-  app.get("/", (req, res) => {
-    if (fs.existsSync(indexPath)) {
-      res.sendFile(indexPath);
+  // Middleware
+  app.use(cors());
+  app.use(Gun.serve);
+  app.use(express.static(publicPath));
+
+  // IPFS File Upload Endpoint
+  const upload = multer({ storage: multer.memoryStorage() });
+  const tokenAuthMiddleware = (req, res, next) => {
+    // Check Authorization header (Bearer token)
+    const authHeader = req.headers['authorization'];
+    const bearerToken = authHeader && authHeader.split(' ')[1];
+    
+    // Check custom token header (for Gun/Wormhole compatibility)
+    const customToken = req.headers['token'];
+    
+    // Accept either format
+    const token = bearerToken || customToken;
+    
+    if (token === process.env.ADMIN_PASSWORD) { // Use a more secure token in production
+        next();
     } else {
-      res.send(
-        "<h1>Shogun Enhanced Relay Server</h1><p>Server is running!</p>"
-      );
+        console.log('Auth failed - Bearer:', bearerToken, 'Custom:', customToken);
+        res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+  };
+
+  // IPFS File Upload Endpoint (Consolidated and Fixed)
+  app.post('/ipfs-upload', tokenAuthMiddleware, upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          error: "No file provided",
+        });
+      }
+
+      const formData = new FormData();
+      formData.append("file", req.file.buffer, {
+        filename: req.file.originalname,
+        contentType: req.file.mimetype,
+      });
+
+      const requestOptions = {
+        hostname: "127.0.0.1",
+        port: 5001,
+        path: "/api/v0/add?wrap-with-directory=false",
+        method: "POST",
+        headers: {
+          ...formData.getHeaders(),
+        },
+      };
+      
+      const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN || process.env.IPFS_API_KEY;
+      if (IPFS_API_TOKEN) {
+        requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+      }
+
+      const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+        let data = "";
+        ipfsRes.on("data", (chunk) => (data += chunk));
+        ipfsRes.on("end", () => {
+          console.log("📤 IPFS Upload raw response:", data);
+
+          try {
+            const lines = data.trim().split("\n");
+            const results = lines.map((line) => JSON.parse(line));
+            const fileResult = results.find((r) => r.Name === req.file.originalname) || results[0];
+
+            res.json({
+              success: true,
+              file: {
+                name: req.file.originalname,
+                size: req.file.size,
+                mimetype: req.file.mimetype,
+                hash: fileResult?.Hash,
+                ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${fileResult?.Hash}`,
+                gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
+                publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
+              },
+              ipfsResponse: results,
+            });
+          } catch (parseError) {
+            console.error("Upload parse error:", parseError);
+            res.status(500).json({
+              success: false,
+              error: "Failed to parse IPFS response",
+              rawResponse: data,
+              parseError: parseError.message,
+            });
+          }
+        });
+      });
+
+      ipfsReq.on("error", (err) => {
+        console.error("❌ IPFS Upload error:", err);
+        res.status(500).json({ success: false, error: err.message });
+      });
+
+      ipfsReq.setTimeout(30000, () => {
+        ipfsReq.destroy();
+        if (!res.headersSent) {
+          res.status(408).json({ success: false, error: "Upload timeout" });
+        }
+      });
+
+      formData.pipe(ipfsReq);
+    } catch (error) {
+      console.error("Upload error:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // S3/FakeS3 File Upload endpoint
+  app.post('/s3-upload', tokenAuthMiddleware, upload.single('file'), async (req, res) => {
+    const enableS3 = process.env.ENABLE_S3 === "true";
+    if (!enableS3) {
+      return res.status(400).json({ success: false, error: 'S3 storage is disabled' });
+    }
+
+    try {
+      const s3 = new AWS.S3({
+        accessKeyId: process.env.S3_ACCESS_KEY,
+        secretAccessKey: process.env.S3_SECRET_KEY,
+        endpoint: process.env.S3_ENDPOINT || 'http://127.0.0.1:4569',
+        s3ForcePathStyle: true,
+        region: process.env.S3_REGION || 'us-east-1',
+      });
+
+      const bucket = process.env.S3_BUCKET;
+      const key = req.file.originalname;
+      const body = req.file.buffer;
+      const contentType = req.file.mimetype;
+
+      const params = {
+        Bucket: bucket,
+        Key: key,
+        Body: body,
+        ContentType: contentType,
+        Metadata: {
+          originalName: req.file.originalname,
+          size: req.file.size.toString(),
+          uploadedAt: new Date().toISOString(),
+        },
+      };
+
+      const uploadResult = await s3.upload(params).promise();
+
+      res.json({
+        success: true,
+        file: {
+          name: req.file.originalname,
+          size: req.file.size,
+          mimetype: req.file.mimetype,
+          s3Key: uploadResult.Key,
+          s3Url: uploadResult.Location,
+        },
+      });
+    } catch (error) {
+      console.error('S3 Upload Error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // S3/FakeS3 File Fetch endpoint
+  app.get('/s3-file/:bucket/:key', async (req, res) => {
+    const enableS3 = process.env.ENABLE_S3 === "true";
+    if (!enableS3) {
+      return res.status(400).json({ success: false, error: 'S3 storage is disabled' });
+    }
+
+    try {
+      const s3 = new AWS.S3({
+        accessKeyId: process.env.S3_ACCESS_KEY,
+        secretAccessKey: process.env.S3_SECRET_KEY,
+        endpoint: process.env.S3_ENDPOINT || 'http://127.0.0.1:4569',
+        s3ForcePathStyle: true,
+        region: process.env.S3_REGION || 'us-east-1',
+      });
+
+      const bucket = req.params.bucket;
+      const key = req.params.key;
+
+      const params = {
+        Bucket: bucket,
+        Key: key,
+      };
+
+      const fileStream = s3.getObject(params).createReadStream();
+
+      fileStream.on('error', (error) => {
+        console.error('S3 Fetch Error:', error);
+        res.status(500).json({ success: false, error: error.message });
+      });
+
+      res.setHeader('Content-Disposition', `attachment; filename="${key}"`);
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error('S3 Fetch Error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // S3/FakeS3 File Info endpoint
+  app.get('/s3-info/:bucket/:key', async (req, res) => {
+    const enableS3 = process.env.ENABLE_S3 === "true";
+    if (!enableS3) {
+      return res.status(400).json({ success: false, error: 'S3 storage is disabled' });
+    }
+
+    try {
+      const s3 = new AWS.S3({
+        accessKeyId: process.env.S3_ACCESS_KEY,
+        secretAccessKey: process.env.S3_SECRET_KEY,
+        endpoint: process.env.S3_ENDPOINT || 'http://127.0.0.1:4569',
+        s3ForcePathStyle: true,
+        region: process.env.S3_REGION || 'us-east-1',
+      });
+
+      const bucket = req.params.bucket;
+      const key = req.params.key;
+
+      const params = {
+        Bucket: bucket,
+        Key: key,
+      };
+
+      const headResult = await s3.headObject(params).promise();
+
+      res.json({
+        success: true,
+        file: {
+          name: key,
+          size: headResult.ContentLength,
+          mimetype: headResult.ContentType,
+          etag: headResult.ETag,
+          lastModified: headResult.LastModified,
+          metadata: headResult.Metadata,
+        },
+      });
+    } catch (error) {
+      console.error('S3 Info Error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // S3/FakeS3 File Delete endpoint
+  app.delete('/s3-file/:bucket/:key', async (req, res) => {
+    const enableS3 = process.env.ENABLE_S3 === "true";
+    if (!enableS3) {
+      return res.status(400).json({ success: false, error: 'S3 storage is disabled' });
+    }
+
+    try {
+      const s3 = new AWS.S3({
+        accessKeyId: process.env.S3_ACCESS_KEY,
+        secretAccessKey: process.env.S3_SECRET_KEY,
+        endpoint: process.env.S3_ENDPOINT || 'http://127.0.0.1:4569',
+        s3ForcePathStyle: true,
+        region: process.env.S3_REGION || 'us-east-1',
+      });
+
+      const bucket = req.params.bucket;
+      const key = req.params.key;
+
+      const params = {
+        Bucket: bucket,
+        Key: key,
+      };
+
+      await s3.deleteObject(params).promise();
+
+      res.json({ success: true, message: 'File deleted successfully' });
+    } catch (error) {
+      console.error('S3 Delete Error:', error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -262,18 +537,9 @@ async function initializeServer() {
   app.use(cors()); // Allow all cross-origin requests
   app.use(express.json());
 
-  // Configure multer for file uploads
-  const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: {
-      fileSize: 100 * 1024 * 1024, // 100MB limit
-    },
-  });
-
   console.log("ADMIN_PASSWORD", process.env.ADMIN_PASSWORD);
 
   // --- IPFS Desktop Proxy Configuration ---
-  const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
   const IPFS_GATEWAY_URL =
     process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
   const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN || process.env.IPFS_API_KEY;
@@ -398,30 +664,6 @@ async function initializeServer() {
     })
   );
 
-  const tokenAuthMiddleware = (req, res, next) => {
-    const expectedToken = process.env.ADMIN_PASSWORD;
-
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({
-        success: false,
-        error: "Unauthorized: A bearer token is required.",
-      });
-    }
-
-    const token = authHeader.split(" ")[1];
-
-    if (token === expectedToken) {
-      return next();
-    }
-
-    return res.status(403).json({
-      success: false,
-      error: "Forbidden: The provided token is invalid.",
-    });
-  };
-
   // --- Start Server Function ---
   async function startServer() {
     // Test and find available port
@@ -488,16 +730,16 @@ async function initializeServer() {
 
   // Initialize Gun with conditional S3 support
   const gunConfig = {
-    super: false,
-    // file: "radata",
-    // radisk: store,
+    // super: false,
+    file: "radata",
+    radisk: true,
     web: server,
-    // localStorage: false,
+    localStorage: false,
     uuid: "shogun-relay",
     wire: true,
     axe: true,
     rfs: true,
-    peer: ['http://localhost:8765/gun']
+    wait: 500,
   };
 
   // Only add S3 if explicitly enabled and configured properly
@@ -509,7 +751,7 @@ async function initializeServer() {
     console.log("📁 Using local file storage only (S3 disabled)");
   }
 
-  const gun = new Gun(gunConfig);
+  const gun = Gun(gunConfig);
 
   gun.on("hi", () => {
     totalConnections += 1;
@@ -734,7 +976,7 @@ async function initializeServer() {
   });
 
   // IPFS File Upload endpoint
-  app.post("/ipfs-upload", upload.single("file"), async (req, res) => {
+  app.post("/ipfs-upload", tokenAuthMiddleware, upload.single("file"), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({
@@ -770,14 +1012,9 @@ async function initializeServer() {
           console.log("📤 IPFS Upload raw response:", data);
 
           try {
-            // IPFS add returns NDJSON (one JSON object per line)
             const lines = data.trim().split("\n");
             const results = lines.map((line) => JSON.parse(line));
-
-            // Get the main file result (not directory)
-            const fileResult =
-              results.find((r) => r.Name === req.file.originalname) ||
-              results[0];
+            const fileResult = results.find((r) => r.Name === req.file.originalname) || results[0];
 
             res.json({
               success: true,
@@ -786,9 +1023,7 @@ async function initializeServer() {
                 size: req.file.size,
                 mimetype: req.file.mimetype,
                 hash: fileResult?.Hash,
-                ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
-                  fileResult?.Hash
-                }`,
+                ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${fileResult?.Hash}`,
                 gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
                 publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
               },
@@ -796,7 +1031,7 @@ async function initializeServer() {
             });
           } catch (parseError) {
             console.error("Upload parse error:", parseError);
-            res.json({
+            res.status(500).json({
               success: false,
               error: "Failed to parse IPFS response",
               rawResponse: data,
@@ -808,30 +1043,20 @@ async function initializeServer() {
 
       ipfsReq.on("error", (err) => {
         console.error("❌ IPFS Upload error:", err);
-        res.status(500).json({
-          success: false,
-          error: err.message,
-        });
+        res.status(500).json({ success: false, error: err.message });
       });
 
       ipfsReq.setTimeout(30000, () => {
         ipfsReq.destroy();
         if (!res.headersSent) {
-          res.status(408).json({
-            success: false,
-            error: "Upload timeout",
-          });
+          res.status(408).json({ success: false, error: "Upload timeout" });
         }
       });
 
-      // Send the form data
       formData.pipe(ipfsReq);
     } catch (error) {
       console.error("Upload error:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -956,6 +1181,7 @@ async function initializeServer() {
   });
 
   // --- API Routes ---
+  
   // Health check endpoint
   app.get("/health", (req, res) => {
     res.json({
@@ -1152,7 +1378,8 @@ async function initializeServer() {
 
   const getGunNodeFromPath = (pathString) => {
     const pathSegments = pathString.split("/").filter(Boolean);
-    let node = gun;
+    let node = gun.get(namespace);
+
     pathSegments.forEach((segment) => {
       node = node.get(segment);
     });
@@ -1340,6 +1567,10 @@ async function initializeServer() {
 
   app.get("/s3-dashboard", (req, res) => {
     res.sendFile(path.resolve(publicPath, "s3-dashboard.html"));
+  });
+
+  app.get("/s3-manager", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "s3-manager.html"));
   });
 
   app.get("/chat", (req, res) => {

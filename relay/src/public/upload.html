@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IPFS File Uploader</title>
+    <link rel="stylesheet" href="dharma-style/dharma.css">
     <style>
         body { background-color: #222; color: #eee; font-family: "Menlo", "Consolas", monospace; line-height: 1.6; margin: 2em; }
         h1, h2 { border-bottom: 1px solid #555; padding-bottom: 10px; }
@@ -32,6 +33,10 @@
         <h2>File Upload</h2>
         <p>Select a file to upload to your IPFS node via the relay.</p>
         <input type="file" id="fileInput" />
+        <div style="margin: 1em 0; font-size: 0.9em; display: flex; align-items: center; gap: 10px;">
+            <input type="checkbox" id="encryptCheck" style="width: auto; margin-bottom: 0;" />
+            <label for="encryptCheck">Encrypt file with admin token before upload?</label>
+        </div>
         <button id="uploadBtn">Upload File</button>
         <div id="loader" class="loader">Uploading...</div>
         <div id="message" class="message"></div>

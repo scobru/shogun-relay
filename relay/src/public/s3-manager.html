@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S3 File Manager</title>
+    <link rel="stylesheet" href="dharma-style/dharma.css">
+    <style>
+        body { 
+            background-color: #222; 
+            color: #eee; 
+            font-family: "Menlo", "Consolas", monospace; 
+            line-height: 1.6; 
+            margin: 2em; 
+        }
+        h1, h2 { 
+            border-bottom: 1px solid #555; 
+            padding-bottom: 10px; 
+            margin-top: 1.5em; 
+        }
+        a { 
+            color: #8af; 
+            text-decoration: none; 
+        }
+        a:hover { 
+            background-color: #333; 
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .upload-section {
+            background-color: #2a2a2a;
+            border: 1px solid #555;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .file-list {
+            background-color: #2a2a2a;
+            border: 1px solid #555;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background-color: #333;
+            border: 1px solid #555;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            transition: all 0.2s ease;
+        }
+        .file-item:hover {
+            background-color: #444;
+            border-color: #8af;
+        }
+        .file-info {
+            flex: 1;
+        }
+        .file-name {
+            font-weight: bold;
+            color: #8af;
+            margin-bottom: 5px;
+        }
+        .file-meta {
+            font-size: 0.85em;
+            color: #aaa;
+        }
+        .file-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            background-color: #444;
+            color: #eee;
+            border: 1px solid #666;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.9em;
+            transition: all 0.2s ease;
+        }
+        .btn:hover {
+            background-color: #555;
+            border-color: #8af;
+        }
+        .btn-primary {
+            background-color: #0a7b4a;
+            border-color: #0f9d58;
+        }
+        .btn-primary:hover {
+            background-color: #0f9d58;
+        }
+        .btn-danger {
+            background-color: #d32f2f;
+            border-color: #f44336;
+        }
+        .btn-danger:hover {
+            background-color: #f44336;
+        }
+        .drag-drop-area {
+            border: 2px dashed #555;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            color: #aaa;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .drag-drop-area.drag-over {
+            border-color: #8af;
+            background-color: rgba(136, 170, 255, 0.1);
+            color: #8af;
+        }
+        .upload-progress {
+            background-color: #333;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+            display: none;
+        }
+        .progress-bar {
+            height: 20px;
+            background-color: #0f9d58;
+            transition: width 0.3s ease;
+            color: white;
+            text-align: center;
+            line-height: 20px;
+            font-size: 0.8em;
+        }
+        .message {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            display: none;
+        }
+        .message.success {
+            background-color: #0f5132;
+            color: #d1e7dd;
+            border: 1px solid #0f9d58;
+        }
+        .message.error {
+            background-color: #842029;
+            color: #f8d7da;
+            border: 1px solid #d32f2f;
+        }
+        .auth-section {
+            background-color: #2a2a2a;
+            border: 1px solid #555;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        input[type="text"], input[type="password"], input[type="file"] {
+            background-color: #444;
+            color: #eee;
+            border: 1px solid #666;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: inherit;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        input[type="file"] {
+            padding: 8px;
+        }
+        .bucket-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #333;
+            border-radius: 5px;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #aaa;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #333;
+            border-radius: 50%;
+            border-top-color: #8af;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/">&larr; Back to Control Panel</a>
+        <h1>📦 S3 File Manager</h1>
+
+        <!-- Authentication Section -->
+        <div class="auth-section">
+            <h3>Authentication</h3>
+            <input type="password" id="authToken" placeholder="Enter admin token (S3RVER)" style="margin-bottom: 10px;">
+            <button class="btn btn-primary" onclick="connectToS3()">Connect to S3</button>
+            <span id="connectionStatus" style="margin-left: 15px; color: #aaa;">Not connected</span>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="upload-section" id="uploadSection" style="display: none;">
+            <h2>📤 Upload Files</h2>
+            
+            <div class="drag-drop-area" id="dropArea">
+                <p>📁 Drag & drop files here or click to select</p>
+                <input type="file" id="fileInput" multiple style="display: none;">
+            </div>
+            
+            <div class="upload-progress" id="uploadProgress">
+                <div class="progress-bar" id="progressBar">0%</div>
+            </div>
+            
+            <button class="btn btn-primary" onclick="triggerFileSelect()">Select Files</button>
+            <button class="btn" onclick="uploadFiles()" id="uploadBtn" disabled>Upload Selected Files</button>
+        </div>
+
+        <!-- Messages -->
+        <div id="message" class="message"></div>
+
+        <!-- File List Section -->
+        <div class="file-list" id="fileListSection" style="display: none;">
+            <div class="bucket-info">
+                <h2>📁 Files in Bucket</h2>
+                <button class="btn" onclick="refreshFileList()">🔄 Refresh</button>
+            </div>
+            
+            <div id="fileList" class="loading">
+                <div class="spinner"></div> Loading files...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = '';
+        let selectedFiles = [];
+        let isConnected = false;
+
+        // Authentication
+        function connectToS3() {
+            authToken = document.getElementById('authToken').value.trim();
+            if (!authToken) {
+                showMessage('Please enter your admin token', 'error');
+                return;
+            }
+
+            // Test connection by trying to get file list
+            testS3Connection();
+        }
+
+        async function testS3Connection() {
+            try {
+                const response = await fetch('/api/s3-stats', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        isConnected = true;
+                        document.getElementById('connectionStatus').textContent = '✅ Connected';
+                        document.getElementById('connectionStatus').style.color = '#0f9d58';
+                        document.getElementById('uploadSection').style.display = 'block';
+                        document.getElementById('fileListSection').style.display = 'block';
+                        showMessage(`Connected! Found ${data.stats.totalBuckets} buckets with ${data.stats.totalObjects} files`, 'success');
+                        refreshFileList();
+                    } else {
+                        throw new Error(data.error || 'Connection failed');
+                    }
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error('S3 connection error:', error);
+                showMessage(`Connection failed: ${error.message}`, 'error');
+                document.getElementById('connectionStatus').textContent = '❌ Connection failed';
+                document.getElementById('connectionStatus').style.color = '#d32f2f';
+            }
+        }
+
+        // File selection and drag & drop
+        function triggerFileSelect() {
+            document.getElementById('fileInput').click();
+        }
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            selectedFiles = Array.from(e.target.files);
+            updateUploadButton();
+            showMessage(`Selected ${selectedFiles.length} file(s)`, 'success');
+        });
+
+        // Drag and drop functionality
+        const dropArea = document.getElementById('dropArea');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            dropArea.classList.add('drag-over');
+        }
+
+        function unhighlight(e) {
+            dropArea.classList.remove('drag-over');
+        }
+
+        dropArea.addEventListener('drop', handleDrop, false);
+        dropArea.addEventListener('click', triggerFileSelect);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            selectedFiles = Array.from(files);
+            updateUploadButton();
+            showMessage(`Dropped ${selectedFiles.length} file(s)`, 'success');
+        }
+
+        function updateUploadButton() {
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = selectedFiles.length === 0;
+            uploadBtn.textContent = selectedFiles.length > 0 ? 
+                `Upload ${selectedFiles.length} file(s)` : 'Upload Selected Files';
+        }
+
+        // File upload
+        async function uploadFiles() {
+            if (selectedFiles.length === 0) {
+                showMessage('No files selected', 'error');
+                return;
+            }
+
+            const progressContainer = document.getElementById('uploadProgress');
+            const progressBar = document.getElementById('progressBar');
+            progressContainer.style.display = 'block';
+
+            let uploadedCount = 0;
+            const totalFiles = selectedFiles.length;
+
+            for (let i = 0; i < selectedFiles.length; i++) {
+                const file = selectedFiles[i];
+                
+                try {
+                    await uploadSingleFile(file);
+                    uploadedCount++;
+                    
+                    const progress = Math.round((uploadedCount / totalFiles) * 100);
+                    progressBar.style.width = progress + '%';
+                    progressBar.textContent = `${progress}% (${uploadedCount}/${totalFiles})`;
+                    
+                } catch (error) {
+                    console.error(`Failed to upload ${file.name}:`, error);
+                    showMessage(`Failed to upload ${file.name}: ${error.message}`, 'error');
+                }
+            }
+
+            if (uploadedCount === totalFiles) {
+                showMessage(`Successfully uploaded ${uploadedCount} file(s)!`, 'success');
+                refreshFileList();
+            } else {
+                showMessage(`Uploaded ${uploadedCount} of ${totalFiles} files`, 'error');
+            }
+
+            // Reset
+            selectedFiles = [];
+            document.getElementById('fileInput').value = '';
+            updateUploadButton();
+            progressContainer.style.display = 'none';
+        }
+
+        async function uploadSingleFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetch('/s3-upload', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP ${response.status}`);
+            }
+
+            return await response.json();
+        }
+
+        // File list management
+        async function refreshFileList() {
+            if (!isConnected) return;
+
+            const fileListEl = document.getElementById('fileList');
+            fileListEl.innerHTML = '<div class="spinner"></div> Loading files...';
+            fileListEl.className = 'loading';
+
+            try {
+                // Get S3 stats to find buckets
+                const statsResponse = await fetch('/api/s3-stats', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!statsResponse.ok) {
+                    throw new Error('Failed to fetch S3 stats');
+                }
+
+                const statsData = await statsResponse.json();
+                if (!statsData.success || !statsData.stats.buckets.length) {
+                    fileListEl.innerHTML = '<p style="text-align: center; color: #aaa;">No buckets found</p>';
+                    fileListEl.className = '';
+                    return;
+                }
+
+                // Get files from the first bucket (assuming shogun-files)
+                const bucket = statsData.stats.buckets[0];
+                const filesResponse = await fetch(`/api/s3-buckets/${bucket.name}/objects`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!filesResponse.ok) {
+                    throw new Error('Failed to fetch file list');
+                }
+
+                const filesData = await filesResponse.json();
+                displayFileList(filesData.objects || [], bucket.name);
+
+            } catch (error) {
+                console.error('Error refreshing file list:', error);
+                fileListEl.innerHTML = `<p style="text-align: center; color: #d32f2f;">Error: ${error.message}</p>`;
+                fileListEl.className = '';
+            }
+        }
+
+        function displayFileList(files, bucketName) {
+            const fileListEl = document.getElementById('fileList');
+            fileListEl.className = '';
+
+            if (files.length === 0) {
+                fileListEl.innerHTML = '<p style="text-align: center; color: #aaa;">No files found</p>';
+                return;
+            }
+
+            fileListEl.innerHTML = files.map(file => `
+                <div class="file-item">
+                    <div class="file-info">
+                        <div class="file-name">${file.Key}</div>
+                        <div class="file-meta">
+                            📏 ${formatFileSize(file.Size)} • 
+                            📅 ${new Date(file.LastModified).toLocaleString()}
+                        </div>
+                    </div>
+                    <div class="file-actions">
+                        <button class="btn" onclick="downloadFile('${bucketName}', '${file.Key}')">
+                            📥 Download
+                        </button>
+                        <button class="btn" onclick="getFileInfo('${bucketName}', '${file.Key}')">
+                            ℹ️ Info
+                        </button>
+                        <button class="btn btn-danger" onclick="deleteFile('${bucketName}', '${file.Key}')">
+                            🗑️ Delete
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // File operations
+        function downloadFile(bucket, key) {
+            const url = `/s3-file/${bucket}/${key}`;
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = key.split('/').pop(); // Extract filename
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showMessage(`Downloading ${key}...`, 'success');
+        }
+
+        async function getFileInfo(bucket, key) {
+            try {
+                const response = await fetch(`/s3-info/${bucket}/${key}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (data.success) {
+                    const info = data.file;
+                    alert(`File Info:\n\n` +
+                        `Name: ${info.key}\n` +
+                        `Size: ${formatFileSize(info.size)}\n` +
+                        `Type: ${info.contentType}\n` +
+                        `Modified: ${new Date(info.lastModified).toLocaleString()}\n` +
+                        `ETag: ${info.etag}\n` +
+                        `URL: ${info.url}`);
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                showMessage(`Failed to get file info: ${error.message}`, 'error');
+            }
+        }
+
+        async function deleteFile(bucket, key) {
+            if (!confirm(`Are you sure you want to delete "${key}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/s3-file/${bucket}/${key}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (data.success) {
+                    showMessage(`Deleted "${key}" successfully`, 'success');
+                    refreshFileList();
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                showMessage(`Failed to delete file: ${error.message}`, 'error');
+            }
+        }
+
+        // Utility functions
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function showMessage(text, type = 'success') {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = text;
+            messageEl.className = `message ${type}`;
+            messageEl.style.display = 'block';
+            
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 5000);
+        }
+
+        // Auto-focus token input
+        document.getElementById('authToken').focus();
+    </script>
+</body>
+</html> 
