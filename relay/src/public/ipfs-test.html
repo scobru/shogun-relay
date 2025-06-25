@@ -67,7 +67,7 @@
         
         <h2>📁 Test Gateway IPFS</h2>
         <p>Inserisci un hash IPFS per testare il gateway:</p>
-        <input type="text" id="ipfsHash" placeholder="Es: QmRJzsvyCQyizr73Gmms8ZRtvNxmgqumxc2KUp71dfEmoj" />
+        <input type="text" id="ipfsHash" placeholder="Es: Qme7ss3ARVgxv6rXqVPiikMJ8u2NLgmgszg13pYrDKEoiu" />
         <button onclick="testIPFSGateway()">Test Gateway</button>
         <button onclick="testValidHash()">🧪 Test Hash Valido</button>
         <button onclick="debugIPFS()">🐛 Debug Proxy</button>
@@ -181,8 +181,8 @@
         }
 
         function testValidHash() {
-            // Use a known valid hash
-            const validHash = 'QmRJzsvyCQyizr73Gmms8ZRtvNxmgqumxc2KUp71dfEmoj';
+            // Use a hash that works on the local gateway
+            const validHash = 'Qme7ss3ARVgxv6rXqVPiikMJ8u2NLgmgszg13pYrDKEoiu';
             document.getElementById('ipfsHash').value = validHash;
             testIPFSGateway();
         }
