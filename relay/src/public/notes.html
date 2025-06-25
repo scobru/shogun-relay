@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Notes</title>
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
     <style>
         body { background-color: #222; color: #eee; font-family: "Menlo", "Consolas", monospace; line-height: 1.6; margin: 2em; }
         h1 { border-bottom: 1px solid #555; padding-bottom: 10px; }
@@ -30,9 +32,10 @@
         </section>
 
         <section>
-            <h2>Your Private Notes</h2>
-            <textarea id="notesArea" placeholder="Your notes will be loaded here..."></textarea>
-            <button onclick="saveNotes()">Save Notes</button>
+            <h2>Your Private, Encrypted Notes</h2>
+            <textarea id="notesArea" placeholder="Enter your admin token to load encrypted notes..."></textarea>
+            <button onclick="saveNotes()">Save Encrypted Notes</button>
+            <button onclick="deleteNotes()" class="danger">Delete Notes</button>
         </section>
 
         <div id="message"></div>
@@ -42,6 +45,9 @@
         const adminTokenInput = document.getElementById('adminToken');
         const notesArea = document.getElementById('notesArea');
         const messageEl = document.getElementById('message');
+
+        // Gun SEA is available globally after including the scripts
+        const SEA = window.SEA;
 
         function showMessage(text, isError = false) {
             messageEl.textContent = text;
@@ -68,6 +74,11 @@
                 }
 
                 const response = await fetch(endpoint, options);
+                
+                if (method === 'DELETE' && response.ok) {
+                    return await response.json();
+                }
+
                 const result = await response.json();
 
                 if (!response.ok || !result.success) {
@@ -81,17 +92,54 @@
         }
 
         async function loadNotes() {
+            const secret = adminTokenInput.value;
+            if (!secret) {
+                notesArea.value = '';
+                return;
+            }
             const result = await apiCall('/api/notes');
-            if (result) {
-                notesArea.value = result.notes || '';
+            if (result && result.notes) {
+                try {
+                    const decryptedNotes = await SEA.decrypt(result.notes, secret);
+                    if (decryptedNotes) {
+                        notesArea.value = decryptedNotes;
+                        showMessage('Notes decrypted and loaded.', false);
+                    } else {
+                        notesArea.value = '';
+                        showMessage('Could not decrypt notes. Check your token or save new notes to overwrite.', true);
+                    }
+                } catch(e) {
+                    notesArea.value = '';
+                    showMessage('Decryption failed. The data may not be encrypted or the token is wrong.', true);
+                }
+            } else {
+                notesArea.value = ''; // Clear if no notes are found
             }
         }
 
         async function saveNotes() {
+            const secret = adminTokenInput.value;
+            if (!secret) {
+                showMessage('Admin Token is required to encrypt and save notes.', true);
+                return;
+            }
             const notes = notesArea.value;
-            const result = await apiCall('/api/notes', 'POST', { notes });
+            const encryptedNotes = await SEA.encrypt(notes, secret);
+            
+            const result = await apiCall('/api/notes', 'POST', { notes: encryptedNotes });
             if (result) {
-                showMessage('Notes saved successfully!', false);
+                showMessage('Notes encrypted and saved successfully!', false);
+            }
+        }
+
+        async function deleteNotes() {
+            if (!confirm('Are you sure you want to delete all notes permanently? This cannot be undone.')) {
+                return;
+            }
+            const result = await apiCall('/api/notes', 'DELETE');
+            if (result && result.success) {
+                notesArea.value = '';
+                showMessage('Notes deleted successfully.', false);
             }
         }
 
@@ -110,4 +158,4 @@
         });
     </script>
 </body>
-</html> 
+</html>   

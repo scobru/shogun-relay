@@ -139,7 +139,7 @@
         <!-- Graph nodes will be injected here -->
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun@0.2020.1239/gun.js"></script>
     <script>
         const graphContainer = document.getElementById('graphContainer');
         const nodeCountEl = document.getElementById('nodeCount');
@@ -235,20 +235,17 @@
             })
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        const errorText = response.statusText || 'Server returned an error';
+                        showError(`Error fetching data: HTTP ${response.status} - ${errorText}`);
+                        throw new Error(`HTTP ${response.status}`);
                     }
                     return response.json();
                 })
                 .then(result => {
                     if (result.success) {
                         console.log('Loaded data from server:', result);
-                        
-                        // Update our current graph with the server data
                         currentGraph = result.data || {};
-                        
-                        // Render immediately
                         renderGraph();
-                        
                         console.log(`Loaded ${result.nodeCount} nodes (${result.rawSize} bytes raw data)`);
                     } else {
                         showError('Failed to load data: ' + result.error);
@@ -256,13 +253,16 @@
                 })
                 .catch(error => {
                     console.error('Error fetching data:', error);
-                    showError('Error fetching data: ' + error.message);
+                    // Avoid showing the error twice if we already handled the HTTP status
+                    if (!error.message.startsWith('HTTP')) {
+                        showError('Error fetching data: ' + error.message);
+                    }
                 });
         }
 
         function showError(message) {
             errorEl.textContent = message;
-            errorEl.style.display = 'block';
+            errorEl.style.display = message ? 'block' : 'none';
         }
 
         function formatNodeId(nodeId) {
@@ -289,7 +289,7 @@
             nodeEl.className = 'node-item';
             nodeEl.dataset.nodeId = nodeId;
             
-            const properties = Object.entries(nodeData).filter(([key, value]) => 
+            const properties = Object.entries(nodeData || {}).filter(([key, value]) => 
                 key !== '_' && value != null && value !== ''
             );
 
@@ -355,6 +355,7 @@
                     console.log('No data in currentGraph');
                     nodeCountEl.textContent = '0';
                     lastUpdateEl.textContent = new Date().toLocaleTimeString();
+                    graphContainer.innerHTML = ''; // Clear "loading" message
                     return;
                 }
 
@@ -395,16 +396,9 @@
         // Initialize and start updating
         initGun();
         
-        // Update every second
-        const updateInterval = setInterval(renderGraph, 1000);
-
         // Initial render
         setTimeout(renderGraph, 500);
 
-        // Cleanup on page unload
-        window.addEventListener('beforeunload', () => {
-            clearInterval(updateInterval);
-        });
     </script>
 </body>
 </html>

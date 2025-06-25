@@ -15,25 +15,39 @@
     </style>
 </head>
 <body>
-    <h1>Shogun Relay Control Panel</h1>
+    <h1 id="relay-title">Shogun Relay Control Panel</h1>
     <p>Select a tool to continue.</p>
     <ul>
-        <li><a href="/stats">View Live Stats</a></li>
+        <li><a href="/stats">📈 View Live Stats</a></li>
         <li><a href="/charts">📊 Advanced Charts Dashboard</a></li>
         <li><a href="/chat">💬 Public Chat</a></li>
         <li><a href="/notes">📝 Admin Notes</a></li>
         <li><a href="/upload">📤 Upload File to IPFS</a></li>
         <li><a href="/pin-manager">📌 IPFS Pin Manager</a></li>
         <li><a href="/s3-dashboard">📦 S3 Storage Dashboard</a></li>
-        <li><a href="/create">Create New Data Node (AuthToken Required)</a></li>
-        <li><a href="/view">View/Query Data (AuthToken Required)</a></li>
-        <li><a href="/derive">Derive Keys </a></li>
-        <li><a href="/client">Safe Messenger Client </a></li>
-        <li><a href="/server">Safe Messenger Server</a></li>
-        <li><a href="/visualGraph">Visualize Graph Data</a></li>
-        <li><a href="/graph">Live Graph Explorer</a></li>
+        <li><a href="/create">➕ Create New Data Node (AuthToken Required)</a></li>
+        <li><a href="/view">🔍 View/Query Data (AuthToken Required)</a></li>
+        <li><a href="/derive">🔑 Derive Keys </a></li>
+        <li><a href="/client">✉️ Safe Messenger Client </a></li>
+        <li><a href="/server">🖥️ Safe Messenger Server</a></li>
+        <li><a href="/visualGraph">🕸️ Visualize Graph Data</a></li>
+        <li><a href="/graph">🌐 Live Graph Explorer</a></li>
         <li><a href="/ipfs-status">📊 IPFS Node Status</a></li>
         <li><a href="/api/v0/version" target="_blank">🔧 IPFS API Version</a></li>
     </ul>
+
+    <script>
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch('/api/relay-info');
+                const data = await response.json();
+                if (data.success && data.name) {
+                    document.getElementById('relay-title').textContent = data.name;
+                }
+            } catch (error) {
+                console.error('Failed to fetch relay name:', error);
+            }
+        });
+    </script>
 </body>
 </html>

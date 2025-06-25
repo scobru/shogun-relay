@@ -407,10 +407,10 @@ async function initializeServer() {
   // Initialize Gun with conditional S3 support
   const gunConfig = {
     super: false,
-    file: "radata",
-    radisk: true, // store,
+    // file: "radata",
+    // radisk: store,
     web: server,
-    localStorage: false,
+    // localStorage: false,
     uuid: "shogun-relay",
     wire: true,
     axe: true,
@@ -886,44 +886,25 @@ async function initializeServer() {
     });
   });
 
-  // All data endpoint - reads from storage, supporting both single-file and directory-based radisk
+  // API endpoint to provide relay configuration details
+  app.get('/api/relay-info', (req, res) => {
+    res.json({
+      success: true,
+      name: process.env.RELAY_NAME || 'Shogun Relay Control Panel'
+    });
+  });
+
+  // All data endpoint - reads directly from the live in-memory graph.
   app.get("/api/alldata", tokenAuthMiddleware, (req, res) => {
     try {
-      const storagePath = path.resolve(__dirname, "..", "radata");
-      let graphData = {};
+      // Access the live, in-memory graph from the Gun instance
+      let graphData = gun._.graph;
 
-      if (fs.existsSync(storagePath)) {
-        if (fs.statSync(storagePath).isFile()) {
-          // --- Single-file mode ---
-          const rawData = fs.readFileSync(storagePath, "utf8");
-          graphData = JSON.parse(rawData);
-
-          // If the graph is wrapped in a single `!` node, unwrap it.
-          const keys = Object.keys(graphData);
-          if (keys.length === 1 && keys[0] === '!') {
-            console.log("Unwrapping single-file graph from '!' node.");
-            graphData = graphData['!'];
-          }
-
-        } else if (fs.statSync(storagePath).isDirectory()) {
-          // --- Directory mode ---
-          const files = fs.readdirSync(storagePath);
-          files.forEach(file => {
-            if (file.startsWith('.')) return;
-            try {
-              const filePath = path.join(storagePath, file);
-              const rawData = fs.readFileSync(filePath, 'utf8');
-              const soul = decodeURIComponent(file);
-              graphData[soul] = JSON.parse(rawData);
-            } catch (e) {
-              console.error(`Could not read or parse file ${file}:`, e);
-            }
-          });
-        }
-      } else {
-        return res.json({
-          success: true, data: {}, message: "No radata storage found.", nodeCount: 0
-        });
+      // If the graph contains a `!` node, which typically holds the root,
+      // use its contents as the main graph.
+      if (graphData && graphData['!']) {
+        console.log("Found '!' node in live graph, using it as the root.");
+        graphData = graphData['!'];
       }
 
       // Clean the graph data for serialization (remove circular `_` metadata)
@@ -949,10 +930,10 @@ async function initializeServer() {
       });
 
     } catch (error) {
-      console.error("Error reading radata storage:", error);
+      console.error("Error reading live graph data:", error);
       res.status(500).json({
         success: false,
-        error: "Failed to read data from storage: " + error.message,
+        error: "Failed to read data from live graph: " + error.message,
       });
     }
   });
@@ -1631,6 +1612,15 @@ async function initializeServer() {
           }
           res.json({ success: true });
       });
+  });
+
+  app.delete('/api/notes', tokenAuthMiddleware, (req, res) => {
+    gun.get('admin').get('notes').put(null, ack => {
+        if (ack.err) {
+            return res.status(500).json({ success: false, error: ack.err });
+        }
+        res.json({ success: true, message: 'Notes deleted.' });
+    });
   });
 
   // Fallback to index.html
