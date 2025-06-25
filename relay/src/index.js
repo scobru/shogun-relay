@@ -14,8 +14,6 @@ import setSelfAdjustingInterval from "self-adjusting-interval";
 
 dotenv.config();
 
-//import "bullet-catcher";
-
 import "gun/sea.js";
 import "gun/lib/stats.js";
 import "gun/lib/then.js";
@@ -27,11 +25,15 @@ import "gun/lib/yson.js";
 import "gun/lib/rindexed.js";
 import "gun/lib/webrtc.js";
 import "gun/lib/rfs.js";
-import "gun/lib/rs3.js";
 import "gun/lib/multicast.js";
+import "gun/lib/rs3.js";
 
 import ShogunCoreModule from "shogun-core";
 const { derive } = ShogunCoreModule;
+import http from "http";
+import { createProxyMiddleware } from 'http-proxy-middleware';
+import multer from 'multer';
+import FormData from 'form-data';
 
 // ES Module equivalent for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -137,7 +139,8 @@ async function initializeServer() {
       customStats.putRequests++;
 
       // If we're here, it's a `put` from a peer that MUST be authenticated.
-      const valid = msg.headers.token && msg.headers.token === "shogun2025";
+      const valid =
+        msg.headers.token && msg.headers.token === process.env.ADMIN_PASSWORD;
 
       if (valid) {
         console.log("PEER PUT ALLOWED (valid token):", Object.keys(msg.put));
@@ -175,11 +178,93 @@ async function initializeServer() {
   // --- Middleware ---
   app.use(cors()); // Allow all cross-origin requests
   app.use(express.json());
+  
+  // Configure multer for file uploads
+  const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 100 * 1024 * 1024 // 100MB limit
+    }
+  });
 
   console.log("ADMIN_PASSWORD", process.env.ADMIN_PASSWORD);
 
+  // --- IPFS Desktop Proxy Configuration ---
+  const IPFS_API_URL = process.env.IPFS_API_URL || 'http://127.0.0.1:5001';
+  const IPFS_GATEWAY_URL = process.env.IPFS_GATEWAY_URL || 'http://127.0.0.1:8080';
+  const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN || process.env.IPFS_API_KEY;
+  
+  console.log(`🌐 IPFS API Proxy: ${IPFS_API_URL}`);
+  console.log(`🌐 IPFS Gateway Proxy: ${IPFS_GATEWAY_URL}`);
+  console.log(`🔐 IPFS Auth: ${IPFS_API_TOKEN ? 'configured' : 'not set'}`);
+
+  // --- IPFS Proxy Routes (MUST BE FIRST) ---
+  
+  // IPFS Gateway Proxy with fallback - for accessing files via IPFS hash
+  // Example: /ipfs/QmHash or /ipns/domain
+  app.use('/ipfs', createProxyMiddleware({
+    target: IPFS_GATEWAY_URL,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/ipfs': '/ipfs'
+    },
+    onProxyReq: (proxyReq, req, res) => {
+      console.log(`📁 IPFS Gateway Request: ${req.method} ${req.url} -> ${IPFS_GATEWAY_URL}${req.url}`);
+    },
+    onProxyRes: (proxyRes, req, res) => {
+      console.log(`📁 IPFS Gateway Response: ${proxyRes.statusCode} for ${req.url}`);
+      
+      // If local gateway fails with 404, try to add fallback headers
+      if (proxyRes.statusCode === 404) {
+        const hash = req.url.replace('/ipfs/', '');
+        console.log(`⚠️ Local gateway 404 for hash: ${hash}, consider using public gateway`);
+        
+        // Add custom header to suggest public gateway
+        proxyRes.headers['X-IPFS-Fallback'] = `https://ipfs.io/ipfs/${hash}`;
+      }
+    },
+    onError: (err, req, res) => {
+      console.error('❌ IPFS Gateway Proxy Error:', err.message);
+      
+      // Extract hash from URL for fallback
+      const hash = req.url.replace('/ipfs/', '');
+      
+      res.status(502).json({ 
+        success: false, 
+        error: 'Local IPFS Gateway unavailable',
+        details: err.message,
+        fallback: {
+          publicGateway: `https://ipfs.io/ipfs/${hash}`,
+          cloudflareGateway: `https://cloudflare-ipfs.com/ipfs/${hash}`,
+          dweb: `https://dweb.link/ipfs/${hash}`
+        }
+      });
+    }
+  }));
+
+  app.use('/ipns', createProxyMiddleware({
+    target: IPFS_GATEWAY_URL,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/ipns': '/ipns'
+    },
+    onProxyReq: (proxyReq, req, res) => {
+      console.log(`📁 IPNS Gateway Request: ${req.method} ${req.url} -> ${IPFS_GATEWAY_URL}${req.url}`);
+    },
+    onError: (err, req, res) => {
+      console.error('❌ IPNS Gateway Proxy Error:', err.message);
+      res.status(500).json({ 
+        success: false, 
+        error: 'IPFS Gateway unavailable',
+        details: err.message 
+      });
+    }
+  }));
+
   const tokenAuthMiddleware = (req, res, next) => {
     const expectedToken = process.env.ADMIN_PASSWORD;
+    console.log("expectedToken", expectedToken);
+
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -223,7 +308,50 @@ async function initializeServer() {
 
   const server = await startServer();
 
-  const gun = new Gun({
+  // Initialize Gun with S3 using proper fake S3 configuration
+  const s3Config = {
+    bucket: process.env.S3_BUCKET,
+    region: process.env.S3_REGION || "us-east-1",
+    accessKeyId: process.env.S3_ACCESS_KEY,
+    secretAccessKey: process.env.S3_SECRET_KEY,
+    endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
+    s3ForcePathStyle: true,
+    address: process.env.S3_ADDRESS || "127.0.0.1",
+    port: process.env.S3_PORT || 4569,
+    key: process.env.S3_ACCESS_KEY,
+    secret: process.env.S3_SECRET_KEY,
+  };
+
+  console.log("🔧 Gun.js S3 Configuration:", {
+    bucket: s3Config.bucket,
+    //endpoint: `"${s3Config.fakes3}"`,  // Show with quotes to see spaces
+    region: s3Config.region,
+    key: s3Config.key,
+    secret: s3Config.secret,
+    hasCredentials: !!(s3Config.key && s3Config.secret),
+  });
+
+  // Additional debug info
+  console.log("🔍 S3 Configuration Debug:");
+  //console.log(`  Endpoint length: ${s3Config.fakes3.length}`);
+  //console.log(`  Endpoint characters: ${JSON.stringify(s3Config.fakes3.split(''))}`);
+  console.log(`  Environment S3_ENDPOINT: "${process.env.S3_ENDPOINT}"`);
+
+  // Let's also try to test the fake S3 connection directly
+  console.log("🧪 Testing FakeS3 connectivity...");
+  const testReq = http
+    .get(s3Config.endpoint.trim(), (res) => {
+      console.log(`✅ FakeS3 responds with status: ${res.statusCode}`);
+    })
+    .on("error", (err) => {
+      console.log(`❌ FakeS3 connection error: ${err.message}`);
+    });
+
+  // Test S3 connection before initializing Gun
+  console.log("🧪 Testing S3 configuration before Gun initialization...");
+
+  // Initialize Gun with conditional S3 support
+  const gunConfig = {
     super: false,
     file: "radata",
     radisk: store,
@@ -232,7 +360,24 @@ async function initializeServer() {
     uuid: "shogun-relay",
     wire: true,
     axe: true,
-  });
+    rfs: true,
+    /* isValid: (msg) => {
+      let valid =  msg && msg && msg.headers && msg.headers.token && msg.headers.token ===  process.env.ADMIN_PASSWORD
+      console.log("isValid", valid)
+      return valid
+    }    */ // Explicitly enable RFS (usually automatic in Node.js)
+  };
+
+  // Only add S3 if explicitly enabled and configured properly
+  const enableS3 = process.env.ENABLE_S3 === "true";
+  if (enableS3) {
+    console.log("✅ S3 storage enabled");
+    gunConfig.s3 = s3Config;
+  } else {
+    console.log("📁 Using local file storage only (S3 disabled)");
+  }
+
+  const gun = new Gun(gunConfig);
 
   gun.on("hi", () => {
     totalConnections += 1;
@@ -296,6 +441,571 @@ async function initializeServer() {
   db?.get("store").put(store);
   db?.get("status").put("running");
   db?.get("started").put(Date.now());
+
+
+
+  // IPFS API Proxy - for API calls to the IPFS node
+  // Example: /api/v0/add, /api/v0/cat, etc.
+  app.use('/api/v0', createProxyMiddleware({
+    target: IPFS_API_URL,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/v0': '/api/v0'
+    },
+    onProxyReq: (proxyReq, req, res) => {
+      console.log(`🔧 IPFS API Request: ${req.method} ${req.url} -> ${IPFS_API_URL}${req.url}`);
+      
+      // Add authentication headers for IPFS API
+      if (IPFS_API_TOKEN) {
+        proxyReq.setHeader('Authorization', `Bearer ${IPFS_API_TOKEN}`);
+      }
+      
+      // IPFS API requires POST method for most endpoints
+      // Override GET requests to POST for IPFS API endpoints
+      if (req.method === 'GET' && (req.url.includes('/version') || req.url.includes('/id') || req.url.includes('/peers'))) {
+        proxyReq.method = 'POST';
+        proxyReq.setHeader('Content-Length', '0');
+      }
+      
+      // Add query parameter to get JSON response
+      if (req.url.includes('/version')) {
+        const originalPath = proxyReq.path;
+        proxyReq.path = originalPath + (originalPath.includes('?') ? '&' : '?') + 'format=json';
+      }
+    },
+    onProxyRes: (proxyRes, req, res) => {
+      console.log(`📤 IPFS API Response: ${proxyRes.statusCode} for ${req.method} ${req.url}`);
+      
+      // Handle non-JSON responses from IPFS
+      if (proxyRes.headers['content-type'] && !proxyRes.headers['content-type'].includes('application/json')) {
+        console.log(`📝 IPFS Response Content-Type: ${proxyRes.headers['content-type']}`);
+      }
+    },
+    onError: (err, req, res) => {
+      console.error('❌ IPFS API Proxy Error:', err.message);
+      res.status(500).json({ 
+        success: false, 
+        error: 'IPFS API unavailable',
+        details: err.message 
+      });
+    }
+  }));
+
+  // IPFS WebUI Detection and Proxy
+  app.get('/webui-check', async (req, res) => {
+    const webUIUrls = [
+      'http://127.0.0.1:5001/webui',
+      'http://127.0.0.1:5001/',
+      'http://127.0.0.1:5001/ipfs/'
+    ];
+    
+    const results = [];
+    for (const url of webUIUrls) {
+      try {
+        const testReq = http.get(url, (response) => {
+          results.push({
+            url: url,
+            status: response.statusCode,
+            headers: response.headers,
+            working: response.statusCode === 200
+          });
+          
+          if (results.length === webUIUrls.length) {
+            res.json({
+              success: true,
+              webUITests: results,
+              recommended: results.find(r => r.working)?.url
+            });
+          }
+        }).on('error', (err) => {
+          results.push({
+            url: url,
+            status: 'error',
+            error: err.message,
+            working: false
+          });
+          
+          if (results.length === webUIUrls.length) {
+            res.json({
+              success: true,
+              webUITests: results,
+              recommended: results.find(r => r.working)?.url
+            });
+          }
+        });
+        
+        testReq.setTimeout(2000, () => {
+          testReq.destroy();
+        });
+      } catch (error) {
+        results.push({
+          url: url,
+          status: 'error',
+          error: error.message,
+          working: false
+        });
+      }
+    }
+  });
+
+  // IPFS WebUI Proxy - Multiple attempts  
+  app.use('/webui*', createProxyMiddleware({
+    target: 'http://127.0.0.1:5001',
+    changeOrigin: true,
+    pathRewrite: {
+      '^/webui': '/webui'
+    },
+    onProxyReq: (proxyReq, req, res) => {
+      console.log(`🖥️ IPFS WebUI Request: ${req.method} ${req.url} -> ${proxyReq.path}`);
+      
+      if (IPFS_API_TOKEN) {
+        proxyReq.setHeader('Authorization', `Bearer ${IPFS_API_TOKEN}`);
+      }
+    },
+    onProxyRes: (proxyRes, req, res) => {
+      console.log(`🖥️ WebUI Response: ${proxyRes.statusCode} for ${req.url}`);
+    },
+    onError: (err, req, res) => {
+      console.error('❌ IPFS WebUI Proxy Error:', err.message);
+      // Try fallback to direct IPFS node
+      res.redirect('http://127.0.0.1:5001/webui');
+    }
+  }));
+
+  // Alternative WebUI routes
+  app.get('/ipfs-webui', (req, res) => {
+    res.redirect('http://127.0.0.1:5001/webui');
+  });
+  
+  app.get('/ipfs-dashboard', (req, res) => {
+    res.redirect('http://127.0.0.1:5001/');
+  });
+
+  // Debug endpoint to test IPFS proxy manually
+  app.get('/debug-ipfs/:hash', async (req, res) => {
+    const hash = req.params.hash;
+    console.log(`🐛 Debug IPFS request for hash: ${hash}`);
+    
+    try {
+      // Test direct connection to gateway
+      const testReq = http.get(`${IPFS_GATEWAY_URL}/ipfs/${hash}`, (gatewayRes) => {
+        console.log(`🐛 Direct gateway response: ${gatewayRes.statusCode}`);
+        console.log(`🐛 Gateway headers:`, gatewayRes.headers);
+        
+        let data = '';
+        gatewayRes.on('data', chunk => data += chunk);
+        gatewayRes.on('end', () => {
+          res.json({
+            success: true,
+            hash: hash,
+            directGateway: {
+              status: gatewayRes.statusCode,
+              headers: gatewayRes.headers,
+              dataSize: data.length,
+              contentType: gatewayRes.headers['content-type']
+            },
+            urls: {
+              relay: `${req.protocol}://${req.get('host')}/ipfs/${hash}`,
+              direct: `${IPFS_GATEWAY_URL}/ipfs/${hash}`,
+              api: IPFS_API_URL,
+              gateway: IPFS_GATEWAY_URL
+            }
+          });
+        });
+      }).on('error', (err) => {
+        console.error(`🐛 Direct gateway error:`, err);
+        res.json({
+          success: false,
+          error: err.message,
+          hash: hash,
+          urls: {
+            relay: `${req.protocol}://${req.get('host')}/ipfs/${hash}`,
+            direct: `${IPFS_GATEWAY_URL}/ipfs/${hash}`,
+            api: IPFS_API_URL,
+            gateway: IPFS_GATEWAY_URL
+          }
+        });
+      });
+      
+      testReq.setTimeout(5000, () => {
+        testReq.destroy();
+        if (!res.headersSent) {
+          res.json({
+            success: false,
+            error: 'Timeout testing direct gateway',
+            hash: hash
+          });
+        }
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        hash: hash
+      });
+    }
+  });
+
+  // Test endpoint for well-known IPFS hashes
+  app.get('/ipfs-test-hashes', async (req, res) => {
+    const testHashes = [
+      {
+        hash: 'QmRJzsvyCQyizr73Gmms8ZRtvNxmgqumxc2KUp71dfEmoj',
+        description: 'Hello World text',
+        type: 'text'
+      },
+      {
+        hash: 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG',
+        description: 'Hello World alternative',
+        type: 'text'
+      },
+      {
+        hash: 'Qme7ss3ARVgxv6rXqVPiikMJ8u2NLgmgszg13pYrDKEoiu',
+        description: 'Example directory',
+        type: 'directory'
+      }
+    ];
+
+    const results = [];
+    for (const testHash of testHashes) {
+      try {
+        // Test via our relay
+        const relayUrl = `http://localhost:${port}/ipfs/${testHash.hash}`;
+        const gatewayUrl = `${IPFS_GATEWAY_URL}/ipfs/${testHash.hash}`;
+        
+        results.push({
+          hash: testHash.hash,
+          description: testHash.description,
+          type: testHash.type,
+          relayUrl: relayUrl,
+          gatewayUrl: gatewayUrl,
+          publicGateway: `https://ipfs.io/ipfs/${testHash.hash}`
+        });
+      } catch (error) {
+        results.push({
+          hash: testHash.hash,
+          description: testHash.description,
+          error: error.message
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      testHashes: results,
+      note: 'These are well-known IPFS hashes for testing'
+    });
+  });
+
+  // Custom IPFS API endpoints with better error handling
+  app.post('/ipfs-api/:endpoint(*)', async (req, res) => {
+    try {
+      const endpoint = req.params.endpoint;
+      const requestOptions = {
+        hostname: '127.0.0.1',
+        port: 5001,
+        path: `/api/v0/${endpoint}`,
+        method: 'POST',
+        headers: {
+          'Content-Length': '0'
+        }
+      };
+
+      if (IPFS_API_TOKEN) {
+        requestOptions.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
+      }
+
+      const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+        let data = '';
+        ipfsRes.on('data', chunk => data += chunk);
+        ipfsRes.on('end', () => {
+          console.log(`📡 IPFS API ${endpoint} raw response:`, data);
+          
+          try {
+            // Try to parse as JSON
+            const jsonData = JSON.parse(data);
+            res.json({
+              success: true,
+              endpoint: endpoint,
+              data: jsonData
+            });
+          } catch (parseError) {
+            // If not JSON, check if it's a structured response
+            if (data.trim()) {
+              // Try to clean the response
+              const cleanData = data.replace(/^\uFEFF/, ''); // Remove BOM
+              try {
+                const jsonData = JSON.parse(cleanData);
+                res.json({
+                  success: true,
+                  endpoint: endpoint,
+                  data: jsonData
+                });
+              } catch (cleanParseError) {
+                res.json({
+                  success: false,
+                  endpoint: endpoint,
+                  error: 'Invalid JSON response',
+                  rawResponse: data,
+                  parseError: cleanParseError.message
+                });
+              }
+            } else {
+              res.json({
+                success: false,
+                endpoint: endpoint,
+                error: 'Empty response',
+                rawResponse: data
+              });
+            }
+          }
+        });
+      });
+
+      ipfsReq.on('error', (err) => {
+        console.error(`❌ IPFS API ${endpoint} error:`, err);
+        res.status(500).json({
+          success: false,
+          endpoint: endpoint,
+          error: err.message
+        });
+      });
+
+      ipfsReq.setTimeout(10000, () => {
+        ipfsReq.destroy();
+        if (!res.headersSent) {
+          res.status(408).json({
+            success: false,
+            endpoint: endpoint,
+            error: 'Request timeout'
+          });
+        }
+      });
+
+      ipfsReq.end();
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // IPFS File Upload endpoint
+  app.post('/ipfs-upload', upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          error: 'No file provided'
+        });
+      }
+
+      const formData = new FormData();
+      formData.append('file', req.file.buffer, {
+        filename: req.file.originalname,
+        contentType: req.file.mimetype
+      });
+
+      const requestOptions = {
+        hostname: '127.0.0.1',
+        port: 5001,
+        path: '/api/v0/add?wrap-with-directory=false',
+        method: 'POST',
+        headers: {
+          ...formData.getHeaders()
+        }
+      };
+
+      if (IPFS_API_TOKEN) {
+        requestOptions.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
+      }
+
+      const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+        let data = '';
+        ipfsRes.on('data', chunk => data += chunk);
+        ipfsRes.on('end', () => {
+          console.log('📤 IPFS Upload raw response:', data);
+          
+          try {
+            // IPFS add returns NDJSON (one JSON object per line)
+            const lines = data.trim().split('\n');
+            const results = lines.map(line => JSON.parse(line));
+            
+            // Get the main file result (not directory)
+            const fileResult = results.find(r => r.Name === req.file.originalname) || results[0];
+            
+            res.json({
+              success: true,
+              file: {
+                name: req.file.originalname,
+                size: req.file.size,
+                mimetype: req.file.mimetype,
+                hash: fileResult?.Hash,
+                ipfsUrl: `${req.protocol}://${req.get('host')}/ipfs/${fileResult?.Hash}`,
+                gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
+                publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`
+              },
+              ipfsResponse: results
+            });
+          } catch (parseError) {
+            console.error('Upload parse error:', parseError);
+            res.json({
+              success: false,
+              error: 'Failed to parse IPFS response',
+              rawResponse: data,
+              parseError: parseError.message
+            });
+          }
+        });
+      });
+
+      ipfsReq.on('error', (err) => {
+        console.error('❌ IPFS Upload error:', err);
+        res.status(500).json({
+          success: false,
+          error: err.message
+        });
+      });
+
+      ipfsReq.setTimeout(30000, () => {
+        ipfsReq.destroy();
+        if (!res.headersSent) {
+          res.status(408).json({
+            success: false,
+            error: 'Upload timeout'
+          });
+        }
+      });
+
+      // Send the form data
+      formData.pipe(ipfsReq);
+    } catch (error) {
+      console.error('Upload error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // Custom IPFS status endpoint
+  app.get('/ipfs-status', async (req, res) => {
+    try {
+      // Create request options with authentication
+      const requestOptions = {
+        hostname: '127.0.0.1',
+        port: 5001,
+        path: '/api/v0/version',
+        method: 'POST',  // IPFS API requires POST method
+        headers: {
+          'Content-Length': '0'
+        }
+      };
+
+      // Add authentication if available
+      if (IPFS_API_TOKEN) {
+        requestOptions.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
+      }
+
+      const testReq = http.request(requestOptions, (ipfsRes) => {
+        let data = '';
+        ipfsRes.on('data', chunk => data += chunk);
+        ipfsRes.on('end', () => {
+          console.log('IPFS Raw Response:', data);
+          
+          try {
+            // Try to parse as JSON first
+            const versionInfo = JSON.parse(data);
+            res.json({
+              success: true,
+              status: 'connected',
+              ipfs: {
+                version: versionInfo.Version,
+                commit: versionInfo.Commit,
+                repo: versionInfo.Repo,
+                system: versionInfo.System,
+                golang: versionInfo.Golang
+              },
+              endpoints: {
+                api: IPFS_API_URL,
+                gateway: IPFS_GATEWAY_URL
+              }
+            });
+          } catch (parseError) {
+            // If not JSON, check if it's Kubo text response
+            if (data.includes('Kubo RPC')) {
+              // Parse Kubo text response
+              const lines = data.split('\n');
+              let version = 'unknown';
+              
+              for (const line of lines) {
+                if (line.includes('Kubo version:')) {
+                  version = line.replace('Kubo version:', '').trim();
+                  break;
+                }
+              }
+              
+              res.json({
+                success: true,
+                status: 'connected',
+                ipfs: {
+                  version: version,
+                  type: 'Kubo',
+                  rawResponse: data
+                },
+                endpoints: {
+                  api: IPFS_API_URL,
+                  gateway: IPFS_GATEWAY_URL
+                }
+              });
+            } else {
+              res.json({
+                success: false,
+                status: 'connected_but_invalid_response',
+                error: parseError.message,
+                rawResponse: data,
+                endpoints: {
+                  api: IPFS_API_URL,
+                  gateway: IPFS_GATEWAY_URL
+                }
+              });
+            }
+          }
+        });
+      }).on('error', (err) => {
+        console.error('IPFS Connection Error:', err);
+        res.json({
+          success: false,
+          status: 'disconnected',
+          error: err.message,
+          endpoints: {
+            api: IPFS_API_URL,
+            gateway: IPFS_GATEWAY_URL
+          }
+        });
+      });
+      
+      testReq.setTimeout(5000, () => {
+        testReq.destroy();
+        if (!res.headersSent) {
+          res.json({
+            success: false,
+            status: 'timeout',
+            error: 'IPFS node did not respond within 5 seconds'
+          });
+        }
+      });
+
+      testReq.end();
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        status: 'error',
+        error: error.message
+      });
+    }
+  });
 
   // --- API Routes ---
   // Health check endpoint
@@ -688,6 +1398,9 @@ async function initializeServer() {
   app.get("/graph", (req, res) => {
     res.sendFile(path.resolve(publicPath, "graph.html"));
   });
+  app.get("/ipfs-test", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "ipfs-test.html"));
+  });
 
   // Fallback to index.html
   app.get("/*", (req, res) => {
@@ -706,6 +1419,18 @@ async function initializeServer() {
   console.log(
     `Admin password: ${process.env.ADMIN_PASSWORD ? "configured" : "not set"}`
   );
+  
+  // Display IPFS proxy information
+  console.log('\n=== IPFS PROXY ENDPOINTS ===');
+  console.log(`📁 IPFS Gateway: ${link}/ipfs/`);
+  console.log(`📁 IPNS Gateway: ${link}/ipns/`);
+  console.log(`🔧 IPFS API: ${link}/api/v0/`);
+  console.log(`🖥️  IPFS WebUI: ${link}/webui/`);
+  console.log(`📊 IPFS Status: ${link}/ipfs-status`);
+  console.log(`🧪 IPFS Test Page: ${link}/ipfs-test`);
+  console.log(`🎯 IPFS Node API: ${IPFS_API_URL}`);
+  console.log(`🌐 IPFS Node Gateway: ${IPFS_GATEWAY_URL}`);
+  console.log('==============================');
 
   // Show QR code if enabled
   if (showQr !== false) {

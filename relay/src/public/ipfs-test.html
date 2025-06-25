@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPFS Desktop Gateway Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .result {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌐 IPFS Desktop Gateway Test</h1>
+        <p>Testa il proxy IPFS attraverso il tuo relay server</p>
+        
+        <div id="statusContainer"></div>
+        
+        <h2>📊 Stato IPFS</h2>
+        <button onclick="checkIPFSStatus()">Controlla Stato IPFS</button>
+        
+        <h2>📁 Test Gateway IPFS</h2>
+        <p>Inserisci un hash IPFS per testare il gateway:</p>
+        <input type="text" id="ipfsHash" placeholder="Es: QmRJzsvyCQyizr73Gmms8ZRtvNxmgqumxc2KUp71dfEmoj" />
+        <button onclick="testIPFSGateway()">Test Gateway</button>
+        <button onclick="testValidHash()">🧪 Test Hash Valido</button>
+        <button onclick="debugIPFS()">🐛 Debug Proxy</button>
+        
+        <h2>🔧 Test API IPFS</h2>
+        <button onclick="testIPFSVersion()">Versione IPFS (Custom)</button>
+        <button onclick="testIPFSPeers()">Lista Peers (Custom)</button>
+        <button onclick="testIPFSRepo()">Info Repository (Custom)</button>
+        <br><br>
+        <button onclick="testIPFSId()">🆔 IPFS Node ID</button>
+        <button onclick="testDirectProxy()">🔄 Test Proxy Diretto</button>
+        <button onclick="testKnownHashes()">📁 Test Hash Conosciuti</button>
+        
+        <h2>📤 Upload File</h2>
+        <input type="file" id="fileInput" />
+        <button onclick="uploadFile()">Upload su IPFS</button>
+        
+        <h2>🖥️ IPFS WebUI</h2>
+        <button onclick="checkWebUI()">🔍 Controlla WebUI</button>
+        <button onclick="openWebUI()">🖥️ Apri WebUI</button>
+        <button onclick="openDirectWebUI()">🔗 Apri WebUI Diretto</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        function addResult(title, content, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.innerHTML = `
+                <h3>${title}</h3>
+                <div class="result">${typeof content === 'object' ? JSON.stringify(content, null, 2) : content}</div>
+            `;
+            results.appendChild(div);
+        }
+
+        async function checkIPFSStatus() {
+            try {
+                const response = await fetch('/ipfs-status');
+                const data = await response.json();
+                
+                const statusDiv = document.getElementById('statusContainer');
+                if (data.success) {
+                    statusDiv.innerHTML = `
+                        <div class="status success">
+                            ✅ IPFS Connesso - Versione: ${data.ipfs.version}
+                        </div>
+                    `;
+                    addResult('🟢 Stato IPFS', data, 'success');
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="status error">
+                            ❌ IPFS Non disponibile: ${data.error}
+                        </div>
+                    `;
+                    addResult('🔴 Errore IPFS', data, 'error');
+                }
+            } catch (error) {
+                addResult('❌ Errore di connessione', error.message, 'error');
+            }
+        }
+
+        async function testIPFSGateway() {
+            const hash = document.getElementById('ipfsHash').value;
+            if (!hash) {
+                alert('Inserisci un hash IPFS valido');
+                return;
+            }
+            
+            try {
+                addResult(`📁 Testing Gateway for: ${hash}`, 'Loading...', 'info');
+                
+                const response = await fetch(`/ipfs/${hash}`);
+                const contentType = response.headers.get('content-type');
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    let errorData;
+                    try {
+                        errorData = JSON.parse(errorText);
+                    } catch {
+                        errorData = { error: errorText };
+                    }
+                    
+                    addResult(`❌ Gateway Error - ${hash}`, `Status: ${response.status} ${response.statusText}`, 'error');
+                    
+                    // Show fallback options if available
+                    if (errorData.fallback) {
+                        addResult('🔄 Fallback Options', errorData.fallback);
+                        // Try public gateway automatically
+                        addResult('🌐 Trying public gateway...', `<a href="${errorData.fallback.publicGateway}" target="_blank">Open via IPFS.io</a>`);
+                    } else {
+                        // Manual fallback
+                        const publicUrl = `https://ipfs.io/ipfs/${hash}`;
+                        addResult('🌐 Try Public Gateway', `<a href="${publicUrl}" target="_blank">Open via IPFS.io</a>`);
+                    }
+                    return;
+                }
+                
+                if (contentType && contentType.includes('image')) {
+                    addResult(`📁 Gateway Test - ${hash}`, `<img src="/ipfs/${hash}" style="max-width: 100%; height: auto;" />`);
+                } else if (contentType && contentType.includes('text')) {
+                    const text = await response.text();
+                    addResult(`📁 Gateway Test - ${hash}`, text);
+                } else {
+                    addResult(`📁 Gateway Test - ${hash}`, `File scaricato con successo. Tipo: ${contentType} | Size: ${response.headers.get('content-length')} bytes`);
+                }
+            } catch (error) {
+                addResult('❌ Errore Gateway', error.message, 'error');
+            }
+        }
+
+        function testValidHash() {
+            // Use a known valid hash
+            const validHash = 'QmRJzsvyCQyizr73Gmms8ZRtvNxmgqumxc2KUp71dfEmoj';
+            document.getElementById('ipfsHash').value = validHash;
+            testIPFSGateway();
+        }
+
+        async function debugIPFS() {
+            const hash = document.getElementById('ipfsHash').value || 'Qme7ss3ARVgxv6rXqVPiikMJ8u2NLgmgszg13pYrDKEoiu';
+            
+            try {
+                addResult(`🐛 Debugging IPFS proxy for: ${hash}`, 'Testing direct gateway access...', 'info');
+                
+                const response = await fetch(`/debug-ipfs/${hash}`);
+                const data = await response.json();
+                
+                addResult('🐛 Debug Results', data);
+                
+                if (data.success) {
+                    // Now test the relay proxy
+                    addResult('🧪 Now testing relay proxy...', 'Comparing with direct gateway', 'info');
+                    testIPFSGateway();
+                }
+            } catch (error) {
+                addResult('❌ Debug Error', error.message, 'error');
+            }
+        }
+
+        async function testKnownHashes() {
+            try {
+                const response = await fetch('/ipfs-test-hashes');
+                const data = await response.json();
+                addResult('📁 Hash di Test Disponibili', data);
+                
+                if (data.success && data.testHashes.length > 0) {
+                    // Test the first hash automatically
+                    const firstHash = data.testHashes[0];
+                    document.getElementById('ipfsHash').value = firstHash.hash;
+                    addResult(`🧪 Testing hash automatico: ${firstHash.description}`, `Hash: ${firstHash.hash}`);
+                    
+                    // Show all available gateways
+                    const gateways = data.testHashes.map(h => `
+                        <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                            <strong>${h.description}</strong><br>
+                            Hash: <code>${h.hash}</code><br>
+                            <a href="${h.relayUrl}" target="_blank">Via Relay</a> | 
+                            <a href="${h.gatewayUrl}" target="_blank">Via Gateway Locale</a> | 
+                            <a href="${h.publicGateway}" target="_blank">Via IPFS.io</a>
+                        </div>
+                    `).join('');
+                    addResult('🔗 Link Diretti ai Test', gateways);
+                }
+            } catch (error) {
+                addResult('❌ Errore Test Hash', error.message, 'error');
+            }
+        }
+
+        async function testIPFSVersion() {
+            try {
+                const response = await fetch('/ipfs-api/version', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                addResult('🔧 Versione IPFS', data);
+            } catch (error) {
+                addResult('❌ Errore API', error.message, 'error');
+            }
+        }
+
+        async function testIPFSPeers() {
+            try {
+                const response = await fetch('/ipfs-api/swarm/peers', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                addResult('👥 Peers IPFS', data);
+            } catch (error) {
+                addResult('❌ Errore Peers', error.message, 'error');
+            }
+        }
+
+        async function testIPFSRepo() {
+            try {
+                const response = await fetch('/ipfs-api/repo/stat', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                addResult('📊 Statistiche Repository', data);
+            } catch (error) {
+                addResult('❌ Errore Repository', error.message, 'error');
+            }
+        }
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Seleziona un file da caricare');
+                return;
+            }
+            
+            addResult(`📤 Uploading file: ${file.name}`, `Size: ${file.size} bytes`, 'info');
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const response = await fetch('/ipfs-upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addResult(`✅ File caricato: ${file.name}`, data);
+                    
+                    // Auto-populate the hash field for testing
+                    if (data.file && data.file.hash) {
+                        document.getElementById('ipfsHash').value = data.file.hash;
+                        
+                        const linkHTML = `
+                            <div style="margin: 10px 0; padding: 10px; background: #e8f5e8; border-radius: 4px;">
+                                <strong>File caricato con successo!</strong><br>
+                                Hash: <code>${data.file.hash}</code><br><br>
+                                <a href="${data.file.ipfsUrl}" target="_blank" style="margin-right: 10px;">🔗 Apri via Relay</a>
+                                <a href="${data.file.gatewayUrl}" target="_blank" style="margin-right: 10px;">🏠 Gateway Locale</a>
+                                <a href="${data.file.publicGateway}" target="_blank">🌐 Gateway Pubblico</a><br><br>
+                                <button onclick="testUploadedFile('${data.file.hash}')">🧪 Test questo file</button>
+                            </div>
+                        `;
+                        addResult('✅ File Upload Completato', linkHTML);
+                    }
+                } else {
+                    addResult('❌ Errore Upload', data, 'error');
+                }
+            } catch (error) {
+                addResult('❌ Errore Upload', error.message, 'error');
+            }
+        }
+
+        async function testIPFSId() {
+            try {
+                const response = await fetch('/ipfs-api/id', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                addResult('🆔 IPFS Node ID', data);
+            } catch (error) {
+                addResult('❌ Errore ID', error.message, 'error');
+            }
+        }
+
+        async function testDirectProxy() {
+            try {
+                const response = await fetch('/api/v0/version', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Length': '0'
+                    }
+                });
+                
+                const contentType = response.headers.get('content-type');
+                console.log('Direct proxy content-type:', contentType);
+                
+                if (contentType && contentType.includes('application/json')) {
+                    const data = await response.json();
+                    addResult('🔄 Proxy Diretto (JSON)', data);
+                } else {
+                    const text = await response.text();
+                    addResult('🔄 Proxy Diretto (Text)', text);
+                    
+                    // Try to parse version from text
+                    if (text.includes('version') || text.includes('Version')) {
+                        const lines = text.split('\n');
+                        const versionInfo = {};
+                        lines.forEach(line => {
+                            if (line.includes(':')) {
+                                const [key, value] = line.split(':').map(s => s.trim());
+                                versionInfo[key] = value;
+                            }
+                        });
+                        addResult('🔄 Parsed Version Info', versionInfo);
+                    }
+                }
+            } catch (error) {
+                addResult('❌ Errore Proxy Diretto', error.message, 'error');
+            }
+        }
+
+        async function checkWebUI() {
+            try {
+                const response = await fetch('/webui-check');
+                const data = await response.json();
+                addResult('🔍 WebUI Check', data);
+                
+                if (data.recommended) {
+                    addResult('✅ WebUI Raccomandato', `Usa: ${data.recommended}`);
+                }
+            } catch (error) {
+                addResult('❌ Errore WebUI Check', error.message, 'error');
+            }
+        }
+
+        function openWebUI() {
+            window.open('/webui', '_blank');
+            addResult('🖥️ WebUI', 'Tentativo di aprire WebUI via proxy relay');
+        }
+
+        function openDirectWebUI() {
+            const directUrls = [
+                'http://127.0.0.1:5001/webui',
+                'http://127.0.0.1:5001/'
+            ];
+            
+            for (const url of directUrls) {
+                window.open(url, '_blank');
+                addResult('🔗 WebUI Diretto', `Tentativo di aprire: ${url}`);
+            }
+        }
+
+        function testUploadedFile(hash) {
+            document.getElementById('ipfsHash').value = hash;
+            testIPFSGateway();
+        }
+
+        // Auto-check status on page load
+        window.onload = () => {
+            checkIPFSStatus();
+        };
+    </script>
+</body>
+</html> 
