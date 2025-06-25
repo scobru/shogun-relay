@@ -107,12 +107,24 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
+        pre {
+            white-space: pre-wrap;
+            word-break: break-all;
+            background-color: #222;
+            padding: 8px;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
     <a href="/">&larr; Back to Control Panel</a>
     <h1>Live Gun Graph Explorer</h1>
     
+    <div class="stats">
+        <strong>Authentication:</strong>
+        <input type="password" id="authToken" placeholder="Admin Token" onchange="loadExistingData()" style="padding: 5px; background-color: #333; color: #eee; border: 1px solid #555; margin-left: 10px;">
+    </div>
+
     <div class="stats">
         <strong>Graph Stats:</strong> 
         <span id="nodeCount">0</span> nodes | 
@@ -138,6 +150,55 @@
         let currentGraph = {};
         let expandedNodes = new Set();
 
+        function formatValue(value) {
+            if (value === null) {
+                return document.createTextNode('null');
+            }
+            const type = typeof value;
+            if (type === 'object') {
+                if (value['#']) { // GunDB link
+                    const link = document.createElement('a');
+                    link.href = '#';
+                    link.textContent = `→ ${value['#']}`;
+                    link.onclick = (e) => {
+                        e.preventDefault();
+                        navigateToNode(value['#']);
+                    };
+                    return link;
+                }
+                try {
+                    // Pretty-print other objects
+                    const pre = document.createElement('pre');
+                    pre.textContent = JSON.stringify(value, null, 2);
+                    return pre;
+                } catch (e) {
+                    return document.createTextNode('[Unserializable Object]');
+                }
+            }
+            return document.createTextNode(String(value));
+        }
+
+        function navigateToNode(nodeId) {
+            if (!expandedNodes.has(nodeId)) {
+                expandedNodes.add(nodeId);
+            }
+            renderGraph();
+            // After re-render, find the element and scroll to it.
+            setTimeout(() => {
+                const element = document.querySelector(`[data-node-id="${nodeId}"]`);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    element.style.transition = 'background-color 0.3s ease-in-out';
+                    element.style.backgroundColor = '#4a4a4a';
+                    setTimeout(() => { 
+                        element.style.backgroundColor = ''; 
+                    }, 1500);
+                } else {
+                    console.warn(`navigateToNode: Could not find node '${nodeId}' in the DOM.`);
+                }
+            }, 100);
+        }
+
         // Initialize Gun connection
         function initGun() {
             const peer = `${window.location.protocol}//${window.location.host}/gun`
@@ -158,10 +219,26 @@
         }
 
         function loadExistingData() {
+            const token = document.getElementById('authToken').value;
+            if (!token) {
+                showError('Admin Token is required to load graph data.');
+                return;
+            }
+            showError(''); // Clear previous errors
+
             console.log('Loading all data from server...');
             
-            fetch('/api/alldata')
-                .then(response => response.json())
+            fetch('/api/alldata', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
                 .then(result => {
                     if (result.success) {
                         console.log('Loaded data from server:', result);
@@ -210,35 +287,54 @@
 
             const nodeEl = document.createElement('div');
             nodeEl.className = 'node-item';
+            nodeEl.dataset.nodeId = nodeId;
             
-            // Filter out metadata and empty values
             const properties = Object.entries(nodeData).filter(([key, value]) => 
                 key !== '_' && value != null && value !== ''
             );
 
-            nodeEl.innerHTML = `
-                <div class="node-header" onclick="toggleNode('${nodeId}')">
-                    <span class="toggle-icon ${isExpanded ? 'expanded' : ''}">▶</span>
-                    <span class="node-id ${nodeInfo.isUser ? 'user-key' : ''}" title="${nodeInfo.full}">
-                        ${nodeInfo.display}
-                    </span>
-                    <span style="margin-left: auto; color: #666; font-size: 0.9em;">
-                        ${properties.length} properties
-                    </span>
-                </div>
-                <div class="node-content ${isExpanded ? 'show' : ''}">
-                    ${properties.map(([key, value]) => `
-                        <div class="property">
-                            <div class="property-key">${key}</div>
-                            <div class="property-value">${
-                                typeof value === 'object' && value['#'] 
-                                    ? `→ ${value['#']}` 
-                                    : String(value)
-                            }</div>
-                        </div>
-                    `).join('')}
-                </div>
-            `;
+            const header = document.createElement('div');
+            header.className = 'node-header';
+            header.onclick = () => toggleNode(nodeId);
+
+            const toggleIcon = document.createElement('span');
+            toggleIcon.className = `toggle-icon ${isExpanded ? 'expanded' : ''}`;
+            toggleIcon.textContent = '▶';
+            header.appendChild(toggleIcon);
+
+            const idSpan = document.createElement('span');
+            idSpan.className = `node-id ${nodeInfo.isUser ? 'user-key' : ''}`;
+            idSpan.title = nodeInfo.full;
+            idSpan.textContent = nodeInfo.display;
+            header.appendChild(idSpan);
+
+            const propsCount = document.createElement('span');
+            propsCount.style.cssText = 'margin-left: auto; color: #666; font-size: 0.9em;';
+            propsCount.textContent = `${properties.length} properties`;
+            header.appendChild(propsCount);
+
+            const content = document.createElement('div');
+            content.className = `node-content ${isExpanded ? 'show' : ''}`;
+
+            properties.forEach(([key, value]) => {
+                const propDiv = document.createElement('div');
+                propDiv.className = 'property';
+
+                const keyDiv = document.createElement('div');
+                keyDiv.className = 'property-key';
+                keyDiv.textContent = key;
+                propDiv.appendChild(keyDiv);
+
+                const valueDiv = document.createElement('div');
+                valueDiv.className = 'property-value';
+                valueDiv.appendChild(formatValue(value));
+                propDiv.appendChild(valueDiv);
+
+                content.appendChild(propDiv);
+            });
+
+            nodeEl.appendChild(header);
+            nodeEl.appendChild(content);
 
             return nodeEl;
         }

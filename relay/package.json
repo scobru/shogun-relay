@@ -5,11 +5,7 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "start": "nodemon src/index.js",
-    "start:s3": "cd .. && node start-full-stack.js",
-    "enhanced": "node src/simple-enhanced.js",
-    "enhanced:dev": "nodemon src/simple-enhanced.js",
-    "test-derive": "node test-derive-api.js"
+    "start": "nodemon src/index.js"
   },
   "keywords": [
     "gun",

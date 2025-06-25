@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPFS File Uploader</title>
+    <style>
+        body { background-color: #222; color: #eee; font-family: "Menlo", "Consolas", monospace; line-height: 1.6; margin: 2em; }
+        h1, h2 { border-bottom: 1px solid #555; padding-bottom: 10px; }
+        a { color: #8af; text-decoration: none; }
+        a:hover { background-color: #333; }
+        .container { max-width: 600px; margin: auto; background-color: #2a2a2a; padding: 2em; border-radius: 5px; border: 1px solid #444; }
+        input[type="file"] { background-color: #444; color: #eee; border: 1px solid #666; padding: 12px; font-family: inherit; width: 100%; box-sizing: border-box; margin-bottom: 1em; border-radius: 3px; }
+        input[type="password"] { background-color: #444; color: #eee; border: 1px solid #666; padding: 12px; font-family: inherit; width: 100%; box-sizing: border-box; margin-bottom: 1em; border-radius: 3px; }
+        button { cursor: pointer; background-color: #8af; color: #111; border: none; padding: 12px 20px; font-size: 1em; font-weight: bold; border-radius: 3px; width: 100%; }
+        button:hover { background-color: #9bf; }
+        button:disabled { background-color: #555; cursor: not-allowed; }
+        .message { padding: 15px; margin-top: 1em; display: none; border-left: 4px solid; border-radius: 3px; }
+        .message.success { background-color: #353; color: #8f8; border-color: #0c0; white-space: pre-wrap; word-break: break-all; }
+        .message.error { background-color: #533; color: #f88; border-color: #c00; }
+        .loader { text-align: center; display: none; margin-top: 1em; }
+    </style>
+</head>
+<body>
+    <a href="/">&larr; Back to Control Panel</a>
+    <div class="container">
+        <h1>IPFS File Uploader</h1>
+        
+        <h2>Authentication</h2>
+        <input type="password" id="adminToken" placeholder="Enter Admin Token (ADMIN_PASSWORD)">
+        
+        <h2>File Upload</h2>
+        <p>Select a file to upload to your IPFS node via the relay.</p>
+        <input type="file" id="fileInput" />
+        <button id="uploadBtn">Upload File</button>
+        <div id="loader" class="loader">Uploading...</div>
+        <div id="message" class="message"></div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const messageEl = document.getElementById('message');
+        const loaderEl = document.getElementById('loader');
+        const adminTokenInput = document.getElementById('adminToken');
+
+        const showMessage = (text, type = 'error') => {
+            messageEl.innerHTML = text; // Use innerHTML to render links
+            messageEl.className = `message ${type}`;
+            messageEl.style.display = 'block';
+        };
+
+        uploadBtn.addEventListener('click', async () => {
+            const file = fileInput.files[0];
+            const token = adminTokenInput.value;
+
+            if (!token) {
+                showMessage('Admin Token is required.');
+                return;
+            }
+
+            if (!file) {
+                showMessage('Please select a file to upload.');
+                return;
+            }
+
+            loaderEl.style.display = 'block';
+            uploadBtn.disabled = true;
+            messageEl.style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/ipfs-upload', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                if (result.success && result.file) {
+                    const { hash, ipfsUrl, gatewayUrl, publicGateway } = result.file;
+                    const successMessage = `
+                        <strong>File uploaded successfully!</strong>
+                        <p>Hash: ${hash}</p>
+                        <p>
+                            <a href="${ipfsUrl}" target="_blank">Relay URL</a> | 
+                            <a href="${gatewayUrl}" target="_blank">Local Gateway</a> | 
+                            <a href="${publicGateway}" target="_blank">Public Gateway</a>
+                        </p>
+                    `;
+                    showMessage(successMessage, 'success');
+                } else {
+                    throw new Error(result.error || 'Upload failed for an unknown reason.');
+                }
+            } catch (err) {
+                showMessage(`Upload failed: ${err.message}`);
+            } finally {
+                loaderEl.style.display = 'none';
+                uploadBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html> 

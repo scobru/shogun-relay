@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S3 Dashboard</title>
+    <style>
+        body { background-color: #222; color: #eee; font-family: "Menlo", "Consolas", monospace; line-height: 1.6; margin: 2em; }
+        h1, h2 { border-bottom: 1px solid #555; padding-bottom: 10px; }
+        a { color: #8af; text-decoration: none; }
+        a:hover { background-color: #333; }
+        .container { max-width: 900px; margin: auto; background-color: #2a2a2a; padding: 2em; border-radius: 5px; border: 1px solid #444; }
+        input[type="password"] { background-color: #444; color: #eee; border: 1px solid #666; padding: 12px; font-family: inherit; width: 100%; box-sizing: border-box; margin: 8px 0; }
+        button { background-color: #444; color: #eee; border: 1px solid #666; padding: 12px 24px; cursor: pointer; font-family: inherit; margin: 8px 0; }
+        button:hover { background-color: #555; }
+        #message { padding: 1em; margin: 1em 0; border-radius: 4px; }
+        .success { background-color: #143; border: 1px solid #175; }
+        .error { background-color: #412; border: 1px solid #511; }
+        .working { opacity: 0.5; cursor: not-allowed; }
+        
+        /* Stats Styles */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1em; margin-bottom: 2em; }
+        .stat-card { background-color: #333; padding: 1.5em; border-radius: 5px; border-left: 4px solid #8af; }
+        .stat-card h3 { margin-top: 0; color: #8af; }
+        .stat-card p { font-size: 2em; margin: 0; font-weight: bold; }
+
+        /* Bucket List Styles */
+        #bucketList { margin-top: 1em; }
+        .bucket-item { background-color: #333; padding: 1em; margin: 0.5em 0; border-radius: 4px; display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 1em; align-items: center; }
+        .bucket-name { font-weight: bold; word-break: break-all; }
+        .bucket-details { text-align: right; color: #aaa; font-size: 0.9em; }
+        .explore-btn { background-color: #3a6; border-color: #4b7; padding: 6px 12px; font-size: 0.9em; margin: 0; }
+        .explore-btn:hover { background-color: #4b7; }
+
+        /* Loader Styles */
+        .loader-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 9999; backdrop-filter: blur(2px); }
+        .loader-spinner { border: 8px solid #444; border-top: 8px solid #3498db; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Modal Styles */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 10000; backdrop-filter: blur(3px); }
+        .modal-content { background-color: #2a2a2a; padding: 2em; border-radius: 5px; border: 1px solid #444; width: 90%; max-width: 1000px; max-height: 80vh; overflow-y: auto; position: relative; }
+        .modal-close { position: absolute; top: 10px; right: 20px; font-size: 2em; cursor: pointer; color: #888; }
+        .modal-close:hover { color: #eee; }
+
+        /* Object List Styles */
+        .object-table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+        .object-table th, .object-table td { padding: 12px; text-align: left; border-bottom: 1px solid #444; }
+        .object-table th { background-color: #333; }
+        .object-table td { font-size: 0.9em; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/">&larr; Back to Control Panel</a>
+        <h1>S3 Storage Dashboard</h1>
+        
+        <div id="loader" class="loader-overlay" style="display: none;">
+            <div class="loader-spinner"></div>
+        </div>
+
+        <section>
+            <h2>Authentication</h2>
+            <input type="password" id="adminToken" placeholder="Admin Token" />
+        </section>
+
+        <button onclick="loadStats()">Refresh Stats</button>
+
+        <div id="message" style="display: none;"></div>
+        
+        <section id="stats-section" style="display: none;">
+            <h2>Overall Statistics</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total Buckets</h3>
+                    <p id="totalBuckets">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Objects</h3>
+                    <p id="totalObjects">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Size</h3>
+                    <p id="totalSize">0 B</p>
+                </div>
+            </div>
+
+            <h2>Buckets</h2>
+            <div id="bucketList"></div>
+        </section>
+    </div>
+
+    <div id="objectsModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <h2 id="modalBucketName">Bucket Contents</h2>
+            <div id="objectListContainer">
+                <!-- Object list will be rendered here -->
+            </div>
+            <button id="loadMoreBtn" style="display: none;" onclick="loadMoreObjects()">Load More</button>
+        </div>
+    </div>
+
+    <script>
+        const adminTokenInput = document.getElementById('adminToken');
+        const messageEl = document.getElementById('message');
+        const loaderEl = document.getElementById('loader');
+        const statsSection = document.getElementById('stats-section');
+        const objectsModal = document.getElementById('objectsModal');
+        const modalBucketName = document.getElementById('modalBucketName');
+        const objectListContainer = document.getElementById('objectListContainer');
+        const loadMoreBtn = document.getElementById('loadMoreBtn');
+        let currentBucket = null;
+        let currentContinuationToken = null;
+
+        function showLoader() { loaderEl.style.display = 'flex'; }
+        function hideLoader() { loaderEl.style.display = 'none'; }
+
+        function showMessage(text, isError = false) {
+            messageEl.textContent = text;
+            messageEl.className = isError ? 'error' : 'success';
+            messageEl.style.display = 'block';
+        }
+        
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        async function loadStats() {
+            showLoader();
+            statsSection.style.display = 'none';
+            messageEl.style.display = 'none';
+            const token = adminTokenInput.value;
+            if (!token) {
+                showMessage('Admin Token is required.', true);
+                hideLoader();
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/s3-stats', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const result = await response.json();
+
+                if (!response.ok || result.success === false) {
+                    throw new Error(result.error || `HTTP error! status: ${response.status}`);
+                }
+                
+                displayStats(result.stats);
+                statsSection.style.display = 'block';
+
+            } catch (error) {
+                console.error('API call error:', error);
+                showMessage(error.message, true);
+            } finally {
+                hideLoader();
+            }
+        }
+
+        function displayStats(stats) {
+            document.getElementById('totalBuckets').textContent = stats.totalBuckets;
+            document.getElementById('totalObjects').textContent = stats.totalObjects;
+            document.getElementById('totalSize').textContent = formatBytes(stats.totalSize);
+
+            const bucketListEl = document.getElementById('bucketList');
+            bucketListEl.innerHTML = '';
+
+            if (stats.buckets.length === 0) {
+                bucketListEl.innerHTML = '<div class="bucket-item">No buckets found.</div>';
+                return;
+            }
+
+            stats.buckets.forEach(bucket => {
+                const bucketEl = document.createElement('div');
+                bucketEl.className = 'bucket-item';
+                
+                bucketEl.innerHTML = `
+                    <div>
+                        <div class="bucket-name">${bucket.name}</div>
+                        <div style="font-size:0.8em; color: #999;">Created: ${new Date(bucket.creationDate).toLocaleString()}</div>
+                    </div>
+                    <div class="bucket-details">${bucket.objectCount} objects</div>
+                    <div class="bucket-details">${formatBytes(bucket.size)}</div>
+                    <div>
+                        <button class="explore-btn" onclick="exploreBucket('${bucket.name}')">Explore</button>
+                    </div>
+                `;
+                bucketListEl.appendChild(bucketEl);
+            });
+        }
+        
+        function closeModal() {
+            objectsModal.style.display = 'none';
+            objectListContainer.innerHTML = ''; // Clear content
+            currentBucket = null;
+            currentContinuationToken = null;
+        }
+
+        async function exploreBucket(bucketName, continuationToken = null) {
+            currentBucket = bucketName;
+            currentContinuationToken = continuationToken;
+
+            showLoader();
+            messageEl.style.display = 'none';
+            const token = adminTokenInput.value;
+            if (!token) {
+                showMessage('Admin Token is required.', true);
+                hideLoader();
+                return;
+            }
+
+            try {
+                let url = `/api/s3-buckets/${bucketName}/objects`;
+                if (continuationToken) {
+                    url += `?continuationToken=${encodeURIComponent(continuationToken)}`;
+                }
+
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const result = await response.json();
+                if (!response.ok || result.success === false) {
+                    throw new Error(result.error || `HTTP error! status: ${response.status}`);
+                }
+
+                if (!continuationToken) {
+                    // This is a new exploration, open the modal
+                    modalBucketName.textContent = `Bucket: ${bucketName}`;
+                    objectsModal.style.display = 'flex';
+                    objectListContainer.innerHTML = `
+                        <table class="object-table">
+                            <thead>
+                                <tr><th>Key</th><th>Size</th><th>Last Modified</th></tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    `;
+                }
+
+                const tableBody = objectListContainer.querySelector('tbody');
+                if (result.objects.length === 0 && !continuationToken) {
+                    tableBody.innerHTML = '<tr><td colspan="3">This bucket is empty.</td></tr>';
+                } else {
+                    result.objects.forEach(obj => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${obj.Key}</td>
+                            <td>${formatBytes(obj.Size)}</td>
+                            <td>${new Date(obj.LastModified).toLocaleString()}</td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                }
+                
+                // Handle pagination
+                currentContinuationToken = result.nextContinuationToken;
+                if (currentContinuationToken) {
+                    loadMoreBtn.style.display = 'block';
+                } else {
+                    loadMoreBtn.style.display = 'none';
+                }
+
+            } catch (error) {
+                console.error('API call error:', error);
+                showMessage(error.message, true);
+                closeModal();
+            } finally {
+                hideLoader();
+            }
+        }
+
+        function loadMoreObjects() {
+            if (currentBucket && currentContinuationToken) {
+                exploreBucket(currentBucket, currentContinuationToken);
+            }
+        }
+        
+        // Auto-load stats if token is in localStorage
+        window.onload = () => {
+            const storedToken = localStorage.getItem('shogun-relay-admin-token');
+            if (storedToken) {
+                adminTokenInput.value = storedToken;
+                loadStats();
+            }
+        };
+
+        adminTokenInput.addEventListener('change', () => {
+             localStorage.setItem('shogun-relay-admin-token', adminTokenInput.value);
+        });
+
+    </script>
+</body>
+</html> 

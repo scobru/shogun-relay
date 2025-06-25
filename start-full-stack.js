@@ -24,7 +24,7 @@ fakeS3.stderr.on('data', (data) => {
 // Wait for FakeS3 to start before starting relay
 setTimeout(() => {
   console.log('\n🔗 Starting Relay server...');
-  const relay = spawn('yarn', ['start'], {
+  const relay = spawn('node', ['src/index.js'], {
     cwd: path.join(__dirname, 'relay'),
     stdio: ['inherit', 'pipe', 'pipe']
   });

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Public Relay Chat</title>
+    <style>
+        body { background-color: #222; color: #eee; font-family: "Menlo", "Consolas", monospace; line-height: 1.6; margin: 2em; }
+        h1 { border-bottom: 1px solid #555; padding-bottom: 10px; }
+        a { color: #8af; text-decoration: none; }
+        a:hover { background-color: #333; }
+        .container { max-width: 800px; margin: auto; background-color: #2a2a2a; padding: 2em; border-radius: 5px; border: 1px solid #444; }
+        #messages { height: 400px; overflow-y: scroll; border: 1px solid #444; padding: 1em; margin-bottom: 1em; background-color: #333; border-radius: 4px; }
+        .message-item { margin-bottom: 0.5em; padding-bottom: 0.5em; border-bottom: 1px solid #444; }
+        .message-item:last-child { border-bottom: none; }
+        .message-meta { font-size: 0.8em; color: #aaa; margin-bottom: 5px; }
+        .message-content { word-break: break-all; }
+        input[type="text"] { background-color: #444; color: #eee; border: 1px solid #666; padding: 12px; font-family: inherit; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
+        button { background-color: #444; color: #eee; border: 1px solid #666; padding: 12px 24px; cursor: pointer; font-family: inherit; }
+        button:hover { background-color: #555; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+</head>
+<body>
+    <div class="container">
+        <a href="/">&larr; Back to Control Panel</a>
+        <h1>Public Relay Chat</h1>
+        <div id="messages"></div>
+        <form id="chatForm">
+            <input type="text" id="usernameInput" placeholder="Your Nickname">
+            <input type="text" id="messageInput" placeholder="Type your message...">
+            <button type="submit">Send</button>
+        </form>
+    </div>
+
+    <script>
+        const messagesEl = document.getElementById('messages');
+        const chatForm = document.getElementById('chatForm');
+        const usernameInput = document.getElementById('usernameInput');
+        const messageInput = document.getElementById('messageInput');
+        
+        // Connect to the local relay
+        const gun = Gun(location.origin + '/gun');
+
+        // Restore nickname from localStorage
+        usernameInput.value = localStorage.getItem('chat-nickname') || '';
+        usernameInput.addEventListener('change', () => {
+            localStorage.setItem('chat-nickname', usernameInput.value);
+        });
+
+        // Handle form submission
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const nickname = usernameInput.value.trim();
+            const message = messageInput.value.trim();
+
+            if (!nickname || !message) {
+                alert('Please provide a nickname and a message.');
+                return;
+            }
+
+            const messageObject = {
+                nickname: nickname,
+                content: message,
+                createdAt: new Date().toISOString()
+            };
+
+            // Save message to a public, chronological list
+            gun.get('public-chat').set(messageObject);
+            
+            messageInput.value = '';
+            messageInput.focus();
+        });
+
+        // Listen for new messages
+        gun.get('public-chat').map().on((message, id) => {
+            if (!message) return;
+            renderMessage(message);
+        });
+
+        function renderMessage(message) {
+            const messageId = `message-${message.createdAt}`;
+            if (document.getElementById(messageId)) return; // Avoid duplicates
+
+            const messageEl = document.createElement('div');
+            messageEl.className = 'message-item';
+            messageEl.id = messageId;
+            
+            messageEl.innerHTML = `
+                <div class="message-meta">
+                    <strong>${message.nickname || 'Anonymous'}</strong>
+                    <span style="float: right;">${new Date(message.createdAt).toLocaleString()}</span>
+                </div>
+                <div class="message-content">${message.content || ''}</div>
+            `;
+            
+            messagesEl.appendChild(messageEl);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+    </script>
+</body>
+</html> 

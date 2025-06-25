@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPFS Pin Manager</title>
+    <style>
+        body { background-color: #222; color: #eee; font-family: "Menlo", "Consolas", monospace; line-height: 1.6; margin: 2em; }
+        h1, h2 { border-bottom: 1px solid #555; padding-bottom: 10px; }
+        a { color: #8af; text-decoration: none; }
+        a:hover { background-color: #333; }
+        .container { max-width: 800px; margin: auto; background-color: #2a2a2a; padding: 2em; border-radius: 5px; border: 1px solid #444; }
+        input[type="text"], input[type="password"] { background-color: #444; color: #eee; border: 1px solid #666; padding: 12px; font-family: inherit; width: 100%; box-sizing: border-box; margin: 8px 0; }
+        button { background-color: #444; color: #eee; border: 1px solid #666; padding: 12px 24px; cursor: pointer; font-family: inherit; margin: 8px 0; }
+        button:hover { background-color: #555; }
+        #message { padding: 1em; margin: 1em 0; border-radius: 4px; }
+        .success { background-color: #143; border: 1px solid #175; }
+        .error { background-color: #412; border: 1px solid #511; }
+        .working { opacity: 0.5; cursor: not-allowed; }
+        #pinList { margin-top: 1em; }
+        .pin-item {
+            background-color: #333;
+            padding: 1em;
+            margin: 0.5em 0;
+            border-radius: 4px;
+            word-break: break-all;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .button-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 5px;
+        }
+        .small-button {
+            padding: 4px 8px;
+            font-size: 0.8em;
+            flex: 0 1 auto;
+        }
+        .pin-action {
+            background-color: #1a4d1a;
+            border-color: #2a6d2a;
+        }
+        .pin-action:hover {
+            background-color: #2a6d2a;
+        }
+        .unpin-action {
+            background-color: #8B4000;
+            border-color: #A04000;
+        }
+        .unpin-action:hover {
+            background-color: #A04000;
+        }
+        .remove-action {
+            background-color: #8B0000;
+            border-color: #A00000;
+        }
+        .remove-action:hover {
+            background-color: #A00000;
+        }
+        .copy-action {
+            background-color: #444;
+        }
+        .copy-action:hover {
+            background-color: #555;
+        }
+
+        /* Loader Styles */
+        .loader-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0,0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            backdrop-filter: blur(2px);
+        }
+        .loader-spinner {
+            border: 8px solid #444;
+            border-top: 8px solid #3498db;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>IPFS Pin Manager</h1>
+        
+        <div id="loader" class="loader-overlay" style="display: none;">
+            <div class="loader-spinner"></div>
+        </div>
+
+        <section>
+            <h2>Authentication</h2>
+            <input type="password" id="adminToken" placeholder="Admin Token" />
+        </section>
+
+        <section>
+            <h2>Pin Management</h2>
+            <input type="text" id="cidInput" placeholder="Enter CID to pin/unpin" />
+            <button onclick="addPin()">Add Pin</button>
+            <button onclick="removePin()">Remove Pin</button>
+            <button onclick="listPins()">List All Pins</button>
+            <button onclick="garbageCollect()">Garbage Collect</button>
+        </section>
+
+        <div id="message" style="display: none;"></div>
+        <div id="pinList"></div>
+    </div>
+
+    <script>
+        const adminTokenInput = document.getElementById('adminToken');
+        const cidInput = document.getElementById('cidInput');
+        const messageEl = document.getElementById('message');
+        const pinListEl = document.getElementById('pinList');
+        const loaderEl = document.getElementById('loader');
+
+        function showLoader() {
+            loaderEl.style.display = 'flex';
+        }
+
+        function hideLoader() {
+            loaderEl.style.display = 'none';
+        }
+
+        function showMessage(text, isError = false) {
+            messageEl.textContent = text;
+            messageEl.className = isError ? 'error' : 'success';
+            messageEl.style.display = 'block';
+        }
+
+        function setWorking(isWorking) {
+            document.querySelectorAll('button').forEach(btn => {
+                if (isWorking) {
+                    btn.classList.add('working');
+                    btn.disabled = true;
+                } else {
+                    btn.classList.remove('working');
+                    btn.disabled = false;
+                }
+            });
+        }
+
+        async function apiCall(endpoint, method = 'POST', body = {}, options = {}) {
+            const manageVisibility = options.manageVisibility !== false;
+            
+            if (manageVisibility) {
+                showLoader();
+                setWorking(true);
+            }
+
+            try {
+                const token = adminTokenInput.value;
+                if (!token) {
+                    throw new Error('Admin Token is required.');
+                }
+
+                messageEl.style.display = 'none';
+                console.log(`Making ${method} request to ${endpoint}`);
+                
+                const response = await fetch(endpoint, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(body)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log('Response:', result);
+
+                if (result.success === false) {
+                    throw new Error(result.error || 'API returned success:false');
+                }
+
+                return result;
+            } catch (error) {
+                console.log('API call error:', error);
+                showMessage(error.message, true);
+                return null;
+            } finally {
+                if (manageVisibility) {
+                    setWorking(false);
+                    hideLoader();
+                }
+            }
+        }
+
+        async function addPin() {
+            const cid = cidInput.value.trim();
+            if (!cid) {
+                showMessage('Please enter a CID', true);
+                return;
+            }
+
+            const result = await apiCall('/pins/add', 'POST', { cid });
+            if (result) {
+                showMessage('Pin added successfully');
+                await listPins();
+            }
+        }
+
+        async function removePin() {
+            const cid = cidInput.value.trim();
+            if (!cid) {
+                showMessage('Please enter a CID', true);
+                return;
+            }
+
+            const result = await apiCall('/pins/rm', 'POST', { cid });
+            if (result) {
+                showMessage('Pin removed successfully');
+                await listPins();
+            }
+        }
+
+        async function listPins() {
+            const result = await apiCall('/pins/ls', 'POST');
+            if (result) {
+                pinListEl.innerHTML = '';
+                
+                // Get pins from the correct path in the response
+                const pins = result.data?.Keys || {};
+                
+                if (Object.keys(pins).length === 0) {
+                    pinListEl.innerHTML = '<div class="pin-item">No pins found</div>';
+                    return;
+                }
+
+                // Add a style for the pin name
+                const style = document.createElement('style');
+                style.textContent = `
+                    .pin-name {
+                        color: #8af;
+                        margin-top: 5px;
+                        font-size: 0.9em;
+                    }
+                    .pin-type {
+                        color: #7c7;
+                        font-size: 0.9em;
+                    }
+                    .pin-item {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 5px;
+                    }
+                    .button-group {
+                        display: flex;
+                        gap: 8px;
+                        margin-top: 5px;
+                    }
+                    .small-button {
+                        padding: 4px 8px;
+                        font-size: 0.8em;
+                        flex: 0 1 auto;
+                    }
+                    .pin-action {
+                        background-color: #1a4d1a;
+                        border-color: #2a6d2a;
+                    }
+                    .pin-action:hover {
+                        background-color: #2a6d2a;
+                    }
+                    .unpin-action {
+                        background-color: #8B4000;
+                        border-color: #A04000;
+                    }
+                    .unpin-action:hover {
+                        background-color: #A04000;
+                    }
+                    .remove-action {
+                        background-color: #8B0000;
+                        border-color: #A00000;
+                    }
+                    .remove-action:hover {
+                        background-color: #A00000;
+                    }
+                    .copy-action {
+                        background-color: #444;
+                    }
+                    .copy-action:hover {
+                        background-color: #555;
+                    }
+                `;
+                document.head.appendChild(style);
+
+                // Process and display pins
+                Object.entries(pins).forEach(([cid, info]) => {
+                    const pinEl = document.createElement('div');
+                    pinEl.className = 'pin-item';
+                    
+                    // Add CID
+                    const cidEl = document.createElement('div');
+                    cidEl.textContent = `CID: ${cid}`;
+                    cidEl.style.fontFamily = 'monospace';
+                    pinEl.appendChild(cidEl);
+
+                    // Add Type
+                    const typeEl = document.createElement('div');
+                    typeEl.textContent = `Type: ${info.Type || 'recursive'}`;
+                    typeEl.style.color = '#8af';
+                    pinEl.appendChild(typeEl);
+
+                    // Add button group
+                    const buttonGroup = document.createElement('div');
+                    buttonGroup.className = 'button-group';
+
+                    // Add copy button
+                    const copyBtn = document.createElement('button');
+                    copyBtn.textContent = '📋 Copy CID';
+                    copyBtn.className = 'small-button copy-action';
+                    copyBtn.onclick = () => {
+                        navigator.clipboard.writeText(cid)
+                            .then(() => {
+                                copyBtn.textContent = '✅ Copied!';
+                                setTimeout(() => copyBtn.textContent = '📋 Copy CID', 2000);
+                            })
+                            .catch(err => {
+                                console.error('Failed to copy:', err);
+                                copyBtn.textContent = '❌ Error';
+                                setTimeout(() => copyBtn.textContent = '📋 Copy CID', 2000);
+                            });
+                    };
+
+                    // Add pin again button
+                    const rePinBtn = document.createElement('button');
+                    rePinBtn.textContent = '📌 Pin Again';
+                    rePinBtn.className = 'small-button pin-action';
+                    rePinBtn.onclick = async () => {
+                        rePinBtn.disabled = true;
+                        rePinBtn.textContent = '⏳ Pinning...';
+                        
+                        const result = await apiCall('/pins/add', 'POST', { cid });
+
+                        if (result) {
+                            rePinBtn.textContent = '✅ Pinned!';
+                            showMessage(`Successfully pinned CID: ${cid}`, false);
+                        } else {
+                            rePinBtn.textContent = '❌ Failed';
+                        }
+                        
+                        setTimeout(() => {
+                            if (rePinBtn.textContent !== '✅ Pinned!') {
+                                rePinBtn.disabled = false;
+                                rePinBtn.textContent = '📌 Pin Again';
+                            }
+                        }, 2000);
+                    };
+
+                    // Add unpin button
+                    const unpinBtn = document.createElement('button');
+                    unpinBtn.textContent = '📍 Unpin';
+                    unpinBtn.className = 'small-button unpin-action';
+                    unpinBtn.onclick = async () => {
+                        if (!confirm('Are you sure you want to unpin this content?')) return;
+                        
+                        unpinBtn.disabled = true;
+                        unpinBtn.textContent = '⏳ Unpinning...';
+                        
+                        const result = await apiCall('/pins/rm', 'POST', { cid });
+
+                        if (result) {
+                            unpinBtn.textContent = '✅ Unpinned!';
+                            showMessage(`Successfully unpinned CID: ${cid}`, false);
+                            setTimeout(listPins, 2000);
+                        } else {
+                            unpinBtn.textContent = '❌ Failed';
+                            // Error is shown by apiCall, just reset button
+                            setTimeout(() => {
+                                unpinBtn.disabled = false;
+                                unpinBtn.textContent = '📍 Unpin';
+                            }, 2000);
+                        }
+                    };
+
+                    // Add remove button
+                    const removeBtn = document.createElement('button');
+                    removeBtn.textContent = '🗑️ Remove';
+                    removeBtn.className = 'small-button remove-action';
+                    removeBtn.onclick = async () => {
+                        if (!confirm('This will unpin the content AND run garbage collection, which can be slow. Are you sure?')) return;
+                        
+                        showLoader();
+                        setWorking(true);
+                        removeBtn.textContent = '⏳ Unpinning...';
+                        
+                        try {
+                            const unpinResult = await apiCall('/pins/rm', 'POST', { cid }, { manageVisibility: false });
+
+                            if (unpinResult) {
+                                showMessage(`Successfully unpinned ${cid}. Now running GC...`, false);
+                                removeBtn.textContent = '🧹 Collecting...';
+
+                                const gcResult = await apiCall('/repo/gc', 'POST', { manageVisibility: false });
+
+                                if (gcResult) {
+                                    showMessage(`Successfully removed ${cid} and ran garbage collection.`, false);
+                                    setTimeout(listPins, 1500);
+                                } else {
+                                    showMessage(`Unpinned ${cid}, but garbage collection failed.`, true);
+                                }
+                            }
+                        } catch (error) {
+                            showMessage(error.message, true);
+                        } finally {
+                            // Hide the main loader. listPins will show its own.
+                            hideLoader();
+                            setWorking(false);
+                            // The list will be refreshed, so no need to manually reset the button.
+                        }
+                    };
+
+                    buttonGroup.appendChild(copyBtn);
+                    buttonGroup.appendChild(rePinBtn);
+                    buttonGroup.appendChild(unpinBtn);
+                    buttonGroup.appendChild(removeBtn);
+                    pinEl.appendChild(buttonGroup);
+
+                    pinListEl.appendChild(pinEl);
+                });
+
+                // Add summary
+                const summary = document.createElement('div');
+                summary.style.marginTop = '1em';
+                summary.style.padding = '1em';
+                summary.style.backgroundColor = '#2a2a2a';
+                summary.style.borderRadius = '4px';
+                summary.textContent = `Total pins: ${Object.keys(pins).length}`;
+                pinListEl.appendChild(summary);
+            }
+        }
+
+        async function garbageCollect() {
+            const result = await apiCall('/repo/gc', 'POST');
+            if (result && result.data) {
+                // Handle the garbage collection response which might be a stream of objects
+                const message = Array.isArray(result.data) 
+                    ? `Garbage collection completed. Removed ${result.data.length} items.`
+                    : 'Garbage collection completed successfully';
+                showMessage(message);
+            }
+        }
+    </script>
+</body>
+</html>
+ 
