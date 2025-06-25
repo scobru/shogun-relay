@@ -6,12 +6,16 @@ const path = require("path");
 const corsConfig = require.resolve("s3rver/example/cors.xml");
 const websiteConfig = require.resolve("s3rver/example/website.xml");
 
+const dotenv = require("dotenv")
+
+dotenv.config()
+
 // Configuration matching the relay server exactly
-let accessKeyId = "S3RVER";
-let secretAccessKey = "S3RVER";
-let bucketName = "test-bucket";
-let port = 4569;
-let address = "localhost";
+let accessKeyId = process.env.ACCESS_KEY || "S3RVER";
+let secretAccessKey = process.env.SECRET_KEY || "S3RVER";
+let bucketName = process.env.BUCKET_NAME || "test-bucket";
+let port = process.env.PORT || 4569;
+let address = process.env.ADDRESS || "localhost";
 let directory = "./buckets";
 
 // Ensure buckets directory exists
