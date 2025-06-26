@@ -117,6 +117,23 @@
             <button onclick="garbageCollect()">Garbage Collect</button>
         </section>
 
+        <section>
+            <h2>Batch Operations</h2>
+            <button onclick="batchUnpinAll()" class="unpin-action">🗑️ Unpin All Files</button>
+            <div id="batchProgress" style="display: none;">
+                <div style="margin: 10px 0;">
+                    <div style="background-color: #444; border: 1px solid #666; border-radius: 4px; height: 20px; overflow: hidden;">
+                        <div id="progressBar" style="background-color: #8B4000; height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+                    </div>
+                    <div style="margin-top: 5px; font-size: 0.9em;">
+                        <span id="progressText">Processing...</span>
+                        <span style="float: right;"><span id="progressCurrent">0</span> / <span id="progressTotal">0</span></span>
+                    </div>
+                </div>
+                <div id="batchLog" style="max-height: 200px; overflow-y: auto; background-color: #2a2a2a; border: 1px solid #555; padding: 10px; font-size: 0.8em; margin-top: 10px;"></div>
+            </div>
+        </section>
+
         <div id="message" style="display: none;"></div>
         <div id="pinList"></div>
     </div>
@@ -456,6 +473,136 @@
                     ? `Garbage collection completed. Removed ${result.data.length} items.`
                     : 'Garbage collection completed successfully';
                 showMessage(message);
+            }
+        }
+
+        function updateBatchProgress(current, total, message) {
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const progressCurrent = document.getElementById('progressCurrent');
+            const progressTotal = document.getElementById('progressTotal');
+            
+            const percentage = total > 0 ? (current / total) * 100 : 0;
+            progressBar.style.width = percentage + '%';
+            progressText.textContent = message;
+            progressCurrent.textContent = current;
+            progressTotal.textContent = total;
+        }
+
+        function addBatchLog(message, isError = false) {
+            const batchLog = document.getElementById('batchLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.style.color = isError ? '#ff6666' : '#cccccc';
+            logEntry.style.marginBottom = '2px';
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            batchLog.appendChild(logEntry);
+            batchLog.scrollTop = batchLog.scrollHeight;
+        }
+
+        async function batchUnpinAll() {
+            if (!confirm('⚠️ This will unpin ALL files from IPFS. This action cannot be undone. Are you sure?')) {
+                return;
+            }
+
+            const batchProgress = document.getElementById('batchProgress');
+            const batchLog = document.getElementById('batchLog');
+            
+            // Clear previous log
+            batchLog.innerHTML = '';
+            batchProgress.style.display = 'block';
+            
+            addBatchLog('Starting batch unpin operation...');
+            
+            try {
+                // First, get all pins
+                addBatchLog('Fetching current pin list...');
+                const listResult = await apiCall('/pins/ls', 'POST', {}, { manageVisibility: false });
+                
+                if (!listResult || !listResult.data || !listResult.data.Keys) {
+                    addBatchLog('Failed to fetch pin list', true);
+                    showMessage('Failed to fetch pin list', true);
+                    batchProgress.style.display = 'none';
+                    return;
+                }
+
+                const pins = Object.keys(listResult.data.Keys);
+                const totalPins = pins.length;
+                
+                if (totalPins === 0) {
+                    addBatchLog('No pins found to remove');
+                    showMessage('No pins found to remove');
+                    batchProgress.style.display = 'none';
+                    return;
+                }
+
+                addBatchLog(`Found ${totalPins} pins to remove`);
+                updateBatchProgress(0, totalPins, 'Unpinning files...');
+
+                let successCount = 0;
+                let errorCount = 0;
+
+                // Process each pin
+                for (let i = 0; i < pins.length; i++) {
+                    const cid = pins[i];
+                    const currentProgress = i + 1;
+                    
+                    updateBatchProgress(currentProgress, totalPins, `Unpinning ${currentProgress}/${totalPins}: ${cid.substring(0, 12)}...`);
+                    addBatchLog(`Unpinning: ${cid}`);
+
+                    try {
+                        const unpinResult = await apiCall('/pins/rm', 'POST', { cid }, { manageVisibility: false });
+                        
+                        if (unpinResult && unpinResult.success !== false) {
+                            successCount++;
+                            addBatchLog(`✅ Successfully unpinned: ${cid.substring(0, 12)}...`);
+                        } else {
+                            errorCount++;
+                            addBatchLog(`❌ Failed to unpin: ${cid.substring(0, 12)}... - ${unpinResult?.error || 'Unknown error'}`, true);
+                        }
+                    } catch (error) {
+                        errorCount++;
+                        addBatchLog(`❌ Error unpinning: ${cid.substring(0, 12)}... - ${error.message}`, true);
+                    }
+
+                    // Small delay to prevent overwhelming the API
+                    if (i < pins.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                }
+
+                updateBatchProgress(totalPins, totalPins, 'Batch unpin completed');
+                addBatchLog(`Batch operation completed: ${successCount} successful, ${errorCount} failed`);
+                
+                if (successCount > 0) {
+                    showMessage(`Batch unpin completed: ${successCount} files unpinned successfully${errorCount > 0 ? `, ${errorCount} failed` : ''}`, errorCount === 0 ? false : true);
+                    
+                    // Ask if user wants to run garbage collection
+                    if (confirm('Files have been unpinned. Would you like to run garbage collection to free up disk space?')) {
+                        addBatchLog('Running garbage collection...');
+                        updateBatchProgress(totalPins, totalPins, 'Running garbage collection...');
+                        
+                        const gcResult = await apiCall('/repo/gc', 'POST', {}, { manageVisibility: false });
+                        if (gcResult) {
+                            addBatchLog('✅ Garbage collection completed');
+                            showMessage('Batch unpin and garbage collection completed successfully');
+                        } else {
+                            addBatchLog('❌ Garbage collection failed', true);
+                            showMessage('Files unpinned but garbage collection failed', true);
+                        }
+                    }
+                    
+                    // Refresh the pin list
+                    await listPins();
+                } else {
+                    showMessage('Batch unpin failed - no files were unpinned', true);
+                }
+
+            } catch (error) {
+                addBatchLog(`❌ Fatal error: ${error.message}`, true);
+                showMessage(`Batch unpin failed: ${error.message}`, true);
+            } finally {
+                updateBatchProgress(0, 0, 'Ready');
             }
         }
     </script>

@@ -215,7 +215,7 @@
         function initGun() {
             const peer = `${window.location.protocol}//${window.location.host}/gun`
             try {
-                gun =  Gun({peers: [peer], localStorage: false});
+                gun = Gun({peers: [peer], localStorage: false});
                 console.log('Gun initialized successfully', peer);
                 errorEl.style.display = 'none';
             } catch (error) {

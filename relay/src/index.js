@@ -53,11 +53,11 @@ const GC_EXCLUDED_NAMESPACES = [
 
   // --- APPLICATION DATA ---
   // Add other persistent application namespaces here.
-  'public-chat',
-  'admin',
   'hal9000', // Example: protect blog posts
   'shogun-relay',
   'shogun-wormhole',
+  'shogun-hal9000', // Example: protect blog posts
+
 ];
 // Data older than this will be deleted (milliseconds). Default: 24 hours.
 const EXPIRATION_AGE = process.env.GC_EXPIRATION_AGE || 24 * 60 * 60 * 1000;
@@ -770,7 +770,7 @@ async function initializeServer() {
   gun.on("out", { get: { "#": { "*": "" } } });
 
   // Set up relay stats database
-  const db = gun.get("relays").get(host);
+  const db = gun.get(namespace).get("relays").get(host);
 
   // Set up pulse interval for health monitoring
   setSelfAdjustingInterval(() => {
@@ -1944,7 +1944,7 @@ async function initializeServer() {
   });
 
   app.get('/api/notes', tokenAuthMiddleware, (req, res) => {
-    const notesNode = gun.get('admin').get('notes');
+    const notesNode = gun.get(namespace).get('admin').get('notes');
     notesNode.once(data => {
       res.json({ success: true, notes: data || '' });
     });
@@ -1955,7 +1955,7 @@ async function initializeServer() {
       if (typeof notes !== 'string') {
           return res.status(400).json({ success: false, error: 'Invalid notes format.' });
       }
-      gun.get('admin').get('notes').put(notes, ack => {
+      gun.get(namespace).get('admin').get('notes').put(notes, ack => {
           if (ack.err) {
               return res.status(500).json({ success: false, error: ack.err });
           }
@@ -1964,7 +1964,7 @@ async function initializeServer() {
   });
 
   app.delete('/api/notes', tokenAuthMiddleware, (req, res) => {
-    gun.get('admin').get('notes').put(null, ack => {
+    gun.get(namespace).get('admin').get('notes').put(null, ack => {
         if (ack.err) {
             return res.status(500).json({ success: false, error: ack.err });
         }

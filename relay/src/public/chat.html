@@ -41,7 +41,7 @@
         const messageInput = document.getElementById('messageInput');
         
         // Connect to the local relay
-        const gun = Gun(location.origin + '/gun');
+        const gun = Gun(location.origin + '/gun').get('shogun-relay');
 
         // Restore nickname from localStorage
         usernameInput.value = localStorage.getItem('chat-nickname') || '';
