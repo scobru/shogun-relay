@@ -1,245 +1,94 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="night">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>S3 File Manager</title>
-    <link rel="stylesheet" href="dharma-style/dharma.css">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles/wormhole.css">
     <!-- Include centralized admin authentication -->
     <script src="lib/admin-auth.js"></script>
-    <style>
-        body { 
-            background-color: #222; 
-            color: #eee; 
-            line-height: 1.6; 
-            margin: 2em; 
-        }
-        h1, h2 { 
-            border-bottom: 1px solid #555; 
-            padding-bottom: 10px; 
-            margin-top: 1.5em; 
-        }
-        a { 
-            color: #8af; 
-            text-decoration: none; 
-        }
-        a:hover { 
-            background-color: #333; 
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .upload-section {
-            background-color: #2a2a2a;
-            border: 1px solid #555;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        .file-list {
-            background-color: #2a2a2a;
-            border: 1px solid #555;
-            border-radius: 8px;
-            padding: 20px;
-        }
-        .file-item {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 15px;
-            background-color: #333;
-            border: 1px solid #555;
-            border-radius: 5px;
-            margin-bottom: 10px;
-            transition: all 0.2s ease;
-        }
-        .file-item:hover {
-            background-color: #444;
-            border-color: #8af;
-        }
-        .file-info {
-            flex: 1;
-        }
-        .file-name {
-            font-weight: bold;
-            color: #8af;
-            margin-bottom: 5px;
-        }
-        .file-meta {
-            font-size: 0.85em;
-            color: #aaa;
-        }
-        .file-actions {
-            display: flex;
-            gap: 10px;
-        }
-        .btn {
-            background-color: #444;
-            color: #eee;
-            border: 1px solid #666;
-            padding: 8px 15px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-family: inherit;
-            font-size: 0.9em;
-            transition: all 0.2s ease;
-        }
-        .btn:hover {
-            background-color: #555;
-            border-color: #8af;
-        }
-        .btn-primary {
-            background-color: #0a7b4a;
-            border-color: #0f9d58;
-        }
-        .btn-primary:hover {
-            background-color: #0f9d58;
-        }
-        .btn-danger {
-            background-color: #d32f2f;
-            border-color: #f44336;
-        }
-        .btn-danger:hover {
-            background-color: #f44336;
-        }
-        .drag-drop-area {
-            border: 2px dashed #555;
-            border-radius: 8px;
-            padding: 40px;
-            text-align: center;
-            color: #aaa;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            margin-bottom: 20px;
-        }
-        .drag-drop-area.drag-over {
-            border-color: #8af;
-            background-color: rgba(136, 170, 255, 0.1);
-            color: #8af;
-        }
-        .upload-progress {
-            background-color: #333;
-            border-radius: 4px;
-            overflow: hidden;
-            margin-top: 10px;
-            display: none;
-        }
-        .progress-bar {
-            height: 20px;
-            background-color: #0f9d58;
-            transition: width 0.3s ease;
-            color: white;
-            text-align: center;
-            line-height: 20px;
-            font-size: 0.8em;
-        }
-        .message {
-            padding: 15px;
-            border-radius: 5px;
-            margin: 15px 0;
-            display: none;
-        }
-        .message.success {
-            background-color: #0f5132;
-            color: #d1e7dd;
-            border: 1px solid #0f9d58;
-        }
-        .message.error {
-            background-color: #842029;
-            color: #f8d7da;
-            border: 1px solid #d32f2f;
-        }
-        .auth-section {
-            background-color: #2a2a2a;
-            border: 1px solid #555;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 20px;
-        }
-        input[type="text"], input[type="password"], input[type="file"] {
-            background-color: #444;
-            color: #eee;
-            border: 1px solid #666;
-            padding: 10px;
-            border-radius: 4px;
-            font-family: inherit;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        input[type="file"] {
-            padding: 8px;
-        }
-        .bucket-info {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding: 10px;
-            background-color: #333;
-            border-radius: 5px;
-        }
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #aaa;
-        }
-        .spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #333;
-            border-radius: 50%;
-            border-top-color: #8af;
-            animation: spin 1s ease-in-out infinite;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-    </style>
 </head>
-<body>
-    <div class="container">
-        <a href="/">&larr; Back to Control Panel</a>
-        <h1>📦 S3 File Manager</h1>
-
-        <!-- Authentication Section -->
-        <div class="auth-section">
-            <h3>Authentication</h3>
-            <input type="password" id="authToken" placeholder="Enter admin token (auto-loaded if saved)" style="margin-bottom: 10px;">
-            <button class="btn btn-primary" onclick="connectToS3()">Connect to S3</button>
-            <span id="connectionStatus" style="margin-left: 15px; color: #aaa;">Not connected</span>
+<body class="antialiased">
+    <div class="container mx-auto p-4">
+        <div class="flex items-center mb-4">
+            <a href="/" class="nav-link">&larr; Back to Control Panel</a>
         </div>
 
-        <!-- Upload Section -->
-        <div class="upload-section" id="uploadSection" style="display: none;">
-            <h2>📤 Upload Files</h2>
-            
-            <div class="drag-drop-area" id="dropArea">
-                <p>📁 Drag & drop files here or click to select</p>
-                <input type="file" id="fileInput" multiple style="display: none;">
-            </div>
-            
-            <div class="upload-progress" id="uploadProgress">
-                <div class="progress-bar" id="progressBar">0%</div>
-            </div>
-            
-            <button class="btn btn-primary" onclick="triggerFileSelect()">Select Files</button>
-            <button class="btn" onclick="uploadFiles()" id="uploadBtn" disabled>Upload Selected Files</button>
-        </div>
+        <div class="card">
+            <div class="p-8">
+                <div class="flex flex-col items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
 
-        <!-- Messages -->
-        <div id="message" class="message"></div>
+                    <h1 class="text-2xl font-semibold mb-8">S3 File Manager</h1>
 
-        <!-- File List Section -->
-        <div class="file-list" id="fileListSection" style="display: none;">
-            <div class="bucket-info">
-                <h2>📁 Files in Bucket</h2>
-                <button class="btn" onclick="refreshFileList()">🔄 Refresh</button>
-            </div>
-            
-            <div id="fileList" class="loading">
-                <div class="spinner"></div> Loading files...
+                    <div class="w-full space-y-6">
+                        <!-- Authentication Section -->
+                        <div class="form-group">
+                            <label class="block text-sm font-medium mb-2">Authentication:</label>
+                            <div class="flex gap-2">
+                                <input type="password" id="authToken" class="input input-bordered flex-1" placeholder="Admin token (auto-loaded if saved)">
+                                <button class="btn btn-primary" onclick="connectToS3()">Connect to S3</button>
+                            </div>
+                            <div class="flex items-center mt-2">
+                                <span class="text-sm">Status:</span>
+                                <span id="connectionStatus" class="ml-2 text-sm opacity-70">Not connected</span>
+                            </div>
+                        </div>
+
+                        <!-- Upload Section -->
+                        <div id="uploadSection" class="form-group hidden">
+                            <label class="block text-sm font-medium mb-2">Upload Files:</label>
+                            
+                            <div class="border-2 border-dashed border-base-content/20 rounded-xl p-8 text-center transition-all duration-300 cursor-pointer hover:border-accent hover:bg-accent/5" id="dropArea">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                </svg>
+                                <p class="text-base-content">📁 Drag & drop files here or click to select</p>
+                                <input type="file" id="fileInput" multiple class="hidden">
+                            </div>
+                            
+                            <div class="hidden mt-4" id="uploadProgress">
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span>Upload Progress</span>
+                                    <span id="progressText">0%</span>
+                                </div>
+                                <progress class="progress progress-success w-full" id="progressBar" value="0" max="100"></progress>
+                            </div>
+                            
+                            <div class="flex gap-2 mt-4">
+                                <button class="btn btn-accent" onclick="triggerFileSelect()">Select Files</button>
+                                <button class="btn btn-primary" onclick="uploadFiles()" id="uploadBtn" disabled>Upload Selected Files</button>
+                            </div>
+                        </div>
+
+                        <!-- Messages -->
+                        <div id="message" class="alert hidden"></div>
+
+                        <!-- File List Section -->
+                        <div id="fileListSection" class="form-group hidden">
+                            <div class="flex justify-between items-center mb-4">
+                                <label class="text-lg font-semibold">Files in Bucket</label>
+                                <button class="btn btn-outline btn-sm" onclick="refreshFileList()">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                    Refresh
+                                </button>
+                            </div>
+                            
+                            <div id="fileList" class="space-y-2">
+                                <div class="flex justify-center items-center p-8">
+                                    <span class="loading loading-spinner loading-md"></span>
+                                    <span class="ml-2">Loading files...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -298,9 +147,9 @@
                     if (data.success) {
                         isConnected = true;
                         document.getElementById('connectionStatus').textContent = '✅ Connected';
-                        document.getElementById('connectionStatus').style.color = '#0f9d58';
-                        document.getElementById('uploadSection').style.display = 'block';
-                        document.getElementById('fileListSection').style.display = 'block';
+                        document.getElementById('connectionStatus').className = 'ml-2 text-sm text-success';
+                        document.getElementById('uploadSection').classList.remove('hidden');
+                        document.getElementById('fileListSection').classList.remove('hidden');
                         showMessage(`Connected! Found ${data.stats.totalBuckets} buckets with ${data.stats.totalObjects} files`, 'success');
                         refreshFileList();
                     } else {
@@ -313,7 +162,7 @@
                 console.error('S3 connection error:', error);
                 showMessage(`Connection failed: ${error.message}`, 'error');
                 document.getElementById('connectionStatus').textContent = '❌ Connection failed';
-                document.getElementById('connectionStatus').style.color = '#d32f2f';
+                document.getElementById('connectionStatus').className = 'ml-2 text-sm text-error';
             }
         }
 
@@ -349,11 +198,11 @@
         });
 
         function highlight(e) {
-            dropArea.classList.add('drag-over');
+            dropArea.classList.add('border-accent', 'bg-accent/10');
         }
 
         function unhighlight(e) {
-            dropArea.classList.remove('drag-over');
+            dropArea.classList.remove('border-accent', 'bg-accent/10');
         }
 
         dropArea.addEventListener('drop', handleDrop, false);
@@ -383,7 +232,8 @@
 
             const progressContainer = document.getElementById('uploadProgress');
             const progressBar = document.getElementById('progressBar');
-            progressContainer.style.display = 'block';
+            const progressText = document.getElementById('progressText');
+            progressContainer.classList.remove('hidden');
 
             let uploadedCount = 0;
             const totalFiles = selectedFiles.length;
@@ -396,8 +246,8 @@
                     uploadedCount++;
                     
                     const progress = Math.round((uploadedCount / totalFiles) * 100);
-                    progressBar.style.width = progress + '%';
-                    progressBar.textContent = `${progress}% (${uploadedCount}/${totalFiles})`;
+                    progressBar.value = progress;
+                    progressText.textContent = `${progress}% (${uploadedCount}/${totalFiles})`;
                     
                 } catch (error) {
                     console.error(`Failed to upload ${file.name}:`, error);
@@ -416,7 +266,7 @@
             selectedFiles = [];
             document.getElementById('fileInput').value = '';
             updateUploadButton();
-            progressContainer.style.display = 'none';
+            progressContainer.classList.add('hidden');
         }
 
         async function uploadSingleFile(file) {
@@ -444,8 +294,12 @@
             if (!isConnected) return;
 
             const fileListEl = document.getElementById('fileList');
-            fileListEl.innerHTML = '<div class="spinner"></div> Loading files...';
-            fileListEl.className = 'loading';
+            fileListEl.innerHTML = `
+                <div class="flex justify-center items-center p-8">
+                    <span class="loading loading-spinner loading-md"></span>
+                    <span class="ml-2">Loading files...</span>
+                </div>
+            `;
 
             try {
                 // Get S3 stats to find buckets
@@ -459,8 +313,7 @@
 
                 const statsData = await statsResponse.json();
                 if (!statsData.success || !statsData.stats.buckets.length) {
-                    fileListEl.innerHTML = '<p style="text-align: center; color: #aaa;">No buckets found</p>';
-                    fileListEl.className = '';
+                    fileListEl.innerHTML = '<div class="text-center p-8 text-base-content/70">No buckets found</div>';
                     return;
                 }
 
@@ -479,39 +332,39 @@
 
             } catch (error) {
                 console.error('Error refreshing file list:', error);
-                fileListEl.innerHTML = `<p style="text-align: center; color: #d32f2f;">Error: ${error.message}</p>`;
-                fileListEl.className = '';
+                fileListEl.innerHTML = `<div class="text-center p-8 text-error">Error: ${error.message}</div>`;
             }
         }
 
         function displayFileList(files, bucketName) {
             const fileListEl = document.getElementById('fileList');
-            fileListEl.className = '';
 
             if (files.length === 0) {
-                fileListEl.innerHTML = '<p style="text-align: center; color: #aaa;">No files found</p>';
+                fileListEl.innerHTML = '<div class="text-center p-8 text-base-content/70">No files found</div>';
                 return;
             }
 
             fileListEl.innerHTML = files.map(file => `
-                <div class="file-item">
-                    <div class="file-info">
-                        <div class="file-name">${file.Key}</div>
-                        <div class="file-meta">
-                            📏 ${formatFileSize(file.Size)} • 
-                            📅 ${new Date(file.LastModified).toLocaleString()}
+                <div class="card bg-base-300 p-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <h3 class="font-semibold text-accent">${file.Key}</h3>
+                            <p class="text-sm text-base-content/70">
+                                📏 ${formatFileSize(file.Size)} • 
+                                📅 ${new Date(file.LastModified).toLocaleString()}
+                            </p>
                         </div>
-                    </div>
-                    <div class="file-actions">
-                        <button class="btn" onclick="downloadFile('${bucketName}', '${file.Key}')">
-                            📥 Download
-                        </button>
-                        <button class="btn" onclick="getFileInfo('${bucketName}', '${file.Key}')">
-                            ℹ️ Info
-                        </button>
-                        <button class="btn btn-danger" onclick="deleteFile('${bucketName}', '${file.Key}')">
-                            🗑️ Delete
-                        </button>
+                        <div class="flex gap-2">
+                            <button class="btn btn-sm btn-accent" onclick="downloadFile('${bucketName}', '${file.Key}')">
+                                📥 Download
+                            </button>
+                            <button class="btn btn-sm btn-info" onclick="getFileInfo('${bucketName}', '${file.Key}')">
+                                ℹ️ Info
+                            </button>
+                            <button class="btn btn-sm btn-error" onclick="deleteFile('${bucketName}', '${file.Key}')">
+                                🗑️ Delete
+                            </button>
+                        </div>
                     </div>
                 </div>
             `).join('');
@@ -596,11 +449,11 @@
         function showMessage(text, type = 'success') {
             const messageEl = document.getElementById('message');
             messageEl.textContent = text;
-            messageEl.className = `message ${type}`;
-            messageEl.style.display = 'block';
+            messageEl.className = `alert ${type === 'success' ? 'alert-success' : 'alert-error'}`;
+            messageEl.classList.remove('hidden');
             
             setTimeout(() => {
-                messageEl.style.display = 'none';
+                messageEl.classList.add('hidden');
             }, 5000);
         }
     </script>

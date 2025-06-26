@@ -77,6 +77,25 @@
          * @param {string} containerId - Container to add the indicator to
          */
         addPasswordIndicator: function(containerId = null) {
+            // If indicator already exists, just update its content and return.
+            const existingIndicator = document.getElementById('shogun-admin-indicator');
+            if (existingIndicator) {
+                const hasPassword = this.hasPassword();
+                existingIndicator.innerHTML = hasPassword 
+                    ? '<span class="indicator-success">🔑 Admin password loaded</span>' 
+                    : '<span class="indicator-warning">⚠️ No admin password set</span>';
+                
+                if (!hasPassword && !existingIndicator.querySelector('.indicator-link')) {
+                    const link = document.createElement('div');
+                    link.innerHTML = '<span class="indicator-link">Set password in Control Panel</span>';
+                    link.style.marginTop = '4px';
+                    link.style.cursor = 'pointer';
+                    link.onclick = () => window.open('/', '_blank');
+                    existingIndicator.appendChild(link);
+                }
+                return;
+            }
+
             const hasPassword = this.hasPassword();
             
             const indicator = document.createElement('div');

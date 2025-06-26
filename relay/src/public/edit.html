@@ -91,16 +91,6 @@
             messageEl.style.display = 'block';
         };
 
-        const getAuthHeader = () => {
-            // Use centralized admin password
-            const token = ShogunAdmin.getPassword() || authTokenInput.value;
-            if (!token) {
-                showMessage('Auth Token is required. Please set it in the Control Panel.');
-                return null;
-            }
-            return { 'Authorization': `Bearer ${token}` };
-        };
-
         async function loadNodeData() {
             const params = new URLSearchParams(window.location.search);
             nodePath = params.get('path');
@@ -130,6 +120,16 @@
                 showMessage(`Load error: ${err.message}`);
             }
         }
+
+        const getAuthHeader = () => {
+            // Use centralized admin password
+            const token = ShogunAdmin.getPassword() || authTokenInput.value;
+            if (!token) {
+                showMessage('Auth Token is required. Please set it in the Control Panel.');
+                return null;
+            }
+            return { 'Authorization': `Bearer ${token}` };
+        };
 
         saveBtn.addEventListener('click', async () => {
             let data;

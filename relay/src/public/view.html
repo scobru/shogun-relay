@@ -1,237 +1,132 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="night">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GunDB Data Viewer</title>
-    <link rel="stylesheet" href="dharma-style/dharma.css">
-    <style>
-        body { 
-            background-color: #222; 
-            color: #eee; 
-            line-height: 1.6; 
-            margin: 2em; 
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 1em;
-        }
-
-        h1, h2 { 
-            border-bottom: 1px solid #555; 
-            padding-bottom: 10px; 
-            margin-bottom: 1.5em;
-        }
-
-        a { 
-            color: #8af; 
-            text-decoration: none; 
-            display: inline-block;
-            margin-bottom: 1em;
-        }
-
-        a:hover { 
-            background-color: #333; 
-        }
-
-        .section-card {
-            background-color: #2a2a2a;
-            border: 1px solid #444;
-            border-radius: 8px;
-            padding: 1.5em;
-            margin-bottom: 1.5em;
-        }
-
-        input[type="text"], 
-        input[type="password"] {
-            background-color: #333;
-            color: #eee;
-            border: 1px solid #555;
-            padding: 12px;
-            border-radius: 4px;
-            font-family: inherit;
-            width: 100%;
-            box-sizing: border-box;
-            margin: 8px 0;
-        }
-
-        .btn {
-            background-color: #444;
-            color: #eee;
-            border: 1px solid #555;
-            padding: 12px 24px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-family: inherit;
-            font-size: 0.9em;
-            transition: all 0.2s ease;
-            margin-right: 0.5em;
-        }
-
-        .btn:hover {
-            background-color: #555;
-            border-color: #8af;
-        }
-
-        .btn-primary {
-            background-color: #0a7b4a;
-            border-color: #0f9d58;
-        }
-
-        .btn-primary:hover {
-            background-color: #0f9d58;
-        }
-
-        pre {
-            background-color: #333;
-            padding: 1em;
-            border-radius: 4px;
-            border: 1px solid #444;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            margin: 1em 0;
-            font-size: 0.9em;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .form-group {
-            margin-bottom: 1.5em;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 0.5em;
-            color: #aaa;
-            font-size: 0.9em;
-        }
-
-        .error {
-            background-color: #412;
-            color: #f88;
-            border: 1px solid #511;
-            padding: 1em;
-            border-radius: 4px;
-            margin: 1em 0;
-            display: none;
-        }
-
-        .toolbar {
-            margin: 1em 0;
-            display: flex;
-            gap: 0.5em;
-        }
-
-        .result-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 1em;
-        }
-
-        .result-path {
-            color: #8af;
-            font-family: monospace;
-            padding: 0.5em;
-            background-color: #333;
-            border-radius: 4px;
-        }
-
-        @media (max-width: 600px) {
-            body {
-                margin: 1em;
-            }
-
-            .toolbar {
-                flex-direction: column;
-            }
-
-            .btn {
-                width: 100%;
-                margin-right: 0;
-                margin-bottom: 0.5em;
-            }
-        }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles/wormhole.css">
+    <!-- Include centralized admin authentication -->
+    <script src="lib/admin-auth.js"></script>
 </head>
-<body>
-    <div class="container">
-        <a href="/">&larr; Back to Control Panel</a>
-        <h1>GunDB Data Viewer</h1>
+<body class="antialiased">
+    <div class="container mx-auto p-4">
+        <div class="flex items-center mb-4">
+            <a href="/" class="nav-link">&larr; Back to Control Panel</a>
+        </div>
 
-        <div class="section-card">
-            <h2>Authentication</h2>
-            <div class="form-group">
-                <label for="authToken">Auth Token:</label>
-                <input type="password" id="authToken" placeholder="Enter your token">
+        <div class="card">
+            <div class="p-8">
+                <div class="flex flex-col items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+
+                    <h1 class="text-2xl font-semibold mb-8">GunDB Data Viewer</h1>
+
+                    <div class="w-full space-y-6">
+                        <div>
+                            <h2 class="text-xl font-semibold mb-4">Authentication</h2>
+                            <div class="form-group">
+                                <label class="block text-sm font-medium mb-2">Auth Token:</label>
+                                <input type="password" id="authToken" class="input-custom" placeholder="Enter your token (auto-loaded if saved)">
+                            </div>
+                        </div>
+
+                        <div>
+                            <h2 class="text-xl font-semibold mb-4">Query Node</h2>
+                            <div class="form-group">
+                                <label class="block text-sm font-medium mb-2">Node Path:</label>
+                                <input type="text" id="nodePath" class="input-custom" placeholder="e.g., test/data">
+                            </div>
+                            <button id="viewBtn" class="btn-custom">View Data</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="section-card">
-            <h2>Query Node</h2>
-            <div class="form-group">
-                <label for="nodePath">Node Path:</label>
-                <input type="text" id="nodePath" placeholder="e.g., test/data">
+        <div id="resultArea" class="card mt-8" style="display:none;">
+            <div class="p-8">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-semibold">Result for: <span id="resultPath" class="text-accent font-mono"></span></h2>
+                    <button id="editBtn" class="btn-custom">Edit Node</button>
+                </div>
+                <pre id="resultData" class="bg-gray-800 p-4 rounded-md text-sm whitespace-pre-wrap break-all"></pre>
             </div>
-            <button id="viewBtn" class="btn btn-primary">View Data</button>
         </div>
 
-        <div id="resultArea" class="section-card" style="display:none;">
-            <div class="result-header">
-                <h2>Result for: <span id="resultPath" class="result-path"></span></h2>
-            </div>
-            <div class="toolbar">
-                <button id="editBtn" class="btn">Edit Node</button>
-            </div>
-            <pre id="resultData"></pre>
-        </div>
-
-        <div id="error" class="error"></div>
+        <div id="message" class="alert hidden mt-6"></div>
     </div>
 
     <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            ShogunAdmin.init({
+                autoFill: true,
+                showIndicator: true,
+                fieldId: 'authToken',
+                syncEnabled: true
+            });
+        });
+
         const viewBtn = document.getElementById('viewBtn');
         const editBtn = document.getElementById('editBtn');
         const nodePathInput = document.getElementById('nodePath');
         const resultArea = document.getElementById('resultArea');
         const resultPath = document.getElementById('resultPath');
         const resultData = document.getElementById('resultData');
-        const errorEl = document.getElementById('error');
+        const messageEl = document.getElementById('message');
         const authTokenInput = document.getElementById('authToken');
+
+        const showMessage = (text, type = 'error') => {
+            messageEl.textContent = text;
+            messageEl.className = `alert alert-${type === 'error' ? 'error' : 'success'} mt-6`;
+            messageEl.style.display = 'block';
+            setTimeout(() => { messageEl.style.display = 'none'; }, 4000);
+        };
+
+        const getAuthHeader = () => {
+            const token = ShogunAdmin.getPassword() || authTokenInput.value;
+            if (!token) {
+                showMessage('Auth Token is required. Please set it in the Control Panel.');
+                return null;
+            }
+            return { 'Authorization': `Bearer ${token}` };
+        };
 
         const fetchData = async () => {
             resultArea.style.display = 'none';
-            errorEl.style.display = 'none';
+            messageEl.style.display = 'none';
             const path = nodePathInput.value.trim();
             if (!path) {
-                errorEl.textContent = 'Error: Node Path is required.';
-                errorEl.style.display = 'block';
+                showMessage('Error: Node Path is required.');
                 return;
             }
+
+            const authHeader = getAuthHeader();
+            if (!authHeader) return;
+
             try {
-                const response = await fetch(`/node/${path}`, {
-                    headers: { 'Authorization': `Bearer ${authTokenInput.value}` }
-                });
+                const response = await fetch(`/node/${path}`, { headers: authHeader });
                 const result = await response.json();
-                if (result.success) {
+                if (response.ok && result.success) {
                     resultPath.textContent = result.path;
                     resultData.textContent = result.data ? JSON.stringify(result.data, null, 2) : 'null (No data at this node)';
                     resultArea.style.display = 'block';
                 } else {
-                    errorEl.textContent = `Error: ${result.error || response.statusText}`;
-                    errorEl.style.display = 'block';
+                    showMessage(`Error: ${result.error || response.statusText}`);
                 }
             } catch (err) {
-                errorEl.textContent = `Network or fetch error: ${err.message}`;
-                errorEl.style.display = 'block';
+                showMessage(`Network or fetch error: ${err.message}`);
             }
         };
+
         viewBtn.addEventListener('click', fetchData);
         nodePathInput.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') fetchData();
         });
+
         editBtn.addEventListener('click', () => {
             const path = nodePathInput.value.trim();
             if (path) window.open(`/edit?path=${encodeURIComponent(path)}`, '_blank');

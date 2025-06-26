@@ -160,7 +160,7 @@
                                         <span>🔑</span>
                                         <span>Derive Keys</span>
                                     </a>
-                                    <a href="/api/v0/version" target="_blank" class="btn-custom flex items-center gap-3">
+                                    <a href="#" onclick="checkIPFSVersion()" class="btn-custom flex items-center gap-3">
                                         <span>🔧</span>
                                         <span>IPFS API Version</span>
                                     </a>
@@ -272,6 +272,54 @@
                 return false;
             }
         };
+        
+        // ==========================================
+        // IPFS API FUNCTIONS
+        // ==========================================
+        
+        async function checkIPFSVersion() {
+            const password = getShogunAdminPassword();
+            if (!password) {
+                alert('⚠️ Please set admin password first');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/v0/version', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${password}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.text();
+                    // Open new window with the response
+                    const newWindow = window.open('', '_blank');
+                    newWindow.document.write(`
+                        <html>
+                            <head>
+                                <title>IPFS Version</title>
+                                <style>
+                                    body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #fff; }
+                                    pre { background: #2a2a2a; padding: 15px; border-radius: 5px; overflow: auto; }
+                                </style>
+                            </head>
+                            <body>
+                                <h2>IPFS API Version</h2>
+                                <pre>${data}</pre>
+                            </body>
+                        </html>
+                    `);
+                } else {
+                    alert(`❌ Error: ${response.status} ${response.statusText}`);
+                }
+            } catch (error) {
+                alert(`❌ Network error: ${error.message}`);
+                console.error('IPFS version check failed:', error);
+            }
+        }
         
         // ==========================================
         // EXISTING FUNCTIONALITY

@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="styles/wormhole.css">
+    <script src="lib/admin-auth.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/eventemitter3@4.0.0/index.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
@@ -134,12 +135,7 @@
   <body class="antialiased">
     <div class="container mx-auto p-4">
       <div class="flex items-center mb-4">
-        <a href="/" class="nav-link">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
-          </svg>
-          Back to Control Panel
-        </a>
+        <a href="/" class="nav-link">&larr; Back to Control Panel</a>
       </div>
 
       <div class="card">
@@ -151,23 +147,36 @@
 
             <h1 class="text-2xl font-semibold mb-8">Minimal Messenger</h1>
 
-            <div class="w-full space-y-4">
-              <div class="flex items-center gap-4">
-                <input type="text" id="serverAddress" class="input-custom flex-1" placeholder="Server Address">
-                <button id="connectBtn" class="btn-custom">Connect</button>
+            <div class="w-full space-y-6">
+              <div class="form-group">
+                <label class="block text-sm font-medium mb-2">Server Address:</label>
+                <div class="flex gap-2">
+                  <input type="text" id="serverAddress" class="input input-bordered flex-1" placeholder="Enter server address">
+                  <button id="connectBtn" class="btn btn-primary">Connect</button>
+                </div>
               </div>
 
-              <pre id="messages" class="w-full bg-opacity-10 bg-white"></pre>
-
-              <div class="flex items-center gap-4 input-group">
-                <input type="text" id="username" class="input-custom w-32" placeholder="Name">
-                <input type="text" id="messageInput" class="input-custom flex-1" placeholder="Type message..." disabled>
-                <button id="sendBtn" class="btn-custom whitespace-nowrap" disabled>Send</button>
+              <div class="form-group">
+                <label class="block text-sm font-medium mb-2">Messages:</label>
+                <div class="mockup-code bg-base-300 h-96 overflow-y-auto" id="messagesContainer">
+                  <pre id="messages" class="text-sm"><code class="text-base-content">Not connected.</code></pre>
+                </div>
               </div>
 
-              <div>
-                <h3 class="text-lg font-semibold mb-2">Log:</h3>
-                <pre id="log" class="w-full bg-opacity-10 bg-white"></pre>
+              <div class="form-group">
+                <label class="block text-sm font-medium mb-2">Send Message:</label>
+                <div class="flex gap-2">
+                  <input type="text" id="username" class="input input-bordered w-32" placeholder="Name">
+                  <input type="text" id="messageInput" class="input input-bordered flex-1" placeholder="Connect to start chatting..." disabled>
+                  <button id="sendBtn" class="btn btn-accent" disabled>Send</button>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="block text-sm font-medium mb-2">Connection Log:</label>
+                <div class="mockup-code bg-base-300 h-32 overflow-y-auto">
+                  <pre id="log" class="text-xs"><code class="text-base-content opacity-70"></code></pre>
+                </div>
               </div>
             </div>
           </div>
@@ -176,6 +185,15 @@
     </div>
 
     <script>
+        // Initialize admin authentication
+        document.addEventListener('DOMContentLoaded', () => {
+            ShogunAdmin.init({
+                autoFill: false, // This app doesn't need auto-fill
+                showIndicator: false,
+                syncEnabled: true
+            });
+        });
+
         const serverAddressInput = document.getElementById('serverAddress');
         const connectBtn = document.getElementById('connectBtn');
         const messagesEl = document.getElementById('messages');
@@ -191,18 +209,22 @@
             const timestamp = new Date().toLocaleTimeString();
             const logMessage = `[${timestamp}] ${args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ')}`;
             console.log(...args);
-            logEl.textContent += logMessage + '\n';
-            logEl.scrollTop = logEl.scrollHeight;
+            const logCode = logEl.querySelector('code') || logEl;
+            logCode.textContent += logMessage + '\n';
+            document.getElementById('messagesContainer').scrollTop = document.getElementById('messagesContainer').scrollHeight;
         }
 
         function updateUI() {
             connectBtn.textContent = connected ? 'Disconnect' : 'Connect';
+            connectBtn.className = connected ? 'btn btn-error' : 'btn btn-primary';
             messageInput.disabled = !connected;
             sendBtn.disabled = !connected;
             if (connected) {
                 messageInput.placeholder = "Type message...";
+                messageInput.className = "input input-bordered flex-1";
             } else {
                 messageInput.placeholder = "Connect to start chatting...";
+                messageInput.className = "input input-bordered flex-1";
             }
         }
 
@@ -213,6 +235,8 @@
                 connected = false;
                 updateUI();
                 log("🔌 Disconnected.");
+                const messagesCode = messagesEl.querySelector('code') || messagesEl;
+                messagesCode.textContent = 'Not connected.';
                 return;
             }
 
@@ -315,7 +339,8 @@
 
         function refreshMessages() {
             if (!connected || !bugout) {
-                messagesEl.textContent = 'Not connected.';
+                const messagesCode = messagesEl.querySelector('code') || messagesEl;
+                messagesCode.textContent = 'Not connected.';
                 return;
             }
 
@@ -333,8 +358,9 @@
                         return `[${time}] ${m.m || ''}`;
                     });
 
-                    messagesEl.textContent = formattedMessages.join('\n');
-                    messagesEl.scrollTop = messagesEl.scrollHeight;
+                    const messagesCode = messagesEl.querySelector('code') || messagesEl;
+                    messagesCode.textContent = formattedMessages.join('\n');
+                    document.getElementById('messagesContainer').scrollTop = document.getElementById('messagesContainer').scrollHeight;
                 });
             } catch (error) {
                 log("💥 Refresh error:", error.message);
