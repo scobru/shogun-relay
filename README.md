@@ -83,8 +83,8 @@ shogun-relay/
 
 ### Prerequisites
 
-- Node.js >= 16.0.0
-- npm or yarn package manager
+- **For Docker**: Docker Desktop or Docker Engine (recommended)
+- **For Manual Setup**: Node.js >= 16.0.0, npm or yarn package manager
 - Optional: IPFS Desktop or daemon for IPFS features
 
 ### Installation
@@ -125,6 +125,238 @@ npm start
 3. **Access the Control Panel**:
    - Open `http://localhost:8765` in your browser
    - Use the admin interface to monitor and manage your relay
+
+## 🐳 Docker Deployment (Recommended)
+
+The easiest way to run Shogun Relay is using Docker, which automatically includes all necessary services:
+
+### Quick Start with Docker
+
+```bash
+# 1. Build the Docker image
+docker build -t shogun-relay:latest .
+
+# 2. Start the container with all services
+docker run -d \
+  --name shogun-relay-stack \
+  --rm \
+  -p 8765:8765 \
+  -p 4569:4569 \
+  -p 5001:5001 \
+  -p 8080:8080 \
+  -p 4001:4001 \
+  shogun-relay:latest
+
+# 3. Verify status
+docker ps --filter "name=shogun-relay"
+docker logs shogun-relay-stack
+```
+
+### Services Included in Container
+
+The Docker container automatically includes:
+
+- **🔗 Relay Server** (port 8765) - Main Gun.js server
+- **📁 FakeS3** (port 4569) - Local S3-compatible storage
+- **🌐 IPFS Daemon** (ports 5001, 8080, 4001) - Complete IPFS node
+- **📊 Supervisor** - Service management and monitoring
+
+### Exposed Ports
+
+| Port | Service | Description |
+|------|---------|-------------|
+| 8765 | Relay Server | Main interface, Gun.js WebSocket |
+| 4569 | FakeS3 | S3-compatible API for local storage |
+| 5001 | IPFS API | IPFS API for programmatic operations |
+| 8080 | IPFS Gateway | HTTP gateway for IPFS content access |
+| 4001 | IPFS Swarm | IPFS P2P communication |
+
+### Comandi Docker Utili
+
+```bash
+# Visualizzare i log in tempo reale
+docker logs -f shogun-relay-stack
+
+# Entrare nel container per debug
+docker exec -it shogun-relay-stack bash
+
+# Controllare lo stato dei servizi interni
+docker exec shogun-relay-stack ps aux
+
+# Riavviare il container
+docker restart shogun-relay-stack
+
+# Fermare e rimuovere il container
+docker stop shogun-relay-stack
+```
+
+### Configurazione Avanzata Docker
+
+#### Con Volume Persistente
+
+Per preservare i dati tra i riavvii:
+
+```bash
+# Creare volume per dati persistenti
+docker volume create shogun-relay-data
+
+# Avviare con volume montato
+docker run -d \
+  --name shogun-relay-stack \
+  --rm \
+  -p 8765:8765 \
+  -p 4569:4569 \
+  -p 5001:5001 \
+  -p 8080:8080 \
+  -p 4001:4001 \
+  -v shogun-relay-data:/data \
+  shogun-relay:latest
+```
+
+#### Con Variabili d'Ambiente
+
+```bash
+docker run -d \
+  --name shogun-relay-stack \
+  --rm \
+  -p 8765:8765 \
+  -p 4569:4569 \
+  -p 5001:5001 \
+  -p 8080:8080 \
+  -p 4001:4001 \
+  -e ADMIN_PASSWORD=your-secure-password \
+  -e GC_ENABLED=true \
+  -e GC_INTERVAL=3600000 \
+  shogun-relay:latest
+```
+
+#### Docker Compose (Raccomandato per Produzione)
+
+Crea un file `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+
+services:
+  shogun-relay:
+    build: .
+    container_name: shogun-relay-stack
+    restart: unless-stopped
+    ports:
+      - "8765:8765"   # Relay Server
+      - "4569:4569"   # FakeS3
+      - "5001:5001"   # IPFS API
+      - "8080:8080"   # IPFS Gateway
+      - "4001:4001"   # IPFS Swarm
+    volumes:
+      - shogun-data:/data
+      - shogun-logs:/var/log/supervisor
+    environment:
+      - NODE_ENV=production
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-me}
+      - GC_ENABLED=true
+      - GC_INTERVAL=3600000
+      - IPFS_API_URL=http://127.0.0.1:5001
+      - IPFS_GATEWAY_URL=http://127.0.0.1:8080
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  shogun-data:
+    driver: local
+  shogun-logs:
+    driver: local
+```
+
+Poi avvia con:
+
+```bash
+# Avvio con Docker Compose
+docker-compose up -d
+
+# Visualizzare i log
+docker-compose logs -f
+
+# Fermare i servizi
+docker-compose down
+```
+
+### Monitoraggio Container
+
+#### Health Check
+
+```bash
+# Controllo stato di salute
+docker inspect shogun-relay-stack | grep -A 10 Health
+
+# Test manuale health check
+curl http://localhost:8765/health
+```
+
+#### Metriche e Log
+
+```bash
+# Statistiche container
+docker stats shogun-relay-stack
+
+# Log specifici per servizio
+docker exec shogun-relay-stack tail -f /var/log/supervisor/relay.log
+docker exec shogun-relay-stack tail -f /var/log/supervisor/ipfs.log
+docker exec shogun-relay-stack tail -f /var/log/supervisor/fakes3.log
+```
+
+### Troubleshooting Docker
+
+#### Problemi Comuni
+
+1. **IPFS non si avvia**:
+   ```bash
+   # Controllare i log IPFS
+   docker exec shogun-relay-stack cat /var/log/supervisor/ipfs.log
+   
+   # Verificare le directory
+   docker exec shogun-relay-stack ls -la /root/.config/ipfs/
+   ```
+
+2. **Porte già in uso**:
+   ```bash
+   # Cambiare le porte esposte
+   docker run -p 8766:8765 -p 4570:4569 ... shogun-relay:latest
+   ```
+
+3. **Problemi di permessi**:
+   ```bash
+   # Ricostruire l'immagine
+   docker build --no-cache -t shogun-relay:latest .
+   ```
+
+4. **Container non risponde**:
+   ```bash
+   # Riavvio completo
+   docker stop shogun-relay-stack
+   docker rm shogun-relay-stack
+   docker run -d --name shogun-relay-stack ... shogun-relay:latest
+   ```
+
+### Aggiornamenti Docker
+
+```bash
+# 1. Fermare il container corrente
+docker stop shogun-relay-stack
+
+# 2. Backup dei dati (se necessario)
+docker cp shogun-relay-stack:/data ./backup-data
+
+# 3. Ricostruire l'immagine
+docker build -t shogun-relay:latest .
+
+# 4. Avviare nuovo container
+docker run -d --name shogun-relay-stack ... shogun-relay:latest
+```
 
 ### Production Deployment
 

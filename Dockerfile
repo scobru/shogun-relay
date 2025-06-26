@@ -1,7 +1,7 @@
 # Shogun Relay Full Stack Container
 # Includes: IPFS, Relay Server, FakeS3
 
-FROM node:18-alpine
+FROM node:20-alpine
 
 # Install required system packages
 RUN apk add --no-cache \
@@ -15,17 +15,22 @@ RUN apk add --no-cache \
 # Set working directory
 WORKDIR /app
 
-# Install IPFS (Kubo)
+# Install IPFS (Kubo) - fix for Alpine Linux compatibility
 ENV IPFS_VERSION=0.24.0
-RUN wget https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-amd64.tar.gz \
+RUN apk add --no-cache libc6-compat \
+    && wget https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-amd64.tar.gz \
     && tar -xzf kubo_v${IPFS_VERSION}_linux-amd64.tar.gz \
+    && chmod +x kubo/ipfs \
     && mv kubo/ipfs /usr/local/bin/ \
-    && rm -rf kubo kubo_v${IPFS_VERSION}_linux-amd64.tar.gz
+    && rm -rf kubo kubo_v${IPFS_VERSION}_linux-amd64.tar.gz \
+    && /usr/local/bin/ipfs version || echo "IPFS binary test failed"
 
 # Create IPFS user and directories
 RUN adduser -D -s /bin/sh ipfs \
-    && mkdir -p /data/ipfs /app/relay /app/fakes3 \
-    && chown -R ipfs:ipfs /data/ipfs
+    && mkdir -p /data/ipfs /app/relay /app/fakes3 /var/log/supervisor \
+    && mkdir -p /home/ipfs/.config/ipfs/denylists /root/.config/ipfs/denylists \
+    && chown -R ipfs:ipfs /data/ipfs /home/ipfs/.config \
+    && chmod -R 755 /home/ipfs/.config /root/.config
 
 # Copy application files
 COPY relay/ /app/relay/
@@ -34,8 +39,8 @@ COPY start-full-stack.js /app/
 COPY docker/ /app/docker/
 
 # Install Node.js dependencies
-RUN cd /app/relay && npm ci --only=production \
-    && cd /app/fakes3 && npm ci --only=production
+RUN cd /app/relay && npm install --omit=dev
+RUN cd /app/fakes3 && npm install --omit=dev
 
 # Create environment files with Docker-optimized settings
 RUN cp /app/docker/relay.env /app/relay/.env \
@@ -47,7 +52,7 @@ RUN chmod +x /app/docker/*.sh \
     && chmod 755 /app/relay/src/public
 
 # Expose ports
-EXPOSE 8765 4569 5001 8080
+EXPOSE 8765 4569 5001 8080 4001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
@@ -58,9 +63,6 @@ COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV IPFS_PATH=/data/ipfs
-ENV IPFS_GATEWAY=127.0.0.1:8080
-ENV IPFS_API=127.0.0.1:5001
 
 # Start all services with supervisor
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"] 

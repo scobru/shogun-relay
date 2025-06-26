@@ -1378,7 +1378,7 @@ async function initializeServer() {
 
   const getGunNodeFromPath = (pathString) => {
     const pathSegments = pathString.split("/").filter(Boolean);
-    let node = gun.get(namespace);
+    let node = gun
 
     pathSegments.forEach((segment) => {
       node = node.get(segment);

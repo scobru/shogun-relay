@@ -1,0 +1,69 @@
+services:
+  shogun-relay:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shogun-relay-stack
+    ports:
+      - "8765:8765"   # Relay Server
+      - "4569:4569"   # FakeS3
+      - "5001:5001"   # IPFS API
+      - "8080:8080"   # IPFS Gateway
+      - "4001:4001"   # IPFS Swarm
+    volumes:
+      # Persist IPFS data
+      - ipfs-data:/data/ipfs
+      # Persist S3 data
+      - s3-data:/app/fakes3/buckets
+      # Persist relay data
+      - relay-data:/app/relay/radata
+      # Mount logs for debugging
+      - ./logs:/var/log/supervisor
+    environment:
+      - NODE_ENV=production
+      - IPFS_PATH=/data/ipfs
+      # Override admin password (change this!)
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-me}
+      - GC_ENABLED=true
+      - GC_INTERVAL=3600000
+      - IPFS_API_URL=http://127.0.0.1:5001
+      - IPFS_GATEWAY_URL=http://127.0.0.1:8080
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - shogun-network
+
+  # Optional: External IPFS node (if you prefer separate container)
+  ipfs-external:
+    image: ipfs/kubo:latest
+    container_name: shogun-ipfs-external
+    ports:
+      - "5002:5001"   # IPFS API (alternative port)
+      - "8081:8080"   # IPFS Gateway (alternative port)
+    volumes:
+      - ipfs-external-data:/data/ipfs
+    environment:
+      - IPFS_PROFILE=server
+    restart: unless-stopped
+    profiles: ["external-ipfs"]
+    networks:
+      - shogun-network
+
+volumes:
+  ipfs-data:
+    driver: local
+  s3-data:
+    driver: local
+  relay-data:
+    driver: local
+  ipfs-external-data:
+    driver: local
+
+networks:
+  shogun-network:
+    driver: bridge 
