@@ -12,6 +12,9 @@ RUN apk add --no-cache \
     ca-certificates \
     && rm -rf /var/cache/apk/*
 
+# Create symlink for Node.js (supervisord expects it in /usr/bin)
+RUN ln -sf /usr/local/bin/node /usr/bin/node
+
 # Set working directory
 WORKDIR /app
 
