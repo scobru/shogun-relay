@@ -69,7 +69,7 @@ case "${1:-docker}" in
             -v shogun-s3-data:/app/fakes3/buckets \
             -v shogun-relay-data:/app/relay/radata \
             -v "$(pwd)/logs:/var/log/supervisor" \
-            -e "ADMIN_PASSWORD=$ADMIN_PASSWORD" \
+            -e "ADMIN_PASSWORD=\"$ADMIN_PASSWORD\"" \
             shogun-relay:latest
         
         if [ $? -eq 0 ]; then
@@ -86,7 +86,7 @@ case "${1:-docker}" in
             echo "   • IPFS Gateway:  http://localhost:8080"
             echo "   • FakeS3:        http://localhost:4569"
             echo ""
-            echo "🔐 Admin Password: $ADMIN_PASSWORD"
+            echo "🔐 Admin Password: \"$ADMIN_PASSWORD\""
             echo ""
             echo "📋 Useful commands:"
             echo "   • View logs:     docker logs -f shogun-relay-stack"
