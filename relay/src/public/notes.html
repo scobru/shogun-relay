@@ -1,45 +1,50 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="night">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Notes</title>
-    <link rel="stylesheet" href="dharma-style/dharma.css">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles/wormhole.css">
     <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
-    <style>
-        body { background-color: #222; color: #eee; font-family: "Menlo", "Consolas", monospace; line-height: 1.6; margin: 2em; }
-        h1 { border-bottom: 1px solid #555; padding-bottom: 10px; }
-        a { color: #8af; text-decoration: none; }
-        a:hover { background-color: #333; }
-        .container { max-width: 900px; margin: auto; background-color: #2a2a2a; padding: 2em; border-radius: 5px; border: 1px solid #444; }
-        input[type="password"] { background-color: #444; color: #eee; border: 1px solid #666; padding: 12px; font-family: inherit; width: 100%; box-sizing: border-box; margin: 8px 0; }
-        textarea { background-color: #333; color: #eee; border: 1px solid #666; padding: 1em; font-family: inherit; width: 100%; box-sizing: border-box; margin: 8px 0; height: 50vh; border-radius: 4px; }
-        button { background-color: #444; color: #eee; border: 1px solid #666; padding: 12px 24px; cursor: pointer; font-family: inherit; margin: 8px 0; }
-        button:hover { background-color: #555; }
-        #message { padding: 1em; margin: 1em 0; border-radius: 4px; display: none; }
-        .success { background-color: #143; border: 1px solid #175; }
-        .error { background-color: #412; border: 1px solid #511; }
-    </style>
 </head>
-<body>
-    <div class="container">
-        <a href="/">&larr; Back to Control Panel</a>
-        <h1>Admin Notes</h1>
-        
-        <section>
-            <h2>Authentication</h2>
-            <input type="password" id="adminToken" placeholder="Admin Token" />
-        </section>
+<body class="antialiased">
+    <div class="container mx-auto p-4">
+        <div class="flex items-center mb-4">
+            <a href="/" class="nav-link">&larr; Back to Control Panel</a>
+        </div>
 
-        <section>
-            <h2>Your Private, Encrypted Notes</h2>
-            <textarea id="notesArea" placeholder="Enter your admin token to load encrypted notes..."></textarea>
-            <button onclick="saveNotes()">Save Encrypted Notes</button>
-            <button onclick="deleteNotes()" class="danger">Delete Notes</button>
-        </section>
+        <div class="card">
+            <div class="p-8">
+                <div class="flex flex-col items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
 
-        <div id="message"></div>
+                    <h1 class="text-2xl font-semibold mb-8">Admin Notes</h1>
+
+                    <div class="w-full space-y-6">
+                        <div class="form-group">
+                            <label class="block text-sm font-medium mb-2">Authentication:</label>
+                            <input type="password" id="adminToken" class="input input-bordered w-full" placeholder="Admin Token">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="block text-sm font-medium mb-2">Your Private, Encrypted Notes:</label>
+                            <textarea id="notesArea" class="textarea textarea-bordered w-full h-96" placeholder="Enter your admin token to load encrypted notes..."></textarea>
+                            <div class="flex gap-2 mt-4">
+                                <button onclick="saveNotes()" class="btn btn-primary">Save Encrypted Notes</button>
+                                <button onclick="deleteNotes()" class="btn btn-error">Delete Notes</button>
+                            </div>
+                        </div>
+
+                        <div id="message" class="alert hidden"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>

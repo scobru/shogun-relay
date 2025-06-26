@@ -734,12 +734,13 @@ async function initializeServer() {
     file: "radata",
     radisk: true,
     web: server,
-    // localStorage: false,
     uuid: "shogun-relay",
-    // wire: true,
-    // axe: true,
-    // rfs: true,
-    // wait: 500,
+    localStorage: false,
+    wire: true,
+    axe: true,
+    rfs: true,
+    wait: 500,
+    webrtc:true,
   };
 
   // Only add S3 if explicitly enabled and configured properly

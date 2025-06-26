@@ -1,141 +1,103 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="night">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IPFS Pin Manager</title>
-    <link rel="stylesheet" href="dharma-style/dharma.css">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles/wormhole.css">
     <style>
-        body { background-color: #222; color: #eee; font-family: "Menlo", "Consolas", monospace; line-height: 1.6; margin: 2em; }
-        h1, h2 { border-bottom: 1px solid #555; padding-bottom: 10px; }
-        a { color: #8af; text-decoration: none; }
-        a:hover { background-color: #333; }
-        .container { max-width: 800px; margin: auto; background-color: #2a2a2a; padding: 2em; border-radius: 5px; border: 1px solid #444; }
-        input[type="text"], input[type="password"] { background-color: #444; color: #eee; border: 1px solid #666; padding: 12px; font-family: inherit; width: 100%; box-sizing: border-box; margin: 8px 0; }
-        button { background-color: #444; color: #eee; border: 1px solid #666; padding: 12px 24px; cursor: pointer; font-family: inherit; margin: 8px 0; }
-        button:hover { background-color: #555; }
-        #message { padding: 1em; margin: 1em 0; border-radius: 4px; }
-        .success { background-color: #143; border: 1px solid #175; }
-        .error { background-color: #412; border: 1px solid #511; }
-        .working { opacity: 0.5; cursor: not-allowed; }
-        #pinList { margin-top: 1em; }
         .pin-item {
-            background-color: #333;
-            padding: 1em;
-            margin: 0.5em 0;
-            border-radius: 4px;
-            word-break: break-all;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
+            @apply bg-base-300 p-4 rounded-xl mb-4 border border-base-content/10;
         }
         .button-group {
-            display: flex;
-            gap: 8px;
-            margin-top: 5px;
+            @apply flex flex-wrap gap-2 mt-3;
         }
         .small-button {
-            padding: 4px 8px;
-            font-size: 0.8em;
-            flex: 0 1 auto;
+            @apply px-3 py-2 text-sm rounded-lg transition-all duration-200;
         }
         .pin-action {
-            background-color: #1a4d1a;
-            border-color: #2a6d2a;
-        }
-        .pin-action:hover {
-            background-color: #2a6d2a;
+            @apply bg-success/20 hover:bg-success/30 border-success/30;
         }
         .unpin-action {
-            background-color: #8B4000;
-            border-color: #A04000;
-        }
-        .unpin-action:hover {
-            background-color: #A04000;
+            @apply bg-warning/20 hover:bg-warning/30 border-warning/30;
         }
         .remove-action {
-            background-color: #8B0000;
-            border-color: #A00000;
-        }
-        .remove-action:hover {
-            background-color: #A00000;
+            @apply bg-error/20 hover:bg-error/30 border-error/30;
         }
         .copy-action {
-            background-color: #444;
+            @apply bg-base-200 hover:bg-base-300;
         }
-        .copy-action:hover {
-            background-color: #555;
+        .progress-container {
+            @apply bg-base-300 border border-base-content/10 rounded-xl p-4 mt-4;
         }
-
-        /* Loader Styles */
-        .loader-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0,0, 0.6);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            backdrop-filter: blur(2px);
+        .progress-bar {
+            @apply bg-base-300 border border-base-content/10 rounded-lg h-5 overflow-hidden;
         }
-        .loader-spinner {
-            border: 8px solid #444;
-            border-top: 8px solid #3498db;
-            border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            animation: spin 1s linear infinite;
+        .progress-fill {
+            @apply bg-warning h-full transition-all duration-300;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .batch-log {
+            @apply mt-4 bg-base-300 border border-base-content/10 rounded-lg p-4 max-h-[200px] overflow-y-auto text-sm font-mono;
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1>IPFS Pin Manager</h1>
-        
-        <div id="loader" class="loader-overlay" style="display: none;">
-            <div class="loader-spinner"></div>
+<body class="antialiased">
+    <div class="container mx-auto p-4">
+        <div class="flex items-center mb-4">
+            <a href="/" class="nav-link">&larr; Back to Control Panel</a>
         </div>
 
-        <section>
-            <h2>Authentication</h2>
-            <input type="password" id="adminToken" placeholder="Admin Token" />
-        </section>
+        <div class="card">
+            <div class="p-8">
+                <div class="flex flex-col items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                    </svg>
 
-        <section>
-            <h2>Pin Management</h2>
-            <input type="text" id="cidInput" placeholder="Enter CID to pin/unpin" />
-            <button onclick="addPin()">Add Pin</button>
-            <button onclick="removePin()">Remove Pin</button>
-            <button onclick="listPins()">List All Pins</button>
-            <button onclick="garbageCollect()">Garbage Collect</button>
-        </section>
+                    <h1 class="text-2xl font-semibold mb-8">IPFS Pin Manager</h1>
 
-        <section>
-            <h2>Batch Operations</h2>
-            <button onclick="batchUnpinAll()" class="unpin-action">🗑️ Unpin All Files</button>
-            <div id="batchProgress" style="display: none;">
-                <div style="margin: 10px 0;">
-                    <div style="background-color: #444; border: 1px solid #666; border-radius: 4px; height: 20px; overflow: hidden;">
-                        <div id="progressBar" style="background-color: #8B4000; height: 100%; width: 0%; transition: width 0.3s ease;"></div>
-                    </div>
-                    <div style="margin-top: 5px; font-size: 0.9em;">
-                        <span id="progressText">Processing...</span>
-                        <span style="float: right;"><span id="progressCurrent">0</span> / <span id="progressTotal">0</span></span>
+                    <div class="w-full space-y-6">
+                        <div class="form-group">
+                            <label class="block text-sm font-medium mb-2">Authentication:</label>
+                            <input type="password" id="adminToken" class="input input-bordered w-full" placeholder="Admin Token">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="block text-sm font-medium mb-2">Pin Management:</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="cidInput" class="input input-bordered flex-1" placeholder="Enter CID to pin/unpin">
+                                <button onclick="addPin()" class="btn btn-accent">Add Pin</button>
+                                <button onclick="removePin()" class="btn btn-warning">Remove Pin</button>
+                            </div>
+                            <div class="flex gap-2 mt-2">
+                                <button onclick="listPins()" class="btn btn-primary">List All Pins</button>
+                                <button onclick="garbageCollect()" class="btn btn-secondary">Garbage Collect</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="block text-sm font-medium mb-2">Batch Operations:</label>
+                            <button onclick="batchUnpinAll()" class="btn btn-error">🗑️ Unpin All Files</button>
+                            <div id="batchProgress" class="progress-container hidden">
+                                <div class="progress-bar">
+                                    <div id="progressBar" class="progress-fill" style="width: 0%"></div>
+                                </div>
+                                <div class="mt-2 text-sm flex justify-between">
+                                    <span id="progressText">Processing...</span>
+                                    <span><span id="progressCurrent">0</span> / <span id="progressTotal">0</span></span>
+                                </div>
+                                <div id="batchLog" class="batch-log"></div>
+                            </div>
+                        </div>
+
+                        <div id="message" class="alert hidden"></div>
+                        <div id="pinList" class="mt-4"></div>
                     </div>
                 </div>
-                <div id="batchLog" style="max-height: 200px; overflow-y: auto; background-color: #2a2a2a; border: 1px solid #555; padding: 10px; font-size: 0.8em; margin-top: 10px;"></div>
             </div>
-        </section>
-
-        <div id="message" style="display: none;"></div>
-        <div id="pinList"></div>
+        </div>
     </div>
 
     <script>

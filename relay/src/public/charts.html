@@ -1,12 +1,13 @@
 <!DOCTYPE HTML>
-<html>
+<html lang="en" data-theme="night">
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Gun Relay Advanced Stats</title>
-<link rel="stylesheet" href="dharma-style/dharma.css">
+<link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="styles/wormhole.css">
 <style>
 	body {
-		font-family: "Menlo", "Consolas", monospace;
 		background-color: rgb(25,25,25);
 		color: rgb(80,135,25) !important;
 		text-shadow: 1px 1px 20px rgb(80,150,25);
@@ -67,22 +68,37 @@
 
 	.charts {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+		grid-template-columns: repeat(3, 1fr);
 		gap: 20px;
 		margin-top: 20px;
+	}
+
+	@media (max-width: 1200px) {
+		.charts {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+
+	@media (max-width: 768px) {
+		.charts {
+			grid-template-columns: 1fr;
+		}
 	}
 
 	.chart {
 		position: relative;
 		border: 1px solid #555;
 		background-color: rgb(40,40,40);
-		padding: 10px;
-		margin: 10px 0;
+		padding: 15px;
+		margin: 0;
+		border-radius: 0.5rem;
+		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 	}
 
 	.chart canvas {
 		width: 100% !important;
 		height: 200px !important;
+		margin-top: 25px;
 	}
 
 	.model {
@@ -103,31 +119,46 @@
 	}
 </style>
 </head>
-<body>
+<body class="antialiased">
+<div class="container mx-auto p-4">
+	<div class="flex items-center mb-4">
+		<a href="/" class="nav-link">&larr; Back to Control Panel</a>
+	</div>
 
-<a href="/">&larr; Back to Control Panel</a>
-<h1>📊 Gun Relay Advanced Stats Dashboard</h1>
+	<div class="card">
+		<div class="p-8">
+			<div class="flex flex-col items-center">
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+				</svg>
+				
+				<h1 class="text-2xl font-semibold mb-8">📊 Gun Relay Advanced Stats Dashboard</h1>
 
-<div class="center">
-	<span class="shout" id="peers">0</span> peers 
-	<span class="shout" id="time">0</span> min 
-	<span class="shout" id="nodes">0</span> nodes 
-	<span class="shout" id="hours">0</span> hours 
-	<span class="shout" id="block">0</span> ms avg 
-	<span class="shout" id="stack">0</span> gets/s
-</div>
+				<div class="center">
+					<span class="shout" id="peers">0</span> peers 
+					<span class="shout" id="time">0</span> min 
+					<span class="shout" id="nodes">0</span> nodes 
+					<span class="shout" id="hours">0</span> hours 
+					<span class="shout" id="block">0</span> ms avg 
+					<span class="shout" id="stack">0</span> gets/s
+				</div>
 
-<div class="topbar">
-	<label for="url">Stats Source URL:</label><br>
-	<input id="url" class="input" placeholder="Enter custom stats source URL (optional)" value="">
-	<div class="status" id="status">Connecting to local stats...</div>
-</div>
+				<div class="stats">
+					<label for="url">Stats Source URL:</label><br>
+					<input id="url" class="input-custom" placeholder="Enter custom stats source URL (optional)" value="">
+					<div class="text-secondary text-sm mt-2" id="status">Connecting to local stats...</div>
+				</div>
 
-<div class="charts" id="charts">
-</div>
+				<div id="charts" class="charts">
+					<!-- Charts will be injected here -->
+				</div>
 
-<div class="model">
-	<div class="chart"><span class="label"></span><canvas class="tall"></canvas></div>
+				<div class="model">
+					<div class="chart"><span class="label"></span><canvas class="tall"></canvas></div>
+				</div>
+			</div>
+		</div>
+	</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>

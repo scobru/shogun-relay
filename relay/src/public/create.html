@@ -1,47 +1,58 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="night">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GunDB Data Creator</title>
-    <link rel="stylesheet" href="dharma-style/dharma.css">
-    <style>
-        body { background-color: #222; color: #eee; font-family: "Menlo", "Consolas", monospace; line-height: 1.6; margin: 2em; }
-        h1, h2 { border-bottom: 1px solid #555; padding-bottom: 10px; margin-top: 1.5em; }
-        a { color: #8af; text-decoration: none; }
-        a:hover { background-color: #333; }
-        input, textarea, button { background-color: #444; color: #eee; border: 1px solid #666; padding: 8px; font-family: inherit; width: 100%; box-sizing: border-box; margin-top: 10px; }
-        textarea { height: 300px; }
-        button { cursor: pointer; width: auto; }
-        button:hover { background-color: #666; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .form-group { margin-bottom: 1em; }
-        .message { padding: 10px; margin-top: 1em; display: none; border-left: 3px solid; }
-        .message.success { background-color: #353; color: #8f8; border-color: #0c0; }
-        .message.error { background-color: #533; color: #f88; border-color: #c00; }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles/wormhole.css">
 </head>
-<body>
-    <a href="/">&larr; Back to Control Panel</a>
-    <h1>GunDB Data Creator</h1>
+<body class="antialiased">
+    <div class="container mx-auto p-4">
+        <div class="flex items-center mb-4">
+            <a href="/" class="nav-link">&larr; Back to Control Panel</a>
+        </div>
 
-    <h2>Authentication</h2>
-    <div class="form-group">
-        <label for="authToken">Auth Token:</label>
-        <input type="password" id="authToken" placeholder="Enter your token">
-    </div>
+        <div class="card">
+            <div class="p-8">
+                <div class="flex flex-col items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
 
-    <h2>Create New Node</h2>
-    <div class="form-group">
-        <label for="nodePathInput">Node Path:</label>
-        <input type="text" id="nodePathInput" placeholder="e.g., my/data/node">
+                    <h1 class="text-2xl font-semibold mb-8">GunDB Data Creator</h1>
+
+                    <div class="w-full space-y-6">
+                        <div>
+                            <h2 class="text-xl font-semibold mb-4">Authentication</h2>
+                            <div class="form-group">
+                                <label class="block text-sm font-medium mb-2">Auth Token:</label>
+                                <input type="password" id="authToken" class="input-custom" placeholder="Enter your token">
+                            </div>
+                        </div>
+
+                        <div>
+                            <h2 class="text-xl font-semibold mb-4">Create New Node</h2>
+                            <div class="space-y-4">
+                                <div class="form-group">
+                                    <label class="block text-sm font-medium mb-2">Node Path:</label>
+                                    <input type="text" id="nodePathInput" class="input-custom" placeholder="e.g., my/data/node">
+                                </div>
+                                <div class="form-group">
+                                    <label class="block text-sm font-medium mb-2">Data (JSON format):</label>
+                                    <textarea id="dataArea" class="input-custom h-64">{}</textarea>
+                                </div>
+                                <button id="createBtn" class="btn-custom">Create Node</button>
+                            </div>
+                        </div>
+
+                        <div id="message" class="alert hidden"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="form-group">
-        <label for="dataArea">Data (JSON format):</label>
-        <textarea id="dataArea">{}</textarea>
-    </div>
-    <button id="createBtn">Create Node</button>
-    <div id="message" class="message"></div>
 
     <script>
         const nodePathInput = document.getElementById('nodePathInput');

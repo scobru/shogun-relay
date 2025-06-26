@@ -1,290 +1,317 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr">
+<html lang="en" data-theme="night">
   <head>
     <meta charset="utf-8" />
     <meta http-equiv="Access-Control-Allow-Origin" content="*" />
     <title>Graph Visualizer</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles/wormhole.css" />
     <link rel="stylesheet" href="vGmain.css" />
   </head>
-  <body>
-    <!-- Title and Icon -->
-    <img src="visualGraphIcon.svg" width="25" height="25" alt="" />
-    <h2>Visualization</h2>
-    <span id="peerList"></span> <br />
-
-    <div class="topbar">
-      <label for="relayPeer">Relay Peer URL:</label>
-      <input
-        id="relayPeer"
-        type="text"
-        size="40"
-        placeholder="http://localhost:8765/gun"
-        value="http://localhost:8765/gun"
-      />
-      <br />
-      <label for="authToken">Auth Token:</label>
-      <input
-        id="authToken"
-        type="password"
-        size="32"
-        placeholder="Enter auth token"
-      />
-      <br />
-      <label for="key">Key to Start from:</label>
-      <input id="key" size="32" /> <br />
-      <label for="label">Property to be used as Label:</label>
-      <input id="label" class="custom" size="32" /> <br />
-      <button type="button" id="startButton">Start</button> <br />
-      <div
-        id="status"
-        style="margin-top: 10px; font-size: 12px; color: #666"
-      ></div>
-    </div>
-    <div class="container">
-      <div class="twothirdleft">
-        <!-- Render area -->
-        <svg></svg>
+  <body class="min-h-screen bg-base-200 text-base-content">
+    <div class="navbar bg-base-300">
+      <div class="flex-1">
+        <img src="visualGraphIcon.svg" width="25" height="25" alt="" class="mr-2" />
+        <h2 class="text-xl font-semibold">Visualization</h2>
       </div>
-      <div class="onethirdright">
-        <!-- Data Inspection Area -->
-        <div class="cont" id="detail">
-          <h3>Data Inspector</h3>
+      <div class="flex-none">
+        <span id="peerList" class="text-sm opacity-70"></span>
+      </div>
+    </div>
+
+    <div class="container mx-auto p-4 flex flex-col gap-4 min-h-[calc(100vh-4rem)]">
+      <!-- Input Controls -->
+      <div class="card bg-base-300 shadow-xl">
+        <div class="card-body p-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="form-control">
+              <label class="label" for="relayPeer">
+                <span class="label-text">Relay Peer URL:</span>
+              </label>
+              <input
+                id="relayPeer"
+                type="text"
+                class="input input-bordered w-full"
+                placeholder="http://localhost:8765/gun"
+                value="http://localhost:8765/gun"
+              />
+            </div>
+
+            <div class="form-control">
+              <label class="label" for="authToken">
+                <span class="label-text">Auth Token:</span>
+              </label>
+              <input
+                id="authToken"
+                type="password"
+                class="input input-bordered w-full"
+                placeholder="Enter auth token"
+              />
+            </div>
+
+            <div class="form-control">
+              <label class="label" for="key">
+                <span class="label-text">Key to Start from:</span>
+              </label>
+              <input id="key" class="input input-bordered w-full" />
+            </div>
+
+            <div class="form-control">
+              <label class="label" for="label">
+                <span class="label-text">Property to be used as Label:</span>
+              </label>
+              <input id="label" class="input input-bordered w-full custom" />
+            </div>
+          </div>
+          
+          <div class="flex items-center gap-4 mt-4">
+            <button id="startButton" class="btn btn-primary flex-1">Start</button>
+            <div id="status" class="text-sm opacity-70 flex-1"></div>
+          </div>
         </div>
-        <button type="button" id="save">Save Changes</button>
+      </div>
+
+      <!-- Graph Viewer -->
+      <div class="card bg-base-300 shadow-xl flex-1">
+        <div class="card-body p-0">
+          <svg class="w-full h-full min-h-[400px]"></svg>
+        </div>
+      </div>
+
+      <!-- Data Inspector -->
+      <div class="card bg-base-300 shadow-xl">
+        <div class="card-body p-4">
+          <div class="flex justify-between items-center">
+            <h3 class="card-title">Data Inspector</h3>
+            <button id="save" class="btn btn-accent">Save Changes</button>
+          </div>
+          <div id="detail" class="cont overflow-auto max-h-[200px] mt-2"></div>
+        </div>
       </div>
     </div>
 
-    <!-- End of Page -->
-  </body>
-  <!-- Use D3 v5 for better compatibility -->
-  <script src="https://d3js.org/d3.v5.min.js"></script>
-  <!-- Needed Gun DB files to hook into a peer -->
-  <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/gun/lib/promise.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/gun/lib/webrtc.js"></script>
+    <!-- Scripts -->
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/lib/promise.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/lib/webrtc.js"></script>
 
-  <!-- Button Logic -->
-
-  <script type="text/javascript">
-    // Status update function
-    function updateStatus(message, isError = false) {
-      const statusEl = document.getElementById("status");
-      if (statusEl) {
-        statusEl.textContent = message;
-        statusEl.style.color = isError ? "#ff0000" : "#666";
-      }
-      console.log(isError ? "ERROR:" : "INFO:", message);
-    }
-
-    // Clear old data more selectively
-    try {
-      // Only clear gun-related data, not all localStorage
-      Object.keys(localStorage).forEach((key) => {
-        if (key.startsWith("gun/") || key.startsWith("radata")) {
-          localStorage.removeItem(key);
+    <!-- Button Logic -->
+    <script type="text/javascript">
+      // Status update function
+      function updateStatus(message, isError = false) {
+        const statusEl = document.getElementById("status");
+        if (statusEl) {
+          statusEl.textContent = message;
+          statusEl.style.color = isError ? "#ff0000" : "#666";
         }
-      });
-    } catch (e) {
-      updateStatus("Warning: Could not clear localStorage", true);
-    }
-
-    let gun = null;
-    let isGunReady = false;
-
-    // Initialize default peers - will be updated when user changes the input
-    let peers = ["http://localhost:8765/gun"];
-
-    // Configure the middleware GLOBALLY before ANY Gun instance creation
-    updateStatus("Configuring Gun middleware...");
-    Gun.on("opt", function (ctx) {
-      if (ctx.once) {
-        return;
-      }
-      ctx.on("out", function (msg) {
-        const to = this.to;
-        const authTokenInput = document.getElementById("authToken");
-        const authToken = authTokenInput ? authTokenInput.value.trim() : "";
-        if (authToken) {
-          // Add headers for all outgoing messages, especially 'put'
-          msg.headers = {
-            ...msg.headers, // Preserve existing headers
-            token: authToken,
-          };
-        }
-        console.log(msg);
-        to.next(msg); // pass to next middleware
-      });
-    });
-
-    // Function to create Gun instance with current peer configuration
-    function createGunInstance() {
-      const relayPeerInput = document.getElementById("relayPeer");
-      const currentPeer = relayPeerInput
-        ? relayPeerInput.value.trim()
-        : "http://localhost:8765/gun";
-
-      if (!currentPeer) {
-        updateStatus("Error: Empty peer URL", true);
-        return null;
+        console.log(isError ? "ERROR:" : "INFO:", message);
       }
 
-      peers = [currentPeer];
-      updateStatus(`Creating Gun instance with peer: ${currentPeer}`);
-
+      // Clear old data more selectively
       try {
-        gun = new Gun({
-          peers: peers,
-          localStorage: false,
-          radisk: false,
-        });
-
-        let graph = {
-          nodes: [],
-          edges: [],
-        };
-
-        let peerList = document.getElementById("peerList");
-        if (peerList) {
-          peerList.innerHTML = currentPeer;
-        }
-
-        // Make gun instance globally available
-        window.gun = gun;
-        window.graph = graph;
-        isGunReady = true;
-
-        updateStatus("Gun instance created successfully");
-        return gun;
-      } catch (error) {
-        updateStatus(`Error creating Gun instance: ${error.message}`, true);
-        return null;
-      }
-    }
-
-    // Create initial instance after DOM is ready
-    document.addEventListener("DOMContentLoaded", function () {
-      setTimeout(function () {
-        const gunInstance = createGunInstance();
-        if (gunInstance) {
-          updateStatus("Ready to start visualization");
-        }
-      }, 500);
-    });
-  </script>
-  <!-- Build and explore graphs -->
-  <script src="visualGraph.js"></script>
-  <!-- Use abstraction to build labelled property graphs -->
-  <script src="abstraction.js"></script>
-
-  <script>
-    // Wait for all scripts to load and DFS to be available
-    function waitForDFS() {
-      return new Promise((resolve, reject) => {
-        let attempts = 0;
-        const maxAttempts = 50;
-
-        const checkDFS = () => {
-          attempts++;
-          if (typeof window.DFS !== "undefined" && window.DFS.search) {
-            updateStatus("DFS module loaded successfully!");
-            resolve();
-          } else if (attempts >= maxAttempts) {
-            updateStatus("Timeout waiting for DFS module", true);
-            reject(new Error("DFS module failed to load"));
-          } else {
-            setTimeout(checkDFS, 100);
+        // Only clear gun-related data, not all localStorage
+        Object.keys(localStorage).forEach((key) => {
+          if (key.startsWith("gun/") || key.startsWith("radata")) {
+            localStorage.removeItem(key);
           }
-        };
-        checkDFS();
-      });
-    }
+        });
+      } catch (e) {
+        updateStatus("Warning: Could not clear localStorage", true);
+      }
 
-    // Initialize everything once DFS is ready
-    waitForDFS()
-      .then(() => {
-        updateStatus("All modules loaded. Ready to use!");
+      let gun = null;
+      let isGunReady = false;
 
-        // Override the start function with a safer version
-        const startButton = document.getElementById("startButton");
-        if (startButton) {
-          startButton.addEventListener("click", function (ev) {
-            ev.preventDefault();
-            updateStatus("Start button clicked...");
+      // Initialize default peers - will be updated when user changes the input
+      let peers = ["http://localhost:8765/gun"];
 
-            const relayPeer = document.getElementById("relayPeer").value.trim();
-            const authToken = document.getElementById("authToken").value.trim();
-            const key = document.getElementById("key").value.trim();
-            const label = document.getElementById("label").value.trim();
-
-            // Validation
-            if (!relayPeer) {
-              updateStatus("Please enter a relay peer URL", true);
-              alert("Please enter a relay peer URL");
-              return;
-            }
-
-            if (!authToken) {
-              updateStatus("Please enter an auth token", true);
-              alert("Please enter an auth token");
-              return;
-            }
-
-            if (!key) {
-              updateStatus("Please enter a key to start from", true);
-              alert("Please enter a key to start from");
-              return;
-            }
-
-            if (!isGunReady || !window.gun) {
-              updateStatus("Gun instance not ready, recreating...");
-              const gunInstance = createGunInstance();
-              if (!gunInstance) {
-                updateStatus("Failed to create Gun instance", true);
-                alert(
-                  "Failed to connect to Gun database. Please check your settings."
-                );
-                return;
-              }
-            }
-
-            // Recreate Gun instance with current peer if it changed
-            const currentPeers = window.gun ? window.gun._.opt.peers : {};
-            const currentPeer = Object.keys(currentPeers)[0];
-            if (!currentPeer || currentPeer !== relayPeer) {
-              updateStatus("Peer changed, recreating Gun instance...");
-              const gunInstance = createGunInstance();
-              if (!gunInstance) {
-                updateStatus("Failed to recreate Gun instance", true);
-                alert(
-                  "Failed to connect to the new peer. Please check the URL."
-                );
-                return;
-              }
-            }
-
-            if (window.DFS && window.DFS.search) {
-              updateStatus(
-                `Starting DFS search with key: ${key}${
-                  label ? `, label: ${label}` : ""
-                }`
-              );
-              try {
-                window.DFS.search(key, label);
-              } catch (error) {
-                updateStatus(`DFS search error: ${error.message}`, true);
-                alert(`Search failed: ${error.message}`);
-              }
-            } else {
-              updateStatus("DFS module not available", true);
-              alert("DFS module is not available. Please refresh the page.");
-            }
-          });
+      // Configure the middleware GLOBALLY before ANY Gun instance creation
+      updateStatus("Configuring Gun middleware...");
+      Gun.on("opt", function (ctx) {
+        if (ctx.once) {
+          return;
         }
-      })
-      .catch((error) => {
-        updateStatus(`Failed to initialize: ${error.message}`, true);
-        alert("Failed to initialize the application. Please refresh the page.");
+        ctx.on("out", function (msg) {
+          const to = this.to;
+          const authTokenInput = document.getElementById("authToken");
+          const authToken = authTokenInput ? authTokenInput.value.trim() : "";
+          if (authToken) {
+            // Add headers for all outgoing messages, especially 'put'
+            msg.headers = {
+              ...msg.headers, // Preserve existing headers
+              token: authToken,
+            };
+          }
+          console.log(msg);
+          to.next(msg); // pass to next middleware
+        });
       });
-  </script>
+
+      // Function to create Gun instance with current peer configuration
+      function createGunInstance() {
+        const relayPeerInput = document.getElementById("relayPeer");
+        const currentPeer = relayPeerInput
+          ? relayPeerInput.value.trim()
+          : "http://localhost:8765/gun";
+
+        if (!currentPeer) {
+          updateStatus("Error: Empty peer URL", true);
+          return null;
+        }
+
+        peers = [currentPeer];
+        updateStatus(`Creating Gun instance with peer: ${currentPeer}`);
+
+        try {
+          gun = new Gun(peers);
+
+          let graph = {
+            nodes: [],
+            edges: [],
+          };
+
+          let peerList = document.getElementById("peerList");
+          if (peerList) {
+            peerList.innerHTML = currentPeer;
+          }
+
+          // Make gun instance globally available
+          window.gun = gun;
+          window.graph = graph;
+          isGunReady = true;
+
+          updateStatus("Gun instance created successfully");
+          return gun;
+        } catch (error) {
+          updateStatus(`Error creating Gun instance: ${error.message}`, true);
+          return null;
+        }
+      }
+
+      // Create initial instance after DOM is ready
+      document.addEventListener("DOMContentLoaded", function () {
+        setTimeout(function () {
+          const gunInstance = createGunInstance();
+          if (gunInstance) {
+            updateStatus("Ready to start visualization");
+          }
+        }, 500);
+      });
+    </script>
+    <script src="visualGraph.js"></script>
+    <script src="abstraction.js"></script>
+    <script>
+      // Wait for all scripts to load and DFS to be available
+      function waitForDFS() {
+        return new Promise((resolve, reject) => {
+          let attempts = 0;
+          const maxAttempts = 50;
+
+          const checkDFS = () => {
+            attempts++;
+            if (typeof window.DFS !== "undefined" && window.DFS.search) {
+              updateStatus("DFS module loaded successfully!");
+              resolve();
+            } else if (attempts >= maxAttempts) {
+              updateStatus("Timeout waiting for DFS module", true);
+              reject(new Error("DFS module failed to load"));
+            } else {
+              setTimeout(checkDFS, 100);
+            }
+          };
+          checkDFS();
+        });
+      }
+
+      // Initialize everything once DFS is ready
+      waitForDFS()
+        .then(() => {
+          updateStatus("All modules loaded. Ready to use!");
+
+          // Override the start function with a safer version
+          const startButton = document.getElementById("startButton");
+          if (startButton) {
+            startButton.addEventListener("click", function (ev) {
+              ev.preventDefault();
+              updateStatus("Start button clicked...");
+
+              const relayPeer = document.getElementById("relayPeer").value.trim();
+              const authToken = document.getElementById("authToken").value.trim();
+              const key = document.getElementById("key").value.trim();
+              const label = document.getElementById("label").value.trim();
+
+              // Validation
+              if (!relayPeer) {
+                updateStatus("Please enter a relay peer URL", true);
+                alert("Please enter a relay peer URL");
+                return;
+              }
+
+              if (!authToken) {
+                updateStatus("Please enter an auth token", true);
+                alert("Please enter an auth token");
+                return;
+              }
+
+              if (!key) {
+                updateStatus("Please enter a key to start from", true);
+                alert("Please enter a key to start from");
+                return;
+              }
+
+              if (!isGunReady || !window.gun) {
+                updateStatus("Gun instance not ready, recreating...");
+                const gunInstance = createGunInstance();
+                if (!gunInstance) {
+                  updateStatus("Failed to create Gun instance", true);
+                  alert(
+                    "Failed to connect to Gun database. Please check your settings."
+                  );
+                  return;
+                }
+              }
+
+              // Recreate Gun instance with current peer if it changed
+              const currentPeers = window.gun ? window.gun._.opt.peers : {};
+              const currentPeer = Object.keys(currentPeers)[0];
+              if (!currentPeer || currentPeer !== relayPeer) {
+                updateStatus("Peer changed, recreating Gun instance...");
+                const gunInstance = createGunInstance();
+                if (!gunInstance) {
+                  updateStatus("Failed to recreate Gun instance", true);
+                  alert(
+                    "Failed to connect to the new peer. Please check the URL."
+                  );
+                  return;
+                }
+              }
+
+              if (window.DFS && window.DFS.search) {
+                updateStatus(
+                  `Starting DFS search with key: ${key}${
+                    label ? `, label: ${label}` : ""
+                  }`
+                );
+                try {
+                  window.DFS.search(key, label);
+                } catch (error) {
+                  updateStatus(`DFS search error: ${error.message}`, true);
+                  alert(`Search failed: ${error.message}`);
+                }
+              } else {
+                updateStatus("DFS module not available", true);
+                alert("DFS module is not available. Please refresh the page.");
+              }
+            });
+          }
+        })
+        .catch((error) => {
+          updateStatus(`Failed to initialize: ${error.message}`, true);
+          alert("Failed to initialize the application. Please refresh the page.");
+        });
+    </script>
+  </body>
 </html>

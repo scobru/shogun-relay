@@ -28,6 +28,10 @@ services:
       - GC_INTERVAL=3600000
       - IPFS_API_URL=http://127.0.0.1:5001
       - IPFS_GATEWAY_URL=http://127.0.0.1:8080
+      - IPFS_API_TOKEN=${IPFS_API_TOKEN:-change-me}
+      - IPFS_API_KEY=${IPFS_API_KEY:-change-me}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-change-me}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:-change-me}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8765/health"]

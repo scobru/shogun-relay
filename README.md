@@ -171,36 +171,36 @@ The Docker container automatically includes:
 | 8080 | IPFS Gateway | HTTP gateway for IPFS content access |
 | 4001 | IPFS Swarm | IPFS P2P communication |
 
-### Comandi Docker Utili
+### Useful Docker Commands
 
 ```bash
-# Visualizzare i log in tempo reale
+# View logs in real-time
 docker logs -f shogun-relay-stack
 
-# Entrare nel container per debug
+# Enter container for debugging
 docker exec -it shogun-relay-stack bash
 
-# Controllare lo stato dei servizi interni
+# Check internal service status
 docker exec shogun-relay-stack ps aux
 
-# Riavviare il container
+# Restart the container
 docker restart shogun-relay-stack
 
-# Fermare e rimuovere il container
+# Stop and remove the container
 docker stop shogun-relay-stack
 ```
 
-### Configurazione Avanzata Docker
+### Advanced Docker Configuration
 
-#### Con Volume Persistente
+#### With Persistent Volume
 
-Per preservare i dati tra i riavvii:
+To preserve data between restarts:
 
 ```bash
-# Creare volume per dati persistenti
+# Create volume for persistent data
 docker volume create shogun-relay-data
 
-# Avviare con volume montato
+# Start with mounted volume
 docker run -d \
   --name shogun-relay-stack \
   --rm \
@@ -213,7 +213,7 @@ docker run -d \
   shogun-relay:latest
 ```
 
-#### Con Variabili d'Ambiente
+#### With Environment Variables
 
 ```bash
 docker run -d \
@@ -230,13 +230,11 @@ docker run -d \
   shogun-relay:latest
 ```
 
-#### Docker Compose (Raccomandato per Produzione)
+#### Docker Compose (Recommended for Production)
 
-Crea un file `docker-compose.yml`:
+Create a `docker-compose.yml` file:
 
 ```yaml
-version: '3.8'
-
 services:
   shogun-relay:
     build: .
@@ -272,38 +270,38 @@ volumes:
     driver: local
 ```
 
-Poi avvia con:
+Then start with:
 
 ```bash
-# Avvio con Docker Compose
+# Start with Docker Compose
 docker-compose up -d
 
-# Visualizzare i log
+# View logs
 docker-compose logs -f
 
-# Fermare i servizi
+# Stop services
 docker-compose down
 ```
 
-### Monitoraggio Container
+### Container Monitoring
 
 #### Health Check
 
 ```bash
-# Controllo stato di salute
+# Check health status
 docker inspect shogun-relay-stack | grep -A 10 Health
 
-# Test manuale health check
+# Manual health check test
 curl http://localhost:8765/health
 ```
 
-#### Metriche e Log
+#### Metrics and Logs
 
 ```bash
-# Statistiche container
+# Container statistics
 docker stats shogun-relay-stack
 
-# Log specifici per servizio
+# Service-specific logs
 docker exec shogun-relay-stack tail -f /var/log/supervisor/relay.log
 docker exec shogun-relay-stack tail -f /var/log/supervisor/ipfs.log
 docker exec shogun-relay-stack tail -f /var/log/supervisor/fakes3.log
@@ -311,50 +309,50 @@ docker exec shogun-relay-stack tail -f /var/log/supervisor/fakes3.log
 
 ### Troubleshooting Docker
 
-#### Problemi Comuni
+#### Common Issues
 
-1. **IPFS non si avvia**:
+1. **IPFS fails to start**:
    ```bash
-   # Controllare i log IPFS
+   # Check IPFS logs
    docker exec shogun-relay-stack cat /var/log/supervisor/ipfs.log
    
-   # Verificare le directory
+   # Verify directories
    docker exec shogun-relay-stack ls -la /root/.config/ipfs/
    ```
 
-2. **Porte già in uso**:
+2. **Ports already in use**:
    ```bash
-   # Cambiare le porte esposte
+   # Change exposed ports
    docker run -p 8766:8765 -p 4570:4569 ... shogun-relay:latest
    ```
 
-3. **Problemi di permessi**:
+3. **Permission issues**:
    ```bash
-   # Ricostruire l'immagine
+   # Rebuild the image
    docker build --no-cache -t shogun-relay:latest .
    ```
 
-4. **Container non risponde**:
+4. **Container not responding**:
    ```bash
-   # Riavvio completo
+   # Complete restart
    docker stop shogun-relay-stack
    docker rm shogun-relay-stack
    docker run -d --name shogun-relay-stack ... shogun-relay:latest
    ```
 
-### Aggiornamenti Docker
+### Docker Updates
 
 ```bash
-# 1. Fermare il container corrente
+# 1. Stop current container
 docker stop shogun-relay-stack
 
-# 2. Backup dei dati (se necessario)
+# 2. Backup data (if needed)
 docker cp shogun-relay-stack:/data ./backup-data
 
-# 3. Ricostruire l'immagine
+# 3. Rebuild the image
 docker build -t shogun-relay:latest .
 
-# 4. Avviare nuovo container
+# 4. Start new container
 docker run -d --name shogun-relay-stack ... shogun-relay:latest
 ```
 

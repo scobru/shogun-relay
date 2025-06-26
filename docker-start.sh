@@ -5,56 +5,56 @@
 
 set -e
 
-echo "🚀 Avviando Shogun Relay Stack con Docker..."
+echo "🚀 Starting Shogun Relay Stack with Docker..."
 
 # Check if Docker is running
 if ! docker info > /dev/null 2>&1; then
-    echo "❌ Errore: Docker non è in esecuzione. Avvia Docker Desktop e riprova."
+    echo "❌ Error: Docker is not running. Start Docker Desktop and try again."
     exit 1
 fi
 
 # Check if .env file exists, if not copy from example
 if [ ! -f .env ]; then
-    echo "📋 Creando file .env da .env.example..."
+    echo "📋 Creating .env file from .env.example..."
     cp .env.example .env
-    echo "⚠️  IMPORTANTE: Modifica il file .env per configurare la password admin!"
+    echo "⚠️  IMPORTANT: Edit the .env file to configure the admin password!"
 fi
 
 # Stop existing container if running
-echo "🛑 Fermando container esistenti..."
+echo "🛑 Stopping existing containers..."
 docker-compose down 2>/dev/null || true
 
 # Build and start the stack
-echo "🔨 Building immagine Docker..."
+echo "🔨 Building Docker image..."
 docker-compose build
 
-echo "🐳 Avviando i servizi..."
+echo "🐳 Starting services..."
 docker-compose up -d
 
 # Wait for services to start
-echo "⏳ Aspettando che i servizi si avviino..."
+echo "⏳ Waiting for services to start..."
 sleep 10
 
 # Check if services are running
 if docker-compose ps | grep -q "Up"; then
-    echo "✅ Shogun Relay Stack avviato con successo!"
+    echo "✅ Shogun Relay Stack started successfully!"
     echo ""
-    echo "🌐 Servizi disponibili:"
+    echo "🌐 Available services:"
     echo "   📡 Relay Server:    http://localhost:8765"
     echo "   📁 FakeS3:          http://localhost:4569"
     echo "   🌐 IPFS API:        http://localhost:5001"
     echo "   🖥️  IPFS Gateway:    http://localhost:8080"
     echo ""
-    echo "🔍 Comandi utili:"
+    echo "🔍 Useful commands:"
     echo "   📊 Logs:            docker-compose logs -f"
     echo "   📈 Stats:           docker stats shogun-relay-stack"
     echo "   🔧 Debug:           docker-compose exec shogun-relay bash"
     echo "   🛑 Stop:            docker-compose down"
     echo ""
-    echo "🎯 Controlla lo stato dei servizi:"
+    echo "🎯 Check service status:"
     echo "   curl http://localhost:8765/health"
 else
-    echo "❌ Errore nell'avvio dei servizi. Controlla i log:"
+    echo "❌ Error starting services. Check logs:"
     echo "   docker-compose logs"
     exit 1
 fi

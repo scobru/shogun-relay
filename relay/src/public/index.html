@@ -1,392 +1,149 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="night">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gun Relay Control Panel</title>
-    <link rel="stylesheet" href="dharma-style/dharma.css">
-    <style>
-        body {
-            margin: 0;
-            padding: 20px;
-            background: var(--terminal-bg);
-            color: var(--dharma-green-primary);
-            font-family: var(--font-mono);
-            min-height: 100vh;
-            background-image: var(--scan-line),
-                radial-gradient(
-                    ellipse at center,
-                    var(--screen-glow) 0%,
-                    var(--terminal-bg) 70%
-                );
-            background-size: 100% 4px, 100% 100%;
-            animation: crtFlicker 0.15s infinite linear alternate;
-        }
-
-        .dharma-screen {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: rgba(0, 34, 0, 0.8);
-            border: 3px solid var(--dharma-green-dark);
-            border-radius: 12px;
-            padding: 2rem;
-            box-shadow: 0 0 30px var(--dharma-green-glow),
-                inset 0 0 30px rgba(0, 255, 65, 0.1);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .dharma-screen::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: var(--scan-line);
-            pointer-events: none;
-            z-index: 1;
-        }
-
-        .dharma-screen > * {
-            position: relative;
-            z-index: 2;
-        }
-
-        .dharma-title {
-            font-family: var(--font-retro);
-            font-size: 3rem;
-            font-weight: bold;
-            color: var(--dharma-green-primary);
-            text-shadow: 0 0 20px var(--dharma-green-glow);
-            text-transform: uppercase;
-            letter-spacing: 4px;
-            margin-bottom: 1rem;
-            text-align: center;
-            border-bottom: 3px solid var(--dharma-green-dark);
-            padding-bottom: 20px;
-            animation: titlePulse 3s infinite ease-in-out;
-        }
-
-        @keyframes titlePulse {
-            0%, 100% { text-shadow: 0 0 20px var(--dharma-green-glow); }
-            50% { text-shadow: 0 0 30px var(--dharma-green-glow), 0 0 40px var(--dharma-green-primary); }
-        }
-
-        .dharma-text {
-            text-align: center;
-            color: var(--phosphor-white);
-            font-size: 1.2rem;
-            margin-bottom: 2.5rem;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-
-        .dharma-text::before {
-            content: "> ";
-            color: var(--dharma-amber);
-            font-weight: bold;
-        }
-
-        .control-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 20px;
-            margin-top: 2rem;
-        }
-
-        .control-section {
-            background: rgba(0, 17, 0, 0.8);
-            border: 2px solid var(--dharma-green-dark);
-            border-radius: 8px;
-            padding: 1.5rem;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .control-section::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, transparent, var(--dharma-green-primary), transparent);
-            animation: scannerLine 2s infinite linear;
-        }
-
-        @keyframes scannerLine {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
-
-        .control-section:hover {
-            border-color: var(--dharma-green-primary);
-            box-shadow: 0 0 20px var(--dharma-green-glow);
-            transform: translateY(-2px);
-        }
-
-        .section-title {
-            font-family: var(--font-retro);
-            font-size: 1.3rem;
-            font-weight: bold;
-            color: var(--dharma-amber);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            margin-bottom: 1rem;
-            text-align: center;
-            text-shadow: 0 0 10px var(--dharma-amber);
-        }
-
-        .control-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .dharma-button {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 15px 20px;
-            background: linear-gradient(145deg, var(--terminal-bg-light), rgba(0, 68, 0, 0.8));
-            border: 1px solid var(--dharma-green-dark);
-            border-radius: 6px;
-            color: var(--phosphor-white);
-            text-decoration: none;
-            font-family: var(--font-mono);
-            font-size: 0.95rem;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .dharma-button::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(0, 255, 65, 0.1), transparent);
-            transition: left 0.5s ease;
-        }
-
-        .dharma-button:hover::before {
-            left: 100%;
-        }
-
-        .dharma-button:hover {
-            border-color: var(--dharma-green-primary);
-            background: linear-gradient(145deg, rgba(0, 68, 0, 0.9), var(--dharma-green-dark));
-            color: var(--dharma-green-primary);
-            text-shadow: 0 0 5px var(--dharma-green-glow);
-            transform: translateX(5px);
-            box-shadow: 0 0 15px rgba(0, 255, 65, 0.3);
-        }
-
-        .button-icon {
-            font-size: 1.2rem;
-            min-width: 24px;
-            text-align: center;
-        }
-
-        .button-text {
-            flex: 1;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .auth-required {
-            position: relative;
-        }
-
-        .auth-required::after {
-            content: "🔒";
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--dharma-amber);
-            font-size: 0.9rem;
-        }
-
-        .system-status {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(0, 34, 0, 0.9);
-            border: 1px solid var(--dharma-green-dark);
-            border-radius: 6px;
-            padding: 10px 15px;
-            font-size: 0.8rem;
-            color: var(--dharma-green-primary);
-            z-index: 1000;
-        }
-
-        .status-indicator {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--dharma-green-primary);
-            margin-right: 8px;
-            animation: statusBlink 2s infinite;
-        }
-
-        @keyframes statusBlink {
-            0%, 50% { opacity: 1; }
-            51%, 100% { opacity: 0.3; }
-        }
-
-        @media (max-width: 768px) {
-            .control-grid {
-                grid-template-columns: 1fr;
-                gap: 15px;
-            }
-            
-            .dharma-title {
-                font-size: 2rem;
-                letter-spacing: 2px;
-            }
-            
-            .system-status {
-                position: static;
-                margin-bottom: 20px;
-                text-align: center;
-            }
-            
-            .dharma-screen {
-                margin: 10px;
-                padding: 1rem;
-            }
-        }
-
-        /* Terminal cursor effect */
-        .cursor::after {
-            content: "_";
-            animation: cursorBlink 1s infinite;
-        }
-
-        @keyframes cursorBlink {
-            0%, 50% { opacity: 1; }
-            51%, 100% { opacity: 0; }
-        }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles/wormhole.css">
 </head>
-<body>
-    <div class="system-status">
-        <span class="status-indicator"></span>
-        SYSTEM ONLINE
-    </div>
+<body class="antialiased">
+    <div class="container mx-auto p-4">
+        <div class="card">
+            <div class="p-8">
+                <div class="flex flex-col items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
 
-    <div class="dharma-screen">
-        <h1 id="relay-title" class="dharma-title">Shogun Relay Control Panel</h1>
-        <p class="dharma-text">Select a tool to continue<span class="cursor"></span></p>
-        
-        <div class="control-grid">
-            <!-- Monitoring & Analytics -->
-            <div class="control-section">
-                <h2 class="section-title">📊 Monitoring & Analytics</h2>
-                <div class="control-buttons">
-                    <a href="/stats" class="dharma-button">
-                        <span class="button-icon">📈</span>
-                        <span class="button-text">Live Stats</span>
-                    </a>
-                    <a href="/charts" class="dharma-button">
-                        <span class="button-icon">📊</span>
-                        <span class="button-text">Advanced Charts</span>
-                    </a>
-                    <a href="/graph" class="dharma-button">
-                        <span class="button-icon">🌐</span>
-                        <span class="button-text">Live Graph Explorer</span>
-                    </a>
-                    <a href="/visualGraph" class="dharma-button">
-                        <span class="button-icon">🕸️</span>
-                        <span class="button-text">Visual Graph Data</span>
-                    </a>
-                </div>
-            </div>
+                    <h1 id="relay-title" class="text-3xl font-semibold mb-8">Shogun Relay Control Panel</h1>
+                    <p class="text-secondary mb-8">Select a tool to continue<span class="animate-pulse">_</span></p>
 
-            <!-- Storage & Files -->
-            <div class="control-section">
-                <h2 class="section-title">💾 Storage & Files</h2>
-                <div class="control-buttons">
-                    <a href="/upload" class="dharma-button">
-                        <span class="button-icon">📤</span>
-                        <span class="button-text">Upload to IPFS</span>
-                    </a>
-                    <a href="/pin-manager" class="dharma-button">
-                        <span class="button-icon">📌</span>
-                        <span class="button-text">IPFS Pin Manager</span>
-                    </a>
-                    <a href="/s3-dashboard" class="dharma-button">
-                        <span class="button-icon">📦</span>
-                        <span class="button-text">S3 Storage Dashboard</span>
-                    </a>
-                    <a href="/s3-manager" class="dharma-button">
-                        <span class="button-icon">📁</span>
-                        <span class="button-text">S3 File Manager</span>
-                    </a>
-                    <a href="/ipfs-status" class="dharma-button">
-                        <span class="button-icon">📊</span>
-                        <span class="button-text">IPFS Node Status</span>
-                    </a>
-                </div>
-            </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+                        <!-- Monitoring & Analytics -->
+                        <div class="card bg-opacity-10 bg-white">
+                            <div class="p-6">
+                                <h2 class="text-xl font-semibold mb-4 text-accent">📊 Monitoring & Analytics</h2>
+                                <div class="space-y-3">
+                                    <a href="/stats" class="btn-custom flex items-center gap-3">
+                                        <span>📈</span>
+                                        <span>Live Stats</span>
+                                    </a>
+                                    <a href="/charts" class="btn-custom flex items-center gap-3">
+                                        <span>📊</span>
+                                        <span>Advanced Charts</span>
+                                    </a>
+                                    <a href="/graph" class="btn-custom flex items-center gap-3">
+                                        <span>🌐</span>
+                                        <span>Live Graph Explorer</span>
+                                    </a>
+                                    <a href="/visualGraph" class="btn-custom flex items-center gap-3">
+                                        <span>🕸️</span>
+                                        <span>Visual Graph Data</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
 
-            <!-- Data Management -->
-            <div class="control-section">
-                <h2 class="section-title">🗃️ Data Management</h2>
-                <div class="control-buttons">
-                    <a href="/create" class="dharma-button auth-required">
-                        <span class="button-icon">➕</span>
-                        <span class="button-text">Create Data Node</span>
-                    </a>
-                    <a href="/view" class="dharma-button auth-required">
-                        <span class="button-icon">🔍</span>
-                        <span class="button-text">View/Query Data</span>
-                    </a>
-                    <a href="/notes" class="dharma-button">
-                        <span class="button-icon">📝</span>
-                        <span class="button-text">Admin Notes</span>
-                    </a>
-                </div>
-            </div>
+                        <!-- Storage & Files -->
+                        <div class="card bg-opacity-10 bg-white">
+                            <div class="p-6">
+                                <h2 class="text-xl font-semibold mb-4 text-accent">💾 Storage & Files</h2>
+                                <div class="space-y-3">
+                                    <a href="/upload" class="btn-custom flex items-center gap-3">
+                                        <span>📤</span>
+                                        <span>Upload to IPFS</span>
+                                        <span class="absolute right-3">🔒</span>
 
-            <!-- Communication -->
-            <div class="control-section">
-                <h2 class="section-title">💬 Communication</h2>
-                <div class="control-buttons">
-                    <a href="/chat" class="dharma-button">
-                        <span class="button-icon">💬</span>
-                        <span class="button-text">Public Chat</span>
-                    </a>
-                    <a href="/client" class="dharma-button">
-                        <span class="button-icon">✉️</span>
-                        <span class="button-text">Safe Messenger Client</span>
-                    </a>
-                    <a href="/server" class="dharma-button">
-                        <span class="button-icon">🖥️</span>
-                        <span class="button-text">Safe Messenger Server</span>
-                    </a>
-                </div>
-            </div>
+                                    </a>
+                                    <a href="/pin-manager" class="btn-custom flex items-center gap-3">
+                                        <span>📌</span>
+                                        <span>IPFS Pin Manager</span>
+                                        <span class="absolute right-3">🔒</span>
 
-            <!-- Security & Tools -->
-            <div class="control-section">
-                <h2 class="section-title">🔐 Security & Tools</h2>
-                <div class="control-buttons">
-                    <a href="/derive" class="dharma-button">
-                        <span class="button-icon">🔑</span>
-                        <span class="button-text">Derive Keys</span>
-                    </a>
-                    <a href="/api/v0/version" target="_blank" class="dharma-button">
-                        <span class="button-icon">🔧</span>
-                        <span class="button-text">IPFS API Version</span>
-                    </a>
+                                    </a>
+                                    <a href="/s3-dashboard" class="btn-custom flex items-center gap-3">
+                                        <span>📦</span>
+                                        <span>S3 Storage Dashboard</span>
+                                        <span class="absolute right-3">🔒</span>
+
+                                    </a>
+                                    <a href="/s3-manager" class="btn-custom flex items-center gap-3">
+                                        <span>📁</span>
+                                        <span>S3 File Manager</span>
+                                        <span class="absolute right-3">🔒</span>
+                                    </a>
+                                    <a href="/ipfs-status" class="btn-custom flex items-center gap-3">
+                                        <span>📊</span>
+                                        <span>IPFS Node Status</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Data Management -->
+                        <div class="card bg-opacity-10 bg-white">
+                            <div class="p-6">
+                                <h2 class="text-xl font-semibold mb-4 text-accent">🗃️ Data Management</h2>
+                                <div class="space-y-3">
+                                    <a href="/create" class="btn-custom flex items-center gap-3 relative">
+                                        <span>➕</span>
+                                        <span>Create Data Node</span>
+                                        <span class="absolute right-3">🔒</span>
+                                    </a>
+                                    <a href="/view" class="btn-custom flex items-center gap-3 relative">
+                                        <span>🔍</span>
+                                        <span>View/Query Data</span>
+                                        <span class="absolute right-3">🔒</span>
+                                    </a>
+                                    <a href="/notes" class="btn-custom flex items-center gap-3">
+                                        <span>📝</span>
+                                        <span>Admin Notes</span>
+                                        <span class="absolute right-3">🔒</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Communication -->
+                        <div class="card bg-opacity-10 bg-white">
+                            <div class="p-6">
+                                <h2 class="text-xl font-semibold mb-4 text-accent">💬 Communication</h2>
+                                <div class="space-y-3">
+                                    <a href="/chat" class="btn-custom flex items-center gap-3">
+                                        <span>💬</span>
+                                        <span>Public Chat</span>
+                                    </a>
+                                    <a href="/client" class="btn-custom flex items-center gap-3">
+                                        <span>✉️</span>
+                                        <span>Safe Messenger Client</span>
+                                    </a>
+                                    <a href="/server" class="btn-custom flex items-center gap-3">
+                                        <span>🖥️</span>
+                                        <span>Safe Messenger Server</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Security & Tools -->
+                        <div class="card bg-opacity-10 bg-white">
+                            <div class="p-6">
+                                <h2 class="text-xl font-semibold mb-4 text-accent">🔐 Security & Tools</h2>
+                                <div class="space-y-3">
+                                    <a href="/derive" class="btn-custom flex items-center gap-3">
+                                        <span>🔑</span>
+                                        <span>Derive Keys</span>
+                                    </a>
+                                    <a href="/api/v0/version" target="_blank" class="btn-custom flex items-center gap-3">
+                                        <span>🔧</span>
+                                        <span>IPFS API Version</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -405,9 +162,9 @@
             }
         });
 
-        // Add some terminal-like loading effects
+        // Add some loading effects
         document.addEventListener('DOMContentLoaded', () => {
-            const buttons = document.querySelectorAll('.dharma-button');
+            const buttons = document.querySelectorAll('.btn-custom');
             buttons.forEach((button, index) => {
                 button.style.opacity = '0';
                 button.style.transform = 'translateY(20px)';

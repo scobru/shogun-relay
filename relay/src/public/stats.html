@@ -1,42 +1,198 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-theme="night">
 <head>
+    <meta charset="UTF-8">
     <title>Gun Relay Stats</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="dharma-style/dharma.css">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles/wormhole.css">
     <style>
-        body { background-color: #222; color: #eee; font-family: "Menlo", "Consolas", monospace; line-height: 1.6; margin: 2em; }
-        h1 { border-bottom: 1px solid #555; padding-bottom: 10px; }
-        a { color: #8af; text-decoration: none; }
-        a:hover { background-color: #333; }
-        .stats-container { display: grid; grid-template-columns: 1fr 2fr; gap: 1em 2em; }
-        .stats-container dt { font-weight: bold; text-align: right; color: #aaa; }
-        .error { background-color: #533; color: #f88; border-left: 3px solid #c00; padding: 10px; margin-top: 1em; display: none; }
-        #lastUpdated { margin-top: 2em; color: #888; font-size: 0.9em; }
+        body { 
+            line-height: 1.6;
+            background-color: rgb(25,25,25);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        h1 { 
+            border-bottom: 1px solid #555; 
+            padding-bottom: 0.75rem;
+            margin-bottom: 1.5rem;
+            color: #eee;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background-color: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            text-align: center;
+            transition: transform 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: #8af;
+        }
+
+        .stat-title {
+            color: #8af;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+            color: #eee;
+        }
+
+        .stat-unit {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .error { 
+            background-color: #533; 
+            color: #f88; 
+            border-left: 3px solid #c00; 
+            padding: 1rem;
+            margin-top: 1rem; 
+            display: none;
+            border-radius: 0.25rem;
+        }
+
+        #lastUpdated { 
+            margin-top: 2rem; 
+            color: #888; 
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            color: #8af;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            margin-bottom: 1rem;
+            transition: background-color 0.2s ease;
+        }
+
+        .back-link:hover {
+            background-color: rgba(136, 170, 255, 0.1);
+        }
+
+        .back-link svg {
+            margin-right: 0.5rem;
+        }
+
+        .view-charts-link {
+            display: block;
+            text-align: center;
+            margin-top: 2rem;
+            color: #8af;
+            text-decoration: none;
+            padding: 1rem;
+            border: 1px solid #444;
+            border-radius: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .view-charts-link:hover {
+            background-color: rgba(136, 170, 255, 0.1);
+            border-color: #8af;
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 1rem;
+            }
+
+            .stat-value {
+                font-size: 1.75rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            body {
+                padding: 0.5rem;
+            }
+            
+            .container {
+                padding: 0.5rem;
+            }
+        }
     </style>
 </head>
-<body>
-    <a href="/">&larr; Back to Control Panel</a>
-    <h1>Gun Relay Live Stats</h1>
-    <dl id="statsContainer" class="stats-container">
-        <!-- Stats will be injected here -->
-    </dl>
-    <div id="error" class="error"></div>
-    <p id="lastUpdated"></p>
+<body class="antialiased">
+    <div class="container">
+        <a href="/" class="back-link">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+            </svg>
+            Back to Control Panel
+        </a>
+        
+        <h1>Gun Relay Live Stats</h1>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-title">Connected Peers</div>
+                <div class="stat-value" id="peersCount">-</div>
+                <div class="stat-unit">peers</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Memory Usage</div>
+                <div class="stat-value" id="memoryUsage">-</div>
+                <div class="stat-unit">MB</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Request Rate</div>
+                <div class="stat-value" id="requestRate">-</div>
+                <div class="stat-unit">req/s</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Uptime</div>
+                <div class="stat-value" id="uptime">-</div>
+                <div class="stat-unit">hours</div>
+            </div>
+        </div>
+
+        <a href="/charts.html" class="view-charts-link">
+            📊 View Detailed Charts & Metrics
+        </a>
+
+        <div id="error" class="error"></div>
+        <p id="lastUpdated"></p>
+    </div>
 
     <script>
-        const statsContainer = document.getElementById('statsContainer');
+        const peersCountEl = document.getElementById('peersCount');
+        const memoryUsageEl = document.getElementById('memoryUsage');
+        const requestRateEl = document.getElementById('requestRate');
+        const uptimeEl = document.getElementById('uptime');
         const errorEl = document.getElementById('error');
         const lastUpdatedEl = document.getElementById('lastUpdated');
-
-        function updateStat(dt, dd) {
-            const dtTerm = document.createElement('dt');
-            dtTerm.textContent = dt;
-            const ddDesc = document.createElement('dd');
-            ddDesc.textContent = dd;
-            statsContainer.appendChild(dtTerm);
-            statsContainer.appendChild(ddDesc);
-        }
 
         function formatBytes(bytes, decimals = 2) {
             if (!bytes || bytes === 0) return '0 Bytes';
@@ -57,31 +213,24 @@
 
                 if (result.success) {
                     errorEl.style.display = 'none';
-                    statsContainer.innerHTML = '';
-
-                    // The data is now directly in result, not nested under result.stats
-                    const { peers, node, rad, up } = result;
                     
-                    updateStat('Connected Peers', peers?.count || 0);
+                    // Update stats
+                    const { peers, node, rad, up, dam } = result;
+                    
+                    peersCountEl.textContent = peers?.count || 0;
 
-                    let uptime = 'N/A';
-                    if (up?.time) {
-                        const totalSeconds = Math.floor(up.time / 1000);
-                        const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
-                        const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
-                        const seconds = String(totalSeconds % 60).padStart(2, '0');
-                        uptime = `${hours}:${minutes}:${seconds}`;
+                    if (node?.memory?.heapUsed) {
+                        memoryUsageEl.textContent = formatBytes(node.memory.heapUsed);
                     }
-                    updateStat('Uptime', uptime);
-                    
-                    updateStat('Memory Usage', node?.memory?.heapUsed ? formatBytes(node.memory.heapUsed) : 'N/A');
-                    updateStat('GET Requests', rad?.get?.count || 0);
-                    updateStat('PUT Requests', rad?.put?.count || 0);
-                    
-                    // Add some additional stats that are now available
-                    updateStat('GET Rate (req/s)', result.dam?.in?.rate ? result.dam.in.rate.toFixed(2) : '0.00');
-                    updateStat('PUT Rate (req/s)', result.dam?.out?.rate ? result.dam.out.rate.toFixed(2) : '0.00');
-                    updateStat('Total Memory', node?.memory?.heapTotal ? formatBytes(node.memory.heapTotal) : 'N/A');
+
+                    if (dam?.in?.rate) {
+                        requestRateEl.textContent = dam.in.rate.toFixed(2);
+                    }
+
+                    if (up?.time) {
+                        const hours = (up.time / (1000 * 60 * 60)).toFixed(2);
+                        uptimeEl.textContent = hours;
+                    }
                     
                     lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
 

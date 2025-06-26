@@ -1,10 +1,12 @@
-<!doctype html>
-<html>
-  <head>
+<!DOCTYPE html>
+<html lang="en" data-theme="night">
+<head>
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1" name="viewport" />
-    <title>Minimal Message Server</title>
-    <link rel="stylesheet" href="dharma-style/dharma.css">
+    <title>Message Server</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles/wormhole.css">
     
     <script src="https://cdn.jsdelivr.net/npm/eventemitter3@4.0.0/index.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
@@ -15,47 +17,131 @@
     <script src="//cdn.jsdelivr.net/npm/qrcode@latest/build/qrcode.min.js"></script>
     
     <style>
-      body { 
-        background-color: #333; 
-        font-family: 'Courier New', monospace;
-        color: #eee;
-        padding: 1em;
-      }
-      pre { 
-        white-space: pre-wrap; 
-        word-wrap: break-word; 
-        line-height: 1.2em;
-      }
-      #qrcode-container {
-        margin-top: 1em;
-        background: white;
-        padding: 1em;
-        display: inline-block;
-      }
+        body { 
+            line-height: 1.6;
+            background-color: rgb(25,25,25);
+        }
+
+        pre { 
+            @apply bg-base-300 p-4 rounded-xl border border-base-content/10 whitespace-pre-wrap break-words text-sm font-mono my-0 max-h-[400px] overflow-y-auto;
+        }
+
+        #qrcode-container {
+            @apply bg-white p-6 rounded-xl inline-block mt-4;
+        }
+
+        .status-indicator {
+            @apply inline-flex items-center gap-2 p-2 rounded-xl bg-base-300 my-4 text-sm;
+        }
+
+        .status-indicator.success {
+            @apply bg-success/20 text-success;
+        }
+
+        .status-indicator.error {
+            @apply bg-error/20 text-error;
+        }
+
+        .log-entry {
+            @apply mb-1 font-mono text-sm;
+        }
+
+        .log-entry.error {
+            @apply text-error;
+        }
+
+        .log-entry.success {
+            @apply text-success;
+        }
+
+        .log-entry.info {
+            @apply text-info;
+        }
+
+        .log-entry.warning {
+            @apply text-warning;
+        }
     </style>
-  </head>
-  <body>
-    <pre id="log"></pre>
-    <div id="qrcode-container" style="display: none;">
-      <canvas id="qrcode"></canvas>
+</head>
+<body class="antialiased">
+    <div class="container mx-auto p-4">
+        <div class="flex items-center mb-4">
+            <a href="/" class="nav-link">&larr; Back to Control Panel</a>
+        </div>
+
+        <div class="card">
+            <div class="p-8">
+                <div class="flex flex-col items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+
+                    <h1 class="text-2xl font-semibold mb-8">Message Server</h1>
+
+                    <div class="w-full space-y-6">
+                        <div class="form-group">
+                            <div class="status-indicator" id="serverStatus">
+                                Initializing...
+                            </div>
+                            <div id="qrcode-container" class="hidden">
+                                <canvas id="qrcode"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="block text-sm font-medium mb-2">Server Logs:</label>
+                            <pre id="log" class="text-base-content/80"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
       const logEl = document.getElementById("log");
       const qrcodeContainerEl = document.getElementById("qrcode-container");
       const qrcodeEl = document.getElementById("qrcode");
+      const serverStatusEl = document.getElementById("serverStatus");
       
       let messages = [];
       let clientUrl = '';
 
       function log(...args) {
+        const timestamp = new Date().toLocaleTimeString();
         const logMessage = args.map(arg => 
           typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
         ).join(' ');
         
+        // Create a new log entry div
+        const logEntry = document.createElement('div');
+        logEntry.className = 'log-entry';
+        
+        // Add timestamp
+        const timestampSpan = document.createElement('span');
+        timestampSpan.className = 'text-base-content/50';
+        timestampSpan.textContent = `[${timestamp}] `;
+        logEntry.appendChild(timestampSpan);
+        
+        // Add message with appropriate styling
+        const messageSpan = document.createElement('span');
+        if (logMessage.includes('❌')) {
+            messageSpan.className = 'text-error';
+        } else if (logMessage.includes('✅')) {
+            messageSpan.className = 'text-success';
+        } else if (logMessage.includes('⚠️')) {
+            messageSpan.className = 'text-warning';
+        } else if (logMessage.includes('ℹ️')) {
+            messageSpan.className = 'text-info';
+        }
+        messageSpan.textContent = logMessage;
+        logEntry.appendChild(messageSpan);
+        
+        logEl.appendChild(logEntry);
         console.log(...args);
-        logEl.textContent += logMessage + '\n';
-        window.scrollTo(0, document.body.scrollHeight);
+        
+        // Auto-scroll to bottom
+        logEl.scrollTop = logEl.scrollHeight;
       }
 
       function generateQRCode(url) {
@@ -81,14 +167,21 @@
         );
       }
 
+      function updateServerStatus(status, type = 'info') {
+        serverStatusEl.className = `status-indicator ${type}`;
+        serverStatusEl.textContent = status;
+      }
+
       function initServer() {
         log("🚀 STARTING MESSAGE SERVER");
+        updateServerStatus("Starting server...");
         
         let seed = localStorage["bugout-messageboard-seed"];
         
         try {
           if (typeof Bugoff !== 'function') {
             log("❌ ERROR: Bugoff library not found");
+            updateServerStatus("Error: Bugoff library not found", "error");
             return;
           }
           
@@ -112,8 +205,14 @@
           log("🔗 Client URL:", clientUrl);
           
           b.SEA()
-            .then(() => log("🔐 Encryption initialized"))
-            .catch((err) => log("❌ Encryption init error:", err));
+            .then(() => {
+                log("🔐 Encryption initialized");
+                updateServerStatus("Encryption ready", "success");
+            })
+            .catch((err) => {
+                log("❌ Encryption init error:", err);
+                updateServerStatus("Encryption error", "error");
+            });
           
           if (localStorage["bugout-messageboard"]) {
             try {
@@ -154,6 +253,9 @@
             if (count > 0) {
                 log("🎉 Server ready for connections");
                 log("\n🔗 " + clientUrl + "\n");
+                updateServerStatus(`Connected (${count} peers)`, "success");
+            } else {
+                updateServerStatus("Waiting for connections", "warning");
             }
           });
 
@@ -163,16 +265,19 @@
           
           b.on("error", (error) => {
             log("❌ Bugout Error:", error);
+            updateServerStatus("Error occurred", "error");
           });
 
           log("✅ Server initialized successfully, waiting for connections...");
+          updateServerStatus("Server initialized", "success");
           
         } catch (error) {
           log("❌ FATAL: Server initialization failed:", error);
+          updateServerStatus("Server initialization failed", "error");
         }
       }
 
       initServer();
     </script>
-  </body>
+</body>
 </html>

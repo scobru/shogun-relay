@@ -1,37 +1,37 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="night">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Public Relay Chat</title>
-    <link rel="stylesheet" href="dharma-style/dharma.css">
-    <style>
-        body { background-color: #222; color: #eee; font-family: "Menlo", "Consolas", monospace; line-height: 1.6; margin: 2em; }
-        h1 { border-bottom: 1px solid #555; padding-bottom: 10px; }
-        a { color: #8af; text-decoration: none; }
-        a:hover { background-color: #333; }
-        .container { max-width: 800px; margin: auto; background-color: #2a2a2a; padding: 2em; border-radius: 5px; border: 1px solid #444; }
-        #messages { height: 400px; overflow-y: scroll; border: 1px solid #444; padding: 1em; margin-bottom: 1em; background-color: #333; border-radius: 4px; }
-        .message-item { margin-bottom: 0.5em; padding-bottom: 0.5em; border-bottom: 1px solid #444; }
-        .message-item:last-child { border-bottom: none; }
-        .message-meta { font-size: 0.8em; color: #aaa; margin-bottom: 5px; }
-        .message-content { word-break: break-all; }
-        input[type="text"] { background-color: #444; color: #eee; border: 1px solid #666; padding: 12px; font-family: inherit; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
-        button { background-color: #444; color: #eee; border: 1px solid #666; padding: 12px 24px; cursor: pointer; font-family: inherit; }
-        button:hover { background-color: #555; }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles/wormhole.css">
     <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
 </head>
-<body>
+<body class="antialiased">
     <div class="container">
-        <a href="/">&larr; Back to Control Panel</a>
-        <h1>Public Relay Chat</h1>
-        <div id="messages"></div>
-        <form id="chatForm">
-            <input type="text" id="usernameInput" placeholder="Your Nickname">
-            <input type="text" id="messageInput" placeholder="Type your message...">
-            <button type="submit">Send</button>
-        </form>
+        <div class="flex items-center mb-4">
+            <a href="/" class="nav-link">&larr; Back to Control Panel</a>
+        </div>
+        
+        <div class="card">
+            <div class="flex flex-col items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                
+                <h1 class="text-2xl font-semibold mb-8">Public Relay Chat</h1>
+                
+                <div id="messages" class="w-full h-96 overflow-y-auto bg-opacity-10 bg-white rounded-xl p-4 mb-4"></div>
+                
+                <form id="chatForm" class="w-full">
+                    <input type="text" id="usernameInput" class="input-custom mb-4" placeholder="Your Nickname">
+                    <input type="text" id="messageInput" class="input-custom" placeholder="Type your message...">
+                    <button type="submit" class="btn-custom w-full">Send</button>
+                </form>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -84,21 +84,20 @@
             if (document.getElementById(messageId)) return; // Avoid duplicates
 
             const messageEl = document.createElement('div');
-            messageEl.className = 'message-item';
+            messageEl.className = 'bg-opacity-10 bg-white rounded-xl p-4 mb-4';
             messageEl.id = messageId;
             
             messageEl.innerHTML = `
-                <div class="message-meta">
-                    <strong>${message.nickname || 'Anonymous'}</strong>
-                    <span style="float: right;">${new Date(message.createdAt).toLocaleString()}</span>
+                <div class="flex justify-between items-center mb-2">
+                    <strong class="text-accent">${message.nickname || 'Anonymous'}</strong>
+                    <span class="text-secondary text-sm">${new Date(message.createdAt).toLocaleString()}</span>
                 </div>
-                <div class="message-content">${message.content || ''}</div>
+                <div class="text-color-text">${message.content || ''}</div>
             `;
             
             messagesEl.appendChild(messageEl);
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
-
     </script>
 </body>
 </html> 
