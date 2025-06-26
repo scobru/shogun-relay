@@ -7,6 +7,8 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="styles/wormhole.css">
+    <!-- Include centralized admin authentication -->
+    <script src="lib/admin-auth.js"></script>
     <style>
         .graph-container {
             display: flex;
@@ -104,7 +106,7 @@
                         <div class="stats">
                             <div class="flex items-center gap-4">
                                 <strong>Authentication:</strong>
-                                <input type="password" id="authToken" class="input-custom flex-1" placeholder="Admin Token">
+                                <input type="password" id="authToken" class="input-custom flex-1" placeholder="Admin Token (auto-loaded if saved)">
                             </div>
                         </div>
 
@@ -248,9 +250,10 @@
         }
 
         function loadAllNodes() {
-            const token = document.getElementById('authToken').value;
+            // Use centralized admin password
+            const token = ShogunAdmin.getPassword() || document.getElementById('authToken').value;
             if (!token) {
-                showError('Admin Token is required to load all graph data.');
+                showError('Admin Token is required to load all graph data. Please set it in the Control Panel.');
                 return;
             }
             showError(''); // Clear previous errors
@@ -419,6 +422,16 @@
         window.toggleNode = toggleNode;
         window.loadNodeFromInput = loadNodeFromInput;
         window.loadAllNodes = loadAllNodes;
+
+        // Initialize admin authentication
+        document.addEventListener('DOMContentLoaded', () => {
+            ShogunAdmin.init({
+                autoFill: true,
+                showIndicator: true,
+                fieldId: 'authToken',
+                syncEnabled: true
+            });
+        });
 
         // Initialize and start updating
         initGun();

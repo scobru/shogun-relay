@@ -7,6 +7,8 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="styles/wormhole.css">
+    <!-- Include centralized admin authentication -->
+    <script src="lib/admin-auth.js"></script>
     <style>
         body { 
             line-height: 1.6;
@@ -123,7 +125,7 @@
 
         .stat-card p {
             font-size: 2rem;
-            margin: 0;
+            margin: 0.5rem 0;
             font-weight: bold;
             color: #eee;
         }
@@ -356,7 +358,7 @@
 
         <section class="section-card">
             <h2>Authentication</h2>
-            <input type="password" id="adminToken" placeholder="Admin Token" />
+            <input type="password" id="adminToken" placeholder="Admin Token (auto-loaded if saved)" />
             <button class="btn btn-primary" onclick="loadStats()">Refresh Stats</button>
         </section>
 
@@ -396,6 +398,29 @@
     </div>
 
     <script>
+        // Initialize admin authentication
+        document.addEventListener('DOMContentLoaded', () => {
+            ShogunAdmin.init({
+                autoFill: true,
+                showIndicator: true,
+                fieldId: 'adminToken',
+                syncEnabled: true
+            });
+            
+            // Auto-load stats if password is available
+            if (ShogunAdmin.hasPassword()) {
+                setTimeout(loadStats, 1000);
+            }
+        });
+
+        // Listen for password updates
+        window.addEventListener('shogun-admin-password-updated', (event) => {
+            if (event.detail.hasPassword) {
+                console.log('Admin password updated, reloading stats...');
+                loadStats();
+            }
+        });
+
         const adminTokenInput = document.getElementById('adminToken');
         const messageEl = document.getElementById('message');
         const loaderEl = document.getElementById('loader');
@@ -429,9 +454,11 @@
             showLoader();
             statsSection.style.display = 'none';
             messageEl.style.display = 'none';
-            const token = adminTokenInput.value;
+            
+            // Use centralized admin password
+            const token = ShogunAdmin.getPassword() || adminTokenInput.value;
             if (!token) {
-                showMessage('Admin Token is required.', true);
+                showMessage('Admin Token is required. Please set it in the Control Panel.', true);
                 hideLoader();
                 return;
             }
@@ -503,9 +530,11 @@
 
             showLoader();
             messageEl.style.display = 'none';
-            const token = adminTokenInput.value;
+            
+            // Use centralized admin password
+            const token = ShogunAdmin.getPassword() || adminTokenInput.value;
             if (!token) {
-                showMessage('Admin Token is required.', true);
+                showMessage('Admin Token is required. Please set it in the Control Panel.', true);
                 hideLoader();
                 return;
             }
@@ -576,20 +605,6 @@
                 exploreBucket(currentBucket, currentContinuationToken);
             }
         }
-        
-        // Auto-load stats if token is in localStorage
-        window.onload = () => {
-            const storedToken = localStorage.getItem('shogun-relay-admin-token');
-            if (storedToken) {
-                adminTokenInput.value = storedToken;
-                loadStats();
-            }
-        };
-
-        adminTokenInput.addEventListener('change', () => {
-             localStorage.setItem('shogun-relay-admin-token', adminTokenInput.value);
-        });
-
     </script>
 </body>
 </html> 

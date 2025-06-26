@@ -7,6 +7,8 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="styles/wormhole.css">
+    <!-- Include centralized admin authentication -->
+    <script src="lib/admin-auth.js"></script>
 </head>
 <body class="antialiased">
     <div class="container mx-auto p-4">
@@ -28,7 +30,7 @@
                             <h2 class="text-xl font-semibold mb-4">Authentication</h2>
                             <div class="form-group">
                                 <label class="block text-sm font-medium mb-2">Auth Token:</label>
-                                <input type="password" id="authToken" class="input-custom" placeholder="Enter your token">
+                                <input type="password" id="authToken" class="input-custom" placeholder="Enter your token (auto-loaded if saved)">
                             </div>
                         </div>
 
@@ -54,6 +56,27 @@
     </div>
 
     <script>
+        // Initialize admin authentication
+        document.addEventListener('DOMContentLoaded', () => {
+            ShogunAdmin.init({
+                autoFill: true,
+                showIndicator: true,
+                fieldId: 'authToken',
+                syncEnabled: true
+            });
+            
+            // Load data after auth setup
+            setTimeout(loadNodeData, 500);
+        });
+
+        // Listen for password updates
+        window.addEventListener('shogun-admin-password-updated', (event) => {
+            if (event.detail.hasPassword) {
+                console.log('Admin password updated, reloading node data...');
+                loadNodeData();
+            }
+        });
+
         const nodePathDisplay = document.getElementById('nodePathDisplay');
         const dataArea = document.getElementById('dataArea');
         const saveBtn = document.getElementById('saveBtn');
@@ -68,9 +91,17 @@
             messageEl.style.display = 'block';
         };
 
-        const getAuthHeader = () => ({ 'Authorization': `Bearer ${authTokenInput.value}` });
+        const getAuthHeader = () => {
+            // Use centralized admin password
+            const token = ShogunAdmin.getPassword() || authTokenInput.value;
+            if (!token) {
+                showMessage('Auth Token is required. Please set it in the Control Panel.');
+                return null;
+            }
+            return { 'Authorization': `Bearer ${token}` };
+        };
 
-        document.addEventListener('DOMContentLoaded', async () => {
+        async function loadNodeData() {
             const params = new URLSearchParams(window.location.search);
             nodePath = params.get('path');
             if (!nodePath) {
@@ -79,8 +110,12 @@
                 return;
             }
             nodePathDisplay.textContent = nodePath;
+            
+            const authHeader = getAuthHeader();
+            if (!authHeader) return;
+            
             try {
-                const response = await fetch(`/node/${nodePath}`, { headers: getAuthHeader() });
+                const response = await fetch(`/node/${nodePath}`, { headers: authHeader });
                 if (!response.ok) {
                     const errorText = await response.text();
                     throw new Error(`HTTP error ${response.status}: ${errorText}`);
@@ -94,15 +129,19 @@
             } catch (err) {
                 showMessage(`Load error: ${err.message}`);
             }
-        });
+        }
 
         saveBtn.addEventListener('click', async () => {
             let data;
             try { data = JSON.parse(dataArea.value); } catch (e) { showMessage('Invalid JSON format.'); return; }
+            
+            const authHeader = getAuthHeader();
+            if (!authHeader) return;
+            
             try {
                 const response = await fetch(`/node/${nodePath}`, {
                     method: 'POST',
-                    headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+                    headers: { ...authHeader, 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
                 if (!response.ok) {
@@ -122,10 +161,14 @@
 
         deleteBtn.addEventListener('click', async () => {
             if (!confirm(`Are you sure you want to delete the node at "${nodePath}"?`)) return;
+            
+            const authHeader = getAuthHeader();
+            if (!authHeader) return;
+            
             try {
                 const response = await fetch(`/node/${nodePath}`, {
                     method: 'DELETE',
-                    headers: getAuthHeader()
+                    headers: authHeader
                 });
                 if (!response.ok) {
                     const errorText = await response.text();

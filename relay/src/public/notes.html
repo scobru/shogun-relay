@@ -7,6 +7,8 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="styles/wormhole.css">
+    <!-- Include centralized admin authentication -->
+    <script src="lib/admin-auth.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
 </head>
@@ -28,7 +30,7 @@
                     <div class="w-full space-y-6">
                         <div class="form-group">
                             <label class="block text-sm font-medium mb-2">Authentication:</label>
-                            <input type="password" id="adminToken" class="input input-bordered w-full" placeholder="Admin Token">
+                            <input type="password" id="adminToken" class="input input-bordered w-full" placeholder="Admin Token (auto-loaded if saved)">
                         </div>
 
                         <div class="form-group">
@@ -63,9 +65,10 @@
         }
         
         async function apiCall(endpoint, method = 'GET', body) {
-            const token = adminTokenInput.value;
+            // Use centralized admin password
+            const token = ShogunAdmin.getPassword() || adminTokenInput.value;
             if (!token) {
-                showMessage('Admin Token is required.', true);
+                showMessage('Admin Token is required. Please set it in the Control Panel.', true);
                 return null;
             }
 
@@ -98,7 +101,8 @@
         }
 
         async function loadNotes() {
-            const secret = adminTokenInput.value;
+            // Use centralized admin password
+            const secret = ShogunAdmin.getPassword() || adminTokenInput.value;
             if (!secret) {
                 notesArea.value = '';
                 return;
@@ -124,9 +128,10 @@
         }
 
         async function saveNotes() {
-            const secret = adminTokenInput.value;
+            // Use centralized admin password
+            const secret = ShogunAdmin.getPassword() || adminTokenInput.value;
             if (!secret) {
-                showMessage('Admin Token is required to encrypt and save notes.', true);
+                showMessage('Admin Token is required to encrypt and save notes. Please set it in the Control Panel.', true);
                 return;
             }
             const notes = notesArea.value;
@@ -149,18 +154,31 @@
             }
         }
 
-        // Auto-load notes if token is stored
-        window.onload = () => {
-            const storedToken = localStorage.getItem('shogun-relay-admin-token');
-            if (storedToken) {
-                adminTokenInput.value = storedToken;
+        // Initialize admin authentication
+        document.addEventListener('DOMContentLoaded', () => {
+            ShogunAdmin.init({
+                autoFill: true,
+                showIndicator: true,
+                fieldId: 'adminToken',
+                syncEnabled: true
+            });
+            
+            // Auto-load notes if password is available
+            if (ShogunAdmin.hasPassword()) {
+                setTimeout(loadNotes, 500);
+            }
+        });
+
+        // Listen for password updates
+        window.addEventListener('shogun-admin-password-updated', (event) => {
+            if (event.detail.hasPassword) {
+                console.log('Admin password updated, reloading notes...');
                 loadNotes();
             }
-        };
+        });
 
         adminTokenInput.addEventListener('change', () => {
-             localStorage.setItem('shogun-relay-admin-token', adminTokenInput.value);
-             loadNotes(); // Load notes when token is entered/changed
+            loadNotes(); // Load notes when token is entered/changed
         });
     </script>
 </body>

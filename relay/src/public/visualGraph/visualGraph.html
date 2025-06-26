@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="styles/wormhole.css" />
     <link rel="stylesheet" href="vGmain.css" />
+    <!-- Include centralized admin authentication -->
+    <script src="../lib/admin-auth.js"></script>
   </head>
   <body class="min-h-screen bg-base-200 text-base-content">
     <div class="navbar bg-base-300">
@@ -46,7 +48,7 @@
                 id="authToken"
                 type="password"
                 class="input input-bordered w-full"
-                placeholder="Enter auth token"
+                placeholder="Enter auth token (auto-loaded if saved)"
               />
             </div>
 
@@ -100,6 +102,21 @@
 
     <!-- Button Logic -->
     <script type="text/javascript">
+      // Initialize admin authentication
+      document.addEventListener('DOMContentLoaded', () => {
+        ShogunAdmin.init({
+          autoFill: true,
+          showIndicator: true,
+          fieldId: 'authToken',
+          syncEnabled: true
+        });
+      });
+
+      // Listen for password updates
+      window.addEventListener('shogun-admin-password-updated', (event) => {
+        console.log('Admin password updated');
+      });
+
       // Status update function
       function updateStatus(message, isError = false) {
         const statusEl = document.getElementById("status");
@@ -136,8 +153,8 @@
         }
         ctx.on("out", function (msg) {
           const to = this.to;
-          const authTokenInput = document.getElementById("authToken");
-          const authToken = authTokenInput ? authTokenInput.value.trim() : "";
+          // Use centralized admin password
+          const authToken = ShogunAdmin.getPassword() || (document.getElementById("authToken") ? document.getElementById("authToken").value.trim() : "");
           if (authToken) {
             // Add headers for all outgoing messages, especially 'put'
             msg.headers = {
@@ -239,7 +256,8 @@
               updateStatus("Start button clicked...");
 
               const relayPeer = document.getElementById("relayPeer").value.trim();
-              const authToken = document.getElementById("authToken").value.trim();
+              // Use centralized admin password
+              const authToken = ShogunAdmin.getPassword() || document.getElementById("authToken").value.trim();
               const key = document.getElementById("key").value.trim();
               const label = document.getElementById("label").value.trim();
 
@@ -251,8 +269,8 @@
               }
 
               if (!authToken) {
-                updateStatus("Please enter an auth token", true);
-                alert("Please enter an auth token");
+                updateStatus("Please enter an auth token. Set it in the Control Panel for automatic loading.", true);
+                alert("Please enter an auth token. Set it in the Control Panel for automatic loading.");
                 return;
               }
 

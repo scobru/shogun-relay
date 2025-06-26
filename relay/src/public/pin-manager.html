@@ -7,6 +7,8 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="styles/wormhole.css">
+    <!-- Include centralized admin authentication -->
+    <script src="lib/admin-auth.js"></script>
     <style>
         .pin-item {
             @apply bg-base-300 p-4 rounded-xl mb-4 border border-base-content/10;
@@ -64,7 +66,7 @@
                     <div class="w-full space-y-6">
                         <div class="form-group">
                             <label class="block text-sm font-medium mb-2">Authentication:</label>
-                            <input type="password" id="adminToken" class="input input-bordered w-full" placeholder="Admin Token">
+                            <input type="password" id="adminToken" class="input input-bordered w-full" placeholder="Admin Token (auto-loaded if saved)">
                         </div>
 
                         <div class="form-group">
@@ -104,6 +106,29 @@
     </div>
 
     <script>
+        // Initialize admin authentication with custom options
+        document.addEventListener('DOMContentLoaded', () => {
+            ShogunAdmin.init({
+                autoFill: true,
+                showIndicator: true,
+                fieldId: 'adminToken',
+                syncEnabled: true
+            });
+            
+            // Auto-load pins if password is available
+            if (ShogunAdmin.hasPassword()) {
+                setTimeout(listPins, 1000);
+            }
+        });
+
+        // Listen for password updates
+        window.addEventListener('shogun-admin-password-updated', (event) => {
+            if (event.detail.hasPassword) {
+                console.log('Admin password updated, reloading pins...');
+                listPins();
+            }
+        });
+
         const adminTokenInput = document.getElementById('adminToken');
         const cidInput = document.getElementById('cidInput');
         const messageEl = document.getElementById('message');
@@ -149,9 +174,10 @@
             }
 
             try {
-                const token = adminTokenInput.value;
+                // Use centralized admin password
+                const token = ShogunAdmin.getPassword() || adminTokenInput.value;
                 if (!token) {
-                    throw new Error('Admin Token is required.');
+                    throw new Error('Admin Token is required. Please set it in the Control Panel.');
                 }
 
                 messageEl.style.display = 'none';

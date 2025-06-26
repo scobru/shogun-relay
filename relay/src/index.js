@@ -82,7 +82,12 @@ const testPort = (port) => {
 // Configuration
 let host = process.env.RELAY_HOST || ip.address();
 let store = process.env.RELAY_STORE !== "false";
-let port = process.env.RELAY_PORT || process.env.PORT || 8765;
+// Ensure port is always a valid integer, fallback to 8765 if NaN
+let port = parseInt(process.env.RELAY_PORT || process.env.PORT || 8765);
+if (isNaN(port) || port <= 0 || port >= 65536) {
+  console.warn(`⚠️ Invalid port detected: ${process.env.RELAY_PORT || process.env.PORT}, falling back to 8765`);
+  port = 8765;
+}
 let path_public = process.env.RELAY_PATH || "public";
 let showQr = process.env.RELAY_QR !== "false";
 
@@ -141,6 +146,13 @@ async function initializeServer() {
     console.log('🗑️ Running Garbage Collector...');
     let cleanedCount = 0;
     const now = Date.now();
+    
+    // Ensure gun is initialized before accessing its properties
+    if (!gun || !gun._ || !gun._.graph) {
+      console.warn('⚠️ Gun not initialized yet, skipping garbage collection');
+      return;
+    }
+    
     const graph = gun._.graph;
 
     for (const soul in graph) {
@@ -170,12 +182,17 @@ async function initializeServer() {
     }
   }
 
-  // Schedule the garbage collector to run periodically
-  if (GC_ENABLED) {
-    setInterval(runGarbageCollector, GC_INTERVAL);
-    console.log(`✅ Garbage Collector scheduled to run every ${GC_INTERVAL / 1000 / 60} minutes.`);
-    // Run once on startup after a delay
-    setTimeout(runGarbageCollector, 30 * 1000); // Run 30s after start
+  // Store GC interval reference for cleanup
+  let gcInterval = null;
+  
+  // Schedule the garbage collector to run periodically (after gun is initialized)
+  function initializeGarbageCollector() {
+    if (GC_ENABLED) {
+      gcInterval = setInterval(runGarbageCollector, GC_INTERVAL);
+      console.log(`✅ Garbage Collector scheduled to run every ${GC_INTERVAL / 1000 / 60} minutes.`);
+      // Run once on startup after a delay
+      setTimeout(runGarbageCollector, 30 * 1000); // Run 30s after start
+    }
   }
 
   // Add listener based on the provided example
@@ -753,6 +770,9 @@ async function initializeServer() {
   }
 
   const gun = Gun(gunConfig);
+  
+  // Initialize garbage collector now that gun is ready
+  initializeGarbageCollector();
 
   gun.on("hi", () => {
     totalConnections += 1;
@@ -2014,6 +2034,12 @@ async function initializeServer() {
   // Graceful shutdown
   async function shutdown() {
     console.log("\nShutting down relay server...");
+
+    // Clear garbage collector interval
+    if (gcInterval) {
+      clearInterval(gcInterval);
+      console.log('🗑️ Garbage Collector stopped');
+    }
 
     if (db) {
       db.get("status").put("stopping");

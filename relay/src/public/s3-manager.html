@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>S3 File Manager</title>
     <link rel="stylesheet" href="dharma-style/dharma.css">
+    <!-- Include centralized admin authentication -->
+    <script src="lib/admin-auth.js"></script>
     <style>
         body { 
             background-color: #222; 
@@ -204,7 +206,7 @@
         <!-- Authentication Section -->
         <div class="auth-section">
             <h3>Authentication</h3>
-            <input type="password" id="authToken" placeholder="Enter admin token (S3RVER)" style="margin-bottom: 10px;">
+            <input type="password" id="authToken" placeholder="Enter admin token (auto-loaded if saved)" style="margin-bottom: 10px;">
             <button class="btn btn-primary" onclick="connectToS3()">Connect to S3</button>
             <span id="connectionStatus" style="margin-left: 15px; color: #aaa;">Not connected</span>
         </div>
@@ -243,15 +245,39 @@
     </div>
 
     <script>
+        // Initialize admin authentication
+        document.addEventListener('DOMContentLoaded', () => {
+            ShogunAdmin.init({
+                autoFill: true,
+                showIndicator: true,
+                fieldId: 'authToken',
+                syncEnabled: true
+            });
+            
+            // Auto-connect if password is available
+            if (ShogunAdmin.hasPassword()) {
+                setTimeout(connectToS3, 500);
+            }
+        });
+
+        // Listen for password updates
+        window.addEventListener('shogun-admin-password-updated', (event) => {
+            if (event.detail.hasPassword) {
+                console.log('Admin password updated, attempting auto-connect...');
+                connectToS3();
+            }
+        });
+
         let authToken = '';
         let selectedFiles = [];
         let isConnected = false;
 
         // Authentication
         function connectToS3() {
-            authToken = document.getElementById('authToken').value.trim();
+            // Use centralized admin password
+            authToken = ShogunAdmin.getPassword() || document.getElementById('authToken').value.trim();
             if (!authToken) {
-                showMessage('Please enter your admin token', 'error');
+                showMessage('Please enter your admin token. Set it in the Control Panel for automatic loading.', 'error');
                 return;
             }
 
@@ -577,9 +603,6 @@
                 messageEl.style.display = 'none';
             }, 5000);
         }
-
-        // Auto-focus token input
-        document.getElementById('authToken').focus();
     </script>
 </body>
 </html> 
