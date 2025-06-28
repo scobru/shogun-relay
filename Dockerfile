@@ -30,7 +30,7 @@ RUN apk add --no-cache libc6-compat \
 
 # Create IPFS user and directories
 RUN adduser -D -s /bin/sh ipfs \
-    && mkdir -p /data/ipfs /app/relay /app/fakes3 /var/log/supervisor \
+    && mkdir -p /data/ipfs /app/relay /app/fakes3/buckets /var/log/supervisor \
     && mkdir -p /home/ipfs/.config/ipfs/denylists /root/.config/ipfs/denylists \
     && chown -R ipfs:ipfs /data/ipfs /home/ipfs/.config \
     && chmod -R 755 /home/ipfs/.config /root/.config
