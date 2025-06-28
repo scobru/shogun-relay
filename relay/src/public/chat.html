@@ -67,7 +67,7 @@
             };
 
             // Save message to a public, chronological list
-            gun.get('public-chat').put(messageObject);
+            gun.get('public-chat').set(messageObject);
             
             messageInput.value = '';
             messageInput.focus();

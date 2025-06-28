@@ -866,6 +866,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Built with ❤️ by the Shogun Team**
+**Built with ❤️ by Scobru**
 
-*Part of the [Shogun Ecosystem](https://github.com/your-org/shogun-2) - Decentralized infrastructure for the future of the web.*
+*Part of the [Shogun Ecosystem](https://github.com/scobru/shogun) - Decentralized infrastructure for the future of the web.*
