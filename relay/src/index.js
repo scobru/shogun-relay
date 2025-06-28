@@ -53,6 +53,8 @@ const GC_EXCLUDED_NAMESPACES = [
 
   // --- APPLICATION DATA ---
   // Add other persistent application namespaces here.
+  'shogun-auth-app',
+  'shogun',
   'hal9000', // Example: protect blog posts
   'shogun-relay',
   'shogun-wormhole',
