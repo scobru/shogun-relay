@@ -156,7 +156,6 @@
       const fileInput = document.getElementById("fileInput");
       const uploadBtn = document.getElementById("uploadBtn");
       const messageEl = document.getElementById("message");
-      const adminTokenInput = document.getElementById("adminToken");
       const encryptCheck = document.getElementById("encryptCheck");
       const dropArea = document.getElementById("dropArea");
       const uploadProgress = document.getElementById("uploadProgress");
@@ -220,7 +219,7 @@
       uploadBtn.addEventListener("click", async () => {
         const file = fileInput.files[0];
         // Use centralized admin password
-        const token = ShogunAdmin.getPassword() || adminTokenInput.value;
+        const token = ShogunAdmin.getPassword();
 
         if (!token) {
           showMessage("Admin Token is required. Please set it in the Control Panel.");

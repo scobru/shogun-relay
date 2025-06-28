@@ -124,7 +124,6 @@
             }
         });
 
-        const adminTokenInput = document.getElementById('adminToken');
         const cidInput = document.getElementById('cidInput');
         const messageEl = document.getElementById('message');
         const pinListEl = document.getElementById('pinList');
@@ -170,7 +169,7 @@
 
             try {
                 // Use centralized admin password
-                const token = ShogunAdmin.getPassword() || adminTokenInput.value;
+                const token = ShogunAdmin.getPassword();
                 if (!token) {
                     throw new Error('Admin Token is required. Please set it in the Control Panel.');
                 }

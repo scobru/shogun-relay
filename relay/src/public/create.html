@@ -68,7 +68,6 @@
         const dataArea = document.getElementById('dataArea');
         const createBtn = document.getElementById('createBtn');
         const messageEl = document.getElementById('message');
-        const authTokenInput = document.getElementById('authToken');
 
         const showMessage = (text, type = 'error') => {
             messageEl.textContent = text;
@@ -84,7 +83,7 @@
             
             try {
                 // Use centralized admin password
-                const token = ShogunAdmin.getPassword() || authTokenInput.value;
+                const token = ShogunAdmin.getPassword();
                 if (!token) {
                     showMessage('Auth Token is required. Please set it in the Control Panel.');
                     return;

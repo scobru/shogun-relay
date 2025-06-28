@@ -57,7 +57,9 @@ const GC_EXCLUDED_NAMESPACES = [
   'shogun-relay',
   'shogun-wormhole',
   'shogun-hal9000', // Example: protect blog posts
-
+  'the-swan-station',
+  'wormhole',
+  'public-chat'
 ];
 // Data older than this will be deleted (milliseconds). Default: 24 hours.
 const EXPIRATION_AGE = process.env.GC_EXPIRATION_AGE || 24 * 60 * 60 * 1000;
@@ -745,6 +747,10 @@ async function initializeServer() {
   // Test S3 connection before initializing Gun
   console.log("🧪 Testing S3 configuration before Gun initialization...");
 
+  const peersString = process.env.RELAY_PEERS;
+  const peers = peersString ? peersString.split(',') : [];
+  console.log("🔍 Peers:", peers);
+
   // Initialize Gun with conditional S3 support
   const gunConfig = {
     // super: false,
@@ -758,6 +764,7 @@ async function initializeServer() {
     rfs: true,
     wait: 500,
     webrtc:true,
+    peers: [peers],
   };
 
   // Only add S3 if explicitly enabled and configured properly

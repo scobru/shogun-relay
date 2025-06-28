@@ -69,7 +69,6 @@
         const resultPath = document.getElementById('resultPath');
         const resultData = document.getElementById('resultData');
         const messageEl = document.getElementById('message');
-        const authTokenInput = document.getElementById('authToken');
 
         const showMessage = (text, type = 'error') => {
             messageEl.textContent = text;
@@ -79,7 +78,7 @@
         };
 
         const getAuthHeader = () => {
-            const token = ShogunAdmin.getPassword() || authTokenInput.value;
+            const token = ShogunAdmin.getPassword();
             if (!token) {
                 showMessage('Auth Token is required. Please set it in the Control Panel.');
                 return null;
