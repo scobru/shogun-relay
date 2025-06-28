@@ -183,7 +183,7 @@
         updateStatus(`Creating Gun instance with peer: ${currentPeer}`);
 
         try {
-          gun = new Gun(peers);
+          gun = Gun(peers);
 
           let graph = {
             nodes: [],
