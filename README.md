@@ -461,9 +461,11 @@ POST /api/derive
 ### Web Interface Features
 
 #### Control Panel (`/`)
-- Server status and configuration
-- Real-time connection monitoring
-- Quick access to all admin tools
+- **Centralized Authentication**: Single admin token management for all tools
+- Server status and configuration with real-time metrics
+- Real-time connection monitoring and health indicators
+- Quick access to all admin tools with streamlined navigation
+- Auto-sync password across all interface components
 
 #### Statistics Dashboard (`/stats`)
 - Real-time performance metrics
@@ -488,16 +490,32 @@ POST /api/derive
 - `/notes` - Admin notes and documentation
 - `/pin-manager` - IPFS pin management
 - `/s3-dashboard` - S3 storage monitoring
+- `/visualGraph` - Interactive graph visualization
+- `/derive` - Shogun key derivation tool
+- `/client` - Minimal messenger interface
+- `/chat` - Public relay chat
 
 ### Security Features
 
-#### Authentication System
+#### Centralized Authentication System
+The relay features a centralized authentication system using `admin-auth.js`:
+
+- **Centralized Token Management**: Set admin token once in the Control Panel
+- **Auto-fill Functionality**: Automatically loads saved tokens across all pages
+- **Secure Storage**: Tokens are stored securely in localStorage
+- **Sync Across Pages**: Token updates propagate to all open tabs
+
 ```javascript
 // All admin endpoints require authentication
 Authorization: Bearer <admin-password>
 // or
 token: <admin-password>
 ```
+
+#### Optimized UI
+- **Removed Redundant Auth Boxes**: Authentication is now centralized in index.html
+- **Streamlined Interface**: Cleaner UI without repetitive authentication fields
+- **Auto-loading**: Admin tokens are automatically loaded where needed
 
 #### Request Validation
 - Input sanitization and validation
@@ -663,6 +681,19 @@ Connect to the relay from your application:
 ```javascript
 // Gun.js client
 const gun = Gun(['http://localhost:8765/gun']);
+
+// With authentication middleware for admin operations
+Gun.on("opt", function (ctx) {
+  if (ctx.once) return;
+  ctx.on("out", function (msg) {
+    const to = this.to;
+    const authToken = 'your-admin-token';
+    if (authToken && msg.put) {
+      msg.headers = { ...msg.headers, token: authToken };
+    }
+    to.next(msg);
+  });
+});
 
 // Shogun Core integration
 import { ShogunCore } from 'shogun-core';

@@ -781,6 +781,9 @@ async function initializeServer() {
   // Initialize garbage collector now that gun is ready
   initializeGarbageCollector();
 
+  // Set up relay stats database
+  const db = gun.get(namespace).get("relays").get(host);
+
   gun.on("hi", () => {
     totalConnections += 1;
     activeWires += 1;
@@ -796,9 +799,6 @@ async function initializeServer() {
   });
 
   gun.on("out", { get: { "#": { "*": "" } } });
-
-  // Set up relay stats database
-  const db = gun.get(namespace).get("relays").get(host);
 
   // Set up pulse interval for health monitoring
   setSelfAdjustingInterval(() => {
@@ -1506,7 +1506,6 @@ async function initializeServer() {
   });
 
   // --- Static Files & Page Routes ---
-  app.use(express.static(publicPath));
 
   const cleanReturnString = (value) => {
     if (!value) return "";
@@ -1999,6 +1998,8 @@ async function initializeServer() {
         res.json({ success: true, message: 'Notes deleted.' });
     });
   });
+
+
 
   // Fallback to index.html
   app.get("/*", (req, res) => {
