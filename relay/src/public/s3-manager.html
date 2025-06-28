@@ -26,19 +26,6 @@
                     <h1 class="text-2xl font-semibold mb-8">S3 File Manager</h1>
 
                     <div class="w-full space-y-6">
-                        <!-- Authentication Section -->
-                        <div class="form-group">
-                            <label class="block text-sm font-medium mb-2">Authentication:</label>
-                            <div class="flex gap-2">
-                                <input type="password" id="authToken" class="input input-bordered flex-1" placeholder="Admin token (auto-loaded if saved)">
-                                <button class="btn btn-primary" onclick="connectToS3()">Connect to S3</button>
-                            </div>
-                            <div class="flex items-center mt-2">
-                                <span class="text-sm">Status:</span>
-                                <span id="connectionStatus" class="ml-2 text-sm opacity-70">Not connected</span>
-                            </div>
-                        </div>
-
                         <!-- Upload Section -->
                         <div id="uploadSection" class="form-group hidden">
                             <label class="block text-sm font-medium mb-2">Upload Files:</label>
@@ -121,12 +108,12 @@
         let selectedFiles = [];
         let isConnected = false;
 
-        // Authentication
+        // Authentication - Auto-connect on page load
         function connectToS3() {
             // Use centralized admin password
-            authToken = ShogunAdmin.getPassword() || document.getElementById('authToken').value.trim();
+            authToken = ShogunAdmin.getPassword();
             if (!authToken) {
-                showMessage('Please enter your admin token. Set it in the Control Panel for automatic loading.', 'error');
+                showMessage('Admin token required. Please set it in the Control Panel for automatic loading.', 'error');
                 return;
             }
 
@@ -146,8 +133,6 @@
                     const data = await response.json();
                     if (data.success) {
                         isConnected = true;
-                        document.getElementById('connectionStatus').textContent = '✅ Connected';
-                        document.getElementById('connectionStatus').className = 'ml-2 text-sm text-success';
                         document.getElementById('uploadSection').classList.remove('hidden');
                         document.getElementById('fileListSection').classList.remove('hidden');
                         showMessage(`Connected! Found ${data.stats.totalBuckets} buckets with ${data.stats.totalObjects} files`, 'success');
@@ -161,8 +146,6 @@
             } catch (error) {
                 console.error('S3 connection error:', error);
                 showMessage(`Connection failed: ${error.message}`, 'error');
-                document.getElementById('connectionStatus').textContent = '❌ Connection failed';
-                document.getElementById('connectionStatus').className = 'ml-2 text-sm text-error';
             }
         }
 

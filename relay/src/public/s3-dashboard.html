@@ -356,12 +356,6 @@
             <div class="loader-spinner"></div>
         </div>
 
-        <section class="section-card">
-            <h2>Authentication</h2>
-            <input type="password" id="adminToken" placeholder="Admin Token (auto-loaded if saved)" />
-            <button class="btn btn-primary" onclick="loadStats()">Refresh Stats</button>
-        </section>
-
         <div id="message" style="display: none;"></div>
         
         <section id="stats-section" style="display: none;">
@@ -421,7 +415,6 @@
             }
         });
 
-        const adminTokenInput = document.getElementById('adminToken');
         const messageEl = document.getElementById('message');
         const loaderEl = document.getElementById('loader');
         const statsSection = document.getElementById('stats-section');
@@ -456,7 +449,7 @@
             messageEl.style.display = 'none';
             
             // Use centralized admin password
-            const token = ShogunAdmin.getPassword() || adminTokenInput.value;
+            const token = ShogunAdmin.getPassword();
             if (!token) {
                 showMessage('Admin Token is required. Please set it in the Control Panel.', true);
                 hideLoader();
@@ -532,7 +525,7 @@
             messageEl.style.display = 'none';
             
             // Use centralized admin password
-            const token = ShogunAdmin.getPassword() || adminTokenInput.value;
+            const token = ShogunAdmin.getPassword();
             if (!token) {
                 showMessage('Admin Token is required. Please set it in the Control Panel.', true);
                 hideLoader();
