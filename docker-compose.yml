@@ -14,7 +14,7 @@ services:
       # Persist IPFS data
       - ipfs-data:/data/ipfs
       # Persist S3 data
-      - ./s3-data:/app/fakes3/buckets
+      - s3-data:/app/fakes3/buckets
       # Persist relay data
       - relay-data:/app/relay/radata
       # Mount logs for debugging
@@ -73,8 +73,8 @@ services:
 volumes:
   ipfs-data:
     driver: local
-  # s3-data:
-  #   driver: local
+  s3-data:
+    driver: local
   relay-data:
     driver: local
   ipfs-external-data:
