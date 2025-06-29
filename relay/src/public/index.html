@@ -20,8 +20,8 @@
                     <h1 id="relay-title" class="text-3xl font-semibold mb-8">Shogun Relay Control Panel</h1>
                     <p class="text-secondary mb-8">Select a tool to continue<span class="animate-pulse">_</span></p>
 
-                    <!-- Admin Password Section -->
-                    <div class="w-full max-w-md mb-8 p-6 bg-base-300/50 rounded-xl border border-base-content/20">
+                    <!-- Admin Password Section - Hidden when password exists -->
+                    <div id="adminPasswordSection" class="w-full max-w-md mb-8 p-6 bg-base-300/50 rounded-xl border border-base-content/20" style="display: none;">
                         <div class="flex items-center gap-3 mb-4">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
@@ -176,6 +176,22 @@
         </div>
     </div>
 
+    <!-- Footer -->
+    <footer class="mt-12 py-8 border-t border-border-color bg-base-200/50">
+        <div class="container mx-auto text-center">
+            <p class="text-gray-400 mb-4">
+                <a href="https://github.com/scobru/shogun-relay" class="text-blue-500 hover:text-blue-400">repo</a>
+                {" - "}
+                build with ❤️ by {" "}
+                <a href="https://github.com/scobru" class="text-blue-500 hover:text-blue-400">scobru</a>
+            </p>
+            <p class="text-gray-400 mb-4">
+                part of {" "}
+                <a href="https://shogun-info.vercel.app" class="text-blue-500 hover:text-blue-400">shogun project</a>
+            </p>
+        </div>
+    </footer>
+
     <script>
         // ==========================================
         // CENTRALIZED ADMIN PASSWORD MANAGEMENT
@@ -200,7 +216,8 @@
                 // Broadcast password update to other tabs/windows
                 broadcastPasswordUpdate();
 
-                
+                // Hide the admin password section
+                document.getElementById('adminPasswordSection').style.display = 'none';
                 
             } catch (error) {
                 updatePasswordStatus('❌ Failed to save password', 'text-error');
@@ -216,6 +233,9 @@
                 
                 // Broadcast password clear to other tabs/windows
                 broadcastPasswordUpdate();
+                
+                // Show the admin password section
+                document.getElementById('adminPasswordSection').style.display = 'block';
                 
             } catch (error) {
                 updatePasswordStatus('❌ Failed to clear password', 'text-error');
@@ -331,6 +351,10 @@
         // ==========================================
         
         window.addEventListener('load', async () => {
+            // Check if password exists and show/hide section accordingly
+            const hasPassword = localStorage.getItem(ADMIN_PASSWORD_KEY);
+            document.getElementById('adminPasswordSection').style.display = hasPassword ? 'none' : 'block';
+            
             // Load admin password status
             loadStoredPassword();
             
