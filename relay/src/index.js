@@ -252,7 +252,7 @@ async function initializeServer() {
 
       // If we're here, it's a `put` from a peer that MUST be authenticated.
       const valid =
-        msg.headers.token && msg.headers.token === process.env.ADMIN_PASSWORD;
+        msg && msg.headers && msg.headers.token && msg.headers.token === process.env.ADMIN_PASSWORD;
 
       if (valid) {
         console.log("PEER PUT ALLOWED (valid token):", Object.keys(msg.put));
