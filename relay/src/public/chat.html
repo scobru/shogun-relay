@@ -67,14 +67,14 @@
             };
 
             // Save message to a public, chronological list
-            gun.get('public-chat').set(messageObject);
+            gun.get('shogun-relay').get('public-chat').set(messageObject);
             
             messageInput.value = '';
             messageInput.focus();
         });
 
         // Listen for new messages
-        gun.get('public-chat').map().on((message, id) => {
+        gun.get('shogun-relay').get('public-chat').map().on((message, id) => {
             if (!message) return;
             renderMessage(message);
         });
