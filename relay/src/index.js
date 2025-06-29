@@ -13,7 +13,7 @@ import qr from "qr";
 import setSelfAdjustingInterval from "self-adjusting-interval";
 import AWS from "aws-sdk";
 import FormData from "form-data";
-import fetch from 'node-fetch';
+import "./utils/bullet-catcher.js";
 
 dotenv.config();
 
@@ -40,28 +40,28 @@ import multer from "multer";
 const namespace = "shogun-relay";
 
 // --- IPFS Configuration ---
-const IPFS_API_URL = process.env.IPFS_API_URL || 'http://127.0.0.1:5001';
+const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
 
 // --- Garbage Collection Configuration ---
-const GC_ENABLED = process.env.GC_ENABLED === 'true';
+const GC_ENABLED = process.env.GC_ENABLED === "true";
 // Namespaces to protect from garbage collection.
 const GC_EXCLUDED_NAMESPACES = [
   // --- CRITICAL GUN METADATA ---
-  '~', // Protects all user spaces, including user data and aliases (~@username).
-  '!', // Protects the root node, often used for system-level pointers.
-  'relays', // Protects relay server health-check data.
+  "~", // Protects all user spaces, including user data and aliases (~@username).
+  "!", // Protects the root node, often used for system-level pointers.
+  "relays", // Protects relay server health-check data.
 
   // --- APPLICATION DATA ---
   // Add other persistent application namespaces here.
-  'shogun-auth-app',
-  'shogun',
-  'hal9000', // Example: protect blog posts
-  'shogun-relay',
-  'shogun-wormhole',
-  'shogun-hal9000', // Example: protect blog posts
-  'the-swan-station',
-  'wormhole',
-  'public-chat'
+  "shogun-auth-app",
+  "shogun",
+  "hal9000", // Example: protect blog posts
+  "shogun-relay",
+  "shogun-wormhole",
+  "shogun-hal9000", // Example: protect blog posts
+  "the-swan-station",
+  "wormhole",
+  "public-chat",
 ];
 // Data older than this will be deleted (milliseconds). Default: 24 hours.
 const EXPIRATION_AGE = process.env.GC_EXPIRATION_AGE || 24 * 60 * 60 * 1000;
@@ -89,7 +89,11 @@ let store = process.env.RELAY_STORE !== "false";
 // Ensure port is always a valid integer, fallback to 8765 if NaN
 let port = parseInt(process.env.RELAY_PORT || process.env.PORT || 8765);
 if (isNaN(port) || port <= 0 || port >= 65536) {
-  console.warn(`⚠️ Invalid port detected: ${process.env.RELAY_PORT || process.env.PORT}, falling back to 8765`);
+  console.warn(
+    `⚠️ Invalid port detected: ${
+      process.env.RELAY_PORT || process.env.PORT
+    }, falling back to 8765`
+  );
   port = 8765;
 }
 let path_public = process.env.RELAY_PATH || "public";
@@ -144,25 +148,27 @@ async function initializeServer() {
   // --- Garbage Collection Service ---
   function runGarbageCollector() {
     if (!GC_ENABLED) {
-      console.log('🗑️ Garbage Collector is disabled.');
+      console.log("🗑️ Garbage Collector is disabled.");
       return;
     }
-    console.log('🗑️ Running Garbage Collector...');
+    console.log("🗑️ Running Garbage Collector...");
     let cleanedCount = 0;
     const now = Date.now();
-    
+
     // Ensure gun is initialized before accessing its properties
     if (!gun || !gun._ || !gun._.graph) {
-      console.warn('⚠️ Gun not initialized yet, skipping garbage collection');
+      console.warn("⚠️ Gun not initialized yet, skipping garbage collection");
       return;
     }
-    
+
     const graph = gun._.graph;
 
     for (const soul in graph) {
       if (Object.prototype.hasOwnProperty.call(graph, soul)) {
         // Check if the soul is in a protected namespace
-        const isProtected = GC_EXCLUDED_NAMESPACES.some(ns => soul.startsWith(ns));
+        const isProtected = GC_EXCLUDED_NAMESPACES.some((ns) =>
+          soul.startsWith(ns)
+        );
 
         if (isProtected) {
           continue; // Skip protected data
@@ -170,7 +176,7 @@ async function initializeServer() {
 
         const node = graph[soul];
         // Check for expiration timestamp on non-protected data
-        if (node && node.createdAt && (now - node.createdAt > EXPIRATION_AGE)) {
+        if (node && node.createdAt && now - node.createdAt > EXPIRATION_AGE) {
           // Nullify the node to delete it from Gun
           gun.get(soul).put(null);
           cleanedCount++;
@@ -180,93 +186,56 @@ async function initializeServer() {
     }
 
     if (cleanedCount > 0) {
-      console.log(`🗑️ Garbage Collector finished. Cleaned ${cleanedCount} expired nodes.`);
+      console.log(
+        `🗑️ Garbage Collector finished. Cleaned ${cleanedCount} expired nodes.`
+      );
     } else {
-      console.log('🗑️ Garbage Collector finished. No expired nodes found.');
+      console.log("🗑️ Garbage Collector finished. No expired nodes found.");
     }
   }
 
   // Store GC interval reference for cleanup
   let gcInterval = null;
-  
+
   // Schedule the garbage collector to run periodically (after gun is initialized)
   function initializeGarbageCollector() {
     if (GC_ENABLED) {
       gcInterval = setInterval(runGarbageCollector, GC_INTERVAL);
-      console.log(`✅ Garbage Collector scheduled to run every ${GC_INTERVAL / 1000 / 60} minutes.`);
+      console.log(
+        `✅ Garbage Collector scheduled to run every ${
+          GC_INTERVAL / 1000 / 60
+        } minutes.`
+      );
       // Run once on startup after a delay
       setTimeout(runGarbageCollector, 30 * 1000); // Run 30s after start
     }
   }
 
-  // Add listener based on the provided example
-  Gun.on("opt", function (ctx) {
-    if (ctx.once) {
-      return;
+  function hasValidToken(msg) {
+    if(process.env.RELAY_PROTECTED === "false") {
+      console.log("🔍 PUT allowed - protected disabled");
+      return true;
     }
-    // Check all incoming traffic
-    ctx.on("in", function (msg) {
-      const to = this.to;
+    // Analizza le anime (souls) che sta cercando di modificare
+    const souls = Object.keys(msg.put || {});
+    // Se ha headers, verifica il token
+    if (msg && msg && msg.headers && msg.headers.token && msg.headers.token) {
+      const hasValidAuth =
+        msg.headers.token === process.env.ADMIN_PASSWORD ||
+        msg.headers.Authorization === `Bearer ${process.env.ADMIN_PASSWORD}`;
 
-      // Track requests in our custom stats
-      if (msg.get) {
-        customStats.getRequests++;
-      }
-
-      // First, let any message that is not a write (`put`) pass through.
-      if (!msg.put) {
-        return to.next(msg);
-      }
-
-      // --- Garbage Collection Timestamping ---
-      // For every incoming write, check if it's for a protected namespace.
-      // If not, inject a `createdAt` timestamp so it can be cleaned up later.
-      if (GC_ENABLED) {
-        Object.keys(msg.put).forEach(soul => {
-            const isProtected = GC_EXCLUDED_NAMESPACES.some(ns => soul.startsWith(ns));
-            if (!isProtected) {
-                // This is ephemeral data, stamp it for future garbage collection.
-                const node = msg.put[soul];
-                if (node && typeof node === 'object' && !node.createdAt) {
-                    node.createdAt = Date.now();
-                }
-            }
-        });
-      }
-      // --- End Garbage Collection Timestamping ---
-
-      // Now we know it's a `put` message. We need to determine if it's
-      // from an external peer or from the relay's internal storage.
-
-      // Internal puts (from radisk) will NOT have a `headers` object.
-      // if (!msg.headers) {
-      //   console.log(
-      //     "INTERNAL PUT ALLOWED (from storage):",
-      //     Object.keys(msg.put)
-      //   );
-      //   return to.next(msg);
-      // }
-
-      // Track PUT requests from peers
-      customStats.putRequests++;
-
-      // If we're here, it's a `put` from a peer that MUST be authenticated.
-      const valid =
-        msg && msg.headers && msg.headers.token && msg.headers.token === process.env.ADMIN_PASSWORD;
-
-      if (valid) {
-        console.log("PEER PUT ALLOWED (valid token):", Object.keys(msg.put));
-        return to.next(msg);
+      if (hasValidAuth) {
+        console.log(`✅ PUT allowed - valid auth for: ${souls[0]}`);
+        return true;
       } else {
-        const error = "Unauthorized: Invalid or missing token.";
-        console.log("PEER PUT REJECTED (invalid token):", Object.keys(msg.put));
-        return to.next({
-          "@": msg["@"],
-          err: error,
-        });
+        console.log(`🚫 PUT blocked - invalid token: ${souls[0]}`);
+        return false;
       }
-    });
-  });
+    } else {
+      console.log(`🚫 PUT blocked - No headers: ${souls[0]}`);
+      return false;
+    }
+  }
 
   const app = express();
   const publicPath = path.resolve(__dirname, path_public);
@@ -281,174 +250,194 @@ async function initializeServer() {
   const upload = multer({ storage: multer.memoryStorage() });
   const tokenAuthMiddleware = (req, res, next) => {
     // Check Authorization header (Bearer token)
-    const authHeader = req.headers['authorization'];
-    const bearerToken = authHeader && authHeader.split(' ')[1];
-    
+    const authHeader = req.headers["authorization"];
+    const bearerToken = authHeader && authHeader.split(" ")[1];
+
     // Check custom token header (for Gun/Wormhole compatibility)
-    const customToken = req.headers['token'];
-    
+    const customToken = req.headers["token"];
+
     // Accept either format
     const token = bearerToken || customToken;
-    
-    if (token === process.env.ADMIN_PASSWORD) { // Use a more secure token in production
-        next();
+
+    if (token === process.env.ADMIN_PASSWORD) {
+      // Use a more secure token in production
+      next();
     } else {
-        console.log('Auth failed - Bearer:', bearerToken, 'Custom:', customToken);
-        res.status(401).json({ success: false, error: 'Unauthorized' });
+      console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
+      res.status(401).json({ success: false, error: "Unauthorized" });
     }
   };
 
   // IPFS File Upload Endpoint (Consolidated and Fixed)
-  app.post('/ipfs-upload', tokenAuthMiddleware, upload.single('file'), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          error: "No file provided",
+  app.post(
+    "/ipfs-upload",
+    tokenAuthMiddleware,
+    upload.single("file"),
+    async (req, res) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({
+            success: false,
+            error: "No file provided",
+          });
+        }
+
+        const formData = new FormData();
+        formData.append("file", req.file.buffer, {
+          filename: req.file.originalname,
+          contentType: req.file.mimetype,
         });
-      }
 
-      const formData = new FormData();
-      formData.append("file", req.file.buffer, {
-        filename: req.file.originalname,
-        contentType: req.file.mimetype,
-      });
+        const requestOptions = {
+          hostname: "127.0.0.1",
+          port: 5001,
+          path: "/api/v0/add?wrap-with-directory=false",
+          method: "POST",
+          headers: {
+            ...formData.getHeaders(),
+          },
+        };
 
-      const requestOptions = {
-        hostname: "127.0.0.1",
-        port: 5001,
-        path: "/api/v0/add?wrap-with-directory=false",
-        method: "POST",
-        headers: {
-          ...formData.getHeaders(),
-        },
-      };
-      
-      const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN || process.env.IPFS_API_KEY;
-      if (IPFS_API_TOKEN) {
-        requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
-      }
+        const IPFS_API_TOKEN =
+          process.env.IPFS_API_TOKEN || process.env.IPFS_API_KEY;
+        if (IPFS_API_TOKEN) {
+          requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+        }
 
-      const ipfsReq = http.request(requestOptions, (ipfsRes) => {
-        let data = "";
-        ipfsRes.on("data", (chunk) => (data += chunk));
-        ipfsRes.on("end", () => {
-          console.log("📤 IPFS Upload raw response:", data);
+        const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+          let data = "";
+          ipfsRes.on("data", (chunk) => (data += chunk));
+          ipfsRes.on("end", () => {
+            console.log("📤 IPFS Upload raw response:", data);
 
-          try {
-            const lines = data.trim().split("\n");
-            const results = lines.map((line) => JSON.parse(line));
-            const fileResult = results.find((r) => r.Name === req.file.originalname) || results[0];
+            try {
+              const lines = data.trim().split("\n");
+              const results = lines.map((line) => JSON.parse(line));
+              const fileResult =
+                results.find((r) => r.Name === req.file.originalname) ||
+                results[0];
 
-            res.json({
-              success: true,
-              file: {
-                name: req.file.originalname,
-                size: req.file.size,
-                mimetype: req.file.mimetype,
-                hash: fileResult?.Hash,
-                ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${fileResult?.Hash}`,
-                gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
-                publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
-              },
-              ipfsResponse: results,
-            });
-          } catch (parseError) {
-            console.error("Upload parse error:", parseError);
-            res.status(500).json({
-              success: false,
-              error: "Failed to parse IPFS response",
-              rawResponse: data,
-              parseError: parseError.message,
-            });
+              res.json({
+                success: true,
+                file: {
+                  name: req.file.originalname,
+                  size: req.file.size,
+                  mimetype: req.file.mimetype,
+                  hash: fileResult?.Hash,
+                  ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
+                    fileResult?.Hash
+                  }`,
+                  gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
+                  publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
+                },
+                ipfsResponse: results,
+              });
+            } catch (parseError) {
+              console.error("Upload parse error:", parseError);
+              res.status(500).json({
+                success: false,
+                error: "Failed to parse IPFS response",
+                rawResponse: data,
+                parseError: parseError.message,
+              });
+            }
+          });
+        });
+
+        ipfsReq.on("error", (err) => {
+          console.error("❌ IPFS Upload error:", err);
+          res.status(500).json({ success: false, error: err.message });
+        });
+
+        ipfsReq.setTimeout(30000, () => {
+          ipfsReq.destroy();
+          if (!res.headersSent) {
+            res.status(408).json({ success: false, error: "Upload timeout" });
           }
         });
-      });
 
-      ipfsReq.on("error", (err) => {
-        console.error("❌ IPFS Upload error:", err);
-        res.status(500).json({ success: false, error: err.message });
-      });
-
-      ipfsReq.setTimeout(30000, () => {
-        ipfsReq.destroy();
-        if (!res.headersSent) {
-          res.status(408).json({ success: false, error: "Upload timeout" });
-        }
-      });
-
-      formData.pipe(ipfsReq);
-    } catch (error) {
-      console.error("Upload error:", error);
-      res.status(500).json({ success: false, error: error.message });
+        formData.pipe(ipfsReq);
+      } catch (error) {
+        console.error("Upload error:", error);
+        res.status(500).json({ success: false, error: error.message });
+      }
     }
-  });
+  );
 
   // S3/FakeS3 File Upload endpoint
-  app.post('/s3-upload', tokenAuthMiddleware, upload.single('file'), async (req, res) => {
-    const enableS3 = process.env.ENABLE_S3 === "true";
-    if (!enableS3) {
-      return res.status(400).json({ success: false, error: 'S3 storage is disabled' });
+  app.post(
+    "/s3-upload",
+    tokenAuthMiddleware,
+    upload.single("file"),
+    async (req, res) => {
+      const enableS3 = process.env.ENABLE_S3 === "true";
+      if (!enableS3) {
+        return res
+          .status(400)
+          .json({ success: false, error: "S3 storage is disabled" });
+      }
+
+      try {
+        const s3 = new AWS.S3({
+          accessKeyId: process.env.S3_ACCESS_KEY,
+          secretAccessKey: process.env.S3_SECRET_KEY,
+          endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
+          s3ForcePathStyle: true,
+          region: process.env.S3_REGION || "us-east-1",
+        });
+
+        const bucket = process.env.S3_BUCKET;
+        const key = req.file.originalname;
+        const body = req.file.buffer;
+        const contentType = req.file.mimetype;
+
+        const params = {
+          Bucket: bucket,
+          Key: key,
+          Body: body,
+          ContentType: contentType,
+          Metadata: {
+            originalName: req.file.originalname,
+            size: req.file.size.toString(),
+            uploadedAt: new Date().toISOString(),
+          },
+        };
+
+        const uploadResult = await s3.upload(params).promise();
+
+        res.json({
+          success: true,
+          file: {
+            name: req.file.originalname,
+            size: req.file.size,
+            mimetype: req.file.mimetype,
+            s3Key: uploadResult.Key,
+            s3Url: uploadResult.Location,
+          },
+        });
+      } catch (error) {
+        console.error("S3 Upload Error:", error);
+        res.status(500).json({ success: false, error: error.message });
+      }
     }
-
-    try {
-      const s3 = new AWS.S3({
-        accessKeyId: process.env.S3_ACCESS_KEY,
-        secretAccessKey: process.env.S3_SECRET_KEY,
-        endpoint: process.env.S3_ENDPOINT || 'http://127.0.0.1:4569',
-        s3ForcePathStyle: true,
-        region: process.env.S3_REGION || 'us-east-1',
-      });
-
-      const bucket = process.env.S3_BUCKET;
-      const key = req.file.originalname;
-      const body = req.file.buffer;
-      const contentType = req.file.mimetype;
-
-      const params = {
-        Bucket: bucket,
-        Key: key,
-        Body: body,
-        ContentType: contentType,
-        Metadata: {
-          originalName: req.file.originalname,
-          size: req.file.size.toString(),
-          uploadedAt: new Date().toISOString(),
-        },
-      };
-
-      const uploadResult = await s3.upload(params).promise();
-
-      res.json({
-        success: true,
-        file: {
-          name: req.file.originalname,
-          size: req.file.size,
-          mimetype: req.file.mimetype,
-          s3Key: uploadResult.Key,
-          s3Url: uploadResult.Location,
-        },
-      });
-    } catch (error) {
-      console.error('S3 Upload Error:', error);
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
+  );
 
   // S3/FakeS3 File Fetch endpoint
-  app.get('/s3-file/:bucket/:key', async (req, res) => {
+  app.get("/s3-file/:bucket/:key", async (req, res) => {
     const enableS3 = process.env.ENABLE_S3 === "true";
     if (!enableS3) {
-      return res.status(400).json({ success: false, error: 'S3 storage is disabled' });
+      return res
+        .status(400)
+        .json({ success: false, error: "S3 storage is disabled" });
     }
 
     try {
       const s3 = new AWS.S3({
         accessKeyId: process.env.S3_ACCESS_KEY,
         secretAccessKey: process.env.S3_SECRET_KEY,
-        endpoint: process.env.S3_ENDPOINT || 'http://127.0.0.1:4569',
+        endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
         s3ForcePathStyle: true,
-        region: process.env.S3_REGION || 'us-east-1',
+        region: process.env.S3_REGION || "us-east-1",
       });
 
       const bucket = req.params.bucket;
@@ -461,33 +450,35 @@ async function initializeServer() {
 
       const fileStream = s3.getObject(params).createReadStream();
 
-      fileStream.on('error', (error) => {
-        console.error('S3 Fetch Error:', error);
+      fileStream.on("error", (error) => {
+        console.error("S3 Fetch Error:", error);
         res.status(500).json({ success: false, error: error.message });
       });
 
-      res.setHeader('Content-Disposition', `attachment; filename="${key}"`);
+      res.setHeader("Content-Disposition", `attachment; filename="${key}"`);
       fileStream.pipe(res);
     } catch (error) {
-      console.error('S3 Fetch Error:', error);
+      console.error("S3 Fetch Error:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
 
   // S3/FakeS3 File Info endpoint
-  app.get('/s3-info/:bucket/:key', async (req, res) => {
+  app.get("/s3-info/:bucket/:key", async (req, res) => {
     const enableS3 = process.env.ENABLE_S3 === "true";
     if (!enableS3) {
-      return res.status(400).json({ success: false, error: 'S3 storage is disabled' });
+      return res
+        .status(400)
+        .json({ success: false, error: "S3 storage is disabled" });
     }
 
     try {
       const s3 = new AWS.S3({
         accessKeyId: process.env.S3_ACCESS_KEY,
         secretAccessKey: process.env.S3_SECRET_KEY,
-        endpoint: process.env.S3_ENDPOINT || 'http://127.0.0.1:4569',
+        endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
         s3ForcePathStyle: true,
-        region: process.env.S3_REGION || 'us-east-1',
+        region: process.env.S3_REGION || "us-east-1",
       });
 
       const bucket = req.params.bucket;
@@ -512,25 +503,27 @@ async function initializeServer() {
         },
       });
     } catch (error) {
-      console.error('S3 Info Error:', error);
+      console.error("S3 Info Error:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
 
   // S3/FakeS3 File Delete endpoint
-  app.delete('/s3-file/:bucket/:key', async (req, res) => {
+  app.delete("/s3-file/:bucket/:key", async (req, res) => {
     const enableS3 = process.env.ENABLE_S3 === "true";
     if (!enableS3) {
-      return res.status(400).json({ success: false, error: 'S3 storage is disabled' });
+      return res
+        .status(400)
+        .json({ success: false, error: "S3 storage is disabled" });
     }
 
     try {
       const s3 = new AWS.S3({
         accessKeyId: process.env.S3_ACCESS_KEY,
         secretAccessKey: process.env.S3_SECRET_KEY,
-        endpoint: process.env.S3_ENDPOINT || 'http://127.0.0.1:4569',
+        endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
         s3ForcePathStyle: true,
-        region: process.env.S3_REGION || 'us-east-1',
+        region: process.env.S3_REGION || "us-east-1",
       });
 
       const bucket = req.params.bucket;
@@ -543,9 +536,9 @@ async function initializeServer() {
 
       await s3.deleteObject(params).promise();
 
-      res.json({ success: true, message: 'File deleted successfully' });
+      res.json({ success: true, message: "File deleted successfully" });
     } catch (error) {
-      console.error('S3 Delete Error:', error);
+      console.error("S3 Delete Error:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -750,8 +743,28 @@ async function initializeServer() {
   console.log("🧪 Testing S3 configuration before Gun initialization...");
 
   const peersString = process.env.RELAY_PEERS;
-  const peers = peersString ? peersString.split(',') : [];
+  const peers = peersString ? peersString.split(",") : [];
   console.log("🔍 Peers:", peers);
+
+  Gun.on("opt", function (ctx) {
+    if (ctx.once) {
+      return;
+    }
+    ctx.on("out", function (msg) {
+      const to = this.to;
+      // Use centralized admin password
+      const authToken = process.env.ADMIN_PASSWORD;
+      if (authToken) {
+        // Add headers for all outgoing messages, especially 'put'
+        msg.headers = {
+          ...msg.headers, // Preserve existing headers
+          token: authToken,
+          Authorization: "Bearer " + authToken,
+        };
+      }
+      to.next(msg); // pass to next middleware
+    });
+  });
 
   // Initialize Gun with conditional S3 support
   const gunConfig = {
@@ -759,13 +772,14 @@ async function initializeServer() {
     file: "radata",
     radisk: true,
     web: server,
-    uuid: "shogun-relay",
+    isValid: hasValidToken,
+    uuid: namespace,
     localStorage: false,
     wire: true,
     axe: true,
     rfs: true,
     wait: 500,
-    webrtc:true,
+    webrtc: true,
     peers: [peers],
   };
 
@@ -778,8 +792,22 @@ async function initializeServer() {
     console.log("📁 Using local file storage only (S3 disabled)");
   }
 
+  Gun.on("opt", function (ctx) {
+    if (ctx.once) {
+      return;
+    }
+    ctx.on("out", function (msg) {
+      var to = this.to;
+      // Adds headers for put
+      msg.headers = {
+        token: process.env.ADMIN_PASSWORD,
+      };
+      to.next(msg); // pass to next middleware
+    });
+  });
+
   const gun = Gun(gunConfig);
-  
+
   // Initialize garbage collector now that gun is ready
   initializeGarbageCollector();
 
@@ -849,67 +877,71 @@ async function initializeServer() {
   // IPFS API Proxy - for API calls to the IPFS node
   // Example: /api/v0/add, /api/v0/cat, etc.
   // SECURED: This generic proxy requires the admin token for any access.
-  app.use('/api/v0', tokenAuthMiddleware, createProxyMiddleware({
-    target: IPFS_API_URL,
-    changeOrigin: true,
-    pathRewrite: {
-      "^/api/v0": "/api/v0",
-    },
-    onProxyReq: (proxyReq, req, res) => {
-      console.log(
-        `🔧 IPFS API Request: ${req.method} ${req.url} -> ${IPFS_API_URL}${req.url}`
-      );
-
-      // Add authentication headers for IPFS API
-      if (IPFS_API_TOKEN) {
-        proxyReq.setHeader("Authorization", `Bearer ${IPFS_API_TOKEN}`);
-      }
-
-      // IPFS API requires POST method for most endpoints
-      // Override GET requests to POST for IPFS API endpoints
-      if (
-        req.method === "GET" &&
-        (req.url.includes("/version") ||
-          req.url.includes("/id") ||
-          req.url.includes("/peers"))
-      ) {
-        proxyReq.method = "POST";
-        proxyReq.setHeader("Content-Length", "0");
-      }
-
-      // Add query parameter to get JSON response
-      if (req.url.includes("/version")) {
-        const originalPath = proxyReq.path;
-        proxyReq.path =
-          originalPath +
-          (originalPath.includes("?") ? "&" : "?") +
-          "format=json";
-      }
-    },
-    onProxyRes: (proxyRes, req, res) => {
-      console.log(
-        `📤 IPFS API Response: ${proxyRes.statusCode} for ${req.method} ${req.url}`
-      );
-
-      // Handle non-JSON responses from IPFS
-      if (
-        proxyRes.headers["content-type"] &&
-        !proxyRes.headers["content-type"].includes("application/json")
-      ) {
+  app.use(
+    "/api/v0",
+    tokenAuthMiddleware,
+    createProxyMiddleware({
+      target: IPFS_API_URL,
+      changeOrigin: true,
+      pathRewrite: {
+        "^/api/v0": "/api/v0",
+      },
+      onProxyReq: (proxyReq, req, res) => {
         console.log(
-          `📝 IPFS Response Content-Type: ${proxyRes.headers["content-type"]}`
+          `🔧 IPFS API Request: ${req.method} ${req.url} -> ${IPFS_API_URL}${req.url}`
         );
-      }
-    },
-    onError: (err, req, res) => {
-      console.error("❌ IPFS API Proxy Error:", err.message);
-      res.status(500).json({
-        success: false,
-        error: "IPFS API unavailable",
-        details: err.message,
-      });
-    },
-  }));
+
+        // Add authentication headers for IPFS API
+        if (IPFS_API_TOKEN) {
+          proxyReq.setHeader("Authorization", `Bearer ${IPFS_API_TOKEN}`);
+        }
+
+        // IPFS API requires POST method for most endpoints
+        // Override GET requests to POST for IPFS API endpoints
+        if (
+          req.method === "GET" &&
+          (req.url.includes("/version") ||
+            req.url.includes("/id") ||
+            req.url.includes("/peers"))
+        ) {
+          proxyReq.method = "POST";
+          proxyReq.setHeader("Content-Length", "0");
+        }
+
+        // Add query parameter to get JSON response
+        if (req.url.includes("/version")) {
+          const originalPath = proxyReq.path;
+          proxyReq.path =
+            originalPath +
+            (originalPath.includes("?") ? "&" : "?") +
+            "format=json";
+        }
+      },
+      onProxyRes: (proxyRes, req, res) => {
+        console.log(
+          `📤 IPFS API Response: ${proxyRes.statusCode} for ${req.method} ${req.url}`
+        );
+
+        // Handle non-JSON responses from IPFS
+        if (
+          proxyRes.headers["content-type"] &&
+          !proxyRes.headers["content-type"].includes("application/json")
+        ) {
+          console.log(
+            `📝 IPFS Response Content-Type: ${proxyRes.headers["content-type"]}`
+          );
+        }
+      },
+      onError: (err, req, res) => {
+        console.error("❌ IPFS API Proxy Error:", err.message);
+        res.status(500).json({
+          success: false,
+          error: "IPFS API unavailable",
+          details: err.message,
+        });
+      },
+    })
+  );
 
   // Custom IPFS API endpoints with better error handling
   app.post("/ipfs-api/:endpoint(*)", async (req, res) => {
@@ -1006,89 +1038,98 @@ async function initializeServer() {
   });
 
   // IPFS File Upload endpoint
-  app.post("/ipfs-upload", tokenAuthMiddleware, upload.single("file"), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          error: "No file provided",
+  app.post(
+    "/ipfs-upload",
+    tokenAuthMiddleware,
+    upload.single("file"),
+    async (req, res) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({
+            success: false,
+            error: "No file provided",
+          });
+        }
+
+        const formData = new FormData();
+        formData.append("file", req.file.buffer, {
+          filename: req.file.originalname,
+          contentType: req.file.mimetype,
         });
-      }
 
-      const formData = new FormData();
-      formData.append("file", req.file.buffer, {
-        filename: req.file.originalname,
-        contentType: req.file.mimetype,
-      });
+        const requestOptions = {
+          hostname: "127.0.0.1",
+          port: 5001,
+          path: "/api/v0/add?wrap-with-directory=false",
+          method: "POST",
+          headers: {
+            ...formData.getHeaders(),
+          },
+        };
 
-      const requestOptions = {
-        hostname: "127.0.0.1",
-        port: 5001,
-        path: "/api/v0/add?wrap-with-directory=false",
-        method: "POST",
-        headers: {
-          ...formData.getHeaders(),
-        },
-      };
+        if (IPFS_API_TOKEN) {
+          requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+        }
 
-      if (IPFS_API_TOKEN) {
-        requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
-      }
+        const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+          let data = "";
+          ipfsRes.on("data", (chunk) => (data += chunk));
+          ipfsRes.on("end", () => {
+            console.log("📤 IPFS Upload raw response:", data);
 
-      const ipfsReq = http.request(requestOptions, (ipfsRes) => {
-        let data = "";
-        ipfsRes.on("data", (chunk) => (data += chunk));
-        ipfsRes.on("end", () => {
-          console.log("📤 IPFS Upload raw response:", data);
+            try {
+              const lines = data.trim().split("\n");
+              const results = lines.map((line) => JSON.parse(line));
+              const fileResult =
+                results.find((r) => r.Name === req.file.originalname) ||
+                results[0];
 
-          try {
-            const lines = data.trim().split("\n");
-            const results = lines.map((line) => JSON.parse(line));
-            const fileResult = results.find((r) => r.Name === req.file.originalname) || results[0];
+              res.json({
+                success: true,
+                file: {
+                  name: req.file.originalname,
+                  size: req.file.size,
+                  mimetype: req.file.mimetype,
+                  hash: fileResult?.Hash,
+                  ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
+                    fileResult?.Hash
+                  }`,
+                  gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
+                  publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
+                },
+                ipfsResponse: results,
+              });
+            } catch (parseError) {
+              console.error("Upload parse error:", parseError);
+              res.status(500).json({
+                success: false,
+                error: "Failed to parse IPFS response",
+                rawResponse: data,
+                parseError: parseError.message,
+              });
+            }
+          });
+        });
 
-            res.json({
-              success: true,
-              file: {
-                name: req.file.originalname,
-                size: req.file.size,
-                mimetype: req.file.mimetype,
-                hash: fileResult?.Hash,
-                ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${fileResult?.Hash}`,
-                gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
-                publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
-              },
-              ipfsResponse: results,
-            });
-          } catch (parseError) {
-            console.error("Upload parse error:", parseError);
-            res.status(500).json({
-              success: false,
-              error: "Failed to parse IPFS response",
-              rawResponse: data,
-              parseError: parseError.message,
-            });
+        ipfsReq.on("error", (err) => {
+          console.error("❌ IPFS Upload error:", err);
+          res.status(500).json({ success: false, error: err.message });
+        });
+
+        ipfsReq.setTimeout(30000, () => {
+          ipfsReq.destroy();
+          if (!res.headersSent) {
+            res.status(408).json({ success: false, error: "Upload timeout" });
           }
         });
-      });
 
-      ipfsReq.on("error", (err) => {
-        console.error("❌ IPFS Upload error:", err);
-        res.status(500).json({ success: false, error: err.message });
-      });
-
-      ipfsReq.setTimeout(30000, () => {
-        ipfsReq.destroy();
-        if (!res.headersSent) {
-          res.status(408).json({ success: false, error: "Upload timeout" });
-        }
-      });
-
-      formData.pipe(ipfsReq);
-    } catch (error) {
-      console.error("Upload error:", error);
-      res.status(500).json({ success: false, error: error.message });
+        formData.pipe(ipfsReq);
+      } catch (error) {
+        console.error("Upload error:", error);
+        res.status(500).json({ success: false, error: error.message });
+      }
     }
-  });
+  );
 
   // Custom IPFS status endpoint
   app.get("/ipfs-status", async (req, res) => {
@@ -1211,7 +1252,7 @@ async function initializeServer() {
   });
 
   // --- API Routes ---
-  
+
   // Health check endpoint
   app.get("/health", (req, res) => {
     res.json({
@@ -1225,10 +1266,10 @@ async function initializeServer() {
   });
 
   // API endpoint to provide relay configuration details
-  app.get('/api/relay-info', (req, res) => {
+  app.get("/api/relay-info", (req, res) => {
     res.json({
       success: true,
-      name: process.env.RELAY_NAME || 'Shogun Relay Control Panel'
+      name: process.env.RELAY_NAME || "Shogun Relay Control Panel",
     });
   });
 
@@ -1240,9 +1281,9 @@ async function initializeServer() {
 
       // If the graph contains a `!` node, which typically holds the root,
       // use its contents as the main graph.
-      if (graphData && graphData['!']) {
+      if (graphData && graphData["!"]) {
         console.log("Found '!' node in live graph, using it as the root.");
-        graphData = graphData['!'];
+        graphData = graphData["!"];
       }
 
       // Clean the graph data for serialization (remove circular `_` metadata)
@@ -1252,7 +1293,7 @@ async function initializeServer() {
           const node = graphData[soul];
           const cleanNode = {};
           for (const key in node) {
-            if (key !== '_') {
+            if (key !== "_") {
               cleanNode[key] = node[key];
             }
           }
@@ -1266,7 +1307,6 @@ async function initializeServer() {
         rawSize: JSON.stringify(cleanGraph).length,
         nodeCount: Object.keys(cleanGraph).length,
       });
-
     } catch (error) {
       console.error("Error reading live graph data:", error);
       res.status(500).json({
@@ -1408,7 +1448,7 @@ async function initializeServer() {
 
   const getGunNodeFromPath = (pathString) => {
     const pathSegments = pathString.split("/").filter(Boolean);
-    let node = gun
+    let node = gun.get(namespace);
 
     pathSegments.forEach((segment) => {
       node = node.get(segment);
@@ -1423,32 +1463,40 @@ async function initializeServer() {
         .status(400)
         .json({ success: false, error: "Node path cannot be empty." });
     }
-  
+
     const timeout = setTimeout(() => {
       if (!res.headersSent) {
         res.status(408).json({ success: false, error: "Request timed out." });
       }
     }, 5000); // 5-second timeout
-  
+
     try {
       const node = getGunNodeFromPath(path);
       const data = await node; // Using promise-based .then()
-      
+
       clearTimeout(timeout);
-  
+
       if (!res.headersSent) {
         // Clean the GunDB metadata (`_`) before sending
         if (data && data._) {
           delete data._;
         }
         // Ensure undefined data is sent as null
-        res.json({ success: true, path, data: data === undefined ? null : data });
+        res.json({
+          success: true,
+          path,
+          data: data === undefined ? null : data,
+        });
       }
     } catch (error) {
       clearTimeout(timeout);
       if (!res.headersSent) {
         console.error("Error in GET /node/*:", error);
-        res.status(500).json({ success: false, error: "Failed to retrieve node data.", details: error.message });
+        res.status(500).json({
+          success: false,
+          error: "Failed to retrieve node data.",
+          details: error.message,
+        });
       }
     }
   });
@@ -1654,23 +1702,29 @@ async function initializeServer() {
               const parts = decrypted.match(/^data:(.+);base64,(.+)$/);
               if (parts) {
                 const mimeType = parts[1];
-                const fileContents = Buffer.from(parts[2], 'base64');
-                res.setHeader('Content-Type', mimeType);
+                const fileContents = Buffer.from(parts[2], "base64");
+                res.setHeader("Content-Type", mimeType);
                 res.send(fileContents);
               } else {
                 // Not a data URL, just plain text
-                res.setHeader('Content-Type', 'text/plain');
+                res.setHeader("Content-Type", "text/plain");
                 res.send(decrypted);
               }
             } else {
               // Decryption failed, send raw content
-              res.setHeader('Content-Type', ipfsRes.headers['content-type'] || 'application/octet-stream');
+              res.setHeader(
+                "Content-Type",
+                ipfsRes.headers["content-type"] || "application/octet-stream"
+              );
               res.send(body);
             }
           } catch (e) {
             console.error("Decryption error:", e);
             // Decryption failed, send raw content
-            res.setHeader('Content-Type', ipfsRes.headers['content-type'] || 'application/octet-stream');
+            res.setHeader(
+              "Content-Type",
+              ipfsRes.headers["content-type"] || "application/octet-stream"
+            );
             res.send(body);
           }
         });
@@ -1742,12 +1796,12 @@ async function initializeServer() {
         endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
         s3ForcePathStyle: true,
         region: process.env.S3_REGION || "us-east-1",
-        signatureVersion: 'v4',
+        signatureVersion: "v4",
       });
 
       const bucketsData = await s3.listBuckets().promise();
       const buckets = bucketsData.Buckets || [];
-      
+
       let totalObjects = 0;
       let totalSize = 0;
 
@@ -1763,10 +1817,12 @@ async function initializeServer() {
               Bucket: bucket.Name,
               ContinuationToken: continuationToken,
             };
-            const objectsData = await s3.listObjectsV2(listObjectsParams).promise();
-            
+            const objectsData = await s3
+              .listObjectsV2(listObjectsParams)
+              .promise();
+
             if (objectsData.Contents) {
-              objectsData.Contents.forEach(obj => {
+              objectsData.Contents.forEach((obj) => {
                 bucketSize += obj.Size;
                 objectCount++;
               });
@@ -1774,7 +1830,6 @@ async function initializeServer() {
 
             isTruncated = objectsData.IsTruncated;
             continuationToken = objectsData.NextContinuationToken;
-
           } while (isTruncated);
 
           totalObjects += objectCount;
@@ -1808,54 +1863,62 @@ async function initializeServer() {
     }
   });
 
-  app.get("/api/s3-buckets/:bucketName/objects", tokenAuthMiddleware, async (req, res) => {
-    const enableS3 = process.env.ENABLE_S3 === "true";
-    if (!enableS3) {
-      return res.status(400).json({ success: false, error: "S3 is not enabled." });
-    }
+  app.get(
+    "/api/s3-buckets/:bucketName/objects",
+    tokenAuthMiddleware,
+    async (req, res) => {
+      const enableS3 = process.env.ENABLE_S3 === "true";
+      if (!enableS3) {
+        return res
+          .status(400)
+          .json({ success: false, error: "S3 is not enabled." });
+      }
 
-    try {
+      try {
         const s3 = new AWS.S3({
-            accessKeyId: process.env.S3_ACCESS_KEY,
-            secretAccessKey: process.env.S3_SECRET_KEY,
-            endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
-            s3ForcePathStyle: true,
-            region: process.env.S3_REGION || "us-east-1",
-            signatureVersion: 'v4',
+          accessKeyId: process.env.S3_ACCESS_KEY,
+          secretAccessKey: process.env.S3_SECRET_KEY,
+          endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
+          s3ForcePathStyle: true,
+          region: process.env.S3_REGION || "us-east-1",
+          signatureVersion: "v4",
         });
 
         const { bucketName } = req.params;
         const { continuationToken } = req.query;
 
         const listObjectsParams = {
-            Bucket: bucketName,
-            ContinuationToken: continuationToken,
+          Bucket: bucketName,
+          ContinuationToken: continuationToken,
         };
 
         const objectsData = await s3.listObjectsV2(listObjectsParams).promise();
 
         res.json({
-            success: true,
-            objects: objectsData.Contents || [],
-            nextContinuationToken: objectsData.NextContinuationToken,
+          success: true,
+          objects: objectsData.Contents || [],
+          nextContinuationToken: objectsData.NextContinuationToken,
         });
-
-    } catch (error) {
-        console.error(`Error listing objects for bucket ${req.params.bucketName}:`, error);
+      } catch (error) {
+        console.error(
+          `Error listing objects for bucket ${req.params.bucketName}:`,
+          error
+        );
         res.status(500).json({
-            success: false,
-            error: `Failed to retrieve objects for bucket ${req.params.bucketName}.`,
-            details: error.message,
+          success: false,
+          error: `Failed to retrieve objects for bucket ${req.params.bucketName}.`,
+          details: error.message,
         });
+      }
     }
-  });
+  );
 
   // --- Secure IPFS Management Endpoints ---
-  const forwardToIpfsApi = (req, res, endpoint, method = 'POST') => {
+  const forwardToIpfsApi = (req, res, endpoint, method = "POST") => {
     try {
       let path = `/api/v0/${endpoint}`;
-      
-      const cid = req.body.cid || req.query.cid || (req.params.cid || '');
+
+      const cid = req.body.cid || req.query.cid || req.params.cid || "";
       if (cid) {
         path += `?arg=${cid}`;
       } else if (req.query.type) {
@@ -1927,81 +1990,105 @@ async function initializeServer() {
     }
   };
 
-  app.post('/pins/add', tokenAuthMiddleware, (req, res) => forwardToIpfsApi(req, res, 'pin/add'));
-  app.post('/pins/rm', tokenAuthMiddleware, (req, res) => forwardToIpfsApi(req, res, 'pin/rm'));
-  app.post('/pins/ls', tokenAuthMiddleware, (req, res) => forwardToIpfsApi(req, res, 'pin/ls', 'POST'));
-  
+  app.post("/pins/add", tokenAuthMiddleware, (req, res) =>
+    forwardToIpfsApi(req, res, "pin/add")
+  );
+  app.post("/pins/rm", tokenAuthMiddleware, (req, res) =>
+    forwardToIpfsApi(req, res, "pin/rm")
+  );
+  app.post("/pins/ls", tokenAuthMiddleware, (req, res) =>
+    forwardToIpfsApi(req, res, "pin/ls", "POST")
+  );
+
   // Custom handler for repo/gc to correctly handle streaming responses
-  app.post('/repo/gc', tokenAuthMiddleware, (req, res) => {
+  app.post("/repo/gc", tokenAuthMiddleware, (req, res) => {
     try {
       const gcOptions = {
         hostname: new URL(IPFS_API_URL).hostname,
         port: new URL(IPFS_API_URL).port,
-        path: '/api/v0/repo/gc',
-        method: 'POST',
+        path: "/api/v0/repo/gc",
+        method: "POST",
         headers: {
-          ...(IPFS_API_TOKEN && { 'Authorization': `Bearer ${IPFS_API_TOKEN}` })
-        }
+          ...(IPFS_API_TOKEN && { Authorization: `Bearer ${IPFS_API_TOKEN}` }),
+        },
       };
 
       const gcReq = http.request(gcOptions, (gcRes) => {
-        let responseBody = '';
-        gcRes.on('data', (chunk) => {
+        let responseBody = "";
+        gcRes.on("data", (chunk) => {
           responseBody += chunk; // Consume the stream
         });
-        gcRes.on('end', () => {
+        gcRes.on("end", () => {
           if (gcRes.statusCode === 200) {
-            console.log('Garbage collection triggered successfully.');
-            res.json({ success: true, message: 'Garbage collection completed.' });
+            console.log("Garbage collection triggered successfully.");
+            res.json({
+              success: true,
+              message: "Garbage collection completed.",
+            });
           } else {
-            console.error(`IPFS repo/gc failed with status ${gcRes.statusCode}:`, responseBody);
-            res.status(gcRes.statusCode).json({ success: false, error: 'IPFS garbage collection failed.', details: responseBody });
+            console.error(
+              `IPFS repo/gc failed with status ${gcRes.statusCode}:`,
+              responseBody
+            );
+            res.status(gcRes.statusCode).json({
+              success: false,
+              error: "IPFS garbage collection failed.",
+              details: responseBody,
+            });
           }
         });
       });
 
-      gcReq.on('error', (error) => {
-        console.error('Error calling /repo/gc:', error);
+      gcReq.on("error", (error) => {
+        console.error("Error calling /repo/gc:", error);
         res.status(500).json({ success: false, error: error.message });
       });
 
       gcReq.end();
     } catch (error) {
-      console.error('Error setting up /repo/gc request:', error);
+      console.error("Error setting up /repo/gc request:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
 
-  app.get('/api/notes', tokenAuthMiddleware, (req, res) => {
-    const notesNode = gun.get(namespace).get('admin').get('notes');
-    notesNode.once(data => {
-      res.json({ success: true, notes: data || '' });
+  app.get("/api/notes", tokenAuthMiddleware, (req, res) => {
+    const notesNode = gun.get(namespace).get("admin").get("notes");
+    notesNode.once((data) => {
+      res.json({ success: true, notes: data || "" });
     });
   });
 
-  app.post('/api/notes', tokenAuthMiddleware, (req, res) => {
-      const { notes } = req.body;
-      if (typeof notes !== 'string') {
-          return res.status(400).json({ success: false, error: 'Invalid notes format.' });
-      }
-      gun.get(namespace).get('admin').get('notes').put(notes, ack => {
-          if (ack.err) {
-              return res.status(500).json({ success: false, error: ack.err });
-          }
-          res.json({ success: true });
+  app.post("/api/notes", tokenAuthMiddleware, (req, res) => {
+    const { notes } = req.body;
+    if (typeof notes !== "string") {
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid notes format." });
+    }
+    gun
+      .get(namespace)
+      .get("admin")
+      .get("notes")
+      .put(notes, (ack) => {
+        if (ack.err) {
+          return res.status(500).json({ success: false, error: ack.err });
+        }
+        res.json({ success: true });
       });
   });
 
-  app.delete('/api/notes', tokenAuthMiddleware, (req, res) => {
-    gun.get(namespace).get('admin').get('notes').put(null, ack => {
+  app.delete("/api/notes", tokenAuthMiddleware, (req, res) => {
+    gun
+      .get(namespace)
+      .get("admin")
+      .get("notes")
+      .put(null, (ack) => {
         if (ack.err) {
-            return res.status(500).json({ success: false, error: ack.err });
+          return res.status(500).json({ success: false, error: ack.err });
         }
-        res.json({ success: true, message: 'Notes deleted.' });
-    });
+        res.json({ success: true, message: "Notes deleted." });
+      });
   });
-
-
 
   // Fallback to index.html
   app.get("/*", (req, res) => {
@@ -2048,7 +2135,7 @@ async function initializeServer() {
     // Clear garbage collector interval
     if (gcInterval) {
       clearInterval(gcInterval);
-      console.log('🗑️ Garbage Collector stopped');
+      console.log("🗑️ Garbage Collector stopped");
     }
 
     if (db) {
@@ -2079,6 +2166,7 @@ async function initializeServer() {
     await shutdown();
     process.exit(0);
   });
+
 } // End of initializeServer function
 
 // Start the server

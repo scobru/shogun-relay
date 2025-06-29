@@ -1,444 +1,976 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="night">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Live Gun Graph Explorer</title>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css"
+      rel="stylesheet"
+      type="text/css"
+    />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="styles/wormhole.css">
+    <link rel="stylesheet" href="styles/wormhole.css" />
     <!-- Include centralized admin authentication -->
     <script src="lib/admin-auth.js"></script>
     <style>
-        .graph-container {
-            display: flex;
-            flex-direction: column;
-            gap: 1em;
-            margin-top: 1em;
+      .graph-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1em;
+        margin-top: 1em;
+      }
+      .node-item {
+        background-color: var(--color-input-bg);
+        border: 1px solid var(--color-input-border);
+        border-radius: 12px;
+        overflow: hidden;
+        transition: all 0.2s ease;
+      }
+      .node-header {
+        padding: 12px 15px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background-color: rgba(255, 255, 255, 0.05);
+        border-bottom: 1px solid var(--color-input-border);
+      }
+      .node-header:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+      .node-id {
+        font-weight: bold;
+        word-break: break-all;
+      }
+      .node-id.user-key {
+        color: var(--color-accent);
+      }
+      .toggle-icon {
+        font-size: 12px;
+        transition: transform 0.2s ease;
+      }
+      .toggle-icon.expanded {
+        transform: rotate(90deg);
+      }
+      .node-content {
+        display: none;
+        padding: 15px;
+      }
+      .node-content.show {
+        display: block;
+        animation: fadeIn 0.2s ease;
+      }
+      .property {
+        margin-bottom: 10px;
+        padding: 8px;
+        background-color: rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        border-left: 3px solid var(--color-accent);
+      }
+      .property-key {
+        font-weight: bold;
+        color: var(--color-accent);
+        margin-bottom: 5px;
+      }
+      .property-value {
+        color: var(--color-text);
+        font-family: inherit;
+        word-break: break-all;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
         }
-        .node-item {
-            background-color: var(--color-input-bg);
-            border: 1px solid var(--color-input-border);
-            border-radius: 12px;
-            overflow: hidden;
-            transition: all 0.2s ease;
+        to {
+          opacity: 1;
         }
-        .node-header {
-            padding: 12px 15px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            background-color: rgba(255, 255, 255, 0.05);
-            border-bottom: 1px solid var(--color-input-border);
-        }
-        .node-header:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-        }
-        .node-id {
-            font-weight: bold;
-            word-break: break-all;
-        }
-        .node-id.user-key {
-            color: var(--color-accent);
-        }
-        .toggle-icon {
-            font-size: 12px;
-            transition: transform 0.2s ease;
-        }
-        .toggle-icon.expanded {
-            transform: rotate(90deg);
-        }
-        .node-content {
-            display: none;
-            padding: 15px;
-        }
-        .node-content.show {
-            display: block;
-            animation: fadeIn 0.2s ease;
-        }
-        .property {
-            margin-bottom: 10px;
-            padding: 8px;
-            background-color: rgba(255, 255, 255, 0.05);
-            border-radius: 12px;
-            border-left: 3px solid var(--color-accent);
-        }
-        .property-key {
-            font-weight: bold;
-            color: var(--color-accent);
-            margin-bottom: 5px;
-        }
-        .property-value {
-            color: var(--color-text);
-            font-family: inherit;
-            word-break: break-all;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        pre {
-            white-space: pre-wrap;
-            word-break: break-all;
-            background-color: rgba(255, 255, 255, 0.05);
-            padding: 8px;
-            border-radius: 12px;
-        }
+      }
+      pre {
+        white-space: pre-wrap;
+        word-break: break-all;
+        background-color: rgba(255, 255, 255, 0.05);
+        padding: 8px;
+        border-radius: 12px;
+      }
+      .btn-custom.btn-sm {
+        padding: 4px 12px;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+      }
+      .alert.alert-success {
+        background-color: rgba(34, 197, 94, 0.1);
+        border-color: rgba(34, 197, 94, 0.3);
+        color: rgb(34, 197, 94);
+      }
     </style>
-</head>
-<body class="antialiased">
+  </head>
+  <body class="antialiased">
     <div class="container mx-auto p-4">
-        <div class="flex items-center mb-4">
-            <a href="/" class="nav-link">&larr; Back to Control Panel</a>
-        </div>
+      <div class="flex items-center mb-4">
+        <a href="/" class="nav-link">&larr; Back to Control Panel</a>
+      </div>
 
-        <div class="card">
-            <div class="p-8">
-                <div class="flex flex-col items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-                    </svg>
+      <div class="card">
+        <div class="p-8">
+          <div class="flex flex-col items-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-12 w-12 mb-4 text-accent"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.5"
+                d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
+              />
+            </svg>
 
-                    <h1 class="text-2xl font-semibold mb-8">Live Gun Graph Explorer</h1>
+            <h1 class="text-2xl font-semibold mb-8">Live Gun Graph Explorer</h1>
 
-                    <div class="w-full space-y-6">
-                        <div class="stats">
-                            <div class="flex items-center gap-4">
-                                <strong>Authentication:</strong>
-                                <input type="password" id="authToken" class="input-custom flex-1" placeholder="Admin Token (auto-loaded if saved)">
-                            </div>
-                        </div>
-
-                        <div class="stats">
-                            <div class="flex items-center gap-4">
-                                <strong>Graph Explorer:</strong>
-                                <input type="text" id="soulInput" class="input-custom flex-1" placeholder="Enter node soul (or leave empty to see all)">
-                                <button onclick="loadNodeFromInput()" class="btn-custom">Load</button>
-                            </div>
-                        </div>
-
-                        <div class="stats">
-                            <strong>Graph Stats:</strong> 
-                            <span id="nodeCount">0</span> nodes loaded | 
-                            Last updated: <span id="lastUpdate">Never</span>
-                        </div>
-
-                        <div id="error" class="alert alert-error hidden"></div>
-                        <div id="graphContainer" class="graph-container">
-                            <!-- Graph nodes will be injected here -->
-                        </div>
-                    </div>
+            <div class="w-full space-y-6">
+              <div class="stats">
+                <div class="flex items-center gap-4">
+                  <strong>Authentication:</strong>
+                  <input
+                    type="password"
+                    id="authToken"
+                    class="input-custom flex-1"
+                    placeholder="Admin Token (auto-loaded if saved)"
+                  />
                 </div>
+              </div>
+
+              <div class="stats">
+                <div class="flex items-center gap-4">
+                  <strong>Graph Explorer:</strong>
+                  <input
+                    type="text"
+                    id="soulInput"
+                    class="input-custom flex-1"
+                    placeholder="Enter node soul (or leave empty to see all)"
+                  />
+                  <button onclick="loadNodeFromInput()" class="btn-custom">
+                    Load
+                  </button>
+                </div>
+              </div>
+
+              <div class="stats">
+                <strong>Graph Stats:</strong>
+                <span id="nodeCount">0</span> nodes loaded | Last updated:
+                <span id="lastUpdate">Never</span>
+              </div>
+
+              <!-- Add sync controls section -->
+              <div class="stats">
+                <div class="flex items-center gap-4 mb-2">
+                  <strong>Graph Traversal:</strong>
+                  <button onclick="loadConnectedGraphFromInput()" class="btn-custom btn-sm">
+                    🕸️ Load Connected Graph
+                  </button>
+                  <select id="maxDepth" class="input-custom" style="width: auto; padding: 4px 8px;">
+                    <option value="2">Depth 2</option>
+                    <option value="3" selected>Depth 3</option>
+                    <option value="4">Depth 4</option>
+                    <option value="5">Depth 5</option>
+                  </select>
+                </div>
+                <div class="text-sm text-gray-400">
+                  🕸️ Automatically follow references to load the entire connected graph
+                </div>
+              </div>
+
+              <div class="stats">
+                <div class="flex items-center gap-4 mb-2">
+                  <strong>Real-time Sync:</strong>
+                  <button onclick="enableGlobalRealTimeSync()" class="btn-custom btn-sm">
+                    Enable Real-time Updates
+                  </button>
+                  <button onclick="disableGlobalRealTimeSync()" class="btn-custom btn-sm">
+                    Disable Real-time
+                  </button>
+                </div>
+                <div class="text-sm text-gray-400">
+                  💡 Enable real-time sync to see live updates as data changes on the relay
+                </div>
+              </div>
+
+              <div id="error" class="alert alert-error hidden"></div>
+              <div id="graphContainer" class="graph-container">
+                <!-- Graph nodes will be injected here -->
+              </div>
             </div>
+          </div>
         </div>
+      </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/gun@0.2020.1239/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/lib/promise.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/lib/webrtc.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/lib/wire.js"></script>
     <script>
-        const graphContainer = document.getElementById('graphContainer');
-        const nodeCountEl = document.getElementById('nodeCount');
-        const lastUpdateEl = document.getElementById('lastUpdate');
-        const errorEl = document.getElementById('error');
-        
-        let gun;
-        let currentGraph = {};
-        let expandedNodes = new Set();
-        let requestedSouls = new Set();
+      const graphContainer = document.getElementById("graphContainer");
+      const nodeCountEl = document.getElementById("nodeCount");
+      const lastUpdateEl = document.getElementById("lastUpdate");
+      const errorEl = document.getElementById("error");
 
-        function formatValue(value) {
-            if (value === null) {
-                return document.createTextNode('null');
-            }
-            const type = typeof value;
-            if (type === 'object') {
-                if (value['#']) { // GunDB link
-                    const link = document.createElement('a');
-                    link.href = '#';
-                    link.textContent = `→ ${value['#']}`;
-                    link.onclick = (e) => {
-                        e.preventDefault();
-                        navigateToNode(value['#']);
-                    };
-                    return link;
-                }
-                try {
-                    // Pretty-print other objects
-                    const pre = document.createElement('pre');
-                    pre.textContent = JSON.stringify(value, null, 2);
-                    return pre;
-                } catch (e) {
-                    return document.createTextNode('[Unserializable Object]');
-                }
-            }
-            return document.createTextNode(String(value));
+      let gun;
+      let currentGraph = {};
+      let expandedNodes = new Set();
+      let requestedSouls = new Set();
+
+      function formatValue(value) {
+        if (value === null) {
+          return document.createTextNode("null");
         }
-
-        function navigateToNode(nodeId) {
-            if (!currentGraph.hasOwnProperty(nodeId)) {
-                loadNode(nodeId);
-            }
-
-            if (!expandedNodes.has(nodeId)) {
-                expandedNodes.add(nodeId);
-                renderGraph(); // Re-render to show expanded state
+        const type = typeof value;
+        if (type === "object") {
+          if (value["#"]) {
+            // GunDB link - enhanced with navigation and status
+            const linkContainer = document.createElement("div");
+            linkContainer.style.cssText = "display: flex; align-items: center; gap: 8px; margin: 4px 0;";
+            
+            const link = document.createElement("a");
+            link.href = "#";
+            link.textContent = `🔗 ${value["#"]}`;
+            link.style.cssText = "color: #3b82f6; text-decoration: none; font-family: monospace;";
+            link.onclick = (e) => {
+              e.preventDefault();
+              navigateToNode(value["#"]);
+            };
+            
+            // Add status indicator
+            const statusIndicator = document.createElement("span");
+            const isLoaded = currentGraph.hasOwnProperty(value["#"]);
+            statusIndicator.textContent = isLoaded ? "✅" : "⏳";
+            statusIndicator.title = isLoaded ? "Node loaded" : "Node not loaded yet";
+            statusIndicator.style.cssText = "font-size: 12px;";
+            
+            // Add quick load button for unloaded nodes
+            if (!isLoaded) {
+              const loadBtn = document.createElement("button");
+              loadBtn.textContent = "Load";
+              loadBtn.style.cssText = "font-size: 10px; padding: 2px 6px; margin-left: 4px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;";
+              loadBtn.onclick = (e) => {
+                e.stopPropagation();
+                loadNode(value["#"]);
+                loadBtn.disabled = true;
+                loadBtn.textContent = "Loading...";
+              };
+              linkContainer.appendChild(loadBtn);
             }
             
-            // After re-render, find the element and scroll to it.
+            linkContainer.appendChild(link);
+            linkContainer.appendChild(statusIndicator);
+            return linkContainer;
+          }
+          try {
+            // Pretty-print other objects
+            const pre = document.createElement("pre");
+            pre.textContent = JSON.stringify(value, null, 2);
+            return pre;
+          } catch (e) {
+            return document.createTextNode("[Unserializable Object]");
+          }
+        }
+        return document.createTextNode(String(value));
+      }
+
+      function navigateToNode(nodeId) {
+        if (!currentGraph.hasOwnProperty(nodeId)) {
+          loadNode(nodeId);
+        }
+
+        if (!expandedNodes.has(nodeId)) {
+          expandedNodes.add(nodeId);
+          renderGraph(); // Re-render to show expanded state
+        }
+
+        // After re-render, find the element and scroll to it.
+        setTimeout(() => {
+          const element = document.querySelector(`[data-node-id="${nodeId}"]`);
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth", block: "center" });
+            element.style.transition = "background-color 0.3s ease-in-out";
+            element.style.backgroundColor = "#4a4a4a";
             setTimeout(() => {
-                const element = document.querySelector(`[data-node-id="${nodeId}"]`);
-                if (element) {
-                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    element.style.transition = 'background-color 0.3s ease-in-out';
-                    element.style.backgroundColor = '#4a4a4a';
-                    setTimeout(() => { 
-                        element.style.backgroundColor = ''; 
-                    }, 1500);
-                } else {
-                    console.warn(`navigateToNode: Could not find node '${nodeId}' in the DOM.`);
-                }
-            }, 100);
-        }
+              element.style.backgroundColor = "";
+            }, 1500);
+          } else {
+            console.warn(
+              `navigateToNode: Could not find node '${nodeId}' in the DOM.`
+            );
+          }
+        }, 100);
+      }
 
-        // Initialize Gun connection
-        function initGun() {
-            const peer = `${window.location.protocol}//${window.location.host}/gun`
-            try {
-                gun = Gun(peer);
-                console.log('Gun initialized successfully', peer);
-                errorEl.style.display = 'none';
-            } catch (error) {
-                console.error('Failed to initialize Gun:', error);
-                showError('Failed to connect to Gun database: ' + error.message);
+      // Initialize Gun connection
+      function initGun() {
+        const peer = `${window.location.protocol}//${window.location.host}/gun`;
+        try {
+          Gun.on("opt", function (ctx) {
+            if (ctx.once) {
+              return;
             }
-        }
+            ctx.on("out", function (msg) {
+              const to = this.to;
+              // Use centralized admin password
+              const authToken =
+                ShogunAdmin.getPassword() ||
+                (document.getElementById("authToken")
+                  ? document.getElementById("authToken").value.trim()
+                  : "");
+              if (authToken) {
+                // Add headers for all outgoing messages, especially 'put'
+                msg.headers = {
+                  ...msg.headers, // Preserve existing headers
+                  token: authToken,
+                  Authorization: "Bearer " + authToken,
+                };
+              }
+              console.log(msg);
+              to.next(msg); // pass to next middleware
+            });
+          });
 
-        function loadNode(soul) {
-            if (!soul || requestedSouls.has(soul)) {
-                return;
+          // Enhanced Gun configuration for better synchronization
+          gun = Gun({ 
+            peers: [peer], 
+            localStorage: false, 
+            radisk: false,
+            // Enhanced sync configurations
+            wire: true,        // Enable wire protocol for efficiency
+            webrtc: true,      // Enable WebRTC for direct peer connections
+            wait: 300,         // Faster batch processing (vs default 1000ms)
+            until: 250,        // Shorter timeout for queries
+            batch: 5,          // Small batch size for real-time updates
+            retry: 3,          // Number of retry attempts
+            // Connection resilience
+            reconnect: true,   // Enable automatic reconnection
+            heartbeat: 30000,  // Heartbeat every 30 seconds
+            timeout: 15000     // Connection timeout
+          });
+
+          // Enhanced connection monitoring and auto-reconnection
+          let connectionState = {
+            isConnected: false,
+            lastPing: Date.now(),
+            reconnectAttempts: 0,
+            maxReconnectAttempts: 5,
+            reconnectDelay: 2000
+          };
+
+          // Monitor connection health
+          gun.on('hi', (peer) => {
+            connectionState.isConnected = true;
+            connectionState.lastPing = Date.now();
+            connectionState.reconnectAttempts = 0;
+            console.log('🟢 Gun connected to peer:', peer);
+            updateConnectionStatus('connected');
+          });
+
+          gun.on('bye', (peer) => {
+            connectionState.isConnected = false;
+            console.log('🔴 Gun disconnected from peer:', peer);
+            updateConnectionStatus('disconnected');
+            attemptReconnection();
+          });
+
+          // Monitor sync events
+          gun.on('out', (msg) => {
+            if (msg.get) {
+              console.log('📤 GET request:', msg.get);
             }
-            console.log(`Requesting node: ${soul}`);
-            requestedSouls.add(soul);
-            showError('');
+            if (msg.put) {
+              console.log('📤 PUT request:', Object.keys(msg.put).length, 'nodes');
+            }
+          });
 
-            // Use .once() to get the data for a soul
-            gun.get(soul).once((data, key) => {
-                console.log(`Received data for ${key}:`, data);
-                if (data) {
-                    // Clean metadata before storing
+          gun.on('in', (msg) => {
+            connectionState.lastPing = Date.now();
+            if (msg.put) {
+              console.log('📥 Received data:', Object.keys(msg.put).length, 'nodes');
+              // Trigger re-render if we have active nodes
+              if (Object.keys(currentGraph).length > 0) {
+                setTimeout(renderGraph, 100);
+              }
+            }
+          });
+
+          // Heartbeat to detect stale connections
+          setInterval(() => {
+            const timeSinceLastPing = Date.now() - connectionState.lastPing;
+            if (timeSinceLastPing > 60000 && connectionState.isConnected) {
+              console.warn('⚠️  Connection may be stale, attempting reconnection');
+              attemptReconnection();
+            }
+          }, 30000);
+
+          // Auto-reconnection logic
+          function attemptReconnection() {
+            if (connectionState.reconnectAttempts >= connectionState.maxReconnectAttempts) {
+              console.error('❌ Max reconnection attempts reached');
+              updateConnectionStatus('failed');
+              return;
+            }
+
+            connectionState.reconnectAttempts++;
+            updateConnectionStatus('reconnecting');
+            
+            console.log(`🔄 Reconnection attempt ${connectionState.reconnectAttempts}/${connectionState.maxReconnectAttempts}`);
+            
+            setTimeout(() => {
+              try {
+                // Reinitialize Gun connection
+                initGun();
+              } catch (error) {
+                console.error('Reconnection failed:', error);
+                setTimeout(attemptReconnection, connectionState.reconnectDelay * connectionState.reconnectAttempts);
+              }
+            }, connectionState.reconnectDelay);
+          }
+
+          // Real-time sync for specific nodes
+          function enableRealTimeSync(soul) {
+            if (!soul) return;
+            
+            gun.get(soul).on((data, key) => {
+              console.log(`🔄 Real-time update for ${key}:`, data);
+              if (data) {
+                const cleanData = { ...data };
+                delete cleanData._;
+                currentGraph[key] = cleanData;
+                renderGraph();
+              }
+            });
+          }
+
+          // Add connection status indicator
+          function updateConnectionStatus(status) {
+            const statusEl = document.getElementById('connectionStatus') || createStatusIndicator();
+            const statusMap = {
+              connected: { text: '🟢 Connected', class: 'text-green-500' },
+              disconnected: { text: '🔴 Disconnected', class: 'text-red-500' },
+              reconnecting: { text: '🟡 Reconnecting...', class: 'text-yellow-500' },
+              failed: { text: '❌ Connection Failed', class: 'text-red-600' }
+            };
+            
+            const statusInfo = statusMap[status] || statusMap.disconnected;
+            statusEl.textContent = statusInfo.text;
+            statusEl.className = statusInfo.class + ' font-medium';
+          }
+
+          function createStatusIndicator() {
+            const statusEl = document.createElement('span');
+            statusEl.id = 'connectionStatus';
+            statusEl.textContent = '🟡 Connecting...';
+            statusEl.className = 'text-yellow-500 font-medium';
+            
+            // Add to stats section
+            const statsSection = document.querySelector('.stats');
+            if (statsSection) {
+              const statusContainer = document.createElement('div');
+              statusContainer.innerHTML = '<strong>Connection Status:</strong> ';
+              statusContainer.appendChild(statusEl);
+              statsSection.appendChild(statusContainer);
+            }
+            
+            return statusEl;
+          }
+
+          window.gun = gun;
+          window.enableRealTimeSync = enableRealTimeSync;
+          console.log("Gun initialized successfully with enhanced sync", peer);
+          errorEl.style.display = "none";
+        } catch (error) {
+          console.error("Failed to initialize Gun:", error);
+          showError("Failed to connect to Gun database: " + error.message);
+        }
+      }
+
+      function loadNode(soul) {
+        if (!soul || requestedSouls.has(soul)) {
+          return;
+        }
+        console.log(`Requesting node: ${soul}`);
+        requestedSouls.add(soul);
+        showError("");
+
+        // Use .once() to get the data for a soul
+        gun.get(soul).once((data, key) => {
+          console.log(`Received data for ${key}:`, data);
+          if (data) {
+            // Clean metadata before storing
+            const cleanData = { ...data };
+            delete cleanData._;
+            currentGraph[key] = cleanData;
+            
+            // Auto-follow references if enabled
+            if (globalRealTimeEnabled) {
+              followReferences(cleanData, key);
+            }
+          } else {
+            // If data is null or undefined, store it to indicate we've checked.
+            currentGraph[key] = null;
+          }
+          renderGraph();
+        });
+      }
+
+      // New function to automatically follow references
+      function followReferences(nodeData, sourceSoul, depth = 0, maxDepth = 3) {
+        if (depth >= maxDepth || !nodeData) return;
+        
+        Object.keys(nodeData).forEach(key => {
+          const value = nodeData[key];
+          // Check if this is a Gun reference
+          if (value && typeof value === 'object' && value['#']) {
+            const targetSoul = value['#'];
+            console.log(`🔗 Following reference: ${sourceSoul} -> ${targetSoul} (depth: ${depth})`);
+            
+            // Load the referenced node if not already loaded
+            if (!requestedSouls.has(targetSoul)) {
+              setTimeout(() => {
+                gun.get(targetSoul).once((data, key) => {
+                  if (data) {
                     const cleanData = { ...data };
                     delete cleanData._;
                     currentGraph[key] = cleanData;
-                } else {
-                    // If data is null or undefined, store it to indicate we've checked.
-                    currentGraph[key] = null; 
-                }
-                renderGraph();
-            });
+                    renderGraph();
+                    
+                    // Recursively follow references from this node
+                    if (depth < maxDepth - 1) {
+                      followReferences(cleanData, key, depth + 1, maxDepth);
+                    }
+                  }
+                });
+                requestedSouls.add(targetSoul);
+              }, 100 * depth); // Stagger requests to avoid overwhelming
+            }
+          }
+        });
+      }
+
+      function loadNodeFromInput() {
+        const soul = document.getElementById("soulInput").value;
+        if (soul) {
+          // Clear the graph for a focused view
+          currentGraph = {};
+          requestedSouls = new Set();
+          loadNode(soul);
+        } else {
+          loadAllNodes();
+        }
+      }
+
+      // Enhanced function to load connected graph
+      function loadConnectedGraph(startSoul, maxDepth = 3) {
+        if (!startSoul) {
+          showError("Please provide a starting node soul");
+          return;
         }
         
-        function loadNodeFromInput() {
-            const soul = document.getElementById('soulInput').value;
-            if (soul) {
-                // Clear the graph for a focused view
-                currentGraph = {};
-                requestedSouls = new Set();
-                loadNode(soul);
-            } else {
-                loadAllNodes();
-            }
+        console.log(`🕸️ Loading connected graph starting from: ${startSoul} (max depth: ${maxDepth})`);
+        showError(`🕸️ Loading connected graph from: ${startSoul} (depth: ${maxDepth})...`, false);
+        
+        // Clear current graph
+        currentGraph = {};
+        requestedSouls = new Set();
+        
+        // Start traversal
+        traverseGraph(startSoul, 0, maxDepth);
+      }
+
+      function traverseGraph(soul, depth, maxDepth) {
+        if (depth >= maxDepth || requestedSouls.has(soul)) {
+          return;
         }
-
-        function loadAllNodes() {
-            // Use centralized admin password
-            const token = ShogunAdmin.getPassword() || document.getElementById('authToken').value;
-            if (!token) {
-                showError('Admin Token is required to load all graph data. Please set it in the Control Panel.');
-                return;
-            }
-            showError(''); // Clear previous errors
-
-            console.log('Loading all data from server...');
-            
-            fetch('/api/alldata', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            })
-                .then(response => {
-                    if (!response.ok) {
-                        const errorText = response.statusText || 'Server returned an error';
-                        showError(`Error fetching data: HTTP ${response.status} - ${errorText}`);
-                        throw new Error(`HTTP ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(result => {
-                    if (result.success) {
-                        console.log('Loaded data from server:', result);
-                        currentGraph = result.data || {};
-                        requestedSouls = new Set(Object.keys(currentGraph)); // Mark all as requested
-                        renderGraph();
-                        console.log(`Loaded ${result.nodeCount} nodes (${result.rawSize} bytes raw data)`);
-                    } else {
-                        showError('Failed to load data: ' + result.error);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching data:', error);
-                    if (!error.message.startsWith('HTTP')) {
-                        showError('Error fetching data: ' + error.message);
-                    }
-                });
-        }
-
-        function showError(message) {
-            errorEl.textContent = message;
-            errorEl.style.display = message ? 'block' : 'none';
-        }
-
-        function formatNodeId(nodeId) {
-            // Check if it's a user key (starts with ~)
-            if (nodeId.startsWith('~')) {
-                return {
-                    isUser: true,
-                    display: nodeId.substring(88) || '[root]',
-                    full: nodeId
-                };
-            }
-            return {
-                isUser: false,
-                display: nodeId,
-                full: nodeId
-            };
-        }
-
-        function createNodeElement(nodeId, nodeData) {
-            const nodeInfo = formatNodeId(nodeId);
-            const isExpanded = expandedNodes.has(nodeId);
-
-            const nodeEl = document.createElement('div');
-            nodeEl.className = 'node-item';
-            nodeEl.dataset.nodeId = nodeId;
-            
-            const properties = Object.entries(nodeData || {}).filter(([key, value]) => 
-                key !== '_' && value != null && value !== ''
-            );
-
-            const header = document.createElement('div');
-            header.className = 'node-header';
-            header.onclick = () => toggleNode(nodeId);
-
-            const toggleIcon = document.createElement('span');
-            toggleIcon.className = `toggle-icon ${isExpanded ? 'expanded' : ''}`;
-            toggleIcon.textContent = '▶';
-            header.appendChild(toggleIcon);
-
-            const idSpan = document.createElement('span');
-            idSpan.className = `node-id ${nodeInfo.isUser ? 'user-key' : ''}`;
-            idSpan.title = nodeInfo.full;
-            idSpan.textContent = nodeInfo.display;
-            header.appendChild(idSpan);
-
-            const propsCount = document.createElement('span');
-            propsCount.style.cssText = 'margin-left: auto; color: #666; font-size: 0.9em;';
-            propsCount.textContent = `${properties.length} properties`;
-            header.appendChild(propsCount);
-
-            const content = document.createElement('div');
-            content.className = `node-content ${isExpanded ? 'show' : ''}`;
-
-            properties.forEach(([key, value]) => {
-                const propDiv = document.createElement('div');
-                propDiv.className = 'property';
-
-                const keyDiv = document.createElement('div');
-                keyDiv.className = 'property-key';
-                keyDiv.textContent = key;
-                propDiv.appendChild(keyDiv);
-
-                const valueDiv = document.createElement('div');
-                valueDiv.className = 'property-value';
-                valueDiv.appendChild(formatValue(value));
-                propDiv.appendChild(valueDiv);
-
-                content.appendChild(propDiv);
-            });
-
-            nodeEl.appendChild(header);
-            nodeEl.appendChild(content);
-
-            return nodeEl;
-        }
-
-        function toggleNode(nodeId) {
-            if (expandedNodes.has(nodeId)) {
-                expandedNodes.delete(nodeId);
-            } else {
-                expandedNodes.add(nodeId);
-            }
+        
+        console.log(`🔍 Traversing node: ${soul} (depth: ${depth})`);
+        requestedSouls.add(soul);
+        
+        gun.get(soul).once((data, key) => {
+          if (data) {
+            // Store the node data
+            const cleanData = { ...data };
+            delete cleanData._;
+            currentGraph[key] = cleanData;
             renderGraph();
-        }
-
-        function renderGraph() {
-            try {
-                // Clear container
-                graphContainer.innerHTML = '';
-
-                const nodes = Object.entries(currentGraph);
-
-                if (nodes.length === 0) {
-                    graphContainer.innerHTML = '<div>No data loaded. Enter a node soul to begin.</div>';
-                } else {
-                    // Sort nodes
-                    nodes.sort(([a], [b]) => {
-                            // Sort user keys first, then alphabetically
-                            const aIsUser = a.startsWith('~');
-                            const bIsUser = b.startsWith('~');
-                            if (aIsUser && !bIsUser) return -1;
-                            if (!aIsUser && bIsUser) return 1;
-                            return a.localeCompare(b);
-                        });
-
-                    // Render each node
-                    nodes.forEach(([nodeId, nodeData]) => {
-                        const nodeEl = createNodeElement(nodeId, nodeData);
-                        graphContainer.appendChild(nodeEl);
-                    });
-                }
-
-
-                // Update stats
-                nodeCountEl.textContent = nodes.length;
-                lastUpdateEl.textContent = new Date().toLocaleTimeString();
-
-            } catch (error) {
-                console.error('Error rendering graph:', error);
-                showError('Error rendering graph: ' + error.message);
-            }
-        }
-
-        // Make functions available globally
-        window.toggleNode = toggleNode;
-        window.loadNodeFromInput = loadNodeFromInput;
-        window.loadAllNodes = loadAllNodes;
-
-        // Initialize admin authentication
-        document.addEventListener('DOMContentLoaded', () => {
-            ShogunAdmin.init({
-                autoFill: true,
-                showIndicator: true,
-                fieldId: 'authToken',
-                syncEnabled: true
+            
+            // Find all references in this node
+            const references = [];
+            Object.keys(cleanData).forEach(prop => {
+              const value = cleanData[prop];
+              if (value && typeof value === 'object' && value['#']) {
+                references.push(value['#']);
+              }
             });
+            
+            console.log(`📎 Found ${references.length} references in ${key}:`, references);
+            
+            // Traverse referenced nodes
+            references.forEach((refSoul, index) => {
+              setTimeout(() => {
+                traverseGraph(refSoul, depth + 1, maxDepth);
+              }, 50 * index); // Stagger requests to avoid overwhelming
+            });
+            
+            // Update progress
+            if (depth === 0) {
+              setTimeout(() => {
+                const nodeCount = Object.keys(currentGraph).length;
+                showError(`✅ Graph traversal complete! Loaded ${nodeCount} connected nodes`, false);
+                setTimeout(() => showError(''), 5000);
+              }, 1000);
+            }
+          } else {
+            console.log(`❌ No data found for node: ${soul}`);
+          }
+        });
+      }
+
+      function loadAllNodes() {
+        // Use centralized admin password
+        const token =
+          ShogunAdmin.getPassword() ||
+          document.getElementById("authToken").value;
+        if (!token) {
+          showError(
+            "Admin Token is required to load all graph data. Please set it in the Control Panel."
+          );
+          return;
+        }
+        showError(""); // Clear previous errors
+
+        console.log("Loading all data from server...");
+
+        fetch("/api/alldata", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+          .then((response) => {
+            if (!response.ok) {
+              const errorText =
+                response.statusText || "Server returned an error";
+              showError(
+                `Error fetching data: HTTP ${response.status} - ${errorText}`
+              );
+              throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+          })
+          .then((result) => {
+            if (result.success) {
+              console.log("Loaded data from server:", result);
+              currentGraph = result.data || {};
+              requestedSouls = new Set(Object.keys(currentGraph)); // Mark all as requested
+              renderGraph();
+              console.log(
+                `Loaded ${result.nodeCount} nodes (${result.rawSize} bytes raw data)`
+              );
+            } else {
+              showError("Failed to load data: " + result.error);
+            }
+          })
+          .catch((error) => {
+            console.error("Error fetching data:", error);
+            if (!error.message.startsWith("HTTP")) {
+              showError("Error fetching data: " + error.message);
+            }
+          });
+      }
+
+      function showError(message) {
+        errorEl.textContent = message;
+        errorEl.style.display = message ? "block" : "none";
+      }
+
+      function formatNodeId(nodeId) {
+        // Check if it's a user key (starts with ~)
+        if (nodeId.startsWith("~")) {
+          return {
+            isUser: true,
+            display: nodeId.substring(88) || "[root]",
+            full: nodeId,
+          };
+        }
+        return {
+          isUser: false,
+          display: nodeId,
+          full: nodeId,
+        };
+      }
+
+      function createNodeElement(nodeId, nodeData) {
+        const nodeInfo = formatNodeId(nodeId);
+        const isExpanded = expandedNodes.has(nodeId);
+
+        const nodeEl = document.createElement("div");
+        nodeEl.className = "node-item";
+        nodeEl.dataset.nodeId = nodeId;
+
+        const properties = Object.entries(nodeData || {}).filter(
+          ([key, value]) => key !== "_" && value != null && value !== ""
+        );
+
+        // Count references for enhanced display
+        const references = properties.filter(([key, value]) => 
+          value && typeof value === 'object' && value['#']
+        );
+
+        const header = document.createElement("div");
+        header.className = "node-header";
+        header.onclick = () => toggleNode(nodeId);
+
+        const toggleIcon = document.createElement("span");
+        toggleIcon.className = `toggle-icon ${isExpanded ? "expanded" : ""}`;
+        toggleIcon.textContent = "▶";
+        header.appendChild(toggleIcon);
+
+        const idSpan = document.createElement("span");
+        idSpan.className = `node-id ${nodeInfo.isUser ? "user-key" : ""}`;
+        idSpan.title = nodeInfo.full;
+        idSpan.textContent = nodeInfo.display;
+        header.appendChild(idSpan);
+
+        // Enhanced property count with reference info
+        const propsCount = document.createElement("span");
+        propsCount.style.cssText =
+          "margin-left: auto; color: #666; font-size: 0.9em; display: flex; gap: 8px; align-items: center;";
+        
+        const propText = `${properties.length} properties`;
+        const refText = references.length > 0 ? `🔗 ${references.length} refs` : '';
+        propsCount.innerHTML = `${propText} ${refText}`;
+        header.appendChild(propsCount);
+
+        // Add quick actions for nodes with references
+        if (references.length > 0) {
+          const expandAllBtn = document.createElement("button");
+          expandAllBtn.textContent = "🕸️";
+          expandAllBtn.title = "Load all connected nodes";
+          expandAllBtn.style.cssText = "margin-left: 8px; background: none; border: none; cursor: pointer; font-size: 16px;";
+          expandAllBtn.onclick = (e) => {
+            e.stopPropagation();
+            loadConnectedGraph(nodeId, 2);
+          };
+          header.appendChild(expandAllBtn);
+        }
+
+        const content = document.createElement("div");
+        content.className = `node-content ${isExpanded ? "show" : ""}`;
+
+        properties.forEach(([key, value]) => {
+          const propDiv = document.createElement("div");
+          propDiv.className = "property";
+
+          // Highlight reference properties
+          if (value && typeof value === 'object' && value['#']) {
+            propDiv.style.borderLeft = "3px solid #3b82f6";
+            propDiv.style.background = "rgba(59, 130, 246, 0.1)";
+          }
+
+          const keyDiv = document.createElement("div");
+          keyDiv.className = "property-key";
+          keyDiv.textContent = key;
+          propDiv.appendChild(keyDiv);
+
+          const valueDiv = document.createElement("div");
+          valueDiv.className = "property-value";
+          valueDiv.appendChild(formatValue(value));
+          propDiv.appendChild(valueDiv);
+
+          content.appendChild(propDiv);
         });
 
-        // Initialize and start updating
-        initGun();
-        
-        // Initial render
-        setTimeout(renderGraph, 500);
+        nodeEl.appendChild(header);
+        nodeEl.appendChild(content);
 
+        return nodeEl;
+      }
+
+      function toggleNode(nodeId) {
+        if (expandedNodes.has(nodeId)) {
+          expandedNodes.delete(nodeId);
+        } else {
+          expandedNodes.add(nodeId);
+        }
+        renderGraph();
+      }
+
+      function renderGraph() {
+        try {
+          // Clear container
+          graphContainer.innerHTML = "";
+
+          const nodes = Object.entries(currentGraph);
+
+          if (nodes.length === 0) {
+            graphContainer.innerHTML =
+              '<div class="text-center p-8 text-gray-400">No data loaded. Enter a node soul or click "🕸️ Load Connected Graph" to begin exploring.</div>';
+          } else {
+            // Sort nodes to show connected ones first
+            nodes.sort(([a], [b]) => {
+              // Sort user keys first, then by reference count, then alphabetically
+              const aIsUser = a.startsWith("~");
+              const bIsUser = b.startsWith("~");
+              
+              if (aIsUser && !bIsUser) return -1;
+              if (!aIsUser && bIsUser) return 1;
+              
+              // Count references for sorting
+              const aRefs = countReferences(currentGraph[a]);
+              const bRefs = countReferences(currentGraph[b]);
+              
+              if (aRefs !== bRefs) return bRefs - aRefs; // More references first
+              
+              return a.localeCompare(b);
+            });
+
+            // Render each node
+            nodes.forEach(([nodeId, nodeData]) => {
+              const nodeEl = createNodeElement(nodeId, nodeData);
+              graphContainer.appendChild(nodeEl);
+            });
+          }
+
+          // Update stats with additional info
+          const totalRefs = Object.values(currentGraph).reduce((sum, data) => sum + countReferences(data), 0);
+          nodeCountEl.textContent = `${nodes.length} nodes, ${totalRefs} references`;
+          lastUpdateEl.textContent = new Date().toLocaleTimeString();
+        } catch (error) {
+          console.error("Error rendering graph:", error);
+          showError("Error rendering graph: " + error.message);
+        }
+      }
+
+      function countReferences(nodeData) {
+        if (!nodeData) return 0;
+        return Object.values(nodeData).filter(value => 
+          value && typeof value === 'object' && value['#']
+        ).length;
+      }
+
+      // Global real-time sync management
+      let globalRealTimeEnabled = false;
+      let realTimeSyncHandlers = new Map();
+
+      function enableGlobalRealTimeSync() {
+        globalRealTimeEnabled = true;
+        console.log('🔄 Enabling global real-time sync for all loaded nodes');
+        
+        // Enable real-time sync for all currently loaded nodes
+        Object.keys(currentGraph).forEach(soul => {
+          enableRealTimeSync(soul);
+        });
+        
+        showError('✅ Real-time sync enabled for all nodes', false);
+        setTimeout(() => showError(''), 3000);
+      }
+
+      function disableGlobalRealTimeSync() {
+        globalRealTimeEnabled = false;
+        console.log('⏸️ Disabling global real-time sync');
+        
+        // Disable all real-time sync handlers
+        realTimeSyncHandlers.forEach((handler, soul) => {
+          handler.off();
+        });
+        realTimeSyncHandlers.clear();
+        
+        showError('⏸️ Real-time sync disabled', false);
+        setTimeout(() => showError(''), 3000);
+      }
+
+      // Enhanced real-time sync function
+      function enableRealTimeSync(soul) {
+        if (!soul || realTimeSyncHandlers.has(soul)) return;
+        
+        console.log(`🔄 Enabling real-time sync for: ${soul}`);
+        
+        const handler = gun.get(soul).on((data, key) => {
+          console.log(`📡 Real-time update for ${key}:`, data);
+          if (data) {
+            const cleanData = { ...data };
+            delete cleanData._;
+            currentGraph[key] = cleanData;
+            renderGraph();
+            
+            // Show visual indication of update
+            setTimeout(() => {
+              const nodeEl = document.querySelector(`[data-node-id="${key}"]`);
+              if (nodeEl) {
+                nodeEl.style.transition = 'box-shadow 0.3s ease';
+                nodeEl.style.boxShadow = '0 0 10px rgba(59, 130, 246, 0.5)';
+                setTimeout(() => {
+                  nodeEl.style.boxShadow = '';
+                }, 2000);
+              }
+            }, 100);
+          }
+        });
+        
+        realTimeSyncHandlers.set(soul, handler);
+      }
+
+      // Sync status monitoring
+      function showSyncStats() {
+        const stats = {
+          totalNodes: Object.keys(currentGraph).length,
+          syncedNodes: realTimeSyncHandlers.size,
+          connectionState: gun ? 'connected' : 'disconnected'
+        };
+        console.log('📊 Sync Statistics:', stats);
+        return stats;
+      }
+
+      // Make functions available globally
+      window.toggleNode = toggleNode;
+      window.loadNodeFromInput = loadNodeFromInput;
+      window.loadAllNodes = loadAllNodes;
+      window.enableGlobalRealTimeSync = enableGlobalRealTimeSync;
+      window.disableGlobalRealTimeSync = disableGlobalRealTimeSync;
+      window.enableRealTimeSync = enableRealTimeSync;
+      window.showSyncStats = showSyncStats;
+      window.loadConnectedGraph = loadConnectedGraph;
+      window.traverseGraph = traverseGraph;
+      
+      // Helper function for UI
+      function loadConnectedGraphFromInput() {
+        const soul = document.getElementById("soulInput").value;
+        const maxDepth = parseInt(document.getElementById("maxDepth").value) || 3;
+        
+        if (!soul) {
+          showError("Please enter a node soul to start graph traversal");
+          return;
+        }
+        
+        loadConnectedGraph(soul, maxDepth);
+      }
+      
+      window.loadConnectedGraphFromInput = loadConnectedGraphFromInput;
+
+      // Initialize admin authentication
+      document.addEventListener("DOMContentLoaded", () => {
+        ShogunAdmin.init({
+          autoFill: true,
+          showIndicator: true,
+          fieldId: "authToken",
+          syncEnabled: true,
+        });
+      });
+
+      // Initialize and start updating
+      initGun();
+
+      // Initial render
+      setTimeout(renderGraph, 500);
     </script>
-</body>
+  </body>
 </html>

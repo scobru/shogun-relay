@@ -13,7 +13,7 @@ dotenv.config()
 // Configuration matching the relay server exactly
 let accessKeyId = process.env.ACCESS_KEY || "S3RVER";
 let secretAccessKey = process.env.SECRET_KEY || "S3RVER";
-let bucketName = process.env.BUCKET_NAME || "test-bucket";
+let bucketName = process.env.BUCKET_NAME || "shogun-bucket";
 let port = process.env.PORT || 4569;
 let address = process.env.ADDRESS || "localhost";
 let directory = "./buckets";
