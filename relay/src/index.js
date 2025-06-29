@@ -239,13 +239,13 @@ async function initializeServer() {
       // from an external peer or from the relay's internal storage.
 
       // Internal puts (from radisk) will NOT have a `headers` object.
-      if (!msg.headers) {
-        console.log(
-          "INTERNAL PUT ALLOWED (from storage):",
-          Object.keys(msg.put)
-        );
-        return to.next(msg);
-      }
+      // if (!msg.headers) {
+      //   console.log(
+      //     "INTERNAL PUT ALLOWED (from storage):",
+      //     Object.keys(msg.put)
+      //   );
+      //   return to.next(msg);
+      // }
 
       // Track PUT requests from peers
       customStats.putRequests++;
