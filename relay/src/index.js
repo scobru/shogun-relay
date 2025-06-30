@@ -37,7 +37,7 @@ import http from "http";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import multer from "multer";
 
-const namespace = "shogun-relay";
+const namespace = "shogun";
 
 // --- IPFS Configuration ---
 const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
@@ -46,6 +46,7 @@ const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
 const GC_ENABLED = process.env.GC_ENABLED === "true";
 // Namespaces to protect from garbage collection.
 const GC_EXCLUDED_NAMESPACES = [
+  namespace,
   // --- CRITICAL GUN METADATA ---
   "~", // Protects all user spaces, including user data and aliases (~@username).
   "!", // Protects the root node, often used for system-level pointers.
@@ -212,7 +213,7 @@ async function initializeServer() {
   }
 
   function hasValidToken(msg) {
-    if(process.env.RELAY_PROTECTED === "false") {
+    if (process.env.RELAY_PROTECTED === "false") {
       console.log("🔍 PUT allowed - protected disabled");
       return true;
     }
@@ -2166,7 +2167,6 @@ async function initializeServer() {
     await shutdown();
     process.exit(0);
   });
-
 } // End of initializeServer function
 
 // Start the server
