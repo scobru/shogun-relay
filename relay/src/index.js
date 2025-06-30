@@ -46,23 +46,11 @@ const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
 const GC_ENABLED = process.env.GC_ENABLED === "true";
 // Namespaces to protect from garbage collection.
 const GC_EXCLUDED_NAMESPACES = [
-  namespace,
   // --- CRITICAL GUN METADATA ---
   "~", // Protects all user spaces, including user data and aliases (~@username).
   "!", // Protects the root node, often used for system-level pointers.
   "relays", // Protects relay server health-check data.
-
-  // --- APPLICATION DATA ---
-  // Add other persistent application namespaces here.
-  "shogun-auth-app",
-  "shogun",
-  "hal9000", // Example: protect blog posts
-  "shogun-relay",
-  "shogun-wormhole",
-  "shogun-hal9000", // Example: protect blog posts
-  "the-swan-station",
-  "wormhole",
-  "public-chat",
+  "shogun"
 ];
 // Data older than this will be deleted (milliseconds). Default: 24 hours.
 const EXPIRATION_AGE = process.env.GC_EXPIRATION_AGE || 24 * 60 * 60 * 1000;
@@ -747,34 +735,14 @@ async function initializeServer() {
   const peers = peersString ? peersString.split(",") : [];
   console.log("🔍 Peers:", peers);
 
-  Gun.on("opt", function (ctx) {
-    if (ctx.once) {
-      return;
-    }
-    ctx.on("out", function (msg) {
-      const to = this.to;
-      // Use centralized admin password
-      const authToken = process.env.ADMIN_PASSWORD;
-      if (authToken) {
-        // Add headers for all outgoing messages, especially 'put'
-        msg.headers = {
-          ...msg.headers, // Preserve existing headers
-          token: authToken,
-          Authorization: "Bearer " + authToken,
-        };
-      }
-      to.next(msg); // pass to next middleware
-    });
-  });
-
   // Initialize Gun with conditional S3 support
   const gunConfig = {
-    // super: false,
+    super: false,
     file: "radata",
     radisk: true,
     web: server,
     isValid: hasValidToken,
-    uuid: namespace,
+    uuid: process.env.RELAY_NAME,
     localStorage: false,
     wire: true,
     axe: true,
@@ -2053,7 +2021,7 @@ async function initializeServer() {
   });
 
   app.get("/api/notes", tokenAuthMiddleware, (req, res) => {
-    const notesNode = gun.get(namespace).get("admin").get("notes");
+    const notesNode = gun.get("shogun").get("admin").get("notes");
     notesNode.once((data) => {
       res.json({ success: true, notes: data || "" });
     });
@@ -2067,7 +2035,7 @@ async function initializeServer() {
         .json({ success: false, error: "Invalid notes format." });
     }
     gun
-      .get(namespace)
+      .get("shogun")
       .get("admin")
       .get("notes")
       .put(notes, (ack) => {
@@ -2080,7 +2048,7 @@ async function initializeServer() {
 
   app.delete("/api/notes", tokenAuthMiddleware, (req, res) => {
     gun
-      .get(namespace)
+      .get("shogun")
       .get("admin")
       .get("notes")
       .put(null, (ack) => {

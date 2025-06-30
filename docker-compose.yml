@@ -33,7 +33,7 @@ services:
       - RELAY_QR=true
       - RELAY_NAME=S3RVER
       - RELAY_PEERS=127.0.0.1:8765/gun
-      - RELAY_PROTECTED=true
+      - RELAY_PROTECTED=false
       - IPFS_API_URL=http://127.0.0.1:5001
       - IPFS_GATEWAY_URL=http://127.0.0.1:8080
       - IPFS_API_TOKEN=S3RVER
