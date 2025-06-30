@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="styles/wormhole.css">
+    <link rel="stylesheet" href="styles/responsive.css">
     <!-- Include centralized admin authentication -->
     <script src="lib/admin-auth.js"></script>
     <style>
@@ -298,6 +299,7 @@
             margin-right: 0.5rem;
         }
 
+        /* Responsive styles */
         @media (max-width: 768px) {
             .container {
                 padding: 0.75rem;
@@ -308,9 +310,22 @@
                 gap: 0.5rem;
                 padding: 0.75rem;
             }
+            
+            .bucket-info {
+                display: flex;
+                flex-direction: column;
+                margin-bottom: 0.5rem;
+            }
 
             .bucket-details {
                 text-align: left;
+                margin-bottom: 0.25rem;
+            }
+            
+            .bucket-actions {
+                display: flex;
+                justify-content: flex-start;
+                margin-top: 0.5rem;
             }
 
             .stats-grid {
@@ -321,22 +336,88 @@
             .modal-content {
                 padding: 1rem;
                 width: 95%;
+                max-height: 90vh;
+            }
+            
+            /* Responsive table */
+            .object-table, 
+            .object-table tbody, 
+            .object-table tr {
+                display: block;
+                width: 100%;
+            }
+            
+            .object-table thead {
+                display: none;
+            }
+            
+            .object-table tr {
+                margin-bottom: 1rem;
+                border: 1px solid #444;
+                border-radius: 0.25rem;
+                padding: 0.5rem;
+            }
+            
+            .object-table td {
+                display: flex;
+                padding: 0.5rem 0.25rem;
+                text-align: right;
+                border-bottom: 1px dashed #444;
+            }
+            
+            .object-table td:last-child {
+                border-bottom: none;
+            }
+            
+            .object-table td:before {
+                content: attr(data-label);
+                float: left;
+                font-weight: bold;
+                color: #8af;
+                padding-right: 0.5rem;
             }
         }
 
         @media (max-width: 480px) {
             body {
-                padding: 0.5rem;
+                padding: 0;
             }
 
             .container {
                 padding: 0.5rem;
             }
 
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            h2 {
+                font-size: 1.25rem;
+            }
+
             .btn {
                 width: 100%;
                 margin-bottom: 0.5rem;
                 margin-right: 0;
+                padding: 0.5rem 1rem;
+            }
+            
+            .stat-card {
+                padding: 1rem;
+            }
+            
+            .stat-card p {
+                font-size: 1.5rem;
+            }
+            
+            .modal-content {
+                padding: 0.75rem;
+                width: 98%;
+            }
+            
+            .modal-close {
+                top: 0.5rem;
+                right: 0.75rem;
             }
         }
     </style>
@@ -405,7 +486,19 @@
             if (ShogunAdmin.hasPassword()) {
                 setTimeout(loadStats, 1000);
             }
+            
+            // Initialize viewport height fix
+            adjustViewportHeight();
         });
+        
+        // Handle viewport resizing for mobile
+        function adjustViewportHeight() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+        
+        window.addEventListener('resize', adjustViewportHeight);
+        window.addEventListener('orientationchange', adjustViewportHeight);
 
         // Listen for password updates
         window.addEventListener('shogun-admin-password-updated', (event) => {
@@ -496,13 +589,13 @@
                 bucketEl.className = 'bucket-item';
                 
                 bucketEl.innerHTML = `
-                    <div>
+                    <div class="bucket-info">
                         <div class="bucket-name">${bucket.name}</div>
                         <div style="font-size:0.8em; color: #999;">Created: ${new Date(bucket.creationDate).toLocaleString()}</div>
                     </div>
                     <div class="bucket-details">${bucket.objectCount} objects</div>
                     <div class="bucket-details">${formatBytes(bucket.size)}</div>
-                    <div>
+                    <div class="bucket-actions">
                         <button class="explore-btn" onclick="exploreBucket('${bucket.name}')">Explore</button>
                     </div>
                 `;
@@ -568,9 +661,9 @@
                     result.objects.forEach(obj => {
                         const row = document.createElement('tr');
                         row.innerHTML = `
-                            <td>${obj.Key}</td>
-                            <td>${formatBytes(obj.Size)}</td>
-                            <td>${new Date(obj.LastModified).toLocaleString()}</td>
+                            <td data-label="Key">${obj.Key}</td>
+                            <td data-label="Size">${formatBytes(obj.Size)}</td>
+                            <td data-label="Last Modified">${new Date(obj.LastModified).toLocaleString()}</td>
                         `;
                         tableBody.appendChild(row);
                     });

@@ -159,17 +159,18 @@
       let isGunReady = false;
 
       // Initialize default peers - will be updated when user changes the input
-      let peers = ["http://localhost:8765/gun"];
 
       // Configure the middleware GLOBALLY before ANY Gun instance creation
       updateStatus("Configuring Gun middleware...");
 
       // Function to create Gun instance with current peer configuration
       function createGunInstance() {
+        const peer = `${window.location.protocol}//${window.location.host}/gun`;
+
         const relayPeerInput = document.getElementById("relayPeer");
         const currentPeer = relayPeerInput
           ? relayPeerInput.value.trim()
-          : "http://localhost:8765/gun";
+          : peer
 
         if (!currentPeer) {
           updateStatus("Error: Empty peer URL", true);

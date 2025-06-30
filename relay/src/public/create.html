@@ -9,25 +9,96 @@
     <link rel="stylesheet" href="styles/wormhole.css">
     <!-- Include centralized admin authentication -->
     <script src="lib/admin-auth.js"></script>
+    <style>
+        .input-custom {
+            width: 100%;
+            background-color: #2a2a2a;
+            color: #eee;
+            border: 1px solid #555;
+            padding: 0.75rem;
+            border-radius: 0.25rem;
+            font-family: inherit;
+            transition: border-color 0.2s ease;
+        }
+        
+        .input-custom:focus {
+            outline: none;
+            border-color: #8af;
+        }
+        
+        .textarea-height {
+            height: 200px;
+        }
+        
+        @media (min-width: 640px) {
+            .textarea-height {
+                height: 256px; /* h-64 equivalent */
+            }
+        }
+        
+        .btn-custom {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #444;
+            color: #eee;
+            border: 1px solid #555;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+        
+        @media (min-width: 640px) {
+            .btn-custom {
+                width: auto;
+            }
+        }
+        
+        .btn-custom:hover {
+            background-color: #555;
+            border-color: #8af;
+        }
+        
+        .message {
+            padding: 1rem;
+            border-radius: 0.25rem;
+            margin-top: 1rem;
+        }
+        
+        .message.success {
+            background-color: rgba(34, 197, 94, 0.2);
+            color: rgb(34, 197, 94);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+        
+        .message.error {
+            background-color: rgba(239, 68, 68, 0.2);
+            color: rgb(239, 68, 68);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+    </style>
 </head>
 <body class="antialiased">
-    <div class="container mx-auto p-4">
+    <div class="container mx-auto p-2 sm:p-4">
         <div class="flex items-center mb-4">
             <a href="/" class="nav-link">&larr; Back to Control Panel</a>
         </div>
 
-        <div class="card">
-            <div class="p-8">
+        <div class="card bg-base-200 shadow-xl">
+            <div class="p-4 sm:p-6 md:p-8">
                 <div class="flex flex-col items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 sm:h-12 sm:w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
 
-                    <h1 class="text-2xl font-semibold mb-8">GunDB Data Creator</h1>
+                    <h1 class="text-xl sm:text-2xl font-semibold mb-6 sm:mb-8 text-center">GunDB Data Creator</h1>
 
-                    <div class="w-full space-y-6">
+                    <div class="w-full space-y-4 sm:space-y-6">
                         <div>
-                            <h2 class="text-xl font-semibold mb-4">Create New Node</h2>
+                            <h2 class="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Create New Node</h2>
                             <div class="space-y-4">
                                 <div class="form-group">
                                     <label class="block text-sm font-medium mb-2">Node Path:</label>
@@ -35,9 +106,11 @@
                                 </div>
                                 <div class="form-group">
                                     <label class="block text-sm font-medium mb-2">Data (JSON format):</label>
-                                    <textarea id="dataArea" class="input-custom h-64">{}</textarea>
+                                    <textarea id="dataArea" class="input-custom textarea-height">{}</textarea>
                                 </div>
-                                <button id="createBtn" class="btn-custom">Create Node</button>
+                                <div class="flex justify-center sm:justify-start">
+                                    <button id="createBtn" class="btn-custom">Create Node</button>
+                                </div>
                             </div>
                         </div>
 
@@ -73,6 +146,16 @@
             messageEl.textContent = text;
             messageEl.className = `message ${type}`;
             messageEl.style.display = 'block';
+            
+            // Scroll to message
+            messageEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            
+            // Auto-hide success messages after 5 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    messageEl.style.display = 'none';
+                }, 5000);
+            }
         };
 
         createBtn.addEventListener('click', async () => {
@@ -80,6 +163,10 @@
             if (!nodePath) { showMessage('Node Path is required.'); return; }
             let data;
             try { data = JSON.parse(dataArea.value); } catch (e) { showMessage('Invalid JSON format.'); return; }
+            
+            // Show loading state
+            createBtn.disabled = true;
+            createBtn.textContent = 'Creating...';
             
             try {
                 // Use centralized admin password
@@ -109,8 +196,22 @@
                 }
             } catch (err) {
                 showMessage(`Network error: ${err.message}`);
+            } finally {
+                // Reset button state
+                createBtn.disabled = false;
+                createBtn.textContent = 'Create Node';
             }
         });
+        
+        // Handle viewport resizing for mobile
+        function adjustViewportHeight() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+        
+        window.addEventListener('resize', adjustViewportHeight);
+        window.addEventListener('orientationchange', adjustViewportHeight);
+        adjustViewportHeight();
     </script>
 </body>
 </html> 

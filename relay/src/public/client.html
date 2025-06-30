@@ -19,7 +19,13 @@
       body { 
         background-color: #333; 
         color: #eee;
-        padding: 1em;
+        padding: 0.5em;
+      }
+
+      @media (min-width: 640px) {
+        body {
+          padding: 1em;
+        }
       }
 
       .nav-link {
@@ -44,6 +50,7 @@
         border-radius: 0.25rem;
         font-family: inherit;
         transition: border-color 0.2s ease;
+        width: 100%;
       }
 
       .input-custom:focus {
@@ -85,10 +92,12 @@
         padding: 1rem;
         border-radius: 0.5rem;
         border: 1px solid #444;
+        font-size: 0.85rem;
+        overflow-x: auto;
       }
 
       #messages {
-        height: 500px;
+        height: 400px;
         overflow-y: auto;
         margin: 1rem 0;
         font-size: 0.95rem;
@@ -112,10 +121,14 @@
         transform: translateY(-2px);
       }
 
+      .input-group {
+        display: flex;
+        gap: 0.5rem;
+      }
+
       @media (max-width: 640px) {
         .input-group {
           flex-direction: column;
-          gap: 0.5rem;
         }
 
         .input-group > * {
@@ -123,34 +136,53 @@
         }
 
         #messages {
-          height: 400px;
+          height: 350px;
         }
 
         #log {
           height: 100px;
         }
+        
+        .form-group {
+          margin-bottom: 1rem;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .container {
+          padding: 0.5rem;
+        }
+        
+        .card .p-8 {
+          padding: 1rem;
+        }
+        
+        h1 {
+          font-size: 1.5rem;
+          margin-bottom: 1rem;
+        }
       }
     </style>
   </head>
   <body class="antialiased">
-    <div class="container mx-auto p-4">
+    <div class="container mx-auto p-2 sm:p-4">
       <div class="flex items-center mb-4">
         <a href="/" class="nav-link">&larr; Back to Control Panel</a>
       </div>
 
       <div class="card">
-        <div class="p-8">
+        <div class="p-4 sm:p-6 md:p-8">
           <div class="flex flex-col items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 sm:h-12 sm:w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
 
-            <h1 class="text-2xl font-semibold mb-8">Minimal Messenger</h1>
+            <h1 class="text-xl sm:text-2xl font-semibold mb-6 sm:mb-8 text-center">Minimal Messenger</h1>
 
-            <div class="w-full space-y-6">
+            <div class="w-full space-y-4 sm:space-y-6">
               <div class="form-group">
                 <label class="block text-sm font-medium mb-2">Server Address:</label>
-                <div class="flex gap-2">
+                <div class="flex flex-col sm:flex-row gap-2">
                   <input type="text" id="serverAddress" class="input input-bordered flex-1" placeholder="Enter server address">
                   <button id="connectBtn" class="btn btn-primary">Connect</button>
                 </div>
@@ -158,15 +190,15 @@
 
               <div class="form-group">
                 <label class="block text-sm font-medium mb-2">Messages:</label>
-                <div class="mockup-code bg-base-300 h-96 overflow-y-auto" id="messagesContainer">
+                <div class="mockup-code bg-base-300 h-[350px] sm:h-96 overflow-y-auto" id="messagesContainer">
                   <pre id="messages" class="text-sm"><code class="text-base-content">Not connected.</code></pre>
                 </div>
               </div>
 
               <div class="form-group">
                 <label class="block text-sm font-medium mb-2">Send Message:</label>
-                <div class="flex gap-2">
-                  <input type="text" id="username" class="input input-bordered w-32" placeholder="Name">
+                <div class="flex flex-col sm:flex-row gap-2">
+                  <input type="text" id="username" class="input input-bordered w-full sm:w-32" placeholder="Name">
                   <input type="text" id="messageInput" class="input input-bordered flex-1" placeholder="Connect to start chatting..." disabled>
                   <button id="sendBtn" class="btn btn-accent" disabled>Send</button>
                 </div>
@@ -174,7 +206,7 @@
 
               <div class="form-group">
                 <label class="block text-sm font-medium mb-2">Connection Log:</label>
-                <div class="mockup-code bg-base-300 h-32 overflow-y-auto">
+                <div class="mockup-code bg-base-300 h-24 sm:h-32 overflow-y-auto">
                   <pre id="log" class="text-xs"><code class="text-base-content opacity-70"></code></pre>
                 </div>
               </div>
@@ -383,6 +415,15 @@
         log("🦄 Minimal Messenger initialized.");
         log("Enter server address and click 'Connect'.");
 
+        // Handle viewport resizing for mobile
+        function adjustViewportHeight() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+        
+        window.addEventListener('resize', adjustViewportHeight);
+        window.addEventListener('orientationchange', adjustViewportHeight);
+        adjustViewportHeight();
     </script>
   </body>
 </html>

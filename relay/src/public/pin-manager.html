@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="styles/wormhole.css">
+    <link rel="stylesheet" href="styles/responsive.css">
     <!-- Include centralized admin authentication -->
     <script src="lib/admin-auth.js"></script>
     <style>
@@ -43,37 +44,67 @@
         .batch-log {
             @apply mt-4 bg-base-300 border border-base-content/10 rounded-lg p-4 max-h-[200px] overflow-y-auto text-sm font-mono;
         }
+        
+        /* Responsive styles */
+        @media (max-width: 640px) {
+            .form-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .form-actions .btn {
+                width: 100%;
+                margin-top: 0.5rem;
+            }
+            
+            .pin-item {
+                padding: 0.75rem;
+            }
+            
+            .button-group {
+                justify-content: center;
+            }
+            
+            .small-button {
+                flex-grow: 1;
+                text-align: center;
+                padding: 0.5rem;
+                font-size: 0.75rem;
+            }
+        }
     </style>
 </head>
 <body class="antialiased">
     <div id="loader" class="fixed inset-0 bg-black bg-opacity-50 z-50 items-center justify-center" style="display: none;">
         <span class="loading loading-spinner loading-lg text-primary"></span>
     </div>
-    <div class="container mx-auto p-4">
+    <div class="container mx-auto p-2 sm:p-4">
         <div class="flex items-center mb-4">
             <a href="/" class="nav-link">&larr; Back to Control Panel</a>
         </div>
 
-        <div class="card">
-            <div class="p-8">
+        <div class="card bg-base-200 shadow-xl">
+            <div class="p-4 sm:p-6 md:p-8">
                 <div class="flex flex-col items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 sm:h-12 sm:w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                     </svg>
 
-                    <h1 class="text-2xl font-semibold mb-8">IPFS Pin Manager</h1>
+                    <h1 class="text-xl sm:text-2xl font-semibold mb-6 sm:mb-8 text-center">IPFS Pin Manager</h1>
 
-                    <div class="w-full space-y-6">
+                    <div class="w-full space-y-4 sm:space-y-6">
                         <div class="form-group">
                             <label class="block text-sm font-medium mb-2">Pin Management:</label>
-                            <div class="flex gap-2">
+                            <div class="flex flex-col sm:flex-row gap-2">
                                 <input type="text" id="cidInput" class="input input-bordered flex-1" placeholder="Enter CID to pin/unpin">
-                                <button onclick="addPin()" class="btn btn-accent">Add Pin</button>
-                                <button onclick="removePin()" class="btn btn-warning">Remove Pin</button>
+                                <div class="flex flex-wrap gap-2">
+                                    <button onclick="addPin()" class="btn btn-accent flex-1 sm:flex-none">Add Pin</button>
+                                    <button onclick="removePin()" class="btn btn-warning flex-1 sm:flex-none">Remove Pin</button>
+                                </div>
                             </div>
-                            <div class="flex gap-2 mt-2">
-                                <button onclick="listPins()" class="btn btn-primary">List All Pins</button>
-                                <button onclick="garbageCollect()" class="btn btn-secondary">Garbage Collect</button>
+                            <div class="flex flex-col sm:flex-row gap-2 mt-2">
+                                <button onclick="listPins()" class="btn btn-primary flex-1 sm:flex-none">List All Pins</button>
+                                <button onclick="garbageCollect()" class="btn btn-secondary flex-1 sm:flex-none">Garbage Collect</button>
                             </div>
                         </div>
 
@@ -84,8 +115,8 @@
                                 <div class="progress-bar">
                                     <div id="progressBar" class="progress-fill" style="width: 0%"></div>
                                 </div>
-                                <div class="mt-2 text-sm flex justify-between">
-                                    <span id="progressText">Processing...</span>
+                                <div class="mt-2 text-sm flex flex-wrap justify-between">
+                                    <span id="progressText" class="mb-1 sm:mb-0">Processing...</span>
                                     <span><span id="progressCurrent">0</span> / <span id="progressTotal">0</span></span>
                                 </div>
                                 <div id="batchLog" class="batch-log"></div>
@@ -114,7 +145,19 @@
             if (ShogunAdmin.hasPassword()) {
                 setTimeout(listPins, 1000);
             }
+            
+            // Initialize viewport height fix for mobile
+            adjustViewportHeight();
         });
+        
+        // Handle viewport resizing for mobile
+        function adjustViewportHeight() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+        
+        window.addEventListener('resize', adjustViewportHeight);
+        window.addEventListener('orientationchange', adjustViewportHeight);
 
         // Listen for password updates
         window.addEventListener('shogun-admin-password-updated', (event) => {
@@ -270,6 +313,7 @@
                     }
                     .button-group {
                         display: flex;
+                        flex-wrap: wrap;
                         gap: 8px;
                         margin-top: 5px;
                     }
@@ -305,6 +349,24 @@
                     .copy-action:hover {
                         background-color: #555;
                     }
+                    
+                    /* Responsive styles for pin items */
+                    @media (max-width: 640px) {
+                        .pin-item {
+                            padding: 10px;
+                        }
+                        .button-group {
+                            flex-direction: row;
+                            flex-wrap: wrap;
+                            justify-content: space-between;
+                        }
+                        .small-button {
+                            flex-grow: 1;
+                            margin-bottom: 5px;
+                            text-align: center;
+                            min-width: calc(50% - 5px);
+                        }
+                    }
                 `;
                 document.head.appendChild(style);
 
@@ -317,6 +379,7 @@
                     const cidEl = document.createElement('div');
                     cidEl.textContent = `CID: ${cid}`;
                     cidEl.style.fontFamily = 'monospace';
+                    cidEl.style.wordBreak = 'break-all';
                     pinEl.appendChild(cidEl);
 
                     // Add Type

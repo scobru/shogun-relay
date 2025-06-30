@@ -11,7 +11,8 @@
 		background-color: rgb(25,25,25);
 		color: rgb(80,135,25) !important;
 		text-shadow: 1px 1px 20px rgb(80,150,25);
-		margin: 2em;
+		margin: 0;
+		padding: 1em;
 		line-height: 1.6;
 	}
 
@@ -19,6 +20,22 @@
 		border-bottom: 1px solid #555;
 		padding-bottom: 10px;
 		color: rgb(80,135,25);
+		font-size: 1.5rem;
+	}
+
+	@media (min-width: 640px) {
+		h1 {
+			font-size: 1.75rem;
+		}
+	}
+
+	@media (min-width: 768px) {
+		body {
+			padding: 1.5em;
+		}
+		h1 {
+			font-size: 2rem;
+		}
 	}
 
 	a {
@@ -33,6 +50,16 @@
 	.center {
 		text-align: center;
 		margin: 1em 0;
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.5rem 1rem;
+	}
+
+	.stat-pair {
+		display: inline-flex;
+		align-items: center;
+		margin: 0 0.25rem;
 	}
 
 	.shout {
@@ -40,6 +67,7 @@
 		font-weight: bold;
 		font-size: 1.2em;
 		text-shadow: 1px 1px 10px rgb(250,50,50);
+		margin-right: 0.25rem;
 	}
 
 	.label {
@@ -68,20 +96,26 @@
 
 	.charts {
 		display: grid;
-		grid-template-columns: repeat(3, 1fr);
+		grid-template-columns: 1fr;
 		gap: 20px;
 		margin-top: 20px;
 	}
 
-	@media (max-width: 1200px) {
+	@media (min-width: 640px) {
 		.charts {
 			grid-template-columns: repeat(2, 1fr);
 		}
 	}
 
-	@media (max-width: 768px) {
+	@media (min-width: 1024px) {
 		.charts {
-			grid-template-columns: 1fr;
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+
+	@media (min-width: 1280px) {
+		.charts {
+			grid-template-columns: repeat(3, 1fr);
 		}
 	}
 
@@ -117,34 +151,49 @@
 		font-size: 12px;
 		color: #666;
 	}
+
+	.stats {
+		width: 100%;
+		max-width: 600px;
+		margin: 1rem auto;
+	}
+
+	.input-custom {
+		width: 100%;
+		padding: 0.5rem;
+		background-color: rgb(50,50,50);
+		color: rgb(250,50,50);
+		border: 1px solid #555;
+		border-radius: 0.25rem;
+	}
 </style>
 </head>
 <body class="antialiased">
-<div class="container mx-auto p-4">
+<div class="container mx-auto p-2 sm:p-4">
 	<div class="flex items-center mb-4">
 		<a href="/" class="nav-link">&larr; Back to Control Panel</a>
 	</div>
 
 	<div class="card">
-		<div class="p-8">
+		<div class="p-4 sm:p-6 md:p-8">
 			<div class="flex flex-col items-center">
-				<svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 sm:h-12 sm:w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
 				</svg>
 				
-				<h1 class="text-2xl font-semibold mb-8">📊 Gun Relay Advanced Stats Dashboard</h1>
+				<h1 class="text-center mb-6 sm:mb-8">📊 Gun Relay Advanced Stats Dashboard</h1>
 
 				<div class="center">
-					<span class="shout" id="peers">0</span> peers 
-					<span class="shout" id="time">0</span> min 
-					<span class="shout" id="nodes">0</span> nodes 
-					<span class="shout" id="hours">0</span> hours 
-					<span class="shout" id="block">0</span> ms avg 
-					<span class="shout" id="stack">0</span> gets/s
+					<div class="stat-pair"><span class="shout" id="peers">0</span> peers</div>
+					<div class="stat-pair"><span class="shout" id="time">0</span> min</div>
+					<div class="stat-pair"><span class="shout" id="nodes">0</span> nodes</div>
+					<div class="stat-pair"><span class="shout" id="hours">0</span> hours</div>
+					<div class="stat-pair"><span class="shout" id="block">0</span> ms avg</div>
+					<div class="stat-pair"><span class="shout" id="stack">0</span> gets/s</div>
 				</div>
 
 				<div class="stats">
-					<label for="url">Stats Source URL:</label><br>
+					<label for="url">Stats Source URL:</label>
 					<input id="url" class="input-custom" placeholder="Enter custom stats source URL (optional)" value="">
 					<div class="text-secondary text-sm mt-2" id="status">Connecting to local stats...</div>
 				</div>
@@ -285,6 +334,17 @@
     fetchData();
   });
 
+  // Handle responsive resizing
+  function handleResize() {
+    const charts = document.querySelectorAll('.chart canvas');
+    charts.forEach(canvas => {
+      if (canvas._chart) {
+        canvas._chart.resize();
+      }
+    });
+  }
+
+  window.addEventListener('resize', handleResize);
 </script>
 </body>
 </html> 

@@ -26,6 +26,7 @@
         border-radius: 12px;
         overflow: hidden;
         transition: all 0.2s ease;
+        width: 100%;
       }
       .node-header {
         padding: 12px 15px;
@@ -35,6 +36,7 @@
         gap: 10px;
         background-color: rgba(255, 255, 255, 0.05);
         border-bottom: 1px solid var(--color-input-border);
+        flex-wrap: wrap;
       }
       .node-header:hover {
         background-color: rgba(255, 255, 255, 0.1);
@@ -42,6 +44,7 @@
       .node-id {
         font-weight: bold;
         word-break: break-all;
+        max-width: 100%;
       }
       .node-id.user-key {
         color: var(--color-accent);
@@ -49,6 +52,7 @@
       .toggle-icon {
         font-size: 12px;
         transition: transform 0.2s ease;
+        flex-shrink: 0;
       }
       .toggle-icon.expanded {
         transform: rotate(90deg);
@@ -67,6 +71,7 @@
         background-color: rgba(255, 255, 255, 0.05);
         border-radius: 12px;
         border-left: 3px solid var(--color-accent);
+        overflow-x: auto;
       }
       .property-key {
         font-weight: bold;
@@ -92,6 +97,7 @@
         background-color: rgba(255, 255, 255, 0.05);
         padding: 8px;
         border-radius: 12px;
+        overflow-x: auto;
       }
       .btn-custom.btn-sm {
         padding: 4px 12px;
@@ -103,6 +109,101 @@
         border-color: rgba(34, 197, 94, 0.3);
         color: rgb(34, 197, 94);
       }
+      
+      /* Responsive styles */
+      .stats {
+        padding: 1rem;
+        border-radius: 0.5rem;
+        background-color: rgba(255, 255, 255, 0.05);
+        margin-bottom: 1rem;
+        overflow-x: auto;
+      }
+      
+      .stats-content {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      
+      .stats-label {
+        font-weight: bold;
+        white-space: nowrap;
+      }
+      
+      /* Mobile optimizations */
+      @media (max-width: 640px) {
+        .container {
+          padding: 0.5rem;
+        }
+        
+        .card .p-8 {
+          padding: 1rem;
+        }
+        
+        .node-header {
+          padding: 8px 10px;
+        }
+        
+        .property {
+          padding: 6px;
+        }
+        
+        .btn-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+          margin-bottom: 0.5rem;
+        }
+        
+        .btn-custom {
+          flex: 1;
+          min-width: fit-content;
+          text-align: center;
+          white-space: nowrap;
+        }
+        
+        .input-row {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+        
+        .input-row .input-custom {
+          width: 100%;
+        }
+        
+        .input-row .btn-custom {
+          width: 100%;
+        }
+      }
+      
+      /* Link container responsiveness */
+      .link-container {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin: 4px 0;
+      }
+      
+      /* Node header responsiveness */
+      .node-meta {
+        display: flex;
+        align-items: center;
+        margin-left: auto;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      
+      /* Connection status responsiveness */
+      .connection-status {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+        flex-wrap: wrap;
+      }
     </style>
   </head>
   <body class="antialiased">
@@ -112,7 +213,7 @@
       </div>
 
       <div class="card">
-        <div class="p-8">
+        <div class="p-4 sm:p-8">
           <div class="flex flex-col items-center">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -129,73 +230,81 @@
               />
             </svg>
 
-            <h1 class="text-2xl font-semibold mb-8">Live Gun Graph Explorer</h1>
+            <h1 class="text-xl sm:text-2xl font-semibold mb-4 sm:mb-8 text-center">Live Gun Graph Explorer</h1>
 
-            <div class="w-full space-y-6">
+            <div class="w-full space-y-4 sm:space-y-6">
               <div class="stats">
-                <div class="flex items-center gap-4">
-                  <strong>Authentication:</strong>
+                <div class="input-row sm:flex sm:items-center sm:gap-4">
+                  <span class="stats-label block mb-2 sm:mb-0">Authentication:</span>
                   <input
                     type="password"
                     id="authToken"
-                    class="input-custom flex-1"
+                    class="input-custom w-full sm:flex-1"
                     placeholder="Admin Token (auto-loaded if saved)"
                   />
                 </div>
               </div>
 
               <div class="stats">
-                <div class="flex items-center gap-4">
-                  <strong>Graph Explorer:</strong>
-                  <input
-                    type="text"
-                    id="soulInput"
-                    class="input-custom flex-1"
-                    placeholder="Enter node soul (or leave empty to see all)"
-                  />
-                  <button onclick="loadNodeFromInput()" class="btn-custom">
-                    Load
-                  </button>
+                <div class="input-row sm:flex sm:items-center sm:gap-4">
+                  <span class="stats-label block mb-2 sm:mb-0">Graph Explorer:</span>
+                  <div class="flex gap-2 w-full">
+                    <input
+                      type="text"
+                      id="soulInput"
+                      class="input-custom flex-1"
+                      placeholder="Enter node soul (or leave empty to see all)"
+                    />
+                    <button onclick="loadNodeFromInput()" class="btn-custom whitespace-nowrap">
+                      Load
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div class="stats">
-                <strong>Graph Stats:</strong>
-                <span id="nodeCount">0</span> nodes loaded | Last updated:
-                <span id="lastUpdate">Never</span>
+              <div class="stats overflow-x-auto">
+                <div class="stats-content">
+                  <span class="stats-label">Graph Stats:</span>
+                  <span id="nodeCount">0</span> nodes loaded | Last updated:
+                  <span id="lastUpdate">Never</span>
+                </div>
               </div>
 
               <!-- Add sync controls section -->
               <div class="stats">
-                <div class="flex items-center gap-4 mb-2">
-                  <strong>Graph Traversal:</strong>
-                  <button onclick="loadConnectedGraphFromInput()" class="btn-custom btn-sm">
-                    🕸️ Load Connected Graph
-                  </button>
-                  <select id="maxDepth" class="input-custom" style="width: auto; padding: 4px 8px;">
-                    <option value="2">Depth 2</option>
-                    <option value="3" selected>Depth 3</option>
-                    <option value="4">Depth 4</option>
-                    <option value="5">Depth 5</option>
-                  </select>
-                </div>
-                <div class="text-sm text-gray-400">
-                  🕸️ Automatically follow references to load the entire connected graph
+                <div>
+                  <span class="stats-label block mb-2">Graph Traversal:</span>
+                  <div class="btn-row mb-3">
+                    <button onclick="loadConnectedGraphFromInput()" class="btn-custom btn-sm">
+                      🕸️ Load Connected Graph
+                    </button>
+                    <select id="maxDepth" class="input-custom" style="width: auto; padding: 4px 8px;">
+                      <option value="2">Depth 2</option>
+                      <option value="3" selected>Depth 3</option>
+                      <option value="4">Depth 4</option>
+                      <option value="5">Depth 5</option>
+                    </select>
+                  </div>
+                  <div class="text-sm text-gray-400 border-t border-gray-700 pt-2">
+                    🕸️ Automatically follow references to load the entire connected graph
+                  </div>
                 </div>
               </div>
 
               <div class="stats">
-                <div class="flex items-center gap-4 mb-2">
-                  <strong>Real-time Sync:</strong>
-                  <button onclick="enableGlobalRealTimeSync()" class="btn-custom btn-sm">
-                    Enable Real-time Updates
-                  </button>
-                  <button onclick="disableGlobalRealTimeSync()" class="btn-custom btn-sm">
-                    Disable Real-time
-                  </button>
-                </div>
-                <div class="text-sm text-gray-400">
-                  💡 Enable real-time sync to see live updates as data changes on the relay
+                <div>
+                  <span class="stats-label block mb-2">Real-time Sync:</span>
+                  <div class="btn-row mb-3">
+                    <button onclick="enableGlobalRealTimeSync()" class="btn-custom btn-sm">
+                      Enable Real-time Updates
+                    </button>
+                    <button onclick="disableGlobalRealTimeSync()" class="btn-custom btn-sm">
+                      Disable Real-time
+                    </button>
+                  </div>
+                  <div class="text-sm text-gray-400 border-t border-gray-700 pt-2">
+                    💡 Enable real-time sync to see live updates as data changes on the relay
+                  </div>
                 </div>
               </div>
 
@@ -234,12 +343,12 @@
           if (value["#"]) {
             // GunDB link - enhanced with navigation and status
             const linkContainer = document.createElement("div");
-            linkContainer.style.cssText = "display: flex; align-items: center; gap: 8px; margin: 4px 0;";
+            linkContainer.className = "link-container";
             
             const link = document.createElement("a");
             link.href = "#";
             link.textContent = `🔗 ${value["#"]}`;
-            link.style.cssText = "color: #3b82f6; text-decoration: none; font-family: monospace;";
+            link.style.cssText = "color: #3b82f6; text-decoration: none; font-family: monospace; overflow-wrap: break-word; max-width: 100%;";
             link.onclick = (e) => {
               e.preventDefault();
               navigateToNode(value["#"]);
@@ -476,7 +585,8 @@
             const statsSection = document.querySelector('.stats');
             if (statsSection) {
               const statusContainer = document.createElement('div');
-              statusContainer.innerHTML = '<strong>Connection Status:</strong> ';
+              statusContainer.className = 'connection-status';
+              statusContainer.innerHTML = '<strong class="stats-label">Connection Status:</strong> ';
               statusContainer.appendChild(statusEl);
               statsSection.appendChild(statusContainer);
             }
@@ -740,15 +850,26 @@
         idSpan.textContent = nodeInfo.display;
         header.appendChild(idSpan);
 
-        // Enhanced property count with reference info
-        const propsCount = document.createElement("span");
-        propsCount.style.cssText =
-          "margin-left: auto; color: #666; font-size: 0.9em; display: flex; gap: 8px; align-items: center;";
+        // Enhanced property count with reference info - now in a container for better responsiveness
+        const nodeMeta = document.createElement("div");
+        nodeMeta.className = "node-meta";
         
         const propText = `${properties.length} properties`;
         const refText = references.length > 0 ? `🔗 ${references.length} refs` : '';
-        propsCount.innerHTML = `${propText} ${refText}`;
-        header.appendChild(propsCount);
+        
+        const propsCount = document.createElement("span");
+        propsCount.style.cssText = "color: #666; font-size: 0.9em;";
+        propsCount.textContent = propText;
+        nodeMeta.appendChild(propsCount);
+        
+        if (references.length > 0) {
+          const refsCount = document.createElement("span");
+          refsCount.style.cssText = "color: #666; font-size: 0.9em;";
+          refsCount.textContent = refText;
+          nodeMeta.appendChild(refsCount);
+        }
+        
+        header.appendChild(nodeMeta);
 
         // Add quick actions for nodes with references
         if (references.length > 0) {
@@ -760,7 +881,7 @@
             e.stopPropagation();
             loadConnectedGraph(nodeId, 2);
           };
-          header.appendChild(expandAllBtn);
+          nodeMeta.appendChild(expandAllBtn);
         }
 
         const content = document.createElement("div");
