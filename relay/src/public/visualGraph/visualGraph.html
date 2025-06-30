@@ -165,8 +165,6 @@
 
       // Function to create Gun instance with current peer configuration
       function createGunInstance() {
-        const peer = `${window.location.protocol}//${window.location.host}/gun`;
-
         const relayPeerInput = document.getElementById("relayPeer");
         const currentPeer = relayPeerInput
           ? relayPeerInput.value.trim()
