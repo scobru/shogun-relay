@@ -13,6 +13,7 @@ import setSelfAdjustingInterval from "self-adjusting-interval";
 import AWS from "aws-sdk";
 import FormData from "form-data";
 import "./utils/bullet-catcher.js";
+import Docker from "dockerode";
 
 dotenv.config();
 
@@ -1808,6 +1809,10 @@ async function initializeServer() {
     res.sendFile(path.resolve(publicPath, "notes.html"));
   });
 
+  app.get("/services-dashboard", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "services-dashboard.html"));
+  });
+
   // Add route to fetch and display IPFS content
   app.get("/ipfs-content/:cid", async (req, res) => {
     const { cid } = req.params;
@@ -2315,6 +2320,258 @@ async function initializeServer() {
   process.on("SIGTERM", async () => {
     await shutdown();
     process.exit(0);
+  });
+
+  // Enhanced system info endpoint
+  app.get("/api/system-info", (req, res) => {
+    try {
+      const memUsage = process.memoryUsage();
+      const cpuUsage = process.cpuUsage();
+      
+      res.json({
+        success: true,
+        system: {
+          nodeVersion: process.version,
+          platform: process.platform,
+          arch: process.arch,
+          uptime: process.uptime() * 1000,
+          pid: process.pid,
+          memory: {
+            heapUsed: memUsage.heapUsed,
+            heapTotal: memUsage.heapTotal,
+            external: memUsage.external,
+            rss: memUsage.rss
+          },
+          cpu: {
+            user: cpuUsage.user,
+            system: cpuUsage.system
+          },
+          loadAverage: process.platform !== 'win32' ? require('os').loadavg() : [0, 0, 0],
+          freeMemory: require('os').freemem(),
+          totalMemory: require('os').totalmem()
+        },
+        services: {
+          gun: {
+            activeConnections: activeWires,
+            totalConnections: totalConnections,
+            startTime: customStats.startTime
+          }
+        }
+      });
+    } catch (error) {
+      console.error("Error in /api/system-info:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to retrieve system info: " + error.message
+      });
+    }
+  });
+
+  // Docker service management functions
+  const docker = new Docker();
+  
+  async function getDockerContainer(containerName) {
+    try {
+      const containers = await docker.listContainers({ all: true });
+      return containers.find(container => 
+        container.Names.some(name => name.includes(containerName))
+      );
+    } catch (error) {
+      console.error(`Error finding container ${containerName}:`, error);
+      return null;
+    }
+  }
+
+  async function restartDockerService(serviceName) {
+    try {
+      const containerMappings = {
+        'gun': 'shogun-relay-stack',
+        'ipfs': 'shogun-relay-stack', // IPFS runs within the main container
+        's3': 'shogun-relay-stack'    // FakeS3 also runs within the main container
+      };
+
+      const containerName = containerMappings[serviceName];
+      if (!containerName) {
+        throw new Error(`Unknown service: ${serviceName}`);
+      }
+
+      const containerInfo = await getDockerContainer(containerName);
+      if (!containerInfo) {
+        throw new Error(`Container ${containerName} not found`);
+      }
+
+      const container = docker.getContainer(containerInfo.Id);
+      
+      // For services within the main container, we'll restart the whole container
+      if (serviceName === 'gun') {
+        // For gun service, we can't restart just the Gun part, so we restart the container
+        console.log(`🔄 Restarting Docker container: ${containerName}`);
+        await container.restart();
+        return `Container ${containerName} restarted successfully`;
+      } else if (serviceName === 'ipfs') {
+        // For IPFS, we can try to restart the IPFS daemon within the container
+        try {
+          const exec = await container.exec({
+            Cmd: ['supervisorctl', 'restart', 'ipfs'],
+            AttachStdout: true,
+            AttachStderr: true
+          });
+          const stream = await exec.start();
+          return `IPFS service restarted within container`;
+        } catch (execError) {
+          // Fallback to container restart
+          console.log(`🔄 IPFS service restart failed, restarting container: ${containerName}`);
+          await container.restart();
+          return `Container ${containerName} restarted (IPFS service restart fallback)`;
+        }
+      } else if (serviceName === 's3') {
+        // For S3/FakeS3, restart the service within the container
+        try {
+          const exec = await container.exec({
+            Cmd: ['supervisorctl', 'restart', 'fakes3'],
+            AttachStdout: true,
+            AttachStderr: true
+          });
+          const stream = await exec.start();
+          return `S3 service restarted within container`;
+        } catch (execError) {
+          // Fallback to container restart
+          console.log(`🔄 S3 service restart failed, restarting container: ${containerName}`);
+          await container.restart();
+          return `Container ${containerName} restarted (S3 service restart fallback)`;
+        }
+      }
+      
+    } catch (error) {
+      throw new Error(`Docker restart failed: ${error.message}`);
+    }
+  }
+
+  // Enhanced service restart endpoint with Docker integration
+  app.post("/api/services/:service/restart", tokenAuthMiddleware, async (req, res) => {
+    try {
+      const { service } = req.params;
+      const allowedServices = ['gun', 'ipfs', 's3'];
+      
+      if (!allowedServices.includes(service)) {
+        return res.status(400).json({
+          success: false,
+          error: `Service '${service}' is not supported. Allowed services: ${allowedServices.join(', ')}`
+        });
+      }
+
+      console.log(`🔄 Restart request received for service: ${service}`);
+      
+      let result;
+      
+      try {
+        // First try Docker restart
+        result = await restartDockerService(service);
+        console.log(`✅ Docker restart successful: ${result}`);
+      } catch (dockerError) {
+        console.warn(`⚠️ Docker restart failed: ${dockerError.message}`);
+        
+        // Fallback to internal operations
+        switch (service) {
+          case 'gun':
+            await runGarbageCollector();
+            result = `Gun relay cleanup triggered (Docker unavailable)`;
+            break;
+            
+          case 'ipfs':
+            result = `IPFS restart attempted but Docker unavailable`;
+            break;
+            
+          case 's3':
+            result = `S3 restart attempted but Docker unavailable`;
+            break;
+        }
+      }
+      
+      res.json({
+        success: true,
+        message: result,
+        service: service,
+        timestamp: Date.now()
+      });
+      
+    } catch (error) {
+      console.error(`Error restarting service ${req.params.service}:`, error);
+      res.status(500).json({
+        success: false,
+        error: `Failed to restart service: ${error.message}`
+      });
+    }
+  });
+
+  // Service status endpoint
+  app.get("/api/services/status", async (req, res) => {
+    try {
+      const services = {};
+      
+      // Check Gun Relay
+      services.gun = {
+        status: 'online',
+        uptime: process.uptime() * 1000,
+        connections: activeWires,
+        totalConnections: totalConnections,
+        memory: process.memoryUsage().heapUsed
+      };
+      
+      // Check IPFS
+      try {
+        const ipfsResponse = await fetch('/ipfs-status');
+        const ipfsData = await ipfsResponse.json();
+        services.ipfs = {
+          status: ipfsData.success ? 'online' : 'offline',
+          version: ipfsData.ipfs?.version || 'unknown',
+          type: ipfsData.ipfs?.type || 'unknown'
+        };
+      } catch (error) {
+        services.ipfs = {
+          status: 'offline',
+          error: error.message
+        };
+      }
+      
+      // Check S3 (requires auth)
+      const authHeader = req.headers.authorization;
+      if (authHeader) {
+        try {
+          const s3Response = await fetch('/api/s3-stats', {
+            headers: { 'Authorization': authHeader }
+          });
+          if (s3Response.ok) {
+            const s3Data = await s3Response.json();
+            services.s3 = {
+              status: 'online',
+              buckets: s3Data.stats.totalBuckets,
+              objects: s3Data.stats.totalObjects,
+              size: s3Data.stats.totalSize
+            };
+          } else {
+            services.s3 = { status: 'offline', error: 'Auth failed' };
+          }
+        } catch (error) {
+          services.s3 = { status: 'offline', error: error.message };
+        }
+      } else {
+        services.s3 = { status: 'unknown', error: 'No auth provided' };
+      }
+      
+      res.json({
+        success: true,
+        services: services,
+        timestamp: Date.now()
+      });
+      
+    } catch (error) {
+      console.error("Error in /api/services/status:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to check services status: " + error.message
+      });
+    }
   });
 } // End of initializeServer function
 
