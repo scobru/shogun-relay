@@ -9,6 +9,8 @@
     <link rel="stylesheet" href="styles/wormhole.css">
     <!-- Include centralized admin authentication -->
     <script src="lib/admin-auth.js"></script>
+    <!-- Include GunWrapper -->
+    <script src="lib/gun-wrapper.js"></script>
     <style>
         .input-custom {
             width: 100%;
@@ -122,14 +124,20 @@
     </div>
 
     <script>
-        // Initialize admin authentication
+        // Initialize Gun wrapper and admin authentication
+        let gun;
+        
         document.addEventListener('DOMContentLoaded', () => {
+            // Initialize admin authentication
             ShogunAdmin.init({
                 autoFill: true,
                 showIndicator: true,
                 fieldId: 'authToken',
                 syncEnabled: true
             });
+            
+            // Initialize Gun wrapper with debug enabled
+            gun = createGunWrapper({ debug: true });
         });
 
         // Listen for password updates
@@ -160,62 +168,35 @@
 
         createBtn.addEventListener('click', async () => {
             const nodePath = nodePathInput.value.trim();
-            if (!nodePath) { showMessage('Node Path is required.'); return; }
+            if (!nodePath) { 
+                showMessage('Node Path is required.'); 
+                return; 
+            }
+            
             let data;
-            try { data = JSON.parse(dataArea.value); } catch (e) { showMessage('Invalid JSON format.'); return; }
+            try { 
+                data = JSON.parse(dataArea.value); 
+            } catch (e) { 
+                showMessage('Invalid JSON format.'); 
+                return; 
+            }
             
             // Show loading state
             createBtn.disabled = true;
             createBtn.textContent = 'Creating...';
             
             try {
-                // Use centralized admin password
-                const token = ShogunAdmin.getPassword();
-                if (!token) {
-                    showMessage('Auth Token is required. Please set it in the Control Panel.');
-                    return;
-                }
-
-                console.log('Sending request to:', `/node/${nodePath}`);
-                console.log('Token present:', !!token);
-                console.log('Data to send:', data);
-
-                const response = await fetch(`/node/${nodePath}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify(data)
-                });
-
-                console.log('Response status:', response.status);
-                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
-                if (!response.ok) {
-                    let errorText;
-                    try {
-                        const errorData = await response.json();
-                        errorText = errorData.error || errorData.message || 'Unknown error';
-                    } catch (e) {
-                        errorText = await response.text();
-                    }
-                    throw new Error(`HTTP ${response.status}: ${errorText}`);
-                }
-
-                const result = await response.json();
-                console.log('Success result:', result);
+                // Use Gun wrapper - much simpler!
+                await gun.put(nodePath, data);
                 
-                if (result.success) {
-                    showMessage(`Node created/updated successfully at "${result.path}"!`, 'success');
-                    // Clear form after success
-                    nodePathInput.value = '';
-                    dataArea.value = '{}';
-                } else {
-                    showMessage(`Save failed: ${result.error || 'Unknown error'}`);
-                }
+                showMessage(`Node created/updated successfully at "${nodePath}"!`, 'success');
+                
+                // Clear form after success
+                nodePathInput.value = '';
+                dataArea.value = '{}';
+                
             } catch (err) {
-                console.error('Full error details:', err);
+                console.error('Error details:', err);
                 showMessage(`Error: ${err.message}`);
             } finally {
                 // Reset button state

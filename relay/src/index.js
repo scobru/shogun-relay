@@ -1,5 +1,4 @@
 // Enhanced Gun relay server with Shogun improvements
-import Gun from "gun";
 // MUST be required after Gun to work
 
 import express from "express";
@@ -17,18 +16,11 @@ import "./utils/bullet-catcher.js";
 
 dotenv.config();
 
+import Gun from "gun";
 import "gun/sea.js";
 import "gun/lib/stats.js";
-import "gun/lib/then.js";
-import "gun/lib/radisk.js";
-import "gun/lib/store.js";
-import "gun/lib/wire.js";
-import "gun/lib/server.js";
-import "gun/lib/yson.js";
-import "gun/lib/rindexed.js";
 import "gun/lib/webrtc.js";
 import "gun/lib/rfs.js";
-import "gun/lib/multicast.js";
 import "gun/lib/rs3.js";
 
 import ShogunCoreModule from "shogun-core";
@@ -200,28 +192,55 @@ async function initializeServer() {
     }
   }
 
+  // Flag per permettere operazioni interne durante REST API
+  let allowInternalOperations = false;
+
   function hasValidToken(msg) {
     if (process.env.RELAY_PROTECTED === "false") {
       console.log("🔍 PUT allowed - protected disabled");
       return true;
     }
+    
     // Analizza le anime (souls) che sta cercando di modificare
     const souls = Object.keys(msg.put || {});
+    const firstSoul = souls[0];
+    
+    // Permetti operazioni temporanee durante REST API
+    if (allowInternalOperations) {
+      console.log(`🔍 PUT allowed - internal operation flag: ${firstSoul}`);
+      return true;
+    }
+    
+    // Permetti operazioni interne di Gun senza autenticazione
+    const isInternalNamespace = firstSoul && (
+      firstSoul.startsWith('~') ||      // User namespace
+      firstSoul.startsWith('!') ||      // Root namespace
+      firstSoul === 'shogun' ||         // Shogun internal operations
+      firstSoul.startsWith('shogun/relays') || // Relay health data
+      !firstSoul.includes('/') ||       // Single level keys (internal Gun operations)
+      firstSoul.match(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/) // UUID souls
+    );
+    
+    if (isInternalNamespace) {
+      console.log(`🔍 PUT allowed - internal namespace: ${firstSoul}`);
+      return true;
+    }
+    
     // Se ha headers, verifica il token
-    if (msg && msg && msg.headers && msg.headers.token && msg.headers.token) {
+    if (msg && msg.headers && msg.headers.token) {
       const hasValidAuth =
         msg.headers.token === process.env.ADMIN_PASSWORD ||
         msg.headers.Authorization === `Bearer ${process.env.ADMIN_PASSWORD}`;
 
       if (hasValidAuth) {
-        console.log(`✅ PUT allowed - valid auth for: ${souls[0]}`);
+        console.log(`✅ PUT allowed - valid auth for: ${firstSoul}`);
         return true;
       } else {
-        console.log(`🚫 PUT blocked - invalid token: ${souls[0]}`);
+        console.log(`🚫 PUT blocked - invalid token: ${firstSoul}`);
         return false;
       }
     } else {
-      console.log(`🚫 PUT blocked - No headers: ${souls[0]}`);
+      console.log(`🚫 PUT blocked - No headers: ${firstSoul}`);
       return false;
     }
   }
@@ -1433,38 +1452,66 @@ async function initializeServer() {
         .json({ success: false, error: "Node path cannot be empty." });
     }
 
+    console.log(`🔍 Reading node at path: "${path}"`);
+
     const timeout = setTimeout(() => {
       if (!res.headersSent) {
+        console.log(`⏰ GET timeout for path: "${path}"`);
         res.status(408).json({ success: false, error: "Request timed out." });
       }
     }, 5000); // 5-second timeout
 
     try {
       const node = getGunNodeFromPath(path);
-      const data = await node; // Using promise-based .then()
+      
+      // Properly promisify the Gun get operation
+      const data = await new Promise((resolve, reject) => {
+        let resolved = false;
+        
+        const onceTimeout = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            console.log(`⏰ Gun get timeout for path: "${path}"`);
+            resolve(null); // Resolve with null for timeout
+          }
+        }, 4000);
+
+        node.once((nodeData) => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(onceTimeout);
+            console.log(`📖 Gun get result for path "${path}":`, nodeData ? 'found' : 'not found');
+            resolve(nodeData);
+          }
+        });
+      });
 
       clearTimeout(timeout);
 
       if (!res.headersSent) {
         // Clean the GunDB metadata (`_`) before sending
+        let cleanData = data;
         if (data && data._) {
-          delete data._;
+          cleanData = { ...data };
+          delete cleanData._;
         }
-        // Ensure undefined data is sent as null
+        
+        console.log(`✅ Successfully read node at path: "${path}"`);
         res.json({
           success: true,
           path,
-          data: data === undefined ? null : data,
+          data: cleanData === undefined ? null : cleanData,
         });
       }
     } catch (error) {
       clearTimeout(timeout);
       if (!res.headersSent) {
-        console.error("Error in GET /node/*:", error);
+        console.error(`❌ Error in GET /node/* for path "${path}":`, error);
         res.status(500).json({
           success: false,
           error: "Failed to retrieve node data.",
           details: error.message,
+          path
         });
       }
     }
@@ -1499,12 +1546,52 @@ async function initializeServer() {
           .status(400)
           .json({ success: false, error: "No data provided in body or path." });
       }
+
+      console.log(`📝 Creating node at path: "${path}" with data:`, data);
+      
       const node = getGunNodeFromPath(path);
-      await node.put(data); // Simplified promise-based put
+      
+      // Temporarily allow internal operations during this REST API call
+      allowInternalOperations = true;
+      
+      try {
+        // Properly promisify the Gun put operation
+        const putResult = await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error("Put operation timed out after 10 seconds"));
+          }, 10000);
+
+          try {
+            node.put(data, (ack) => {
+              clearTimeout(timeout);
+              if (ack.err) {
+                console.error(`❌ Gun put error for path "${path}":`, ack.err);
+                reject(new Error(ack.err));
+              } else {
+                console.log(`✅ Gun put success for path "${path}":`, ack);
+                resolve(ack);
+              }
+            });
+          } catch (syncError) {
+            clearTimeout(timeout);
+            console.error(`❌ Synchronous error in put for path "${path}":`, syncError);
+            reject(syncError);
+          }
+        });
+      } finally {
+        // Reset flag
+        allowInternalOperations = false;
+      }
+
+      console.log(`✅ Node successfully created/updated at path: "${path}"`);
       return res.json({ success: true, path, data });
     } catch (error) {
-      console.error("Error in POST /node/*:", error);
-      return res.status(500).json({ success: false, error: error.message });
+      console.error(`❌ Error in POST /node/* for path "${req.params[0]}":`, error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error.message,
+        path: req.params[0]
+      });
     }
   });
 
@@ -1516,11 +1603,52 @@ async function initializeServer() {
           .status(400)
           .json({ success: false, error: "Node path cannot be empty." });
       }
+
+      console.log(`🗑️ Deleting node at path: "${path}"`);
+      
       const node = getGunNodeFromPath(path);
-      await node.put(null); // Simplified promise-based delete
+      
+      // Temporarily allow internal operations during this REST API call
+      allowInternalOperations = true;
+      
+      try {
+        // Properly promisify the Gun delete operation
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error("Delete operation timed out after 10 seconds"));
+          }, 10000);
+
+          try {
+            node.put(null, (ack) => {
+              clearTimeout(timeout);
+              if (ack.err) {
+                console.error(`❌ Gun delete error for path "${path}":`, ack.err);
+                reject(new Error(ack.err));
+              } else {
+                console.log(`✅ Gun delete success for path "${path}":`, ack);
+                resolve(ack);
+              }
+            });
+          } catch (syncError) {
+            clearTimeout(timeout);
+            console.error(`❌ Synchronous error in delete for path "${path}":`, syncError);
+            reject(syncError);
+          }
+        });
+      } finally {
+        // Reset flag
+        allowInternalOperations = false;
+      }
+
+      console.log(`✅ Node successfully deleted at path: "${path}"`);
       res.json({ success: true, path, message: "Data deleted." });
     } catch (error) {
-      res.status(500).json({ success: false, error: error.message });
+      console.error(`❌ Error in DELETE /node/* for path "${req.params[0]}":`, error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message,
+        path: req.params[0]
+      });
     }
   });
 

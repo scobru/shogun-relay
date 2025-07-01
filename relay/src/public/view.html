@@ -9,6 +9,8 @@
     <link rel="stylesheet" href="styles/wormhole.css">
     <!-- Include centralized admin authentication -->
     <script src="lib/admin-auth.js"></script>
+    <!-- Include GunWrapper -->
+    <script src="lib/gun-wrapper.js"></script>
 </head>
 <body class="antialiased">
     <div class="container mx-auto p-4">
@@ -53,13 +55,20 @@
     </div>
 
     <script>
+        // Initialize Gun wrapper
+        let gun;
+        
         document.addEventListener('DOMContentLoaded', () => {
+            // Initialize admin authentication
             ShogunAdmin.init({
                 autoFill: true,
                 showIndicator: true,
                 fieldId: 'authToken',
                 syncEnabled: true
             });
+            
+            // Initialize Gun wrapper
+            gun = createGunWrapper({ debug: true });
         });
 
         const viewBtn = document.getElementById('viewBtn');
@@ -77,39 +86,26 @@
             setTimeout(() => { messageEl.style.display = 'none'; }, 4000);
         };
 
-        const getAuthHeader = () => {
-            const token = ShogunAdmin.getPassword();
-            if (!token) {
-                showMessage('Auth Token is required. Please set it in the Control Panel.');
-                return null;
-            }
-            return { 'Authorization': `Bearer ${token}` };
-        };
-
         const fetchData = async () => {
             resultArea.style.display = 'none';
             messageEl.style.display = 'none';
+            
             const path = nodePathInput.value.trim();
             if (!path) {
                 showMessage('Error: Node Path is required.');
                 return;
             }
 
-            const authHeader = getAuthHeader();
-            if (!authHeader) return;
-
             try {
-                const response = await fetch(`/node/${path}`, { headers: authHeader });
-                const result = await response.json();
-                if (response.ok && result.success) {
-                    resultPath.textContent = result.path;
-                    resultData.textContent = result.data ? JSON.stringify(result.data, null, 2) : 'null (No data at this node)';
-                    resultArea.style.display = 'block';
-                } else {
-                    showMessage(`Error: ${result.error || response.statusText}`);
-                }
+                // Use Gun wrapper - much simpler!
+                const data = await gun.get(path);
+                
+                resultPath.textContent = path;
+                resultData.textContent = data ? JSON.stringify(data, null, 2) : 'null (No data at this node)';
+                resultArea.style.display = 'block';
+                
             } catch (err) {
-                showMessage(`Network or fetch error: ${err.message}`);
+                showMessage(`Error: ${err.message}`);
             }
         };
 
