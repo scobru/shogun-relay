@@ -44,10 +44,8 @@ const GC_EXCLUDED_NAMESPACES = [
   "relays", // Protects relay server health-check data.
   "shogun"
 ];
-// Data older than this will be deleted (milliseconds). Default: 24 hours.
-const EXPIRATION_AGE = process.env.GC_EXPIRATION_AGE || 24 * 60 * 60 * 1000;
-// How often to run the garbage collector (milliseconds). Default: 1 hour.
-const GC_INTERVAL = process.env.GC_INTERVAL || 60 * 60 * 1000;
+// How often to run the garbage collector (milliseconds).
+const GC_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 // ES Module equivalent for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -134,7 +132,6 @@ async function initializeServer() {
     }
     console.log("🗑️ Running Garbage Collector...");
     let cleanedCount = 0;
-    const now = Date.now();
 
     // Ensure gun is initialized before accessing its properties
     if (!gun || !gun._ || !gun._.graph) {
@@ -146,32 +143,24 @@ async function initializeServer() {
 
     for (const soul in graph) {
       if (Object.prototype.hasOwnProperty.call(graph, soul)) {
-        // Check if the soul is in a protected namespace
         const isProtected = GC_EXCLUDED_NAMESPACES.some((ns) =>
           soul.startsWith(ns)
         );
 
-        if (isProtected) {
-          continue; // Skip protected data
-        }
-
-        const node = graph[soul];
-        // Check for expiration timestamp on non-protected data
-        if (node && node.createdAt && now - node.createdAt > EXPIRATION_AGE) {
-          // Nullify the node to delete it from Gun
+        if (!isProtected) {
           gun.get(soul).put(null);
           cleanedCount++;
-          console.log(`🗑️ Cleaned up expired node: ${soul}`);
+          console.log(`🗑️ Cleaned up unprotected node: ${soul}`);
         }
       }
     }
 
     if (cleanedCount > 0) {
       console.log(
-        `🗑️ Garbage Collector finished. Cleaned ${cleanedCount} expired nodes.`
+        `🗑️ Garbage Collector finished. Cleaned ${cleanedCount} unprotected nodes.`
       );
     } else {
-      console.log("🗑️ Garbage Collector finished. No expired nodes found.");
+      console.log("🗑️ Garbage Collector finished. No unprotected nodes found to clean.");
     }
   }
 
