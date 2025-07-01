@@ -9,8 +9,6 @@
     <link rel="stylesheet" href="styles/wormhole.css">
     <!-- Include centralized admin authentication -->
     <script src="lib/admin-auth.js"></script>
-    <!-- Include GunWrapper -->
-    <script src="lib/gun-wrapper.js"></script>
     <style>
         .input-custom {
             width: 100%;
@@ -124,9 +122,6 @@
     </div>
 
     <script>
-        // Initialize Gun wrapper and admin authentication
-        let gun;
-        
         document.addEventListener('DOMContentLoaded', () => {
             // Initialize admin authentication
             ShogunAdmin.init({
@@ -135,9 +130,6 @@
                 fieldId: 'authToken',
                 syncEnabled: true
             });
-            
-            // Initialize Gun wrapper with debug enabled
-            gun = createGunWrapper({ debug: true });
         });
 
         // Listen for password updates
@@ -166,6 +158,16 @@
             }
         };
 
+        const getAuthHeader = () => {
+            // Use centralized admin password
+            const token = ShogunAdmin.getPassword();
+            if (!token) {
+                showMessage('Auth Token is required. Please set it in the Control Panel.');
+                return null;
+            }
+            return { 'Authorization': `Bearer ${token}` };
+        };
+
         createBtn.addEventListener('click', async () => {
             const nodePath = nodePathInput.value.trim();
             if (!nodePath) { 
@@ -181,19 +183,36 @@
                 return; 
             }
             
+            const authHeader = getAuthHeader();
+            if (!authHeader) return;
+            
             // Show loading state
             createBtn.disabled = true;
             createBtn.textContent = 'Creating...';
             
             try {
-                // Use Gun wrapper - much simpler!
-                await gun.put(nodePath, data);
+                // Use REST API instead of Gun directly
+                const response = await fetch(`/node/${nodePath}`, {
+                    method: 'POST',
+                    headers: { ...authHeader, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
                 
-                showMessage(`Node created/updated successfully at "${nodePath}"!`, 'success');
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error ${response.status}: ${errorText}`);
+                }
                 
-                // Clear form after success
-                nodePathInput.value = '';
-                dataArea.value = '{}';
+                const result = await response.json();
+                if (result.success) {
+                    showMessage(`Node created/updated successfully at "${nodePath}"!`, 'success');
+                    
+                    // Clear form after success
+                    nodePathInput.value = '';
+                    dataArea.value = '{}';
+                } else {
+                    showMessage(`Failed to create node: ${result.error}`);
+                }
                 
             } catch (err) {
                 console.error('Error details:', err);

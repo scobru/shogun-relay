@@ -118,6 +118,79 @@
             border-color: #8af;
         }
 
+        /* Admin Controls Styles */
+        .admin-controls {
+            background-color: #2a2a2a;
+            border: 1px solid #444;
+            margin-top: 2rem;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .admin-controls:hover {
+            border-color: #8af;
+        }
+
+        .admin-controls h2 {
+            color: #8af;
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+        }
+
+        .admin-controls h3 {
+            color: #eee;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .admin-controls .btn {
+            background-color: #444;
+            color: #fff;
+            border: 1px solid #666;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .admin-controls .btn:hover {
+            background-color: #555;
+            border-color: #8af;
+        }
+
+        .admin-controls .input {
+            background-color: #333;
+            border: 1px solid #555;
+            color: #fff;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            width: 100%;
+        }
+
+        .admin-controls .input:focus {
+            border-color: #8af;
+            outline: none;
+        }
+
+        .admin-controls .text-success {
+            color: #4ade80;
+        }
+
+        .admin-controls .text-error {
+            color: #f87171;
+        }
+
+        .admin-controls .form-control {
+            margin-bottom: 1rem;
+        }
+
+        .admin-controls .label-text {
+            color: #ccc;
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+        }
+
         @media (max-width: 768px) {
             .stats-grid {
                 grid-template-columns: 1fr 1fr;
@@ -178,6 +251,46 @@
             </div>
         </div>
 
+        <!-- New Admin Controls Section -->
+        <div class="admin-controls bg-base-200 rounded-lg p-6 mt-8">
+            <h2 class="text-xl font-bold mb-4 text-primary">Admin Controls</h2>
+            
+            <!-- Garbage Collector Control -->
+            <div class="mb-6">
+                <h3 class="text-lg mb-2">Garbage Collector</h3>
+                <button id="triggerGC" class="btn btn-primary">
+                    🗑️ Trigger Garbage Collection
+                </button>
+                <div id="gcStatus" class="mt-2 text-sm"></div>
+            </div>
+
+            <!-- Stats Modification -->
+            <div class="mb-6">
+                <h3 class="text-lg mb-2">Modify Stats</h3>
+                <div class="flex flex-col gap-4">
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">GET Requests</span>
+                        </label>
+                        <div class="flex gap-2">
+                            <input type="number" id="getRequestsInput" class="input input-bordered w-full" placeholder="Enter value">
+                            <button onclick="updateStat('getRequests')" class="btn btn-primary">Update</button>
+                        </div>
+                    </div>
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">PUT Requests</span>
+                        </label>
+                        <div class="flex gap-2">
+                            <input type="number" id="putRequestsInput" class="input input-bordered w-full" placeholder="Enter value">
+                            <button onclick="updateStat('putRequests')" class="btn btn-primary">Update</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="updateStatus" class="mt-2 text-sm"></div>
+            </div>
+        </div>
+
         <a href="/charts.html" class="view-charts-link">
             📊 View Detailed Charts & Metrics
         </a>
@@ -193,6 +306,90 @@
         const uptimeEl = document.getElementById('uptime');
         const errorEl = document.getElementById('error');
         const lastUpdatedEl = document.getElementById('lastUpdated');
+        const gcStatusEl = document.getElementById('gcStatus');
+        const updateStatusEl = document.getElementById('updateStatus');
+
+        // Get the token from localStorage or prompt the user
+        function getAuthToken() {
+            let token = localStorage.getItem('adminToken');
+            if (!token) {
+                token = prompt('Please enter your admin token:');
+                if (token) {
+                    localStorage.setItem('adminToken', token);
+                }
+            }
+            return token;
+        }
+
+        // Function to trigger garbage collection
+        async function triggerGC() {
+            const token = getAuthToken();
+            if (!token) {
+                gcStatusEl.innerHTML = '<span class="text-error">Authentication required</span>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/gc/trigger', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    gcStatusEl.innerHTML = '<span class="text-success">✓ Garbage collection triggered successfully</span>';
+                } else {
+                    gcStatusEl.innerHTML = `<span class="text-error">✗ Error: ${result.error}</span>`;
+                }
+            } catch (error) {
+                gcStatusEl.innerHTML = `<span class="text-error">✗ Error: ${error.message}</span>`;
+            }
+        }
+
+        // Function to update stats
+        async function updateStat(key) {
+            const token = getAuthToken();
+            if (!token) {
+                updateStatusEl.innerHTML = '<span class="text-error">Authentication required</span>';
+                return;
+            }
+
+            const input = document.getElementById(`${key}Input`);
+            const value = parseInt(input.value);
+
+            if (isNaN(value)) {
+                updateStatusEl.innerHTML = '<span class="text-error">Please enter a valid number</span>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/stats/update', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ key, value })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    updateStatusEl.innerHTML = `<span class="text-success">✓ ${key} updated to ${value}</span>`;
+                    input.value = ''; // Clear input
+                } else {
+                    updateStatusEl.innerHTML = `<span class="text-error">✗ Error: ${result.error}</span>`;
+                }
+            } catch (error) {
+                updateStatusEl.innerHTML = `<span class="text-error">✗ Error: ${error.message}</span>`;
+            }
+        }
+
+        // Add event listeners
+        document.getElementById('triggerGC').addEventListener('click', triggerGC);
 
         function formatBytes(bytes, decimals = 2) {
             if (!bytes || bytes === 0) return '0 Bytes';

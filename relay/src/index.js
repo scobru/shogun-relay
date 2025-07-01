@@ -757,8 +757,8 @@ async function initializeServer() {
   // Initialize Gun with conditional S3 support
   const gunConfig = {
     super: false,
-    file: "radata",
-    radisk: true,
+    // file: "radata",
+    // radisk: true,
     web: server,
     isValid: hasValidToken,
     uuid: process.env.RELAY_NAME,
@@ -1360,6 +1360,70 @@ async function initializeServer() {
       res
         .status(500)
         .json({ success: false, error: "Failed to retrieve stats." });
+    }
+  });
+
+  // New endpoint to trigger garbage collection manually
+  app.post("/api/gc/trigger", tokenAuthMiddleware, (req, res) => {
+    try {
+      if (!GC_ENABLED) {
+        return res.status(400).json({
+          success: false,
+          error: "Garbage collector is disabled in configuration"
+        });
+      }
+      
+      console.log("🗑️ Manual garbage collection triggered via API");
+      runGarbageCollector();
+      
+      res.json({
+        success: true,
+        message: "Garbage collection triggered successfully"
+      });
+    } catch (error) {
+      console.error("Error triggering garbage collection:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to trigger garbage collection: " + error.message
+      });
+    }
+  });
+
+  // New endpoint to update stats values
+  app.post("/api/stats/update", tokenAuthMiddleware, (req, res) => {
+    try {
+      const { key, value } = req.body;
+      
+      if (!key || value === undefined) {
+        return res.status(400).json({
+          success: false,
+          error: "Both key and value are required"
+        });
+      }
+
+      // Add validation for allowed keys
+      const allowedKeys = ["getRequests", "putRequests"];
+      if (!allowedKeys.includes(key)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid key. Allowed keys are: ${allowedKeys.join(", ")}`
+        });
+      }
+
+      // Update the stat value
+      customStats[key] = parseInt(value, 10);
+      
+      res.json({
+        success: true,
+        message: `Stat ${key} updated to ${value}`,
+        newValue: customStats[key]
+      });
+    } catch (error) {
+      console.error("Error updating stats:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to update stats: " + error.message
+      });
     }
   });
 
