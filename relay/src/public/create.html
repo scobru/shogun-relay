@@ -176,6 +176,10 @@
                     return;
                 }
 
+                console.log('Sending request to:', `/node/${nodePath}`);
+                console.log('Token present:', !!token);
+                console.log('Data to send:', data);
+
                 const response = await fetch(`/node/${nodePath}`, {
                     method: 'POST',
                     headers: {
@@ -184,18 +188,35 @@
                     },
                     body: JSON.stringify(data)
                 });
+
+                console.log('Response status:', response.status);
+                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`HTTP error ${response.status}: ${errorText}`);
+                    let errorText;
+                    try {
+                        const errorData = await response.json();
+                        errorText = errorData.error || errorData.message || 'Unknown error';
+                    } catch (e) {
+                        errorText = await response.text();
+                    }
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
                 }
+
                 const result = await response.json();
+                console.log('Success result:', result);
+                
                 if (result.success) {
                     showMessage(`Node created/updated successfully at "${result.path}"!`, 'success');
+                    // Clear form after success
+                    nodePathInput.value = '';
+                    dataArea.value = '{}';
                 } else {
-                    showMessage(`Save failed: ${result.error}`);
+                    showMessage(`Save failed: ${result.error || 'Unknown error'}`);
                 }
             } catch (err) {
-                showMessage(`Network error: ${err.message}`);
+                console.error('Full error details:', err);
+                showMessage(`Error: ${err.message}`);
             } finally {
                 // Reset button state
                 createBtn.disabled = false;
