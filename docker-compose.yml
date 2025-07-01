@@ -24,8 +24,6 @@ services:
       - IPFS_PATH=/data/ipfs
       - ADMIN_PASSWORD=S3RVER
       - GC_ENABLED=true
-      - GC_INTERVAL=3600000
-      - EXPIRATION_AGE=60000
       - RELAY_HOST=localhost
       - RELAY_PORT=8765
       - RELAY_STORE=true
