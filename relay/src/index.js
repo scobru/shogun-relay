@@ -43,7 +43,7 @@ const GC_EXCLUDED_NAMESPACES = [
   "~", // Protects all user spaces, including user data and aliases (~@username).
   "!", // Protects the root node, often used for system-level pointers.
   "relays", // Protects relay server health-check data.
-  "shogun"
+  "shogun",
 ];
 // How often to run the garbage collector (milliseconds).
 const GC_INTERVAL = 5 * 60 * 1000; // 5 minutes
@@ -161,7 +161,9 @@ async function initializeServer() {
         `🗑️ Garbage Collector finished. Cleaned ${cleanedCount} unprotected nodes.`
       );
     } else {
-      console.log("🗑️ Garbage Collector finished. No unprotected nodes found to clean.");
+      console.log(
+        "🗑️ Garbage Collector finished. No unprotected nodes found to clean."
+      );
     }
   }
 
@@ -190,32 +192,34 @@ async function initializeServer() {
       console.log("🔍 PUT allowed - protected disabled");
       return true;
     }
-    
+
     // Analizza le anime (souls) che sta cercando di modificare
     const souls = Object.keys(msg.put || {});
     const firstSoul = souls[0];
-    
+
     // Permetti operazioni temporanee durante REST API
     if (allowInternalOperations) {
       console.log(`🔍 PUT allowed - internal operation flag: ${firstSoul}`);
       return true;
     }
-    
+
     // Permetti operazioni interne di Gun senza autenticazione
-    const isInternalNamespace = firstSoul && (
-      firstSoul.startsWith('~') ||      // User namespace
-      firstSoul.startsWith('!') ||      // Root namespace
-      firstSoul === 'shogun' ||         // Shogun internal operations
-      firstSoul.startsWith('shogun/relays') || // Relay health data
-      !firstSoul.includes('/') ||       // Single level keys (internal Gun operations)
-      firstSoul.match(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/) // UUID souls
-    );
-    
+    const isInternalNamespace =
+      firstSoul &&
+      (firstSoul.startsWith("~") || // User namespace
+        firstSoul.startsWith("!") || // Root namespace
+        firstSoul === "shogun" || // Shogun internal operations
+        firstSoul.startsWith("shogun/relays") || // Relay health data
+        !firstSoul.includes("/") || // Single level keys (internal Gun operations)
+        firstSoul.match(
+          /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
+        )); // UUID souls
+
     if (isInternalNamespace) {
       console.log(`🔍 PUT allowed - internal namespace: ${firstSoul}`);
       return true;
     }
-    
+
     // Se ha headers, verifica il token
     if (msg && msg.headers && msg.headers.token) {
       const hasValidAuth =
@@ -1359,22 +1363,22 @@ async function initializeServer() {
       if (!GC_ENABLED) {
         return res.status(400).json({
           success: false,
-          error: "Garbage collector is disabled in configuration"
+          error: "Garbage collector is disabled in configuration",
         });
       }
-      
+
       console.log("🗑️ Manual garbage collection triggered via API");
       runGarbageCollector();
-      
+
       res.json({
         success: true,
-        message: "Garbage collection triggered successfully"
+        message: "Garbage collection triggered successfully",
       });
     } catch (error) {
       console.error("Error triggering garbage collection:", error);
       res.status(500).json({
         success: false,
-        error: "Failed to trigger garbage collection: " + error.message
+        error: "Failed to trigger garbage collection: " + error.message,
       });
     }
   });
@@ -1383,11 +1387,11 @@ async function initializeServer() {
   app.post("/api/stats/update", tokenAuthMiddleware, (req, res) => {
     try {
       const { key, value } = req.body;
-      
+
       if (!key || value === undefined) {
         return res.status(400).json({
           success: false,
-          error: "Both key and value are required"
+          error: "Both key and value are required",
         });
       }
 
@@ -1396,23 +1400,23 @@ async function initializeServer() {
       if (!allowedKeys.includes(key)) {
         return res.status(400).json({
           success: false,
-          error: `Invalid key. Allowed keys are: ${allowedKeys.join(", ")}`
+          error: `Invalid key. Allowed keys are: ${allowedKeys.join(", ")}`,
         });
       }
 
       // Update the stat value
       customStats[key] = parseInt(value, 10);
-      
+
       res.json({
         success: true,
         message: `Stat ${key} updated to ${value}`,
-        newValue: customStats[key]
+        newValue: customStats[key],
       });
     } catch (error) {
       console.error("Error updating stats:", error);
       res.status(500).json({
         success: false,
-        error: "Failed to update stats: " + error.message
+        error: "Failed to update stats: " + error.message,
       });
     }
   });
@@ -1517,11 +1521,11 @@ async function initializeServer() {
 
     try {
       const node = getGunNodeFromPath(path);
-      
+
       // Properly promisify the Gun get operation
       const data = await new Promise((resolve, reject) => {
         let resolved = false;
-        
+
         const onceTimeout = setTimeout(() => {
           if (!resolved) {
             resolved = true;
@@ -1534,7 +1538,10 @@ async function initializeServer() {
           if (!resolved) {
             resolved = true;
             clearTimeout(onceTimeout);
-            console.log(`📖 Gun get result for path "${path}":`, nodeData ? 'found' : 'not found');
+            console.log(
+              `📖 Gun get result for path "${path}":`,
+              nodeData ? "found" : "not found"
+            );
             resolve(nodeData);
           }
         });
@@ -1549,7 +1556,7 @@ async function initializeServer() {
           cleanData = { ...data };
           delete cleanData._;
         }
-        
+
         console.log(`✅ Successfully read node at path: "${path}"`);
         res.json({
           success: true,
@@ -1565,7 +1572,7 @@ async function initializeServer() {
           success: false,
           error: "Failed to retrieve node data.",
           details: error.message,
-          path
+          path,
         });
       }
     }
@@ -1602,12 +1609,12 @@ async function initializeServer() {
       }
 
       console.log(`📝 Creating node at path: "${path}" with data:`, data);
-      
+
       const node = getGunNodeFromPath(path);
-      
+
       // Temporarily allow internal operations during this REST API call
       allowInternalOperations = true;
-      
+
       try {
         // Properly promisify the Gun put operation
         const putResult = await new Promise((resolve, reject) => {
@@ -1628,7 +1635,10 @@ async function initializeServer() {
             });
           } catch (syncError) {
             clearTimeout(timeout);
-            console.error(`❌ Synchronous error in put for path "${path}":`, syncError);
+            console.error(
+              `❌ Synchronous error in put for path "${path}":`,
+              syncError
+            );
             reject(syncError);
           }
         });
@@ -1640,11 +1650,14 @@ async function initializeServer() {
       console.log(`✅ Node successfully created/updated at path: "${path}"`);
       return res.json({ success: true, path, data });
     } catch (error) {
-      console.error(`❌ Error in POST /node/* for path "${req.params[0]}":`, error);
-      return res.status(500).json({ 
-        success: false, 
+      console.error(
+        `❌ Error in POST /node/* for path "${req.params[0]}":`,
+        error
+      );
+      return res.status(500).json({
+        success: false,
         error: error.message,
-        path: req.params[0]
+        path: req.params[0],
       });
     }
   });
@@ -1659,12 +1672,12 @@ async function initializeServer() {
       }
 
       console.log(`🗑️ Deleting node at path: "${path}"`);
-      
+
       const node = getGunNodeFromPath(path);
-      
+
       // Temporarily allow internal operations during this REST API call
       allowInternalOperations = true;
-      
+
       try {
         // Properly promisify the Gun delete operation
         await new Promise((resolve, reject) => {
@@ -1676,7 +1689,10 @@ async function initializeServer() {
             node.put(null, (ack) => {
               clearTimeout(timeout);
               if (ack.err) {
-                console.error(`❌ Gun delete error for path "${path}":`, ack.err);
+                console.error(
+                  `❌ Gun delete error for path "${path}":`,
+                  ack.err
+                );
                 reject(new Error(ack.err));
               } else {
                 console.log(`✅ Gun delete success for path "${path}":`, ack);
@@ -1685,7 +1701,10 @@ async function initializeServer() {
             });
           } catch (syncError) {
             clearTimeout(timeout);
-            console.error(`❌ Synchronous error in delete for path "${path}":`, syncError);
+            console.error(
+              `❌ Synchronous error in delete for path "${path}":`,
+              syncError
+            );
             reject(syncError);
           }
         });
@@ -1697,11 +1716,14 @@ async function initializeServer() {
       console.log(`✅ Node successfully deleted at path: "${path}"`);
       res.json({ success: true, path, message: "Data deleted." });
     } catch (error) {
-      console.error(`❌ Error in DELETE /node/* for path "${req.params[0]}":`, error);
-      res.status(500).json({ 
-        success: false, 
+      console.error(
+        `❌ Error in DELETE /node/* for path "${req.params[0]}":`,
+        error
+      );
+      res.status(500).json({
+        success: false,
         error: error.message,
-        path: req.params[0]
+        path: req.params[0],
       });
     }
   });
@@ -2327,7 +2349,7 @@ async function initializeServer() {
     try {
       const memUsage = process.memoryUsage();
       const cpuUsage = process.cpuUsage();
-      
+
       res.json({
         success: true,
         system: {
@@ -2340,41 +2362,42 @@ async function initializeServer() {
             heapUsed: memUsage.heapUsed,
             heapTotal: memUsage.heapTotal,
             external: memUsage.external,
-            rss: memUsage.rss
+            rss: memUsage.rss,
           },
           cpu: {
             user: cpuUsage.user,
-            system: cpuUsage.system
+            system: cpuUsage.system,
           },
-          loadAverage: process.platform !== 'win32' ? require('os').loadavg() : [0, 0, 0],
-          freeMemory: require('os').freemem(),
-          totalMemory: require('os').totalmem()
+          loadAverage:
+            process.platform !== "win32" ? require("os").loadavg() : [0, 0, 0],
+          freeMemory: require("os").freemem(),
+          totalMemory: require("os").totalmem(),
         },
         services: {
           gun: {
             activeConnections: activeWires,
             totalConnections: totalConnections,
-            startTime: customStats.startTime
-          }
-        }
+            startTime: customStats.startTime,
+          },
+        },
       });
     } catch (error) {
       console.error("Error in /api/system-info:", error);
       res.status(500).json({
         success: false,
-        error: "Failed to retrieve system info: " + error.message
+        error: "Failed to retrieve system info: " + error.message,
       });
     }
   });
 
   // Docker service management functions
   const docker = new Docker();
-  
+
   async function getDockerContainer(containerName) {
     try {
       const containers = await docker.listContainers({ all: true });
-      return containers.find(container => 
-        container.Names.some(name => name.includes(containerName))
+      return containers.find((container) =>
+        container.Names.some((name) => name.includes(containerName))
       );
     } catch (error) {
       console.error(`Error finding container ${containerName}:`, error);
@@ -2385,13 +2408,21 @@ async function initializeServer() {
   async function restartDockerService(serviceName) {
     try {
       const containerMappings = {
-        'gun': 'shogun-relay-stack',
-        'ipfs': 'shogun-relay-stack', // IPFS runs within the main container
-        's3': 'shogun-relay-stack'    // FakeS3 also runs within the main container
+        gun: "shogun-relay-stack",
+        ipfs: "shogun-relay-stack", // IPFS runs within the main container
+        s3: "shogun-relay-stack", // FakeS3 also runs within the main container
+      };
+
+      const supervisorServiceMappings = {
+        gun: "shogun-stack:relay",
+        ipfs: "shogun-stack:ipfs-daemon",
+        s3: "shogun-stack:fakes3",
       };
 
       const containerName = containerMappings[serviceName];
-      if (!containerName) {
+      const supervisorService = supervisorServiceMappings[serviceName];
+
+      if (!containerName || !supervisorService) {
         throw new Error(`Unknown service: ${serviceName}`);
       }
 
@@ -2401,175 +2432,198 @@ async function initializeServer() {
       }
 
       const container = docker.getContainer(containerInfo.Id);
-      
-      // For services within the main container, we'll restart the whole container
-      if (serviceName === 'gun') {
-        // For gun service, we can't restart just the Gun part, so we restart the container
-        console.log(`🔄 Restarting Docker container: ${containerName}`);
+
+      console.log(
+        `🔄 Restarting service '${supervisorService}' in container '${containerName}'`
+      );
+
+      try {
+        // Use supervisorctl to restart the specific service
+        const exec = await container.exec({
+          Cmd: ["supervisorctl", "restart", supervisorService],
+          AttachStdout: true,
+          AttachStderr: true,
+        });
+
+        const stream = await exec.start();
+
+        // Read the output to check if restart was successful
+        let output = "";
+        return new Promise((resolve, reject) => {
+          stream.on("data", (chunk) => {
+            output += chunk.toString();
+          });
+
+          stream.on("end", async () => {
+            console.log(`📋 Supervisorctl output: ${output}`);
+
+            // Check if the restart was successful
+            if (output.includes("ERROR") || output.includes("FAILED")) {
+              console.warn(`⚠️ Service restart failed: ${output}`);
+              // Fallback to container restart
+              console.log(`🔄 Falling back to container restart`);
+              await container.restart();
+              resolve(
+                `Container ${containerName} restarted (service restart failed: ${output.trim()})`
+              );
+            } else {
+              resolve(
+                `Service '${serviceName}' (${supervisorService}) restarted successfully`
+              );
+            }
+          });
+
+          stream.on("error", async (error) => {
+            console.error(`❌ Stream error: ${error.message}`);
+            // Fallback to container restart
+            console.log(
+              `🔄 Falling back to container restart due to stream error`
+            );
+            await container.restart();
+            resolve(
+              `Container ${containerName} restarted (stream error fallback)`
+            );
+          });
+        });
+      } catch (execError) {
+        console.warn(`⚠️ Service restart failed: ${execError.message}`);
+        // Fallback to container restart
+        console.log(`🔄 Falling back to container restart`);
         await container.restart();
-        return `Container ${containerName} restarted successfully`;
-      } else if (serviceName === 'ipfs') {
-        // For IPFS, we can try to restart the IPFS daemon within the container
-        try {
-          const exec = await container.exec({
-            Cmd: ['supervisorctl', 'restart', 'ipfs'],
-            AttachStdout: true,
-            AttachStderr: true
-          });
-          const stream = await exec.start();
-          return `IPFS service restarted within container`;
-        } catch (execError) {
-          // Fallback to container restart
-          console.log(`🔄 IPFS service restart failed, restarting container: ${containerName}`);
-          await container.restart();
-          return `Container ${containerName} restarted (IPFS service restart fallback)`;
-        }
-      } else if (serviceName === 's3') {
-        // For S3/FakeS3, restart the service within the container
-        try {
-          const exec = await container.exec({
-            Cmd: ['supervisorctl', 'restart', 'fakes3'],
-            AttachStdout: true,
-            AttachStderr: true
-          });
-          const stream = await exec.start();
-          return `S3 service restarted within container`;
-        } catch (execError) {
-          // Fallback to container restart
-          console.log(`🔄 S3 service restart failed, restarting container: ${containerName}`);
-          await container.restart();
-          return `Container ${containerName} restarted (S3 service restart fallback)`;
-        }
+        return `Container ${containerName} restarted (exec error fallback: ${execError.message})`;
       }
-      
     } catch (error) {
       throw new Error(`Docker restart failed: ${error.message}`);
     }
   }
 
   // Enhanced service restart endpoint with Docker integration
-  app.post("/api/services/:service/restart", tokenAuthMiddleware, async (req, res) => {
-    try {
-      const { service } = req.params;
-      const allowedServices = ['gun', 'ipfs', 's3'];
-      
-      if (!allowedServices.includes(service)) {
-        return res.status(400).json({
+  app.post(
+    "/api/services/:service/restart",
+    tokenAuthMiddleware,
+    async (req, res) => {
+      try {
+        const { service } = req.params;
+        const allowedServices = ["gun", "ipfs", "s3"];
+
+        if (!allowedServices.includes(service)) {
+          return res.status(400).json({
+            success: false,
+            error: `Service '${service}' is not supported. Allowed services: ${allowedServices.join(
+              ", "
+            )}`,
+          });
+        }
+
+        console.log(`🔄 Restart request received for service: ${service}`);
+
+        let result;
+
+        try {
+          // First try Docker restart
+          result = await restartDockerService(service);
+          console.log(`✅ Docker restart successful: ${result}`);
+        } catch (dockerError) {
+          console.warn(`⚠️ Docker restart failed: ${dockerError.message}`);
+
+          // Fallback to internal operations
+          switch (service) {
+            case "gun":
+              await runGarbageCollector();
+              result = `Gun relay cleanup triggered (Docker unavailable)`;
+              break;
+
+            case "ipfs":
+              result = `IPFS restart attempted but Docker unavailable`;
+              break;
+
+            case "s3":
+              result = `S3 restart attempted but Docker unavailable`;
+              break;
+          }
+        }
+
+        res.json({
+          success: true,
+          message: result,
+          service: service,
+          timestamp: Date.now(),
+        });
+      } catch (error) {
+        console.error(`Error restarting service ${req.params.service}:`, error);
+        res.status(500).json({
           success: false,
-          error: `Service '${service}' is not supported. Allowed services: ${allowedServices.join(', ')}`
+          error: `Failed to restart service: ${error.message}`,
         });
       }
-
-      console.log(`🔄 Restart request received for service: ${service}`);
-      
-      let result;
-      
-      try {
-        // First try Docker restart
-        result = await restartDockerService(service);
-        console.log(`✅ Docker restart successful: ${result}`);
-      } catch (dockerError) {
-        console.warn(`⚠️ Docker restart failed: ${dockerError.message}`);
-        
-        // Fallback to internal operations
-        switch (service) {
-          case 'gun':
-            await runGarbageCollector();
-            result = `Gun relay cleanup triggered (Docker unavailable)`;
-            break;
-            
-          case 'ipfs':
-            result = `IPFS restart attempted but Docker unavailable`;
-            break;
-            
-          case 's3':
-            result = `S3 restart attempted but Docker unavailable`;
-            break;
-        }
-      }
-      
-      res.json({
-        success: true,
-        message: result,
-        service: service,
-        timestamp: Date.now()
-      });
-      
-    } catch (error) {
-      console.error(`Error restarting service ${req.params.service}:`, error);
-      res.status(500).json({
-        success: false,
-        error: `Failed to restart service: ${error.message}`
-      });
     }
-  });
+  );
 
   // Service status endpoint
   app.get("/api/services/status", async (req, res) => {
     try {
       const services = {};
-      
+
       // Check Gun Relay
       services.gun = {
-        status: 'online',
+        status: "online",
         uptime: process.uptime() * 1000,
         connections: activeWires,
         totalConnections: totalConnections,
-        memory: process.memoryUsage().heapUsed
+        memory: process.memoryUsage().heapUsed,
       };
-      
+
       // Check IPFS
       try {
-        const ipfsResponse = await fetch('/ipfs-status');
+        const ipfsResponse = await fetch("/ipfs-status");
         const ipfsData = await ipfsResponse.json();
         services.ipfs = {
-          status: ipfsData.success ? 'online' : 'offline',
-          version: ipfsData.ipfs?.version || 'unknown',
-          type: ipfsData.ipfs?.type || 'unknown'
+          status: ipfsData.success ? "online" : "offline",
+          version: ipfsData.ipfs?.version || "unknown",
+          type: ipfsData.ipfs?.type || "unknown",
         };
       } catch (error) {
         services.ipfs = {
-          status: 'offline',
-          error: error.message
+          status: "offline",
+          error: error.message,
         };
       }
-      
+
       // Check S3 (requires auth)
       const authHeader = req.headers.authorization;
       if (authHeader) {
         try {
-          const s3Response = await fetch('/api/s3-stats', {
-            headers: { 'Authorization': authHeader }
+          const s3Response = await fetch("/api/s3-stats", {
+            headers: { Authorization: authHeader },
           });
           if (s3Response.ok) {
             const s3Data = await s3Response.json();
             services.s3 = {
-              status: 'online',
+              status: "online",
               buckets: s3Data.stats.totalBuckets,
               objects: s3Data.stats.totalObjects,
-              size: s3Data.stats.totalSize
+              size: s3Data.stats.totalSize,
             };
           } else {
-            services.s3 = { status: 'offline', error: 'Auth failed' };
+            services.s3 = { status: "offline", error: "Auth failed" };
           }
         } catch (error) {
-          services.s3 = { status: 'offline', error: error.message };
+          services.s3 = { status: "offline", error: error.message };
         }
       } else {
-        services.s3 = { status: 'unknown', error: 'No auth provided' };
+        services.s3 = { status: "unknown", error: "No auth provided" };
       }
-      
+
       res.json({
         success: true,
         services: services,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
-      
     } catch (error) {
       console.error("Error in /api/services/status:", error);
       res.status(500).json({
         success: false,
-        error: "Failed to check services status: " + error.message
+        error: "Failed to check services status: " + error.message,
       });
     }
   });
