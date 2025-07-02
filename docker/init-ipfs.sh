@@ -8,11 +8,23 @@ echo "🔧 Initializing IPFS..."
 echo "IPFS_PATH: $IPFS_PATH"
 echo "Current user: $(whoami)"
 echo "IPFS binary location: $(which ipfs || echo 'not found')"
+
+# Create and set proper permissions for IPFS directory
+mkdir -p $IPFS_PATH
+chown -R ipfs:ipfs $IPFS_PATH 2>/dev/null || true
+chmod -R 755 $IPFS_PATH
+
+# Verify IPFS binary
+if [ ! -x "/usr/local/bin/ipfs" ]; then
+    echo "❌ IPFS binary not found or not executable"
+    exit 1
+fi
+
 ls -la /usr/local/bin/ipfs || echo "IPFS binary not found"
 
 # Create denylists directories for both root and current user
 echo "📁 Creating denylists directories..."
-mkdir -p /root/.config/ipfs/denylists
+mkdir -p /root/.config/ipfs/denylists 2>/dev/null || true
 mkdir -p /home/ipfs/.config/ipfs/denylists
 chmod -R 755 /root/.config/ipfs /home/ipfs/.config/ipfs 2>/dev/null || true
 chown -R ipfs:ipfs /home/ipfs/.config 2>/dev/null || true

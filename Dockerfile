@@ -10,6 +10,7 @@ RUN apk add --no-cache \
     bash \
     supervisor \
     ca-certificates \
+    dos2unix \
     && rm -rf /var/cache/apk/*
 
 # Create symlink for Node.js (supervisord expects it in /usr/bin)
@@ -51,7 +52,10 @@ RUN cp /app/docker/relay.env /app/relay/.env \
 
 # Set proper permissions
 RUN chmod +x /app/docker/*.sh \
+    && chmod +x /app/docker/init-ipfs.sh \
+    && dos2unix /app/docker/*.sh \
     && chown -R node:node /app \
+    && chown -R ipfs:ipfs /data/ipfs \
     && chmod 755 /app/relay/src/public
 
 # Expose ports
