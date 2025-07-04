@@ -11,12 +11,18 @@ const dotenv = require("dotenv")
 dotenv.config()
 
 // Configuration matching the relay server exactly
-let accessKeyId = process.env.ACCESS_KEY || "S3RVER";
-let secretAccessKey = process.env.SECRET_KEY || "S3RVER";
-let bucketName = process.env.BUCKET_NAME || "shogun-bucket";
-let port = process.env.PORT || 4569;
+let accessKeyId = process.env.S3_ACCESS_KEY || "S3RVER2025";
+let secretAccessKey = process.env.S3_SECRET_KEY || "S3RVER2025";
+let bucketName = process.env.S3_BUCKET || "shogun-bucket";
+let port = process.env.S3_PORT || 4569;
 let address = process.env.ADDRESS || "localhost";
 let directory = "./buckets";
+
+
+if(!accessKeyId || !secretAccessKey || !bucketName || !port || !address) {
+  console.error("❌ Missing required environment variables");
+  process.exit(1);
+}
 
 // Ensure buckets directory exists
 if (!fs.existsSync(directory)) {
