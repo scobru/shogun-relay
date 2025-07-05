@@ -11,11 +11,11 @@ const dotenv = require("dotenv")
 dotenv.config()
 
 // Configuration matching the relay server exactly
-let accessKeyId = process.env.S3_ACCESS_KEY || "S3RVER2025";
-let secretAccessKey = process.env.S3_SECRET_KEY || "S3RVER2025";
-let bucketName = process.env.S3_BUCKET || "shogun-bucket";
-let port = process.env.S3_PORT || 4569;
-let address = process.env.ADDRESS || "localhost";
+let accessKeyId = process.env.S3_ACCESS_KEY;
+let secretAccessKey = process.env.S3_SECRET_KEY;
+let bucketName = process.env.S3_BUCKET;
+let port = process.env.S3_PORT;
+let address = process.env.S3_ADDRESS;
 let directory = "./buckets";
 
 
@@ -38,22 +38,18 @@ if (!fs.existsSync(bucketDir)) {
 }
 
 const instance = new S3rver({
-  serviceEndpoint: "test-bucket.127.0.0.1",
+  serviceEndpoint: address,
   port: port,
   address: address,
   silent: false,
   directory: directory,
-  accessKeyId: accessKeyId,
-  secretAccessKey: secretAccessKey,
   allowMismatchedSignatures: true,
-  vhostBuckets: true, // Disable virtual hosted style buckets for compatibility
+  vhostBuckets: false, // Virtual hosted style buckets are disabled for compatibility
   configureBuckets: [
     {
       name: bucketName,
       region: "us-east-1",
-      configs: [fs.readFileSync(corsConfig), fs.readFileSync(websiteConfig)],
-      accessKeyId: accessKeyId,
-      secretAccessKey: secretAccessKey,
+      configs: [fs.readFileSync(corsConfig), fs.readFileSync(websiteConfig)]
     },
       
   ],
