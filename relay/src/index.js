@@ -399,23 +399,16 @@ async function initializeServer() {
         const body = req.file.buffer;
         const contentType = req.file.mimetype;
 
-        // First, ensure the bucket exists
+        // Ensure the bucket exists by trying to create it
         try {
-          await s3.headBucket({ Bucket: bucket }).promise();
-          console.log(`✅ Bucket ${bucket} exists`);
-        } catch (bucketError) {
-          if (bucketError.statusCode === 404) {
-            console.log(`🪣 Creating bucket ${bucket}...`);
-            try {
-              await s3.createBucket({ Bucket: bucket }).promise();
-              console.log(`✅ Bucket ${bucket} created successfully`);
-            } catch (createError) {
-              console.error(`❌ Failed to create bucket ${bucket}:`, createError);
-              throw new Error(`Failed to create bucket: ${createError.message}`);
-            }
+          await s3.createBucket({ Bucket: bucket }).promise();
+          console.log(`🪣 Bucket "${bucket}" created successfully.`);
+        } catch (error) {
+          if (error.code === 'BucketAlreadyOwnedByYou' || error.code === 'BucketAlreadyExists') {
+            console.log(`✅ Bucket "${bucket}" already exists.`);
           } else {
-            console.error(`❌ Bucket verification error:`, bucketError);
-            throw new Error(`Bucket verification failed: ${bucketError.message}`);
+            console.error('❌ S3 Bucket creation/verification failed:', error);
+            throw new Error(`Bucket setup failed: ${error.message}`);
           }
         }
 
