@@ -376,18 +376,48 @@ async function initializeServer() {
       }
 
       try {
+        console.log("🔧 S3 Upload Configuration:", {
+          accessKeyId: process.env.S3_ACCESS_KEY,
+          secretAccessKey: process.env.S3_SECRET_KEY ? "***" : "NOT SET",
+          endpoint: process.env.S3_ENDPOINT,
+          bucket: process.env.S3_BUCKET,
+          region: process.env.S3_REGION || "us-east-1"
+        });
+
         const s3 = new AWS.S3({
           accessKeyId: process.env.S3_ACCESS_KEY,
           secretAccessKey: process.env.S3_SECRET_KEY,
-          endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
+          endpoint: process.env.S3_ENDPOINT,
           s3ForcePathStyle: true,
           region: process.env.S3_REGION || "us-east-1",
+          signatureVersion: 'v4',
+          sslEnabled: false
         });
 
         const bucket = process.env.S3_BUCKET;
         const key = req.file.originalname;
         const body = req.file.buffer;
         const contentType = req.file.mimetype;
+
+        // First, ensure the bucket exists
+        try {
+          await s3.headBucket({ Bucket: bucket }).promise();
+          console.log(`✅ Bucket ${bucket} exists`);
+        } catch (bucketError) {
+          if (bucketError.statusCode === 404) {
+            console.log(`🪣 Creating bucket ${bucket}...`);
+            try {
+              await s3.createBucket({ Bucket: bucket }).promise();
+              console.log(`✅ Bucket ${bucket} created successfully`);
+            } catch (createError) {
+              console.error(`❌ Failed to create bucket ${bucket}:`, createError);
+              throw new Error(`Failed to create bucket: ${createError.message}`);
+            }
+          } else {
+            console.error(`❌ Bucket verification error:`, bucketError);
+            throw new Error(`Bucket verification failed: ${bucketError.message}`);
+          }
+        }
 
         const params = {
           Bucket: bucket,
@@ -401,7 +431,9 @@ async function initializeServer() {
           },
         };
 
+        console.log(`📤 Uploading file ${key} to bucket ${bucket}...`);
         const uploadResult = await s3.upload(params).promise();
+        console.log(`✅ Upload successful:`, uploadResult.Location);
 
         res.json({
           success: true,
@@ -414,8 +446,28 @@ async function initializeServer() {
           },
         });
       } catch (error) {
-        console.error("S3 Upload Error:", error);
-        res.status(500).json({ success: false, error: error.message });
+        console.error("❌ S3 Upload Error:", {
+          message: error.message,
+          code: error.code,
+          statusCode: error.statusCode,
+          requestId: error.requestId,
+          stack: error.stack
+        });
+        
+        let errorMessage = error.message;
+        if (error.code === 'SignatureDoesNotMatch') {
+          errorMessage = 'Invalid S3 credentials. Check your access key and secret key.';
+        } else if (error.code === 'InvalidAccessKeyId') {
+          errorMessage = 'Invalid S3 access key ID.';
+        } else if (error.code === 'NetworkingError') {
+          errorMessage = 'Cannot connect to S3 server. Check if FakeS3 is running.';
+        }
+        
+        res.status(500).json({ 
+          success: false, 
+          error: errorMessage,
+          code: error.code || 'UNKNOWN_ERROR'
+        });
       }
     }
   );
