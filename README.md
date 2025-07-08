@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen.svg)](https://nodejs.org/)
 
-A comprehensive, production-ready decentralized relay server for the Shogun ecosystem. Built on GunDB with enhanced performance, security features, IPFS integration, S3 storage support, and real-time monitoring capabilities.
+A comprehensive, production-ready decentralized relay server for the Shogun ecosystem. Built on GunDB with enhanced performance, security features, IPFS integration, and real-time monitoring capabilities.
 
 ## 🌟 Overview
 
@@ -20,7 +20,6 @@ Shogun Relay is an enhanced Gun.js relay server that facilitates secure, decentr
 
 ### 📁 Storage Solutions
 - **IPFS Integration**: Direct IPFS API proxy with file upload/download
-- **S3 Storage**: Compatible with AWS S3 and local FakeS3 server
 - **GunDB Persistence**: Enhanced radisk storage with garbage collection
 - **Encrypted Storage**: Support for encrypted file uploads with SEA
 
@@ -38,7 +37,7 @@ Shogun Relay is an enhanced Gun.js relay server that facilitates secure, decentr
 
 ## 🏗️ Architecture
 
-The Shogun Relay consists of three main components:
+The Shogun Relay consists of two main components:
 
 ### 1. Main Relay Server (`/relay`)
 The core relay server with enhanced Gun.js functionality:
@@ -57,25 +56,13 @@ shogun-relay/relay/
 └── env.example           # Environment configuration template
 ```
 
-### 2. FakeS3 Server (`/fakes3`)
-Local S3-compatible storage server for development and testing:
-
-```
-shogun-relay/fakes3/
-├── index.js              # S3rver implementation
-├── buckets/              # Local storage directory
-├── example/              # Configuration examples
-│   ├── cors.xml          # CORS configuration
-│   └── website.xml       # Website configuration
-└── package.json          # Dependencies
-```
-
-### 3. Management Scripts
+### 2. Management Scripts
 Utility scripts for running the complete stack:
 
 ```
 shogun-relay/
-├── start-full-stack.js   # Launch relay + FakeS3 together
+├── docker-compose.yml   # Docker configuration
+├── Dockerfile           # Docker build instructions
 └── README.md            # This documentation
 ```
 
@@ -96,10 +83,6 @@ cd shogun-relay
 
 # Install relay dependencies
 cd relay
-npm install
-
-# Install FakeS3 dependencies (optional)
-cd ../fakes3
 npm install
 ```
 
@@ -128,28 +111,37 @@ npm start
 
 ## 🐳 Docker Deployment (Recommended)
 
-The easiest way to run Shogun Relay is using Docker, which automatically includes all necessary services:
+The easiest way to run Shogun Relay is using the provided start script with Docker. This will set up and launch all necessary services automatically.
 
-### Quick Start with Docker
+### Quick Start with `docker-start.sh`
+
+From the root of the `shogun-relay` directory, simply run:
 
 ```bash
-# 1. Build the Docker image
-docker build -t shogun-relay:latest .
+./docker-start.sh
+```
 
-# 2. Start the container with all services
-docker run -d \
-  --name shogun-relay-stack \
-  --rm \
-  -p 8765:8765 \
-  -p 4569:4569 \
-  -p 5001:5001 \
-  -p 8080:8080 \
-  -p 4001:4001 \
-  shogun-relay:latest
+This script will:
+1. Check if Docker is running.
+2. Stop any old containers.
+3. Build the latest Docker image.
+4. Start all services in the background.
+5. Display the status and available service URLs.
+
+### Manual Docker Compose Commands
+
+If you prefer to manage the services manually, you can use `docker-compose`:
+
+```bash
+# 1. Build the image
+docker-compose build
+
+# 2. Start the services
+docker-compose up -d
 
 # 3. Verify status
-docker ps --filter "name=shogun-relay"
-docker logs shogun-relay-stack
+docker-compose ps
+docker-compose logs -f
 ```
 
 ### Services Included in Container
@@ -157,7 +149,6 @@ docker logs shogun-relay-stack
 The Docker container automatically includes:
 
 - **🔗 Relay Server** (port 8765) - Main Gun.js server
-- **📁 FakeS3** (port 4569) - Local S3-compatible storage
 - **🌐 IPFS Daemon** (ports 5001, 8080, 4001) - Complete IPFS node
 - **📊 Supervisor** - Service management and monitoring
 
@@ -166,7 +157,6 @@ The Docker container automatically includes:
 | Port | Service | Description |
 |------|---------|-------------|
 | 8765 | Relay Server | Main interface, Gun.js WebSocket |
-| 4569 | FakeS3 | S3-compatible API for local storage |
 | 5001 | IPFS API | IPFS API for programmatic operations |
 | 8080 | IPFS Gateway | HTTP gateway for IPFS content access |
 | 4001 | IPFS Swarm | IPFS P2P communication |
@@ -175,214 +165,24 @@ The Docker container automatically includes:
 
 ```bash
 # View logs in real-time
-docker logs -f shogun-relay-stack
+docker-compose logs -f
 
 # Enter container for debugging
-docker exec -it shogun-relay-stack bash
+docker-compose exec shogun-relay-stack bash
 
 # Check internal service status
-docker exec shogun-relay-stack ps aux
+docker-compose exec shogun-relay-stack supervisorctl status
 
-# Restart the container
-docker restart shogun-relay-stack
+# Restart the services
+docker-compose restart
 
-# Stop and remove the container
-docker stop shogun-relay-stack
+# Stop and remove the container and volumes
+docker-compose down -v
 ```
 
 ### Advanced Docker Configuration
 
-#### With Persistent Volume
-
-To preserve data between restarts:
-
-```bash
-# Create volume for persistent data
-docker volume create shogun-relay-data
-
-# Start with mounted volume
-docker run -d \
-  --name shogun-relay-stack \
-  --rm \
-  -p 8765:8765 \
-  -p 4569:4569 \
-  -p 5001:5001 \
-  -p 8080:8080 \
-  -p 4001:4001 \
-  -v shogun-relay-data:/data \
-  shogun-relay:latest
-```
-
-#### With Environment Variables
-
-```bash
-docker run -d \
-  --name shogun-relay-stack \
-  --rm \
-  -p 8765:8765 \
-  -p 4569:4569 \
-  -p 5001:5001 \
-  -p 8080:8080 \
-  -p 4001:4001 \
-  -e ADMIN_PASSWORD=your-secure-password \
-  -e GC_ENABLED=true \
-  -e GC_INTERVAL=3600000 \
-  shogun-relay:latest
-```
-
-#### Docker Compose (Recommended for Production)
-
-Create a `docker-compose.yml` file:
-
-```yaml
-services:
-  shogun-relay:
-    build: .
-    container_name: shogun-relay-stack
-    restart: unless-stopped
-    ports:
-      - "8765:8765"   # Relay Server
-      - "4569:4569"   # FakeS3
-      - "5001:5001"   # IPFS API
-      - "8080:8080"   # IPFS Gateway
-      - "4001:4001"   # IPFS Swarm
-    volumes:
-      - shogun-data:/data
-      - shogun-logs:/var/log/supervisor
-    environment:
-      - NODE_ENV=production
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-me}
-      - GC_ENABLED=true
-      - GC_INTERVAL=3600000
-      - IPFS_API_URL=http://127.0.0.1:5001
-      - IPFS_GATEWAY_URL=http://127.0.0.1:8080
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-
-volumes:
-  shogun-data:
-    driver: local
-  shogun-logs:
-    driver: local
-```
-
-Then start with:
-
-```bash
-# Start with Docker Compose
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-```
-
-### Container Monitoring
-
-#### Health Check
-
-```bash
-# Check health status
-docker inspect shogun-relay-stack | grep -A 10 Health
-
-# Manual health check test
-curl http://localhost:8765/health
-```
-
-#### Metrics and Logs
-
-```bash
-# Container statistics
-docker stats shogun-relay-stack
-
-# Service-specific logs
-docker exec shogun-relay-stack tail -f /var/log/supervisor/relay.log
-docker exec shogun-relay-stack tail -f /var/log/supervisor/ipfs.log
-docker exec shogun-relay-stack tail -f /var/log/supervisor/fakes3.log
-```
-
-### Troubleshooting Docker
-
-#### Common Issues
-
-1. **IPFS fails to start**:
-   ```bash
-   # Check IPFS logs
-   docker exec shogun-relay-stack cat /var/log/supervisor/ipfs.log
-   
-   # Verify directories
-   docker exec shogun-relay-stack ls -la /root/.config/ipfs/
-   ```
-
-2. **Ports already in use**:
-   ```bash
-   # Change exposed ports
-   docker run -p 8766:8765 -p 4570:4569 ... shogun-relay:latest
-   ```
-
-3. **Permission issues**:
-   ```bash
-   # Rebuild the image
-   docker build --no-cache -t shogun-relay:latest .
-   ```
-
-4. **Container not responding**:
-   ```bash
-   # Complete restart
-   docker stop shogun-relay-stack
-   docker rm shogun-relay-stack
-   docker run -d --name shogun-relay-stack ... shogun-relay:latest
-   ```
-
-### Docker Updates
-
-```bash
-# 1. Stop current container
-docker stop shogun-relay-stack
-
-# 2. Backup data (if needed)
-docker cp shogun-relay-stack:/data ./backup-data
-
-# 3. Rebuild the image
-docker build -t shogun-relay:latest .
-
-# 4. Start new container
-docker run -d --name shogun-relay-stack ... shogun-relay:latest
-```
-
-### Production Deployment
-
-For production use, configure the following environment variables:
-
-```bash
-# Core Configuration
-RELAY_HOST=your-domain.com
-RELAY_PORT=8765
-ADMIN_PASSWORD=your-secure-admin-password
-
-# Storage Configuration
-ENABLE_S3=true
-S3_ENDPOINT=https://s3.amazonaws.com
-S3_BUCKET=your-bucket-name
-S3_ACCESS_KEY=your-access-key
-S3_SECRET_KEY=your-secret-key
-
-# IPFS Configuration
-IPFS_API_URL=http://127.0.0.1:5001
-IPFS_GATEWAY_URL=http://127.0.0.1:8080
-IPFS_API_TOKEN=your-ipfs-token
-
-# Performance Tuning
-GC_ENABLED=true
-GC_INTERVAL=3600000
-GC_EXPIRATION_AGE=86400000
-```
+See the `docker-compose.yml` file for advanced configuration options, including setting environment variables and managing persistent volumes.
 
 ## 📖 Detailed Documentation
 
@@ -416,26 +216,7 @@ POST /api/v0/<endpoint>
 Authorization: Bearer <admin-token>
 ```
 
-#### 3. S3 Storage Support
-
-AWS S3 and FakeS3 compatibility:
-
-```javascript
-// Upload to S3
-POST /s3-upload
-Authorization: Bearer <admin-token>
-
-// Download from S3
-GET /s3-file/<bucket>/<key>
-
-// Get file metadata
-GET /s3-info/<bucket>/<key>
-
-// Delete file
-DELETE /s3-file/<bucket>/<key>
-```
-
-#### 4. Data Management
+#### 3. Data Management
 
 Advanced data operations:
 
@@ -481,7 +262,6 @@ POST /api/derive
 
 #### File Upload Interface (`/upload`)
 - IPFS file upload with encryption
-- S3 storage upload options
 - Upload progress tracking
 - File management tools
 
@@ -489,8 +269,6 @@ POST /api/derive
 - `/charts` - Advanced performance charts
 - `/notes` - Admin notes and documentation
 - `/pin-manager` - IPFS pin management
-- `/s3-dashboard` - S3 storage monitoring
-- `/visualGraph` - Interactive graph visualization
 - `/derive` - Shogun key derivation tool
 - `/client` - Minimal messenger interface
 - `/chat` - Public relay chat
@@ -571,29 +349,12 @@ const GC_INTERVAL = 60 * 60 * 1000;         // 1 hour
 | `RELAY_STORE` | true | Enable persistent storage |
 | `RELAY_PATH` | "public" | Static files directory |
 | `ADMIN_PASSWORD` | - | Admin authentication token |
-| `ENABLE_S3` | false | Enable S3 storage |
-| `S3_ENDPOINT` | AWS default | S3 service endpoint |
-| `S3_BUCKET` | - | S3 bucket name |
-| `S3_ACCESS_KEY` | - | S3 access key |
-| `S3_SECRET_KEY` | - | S3 secret key |
 | `IPFS_API_URL` | http://127.0.0.1:5001 | IPFS API endpoint |
 | `IPFS_GATEWAY_URL` | http://127.0.0.1:8080 | IPFS gateway URL |
 | `IPFS_API_TOKEN` | - | IPFS API authentication |
 | `GC_ENABLED` | false | Enable garbage collection |
 | `GC_INTERVAL` | 3600000 | GC run interval (ms) |
 | `GC_EXPIRATION_AGE` | 86400000 | Data expiration time (ms) |
-
-### FakeS3 Configuration
-
-For local development and testing:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ACCESS_KEY` | S3RVER | FakeS3 access key |
-| `SECRET_KEY` | S3RVER | FakeS3 secret key |
-| `BUCKET_NAME` | test-bucket | Default bucket name |
-| `PORT` | 4569 | FakeS3 server port |
-| `ADDRESS` | localhost | FakeS3 bind address |
 
 ## 🛠️ Development
 
@@ -659,7 +420,6 @@ The relay provides comprehensive logging:
 💾 Radisk persistence: radata
 🌐 Peers: http://localhost:8766/gun
 ✅ IPFS node is responsive
-✅ S3 storage enabled
 📊 Metrics - Active: 45, Total: 150, Messages: 5420
 ```
 
