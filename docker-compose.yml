@@ -43,28 +43,10 @@ services:
     networks:
       - shogun-network
 
-  # Optional: External IPFS node (if you prefer separate container)
-  ipfs-external:
-    image: ipfs/kubo:latest
-    container_name: shogun-ipfs-external
-    ports:
-      - "5002:5001"   # IPFS API (alternative port)
-      - "8081:8080"   # IPFS Gateway (alternative port)
-    volumes:
-      - ipfs-external-data:/data/ipfs
-    environment:
-      - IPFS_PROFILE=server
-    restart: unless-stopped
-    profiles: ["external-ipfs"]
-    networks:
-      - shogun-network
-
 volumes:
   ipfs-data:
     driver: local
   relay-data:
-    driver: local
-  ipfs-external-data:
     driver: local
 
 networks:

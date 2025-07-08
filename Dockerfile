@@ -10,17 +10,29 @@ RUN apk add --no-cache \
     bash \
     supervisor \
     ca-certificates \
+    libc6-compat \
+    libstdc++ \
+    dos2unix \
     && rm -rf /var/cache/apk/*
 
-# Install IPFS (Kubo) - fix for Alpine Linux compatibility
+# Install IPFS (Kubo) with architecture detection and verification
 ENV IPFS_VERSION=0.24.0
-RUN apk add --no-cache libc6-compat \
-    && wget https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-arm64.tar.gz \
-    && tar -xzf kubo_v${IPFS_VERSION}_linux-arm64.tar.gz \
+RUN ARCH=$(uname -m); \
+    case "$ARCH" in \
+        x86_64) ARCH_NAME="amd64" ;; \
+        aarch64) ARCH_NAME="arm64" ;; \
+        *) echo "Unsupported architecture: $ARCH"; exit 1 ;; \
+    esac; \
+    wget https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
+    && wget https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
+    && sha512sum -c kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
+    && tar -xzf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
     && chmod +x kubo/ipfs \
     && mv kubo/ipfs /usr/local/bin/ \
-    && rm -rf kubo kubo_v${IPFS_VERSION}_linux-arm64.tar.gz \
-    && /usr/local/bin/ipfs version || echo "IPFS binary test failed"
+    && rm -rf kubo kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz* \
+    && echo "Testing IPFS binary..." \
+    && /usr/local/bin/ipfs version \
+    && echo "IPFS binary test successful"
 
 # Create symlink for Node.js (supervisord expects it in /usr/bin)
 RUN ln -sf /usr/local/bin/node /usr/bin/node
@@ -33,13 +45,17 @@ RUN adduser -D -s /bin/sh ipfs \
     && mkdir -p /home/ipfs/.config/ipfs/denylists \
     && mkdir -p /root/.config/ipfs/denylists \
     && chown -R ipfs:ipfs /data/ipfs /home/ipfs/.config \
-    && chmod -R 755 /home/ipfs/.config /root/.config
+    && chmod -R 755 /home/ipfs/.config /root/.config \
+    && chmod 755 /usr/local/bin/ipfs
 
 # Set up relay application
 WORKDIR /app
 
 # Copy configuration files first
 COPY docker/ /app/docker/
+
+# Convert script line endings from CRLF to LF
+RUN dos2unix /app/docker/init-ipfs.sh
 
 # Create environment files with Docker-optimized settings
 RUN cp /app/docker/relay.env /app/relay/.env

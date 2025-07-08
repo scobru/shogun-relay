@@ -61,7 +61,6 @@ case "${1:-docker}" in
         docker run -d \
             --name shogun-relay-stack \
             -p 8765:8765 \
-            -p 4569:4569 \
             -p 5001:5001 \
             -p 8080:8080 \
             -p 4001:4001 \
@@ -84,7 +83,6 @@ case "${1:-docker}" in
             echo "   • Relay Server:   http://localhost:8765"
             echo "   • IPFS API:      http://localhost:5001"
             echo "   • IPFS Gateway:  http://localhost:8080"
-            echo "   • FakeS3:        http://localhost:4569"
             echo ""
             echo "🔐 Admin Password: \"$ADMIN_PASSWORD\""
             echo ""
