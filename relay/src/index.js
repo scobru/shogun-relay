@@ -538,7 +538,7 @@ async function initializeServer() {
     rfs: true,
     wait: 500,
     webrtc: true,
-    peers: [peers],
+    peers: peers,
   };
 
   console.log("📁 Using local file storage only");
@@ -1476,6 +1476,45 @@ async function initializeServer() {
         error: error.message,
         path: req.params[0]
       });
+    }
+  });
+
+  // --- Peer Management API ---
+  app.get("/api/peers", tokenAuthMiddleware, (req, res) => {
+    try {
+      const peers = gun._.opt.peers || {};
+      const peerList = Object.keys(peers);
+      res.json({ success: true, peers: peerList });
+    } catch (error) {
+      console.error("Error fetching peer list:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to retrieve peer list: " + error.message,
+      });
+    }
+  });
+
+  app.post("/api/peers/add", tokenAuthMiddleware, (req, res) => {
+    try {
+      const { peerUrl } = req.body;
+      if (!peerUrl || typeof peerUrl !== 'string') {
+        return res.status(400).json({ success: false, error: "Invalid 'peerUrl' provided." });
+      }
+
+      try {
+        new URL(peerUrl);
+      } catch (e) {
+        return res.status(400).json({ success: false, error: "Malformed 'peerUrl'." });
+      }
+      
+      console.log(`🔌 Attempting to connect to new peer: ${peerUrl}`);
+      gun.opt({ peers: [peerUrl] });
+
+      res.json({ success: true, message: `Connection to peer ${peerUrl} initiated.` });
+
+    } catch (error) {
+      console.error(`❌ Error adding peer:`, error);
+      res.status(500).json({ success: false, error: "Failed to add peer: " + error.message });
     }
   });
 
