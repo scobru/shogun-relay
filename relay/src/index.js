@@ -10,7 +10,6 @@ import dotenv from "dotenv";
 import ip from "ip";
 import qr from "qr";
 import setSelfAdjustingInterval from "self-adjusting-interval";
-import AWS from "aws-sdk";
 import FormData from "form-data";
 import "./utils/bullet-catcher.js";
 import Docker from "dockerode";
@@ -22,7 +21,6 @@ import "gun/sea.js";
 import "gun/lib/stats.js";
 import "gun/lib/webrtc.js";
 import "gun/lib/rfs.js";
-import "gun/lib/rs3.js";
 
 import ShogunCoreModule from "shogun-core";
 const { derive, SEA } = ShogunCoreModule;
@@ -362,229 +360,7 @@ async function initializeServer() {
     }
   );
 
-  // S3/FakeS3 File Upload endpoint
-  app.post(
-    "/s3-upload",
-    tokenAuthMiddleware,
-    upload.single("file"),
-    async (req, res) => {
-      const enableS3 = process.env.ENABLE_S3 === "true";
-      if (!enableS3) {
-        return res
-          .status(400)
-          .json({ success: false, error: "S3 storage is disabled" });
-      }
 
-      try {
-        console.log("🔧 S3 Upload Configuration:", {
-          accessKeyId: process.env.S3_ACCESS_KEY,
-          secretAccessKey: process.env.S3_SECRET_KEY ? "***" : "NOT SET",
-          endpoint: process.env.S3_ENDPOINT,
-          bucket: process.env.S3_BUCKET,
-          region: process.env.S3_REGION || "us-east-1"
-        });
-
-        const s3 = new AWS.S3({
-          accessKeyId: process.env.S3_ACCESS_KEY,
-          secretAccessKey: process.env.S3_SECRET_KEY,
-          endpoint: process.env.S3_ENDPOINT,
-          s3ForcePathStyle: true,
-          region: process.env.S3_REGION || "us-east-1",
-          signatureVersion: 'v4',
-          sslEnabled: false
-        });
-
-        const bucket = process.env.S3_BUCKET;
-        const key = req.file.originalname;
-        const body = req.file.buffer;
-        const contentType = req.file.mimetype;
-
-        // Ensure the bucket exists by trying to create it
-        try {
-          await s3.createBucket({ Bucket: bucket }).promise();
-          console.log(`🪣 Bucket "${bucket}" created successfully.`);
-        } catch (error) {
-          if (error.code === 'BucketAlreadyOwnedByYou' || error.code === 'BucketAlreadyExists') {
-            console.log(`✅ Bucket "${bucket}" already exists.`);
-          } else {
-            console.error('❌ S3 Bucket creation/verification failed:', error);
-            throw new Error(`Bucket setup failed: ${error.message}`);
-          }
-        }
-
-        const params = {
-          Bucket: bucket,
-          Key: key,
-          Body: body,
-          ContentType: contentType,
-          Metadata: {
-            originalName: req.file.originalname,
-            size: req.file.size.toString(),
-            uploadedAt: new Date().toISOString(),
-          },
-        };
-
-        console.log(`📤 Uploading file ${key} to bucket ${bucket}...`);
-        const uploadResult = await s3.upload(params).promise();
-        console.log(`✅ Upload successful:`, uploadResult.Location);
-
-        res.json({
-          success: true,
-          file: {
-            name: req.file.originalname,
-            size: req.file.size,
-            mimetype: req.file.mimetype,
-            s3Key: uploadResult.Key,
-            s3Url: uploadResult.Location,
-          },
-        });
-      } catch (error) {
-        console.error("❌ S3 Upload Error:", {
-          message: error.message,
-          code: error.code,
-          statusCode: error.statusCode,
-          requestId: error.requestId,
-          stack: error.stack
-        });
-        
-        let errorMessage = error.message;
-        if (error.code === 'SignatureDoesNotMatch') {
-          errorMessage = 'Invalid S3 credentials. Check your access key and secret key.';
-        } else if (error.code === 'InvalidAccessKeyId') {
-          errorMessage = 'Invalid S3 access key ID.';
-        } else if (error.code === 'NetworkingError') {
-          errorMessage = 'Cannot connect to S3 server. Check if FakeS3 is running.';
-        }
-        
-        res.status(500).json({ 
-          success: false, 
-          error: errorMessage,
-          code: error.code || 'UNKNOWN_ERROR'
-        });
-      }
-    }
-  );
-
-  // S3/FakeS3 File Fetch endpoint
-  app.get("/s3-file/:bucket/:key", async (req, res) => {
-    const enableS3 = process.env.ENABLE_S3 === "true";
-    if (!enableS3) {
-      return res
-        .status(400)
-        .json({ success: false, error: "S3 storage is disabled" });
-    }
-
-    try {
-      const s3 = new AWS.S3({
-        accessKeyId: process.env.S3_ACCESS_KEY,
-        secretAccessKey: process.env.S3_SECRET_KEY,
-        endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
-        s3ForcePathStyle: true,
-        region: process.env.S3_REGION || "us-east-1",
-      });
-
-      const bucket = req.params.bucket;
-      const key = req.params.key;
-
-      const params = {
-        Bucket: bucket,
-        Key: key,
-      };
-
-      const fileStream = s3.getObject(params).createReadStream();
-
-      fileStream.on("error", (error) => {
-        console.error("S3 Fetch Error:", error);
-        res.status(500).json({ success: false, error: error.message });
-      });
-
-      res.setHeader("Content-Disposition", `attachment; filename="${key}"`);
-      fileStream.pipe(res);
-    } catch (error) {
-      console.error("S3 Fetch Error:", error);
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
-  // S3/FakeS3 File Info endpoint
-  app.get("/s3-info/:bucket/:key", async (req, res) => {
-    const enableS3 = process.env.ENABLE_S3 === "true";
-    if (!enableS3) {
-      return res
-        .status(400)
-        .json({ success: false, error: "S3 storage is disabled" });
-    }
-
-    try {
-      const s3 = new AWS.S3({
-        accessKeyId: process.env.S3_ACCESS_KEY,
-        secretAccessKey: process.env.S3_SECRET_KEY,
-        endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
-        s3ForcePathStyle: true,
-        region: process.env.S3_REGION || "us-east-1",
-      });
-
-      const bucket = req.params.bucket;
-      const key = req.params.key;
-
-      const params = {
-        Bucket: bucket,
-        Key: key,
-      };
-
-      const headResult = await s3.headObject(params).promise();
-
-      res.json({
-        success: true,
-        file: {
-          name: key,
-          size: headResult.ContentLength,
-          mimetype: headResult.ContentType,
-          etag: headResult.ETag,
-          lastModified: headResult.LastModified,
-          metadata: headResult.Metadata,
-        },
-      });
-    } catch (error) {
-      console.error("S3 Info Error:", error);
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
-  // S3/FakeS3 File Delete endpoint
-  app.delete("/s3-file/:bucket/:key", async (req, res) => {
-    const enableS3 = process.env.ENABLE_S3 === "true";
-    if (!enableS3) {
-      return res
-        .status(400)
-        .json({ success: false, error: "S3 storage is disabled" });
-    }
-
-    try {
-      const s3 = new AWS.S3({
-        accessKeyId: process.env.S3_ACCESS_KEY,
-        secretAccessKey: process.env.S3_SECRET_KEY,
-        endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
-        s3ForcePathStyle: true,
-        region: process.env.S3_REGION || "us-east-1",
-      });
-
-      const bucket = req.params.bucket;
-      const key = req.params.key;
-
-      const params = {
-        Bucket: bucket,
-        Key: key,
-      };
-
-      await s3.deleteObject(params).promise();
-
-      res.json({ success: true, message: "File deleted successfully" });
-    } catch (error) {
-      console.error("S3 Delete Error:", error);
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
 
   // Connection tracking
   let totalConnections = 0;
@@ -743,57 +519,16 @@ async function initializeServer() {
 
   const server = await startServer();
 
-  // Initialize Gun with S3 using proper fake S3 configuration
-  const s3Config = {
-    bucket: process.env.S3_BUCKET,
-    region: process.env.S3_REGION || "us-east-1",
-    accessKeyId: process.env.S3_ACCESS_KEY,
-    secretAccessKey: process.env.S3_SECRET_KEY,
-    endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
-    s3ForcePathStyle: true,
-    address: process.env.S3_ADDRESS || "127.0.0.1",
-    port: process.env.S3_PORT || 4569,
-    key: process.env.S3_ACCESS_KEY,
-    secret: process.env.S3_SECRET_KEY,
-  };
-
-  console.log("🔧 Gun.js S3 Configuration:", {
-    bucket: s3Config.bucket,
-    //endpoint: `"${s3Config.fakes3}"`,  // Show with quotes to see spaces
-    region: s3Config.region,
-    key: s3Config.key,
-    secret: s3Config.secret,
-    hasCredentials: !!(s3Config.key && s3Config.secret),
-  });
-
-  // Additional debug info
-  console.log("🔍 S3 Configuration Debug:");
-  //console.log(`  Endpoint length: ${s3Config.fakes3.length}`);
-  //console.log(`  Endpoint characters: ${JSON.stringify(s3Config.fakes3.split(''))}`);
-  console.log(`  Environment S3_ENDPOINT: "${process.env.S3_ENDPOINT}"`);
-
-  // Let's also try to test the fake S3 connection directly
-  console.log("🧪 Testing FakeS3 connectivity...");
-  const testReq = http
-    .get(s3Config.endpoint.trim(), (res) => {
-      console.log(`✅ FakeS3 responds with status: ${res.statusCode}`);
-    })
-    .on("error", (err) => {
-      console.log(`❌ FakeS3 connection error: ${err.message}`);
-    });
-
-  // Test S3 connection before initializing Gun
-  console.log("🧪 Testing S3 configuration before Gun initialization...");
 
   const peersString = process.env.RELAY_PEERS;
   const peers = peersString ? peersString.split(",") : [];
   console.log("🔍 Peers:", peers);
 
-  // Initialize Gun with conditional S3 support
+  // Initialize Gun with conditional support
   const gunConfig = {
     super: false,
-    // file: "radata",
-    // radisk: true,
+    file: "radata",
+    radisk: true,
     web: server,
     isValid: hasValidToken,
     uuid: process.env.RELAY_NAME,
@@ -806,14 +541,7 @@ async function initializeServer() {
     peers: [peers],
   };
 
-  // Only add S3 if explicitly enabled and configured properly
-  const enableS3 = process.env.ENABLE_S3 === "true";
-  if (enableS3) {
-    console.log("✅ S3 storage enabled");
-    gunConfig.s3 = s3Config;
-  } else {
-    console.log("📁 Using local file storage only (S3 disabled)");
-  }
+  console.log("📁 Using local file storage only");
 
   Gun.on("opt", function (ctx) {
     if (ctx.once) {
@@ -1838,13 +1566,8 @@ async function initializeServer() {
     res.sendFile(path.resolve(publicPath, "pin-manager.html"));
   });
 
-  app.get("/s3-dashboard", (req, res) => {
-    res.sendFile(path.resolve(publicPath, "s3-dashboard.html"));
-  });
 
-  app.get("/s3-manager", (req, res) => {
-    res.sendFile(path.resolve(publicPath, "s3-manager.html"));
-  });
+
 
   app.get("/chat", (req, res) => {
     res.sendFile(path.resolve(publicPath, "chat.html"));
@@ -1980,188 +1703,9 @@ async function initializeServer() {
     }
   });
 
-  app.get("/api/s3-stats", tokenAuthMiddleware, async (req, res) => {
-    const enableS3 = process.env.ENABLE_S3 === "true";
-    if (!enableS3) {
-      return res.status(400).json({
-        success: false,
-        error: "S3 is not enabled in the relay configuration.",
-      });
-    }
 
-    try {
-      // Direct HTTP request to FakeS3 server instead of AWS SDK
-      const s3Endpoint = process.env.S3_ENDPOINT || "http://0.0.0.0:4569";
-      
-      const requestOptions = {
-        hostname: new URL(s3Endpoint).hostname,
-        port: new URL(s3Endpoint).port,
-        path: '/',
-        method: 'GET',
-        headers: {
-          'Host': new URL(s3Endpoint).hostname + ':' + new URL(s3Endpoint).port
-        }
-      };
 
-      const s3Request = http.request(requestOptions, (s3Response) => {
-        let data = '';
-        s3Response.on('data', (chunk) => {
-          data += chunk;
-        });
-        
-        s3Response.on('end', () => {
-          try {
-            // Parse XML response from FakeS3
-            const bucketMatches = data.match(/<Bucket><Name>([^<]+)<\/Name><CreationDate>([^<]+)<\/CreationDate><\/Bucket>/g);
-            const buckets = [];
-            
-            if (bucketMatches) {
-              bucketMatches.forEach(match => {
-                const nameMatch = match.match(/<Name>([^<]+)<\/Name>/);
-                const dateMatch = match.match(/<CreationDate>([^<]+)<\/CreationDate>/);
-                if (nameMatch && dateMatch) {
-                  buckets.push({
-                    name: nameMatch[1],
-                    creationDate: dateMatch[1],
-                    objectCount: 0, // Simplified for now
-                    size: 0 // Simplified for now
-                  });
-                }
-              });
-            }
 
-            res.json({
-              success: true,
-              stats: {
-                totalBuckets: buckets.length,
-                totalObjects: 0,
-                totalSize: 0,
-                buckets: buckets,
-              },
-            });
-          } catch (parseError) {
-            console.error("Error parsing S3 response:", parseError);
-            res.status(500).json({
-              success: false,
-              error: "Failed to parse S3 response.",
-              details: parseError.message,
-            });
-          }
-        });
-      });
-
-      s3Request.on('error', (error) => {
-        console.error("Error connecting to S3:", error);
-        res.status(500).json({
-          success: false,
-          error: "Failed to connect to S3 server.",
-          details: error.message,
-        });
-      });
-
-      s3Request.end();
-    } catch (error) {
-      console.error("Error getting S3 stats:", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to retrieve S3 statistics.",
-        details: error.message,
-      });
-    }
-  });
-
-  app.get(
-    "/api/s3-buckets/:bucketName/objects",
-    tokenAuthMiddleware,
-    async (req, res) => {
-      const enableS3 = process.env.ENABLE_S3 === "true";
-      if (!enableS3) {
-        return res
-          .status(400)
-          .json({ success: false, error: "S3 is not enabled." });
-      }
-
-      try {
-        // Direct HTTP request to FakeS3 server for listing objects
-        const s3Endpoint = process.env.S3_ENDPOINT || "http://0.0.0.0:4569";
-        const { bucketName } = req.params;
-        const { continuationToken } = req.query;
-        
-        const url = new URL(s3Endpoint);
-        const requestOptions = {
-          hostname: url.hostname,
-          port: url.port,
-          path: `/${bucketName}`,
-          method: 'GET',
-          headers: {
-            'Host': url.hostname + ':' + url.port
-          }
-        };
-
-        const s3Request = http.request(requestOptions, (s3Response) => {
-          let data = '';
-          s3Response.on('data', (chunk) => {
-            data += chunk;
-          });
-          
-          s3Response.on('end', () => {
-            try {
-              // Parse XML response from FakeS3 for object listing
-              const objectMatches = data.match(/<Key>([^<]+)<\/Key>/g);
-              const objects = [];
-              
-              if (objectMatches) {
-                objectMatches.forEach(match => {
-                  const keyMatch = match.match(/<Key>([^<]+)<\/Key>/);
-                  if (keyMatch) {
-                    objects.push({
-                      Key: keyMatch[1],
-                      LastModified: new Date().toISOString(),
-                      Size: 0 // Simplified
-                    });
-                  }
-                });
-              }
-
-              res.json({
-                success: true,
-                objects: objects,
-                nextContinuationToken: null,
-              });
-            } catch (parseError) {
-              console.error("Error parsing S3 response:", parseError);
-              res.status(500).json({
-                success: false,
-                error: "Failed to parse S3 response.",
-                details: parseError.message,
-              });
-            }
-          });
-        });
-
-        s3Request.on('error', (error) => {
-          console.error("Error listing S3 objects:", error);
-          res.status(500).json({
-            success: false,
-            error: "Failed to list S3 objects.",
-            details: error.message,
-          });
-        });
-
-        s3Request.end();
-      } catch (error) {
-        console.error(
-          `Error listing objects for bucket ${req.params.bucketName}:`,
-          error
-        );
-        res.status(500).json({
-          success: false,
-          error: `Failed to retrieve objects for bucket ${req.params.bucketName}.`,
-          details: error.message,
-        });
-      }
-    }
-  );
 
   // --- Secure IPFS Management Endpoints ---
   const forwardToIpfsApi = (req, res, endpoint, method = "POST") => {
@@ -2482,7 +2026,6 @@ async function initializeServer() {
       const containerMappings = {
         'gun': 'shogun-relay-stack',
         'ipfs': 'shogun-relay-stack', // IPFS runs within the main container
-        's3': 'shogun-relay-stack'    // FakeS3 also runs within the main container
       };
 
       const containerName = containerMappings[serviceName];
@@ -2519,22 +2062,6 @@ async function initializeServer() {
           await container.restart();
           return `Container ${containerName} restarted (IPFS service restart fallback)`;
         }
-      } else if (serviceName === 's3') {
-        // For S3/FakeS3, restart the service within the container
-        try {
-          const exec = await container.exec({
-            Cmd: ['supervisorctl', 'restart', 'fakes3'],
-            AttachStdout: true,
-            AttachStderr: true
-          });
-          const stream = await exec.start();
-          return `S3 service restarted within container`;
-        } catch (execError) {
-          // Fallback to container restart
-          console.log(`🔄 S3 service restart failed, restarting container: ${containerName}`);
-          await container.restart();
-          return `Container ${containerName} restarted (S3 service restart fallback)`;
-        }
       }
       
     } catch (error) {
@@ -2546,7 +2073,7 @@ async function initializeServer() {
   app.post("/api/services/:service/restart", tokenAuthMiddleware, async (req, res) => {
     try {
       const { service } = req.params;
-      const allowedServices = ['gun', 'ipfs', 's3'];
+      const allowedServices = ['gun', 'ipfs'];
       
       if (!allowedServices.includes(service)) {
         return res.status(400).json({
@@ -2575,10 +2102,6 @@ async function initializeServer() {
             
           case 'ipfs':
             result = `IPFS restart attempted but Docker unavailable`;
-            break;
-            
-          case 's3':
-            result = `S3 restart attempted but Docker unavailable`;
             break;
         }
       }
@@ -2627,31 +2150,6 @@ async function initializeServer() {
           status: 'offline',
           error: error.message
         };
-      }
-      
-      // Check S3 (requires auth)
-      const authHeader = req.headers.authorization;
-      if (authHeader) {
-        try {
-          const s3Response = await fetch('/api/s3-stats', {
-            headers: { 'Authorization': authHeader }
-          });
-          if (s3Response.ok) {
-            const s3Data = await s3Response.json();
-            services.s3 = {
-              status: 'online',
-              buckets: s3Data.stats.totalBuckets,
-              objects: s3Data.stats.totalObjects,
-              size: s3Data.stats.totalSize
-            };
-          } else {
-            services.s3 = { status: 'offline', error: 'Auth failed' };
-          }
-        } catch (error) {
-          services.s3 = { status: 'offline', error: error.message };
-        }
-      } else {
-        services.s3 = { status: 'unknown', error: 'No auth provided' };
       }
       
       res.json({

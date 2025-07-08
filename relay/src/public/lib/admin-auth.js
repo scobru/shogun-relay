@@ -5,263 +5,138 @@
  * It automatically loads stored passwords and provides utilities for authentication.
  */
 
-(function() {
-    'use strict';
-    
+const ShogunAdmin = (() => {
     const ADMIN_PASSWORD_KEY = 'shogun-relay-admin-password';
-    const BROADCAST_CHANNEL_NAME = 'shogun-relay-admin';
-    
-    // Global namespace for admin authentication
-    window.ShogunAdmin = {
-        
-        /**
-         * Get the stored admin password
-         * @returns {string} The stored password or empty string
-         */
-        getPassword: function() {
-            try {
-                return localStorage.getItem(ADMIN_PASSWORD_KEY) || '';
-            } catch (error) {
-                console.error('[ShogunAdmin] Failed to get password:', error);
-                return '';
-            }
-        },
-        
-        /**
-         * Check if admin password is stored
-         * @returns {boolean} True if password exists
-         */
-        hasPassword: function() {
-            try {
-                const password = localStorage.getItem(ADMIN_PASSWORD_KEY);
-                return password && password.trim().length > 0;
-            } catch (error) {
-                console.error('[ShogunAdmin] Failed to check password:', error);
-                return false;
-            }
-        },
-        
-        /**
-         * Auto-fill password field if it exists on the page
-         * @param {string} fieldId - The ID of the password field (default: 'adminToken', 'authToken', 'adminPassword')
-         */
-        autoFillPassword: function(fieldId = null) {
-            const password = this.getPassword();
-            if (!password) return false;
-            
-            // Default field IDs to try
-            const fieldIds = fieldId ? [fieldId] : [
-                'adminToken', 'authToken', 'adminPassword', 
-                'adminTokenInput', 'authTokenInput', 'admin-token'
-            ];
-            
-            for (const id of fieldIds) {
-                const field = document.getElementById(id);
-                if (field) {
-                    field.value = password;
-                    console.log(`[ShogunAdmin] Auto-filled password field: ${id}`);
-                    
-                    // Trigger change event for any listeners
-                    const event = new Event('change', { bubbles: true });
-                    field.dispatchEvent(event);
-                    
-                    return true;
-                }
-            }
-            
-            return false;
-        },
-        
-        /**
-         * Add visual indicator showing password status
-         * @param {string} containerId - Container to add the indicator to
-         */
-        addPasswordIndicator: function(containerId = null) {
-            // If indicator already exists, just update its content and return.
-            const existingIndicator = document.getElementById('shogun-admin-indicator');
-            if (existingIndicator) {
-                const hasPassword = this.hasPassword();
-                existingIndicator.innerHTML = hasPassword 
-                    ? '<span class="indicator-success">🔑 Admin password loaded</span>' 
-                    : '<span class="indicator-warning">⚠️ No admin password set</span>';
-                
-                if (!hasPassword && !existingIndicator.querySelector('.indicator-link')) {
-                    const link = document.createElement('div');
-                    link.innerHTML = '<span class="indicator-link">Set password in Control Panel</span>';
-                    link.style.marginTop = '4px';
-                    link.style.cursor = 'pointer';
-                    link.onclick = () => window.open('/', '_blank');
-                    existingIndicator.appendChild(link);
-                }
-                return;
-            }
+    const S3_SECRET_KEY = 'shogun-relay-s3-secret';
+    let options = {};
 
-            const hasPassword = this.hasPassword();
-            
-            const indicator = document.createElement('div');
-            indicator.id = 'shogun-admin-indicator';
-            indicator.className = 'shogun-admin-indicator';
-            indicator.innerHTML = hasPassword ? 
-                '<span class="indicator-success">🔑 Admin password loaded</span>' : 
-                '<span class="indicator-warning">⚠️ No admin password set</span>';
-            
-            // Add styles
-            const style = document.createElement('style');
-            style.textContent = `
-                .shogun-admin-indicator {
-                    padding: 8px 12px;
-                    border-radius: 6px;
-                    font-size: 0.85em;
-                    margin: 8px 0;
-                    text-align: center;
-                    background-color: rgba(255,255,255,0.05);
-                    border: 1px solid rgba(255,255,255,0.1);
-                }
-                .indicator-success {
-                    color: #4ade80;
-                }
-                .indicator-warning {
-                    color: #fbbf24;
-                }
-                .indicator-link {
-                    color: #60a5fa;
-                    text-decoration: underline;
-                    cursor: pointer;
-                }
-            `;
-            document.head.appendChild(style);
-            
-            // Try to find container
-            let container = null;
-            if (containerId) {
-                container = document.getElementById(containerId);
-            } else {
-                // Try common container selectors
-                container = document.querySelector('.container') || 
-                           document.querySelector('.card') || 
-                           document.querySelector('body > div') ||
-                           document.body;
+    function _broadcastUpdate() {
+        if ('BroadcastChannel' in window) {
+            const channel = new BroadcastChannel('shogun-relay-admin');
+            channel.postMessage({ type: 'password-updated' });
+            channel.close();
+        }
+         // Dispatch a custom event for same-page updates
+        window.dispatchEvent(new CustomEvent('shogun-admin-password-updated', {
+            detail: {
+                hasPassword: ShogunAdmin.hasPassword(),
+                hasS3Secret: ShogunAdmin.hasS3Secret(),
+                source: 'local'
             }
-            
-            if (container && container.children.length > 0) {
-                container.insertBefore(indicator, container.children[0]);
-            } else if (container) {
-                container.appendChild(indicator);
+        }));
+    }
+
+    function _initField(fieldId, getter) {
+        if (options.autoFill) {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.value = getter() || '';
             }
-            
-            // Add link to main page if no password
-            if (!hasPassword) {
-                const link = document.createElement('div');
-                link.innerHTML = '<span class="indicator-link">Set password in Control Panel</span>';
-                link.style.marginTop = '4px';
-                link.style.cursor = 'pointer';
-                link.onclick = () => window.open('/', '_blank');
-                indicator.appendChild(link);
-            }
-        },
-        
-        /**
-         * Listen for password updates from other tabs
-         */
-        setupPasswordSync: function() {
-            if ('BroadcastChannel' in window) {
-                const channel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
+        }
+    }
+
+    // Public API
+    return {
+        init(opts = {}) {
+            options = {
+                autoFill: opts.autoFill || false,
+                showIndicator: opts.showIndicator || false,
+                adminFieldId: opts.adminFieldId || 'adminPassword',
+                s3FieldId: opts.s3FieldId || 's3SecretKey',
+                syncEnabled: opts.syncEnabled || true,
+                ...opts
+            };
+
+            document.addEventListener('DOMContentLoaded', () => {
+                 _initField(options.adminFieldId, this.getPassword);
+                 _initField(options.s3FieldId, this.getS3Secret);
+            });
+
+
+            if (options.syncEnabled && 'BroadcastChannel' in window) {
+                const channel = new BroadcastChannel('shogun-relay-admin');
                 channel.onmessage = (event) => {
-                    if (event.data.type === 'password-updated') {
-                        console.log('[ShogunAdmin] Password updated in another tab, refreshing...');
-                        
-                        // Re-fill password fields
-                        this.autoFillPassword();
-                        
-                        // Update indicator if it exists
-                        const indicator = document.getElementById('shogun-admin-indicator');
-                        if (indicator) {
-                            const hasPassword = this.hasPassword();
-                            indicator.innerHTML = hasPassword ? 
-                                '<span class="indicator-success">🔑 Admin password loaded (updated)</span>' : 
-                                '<span class="indicator-warning">⚠️ No admin password set</span>';
-                        }
-                        
-                        // Dispatch custom event for pages to listen to
-                        window.dispatchEvent(new CustomEvent('shogun-admin-password-updated', {
-                            detail: { hasPassword: this.hasPassword() }
+                    if (event.data && event.data.type === 'password-updated') {
+                        console.log('Auth details updated in another tab, reloading...');
+                         _initField(options.adminFieldId, this.getPassword);
+                         _initField(options.s3FieldId, this.getS3Secret);
+                         window.dispatchEvent(new CustomEvent('shogun-admin-password-updated', {
+                            detail: {
+                                hasPassword: this.hasPassword(),
+                                hasS3Secret: this.hasS3Secret(),
+                                source: 'broadcast'
+                            }
                         }));
                     }
                 };
             }
         },
-        
-        /**
-         * Get authorization header object
-         * @returns {Object} Authorization header or empty object
-         */
-        getAuthHeader: function() {
-            const password = this.getPassword();
-            return password ? { 'Authorization': `Bearer ${password}` } : {};
+
+        // Admin Password
+        savePassword(password) {
+            localStorage.setItem(ADMIN_PASSWORD_KEY, password);
+            _broadcastUpdate();
         },
-        
-        /**
-         * Initialize admin authentication for the current page
-         * @param {Object} options - Configuration options
-         */
-        init: function(options = {}) {
-            const {
-                autoFill = true,
-                showIndicator = true,
-                fieldId = null,
-                containerId = null,
-                syncEnabled = true
-            } = options;
-            
-            console.log('[ShogunAdmin] Initializing admin authentication...');
-            
-            // Setup password sync
-            if (syncEnabled) {
-                this.setupPasswordSync();
+        getPassword() {
+            return localStorage.getItem(ADMIN_PASSWORD_KEY) || '';
+        },
+        hasPassword() {
+            const pw = this.getPassword();
+            return !!pw && pw.length > 0;
+        },
+        clearPassword() {
+            localStorage.removeItem(ADMIN_PASSWORD_KEY);
+            _broadcastUpdate();
+        },
+
+        // S3 Secret
+        saveS3Secret(secret) {
+            localStorage.setItem(S3_SECRET_KEY, secret);
+            _broadcastUpdate();
+        },
+        getS3Secret() {
+            return localStorage.getItem(S3_SECRET_KEY) || '';
+        },
+        hasS3Secret() {
+            const secret = this.getS3Secret();
+            return !!secret && secret.length > 0;
+        },
+        clearS3Secret() {
+            localStorage.removeItem(S3_SECRET_KEY);
+            _broadcastUpdate();
+        },
+
+        getAuthHeaders() {
+            const headers = {};
+            if(this.hasPassword()) {
+                headers['Authorization'] = `Bearer ${this.getPassword()}`;
             }
-            
-            // Auto-fill password field
-            if (autoFill) {
-                // Try immediately
-                this.autoFillPassword(fieldId);
-                
-                // Try again after DOM is fully loaded
-                if (document.readyState === 'loading') {
-                    document.addEventListener('DOMContentLoaded', () => {
-                        setTimeout(() => this.autoFillPassword(fieldId), 100);
-                    });
-                } else {
-                    setTimeout(() => this.autoFillPassword(fieldId), 100);
-                }
+            return headers;
+        },
+
+        getS3AuthHeaders() {
+             const headers = {};
+            if(this.hasS3Secret()) {
+                headers['X-S3-Authorization'] = `Bearer ${this.getS3Secret()}`;
             }
-            
-            // Show password indicator
-            if (showIndicator) {
-                if (document.readyState === 'loading') {
-                    document.addEventListener('DOMContentLoaded', () => {
-                        this.addPasswordIndicator(containerId);
-                    });
-                } else {
-                    this.addPasswordIndicator(containerId);
-                }
+             if(this.hasPassword()) {
+                headers['Authorization'] = `Bearer ${this.getPassword()}`;
             }
-            
-            console.log('[ShogunAdmin] Admin authentication initialized');
+            return headers;
         }
     };
-    
-    // Auto-initialize with default settings when script loads
-    // Pages can call ShogunAdmin.init() again with custom options to override
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            ShogunAdmin.init();
-        });
-    } else {
+})();
+
+// Auto-initialize with default settings when script loads
+// Pages can call ShogunAdmin.init() again with custom options to override
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
         ShogunAdmin.init();
-    }
-    
-    // Legacy support for existing function names
-    window.getShogunAdminPassword = ShogunAdmin.getPassword;
-    window.hasShogunAdminPassword = ShogunAdmin.hasPassword;
-    
-})(); 
+    });
+} else {
+    ShogunAdmin.init();
+}
+
+// Legacy support for existing function names
+window.getShogunAdminPassword = ShogunAdmin.getPassword;
+window.hasShogunAdminPassword = ShogunAdmin.hasPassword; 

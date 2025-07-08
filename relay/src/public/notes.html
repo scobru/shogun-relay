@@ -59,9 +59,8 @@
         }
         
         async function apiCall(endpoint, method = 'GET', body) {
-            // Use centralized admin password
-            const token = ShogunAdmin.getPassword();
-            if (!token) {
+            const authHeader = ShogunAdmin.getAuthHeaders();
+            if (!authHeader['Authorization']) {
                 showMessage('Admin Token is required. Please set it in the Control Panel.', true);
                 return null;
             }
@@ -69,7 +68,7 @@
             try {
                 const options = {
                     method,
-                    headers: { 'Authorization': `Bearer ${token}` },
+                    headers: { ...authHeader },
                 };
                 if (body) {
                     options.headers['Content-Type'] = 'application/json';

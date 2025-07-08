@@ -429,18 +429,13 @@
             }
             ctx.on("out", function (msg) {
               const to = this.to;
-              // Use centralized admin password
-              const authToken =
-                ShogunAdmin.getPassword() ||
-                (document.getElementById("authToken")
-                  ? document.getElementById("authToken").value.trim()
-                  : "");
-              if (authToken) {
-                // Add headers for all outgoing messages, especially 'put'
-                msg.headers = {
-                  ...msg.headers, // Preserve existing headers
-                  token: authToken,
-                  Authorization: "Bearer " + authToken,
+              const headers = ShogunAdmin.getAuthHeaders();
+              if (headers['Authorization']) {
+                  const token = headers['Authorization'].split(' ')[1];
+                   msg.headers = {
+                    ...msg.headers, // Preserve existing headers
+                    token: token,
+                    Authorization: `Bearer ${token}`,
                 };
               }
               console.log(msg);
@@ -746,11 +741,8 @@
       }
 
       function loadAllNodes() {
-        // Use centralized admin password
-        const token =
-          ShogunAdmin.getPassword() ||
-          document.getElementById("authToken").value;
-        if (!token) {
+        const authHeaders = ShogunAdmin.getAuthHeaders();
+        if (!authHeaders['Authorization']) {
           showError(
             "Admin Token is required to load all graph data. Please set it in the Control Panel."
           );
@@ -761,9 +753,7 @@
         console.log("Loading all data from server...");
 
         fetch("/api/alldata", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: authHeaders,
         })
           .then((response) => {
             if (!response.ok) {

@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="styles/wormhole.css">
+    <script src="lib/admin-auth.js"></script>
 </head>
 <body class="antialiased">
     <div class="container mx-auto p-4">
@@ -20,8 +21,8 @@
                     <h1 id="relay-title" class="text-3xl font-semibold mb-8">Shogun Relay Control Panel</h1>
                     <p class="text-secondary mb-8">Select a tool to continue<span class="animate-pulse">_</span></p>
 
-                    <!-- Admin Password Section - Hidden when password exists -->
-                    <div id="adminPasswordSection" class="w-full max-w-md mb-8 p-6 bg-base-300/50 rounded-xl border border-base-content/20" style="display: none;">
+                    <!-- Admin Password Section -->
+                    <div id="adminPasswordSection" class="w-full max-w-md mb-8 p-6 bg-base-300/50 rounded-xl border border-base-content/20">
                         <div class="flex items-center gap-3 mb-4">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
@@ -93,17 +94,6 @@
                                         <span>IPFS Pin Manager</span>
                                         <span class="absolute right-3">🔒</span>
 
-                                    </a>
-                                    <a href="/s3-dashboard" class="btn-custom flex items-center gap-3">
-                                        <span>📦</span>
-                                        <span>S3 Storage Dashboard</span>
-                                        <span class="absolute right-3">🔒</span>
-
-                                    </a>
-                                    <a href="/s3-manager" class="btn-custom flex items-center gap-3">
-                                        <span>📁</span>
-                                        <span>S3 File Manager</span>
-                                        <span class="absolute right-3">🔒</span>
                                     </a>
                                     <a href="/ipfs-status" class="btn-custom flex items-center gap-3">
                                         <span>📊</span>
@@ -197,118 +187,44 @@
     </footer>
 
     <script>
-        // ==========================================
-        // CENTRALIZED ADMIN PASSWORD MANAGEMENT
-        // ==========================================
-        
-        const ADMIN_PASSWORD_KEY = 'shogun-relay-admin-password';
-        
+        // Initialize Admin Auth library
+        ShogunAdmin.init({
+            adminFieldId: 'adminPassword',
+            autoFill: true
+        });
+
+        // Admin Password Functions
         function saveAdminPassword() {
             const password = document.getElementById('adminPassword').value.trim();
             if (!password) {
                 updatePasswordStatus('⚠️ Please enter a password', 'text-warning');
                 return;
             }
-            
-            try {
-                localStorage.setItem(ADMIN_PASSWORD_KEY, password);
-                updatePasswordStatus('✅ Password saved successfully', 'text-success');
-                
-                // Clear the input for security
-                document.getElementById('adminPassword').value = '';
-                
-                // Broadcast password update to other tabs/windows
-                broadcastPasswordUpdate();
-
-                // Hide the admin password section
-                document.getElementById('adminPasswordSection').style.display = 'none';
-                
-            } catch (error) {
-                updatePasswordStatus('❌ Failed to save password', 'text-error');
-                console.error('Failed to save admin password:', error);
-            }
+            ShogunAdmin.savePassword(password);
+            updatePasswordStatus('✅ Password saved successfully', 'text-success');
+            document.getElementById('adminPassword').value = '';
         }
-        
+
         function clearAdminPassword() {
-            try {
-                localStorage.removeItem(ADMIN_PASSWORD_KEY);
-                document.getElementById('adminPassword').value = '';
-                updatePasswordStatus('🗑️ Password cleared', 'text-info');
-                
-                // Broadcast password clear to other tabs/windows
-                broadcastPasswordUpdate();
-                
-                // Show the admin password section
-                document.getElementById('adminPasswordSection').style.display = 'block';
-                
-            } catch (error) {
-                updatePasswordStatus('❌ Failed to clear password', 'text-error');
-                console.error('Failed to clear admin password:', error);
-            }
+            ShogunAdmin.clearPassword();
+            updatePasswordStatus('🗑️ Password cleared', 'text-info');
         }
         
         function updatePasswordStatus(message, className = '') {
             const statusEl = document.getElementById('passwordStatus');
             statusEl.textContent = message;
             statusEl.className = `text-sm text-center opacity-70 ${className}`;
-            
-            // Clear status after 3 seconds
-            setTimeout(() => {
-                statusEl.textContent = '';
-                statusEl.className = 'text-sm text-center opacity-70';
-            }, 3000);
+            setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'text-sm text-center opacity-70'; }, 3000);
         }
-        
-        function broadcastPasswordUpdate() {
-            // Use BroadcastChannel to notify other tabs about password changes
-            if ('BroadcastChannel' in window) {
-                const channel = new BroadcastChannel('shogun-relay-admin');
-                channel.postMessage({ type: 'password-updated' });
-                channel.close();
-            }
+
+        function updateAuthSectionsVisibility() {
+            document.getElementById('adminPasswordSection').style.display = ShogunAdmin.hasPassword() ? 'none' : 'block';
         }
-        
-        function loadStoredPassword() {
-            try {
-                const storedPassword = localStorage.getItem(ADMIN_PASSWORD_KEY);
-                if (storedPassword) {
-                    updatePasswordStatus('🔑 Admin password is stored', 'text-accent');
-                    return true;
-                }
-            } catch (error) {
-                console.error('Failed to load stored password:', error);
-            }
-            return false;
-        }
-        
-        // Global function to get admin password for other pages
-        window.getShogunAdminPassword = function() {
-            try {
-                return localStorage.getItem(ADMIN_PASSWORD_KEY) || '';
-            } catch (error) {
-                console.error('Failed to get admin password:', error);
-                return '';
-            }
-        };
-        
-        // Global function for other pages to check if password exists
-        window.hasShogunAdminPassword = function() {
-            try {
-                const password = localStorage.getItem(ADMIN_PASSWORD_KEY);
-                return password && password.trim().length > 0;
-            } catch (error) {
-                console.error('Failed to check admin password:', error);
-                return false;
-            }
-        };
-        
-        // ==========================================
+
         // IPFS API FUNCTIONS
-        // ==========================================
-        
         async function checkIPFSVersion() {
-            const password = getShogunAdminPassword();
-            if (!password) {
+            const headers = ShogunAdmin.getAuthHeaders();
+            if (!headers['Authorization']) {
                 alert('⚠️ Please set admin password first');
                 return;
             }
@@ -316,31 +232,13 @@
             try {
                 const response = await fetch('/api/v0/version', {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${password}`,
-                        'Content-Type': 'application/json'
-                    }
+                    headers: { ...headers, 'Content-Type': 'application/json' }
                 });
                 
                 if (response.ok) {
                     const data = await response.text();
-                    // Open new window with the response
                     const newWindow = window.open('', '_blank');
-                    newWindow.document.write(`
-                        <html>
-                            <head>
-                                <title>IPFS Version</title>
-                                <style>
-                                    body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #fff; }
-                                    pre { background: #2a2a2a; padding: 15px; border-radius: 5px; overflow: auto; }
-                                </style>
-                            </head>
-                            <body>
-                                <h2>IPFS API Version</h2>
-                                <pre>${data}</pre>
-                            </body>
-                        </html>
-                    `);
+                    newWindow.document.write(`<pre>${data}</pre>`);
                 } else {
                     alert(`❌ Error: ${response.status} ${response.statusText}`);
                 }
@@ -350,19 +248,11 @@
             }
         }
         
-        // ==========================================
-        // EXISTING FUNCTIONALITY
-        // ==========================================
-        
-        window.addEventListener('load', async () => {
-            // Check if password exists and show/hide section accordingly
-            const hasPassword = localStorage.getItem(ADMIN_PASSWORD_KEY);
-            document.getElementById('adminPasswordSection').style.display = hasPassword ? 'none' : 'block';
-            
-            // Load admin password status
-            loadStoredPassword();
-            
-            // Load relay info
+        // Load event
+        window.addEventListener('DOMContentLoaded', async () => {
+            updateAuthSectionsVisibility();
+            if(ShogunAdmin.hasPassword()) updatePasswordStatus('🔑 Admin password is stored', 'text-accent');
+
             try {
                 const response = await fetch('/api/relay-info');
                 const data = await response.json();
@@ -376,9 +266,7 @@
 
         // Handle Enter key in password input
         document.getElementById('adminPassword').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                saveAdminPassword();
-            }
+            if (e.key === 'Enter') saveAdminPassword();
         });
 
         // Add some loading effects
