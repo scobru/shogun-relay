@@ -105,8 +105,13 @@
                                     <input type="text" id="nodePathInput" class="input-custom" placeholder="e.g., my/data/node">
                                 </div>
                                 <div class="form-group">
-                                    <label class="block text-sm font-medium mb-2">Data (JSON format):</label>
-                                    <textarea id="dataArea" class="input-custom textarea-height">{}</textarea>
+                                    <label class="block text-sm font-medium mb-2">Data:</label>
+                                    <div id="json-fields-container" class="space-y-3 p-3 border border-base-300 rounded-md bg-base-100">
+                                        <!-- Key-value pairs will be dynamically added here -->
+                                    </div>
+                                    <div class="mt-3">
+                                        <button id="addFieldBtn" class="btn btn-sm btn-outline btn-accent">+ Add Field</button>
+                                    </div>
                                 </div>
                                 <div class="flex justify-center sm:justify-start">
                                     <button id="createBtn" class="btn-custom">Create Node</button>
@@ -130,6 +135,8 @@
                 fieldId: 'authToken',
                 syncEnabled: true
             });
+            // Add the first empty field for the user
+            addField();
         });
 
         // Listen for password updates
@@ -138,25 +145,46 @@
         });
 
         const nodePathInput = document.getElementById('nodePathInput');
-        const dataArea = document.getElementById('dataArea');
         const createBtn = document.getElementById('createBtn');
         const messageEl = document.getElementById('message');
+        const jsonFieldsContainer = document.getElementById('json-fields-container');
+        const addFieldBtn = document.getElementById('addFieldBtn');
 
         const showMessage = (text, type = 'error') => {
             messageEl.textContent = text;
-            messageEl.className = `message ${type}`;
-            messageEl.style.display = 'block';
+            messageEl.className = `alert ${type === 'success' ? 'alert-success' : 'alert-error'} shadow-lg`;
+            messageEl.classList.remove('hidden');
             
             // Scroll to message
-            messageEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            messageEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
             
-            // Auto-hide success messages after 5 seconds
-            if (type === 'success') {
-                setTimeout(() => {
-                    messageEl.style.display = 'none';
-                }, 5000);
-            }
+            // Auto-hide messages after 5 seconds
+            setTimeout(() => {
+                messageEl.classList.add('hidden');
+            }, 5000);
         };
+        
+        const addField = (key = '', value = '') => {
+            const fieldId = `field-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+            const newField = document.createElement('div');
+            newField.classList.add('flex', 'items-center', 'space-x-2');
+            newField.id = fieldId;
+            newField.innerHTML = `
+                <input type="text" placeholder="Key" class="input input-bordered w-full key-input" value="${key}">
+                <input type="text" placeholder="Value (string, number, boolean, or JSON)" class="input input-bordered w-full value-input" value="${value}">
+                <button type="button" class="btn btn-sm btn-ghost" onclick="document.getElementById('${fieldId}').remove()">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
+            `;
+            jsonFieldsContainer.appendChild(newField);
+        };
+
+        addFieldBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            addField();
+        });
 
         createBtn.addEventListener('click', async () => {
             const nodePath = nodePathInput.value.trim();
@@ -165,12 +193,48 @@
                 return; 
             }
             
-            let data;
-            try { 
-                data = JSON.parse(dataArea.value); 
-            } catch (e) { 
-                showMessage('Invalid JSON format.'); 
-                return; 
+            const data = {};
+            const fields = jsonFieldsContainer.querySelectorAll('.flex');
+            let hasError = false;
+            
+            fields.forEach(field => {
+                if (hasError) return;
+                
+                const keyInput = field.querySelector('.key-input');
+                const valueInput = field.querySelector('.value-input');
+                const key = keyInput.value.trim();
+                let value = valueInput.value; // Keep original input to check for empty strings
+
+                if (key) {
+                    // Try to parse numbers, booleans, and JSON strings
+                    const trimmedValue = value.trim();
+                    if (trimmedValue !== '' && !isNaN(trimmedValue) && !isNaN(parseFloat(trimmedValue))) {
+                        value = Number(trimmedValue);
+                    } else if (trimmedValue.toLowerCase() === 'true') {
+                        value = true;
+                    } else if (trimmedValue.toLowerCase() === 'false') {
+                        value = false;
+                    } else if ((trimmedValue.startsWith('{') && trimmedValue.endsWith('}')) || (trimmedValue.startsWith('[') && trimmedValue.endsWith(']'))) {
+                        try {
+                           value = JSON.parse(trimmedValue);
+                        } catch (e) { 
+                            // It's not valid JSON, treat as a string.
+                            value = value;
+                        }
+                    }
+                    data[key] = value;
+                } else if (value.trim()) {
+                    showMessage(`Field has a value but no key. Please provide a key or remove the field.`);
+                    keyInput.focus();
+                    hasError = true;
+                }
+            });
+
+            if (hasError) return;
+            
+            if (Object.keys(data).length === 0) {
+                showMessage('Data cannot be empty. Please add at least one key-value pair.');
+                return;
             }
             
             const authHeader = ShogunAdmin.getAuthHeaders();
@@ -181,7 +245,7 @@
             
             // Show loading state
             createBtn.disabled = true;
-            createBtn.textContent = 'Creating...';
+            createBtn.innerHTML = '<span class="loading loading-spinner"></span> Creating...';
             
             try {
                 // Use REST API instead of Gun directly
@@ -202,9 +266,10 @@
                     
                     // Clear form after success
                     nodePathInput.value = '';
-                    dataArea.value = '{}';
+                    jsonFieldsContainer.innerHTML = ''; // Clear fields
+                    addField(); // Add a fresh empty field
                 } else {
-                    showMessage(`Failed to create node: ${result.error}`);
+                    showMessage(`Failed to create node: ${result.error || JSON.stringify(result)}`);
                 }
                 
             } catch (err) {
