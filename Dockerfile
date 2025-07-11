@@ -5,6 +5,7 @@ FROM node:20-alpine
 
 # Install required system packages
 RUN apk add --no-cache \
+    git \
     curl \
     wget \
     bash \
