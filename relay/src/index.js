@@ -27,7 +27,6 @@ const { derive, SEA } = ShogunCoreModule;
 import http from "http";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import multer from "multer";
-import setupActivityPub from './activitypub/index.js';
 
 const namespace = "shogun";
 
@@ -1923,17 +1922,6 @@ async function initializeServer() {
         res.json({ success: true, message: "Notes deleted." });
       });
   });
-
-  // Initialize ActivityPub Service
-  const { apex, router: apRouter, adminRouter } = setupActivityPub(gun, {
-    RELAY_URL: process.env.RELAY_URL || `http://${host}:${port}`,
-    RELAY_HOST: process.env.RELAY_HOST,
-    RELAY_PORT: process.env.RELAY_PORT,
-    RELAY_NAME: process.env.RELAY_NAME,
-  }, tokenAuthMiddleware);
-  app.use('/ap', apRouter);
-  app.use('/ap/admin', adminRouter);
-
 
   // Fallback to index.html
   app.get("/*", (req, res) => {
