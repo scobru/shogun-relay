@@ -64,7 +64,9 @@ function setupActivityPub(gun, config, authMiddleware) {
   app.get('/nodeinfo/:version.json', apex.net.nodeInfo.get);
 
   // Admin route to create a new actor
-  app.post('/admin/create-actor', authMiddleware, async (req, res) => {
+  // IMPORTANT: This needs to be added to the main router, not the apex internal one.
+  const adminRouter = express.Router();
+  adminRouter.post('/create-actor', authMiddleware, async (req, res) => {
     const { username } = req.body;
     if (!username) {
       return res.status(400).json({ error: 'Username is required' });
@@ -79,7 +81,7 @@ function setupActivityPub(gun, config, authMiddleware) {
 
       // Create a new actor
       const actor = await apex.createActor(username, username, 'This is a Shogun-relay user');
-      
+
       console.log(`[ActivityPub] Created actor: ${actor.id}`);
       res.status(201).json({ success: true, actor });
 
@@ -106,7 +108,7 @@ function setupActivityPub(gun, config, authMiddleware) {
 
   console.log('📢 ActivityPub service configured');
 
-  return { apex, router: app };
+  return { apex, router: app, adminRouter };
 }
 
 export default setupActivityPub; 

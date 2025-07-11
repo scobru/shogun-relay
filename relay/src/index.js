@@ -1925,13 +1925,15 @@ async function initializeServer() {
   });
 
   // Initialize ActivityPub Service
-  const { apex, router: apRouter } = setupActivityPub(gun, {
+  const { apex, router: apRouter, adminRouter } = setupActivityPub(gun, {
     RELAY_URL: process.env.RELAY_URL || `http://${host}:${port}`,
     RELAY_HOST: process.env.RELAY_HOST,
     RELAY_PORT: process.env.RELAY_PORT,
     RELAY_NAME: process.env.RELAY_NAME,
   }, tokenAuthMiddleware);
   app.use('/ap', apRouter);
+  app.use('/ap/admin', adminRouter);
+
 
   // Fallback to index.html
   app.get("/*", (req, res) => {
