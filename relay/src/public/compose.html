@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="night">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compose Post</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles/wormhole.css">
+    <script src="lib/admin-auth.js"></script>
+</head>
+<body class="antialiased">
+    <div class="container mx-auto p-4 max-w-2xl">
+        <div class="card">
+            <div class="p-8">
+                <h1 class="text-3xl font-bold mb-6 text-center">Compose New Post</h1>
+
+                <div class="form-control mb-4">
+                    <label class="label"><span class="label-text">Username of Actor 🔒</span></label>
+                    <input type="text" id="username" class="input input-bordered w-full" placeholder="e.g., testuser" />
+                </div>
+
+                <div class="form-control mb-6">
+                    <label class="label"><span class="label-text">Post Content</span></label>
+                    <textarea id="postContent" class="textarea textarea-bordered h-32" placeholder="What's on your mind?"></textarea>
+                </div>
+
+                <button id="postButton" class="btn btn-accent w-full" onclick="publishPost()">
+                    <span class="loading loading-spinner loading-sm hidden"></span>
+                    Publish Post
+                </button>
+
+                <div id="status" class="text-sm text-center opacity-70 h-4 mt-4"></div>
+            </div>
+        </div>
+        <div class="text-center mt-4">
+            <a href="/" class="link link-hover">← Back to Control Panel</a>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Admin Auth library
+        ShogunAdmin.init({ autoFill: false });
+
+        async function publishPost() {
+            const statusEl = document.getElementById('status');
+            const button = document.getElementById('postButton');
+            const spinner = button.querySelector('.loading');
+
+            const username = document.getElementById('username').value.trim();
+            const content = document.getElementById('postContent').value.trim();
+
+            if (!username || !content) {
+                updateStatus('⚠️ Username and content are required.', 'text-warning');
+                return;
+            }
+
+            const headers = ShogunAdmin.getAuthHeaders();
+            if (!headers['Authorization']) {
+                updateStatus('🔒 Admin password not set. Please set it on the main page.', 'text-error');
+                return;
+            }
+
+            // Show loading state
+            button.disabled = true;
+            spinner.classList.remove('hidden');
+            updateStatus('Publishing post...', 'text-info');
+
+            try {
+                // The body of the POST to outbox is the object to be created.
+                // activitypub-express will wrap it in a Create activity.
+                const objectToCreate = {
+                    type: 'Note',
+                    content: content,
+                    attributedTo: `/ap/u/${username}`, // Link back to the actor
+                    to: ['https://www.w3.org/ns/activitystreams#Public'] // Public post
+                };
+
+                const response = await fetch(`/ap/u/${username}/outbox`, {
+                    method: 'POST',
+                    headers: {
+                        ...headers,
+                        'Content-Type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+                    },
+                    body: JSON.stringify(objectToCreate)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    updateStatus(`✅ Post published successfully! ID: ${result.id}`, 'text-success');
+                    document.getElementById('postContent').value = '';
+                } else {
+                    updateStatus(`❌ Error: ${result.error || response.statusText}`, 'text-error');
+                }
+
+            } catch (error) {
+                updateStatus(`❌ Network Error: ${error.message}`, 'text-error');
+            } finally {
+                // Hide loading state
+                button.disabled = false;
+                spinner.classList.add('hidden');
+            }
+        }
+
+        function updateStatus(message, className) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `text-sm text-center opacity-70 h-4 mt-4 ${className}`;
+        }
+    </script>
+</body>
+</html> 

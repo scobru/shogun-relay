@@ -63,6 +63,33 @@ function setupActivityPub(gun, config, authMiddleware) {
   app.get('/.well-known/nodeinfo', apex.net.nodeInfoLocation.get);
   app.get('/nodeinfo/:version.json', apex.net.nodeInfo.get);
 
+  // Admin route to create a new actor
+  app.post('/admin/create-actor', authMiddleware, async (req, res) => {
+    const { username } = req.body;
+    if (!username) {
+      return res.status(400).json({ error: 'Username is required' });
+    }
+
+    try {
+      // Check if user already exists
+      const existingUser = await apex.store.findObject({ preferredUsername: username });
+      if (existingUser) {
+        return res.status(409).json({ error: 'User already exists' });
+      }
+
+      // Create a new actor
+      const actor = await apex.createActor(username, username, 'This is a Shogun-relay user');
+      
+      console.log(`[ActivityPub] Created actor: ${actor.id}`);
+      res.status(201).json({ success: true, actor });
+
+    } catch (error) {
+      console.error('[ActivityPub] Error creating actor:', error);
+      res.status(500).json({ error: 'Failed to create actor', details: error.message });
+    }
+  });
+
+
   // Proxy for fetching remote objects
   app.post('/proxy', apex.net.proxy.post);
 
