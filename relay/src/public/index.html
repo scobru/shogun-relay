@@ -148,35 +148,6 @@
                             </div>
                         </div>
 
-                        <!-- Fediverse & ActivityPub -->
-                        <div class="card bg-opacity-10 bg-white">
-                            <div class="p-6">
-                                <h2 class="text-xl font-semibold mb-4 text-accent">🚀 Fediverse & ActivityPub</h2>
-                                <div class="space-y-3">
-                                    <a href="/compose.html" class="btn-custom flex items-center gap-3 relative">
-                                        <span>✍️</span>
-                                        <span>Compose Post</span>
-                                        <span class="absolute right-3">🔒</span>
-                                    </a>
-                                    <div class="divider"></div>
-                                    <div class="form-control">
-                                        <label class="label"><span class="label-text">Create New Actor 🔒</span></label>
-                                        <input type="text" id="actorUsername" class="input input-bordered w-full" placeholder="Enter username..."/>
-                                    </div>
-                                    <button class="btn btn-accent w-full" onclick="createActor()">Create Actor</button>
-                                    <div id="actorCreateStatus" class="text-sm text-center opacity-70 h-4"></div>
-
-                                    <div class="divider"></div>
-
-                                    <div class="form-control">
-                                        <label class="label"><span class="label-text">View User Profile</span></label>
-                                        <input type="text" id="viewUsername" class="input input-bordered w-full" placeholder="Enter username..."/>
-                                    </div>
-                                    <button class="btn btn-outline w-full" onclick="viewProfile()">View Profile</button>
-                                </div>
-                            </div>
-                        </div>
-
                         <!-- Security & Tools -->
                         <div class="card bg-opacity-10 bg-white">
                             <div class="p-6">
@@ -249,62 +220,6 @@
         function updateAuthSectionsVisibility() {
             document.getElementById('adminPasswordSection').style.display = ShogunAdmin.hasPassword() ? 'none' : 'block';
         }
-
-        // ActivityPub Functions
-        function viewProfile() {
-            const username = document.getElementById('viewUsername').value.trim();
-            if (username) {
-                window.open(`/profile.html?user=${username}`, '_blank');
-            }
-        }
-        
-        async function createActor() {
-            const statusEl = document.getElementById('actorCreateStatus');
-            const usernameInput = document.getElementById('actorUsername');
-            const username = usernameInput.value.trim();
-
-            if (!username) {
-                statusEl.textContent = '⚠️ Username is required.';
-                statusEl.className = 'text-sm text-center opacity-70 text-warning';
-                return;
-            }
-
-            const headers = ShogunAdmin.getAuthHeaders();
-            if (!headers['Authorization']) {
-                statusEl.textContent = '🔒 Admin password not set.';
-                statusEl.className = 'text-sm text-center opacity-70 text-error';
-                return;
-            }
-
-            statusEl.textContent = 'Creating actor...';
-            statusEl.className = 'text-sm text-center opacity-70 text-info';
-
-            try {
-                const response = await fetch('/ap/admin/create-actor', {
-                    method: 'POST',
-                    headers: {
-                        ...headers,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ username: username })
-                });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    statusEl.textContent = `✅ Actor created: ${result.actor.id}`;
-                    statusEl.className = 'text-sm text-center opacity-70 text-success';
-                    usernameInput.value = '';
-                } else {
-                    statusEl.textContent = `❌ Error: ${result.error || response.statusText}`;
-                    statusEl.className = 'text-sm text-center opacity-70 text-error';
-                }
-            } catch (error) {
-                statusEl.textContent = `❌ Network Error: ${error.message}`;
-                statusEl.className = 'text-sm text-center opacity-70 text-error';
-            }
-        }
-
 
         // IPFS API FUNCTIONS
         async function checkIPFSVersion() {

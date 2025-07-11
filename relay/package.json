@@ -21,7 +21,6 @@
   "author": "Shogun Team",
   "license": "MIT",
   "dependencies": {
-    "activitypub-express": "^4.4.2",
     "aws-sdk": "^2.1692.0",
     "cors": "^2.8.5",
     "dockerode": "^4.0.0",
