@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="night">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shogun Drive</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="styles/wormhole.css">
+  <script src="lib/admin-auth.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+  <style>
+    .drive-card { @apply bg-base-200 rounded-xl shadow-xl p-6 mb-6; }
+    .file-row { @apply flex flex-col sm:flex-row items-center gap-2 p-2 border-b border-base-content/10; }
+    .file-actions { @apply flex flex-wrap gap-2 mt-2 sm:mt-0; }
+    .file-name { @apply font-mono break-all text-base; }
+    .file-meta { @apply text-xs text-base-content/60; }
+    .drive-table { @apply w-full; }
+    .drive-table th, .drive-table td { @apply px-2 py-1; }
+    .drive-table th { @apply text-left text-base-content/70; }
+    .drive-table tr { @apply border-b border-base-content/10; }
+    .drive-table tr:last-child { border-bottom: none; }
+    @media (max-width: 640px) {
+      .file-row { flex-direction: column; align-items: flex-start; }
+      .file-actions { width: 100%; justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body class="antialiased">
+  <div class="container mx-auto p-2 sm:p-4">
+    <div class="flex items-center mb-4">
+      <a href="/" class="nav-link">&larr; Back to Control Panel</a>
+    </div>
+    <div class="drive-card">
+      <h1 class="text-xl sm:text-2xl font-semibold mb-4 text-center">Shogun Drive</h1>
+      <div class="flex flex-col sm:flex-row gap-4 mb-6">
+        <div class="flex-1">
+          <label class="block text-sm font-medium mb-2">Upload file:</label>
+          <div class="flex flex-col gap-2">
+            <input type="file" id="fileInput" class="file-input file-input-bordered w-full max-w-xs" />
+            <label class="label cursor-pointer gap-2">
+              <input type="checkbox" id="encryptCheck" class="checkbox checkbox-accent" />
+              <span class="label-text">Encrypt file with admin token</span>
+            </label>
+            <button class="btn btn-accent w-fit" id="uploadBtn">Upload</button>
+          </div>
+        </div>
+        <div class="flex-1 flex flex-col gap-2">
+          <label class="block text-sm font-medium mb-2">Search files:</label>
+          <input type="text" id="searchInput" class="input input-bordered w-full" placeholder="Search by name or hash..." />
+        </div>
+      </div>
+      <div id="message" class="alert hidden"></div>
+      <div id="fileList" class="mt-6"></div>
+    </div>
+  </div>
+  <script>
+    // --- Config ---
+    const GUN_PATH = 'shogun/drive/files';
+    const gun = Gun();
+    const SEA = window.SEA;
+    let adminToken = null;
+
+    // --- UI Elements ---
+    const fileInput = document.getElementById('fileInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const encryptCheck = document.getElementById('encryptCheck');
+    const messageEl = document.getElementById('message');
+    const fileListEl = document.getElementById('fileList');
+    const searchInput = document.getElementById('searchInput');
+
+    // --- Admin Auth ---
+    document.addEventListener('DOMContentLoaded', () => {
+      ShogunAdmin.init({
+        autoFill: true,
+        showIndicator: true,
+        fieldId: 'adminToken',
+        syncEnabled: true
+      });
+      adminToken = ShogunAdmin.getPassword();
+      window.addEventListener('shogun-admin-password-updated', (event) => {
+        adminToken = event.detail.password;
+      });
+      loadFiles();
+    });
+
+    // --- Upload ---
+    uploadBtn.addEventListener('click', async () => {
+      const file = fileInput.files[0];
+      if (!file) return showMessage('Please select a file.', true);
+      if (!adminToken) return showMessage('Admin Token required.', true);
+      uploadBtn.disabled = true;
+      showMessage('Uploading...', false);
+      let fileToUpload = file;
+      let encrypted = false;
+      if (encryptCheck.checked) {
+        try {
+          const base64data = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (err) => reject(err);
+            reader.readAsDataURL(file);
+          });
+          const encryptedData = await SEA.encrypt(base64data, adminToken);
+          fileToUpload = new File([encryptedData], file.name + '.enc', { type: 'text/plain' });
+          encrypted = true;
+        } catch (err) {
+          showMessage('Encryption failed: ' + err.message, true);
+          uploadBtn.disabled = false;
+          return;
+        }
+      }
+      const formData = new FormData();
+      formData.append('file', fileToUpload);
+      try {
+        const res = await fetch('/ipfs-upload', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${adminToken}` },
+          body: formData
+        });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Upload failed');
+        // Save metadata to GunDB
+        const meta = {
+          name: file.name,
+          hash: result.file.hash,
+          size: file.size,
+          type: file.type,
+          date: Date.now(),
+          encrypted,
+          pinned: true,
+        };
+        const fileId = result.file.hash;
+        gun.get(GUN_PATH).get(fileId).put(meta, () => {
+          showMessage('File uploaded and saved!', false);
+          loadFiles();
+        });
+      } catch (err) {
+        showMessage('Upload failed: ' + err.message, true);
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    });
+
+    // --- Show Message ---
+    function showMessage(text, isError = false) {
+      messageEl.textContent = text;
+      messageEl.className = 'alert ' + (isError ? 'alert-error' : 'alert-success');
+      messageEl.style.display = 'block';
+      setTimeout(() => { messageEl.style.display = 'none'; }, 4000);
+    }
+
+    // --- Load & Render Files ---
+    function loadFiles() {
+      fileListEl.innerHTML = '<div class="text-center">Loading files...</div>';
+      gun.get(GUN_PATH).map().once((data, key) => {
+        if (!data || !key) return;
+        renderFileList();
+      });
+      setTimeout(renderFileList, 500); // fallback
+    }
+
+    function renderFileList() {
+      gun.get(GUN_PATH).once((files) => {
+        if (!files) {
+          fileListEl.innerHTML = '<div class="text-center">No files found.</div>';
+          return;
+        }
+        const search = searchInput.value.trim().toLowerCase();
+        const fileArr = Object.entries(files)
+          .filter(([k, v]) => v && typeof v === 'object' && v.hash)
+          .map(([k, v]) => ({ ...v, id: k }))
+          .filter(f => !search || f.name.toLowerCase().includes(search) || (f.hash && f.hash.toLowerCase().includes(search)));
+        if (fileArr.length === 0) {
+          fileListEl.innerHTML = '<div class="text-center">No files found.</div>';
+          return;
+        }
+        let html = `<table class="drive-table"><thead><tr><th>Name</th><th>Size</th><th>Date</th><th>Hash</th><th>Encrypted</th><th>Actions</th></tr></thead><tbody>`;
+        for (const file of fileArr) {
+          html += `<tr><td class="file-name">${file.name}</td><td class="file-meta">${formatSize(file.size)}</td><td class="file-meta">${formatDate(file.date)}</td><td class="file-meta">${file.hash.slice(0, 8)}...</td><td class="file-meta">${file.encrypted ? '🔒' : ''}</td><td><div class="file-actions">
+            <button class="btn btn-xs btn-primary" onclick="downloadFile('${file.hash}', ${!!file.encrypted}, '${file.name.replace(/'/g, '')}')">⬇️</button>
+            <button class="btn btn-xs btn-accent" onclick="copyLink('${file.hash}', ${!!file.encrypted})">🔗</button>
+            <button class="btn btn-xs btn-warning" onclick="unpinFile('${file.hash}')">Unpin</button>
+            <button class="btn btn-xs btn-error" onclick="deleteFile('${file.hash}')">🗑️</button>
+          </div></td></tr>`;
+        }
+        html += '</tbody></table>';
+        fileListEl.innerHTML = html;
+      });
+    }
+
+    searchInput.addEventListener('input', renderFileList);
+
+    // --- Utils ---
+    function formatSize(bytes) {
+      if (!bytes) return '-';
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      let i = 0;
+      while (bytes >= 1024 && i < sizes.length - 1) { bytes /= 1024; i++; }
+      return bytes.toFixed(1) + ' ' + sizes[i];
+    }
+    function formatDate(ts) {
+      if (!ts) return '-';
+      return new Date(ts).toLocaleString();
+    }
+
+    // --- Actions ---
+    window.downloadFile = async (hash, encrypted, name) => {
+      if (!adminToken) return showMessage('Admin Token required.', true);
+      let url = `/ipfs-content/${hash}`;
+      if (encrypted) url += `?token=${encodeURIComponent(adminToken)}`;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Download failed');
+        let blob = await res.blob();
+        if (encrypted) {
+          const text = await blob.text();
+          const decrypted = await SEA.decrypt(text, adminToken);
+          if (!decrypted) throw new Error('Decryption failed');
+          // Assume base64 data url
+          const parts = decrypted.match(/^data:(.+);base64,(.+)$/);
+          if (parts) {
+            blob = b64toBlob(parts[2], parts[1]);
+          } else {
+            blob = new Blob([decrypted], { type: 'text/plain' });
+          }
+        }
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name || hash;
+        a.click();
+        showMessage('Download started!', false);
+      } catch (err) {
+        showMessage('Download failed: ' + err.message, true);
+      }
+    };
+    function b64toBlob(b64Data, contentType = '', sliceSize = 512) {
+      const byteCharacters = atob(b64Data);
+      const byteArrays = [];
+      for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+        const slice = byteCharacters.slice(offset, offset + sliceSize);
+        const byteNumbers = new Array(slice.length);
+        for (let i = 0; i < slice.length; i++) {
+          byteNumbers[i] = slice.charCodeAt(i);
+        }
+        byteArrays.push(new Uint8Array(byteNumbers));
+      }
+      return new Blob(byteArrays, { type: contentType });
+    }
+    window.copyLink = (hash, encrypted) => {
+      let url = `${location.origin}/ipfs-content/${hash}`;
+      if (encrypted) url += `?token=${encodeURIComponent(adminToken)}`;
+      navigator.clipboard.writeText(url).then(() => {
+        showMessage('Link copied!', false);
+      });
+    };
+    window.unpinFile = async (hash) => {
+      if (!adminToken) return showMessage('Admin Token required.', true);
+      if (!confirm('Unpin this file from IPFS?')) return;
+      try {
+        const res = await fetch('/pins/rm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+          body: JSON.stringify({ cid: hash })
+        });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Unpin failed');
+        showMessage('File unpinned!', false);
+      } catch (err) {
+        showMessage('Unpin failed: ' + err.message, true);
+      }
+    };
+    window.deleteFile = async (hash) => {
+      if (!adminToken) return showMessage('Admin Token required.', true);
+      if (!confirm('Delete this file from Drive? (Unpins from IPFS and removes metadata)')) return;
+      try {
+        // Unpin from IPFS
+        await window.unpinFile(hash);
+        // Remove from GunDB
+        gun.get(GUN_PATH).get(hash).put(null, () => {
+          showMessage('File deleted!', false);
+          loadFiles();
+        });
+      } catch (err) {
+        showMessage('Delete failed: ' + err.message, true);
+      }
+    };
+  </script>
+</body>
+</html> 

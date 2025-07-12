@@ -1604,6 +1604,9 @@ async function initializeServer() {
   app.get("/pin-manager", (req, res) => {
     res.sendFile(path.resolve(publicPath, "pin-manager.html"));
   });
+  app.get("/drive", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "drive.html"));
+  });
 
 
 
