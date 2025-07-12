@@ -100,7 +100,7 @@
     function renderFolderSelect(selectedId) {
       folderSelect.innerHTML = '';
       // Flat: solo root e figli diretti (per ora)
-      const allFolders = Object.values(foldersCache).filter(f => f && typeof f === 'object');
+      const allFolders = Object.values(foldersCache).filter(f => f && typeof f === 'object' && typeof f.name === 'string');
       allFolders.sort((a, b) => a.name.localeCompare(b.name));
       for (const folder of allFolders) {
         const opt = document.createElement('option');
@@ -141,17 +141,6 @@
       renderFileList();
     });
 
-    document.getElementById('newFolderBtn').addEventListener('click', () => {
-      const name = prompt('Nome nuova cartella?');
-      if (!name) return;
-      const id = 'fld_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-      const folder = { id, name, parentId: currentFolderId };
-      gun.get(FOLDER_PATH).get(id).put(folder, () => {
-        loadFolders(id);
-      });
-    });
-
-    // --- Admin Auth ---
     document.addEventListener('DOMContentLoaded', () => {
       ShogunAdmin.init({
         autoFill: true,
@@ -165,6 +154,15 @@
       });
       loadFolders();
       loadFiles();
+      document.getElementById('newFolderBtn').addEventListener('click', () => {
+        const name = prompt('Nome nuova cartella?');
+        if (!name) return;
+        const id = 'fld_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        const folder = { id, name, parentId: currentFolderId };
+        gun.get(FOLDER_PATH).get(id).put(folder, () => {
+          loadFolders(id);
+        });
+      });
     });
 
     // --- Upload ---
