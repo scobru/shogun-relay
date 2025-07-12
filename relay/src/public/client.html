@@ -128,7 +128,10 @@
             console.log(...args);
             const logCode = logEl.querySelector('code') || logEl;
             logCode.textContent += logMessage + '\n';
-            document.getElementById('messagesContainer').scrollTop = document.getElementById('messagesContainer').scrollHeight;
+            // Scroll log area if present
+            if (logEl) {
+                logEl.scrollTop = logEl.scrollHeight;
+            }
         }
 
         function updateUI() {
