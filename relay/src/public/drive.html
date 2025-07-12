@@ -39,11 +39,16 @@
           <label class="block text-sm font-medium mb-2">Upload file:</label>
           <div class="flex flex-col gap-2">
             <input type="file" id="fileInput" class="file-input file-input-bordered w-full max-w-xs" />
+            <input type="text" id="customNameInput" class="input input-bordered w-full max-w-xs" placeholder="Nome file custom (opzionale)" />
             <label class="label cursor-pointer gap-2">
               <input type="checkbox" id="encryptCheck" class="checkbox checkbox-accent" />
               <span class="label-text">Encrypt file with admin token</span>
             </label>
-            <button class="btn btn-accent w-fit" id="uploadBtn">Upload</button>
+            <label class="block text-sm font-medium">Cartella:</label>
+            <div class="flex gap-2 items-center">
+              <select id="folderSelect" class="select select-bordered w-full max-w-xs"></select>
+              <button class="btn btn-xs btn-outline btn-primary" id="newFolderBtn" title="Crea nuova cartella">+ Cartella</button>
+            </div>
           </div>
         </div>
         <div class="flex-1 flex flex-col gap-2">
@@ -51,6 +56,7 @@
           <input type="text" id="searchInput" class="input input-bordered w-full" placeholder="Search by name or hash..." />
         </div>
       </div>
+      <div class="mt-2" id="breadcrumb"></div>
       <div id="message" class="alert hidden"></div>
       <div id="fileList" class="mt-6"></div>
     </div>
@@ -69,6 +75,81 @@
     const messageEl = document.getElementById('message');
     const fileListEl = document.getElementById('fileList');
     const searchInput = document.getElementById('searchInput');
+    const customNameInput = document.getElementById('customNameInput');
+    const folderSelect = document.getElementById('folderSelect');
+
+    // --- Cartelle ---
+    const FOLDER_PATH = 'shogun/drive/folders';
+    let currentFolderId = 'root';
+    let foldersCache = {};
+
+    function loadFolders(selectedId) {
+      gun.get(FOLDER_PATH).once(folders => {
+        if (!folders) folders = {};
+        foldersCache = folders;
+        // Assicura che la root esista sempre
+        if (!folders.root) {
+          folders.root = { id: 'root', name: '/', parentId: null };
+          gun.get(FOLDER_PATH).get('root').put(folders.root);
+        }
+        renderFolderSelect(selectedId || currentFolderId);
+        renderBreadcrumb();
+      });
+    }
+
+    function renderFolderSelect(selectedId) {
+      folderSelect.innerHTML = '';
+      // Flat: solo root e figli diretti (per ora)
+      const allFolders = Object.values(foldersCache).filter(f => f && typeof f === 'object');
+      allFolders.sort((a, b) => a.name.localeCompare(b.name));
+      for (const folder of allFolders) {
+        const opt = document.createElement('option');
+        opt.value = folder.id;
+        opt.textContent = folder.name + (folder.id === 'root' ? ' (root)' : '');
+        if (folder.id === (selectedId || 'root')) opt.selected = true;
+        folderSelect.appendChild(opt);
+      }
+    }
+
+    function renderBreadcrumb() {
+      const bc = document.getElementById('breadcrumb');
+      let path = [];
+      let fid = currentFolderId;
+      while (fid && foldersCache[fid]) {
+        path.unshift(foldersCache[fid]);
+        fid = foldersCache[fid].parentId;
+      }
+      bc.innerHTML = path.map((f, i) => `<a href="#" data-folder="${f.id}" class="link link-primary">${f.name}</a>`).join(' / ');
+      // Click su breadcrumb
+      bc.querySelectorAll('a[data-folder]').forEach(a => {
+        a.onclick = (e) => {
+          e.preventDefault();
+          const fid = a.getAttribute('data-folder');
+          if (fid) {
+            currentFolderId = fid;
+            folderSelect.value = fid;
+            renderBreadcrumb();
+            renderFileList();
+          }
+        };
+      });
+    }
+
+    folderSelect.addEventListener('change', () => {
+      currentFolderId = folderSelect.value;
+      renderBreadcrumb();
+      renderFileList();
+    });
+
+    document.getElementById('newFolderBtn').addEventListener('click', () => {
+      const name = prompt('Nome nuova cartella?');
+      if (!name) return;
+      const id = 'fld_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+      const folder = { id, name, parentId: currentFolderId };
+      gun.get(FOLDER_PATH).get(id).put(folder, () => {
+        loadFolders(id);
+      });
+    });
 
     // --- Admin Auth ---
     document.addEventListener('DOMContentLoaded', () => {
@@ -82,12 +163,15 @@
       window.addEventListener('shogun-admin-password-updated', (event) => {
         adminToken = event.detail.password;
       });
+      loadFolders();
       loadFiles();
     });
 
     // --- Upload ---
     uploadBtn.addEventListener('click', async () => {
       const file = fileInput.files[0];
+      const customName = document.getElementById('customNameInput').value.trim();
+      const folderId = folderSelect.value;
       if (!file) return showMessage('Please select a file.', true);
       if (!adminToken) return showMessage('Admin Token required.', true);
       uploadBtn.disabled = true;
@@ -124,17 +208,20 @@
         // Save metadata to GunDB
         const meta = {
           name: file.name,
+          customName: customName || undefined,
           hash: result.file.hash,
           size: file.size,
           type: file.type,
           date: Date.now(),
           encrypted,
           pinned: true,
+          folderId: folderId || 'root',
         };
         const fileId = result.file.hash;
         gun.get(GUN_PATH).get(fileId).put(meta, () => {
           showMessage('File uploaded and saved!', false);
           loadFiles();
+          renderFileList();
         });
       } catch (err) {
         showMessage('Upload failed: ' + err.message, true);
@@ -163,23 +250,25 @@
 
     function renderFileList() {
       gun.get(GUN_PATH).once((files) => {
+        console.log('FILES FROM GUN:', files); // DEBUG LOG
         if (!files) {
           fileListEl.innerHTML = '<div class="text-center">No files found.</div>';
           return;
         }
         const search = searchInput.value.trim().toLowerCase();
+        // Filtro: solo file nella cartella corrente
         const fileArr = Object.entries(files)
-          .filter(([k, v]) => v && typeof v === 'object' && v.hash)
+          .filter(([k, v]) => k !== '_' && v && typeof v === 'object' && v.hash && (v.folderId === currentFolderId || (!v.folderId && currentFolderId === 'root')))
           .map(([k, v]) => ({ ...v, id: k }))
-          .filter(f => !search || f.name.toLowerCase().includes(search) || (f.hash && f.hash.toLowerCase().includes(search)));
+          .filter(f => !search || (f.customName && f.customName.toLowerCase().includes(search)) || (f.name && f.name.toLowerCase().includes(search)) || (f.hash && f.hash.toLowerCase().includes(search)));
         if (fileArr.length === 0) {
           fileListEl.innerHTML = '<div class="text-center">No files found.</div>';
           return;
         }
         let html = `<table class="drive-table"><thead><tr><th>Name</th><th>Size</th><th>Date</th><th>Hash</th><th>Encrypted</th><th>Actions</th></tr></thead><tbody>`;
         for (const file of fileArr) {
-          html += `<tr><td class="file-name">${file.name}</td><td class="file-meta">${formatSize(file.size)}</td><td class="file-meta">${formatDate(file.date)}</td><td class="file-meta">${file.hash.slice(0, 8)}...</td><td class="file-meta">${file.encrypted ? '🔒' : ''}</td><td><div class="file-actions">
-            <button class="btn btn-xs btn-primary" onclick="downloadFile('${file.hash}', ${!!file.encrypted}, '${file.name.replace(/'/g, '')}')">⬇️</button>
+          html += `<tr><td class="file-name">${file.customName || file.name}</td><td class="file-meta">${formatSize(file.size)}</td><td class="file-meta">${formatDate(file.date)}</td><td class="file-meta">${file.hash ? file.hash.slice(0, 8) : ''}...</td><td class="file-meta">${file.encrypted ? '🔒' : ''}</td><td><div class="file-actions">
+            <button class="btn btn-xs btn-primary" onclick="downloadFile('${file.hash}', ${!!file.encrypted}, '${(file.customName || file.name || '').replace(/'/g, '')}')">⬇️</button>
             <button class="btn btn-xs btn-accent" onclick="copyLink('${file.hash}', ${!!file.encrypted})">🔗</button>
             <button class="btn btn-xs btn-warning" onclick="unpinFile('${file.hash}')">Unpin</button>
             <button class="btn btn-xs btn-error" onclick="deleteFile('${file.hash}')">🗑️</button>
