@@ -272,15 +272,19 @@
                     }
 
                     log(`📨 Loaded ${messageList.length} messages`);
-                    
+
                     const formattedMessages = messageList.map((m) => {
                         const time = new Date(m.t).toLocaleTimeString();
                         return `[${time}] ${m.m || ''}`;
                     });
 
+                    // Write messages directly to the #messages <pre> element
                     const messagesCode = messagesEl.querySelector('code') || messagesEl;
                     messagesCode.textContent = formattedMessages.join('\n');
-                    document.getElementById('messagesContainer').scrollTop = document.getElementById('messagesContainer').scrollHeight;
+                    // Scroll messages area if present
+                    if (messagesEl) {
+                        messagesEl.scrollTop = messagesEl.scrollHeight;
+                    }
                 });
             } catch (error) {
                 log("💥 Refresh error:", error.message);
