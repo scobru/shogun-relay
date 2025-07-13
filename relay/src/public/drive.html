@@ -235,7 +235,6 @@
         const fileId = result.file.hash;
         gun.get(GUN_PATH).get(fileId).put(meta, () => {
           showMessage('File uploaded and saved!', false);
-          loadFiles();
           renderFileList();
         });
       } catch (err) {
@@ -265,25 +264,51 @@
 
     function renderFileList() {
       gun.get(GUN_PATH).once((files) => {
-        console.log('FILES FROM GUN:', files); // DEBUG LOG
+        console.log('FILES FROM GUN (renderFileList):', files); // DEBUG LOG 1
         if (!files) {
           fileListEl.innerHTML = '<div class="text-center">No files found.</div>';
+          console.log('No files object found in GunDB.'); // DEBUG LOG 2
           return;
         }
         const search = searchInput.value.trim().toLowerCase();
-        // Filtro: solo file nella cartella corrente
+        console.log('Current Folder ID:', currentFolderId); // DEBUG LOG 3
+        console.log('Search query:', search); // DEBUG LOG 4
+
         const fileArr = Object.entries(files)
-          .filter(([k, v]) => k !== '_' && v && typeof v === 'object' && v.hash && (v.folderId === currentFolderId || (!v.folderId && currentFolderId === 'root')))
-          .map(([k, v]) => ({ ...v, id: k }))
-          .filter(f => !search || (f.customName && f.customName.toLowerCase().includes(search)) || (f.name && f.name.toLowerCase().includes(search)) || (f.hash && f.hash.toLowerCase().includes(search)));
+          .filter(([k, v]) => {
+            const isValid = k !== '_' && v && typeof v === 'object' && v.hash;
+            if (!isValid) {
+              console.log('Skipping invalid file entry:', k, v); // DEBUG LOG 5
+              return false;
+            }
+            const isInCurrentFolder = (v.folderId === currentFolderId || (!v.folderId && currentFolderId === 'root'));
+            // Il filtro per la ricerca deve essere applicato sull'oggetto file completo
+            const matchesSearch = !search ||
+                                (v.customName && v.customName.toLowerCase().includes(search)) ||
+                                (v.name && v.name.toLowerCase().includes(search)) ||
+                                (v.hash && v.hash.toLowerCase().includes(search));
+
+            if (!isInCurrentFolder) {
+                console.log(`File ${v.name || v.customName || k} (hash: ${v.hash}) not in current folder ${currentFolderId}. File folderId: ${v.folderId}`); // DEBUG LOG 6
+            }
+            if (!matchesSearch) {
+                console.log(`File ${v.name || v.customName || k} (hash: ${v.hash}) does not match search query '${search}'.`); // DEBUG LOG 7
+            }
+            return isInCurrentFolder && matchesSearch;
+          })
+          .map(([k, v]) => ({ ...v, id: k }));
+
+        console.log('Filtered files (fileArr):', fileArr); // DEBUG LOG 8
+
         if (fileArr.length === 0) {
           fileListEl.innerHTML = '<div class="text-center">No files found.</div>';
+          console.log('No files found after filtering.'); // DEBUG LOG 9
           return;
         }
         let html = `<table class="drive-table"><thead><tr><th>Name</th><th>Size</th><th>Date</th><th>Hash</th><th>Encrypted</th><th>Actions</th></tr></thead><tbody>`;
         for (const file of fileArr) {
           html += `<tr><td class="file-name">${file.customName || file.name}</td><td class="file-meta">${formatSize(file.size)}</td><td class="file-meta">${formatDate(file.date)}</td><td class="file-meta">${file.hash ? file.hash.slice(0, 8) : ''}...</td><td class="file-meta">${file.encrypted ? '🔒' : ''}</td><td><div class="file-actions">
-            <button class="btn btn-xs btn-primary" onclick="downloadFile('${file.hash}', ${!!file.encrypted}, '${(file.customName || file.name || '').replace(/'/g, '')}')">⬇️</button>
+            <button class="btn btn-xs btn-primary" onclick="downloadFile('${file.hash}', ${!!file.encrypted}, '${(file.customName || file.name || '').replace(/'/g, '\'')}')">⬇️</button>
             <button class="btn btn-xs btn-accent" onclick="copyLink('${file.hash}', ${!!file.encrypted})">🔗</button>
             <button class="btn btn-xs btn-warning" onclick="unpinFile('${file.hash}')">Unpin</button>
             <button class="btn btn-xs btn-error" onclick="deleteFile('${file.hash}')">🗑️</button>
