@@ -91,7 +91,15 @@
         // Assicura che la root esista sempre
         if (!folders.root) {
           folders.root = { id: 'root', name: '/', parentId: null };
-          gun.get(FOLDER_PATH).get('root').put(folders.root);
+          gun.get(FOLDER_PATH).get('root').put(folders.root, () => {
+            // Dopo aver creato la root, ricarica le cartelle
+            gun.get(FOLDER_PATH).once(folders2 => {
+              foldersCache = folders2 || {};
+              renderFolderSelect(selectedId || 'root');
+              renderBreadcrumb();
+            });
+          });
+          return; // Esci per evitare doppio rendering
         }
         renderFolderSelect(selectedId || currentFolderId);
         renderBreadcrumb();
@@ -102,6 +110,14 @@
       folderSelect.innerHTML = '';
       // Flat: solo root e figli diretti (per ora)
       const allFolders = Object.values(foldersCache).filter(f => f && typeof f === 'object' && typeof f.name === 'string');
+      if (allFolders.length === 0) {
+        // Se per qualche motivo non ci sono cartelle, aggiungi la root
+        const opt = document.createElement('option');
+        opt.value = 'root';
+        opt.textContent = '/ (root)';
+        folderSelect.appendChild(opt);
+        return;
+      }
       allFolders.sort((a, b) => a.name.localeCompare(b.name));
       for (const folder of allFolders) {
         const opt = document.createElement('option');
