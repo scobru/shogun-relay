@@ -275,28 +275,35 @@
         console.log('Search query:', search); // DEBUG LOG 4
 
         const fileArr = Object.entries(files)
-          .filter(([k, v]) => {
-            const isValid = k !== '_' && v && typeof v === 'object' && v.hash;
-            if (!isValid) {
-              console.log('Skipping invalid file entry:', k, v); // DEBUG LOG 5
-              return false;
-            }
-            const isInCurrentFolder = (v.folderId === currentFolderId || (!v.folderId && currentFolderId === 'root'));
-            // Il filtro per la ricerca deve essere applicato sull'oggetto file completo
+          .map(([k, v]) => {
+              // Ensure 'v' is a valid object and add 'id' (from k) and 'hash' (from k if v.hash is missing)
+              if (!v || typeof v !== 'object') {
+                  console.log('Skipping non-object or null entry:', k, v);
+                  return null;
+              }
+              if (k === '_') { // Skip internal GunDB properties
+                  console.log('Skipping internal GunDB entry:', k);
+                  return null;
+              }
+              return { ...v, id: k, hash: v.hash || k }; // Guarantee 'hash' and 'id'
+          })
+          .filter(file => file !== null) // Remove nulls from the map step
+          .filter(file => {
+            // Now 'file' object should definitely have 'id' and 'hash'
+            const isInCurrentFolder = (file.folderId === currentFolderId || (!file.folderId && currentFolderId === 'root'));
             const matchesSearch = !search ||
-                                (v.customName && v.customName.toLowerCase().includes(search)) ||
-                                (v.name && v.name.toLowerCase().includes(search)) ||
-                                (v.hash && v.hash.toLowerCase().includes(search));
+                                (file.customName && file.customName.toLowerCase().includes(search)) ||
+                                (file.name && file.name.toLowerCase().includes(search)) ||
+                                (file.hash && file.hash.toLowerCase().includes(search)); // Use file.hash here
 
             if (!isInCurrentFolder) {
-                console.log(`File ${v.name || v.customName || k} (hash: ${v.hash}) not in current folder ${currentFolderId}. File folderId: ${v.folderId}`); // DEBUG LOG 6
+                console.log(`File ${file.name || file.customName || file.id} (hash: ${file.hash}) not in current folder ${currentFolderId}. File folderId: ${file.folderId}`);
             }
             if (!matchesSearch) {
-                console.log(`File ${v.name || v.customName || k} (hash: ${v.hash}) does not match search query '${search}'.`); // DEBUG LOG 7
+                console.log(`File ${file.name || file.customName || file.id} (hash: ${file.hash}) does not match search query '${search}'.`);
             }
             return isInCurrentFolder && matchesSearch;
-          })
-          .map(([k, v]) => ({ ...v, id: k }));
+          });
 
         console.log('Filtered files (fileArr):', fileArr); // DEBUG LOG 8
 
