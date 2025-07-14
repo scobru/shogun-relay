@@ -45,10 +45,13 @@
               <input type="checkbox" id="encryptCheck" class="checkbox checkbox-accent" />
               <span class="label-text">Encrypt file with admin token</span>
             </label>
-            <label class="block text-sm font-medium">Cartella:</label>
-            <div class="flex gap-2 items-center">
-              <select id="folderSelect" class="select select-bordered w-full max-w-xs"></select>
-              <button class="btn btn-xs btn-outline btn-primary" id="newFolderBtn" title="Crea nuova cartella">+ Cartella</button>
+            <label class="block text-sm font-medium mb-2">Current Folder:</label>
+            <div id="folderNavigation" class="flex flex-wrap gap-2 mb-4">
+                <button class="btn btn-xs btn-outline" id="goUpBtn" style="display:none;">&uarr; Go Up</button>
+            </div>
+            <div class="flex gap-2 items-center mb-4">
+                <input type="text" id="newFolderNameInput" class="input input-bordered w-full max-w-xs" placeholder="New folder name" />
+                <button class="btn btn-primary" id="createNewFolderBtn">Create Folder</button>
             </div>
           </div>
         </div>
@@ -77,7 +80,10 @@
     const fileListEl = document.getElementById('fileList');
     const searchInput = document.getElementById('searchInput');
     const customNameInput = document.getElementById('customNameInput');
-    const folderSelect = document.getElementById('folderSelect');
+    const folderNavigation = document.getElementById('folderNavigation');
+    const goUpBtn = document.getElementById('goUpBtn');
+    const newFolderNameInput = document.getElementById('newFolderNameInput');
+    const createNewFolderBtn = document.getElementById('createNewFolderBtn');
 
     // --- Cartelle ---
     const FOLDER_PATH = 'shogun/drive/folders';
@@ -95,37 +101,63 @@
             // Dopo aver creato la root, ricarica le cartelle
             gun.get(FOLDER_PATH).once(folders2 => {
               foldersCache = folders2 || {};
-              renderFolderSelect(selectedId || 'root');
+              renderFolderNavigation(selectedId || 'root');
               renderBreadcrumb();
             });
           });
           return; // Esci per evitare doppio rendering
         }
-        renderFolderSelect(selectedId || currentFolderId);
+        renderFolderNavigation(selectedId || currentFolderId);
         renderBreadcrumb();
       });
     }
 
-    function renderFolderSelect(selectedId) {
-      folderSelect.innerHTML = '';
-      // Flat: solo root e figli diretti (per ora)
-      const allFolders = Object.values(foldersCache).filter(f => f && typeof f === 'object' && typeof f.name === 'string');
-      if (allFolders.length === 0) {
-        // Se per qualche motivo non ci sono cartelle, aggiungi la root
-        const opt = document.createElement('option');
-        opt.value = 'root';
-        opt.textContent = '/ (root)';
-        folderSelect.appendChild(opt);
-        return;
+    function renderFolderNavigation(selectedId) {
+      folderNavigation.innerHTML = '';
+      // Add "Go Up" button if not in root
+      if (currentFolderId !== 'root' && foldersCache[currentFolderId]?.parentId) {
+        goUpBtn.style.display = 'inline-block';
+        goUpBtn.onclick = () => {
+          currentFolderId = foldersCache[currentFolderId].parentId;
+          renderFolderNavigation();
+          renderBreadcrumb();
+          renderFileList();
+        };
+      } else {
+        goUpBtn.style.display = 'none';
       }
-      allFolders.sort((a, b) => a.name.localeCompare(b.name));
-      for (const folder of allFolders) {
-        const opt = document.createElement('option');
-        opt.value = folder.id;
-        opt.textContent = folder.name + (folder.id === 'root' ? ' (root)' : '');
-        if (folder.id === (selectedId || 'root')) opt.selected = true;
-        folderSelect.appendChild(opt);
+
+      // Add subfolder buttons
+      const subfolders = Object.values(foldersCache).filter(f => f && f.parentId === currentFolderId && f.id !== currentFolderId);
+      subfolders.sort((a, b) => a.name.localeCompare(b.name));
+
+      if (goUpBtn.style.display === 'inline-block') {
+        folderNavigation.prepend(goUpBtn); // Prepend the Go Up button
       }
+
+      // Remove redundant current folder display, as it's handled by breadcrumb
+      // const currentFolderName = foldersCache[currentFolderId]?.name || '/';
+      // const currentFolderDisplay = document.createElement('span');
+      // currentFolderDisplay.className = 'text-xl font-bold mr-4';
+      // currentFolderDisplay.textContent = `Current: ${currentFolderName}`;
+      // folderNavigation.prepend(currentFolderDisplay);
+
+      for (const folder of subfolders) {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-sm btn-outline btn-info';
+        btn.textContent = folder.name;
+        btn.onclick = () => {
+          currentFolderId = folder.id;
+          renderFolderNavigation();
+          renderBreadcrumb();
+          renderFileList();
+        };
+        folderNavigation.appendChild(btn);
+      }
+
+      // Debugging logs
+      console.log('Rendering folder navigation for:', currentFolderId);
+      console.log('Subfolders:', subfolders);
     }
 
     function renderBreadcrumb() {
@@ -144,19 +176,12 @@
           const fid = a.getAttribute('data-folder');
           if (fid) {
             currentFolderId = fid;
-            folderSelect.value = fid;
             renderBreadcrumb();
             renderFileList();
           }
         };
       });
     }
-
-    folderSelect.addEventListener('change', () => {
-      currentFolderId = folderSelect.value;
-      renderBreadcrumb();
-      renderFileList();
-    });
 
     document.addEventListener('DOMContentLoaded', () => {
       ShogunAdmin.init({
@@ -171,13 +196,22 @@
       });
       loadFolders();
       loadFiles();
-      document.getElementById('newFolderBtn').addEventListener('click', () => {
-        const name = prompt('Nome nuova cartella?');
-        if (!name) return;
+      createNewFolderBtn.addEventListener('click', () => {
+        const name = newFolderNameInput.value.trim();
+        if (!name) {
+          showMessage('Folder name cannot be empty.', true);
+          return;
+        }
         const id = 'fld_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
         const folder = { id, name, parentId: currentFolderId };
-        gun.get(FOLDER_PATH).get(id).put(folder, () => {
-          loadFolders(id);
+        gun.get(FOLDER_PATH).get(id).put(folder, (ack) => {
+          if (ack.err) {
+            showMessage('Error creating folder: ' + ack.err, true);
+          } else {
+            showMessage(`Folder "${name}" created!`, false);
+            newFolderNameInput.value = ''; // Clear input
+            loadFolders(); // Reload folders to update navigation
+          }
         });
       });
     });
@@ -186,7 +220,7 @@
     uploadBtn.addEventListener('click', async () => {
       const file = fileInput.files[0];
       const customName = document.getElementById('customNameInput').value.trim();
-      const folderId = folderSelect.value;
+      const folderId = currentFolderId; // Use currentFolderId directly
       if (!file) return showMessage('Please select a file.', true);
       if (!adminToken) return showMessage('Admin Token required.', true);
       uploadBtn.disabled = true;
@@ -255,11 +289,14 @@
     // --- Load & Render Files ---
     function loadFiles() {
       fileListEl.innerHTML = '<div class="text-center">Loading files...</div>';
-      gun.get(GUN_PATH).map().once((data, key) => {
-        if (!data || !key) return;
-        renderFileList();
+      // Instead of mapping, directly get once to process all files
+      gun.get(GUN_PATH).once((allFiles) => {
+        // This `once` will give us the entire current state of files
+        // The actual filtering and rendering happens in renderFileList
+        renderFileList(); // Call renderFileList after data is fetched
       });
-      setTimeout(renderFileList, 500); // fallback
+      // The setTimeout fallback can be removed or reduced if `once` is reliable
+      // setTimeout(renderFileList, 500); // fallback
     }
 
     function renderFileList() {
