@@ -317,6 +317,7 @@ async function initializeServer() {
                 success: true,
                 file: {
                   name: req.file.originalname,
+                  customName: req.body.customName || undefined, // Add customName here
                   size: req.file.size,
                   mimetype: req.file.mimetype,
                   hash: fileResult?.Hash,

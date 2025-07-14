@@ -91,34 +91,50 @@
     let foldersCache = {};
 
     function loadFolders(selectedId) {
+      console.log('--- loadFolders START ---');
       gun.get(FOLDER_PATH).once(folders => {
+        console.log('GunDB folders raw response:', folders);
         if (!folders) folders = {};
         foldersCache = folders;
         // Assicura che la root esista sempre
         if (!folders.root) {
+          console.log('Root folder not found, creating it...');
           folders.root = { id: 'root', name: '/', parentId: null };
-          gun.get(FOLDER_PATH).get('root').put(folders.root, () => {
-            // Dopo aver creato la root, ricarica le cartelle
-            gun.get(FOLDER_PATH).once(folders2 => {
-              foldersCache = folders2 || {};
-              renderFolderNavigation(selectedId || 'root');
-              renderBreadcrumb();
-            });
+          gun.get(FOLDER_PATH).get('root').put(folders.root, (ack) => {
+            if (ack.err) {
+              console.error('Error creating root folder:', ack.err);
+            } else {
+              console.log('Root folder created successfully.');
+              gun.get(FOLDER_PATH).once(folders2 => {
+                foldersCache = folders2 || {};
+                console.log('Folders after root creation and reload:', foldersCache);
+                renderFolderNavigation(selectedId || 'root');
+                renderBreadcrumb();
+              });
+            }
           });
           return; // Esci per evitare doppio rendering
         }
+        console.log('Folders loaded, foldersCache:', foldersCache);
         renderFolderNavigation(selectedId || currentFolderId);
         renderBreadcrumb();
+        console.log('--- loadFolders END ---');
       });
     }
 
     function renderFolderNavigation(selectedId) {
+      console.log('--- renderFolderNavigation START ---');
+      console.log('Selected Folder ID for rendering:', selectedId);
+      console.log('Current Folder ID:', currentFolderId);
+      console.log('Folders Cache:', foldersCache);
       folderNavigation.innerHTML = '';
       // Add "Go Up" button if not in root
       if (currentFolderId !== 'root' && foldersCache[currentFolderId]?.parentId) {
         goUpBtn.style.display = 'inline-block';
         goUpBtn.onclick = () => {
+          console.log('Go Up button clicked. Before:', currentFolderId);
           currentFolderId = foldersCache[currentFolderId].parentId;
+          console.log('Go Up button clicked. After:', currentFolderId);
           renderFolderNavigation();
           renderBreadcrumb();
           renderFileList();
@@ -128,46 +144,48 @@
       }
 
       // Add subfolder buttons
-      const subfolders = Object.values(foldersCache).filter(f => f && f.parentId === currentFolderId && f.id !== currentFolderId);
+      const subfolders = Object.values(foldersCache).filter(f => {
+        const isValid = f && f.parentId === currentFolderId && f.id !== currentFolderId;
+        if (!isValid) {
+          console.log('Skipping folder in subfolder filter (invalid or not in current path):', f);
+        }
+        return isValid;
+      });
       subfolders.sort((a, b) => a.name.localeCompare(b.name));
+      console.log('Filtered subfolders:', subfolders);
 
       if (goUpBtn.style.display === 'inline-block') {
         folderNavigation.prepend(goUpBtn); // Prepend the Go Up button
       }
-
-      // Remove redundant current folder display, as it's handled by breadcrumb
-      // const currentFolderName = foldersCache[currentFolderId]?.name || '/';
-      // const currentFolderDisplay = document.createElement('span');
-      // currentFolderDisplay.className = 'text-xl font-bold mr-4';
-      // currentFolderDisplay.textContent = `Current: ${currentFolderName}`;
-      // folderNavigation.prepend(currentFolderDisplay);
 
       for (const folder of subfolders) {
         const btn = document.createElement('button');
         btn.className = 'btn btn-sm btn-outline btn-info';
         btn.textContent = folder.name;
         btn.onclick = () => {
+          console.log('Subfolder clicked. Before:', currentFolderId, 'Clicking on:', folder.id);
           currentFolderId = folder.id;
+          console.log('Subfolder clicked. After:', currentFolderId);
           renderFolderNavigation();
           renderBreadcrumb();
           renderFileList();
         };
         folderNavigation.appendChild(btn);
       }
-
-      // Debugging logs
-      console.log('Rendering folder navigation for:', currentFolderId);
-      console.log('Subfolders:', subfolders);
+      console.log('--- renderFolderNavigation END ---');
     }
 
     function renderBreadcrumb() {
+      console.log('--- renderBreadcrumb START ---');
       const bc = document.getElementById('breadcrumb');
       let path = [];
       let fid = currentFolderId;
       while (fid && foldersCache[fid]) {
+        console.log('Building breadcrumb path. Current fid:', fid, 'Folder:', foldersCache[fid]);
         path.unshift(foldersCache[fid]);
         fid = foldersCache[fid].parentId;
       }
+      console.log('Breadcrumb path array:', path);
       bc.innerHTML = path.map((f, i) => `<a href="#" data-folder="${f.id}" class="link link-primary">${f.name}</a>`).join(' / ');
       // Click su breadcrumb
       bc.querySelectorAll('a[data-folder]').forEach(a => {
@@ -175,15 +193,19 @@
           e.preventDefault();
           const fid = a.getAttribute('data-folder');
           if (fid) {
+            console.log('Breadcrumb clicked. Before:', currentFolderId, 'Clicking on:', fid);
             currentFolderId = fid;
+            console.log('Breadcrumb clicked. After:', currentFolderId);
             renderBreadcrumb();
             renderFileList();
           }
         };
       });
+      console.log('--- renderBreadcrumb END ---');
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+      console.log('--- DOMContentLoaded START ---');
       ShogunAdmin.init({
         autoFill: true,
         showIndicator: true,
@@ -193,34 +215,43 @@
       adminToken = ShogunAdmin.getPassword();
       window.addEventListener('shogun-admin-password-updated', (event) => {
         adminToken = event.detail.password;
+        console.log('Admin token updated:', adminToken ? 'present' : 'missing');
       });
       loadFolders();
       loadFiles();
       createNewFolderBtn.addEventListener('click', () => {
+        console.log('Create New Folder button clicked.');
         const name = newFolderNameInput.value.trim();
         if (!name) {
           showMessage('Folder name cannot be empty.', true);
+          console.log('Folder name empty.');
           return;
         }
         const id = 'fld_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
         const folder = { id, name, parentId: currentFolderId };
+        console.log('Attempting to create folder:', folder);
         gun.get(FOLDER_PATH).get(id).put(folder, (ack) => {
           if (ack.err) {
             showMessage('Error creating folder: ' + ack.err, true);
+            console.error('GunDB error creating folder:', ack.err);
           } else {
             showMessage(`Folder "${name}" created!`, false);
             newFolderNameInput.value = ''; // Clear input
+            console.log('Folder created in GunDB. Reloading folders.');
             loadFolders(); // Reload folders to update navigation
           }
         });
       });
+      console.log('--- DOMContentLoaded END ---');
     });
 
     // --- Upload ---
     uploadBtn.addEventListener('click', async () => {
+      console.log('--- Upload START ---');
       const file = fileInput.files[0];
       const customName = document.getElementById('customNameInput').value.trim();
       const folderId = currentFolderId; // Use currentFolderId directly
+      console.log('Uploading file:', file?.name, 'Custom Name:', customName, 'Folder ID:', folderId);
       if (!file) return showMessage('Please select a file.', true);
       if (!adminToken) return showMessage('Admin Token required.', true);
       uploadBtn.disabled = true;
@@ -228,6 +259,7 @@
       let fileToUpload = file;
       let encrypted = false;
       if (encryptCheck.checked) {
+        console.log('Encryption checked. Encrypting file...');
         try {
           const base64data = await new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -238,14 +270,21 @@
           const encryptedData = await SEA.encrypt(base64data, adminToken);
           fileToUpload = new File([encryptedData], file.name + '.enc', { type: 'text/plain' });
           encrypted = true;
+          console.log('File encrypted.');
         } catch (err) {
           showMessage('Encryption failed: ' + err.message, true);
           uploadBtn.disabled = false;
+          console.error('Encryption failed:', err);
           return;
         }
       }
       const formData = new FormData();
       formData.append('file', fileToUpload);
+      // Append customName and folderId to FormData for server-side processing
+      formData.append('customName', customName);
+      formData.append('folderId', folderId);
+      console.log('FormData prepared with customName and folderId.');
+
       try {
         const res = await fetch('/ipfs-upload', {
           method: 'POST',
@@ -253,6 +292,7 @@
           body: formData
         });
         const result = await res.json();
+        console.log('IPFS Upload response:', result);
         if (!result.success) throw new Error(result.error || 'Upload failed');
         // Save metadata to GunDB
         const meta = {
@@ -264,17 +304,26 @@
           date: Date.now(),
           encrypted,
           pinned: true,
-          folderId: folderId || 'root',
+          folderId: folderId || 'root', // Ensure folderId is saved
         };
         const fileId = result.file.hash;
-        gun.get(GUN_PATH).get(fileId).put(meta, () => {
-          showMessage('File uploaded and saved!', false);
-          renderFileList();
+        console.log('Saving file metadata to GunDB:', meta);
+        gun.get(GUN_PATH).get(fileId).put(meta, (ack) => {
+          if (ack.err) {
+            console.error('GunDB error saving file metadata:', ack.err);
+            showMessage('Error saving file metadata: ' + ack.err, true);
+          } else {
+            showMessage('File uploaded and saved!', false);
+            console.log('File metadata saved to GunDB. Rendering file list.');
+            renderFileList();
+          }
         });
       } catch (err) {
         showMessage('Upload failed: ' + err.message, true);
+        console.error('Upload process failed:', err);
       } finally {
         uploadBtn.disabled = false;
+        console.log('--- Upload END ---');
       }
     });
 
@@ -284,22 +333,25 @@
       messageEl.className = 'alert ' + (isError ? 'alert-error' : 'alert-success');
       messageEl.style.display = 'block';
       setTimeout(() => { messageEl.style.display = 'none'; }, 4000);
+      console.log(`Message: ${text} (Error: ${isError})`);
     }
 
     // --- Load & Render Files ---
     function loadFiles() {
+      console.log('--- loadFiles START ---');
       fileListEl.innerHTML = '<div class="text-center">Loading files...</div>';
       // Instead of mapping, directly get once to process all files
       gun.get(GUN_PATH).once((allFiles) => {
+        console.log('GunDB all files raw response:', allFiles);
         // This `once` will give us the entire current state of files
         // The actual filtering and rendering happens in renderFileList
         renderFileList(); // Call renderFileList after data is fetched
       });
-      // The setTimeout fallback can be removed or reduced if `once` is reliable
-      // setTimeout(renderFileList, 500); // fallback
+      console.log('--- loadFiles END ---');
     }
 
     function renderFileList() {
+      console.log('--- renderFileList START ---');
       gun.get(GUN_PATH).once((files) => {
         console.log('FILES FROM GUN (renderFileList):', files); // DEBUG LOG 1
         if (!files) {
@@ -322,7 +374,9 @@
                   console.log('Skipping internal GunDB entry:', k);
                   return null;
               }
-              return { ...v, id: k, hash: v.hash || k }; // Guarantee 'hash' and 'id'
+              const file = { ...v, id: k, hash: v.hash || k };
+              console.log('Mapping file:', file);
+              return file;
           })
           .filter(file => file !== null) // Remove nulls from the map step
           .filter(file => {
@@ -332,6 +386,8 @@
                                 (file.customName && file.customName.toLowerCase().includes(search)) ||
                                 (file.name && file.name.toLowerCase().includes(search)) ||
                                 (file.hash && file.hash.toLowerCase().includes(search)); // Use file.hash here
+
+            console.log(`Filtering file: ${file.name || file.customName || file.id} (hash: ${file.hash}) - folderId: ${file.folderId}, currentFolderId: ${currentFolderId}, isInCurrentFolder: ${isInCurrentFolder}, matchesSearch: ${matchesSearch}`);
 
             if (!isInCurrentFolder) {
                 console.log(`File ${file.name || file.customName || file.id} (hash: ${file.hash}) not in current folder ${currentFolderId}. File folderId: ${file.folderId}`);
@@ -343,6 +399,7 @@
           });
 
         console.log('Filtered files (fileArr):', fileArr); // DEBUG LOG 8
+        console.log('--- renderFileList END ---');
 
         if (fileArr.length === 0) {
           fileListEl.innerHTML = '<div class="text-center">No files found.</div>';
