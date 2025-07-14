@@ -37,7 +37,7 @@
     "node-fetch": "^3.3.2",
     "qr": "^0.5.0",
     "self-adjusting-interval": "^1.0.0",
-    "shogun-core": "latest",
+    "shogun-core": "^1.5.1",
     "shogun-ipfs": "^1.0.2",
     "ws": "^8.14.2"
   },
