@@ -1134,7 +1134,7 @@
                 }
 
                 // Usa il nuovo endpoint ibrido che supporta sia pubKey che userAddress
-                const identifier = gunKeyPair?.pub || walletAddress;
+                const identifier = walletAddress;
                 console.log('🔍 Checking subscription status for identifier:', identifier);
 
                 const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
@@ -1161,7 +1161,7 @@
                                 <span>Your Gun public key is authorized for relay uploads!</span>
                             </div>
                             <p class="text-sm text-base-content/70 mt-2">
-                                You can now use the upload endpoint with your Gun public key: <strong>${gunKeyPair?.pub || 'N/A'}</strong>
+                                You can now use the upload endpoint with your Gun public key: <strong>${walletAddress}</strong>
                             </p>
                         `;
                     } else {
@@ -1273,7 +1273,7 @@
 
                         <div class="bg-base-300/50 rounded-lg p-3">
                             <p class="text-sm text-base-content/70">
-                                <strong>Gun Public Key:</strong> ${gunKeyPair?.pub || 'Not set'}
+                                <strong>Gun Public Key:</strong> ${walletAddress}
                             </p>
                             <p class="text-sm text-base-content/70 mt-1">
                                 You can now upload files using the <a href="/user-upload" class="link link-accent">User Upload</a> page.

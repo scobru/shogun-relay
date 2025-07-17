@@ -90,24 +90,19 @@ let relayAbi = [
   "function SUBSCRIPTION_DURATION() view returns (uint256)",
   "function calculateMBFromAmount(uint256 _amount) public pure returns (uint256)",
   "function calculateAmountFromMB(uint256 _mb) public pure returns (uint256)",
-  "function subscribeToRelay(address _relayAddress, string memory _gunPubKey) payable",
-  "function addMBToSubscription(address _relayAddress, string memory _gunPubKey) payable",
-  "function recordMBUsage(string memory _gunPubKey, uint256 _mbUsed) external",
+  "function subscribeToRelay(address _relayAddress) payable",
+  "function addMBToSubscription(address _relayAddress) payable",
+  "function recordMBUsage(address _user, uint256 _mbUsed) external",
   "function checkUserSubscription(address _user) external view returns (bool)",
-  "function checkGunKeySubscription(string memory _gunPubKey) external view returns (bool)",
   "function isSubscriptionActive(address _user, address _relayAddress) external view returns (bool)",
-  "function isSubscriptionActiveByGunKey(string memory _gunPubKey, address _relayAddress) external view returns (bool)",
-  "function hasAvailableMB(string memory _gunPubKey, address _relayAddress, uint256 _mbRequired) public view returns (bool)",
-  "function getRemainingMB(string memory _gunPubKey, address _relayAddress) public view returns (uint256)",
-  "function getSubscriptionDetails(address _user, address _relayAddress) external view returns (uint256 startTime, uint256 endTime, uint256 amountPaid, uint256 mbAllocated, uint256 mbUsed, uint256 mbRemaining, bool isActive, string memory gunPubKey)",
-  "function getSubscriptionDetailsByGunKey(string memory _gunPubKey, address _relayAddress) external view returns (uint256 startTime, uint256 endTime, uint256 amountPaid, uint256 mbAllocated, uint256 mbUsed, uint256 mbRemaining, bool isActive, address userAddress)",
+  "function hasAvailableMB(address _user, address _relayAddress, uint256 _mbRequired) public view returns (bool)",
+  "function getRemainingMB(address _user, address _relayAddress) public view returns (uint256)",
+  "function getSubscriptionDetails(address _user, address _relayAddress) external view returns (uint256 startTime, uint256 endTime, uint256 amountPaid, uint256 mbAllocated, uint256 mbUsed, uint256 mbRemaining, bool isActive)",
   "function getRelayDetails(address _relayAddress) external view returns (string memory url, address relayAddress, bool isActive, uint256 registeredAt)",
   "function getAllRelays() external view returns (address[] memory)",
   "function registerRelay(string memory _url) external",
   "function deactivateRelay() external",
   "function getUserSubscriptions(address _user) external view returns (address[] memory)",
-  "function getUserGunKeys(address _user) external view returns (string[] memory)",
-  "function getAddressByGunKey(string memory _gunPubKey) external view returns (address)",
   "function getRelaySubscribers(address _relayAddress) external view returns (address[] memory)",
 ];
 
@@ -165,12 +160,11 @@ async function initializeRelayContract() {
 const relayContractAuthMiddleware = async (req, res, next) => {
   try {
     const userAddress = req.headers["x-user-address"];
-    const pubKey = req.headers["x-pubkey"];
 
-    if (!userAddress && !pubKey) {
+    if (!userAddress) {
       return res.status(401).json({
         success: false,
-        error: "x-user-address o x-pubkey header richiesto",
+        error: "x-user-address header richiesto",
       });
     }
 
@@ -179,9 +173,6 @@ const relayContractAuthMiddleware = async (req, res, next) => {
         .status(500)
         .json({ success: false, error: "Relay contract non configurato" });
     }
-
-    let isAuth = false;
-    let authMethod = null;
 
     // Ottieni tutti i relay registrati
     const allRelays = await relayContract.getAllRelays();
@@ -193,126 +184,38 @@ const relayContractAuthMiddleware = async (req, res, next) => {
     }
     const relayAddress = allRelays[0];
 
-    // Se abbiamo un indirizzo utente, verifica la sottoscrizione tramite smart contract
-    if (userAddress) {
-      try {
-        isAuth = await relayContract.checkUserSubscription(userAddress);
-        authMethod = "smart_contract_address";
-        console.log(
-          `🔐 Autorizzazione smart contract per indirizzo: ${userAddress} - ${
-            isAuth ? "AUTORIZZATO" : "NON AUTORIZZATO"
-          }`
-        );
-      } catch (e) {
-        console.error("Errore verifica sottoscrizione smart contract:", e);
-        return res
-          .status(500)
-          .json({ success: false, error: "Errore chiamata contratto" });
+    // Verifica la sottoscrizione tramite smart contract usando solo l'address
+    try {
+      const isAuth = await relayContract.checkUserSubscription(userAddress);
+
+      console.log(
+        `🔐 Autorizzazione smart contract per indirizzo: ${userAddress} - ${
+          isAuth ? "AUTORIZZATO" : "NON AUTORIZZATO"
+        }`
+      );
+
+      if (!isAuth) {
+        return res.status(403).json({
+          success: false,
+          error: "Utente non autorizzato - sottoscrizione non attiva",
+          details: {
+            userAddress: `${userAddress.slice(0, 6)}...${userAddress.slice(
+              -4
+            )}`,
+            authMethod: "smart_contract_address",
+          },
+        });
       }
+
+      req.userAddress = userAddress;
+      req.authMethod = "smart_contract_address";
+      next();
+    } catch (e) {
+      console.error("Errore verifica sottoscrizione smart contract:", e);
+      return res
+        .status(500)
+        .json({ success: false, error: "Errore chiamata contratto" });
     }
-
-    // Se abbiamo una pubkey, verifica la sottoscrizione tramite Gun key
-    if (pubKey && !isAuth) {
-      try {
-        // Usa isSubscriptionActiveByGunKey invece di checkGunKeySubscription
-        isAuth = await relayContract.isSubscriptionActiveByGunKey(
-          pubKey,
-          relayAddress
-        );
-        authMethod = "smart_contract_gunkey";
-        console.log(
-          `🔐 Autorizzazione smart contract per Gun key: ${pubKey.slice(
-            0,
-            10
-          )}... - ${isAuth ? "AUTORIZZATO" : "NON AUTORIZZATO"}`
-        );
-
-        // Se abbiamo anche un indirizzo wallet, verifica che corrisponda al proprietario della Gun key
-        if (isAuth && userAddress) {
-          try {
-            const subscriptionDetails =
-              await relayContract.getSubscriptionDetailsByGunKey(
-                pubKey,
-                relayAddress
-              );
-            const [
-              startTime,
-              endTime,
-              amountPaid,
-              mbAllocated,
-              mbUsed,
-              mbRemaining,
-              isActive,
-              ownerAddress,
-            ] = subscriptionDetails;
-
-            const isOwner =
-              ownerAddress.toLowerCase() === userAddress.toLowerCase();
-
-            if (!isOwner) {
-              console.log(
-                `❌ Wallet ${userAddress.slice(
-                  0,
-                  6
-                )}... non corrisponde al proprietario ${ownerAddress.slice(
-                  0,
-                  6
-                )}... della Gun key ${pubKey.slice(0, 10)}...`
-              );
-              return res.status(403).json({
-                success: false,
-                error: "Wallet non autorizzato per questa Gun key",
-                details: {
-                  providedWallet: userAddress,
-                  gunKeyOwner: ownerAddress,
-                  message:
-                    "Solo il proprietario della Gun key può caricare file",
-                },
-              });
-            } else {
-              console.log(
-                `✅ Wallet ${userAddress.slice(
-                  0,
-                  6
-                )}... autorizzato per Gun key ${pubKey.slice(0, 10)}...`
-              );
-            }
-          } catch (ownerError) {
-            console.error("Errore verifica proprietario:", ownerError);
-            // Se non riusciamo a verificare il proprietario, blocchiamo per sicurezza
-            return res.status(403).json({
-              success: false,
-              error: "Impossibile verificare la proprietà della Gun key",
-              details: ownerError.message,
-            });
-          }
-        }
-      } catch (e) {
-        console.error("Errore verifica sottoscrizione Gun key:", e);
-        return res
-          .status(500)
-          .json({ success: false, error: "Errore chiamata contratto Gun key" });
-      }
-    }
-
-    if (!isAuth) {
-      return res.status(403).json({
-        success: false,
-        error: "Utente non autorizzato - sottoscrizione non attiva",
-        details: {
-          userAddress: userAddress
-            ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`
-            : null,
-          pubKey: pubKey ? `${pubKey.slice(0, 10)}...` : null,
-          authMethod: authMethod,
-        },
-      });
-    }
-
-    req.userAddress = userAddress;
-    req.userPubKey = pubKey;
-    req.authMethod = authMethod;
-    next();
   } catch (err) {
     console.error("Errore middleware smart contract:", err);
     return res
@@ -696,7 +599,7 @@ async function initializeServer() {
                 results.find((r) => r.Name === req.file.originalname) ||
                 results[0];
 
-              // Salva l'upload nel database Gun
+              // Salva l'upload nel database Gun usando l'address come identificatore
               const uploadData = {
                 hash: fileResult?.Hash,
                 name: req.file.originalname,
@@ -705,7 +608,6 @@ async function initializeServer() {
                 mimetype: req.file.mimetype,
                 uploadedAt: Date.now(),
                 userAddress: req.userAddress,
-                pubKey: req.userPubKey,
                 ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
                   fileResult?.Hash
                 }`,
@@ -713,13 +615,11 @@ async function initializeServer() {
                 publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
               };
 
-              // Salva nel database Gun usando la Gun key come identificatore principale
-              const identifier = req.userPubKey || req.userAddress;
+              // Salva nel database Gun usando l'address come identificatore
+              const identifier = req.userAddress;
               console.log(
                 `💾 Salvando upload con identificatore: ${identifier}`
               );
-              console.log(`📝 req.userPubKey: ${req.userPubKey}`);
-              console.log(`📝 req.userAddress: ${req.userAddress}`);
 
               const uploadNode = gun
                 .get("shogun")
@@ -728,32 +628,9 @@ async function initializeServer() {
                 .get(fileResult?.Hash);
               uploadNode.put(uploadData);
 
-              // Salva il mapping pubKey -> userAddress se disponibili entrambi
-              if (req.userAddress && req.userPubKey) {
-                const mappingData = {
-                  userAddress: req.userAddress,
-                  pubKey: req.userPubKey,
-                  mappedAt: Date.now(),
-                  lastUpload: Date.now(),
-                };
-
-                const mappingNode = gun
-                  .get("shogun")
-                  .get("pubkey_mapping")
-                  .get(req.userPubKey);
-                mappingNode.put(mappingData);
-
-                console.log(
-                  `✅ Mapping salvato: ${req.userPubKey.slice(
-                    0,
-                    10
-                  )}... -> ${req.userAddress.slice(0, 6)}...`
-                );
-              }
-
               // Registra l'uso di MB tramite smart contract se disponibile
               let mbUsageRecorded = false;
-              if (relayContract && req.userPubKey) {
+              if (relayContract && req.userAddress) {
                 try {
                   // Calcola MB arrotondando sempre verso l'alto e convertendo in intero
                   const fileSizeBytes = req.file.size;
@@ -771,9 +648,9 @@ async function initializeServer() {
                   const relayAddress = allRelays[0];
 
                   console.log(
-                    `🔍 Verificando MB per Gun key: ${req.userPubKey.slice(
+                    `🔍 Verificando MB per indirizzo: ${req.userAddress.slice(
                       0,
-                      10
+                      6
                     )}...`
                   );
                   console.log(
@@ -781,35 +658,78 @@ async function initializeServer() {
                   );
                   console.log(`🏠 Relay address: ${relayAddress}`);
 
-                  // Verifica che ci siano MB sufficienti usando hasAvailableMB
-                  const hasMB = await relayContract.hasAvailableMB(
-                    req.userPubKey,
-                    relayAddress,
-                    fileSizeMB
-                  );
+                  // Verifica MB disponibili tramite smart contract
+                  let mbVerified = false;
+                  if (relayContract && req.userAddress) {
+                    try {
+                      // Verifica che ci siano MB sufficienti usando hasAvailableMB
+                      const hasMB = await relayContract.hasAvailableMB(
+                        req.userAddress,
+                        relayAddress,
+                        fileSizeMB
+                      );
 
-                  console.log(`✅ hasAvailableMB result: ${hasMB}`);
+                      console.log(`✅ hasAvailableMB result: ${hasMB}`);
 
-                  if (hasMB) {
+                      if (hasMB) {
+                        console.log(
+                          `✅ MB sufficienti per ${req.userAddress.slice(
+                            0,
+                            6
+                          )}... (richiesti: ${fileSizeMB} MB)`
+                        );
+                        mbVerified = true;
+                      } else {
+                        console.warn(
+                          `⚠️ MB insufficienti per ${req.userAddress.slice(
+                            0,
+                            6
+                          )}... (richiesti: ${fileSizeMB} MB)`
+                        );
+
+                        // BLOCCA l'upload se non ci sono MB sufficienti
+                        return res.status(403).json({
+                          success: false,
+                          error: "Storage insufficiente per questo file",
+                          details: {
+                            requiredMB: fileSizeMB,
+                            userAddress: req.userAddress.slice(0, 6) + "...",
+                            message:
+                              "Aggiungi più MB alla tua sottoscrizione per caricare questo file",
+                          },
+                        });
+                      }
+                    } catch (mbError) {
+                      console.error("Errore verifica MB:", mbError);
+                      // BLOCCA l'upload se c'è un errore nella verifica MB
+                      return res.status(500).json({
+                        success: false,
+                        error: "Errore verifica storage disponibile",
+                        details: mbError.message,
+                      });
+                    }
+                  }
+
+                  if (mbVerified) {
                     // Registra l'uso di MB
                     const tx = await relayContract.recordMBUsage(
-                      req.userPubKey,
+                      req.userAddress,
                       fileSizeMB
                     );
                     await tx.wait();
 
                     console.log(
-                      `✅ Uso MB registrato: ${fileSizeMB} MB per ${req.userPubKey.slice(
+                      `✅ Uso MB registrato: ${fileSizeMB} MB per ${req.userAddress.slice(
                         0,
-                        10
+                        6
                       )}...`
                     );
                     mbUsageRecorded = true;
                   } else {
                     console.warn(
-                      `⚠️ MB insufficienti per ${req.userPubKey.slice(
+                      `⚠️ MB insufficienti per ${req.userAddress.slice(
                         0,
-                        10
+                        6
                       )}... (richiesti: ${fileSizeMB} MB)`
                     );
 
@@ -819,7 +739,7 @@ async function initializeServer() {
                       error: "Storage insufficiente per questo file",
                       details: {
                         requiredMB: fileSizeMB,
-                        pubKey: req.userPubKey.slice(0, 10) + "...",
+                        userAddress: req.userAddress.slice(0, 6) + "...",
                         message:
                           "Aggiungi più MB alla tua sottoscrizione per caricare questo file",
                       },
@@ -852,13 +772,10 @@ async function initializeServer() {
                 },
                 user: {
                   address: req.userAddress,
-                  pubKey: req.userPubKey,
                 },
                 mbUsage: {
-                  recorded: mbUsageRecorded,
-                  sizeMB: mbUsageRecorded
-                    ? Math.ceil(req.file.size / (1024 * 1024))
-                    : +(req.file.size / 1024 / 1024).toFixed(2),
+                  verified: mbVerified,
+                  sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
                   actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
                 },
                 ipfsResponse: results,
@@ -2044,7 +1961,7 @@ async function initializeServer() {
     }
   });
 
-  // Endpoint ibrido per verificare lo stato della sottoscrizione (cerca prima per pubKey, poi per userAddress)
+  // Endpoint ibrido per verificare lo stato della sottoscrizione (usa solo userAddress)
   app.get("/api/subscription-status/:identifier", async (req, res) => {
     try {
       const { identifier } = req.params;
@@ -2052,7 +1969,7 @@ async function initializeServer() {
       if (!identifier) {
         return res.status(400).json({
           success: false,
-          error: "Identificatore richiesto (pubKey o userAddress)",
+          error: "Identificatore richiesto (userAddress)",
         });
       }
 
@@ -2084,7 +2001,7 @@ async function initializeServer() {
         let isSubscribed = false;
         let subscriptionDetails = null;
 
-        // Determina se l'identificatore è un indirizzo Ethereum o una pubKey
+        // Verifica se l'identificatore è un indirizzo Ethereum
         if (identifier.startsWith("0x") && identifier.length === 42) {
           // È un indirizzo Ethereum
           console.log(
@@ -2099,30 +2016,16 @@ async function initializeServer() {
             );
           }
         } else {
-          // È una pubKey, usa le funzioni per Gun key
-          console.log(`Verificando sottoscrizione per Gun key: ${identifier}`);
-          console.log(`Relay address: ${relayAddress}`);
-
-          isSubscribed = await relayContract.isSubscriptionActiveByGunKey(
+          // Non è un indirizzo valido
+          return res.json({
+            success: true,
             identifier,
-            relayAddress
-          );
-
-          console.log(`isSubscriptionActiveByGunKey result: ${isSubscribed}`);
-
-          if (isSubscribed) {
-            console.log(`Sottoscrizione trovata, ottenendo dettagli...`);
-            subscriptionDetails =
-              await relayContract.getSubscriptionDetailsByGunKey(
-                identifier,
-                relayAddress
-              );
-            console.log(`Dettagli sottoscrizione:`, subscriptionDetails);
-          } else {
-            console.log(
-              `Nessuna sottoscrizione attiva trovata per Gun key: ${identifier}`
-            );
-          }
+            subscription: {
+              isActive: false,
+              reason:
+                "Identificatore non valido - deve essere un indirizzo Ethereum",
+            },
+          });
         }
 
         if (isSubscribed && subscriptionDetails) {
@@ -2134,7 +2037,6 @@ async function initializeServer() {
             mbUsed,
             mbRemaining,
             isActive,
-            userOrGunKey,
           ] = subscriptionDetails;
 
           res.json({
@@ -2179,11 +2081,6 @@ async function initializeServer() {
 
           if (identifier.startsWith("0x") && identifier.length === 42) {
             isActive = await relayContract.isSubscriptionActive(
-              identifier,
-              relayAddress
-            );
-          } else {
-            isActive = await relayContract.isSubscriptionActiveByGunKey(
               identifier,
               relayAddress
             );
@@ -4374,6 +4271,62 @@ async function initializeServer() {
     customStats.putRequests++;
     addTimeSeriesPoint("puts/s", customStats.putRequests);
     addSystemLog("debug", "Gun PUT request", { msg: msg });
+  });
+
+  // Endpoint per ottenere i MB usati da un utente (sommando i file in GunDB)
+  app.get("/api/user-mb-used/:address", async (req, res) => {
+    try {
+      const { address } = req.params;
+      if (!address) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Address is required" });
+      }
+
+      // Access the live, in-memory graph from the Gun instance
+      const graphData = gun._.graph;
+
+      // If the graph contains a `!` node, which typically holds the root,
+      // use its contents as the main graph.
+      if (graphData && graphData["!"]) {
+        console.log("Found '!' node in live graph, using it as the root.");
+        graphData = graphData["!"];
+      }
+
+      // Clean the graph data for serialization (remove circular `_` metadata)
+      const cleanGraph = {};
+      for (const soul in graphData) {
+        if (Object.prototype.hasOwnProperty.call(graphData, soul)) {
+          const node = graphData[soul];
+          const cleanNode = {};
+          for (const key in node) {
+            if (key !== "_") {
+              cleanNode[key] = node[key];
+            }
+          }
+          cleanGraph[soul] = cleanNode;
+        }
+      }
+
+      // Calculate the total size of all files in the user's graph
+      let totalSize = 0;
+      for (const key in cleanGraph) {
+        if (cleanGraph[key].size) {
+          totalSize += cleanGraph[key].size;
+        }
+      }
+
+      res.json({
+        success: true,
+        totalSizeMB: totalSize / 1024 / 1024, // Convert bytes to MB
+        address,
+      });
+    } catch (error) {
+      console.error("Error calculating user MB used:", error);
+      res
+        .status(500)
+        .json({ success: false, error: "Failed to calculate user MB used" });
+    }
   });
 } // End of initializeServer function
 

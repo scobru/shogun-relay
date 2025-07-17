@@ -204,12 +204,9 @@
 
     <script>
         // Global variables
-        let currentGunPubKey = '';
         let walletAddress = '';
 
         // DOM elements
-        const gunPubKeyInput = document.getElementById('gunPubKey');
-        const setAuthBtn = document.getElementById('setAuthBtn');
         const uploadSection = document.getElementById('uploadSection');
         const currentGunKeyEl = document.getElementById('currentGunKey');
         const fileInput = document.getElementById('fileInput');
@@ -229,7 +226,6 @@
         const walletAddressEl = document.getElementById('walletAddress');
 
         // Event listeners
-        setAuthBtn.addEventListener('click', setAuthorization);
         uploadBtn.addEventListener('click', uploadFile);
         refreshFilesBtn.addEventListener('click', loadUserFiles);
         connectWalletBtn.addEventListener('click', connectWallet);
@@ -368,8 +364,8 @@
                 return;
             }
 
-            if (!currentGunPubKey || !walletAddress) {
-                showStatus('Please set your authorization first', 'error');
+            if (!walletAddress) {
+                showStatus('Please connect your wallet first', 'error');
                 return;
             }
 
@@ -384,7 +380,6 @@
                 const response = await fetch('/ipfs-upload-user', {
                     method: 'POST',
                     headers: {
-                        'x-pubkey': currentGunPubKey,
                         'x-user-address': walletAddress
                     },
                     body: formData
@@ -395,11 +390,16 @@
                 if (result.success) {
                     const actualSize = result.mbUsage.actualSizeMB;
                     const chargedSize = result.mbUsage.sizeMB;
+                    const verified = result.mbUsage.verified;
                     const sizeInfo = actualSize !== chargedSize ?
                         ` (${actualSize} MB actual, ${chargedSize} MB charged)` :
                         ` (${chargedSize} MB)`;
 
-                    showStatus(`✅ File uploaded successfully! Hash: ${result.file.hash}${sizeInfo}`, 'success');
+                    const verificationInfo = verified ?
+                        ` ✅ Storage verified` :
+                        ` ⚠️ Storage not verified`;
+
+                    showStatus(`✅ File uploaded successfully! Hash: ${result.file.hash}${sizeInfo}${verificationInfo}`, 'success');
                     fileInput.value = '';
                     loadUserFiles(); // Refresh files list
                 } else {
@@ -427,10 +427,10 @@
 
         // Load user files
         async function loadUserFiles() {
-            if (!currentGunPubKey) return;
+            if (!walletAddress) return;
 
             try {
-                const response = await fetch(`/api/user-uploads/${encodeURIComponent(currentGunPubKey)}`);
+                const response = await fetch(`/api/user-uploads/${encodeURIComponent(walletAddress)}`);
                 const result = await response.json();
 
                 if (result.success) {
@@ -488,7 +488,7 @@
             if (!confirm('Are you sure you want to delete this file?')) return;
 
             try {
-                const response = await fetch(`/api/user-uploads/${encodeURIComponent(currentGunPubKey)}/${hash}`, {
+                const response = await fetch(`/api/user-uploads/${encodeURIComponent(walletAddress)}/${hash}`, {
                     method: 'DELETE'
                 });
 
@@ -515,7 +515,7 @@
                     walletAddressEl.textContent = walletAddress;
                     walletStatus.textContent = `Connected: ${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 4)}`;
                     walletInfo.classList.remove('hidden');
-                    setAuthBtn.disabled = false;
+                    // setAuthBtn.disabled = false; // This button is removed, so no need to re-enable it
                     showStatus('Wallet connected!', 'success');
                 } catch (error) {
                     console.error('Error connecting wallet:', error);
