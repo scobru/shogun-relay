@@ -8,9 +8,8 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="styles/wormhole.css" />
-    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
-    <script src="https://cdn.ethers.io/lib/ethers-6.15.0.umd.min.js" type="application/javascript"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.15.0/ethers.umd.min.js"
+        type="application/javascript"></script>
     <style>
         body {
             line-height: 1.6;
@@ -123,7 +122,7 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
                                     stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                                 </svg>
                                 Enter Your Gun Public Key
                             </h3>
@@ -256,9 +255,6 @@
         const statusMessage = document.getElementById('statusMessage');
         const subscriptionStatus = document.getElementById('subscriptionStatus');
         const statusContent = document.getElementById('statusContent');
-
-        // Initialize Gun
-        const gun = Gun(['http://localhost:8765/gun']);
 
         // Event listeners
         connectWalletBtn.addEventListener('click', connectWallet);

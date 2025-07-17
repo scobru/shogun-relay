@@ -8,8 +8,6 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="styles/wormhole.css" />
-    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
     <style>
         body {
             line-height: 1.6;
@@ -54,9 +52,9 @@
                     </svg>
 
                     <h1 class="text-3xl font-semibold mb-2">User Upload</h1>
-                    <p class="text-base-content/70 mb-8">Upload files using your Gun public key authorization</p>
+                    <p class="text-base-content/70 mb-8">Upload files using your Ethereum wallet and Gun public key</p>
 
-                    <!-- Gun Key Setup -->
+                    <!-- Setup Section -->
                     <div class="w-full max-w-4xl space-y-6">
                         <div class="upload-card">
                             <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -65,12 +63,12 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                                 </svg>
-                                Wallet Address Setup
+                                Authorization Setup
                             </h3>
                             <p class="text-base-content/70 mb-4">
-                                Enter your Ethereum wallet address to upload files. This address must be authorized via
-                                smart
-                                contract subscription.
+                                Enter your Ethereum wallet address and Gun public key. The wallet address must be
+                                authorized via
+                                smart contract subscription.
                             </p>
 
                             <div class="form-control mb-4">
@@ -81,8 +79,16 @@
                                     placeholder="Enter your Ethereum wallet address (0x...)" />
                             </div>
 
-                            <button id="setWalletBtn" class="btn btn-accent">
-                                Set Wallet Address
+                            <div class="form-control mb-4">
+                                <label class="label">
+                                    <span class="label-text">Gun Public Key:</span>
+                                </label>
+                                <textarea id="gunPubKey" class="textarea textarea-bordered h-20 font-mono text-sm"
+                                    placeholder="Enter your Gun public key..."></textarea>
+                            </div>
+
+                            <button id="setAuthBtn" class="btn btn-accent">
+                                Set Authorization
                             </button>
                         </div>
 
@@ -97,9 +103,15 @@
                                 Upload Files
                             </h3>
 
-                            <div class="mb-4">
-                                <p class="text-sm text-base-content/70 mb-2">Current Wallet Address:</p>
-                                <div class="pubkey-display" id="currentWallet"></div>
+                            <div class="mb-4 space-y-2">
+                                <div>
+                                    <p class="text-sm text-base-content/70 mb-1">Wallet Address:</p>
+                                    <div class="pubkey-display" id="currentWallet"></div>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-base-content/70 mb-1">Gun Public Key:</p>
+                                    <div class="pubkey-display" id="currentGunKey"></div>
+                                </div>
                             </div>
 
                             <div class="drag-drop-area" id="dropArea">
@@ -170,13 +182,15 @@
     <script>
         // Global variables
         let currentWalletAddress = '';
-        let gunKeyPair = null;
+        let currentGunPubKey = '';
 
         // DOM elements
         const walletAddressInput = document.getElementById('walletAddress');
-        const setWalletBtn = document.getElementById('setWalletBtn');
+        const gunPubKeyInput = document.getElementById('gunPubKey');
+        const setAuthBtn = document.getElementById('setAuthBtn');
         const uploadSection = document.getElementById('uploadSection');
         const currentWalletEl = document.getElementById('currentWallet');
+        const currentGunKeyEl = document.getElementById('currentGunKey');
         const fileInput = document.getElementById('fileInput');
         const uploadBtn = document.getElementById('uploadBtn');
         const dropArea = document.getElementById('dropArea');
@@ -189,11 +203,8 @@
         const refreshFilesBtn = document.getElementById('refreshFilesBtn');
         const statusMessage = document.getElementById('statusMessage');
 
-        // Initialize Gun
-        const gun = Gun(['http://localhost:8765/gun']);
-
         // Event listeners
-        setWalletBtn.addEventListener('click', setWalletAddress);
+        setAuthBtn.addEventListener('click', setAuthorization);
         uploadBtn.addEventListener('click', uploadFile);
         refreshFilesBtn.addEventListener('click', loadUserFiles);
 
@@ -232,11 +243,18 @@
             fileInput.files = files;
         }
 
-        // Wallet address management
-        function setWalletAddress() {
+        // Authorization setup
+        function setAuthorization() {
             const walletAddress = walletAddressInput.value.trim();
+            const gunPubKey = gunPubKeyInput.value.trim();
+
             if (!walletAddress) {
                 showStatus('Please enter a wallet address', 'error');
+                return;
+            }
+
+            if (!gunPubKey) {
+                showStatus('Please enter a Gun public key', 'error');
                 return;
             }
 
@@ -246,12 +264,22 @@
                 return;
             }
 
+            // Validazione base della chiave Gun
+            if (gunPubKey.length < 20) {
+                showStatus('Please enter a valid Gun public key', 'error');
+                return;
+            }
+
             currentWalletAddress = walletAddress;
+            currentGunPubKey = gunPubKey;
+
             currentWalletEl.textContent = walletAddress;
+            currentGunKeyEl.textContent = gunPubKey;
+
             uploadSection.classList.remove('hidden');
             filesSection.classList.remove('hidden');
 
-            showStatus('Wallet address set successfully!', 'success');
+            showStatus('Authorization set successfully!', 'success');
             loadUserFiles();
         }
 
@@ -263,8 +291,8 @@
                 return;
             }
 
-            if (!currentWalletAddress) {
-                showStatus('Please set your wallet address first', 'error');
+            if (!currentWalletAddress || !currentGunPubKey) {
+                showStatus('Please set your authorization first', 'error');
                 return;
             }
 
@@ -278,7 +306,8 @@
                 const response = await fetch('/ipfs-upload-user', {
                     method: 'POST',
                     headers: {
-                        'x-user-address': currentWalletAddress
+                        'x-user-address': currentWalletAddress,
+                        'x-pubkey': currentGunPubKey
                     },
                     body: formData
                 });
@@ -403,7 +432,7 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
-            showStatus('Enter your Ethereum wallet address to start uploading files', 'info');
+            showStatus('Enter your Ethereum wallet address and Gun public key to start uploading files', 'info');
         });
     </script>
 </body>
