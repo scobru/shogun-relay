@@ -132,16 +132,11 @@
                         <div class="w-8 h-px bg-base-content/30"></div>
                         <div class="flex items-center gap-2">
                             <div id="step2" class="step-indicator step-pending">2</div>
-                            <span class="text-sm">Enter Gun Key</span>
-                        </div>
-                        <div class="w-8 h-px bg-base-content/30"></div>
-                        <div class="flex items-center gap-2">
-                            <div id="step3" class="step-indicator step-pending">3</div>
                             <span class="text-sm">Subscribe</span>
                         </div>
                         <div class="w-8 h-px bg-base-content/30"></div>
                         <div class="flex items-center gap-2">
-                            <div id="step4" class="step-indicator step-pending">4</div>
+                            <div id="step3" class="step-indicator step-pending">3</div>
                             <span class="text-sm">Status</span>
                         </div>
                     </div>
@@ -182,50 +177,8 @@
                         </div>
                     </div>
 
-                    <!-- Step 2: Gun Key Input -->
+                    <!-- Step 2: Subscription -->
                     <div id="step2Content" class="w-full max-w-2xl space-y-6 hidden">
-                        <div class="status-card">
-                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
-                                    stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                                </svg>
-                                Enter Your Gun Public Key
-                            </h3>
-                            <p class="text-base-content/70 mb-4">
-                                Paste your existing Gun public key that will be used for relay authorization.
-                            </p>
-
-                            <div class="form-control mb-4">
-                                <label class="label">
-                                    <span class="label-text">Gun Public Key:</span>
-                                </label>
-                                <textarea id="gunPubKeyInput" class="textarea textarea-bordered h-24 font-mono text-sm"
-                                    placeholder="Paste your Gun public key here..."></textarea>
-                            </div>
-
-                            <button id="validateKeyBtn" class="btn btn-accent">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
-                                    viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Validate & Continue
-                            </button>
-                        </div>
-
-                        <div id="keyInfo" class="wallet-info hidden">
-                            <h4 class="font-semibold mb-2">Your Gun Public Key:</h4>
-                            <div class="pubkey-display" id="gunPubKey"></div>
-                            <p class="text-xs text-base-content/60 mt-2">
-                                This key will be used to authorize your uploads to the relay.
-                            </p>
-                        </div>
-                    </div>
-
-                    <!-- Step 3: Subscription -->
-                    <div id="step3Content" class="w-full max-w-2xl space-y-6 hidden">
                         <div class="status-card">
                             <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
@@ -236,7 +189,8 @@
                                 Subscribe to Relay
                             </h3>
                             <p class="text-base-content/70 mb-4">
-                                Subscribe to the relay using your smart contract. Choose the subscription duration.
+                                Sottoscrivi lo storage usando il tuo wallet Ethereum. Scegli la quantità di MB
+                                desiderata.
                             </p>
 
                             <div class="form-control mb-4">
@@ -287,8 +241,8 @@
                         </div>
                     </div>
 
-                    <!-- Step 4: Subscription Status Check -->
-                    <div id="step4Content" class="w-full max-w-2xl space-y-6 hidden">
+                    <!-- Step 3: Subscription Status Check -->
+                    <div id="step3Content" class="w-full max-w-2xl space-y-6 hidden">
                         <div class="status-card">
                             <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
@@ -364,7 +318,8 @@
         let signer = null;
         let walletAddress = null;
         let relayContract = null;
-        let gunKeyPair = null;
+        // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
+        // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
 
         // Contract configuration - caricata dinamicamente
         let RELAY_CONTRACT_ADDRESS = null;
@@ -446,11 +401,8 @@
         const disconnectWalletBtn = document.getElementById('disconnectWalletBtn');
         const walletInfo = document.getElementById('walletInfo');
         const walletAddressEl = document.getElementById('walletAddress');
-        const keyInfo = document.getElementById('keyInfo');
-        const gunPubKeyEl = document.getElementById('gunPubKey');
-        const gunPubKeyInput = document.getElementById('gunPubKeyInput');
-        const validateKeyBtn = document.getElementById('validateKeyBtn');
-        const subscriptionMonths = document.getElementById('subscriptionMonths');
+        // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
+        // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
         const subscribeBtn = document.getElementById('subscribeBtn');
         const statusMessage = document.getElementById('statusMessage');
         const subscriptionStatus = document.getElementById('subscriptionStatus');
@@ -467,12 +419,9 @@
         // Funzione per testare l'endpoint direttamente
         async function testEndpoint() {
             try {
-                if (!gunKeyPair?.pub) {
-                    showNotification('Please enter and validate your Gun public key first', 'error');
-                    return;
-                }
-
-                const identifier = gunKeyPair.pub;
+                // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
+                // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
+                const identifier = walletAddress;
                 console.log('🧪 Testing endpoint directly for:', identifier);
 
                 const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
@@ -559,14 +508,9 @@
         // Funzione per verificare preventivamente se esiste già una sottoscrizione
         async function checkExistingSubscription() {
             try {
-                if (!gunKeyPair?.pub) {
-                    showNotification('Please enter and validate your Gun public key first', 'error');
-                    showStep(2);
-                    updateStep(2, 'step-active');
-                    return false;
-                }
-
-                const identifier = gunKeyPair.pub;
+                // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
+                // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
+                const identifier = walletAddress;
                 console.log('🔍 Checking existing subscription for Gun key:', identifier);
 
                 const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
@@ -604,7 +548,6 @@
         // Event listeners
         connectWalletBtn.addEventListener('click', connectWallet);
         disconnectWalletBtn.addEventListener('click', disconnectWallet);
-        validateKeyBtn.addEventListener('click', validateAndContinue);
         subscribeBtn.addEventListener('click', subscribeToRelay);
         mbInput.addEventListener('input', updateSubscriptionDetails);
         if (addMbInput) addMbInput.addEventListener('input', updateAddMBCost);
@@ -612,10 +555,12 @@
         refreshStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
         testEndpointBtn.addEventListener('click', testEndpoint);
         newSubscriptionBtn.addEventListener('click', async () => {
-            if (!gunKeyPair || !gunKeyPair.pub) {
-                showNotification('Please enter and validate your Gun public key first', 'error');
-                showStep(2);
-                updateStep(2, 'step-active');
+            // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
+            // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
+            if (!walletAddress) {
+                showNotification('Please connect your wallet first', 'error');
+                showStep(1);
+                updateStep(1, 'step-active');
                 return;
             }
 
@@ -821,16 +766,13 @@
             signer = null;
             walletAddress = null;
             relayContract = null;
-            gunKeyPair = null;
-
+            // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
+            // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
             walletInfo.classList.add('hidden');
             connectWalletBtn.classList.remove('hidden');
-            keyInfo.classList.add('hidden');
-            validateKeyBtn.classList.remove('hidden');
-            gunPubKeyInput.value = '';
-            subscriptionStatus.classList.add('hidden');
-
-            showStep(1);
+            // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
+            // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
+            updateStep(1);
             updateStep(1, 'step-active');
             updateStep(2, 'step-pending');
             updateStep(3, 'step-pending');
@@ -839,53 +781,8 @@
             showNotification('Wallet disconnected', 'info');
         }
 
-        // Gun key validation
-        async function validateAndContinue() {
-            const gunPubKey = gunPubKeyInput.value.trim();
-
-            if (!gunPubKey) {
-                showNotification('Please enter a Gun public key.', 'warning');
-                return;
-            }
-
-            try {
-                // Validate the public key format (basic check)
-                if (gunPubKey.length < 20) {
-                    showNotification('Invalid Gun public key format. Please check your key.', 'error');
-                    return;
-                }
-
-                // Store the public key
-                gunKeyPair = { pub: gunPubKey };
-
-                // Display the key
-                gunPubKeyEl.textContent = gunPubKey;
-                keyInfo.classList.remove('hidden');
-                validateKeyBtn.classList.add('hidden');
-
-                showNotification('Gun public key validated successfully!', 'success');
-                updateStep(2, 'step-completed');
-
-                // Verifica automaticamente se esiste già una sottoscrizione
-                const hasExisting = await checkExistingSubscription();
-                if (hasExisting) {
-                    // Se esiste già una sottoscrizione, non andare al Step 4 automaticamente
-                    // perché checkExistingSubscription già lo fa
-                    return;
-                }
-
-                // Mostra il Step 4 per controllare lo stato della sottoscrizione
-                showStep(4);
-                updateStep(4, 'step-active');
-
-                // Controlla automaticamente lo stato della sottoscrizione
-                await checkSubscriptionStatusFromServer();
-
-            } catch (error) {
-                showNotification(`Failed to validate Gun public key: ${error.message}`, 'error');
-            }
-        }
-
+        // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
+        // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
         // Subscription management
         async function loadSubscriptionDetails() {
             try {
@@ -994,14 +891,8 @@
                     return;
                 }
 
-                if (!gunKeyPair || !gunKeyPair.pub) {
-                    showNotification('Please enter and validate your Gun public key first', 'error');
-                    // Torna al Step 2 per inserire la chiave Gun
-                    showStep(2);
-                    updateStep(2, 'step-active');
-                    return;
-                }
-
+                // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
+                // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
                 if (!registeredRelayAddress) {
                     showNotification('No relay available for subscription. Please try again later.', 'error');
                     return;
@@ -1012,7 +903,7 @@
                 const totalCost = (BigInt(mb) * pricePerGB) / 1000n; // Calcola il costo per i MB specificati
 
                 // Subscribe usando l'indirizzo del relay registrato
-                const tx = await relayContract.subscribeToRelay(registeredRelayAddress, gunKeyPair.pub, {
+                const tx = await relayContract.subscribeToRelay(registeredRelayAddress, {
                     value: totalCost
                 });
 
@@ -1048,11 +939,8 @@
                     return;
                 }
 
-                if (!gunKeyPair || !gunKeyPair.pub) {
-                    showNotification('Please enter and validate your Gun public key first', 'error');
-                    return;
-                }
-
+                // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
+                // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
                 if (!registeredRelayAddress) {
                     showNotification('No relay available for adding MB. Please try again later.', 'error');
                     return;
@@ -1068,7 +956,7 @@
                 const pricePerGB = await relayContract.PRICE_PER_GB();
                 const cost = (BigInt(mbToAdd) * pricePerGB) / 1000n; // Calcola il costo per i MB specificati
 
-                const tx = await relayContract.addMBToSubscription(registeredRelayAddress, gunKeyPair.pub, {
+                const tx = await relayContract.addMBToSubscription(registeredRelayAddress, {
                     value: cost
                 });
 
@@ -1092,13 +980,15 @@
 
         async function checkSubscriptionStatus() {
             try {
-                if (!relayContract || !walletAddress || !registeredRelayAddress || !gunKeyPair?.pub) return;
+                if (!relayContract || !walletAddress || !registeredRelayAddress) return;
 
                 let isSubscribed = false;
 
                 try {
                     // Usa isSubscriptionActiveByGunKey che verifica la sottoscrizione per questa chiave Gun specifica
-                    isSubscribed = await relayContract.isSubscriptionActiveByGunKey(gunKeyPair.pub, registeredRelayAddress);
+                    // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
+                    // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
+                    isSubscribed = await relayContract.isSubscriptionActive(walletAddress, registeredRelayAddress);
                 } catch (e) {
                     // Fallback per compatibilità con il vecchio sistema
                     console.log('Fallback to address-based check:', e);
@@ -1112,10 +1002,10 @@
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <span>Your Gun public key is authorized for relay uploads!</span>
+                            <span>Your wallet is authorized for relay uploads!</span>
                         </div>
                         <p class="text-sm text-base-content/70 mt-2">
-                            You can now use the upload endpoint with your Gun public key: <strong>${gunKeyPair?.pub || 'N/A'}</strong>
+                            You can now use the upload endpoint with your wallet address: <strong>${walletAddress}</strong>
                         </p>
                     `;
                 }
@@ -1158,10 +1048,10 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                <span>Your Gun public key is authorized for relay uploads!</span>
+                                <span>Your wallet is authorized for relay uploads!</span>
                             </div>
                             <p class="text-sm text-base-content/70 mt-2">
-                                You can now use the upload endpoint with your Gun public key: <strong>${walletAddress}</strong>
+                                You can now use the upload endpoint with your wallet address: <strong>${walletAddress}</strong>
                             </p>
                         `;
                     } else {
@@ -1273,7 +1163,7 @@
 
                         <div class="bg-base-300/50 rounded-lg p-3">
                             <p class="text-sm text-base-content/70">
-                                <strong>Gun Public Key:</strong> ${walletAddress}
+                                <strong>Wallet Address:</strong> ${walletAddress}
                             </p>
                             <p class="text-sm text-base-content/70 mt-1">
                                 You can now upload files using the <a href="/user-upload" class="link link-accent">User Upload</a> page.

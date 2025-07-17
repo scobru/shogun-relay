@@ -68,6 +68,7 @@
 
                     <!-- Setup Section -->
                     <div class="w-full max-w-4xl space-y-6">
+                        <!-- Authorization Setup -->
                         <div class="upload-card">
                             <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
@@ -75,14 +76,11 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                                 </svg>
-                                Authorization Setup
+                                Wallet Setup
                             </h3>
                             <p class="text-base-content/70 mb-4">
-                                Connect your wallet and enter your Gun public key. The wallet must match the one
-                                registered in the smart contract.
+                                Connetti il tuo wallet Ethereum. Tutti i file caricati saranno associati al tuo address.
                             </p>
-
-                            <!-- Wallet Connection -->
                             <div class="form-control mb-4">
                                 <label class="label">
                                     <span class="label-text">Wallet Connection:</span>
@@ -105,18 +103,6 @@
                                     </div>
                                 </div>
                             </div>
-
-                            <div class="form-control mb-4">
-                                <label class="label">
-                                    <span class="label-text">Gun Public Key:</span>
-                                </label>
-                                <textarea id="gunPubKey" class="textarea textarea-bordered h-20 font-mono text-sm"
-                                    placeholder="Enter your Gun public key..."></textarea>
-                            </div>
-
-                            <button id="setAuthBtn" class="btn btn-accent" disabled>
-                                Set Authorization
-                            </button>
                         </div>
 
                         <!-- Upload Section -->
@@ -266,72 +252,8 @@
         }
 
         // Authorization setup
-        async function setAuthorization() {
-            const gunPubKey = gunPubKeyInput.value.trim();
-
-            if (!walletAddress) {
-                showStatus('Please connect your wallet first', 'error');
-                return;
-            }
-
-            if (!gunPubKey) {
-                showStatus('Please enter a Gun public key', 'error');
-                return;
-            }
-
-            // Validazione base della chiave Gun
-            if (gunPubKey.length < 20) {
-                showStatus('Please enter a valid Gun public key', 'error');
-                return;
-            }
-
-            try {
-                setAuthBtn.disabled = true;
-                setAuthBtn.textContent = 'Verifying...';
-
-                // Verifica che il wallet corrisponda alla Gun key registrata nel contratto
-                const response = await fetch(`/api/verify-gunkey-ownership`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        gunPubKey: gunPubKey,
-                        walletAddress: walletAddress
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-
-                const result = await response.json();
-
-                if (result.success && result.isOwner) {
-                    currentGunPubKey = gunPubKey;
-                    currentGunKeyEl.textContent = gunPubKey;
-                    uploadSection.classList.remove('hidden');
-                    filesSection.classList.remove('hidden');
-                    showStatus('Authorization verified! Wallet matches Gun key.', 'success');
-
-                    // Controlla automaticamente lo stato della sottoscrizione
-                    checkSubscriptionStatus(gunPubKey);
-                    loadUserFiles();
-                } else {
-                    showStatus('❌ Wallet does not match the Gun key registered in the smart contract. Only the owner can upload files.', 'error');
-                }
-            } catch (error) {
-                console.error('Error verifying ownership:', error);
-                if (error.message.includes('Failed to fetch') || error.message.includes('net::ERR_NAME_NOT_RESOLVED')) {
-                    showStatus('❌ Connection error. Please check your internet connection and try again.', 'error');
-                } else {
-                    showStatus(`❌ Error verifying wallet ownership: ${error.message}`, 'error');
-                }
-            } finally {
-                setAuthBtn.disabled = false;
-                setAuthBtn.textContent = 'Set Authorization';
-            }
-        }
+        // Rimuovo la textarea Gun Public Key, il bottone Set Authorization e la logica JS associata
+        // Aggiorno la logica di upload e caricamento file per usare solo walletAddress
 
         // Controlla lo stato della sottoscrizione
         async function checkSubscriptionStatus(key) {
