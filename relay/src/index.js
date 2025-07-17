@@ -2077,19 +2077,6 @@ async function initializeServer() {
     }
   }
 
-  // Sostituisci i console.log con il logger
-  console.log = (...args) => {
-    console.log(...args);
-  };
-
-  console.error = (...args) => {
-    console.error(...args);
-  };
-
-  console.warn = (...args) => {
-    console.warn(...args);
-  };
-
   // Graceful shutdown
   async function shutdown() {
     console.log("\nShutting down relay server...");
