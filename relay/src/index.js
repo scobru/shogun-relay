@@ -1890,43 +1890,6 @@ async function initializeServer() {
         });
       }
 
-      let userAddress = null;
-      let pubKey = null;
-
-      // Determina se l'identificatore è un indirizzo Ethereum o una pubKey
-      if (identifier.startsWith("0x") && identifier.length === 42) {
-        // È un indirizzo Ethereum
-        userAddress = identifier;
-      } else {
-        // Probabilmente è una pubKey, cerca nel mapping
-        pubKey = identifier;
-
-        // Cerca il mapping nel database Gun
-        const mappingNode = gun.get("shogun").get("pubkey_mapping").get(pubKey);
-
-        const mapping = await new Promise((resolve) => {
-          mappingNode.once((data) => {
-            resolve(data);
-          });
-        });
-
-        if (mapping && mapping.userAddress) {
-          userAddress = mapping.userAddress;
-          console.log(`Mapping trovato: ${pubKey} -> ${userAddress}`);
-        } else {
-          return res.json({
-            success: true,
-            identifier,
-            pubKey,
-            userAddress: null,
-            subscription: {
-              isActive: false,
-              reason: "Nessun mapping trovato per questa chiave pubblica Gun",
-            },
-          });
-        }
-      }
-
       // Ottieni tutti i relay registrati
       const allRelays = await relayContract.getAllRelays();
 
@@ -1934,8 +1897,6 @@ async function initializeServer() {
         return res.json({
           success: true,
           identifier,
-          pubKey,
-          userAddress,
           subscription: {
             isActive: false,
             reason: "Nessun relay registrato nel contratto",
@@ -1950,30 +1911,33 @@ async function initializeServer() {
         let isSubscribed = false;
         let subscriptionDetails = null;
 
-        // Se abbiamo una pubKey, usa le funzioni per Gun key
-        if (pubKey) {
-          console.log(`Verificando sottoscrizione per Gun key: ${pubKey}`);
-          isSubscribed = await relayContract.checkGunKeySubscription(pubKey);
+        // Determina se l'identificatore è un indirizzo Ethereum o una pubKey
+        if (identifier.startsWith("0x") && identifier.length === 42) {
+          // È un indirizzo Ethereum
+          console.log(
+            `Verificando sottoscrizione per indirizzo: ${identifier}`
+          );
+          isSubscribed = await relayContract.checkUserSubscription(identifier);
+
+          if (isSubscribed) {
+            subscriptionDetails = await relayContract.getSubscriptionDetails(
+              identifier,
+              relayAddress
+            );
+          }
+        } else {
+          // È una pubKey, usa le funzioni per Gun key
+          console.log(`Verificando sottoscrizione per Gun key: ${identifier}`);
+          isSubscribed = await relayContract.checkGunKeySubscription(
+            identifier
+          );
 
           if (isSubscribed) {
             subscriptionDetails =
               await relayContract.getSubscriptionDetailsByGunKey(
-                pubKey,
+                identifier,
                 relayAddress
               );
-          }
-        } else {
-          // Fallback per indirizzo
-          console.log(
-            `Verificando sottoscrizione per indirizzo: ${userAddress}`
-          );
-          isSubscribed = await relayContract.checkUserSubscription(userAddress);
-
-          if (isSubscribed) {
-            subscriptionDetails = await relayContract.getSubscriptionDetails(
-              userAddress,
-              relayAddress
-            );
           }
         }
 
@@ -1992,8 +1956,6 @@ async function initializeServer() {
           res.json({
             success: true,
             identifier,
-            pubKey,
-            userAddress,
             relayAddress,
             subscription: {
               isActive: isActive,
@@ -2017,8 +1979,6 @@ async function initializeServer() {
           res.json({
             success: true,
             identifier,
-            pubKey,
-            userAddress,
             relayAddress,
             subscription: {
               isActive: false,
@@ -2033,14 +1993,14 @@ async function initializeServer() {
         try {
           let isActive = false;
 
-          if (pubKey) {
-            isActive = await relayContract.isSubscriptionActiveByGunKey(
-              pubKey,
+          if (identifier.startsWith("0x") && identifier.length === 42) {
+            isActive = await relayContract.isSubscriptionActive(
+              identifier,
               relayAddress
             );
           } else {
-            isActive = await relayContract.isSubscriptionActive(
-              userAddress,
+            isActive = await relayContract.isSubscriptionActiveByGunKey(
+              identifier,
               relayAddress
             );
           }
@@ -2048,8 +2008,6 @@ async function initializeServer() {
           res.json({
             success: true,
             identifier,
-            pubKey,
-            userAddress,
             relayAddress,
             subscription: {
               isActive: isActive,
@@ -3974,6 +3932,9 @@ async function initializeServer() {
       });
     }
   });
+
+  // Endpoint per registrare il mapping pubKey -> userAddress durante la sottoscrizione
+  // RIMOSSO: Non serve più dato che usiamo solo i dati on-chain
 } // End of initializeServer function
 
 // Start the server

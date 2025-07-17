@@ -302,8 +302,8 @@
         // Controlla lo stato della sottoscrizione
         async function checkSubscriptionStatus(address) {
             try {
-                // Usa il nuovo endpoint ibrido che supporta sia pubKey che userAddress
-                const identifier = currentGunPubKey || address;
+                // Usa l'indirizzo wallet come identificatore principale (più affidabile)
+                const identifier = address;
                 const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
                 const result = await response.json();
 
