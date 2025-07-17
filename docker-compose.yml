@@ -19,22 +19,22 @@ services:
     environment:
       - NODE_ENV=production
       - IPFS_PATH=/data/ipfs
-      - ADMIN_PASSWORD=--admin-password--
+      - ADMIN_PASSWORD=shogun2025
       - GC_ENABLED=true
       - RELAY_HOST=localhost
       - RELAY_PORT=8765
       - RELAY_STORE=true
       - RELAY_PATH=public
       - RELAY_QR=true
-      - RELAY_NAME=--relay-name--
+      - RELAY_NAME=OP1
       - RELAY_PEERS=wss://127.0.0.1:8765/gun
       - RELAY_PROTECTED=true
       - ALCHEMY_API_KEY=
       - RELAY_CONTRACT_ADDRESS=0xEEEDdFE52A9DdeE21bad99AE84CAc684F421d54d
       - IPFS_API_URL=http://127.0.0.1:5001
       - IPFS_GATEWAY_URL=http://127.0.0.1:8080
-      - IPFS_API_TOKEN=--ipfs-api-token--
-      - IPFS_API_KEY=--ipfs-api-key--
+      - IPFS_API_TOKEN=shogun2025
+      - IPFS_API_KEY=shogun2025
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
