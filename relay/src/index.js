@@ -10,10 +10,10 @@ import dotenv from "dotenv";
 import ip from "ip";
 import qr from "qr";
 import setSelfAdjustingInterval from "self-adjusting-interval";
-import AWS from "aws-sdk";
 import FormData from "form-data";
 import "./utils/bullet-catcher.js";
 import Docker from "dockerode";
+import { ethers } from "ethers";
 
 dotenv.config();
 
@@ -22,7 +22,6 @@ import "gun/sea.js";
 import "gun/lib/stats.js";
 import "gun/lib/webrtc.js";
 import "gun/lib/rfs.js";
-import "gun/lib/rs3.js";
 
 import ShogunCoreModule from "shogun-core";
 const { derive, SEA } = ShogunCoreModule;
@@ -78,6 +77,69 @@ if (isNaN(port) || port <= 0 || port >= 65536) {
 }
 let path_public = process.env.RELAY_PATH || "public";
 let showQr = process.env.RELAY_QR !== "false";
+
+// --- Config per smart contract ---
+const WEB3_PROVIDER_URL =
+  process.env.WEB3_PROVIDER_URL || "http://127.0.0.1:8545";
+const RELAY_CONTRACT_ADDRESS = process.env.RELAY_CONTRACT_ADDRESS;
+let relayContract;
+let provider;
+let relayAbi = [
+  "function isSubscribed(bytes calldata _pubKey) external view returns (bool)",
+  "function isAuthorizedByPubKey(bytes calldata _pubKey) external view returns (bool)",
+];
+if (RELAY_CONTRACT_ADDRESS) {
+  provider = new ethers.JsonRpcProvider(WEB3_PROVIDER_URL);
+  relayContract = new ethers.Contract(
+    RELAY_CONTRACT_ADDRESS,
+    relayAbi,
+    provider
+  );
+}
+
+// Middleware per autorizzazione smart contract
+const relayContractAuthMiddleware = async (req, res, next) => {
+  try {
+    const pubKey = req.headers["x-pubkey"];
+    if (!pubKey) {
+      return res
+        .status(401)
+        .json({ success: false, error: "x-pubkey header richiesto" });
+    }
+    if (!relayContract) {
+      return res
+        .status(500)
+        .json({ success: false, error: "Relay contract non configurato" });
+    }
+    // La pubkey può essere stringa esadecimale o base64, qui si assume hex (come da doc)
+    // ethers accetta sia 0x-prefixed che Buffer
+    let isAuth = false;
+    try {
+      isAuth = await relayContract.isSubscribed(pubKey);
+    } catch (e) {
+      // fallback su isAuthorizedByPubKey se isSubscribed non esiste
+      try {
+        isAuth = await relayContract.isAuthorizedByPubKey(pubKey);
+      } catch (e2) {
+        return res
+          .status(500)
+          .json({ success: false, error: "Errore chiamata contratto" });
+      }
+    }
+    if (!isAuth) {
+      return res.status(403).json({
+        success: false,
+        error: "Pubkey non autorizzata dal contratto",
+      });
+    }
+    req.userPubKey = pubKey;
+    next();
+  } catch (err) {
+    return res
+      .status(500)
+      .json({ success: false, error: "Errore middleware smart contract" });
+  }
+};
 
 // Main async function to initialize the server
 async function initializeServer() {
@@ -323,6 +385,7 @@ async function initializeServer() {
                 success: true,
                 file: {
                   name: req.file.originalname,
+                  customName: req.body.customName || undefined, // Add customName here
                   size: req.file.size,
                   mimetype: req.file.mimetype,
                   hash: fileResult?.Hash,
@@ -366,181 +429,175 @@ async function initializeServer() {
     }
   );
 
-  // S3/FakeS3 File Upload endpoint
+  // Endpoint upload IPFS per utenti smart contract
   app.post(
-    "/s3-upload",
-    tokenAuthMiddleware,
+    "/ipfs-upload-user",
+    relayContractAuthMiddleware,
     upload.single("file"),
     async (req, res) => {
-      const enableS3 = process.env.ENABLE_S3 === "true";
-      if (!enableS3) {
-        return res
-          .status(400)
-          .json({ success: false, error: "S3 storage is disabled" });
-      }
-
       try {
-        const s3 = new AWS.S3({
-          accessKeyId: process.env.S3_ACCESS_KEY,
-          secretAccessKey: process.env.S3_SECRET_KEY,
-          endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
-          s3ForcePathStyle: true,
-          region: process.env.S3_REGION || "us-east-1",
+        if (!req.file) {
+          return res
+            .status(400)
+            .json({ success: false, error: "No file provided" });
+        }
+        const formData = new FormData();
+        formData.append("file", req.file.buffer, {
+          filename: req.file.originalname,
+          contentType: req.file.mimetype,
         });
-
-        const bucket = process.env.S3_BUCKET;
-        const key = req.file.originalname;
-        const body = req.file.buffer;
-        const contentType = req.file.mimetype;
-
-        const params = {
-          Bucket: bucket,
-          Key: key,
-          Body: body,
-          ContentType: contentType,
-          Metadata: {
-            originalName: req.file.originalname,
-            size: req.file.size.toString(),
-            uploadedAt: new Date().toISOString(),
+        const requestOptions = {
+          hostname: "127.0.0.1",
+          port: 5001,
+          path: "/api/v0/add?wrap-with-directory=false",
+          method: "POST",
+          headers: {
+            ...formData.getHeaders(),
           },
         };
+        if (IPFS_API_TOKEN) {
+          requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+        }
+        const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+          let data = "";
+          ipfsRes.on("data", (chunk) => (data += chunk));
+          ipfsRes.on("end", async () => {
+            try {
+              const lines = data.trim().split("\n");
+              const results = lines.map((line) => JSON.parse(line));
+              const fileResult =
+                results.find((r) => r.Name === req.file.originalname) ||
+                results[0];
 
-        const uploadResult = await s3.upload(params).promise();
+              // Salva l'upload nel database Gun
+              const uploadData = {
+                hash: fileResult?.Hash,
+                name: req.file.originalname,
+                size: req.file.size,
+                sizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                mimetype: req.file.mimetype,
+                uploadedAt: Date.now(),
+                pubKey: req.userPubKey,
+                ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
+                  fileResult?.Hash
+                }`,
+                gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
+                publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
+              };
 
-        res.json({
-          success: true,
-          file: {
-            name: req.file.originalname,
-            size: req.file.size,
-            mimetype: req.file.mimetype,
-            s3Key: uploadResult.Key,
-            s3Url: uploadResult.Location,
-          },
+              // Salva nel database Gun sotto shogun/uploads/{pubKey}/{hash}
+              const uploadNode = gun
+                .get("shogun")
+                .get("uploads")
+                .get(req.userPubKey)
+                .get(fileResult?.Hash);
+              uploadNode.put(uploadData);
+
+              res.json({
+                success: true,
+                file: {
+                  name: req.file.originalname,
+                  size: req.file.size,
+                  sizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                  mimetype: req.file.mimetype,
+                  hash: fileResult?.Hash,
+                  ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
+                    fileResult?.Hash
+                  }`,
+                  gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
+                  publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
+                },
+                user: { pubKey: req.userPubKey },
+                ipfsResponse: results,
+              });
+            } catch (parseError) {
+              res.status(500).json({
+                success: false,
+                error: "Failed to parse IPFS response",
+                rawResponse: data,
+              });
+            }
+          });
         });
+        ipfsReq.on("error", (err) => {
+          res.status(500).json({ success: false, error: err.message });
+        });
+        ipfsReq.setTimeout(30000, () => {
+          ipfsReq.destroy();
+          if (!res.headersSent) {
+            res.status(408).json({ success: false, error: "Upload timeout" });
+          }
+        });
+        formData.pipe(ipfsReq);
       } catch (error) {
-        console.error("S3 Upload Error:", error);
         res.status(500).json({ success: false, error: error.message });
       }
     }
   );
 
-  // S3/FakeS3 File Fetch endpoint
-  app.get("/s3-file/:bucket/:key", async (req, res) => {
-    const enableS3 = process.env.ENABLE_S3 === "true";
-    if (!enableS3) {
-      return res
-        .status(400)
-        .json({ success: false, error: "S3 storage is disabled" });
-    }
-
+  // Endpoint per recuperare gli upload di un utente
+  app.get("/api/user-uploads/:pubKey", async (req, res) => {
     try {
-      const s3 = new AWS.S3({
-        accessKeyId: process.env.S3_ACCESS_KEY,
-        secretAccessKey: process.env.S3_SECRET_KEY,
-        endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
-        s3ForcePathStyle: true,
-        region: process.env.S3_REGION || "us-east-1",
+      const { pubKey } = req.params;
+      if (!pubKey) {
+        return res
+          .status(400)
+          .json({ success: false, error: "PubKey richiesto" });
+      }
+
+      // Recupera gli upload dal database Gun
+      const uploadsNode = gun.get("shogun").get("uploads").get(pubKey);
+
+      // Usa once per ottenere i dati una volta
+      uploadsNode.once((uploads) => {
+        if (!uploads) {
+          return res.json({ success: true, uploads: [], pubKey });
+        }
+
+        // Converte l'oggetto uploads in array
+        const uploadsArray = Object.keys(uploads)
+          .filter((key) => key !== "_") // Esclude i metadati Gun
+          .map((hash) => uploads[hash])
+          .filter((upload) => upload && upload.hash) // Filtra upload validi
+          .sort((a, b) => b.uploadedAt - a.uploadedAt); // Ordina per data
+
+        res.json({
+          success: true,
+          uploads: uploadsArray,
+          pubKey,
+          count: uploadsArray.length,
+          totalSizeMB: uploadsArray.reduce(
+            (sum, upload) => sum + (upload.sizeMB || 0),
+            0
+          ),
+        });
       });
-
-      const bucket = req.params.bucket;
-      const key = req.params.key;
-
-      const params = {
-        Bucket: bucket,
-        Key: key,
-      };
-
-      const fileStream = s3.getObject(params).createReadStream();
-
-      fileStream.on("error", (error) => {
-        console.error("S3 Fetch Error:", error);
-        res.status(500).json({ success: false, error: error.message });
-      });
-
-      res.setHeader("Content-Disposition", `attachment; filename="${key}"`);
-      fileStream.pipe(res);
     } catch (error) {
-      console.error("S3 Fetch Error:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
 
-  // S3/FakeS3 File Info endpoint
-  app.get("/s3-info/:bucket/:key", async (req, res) => {
-    const enableS3 = process.env.ENABLE_S3 === "true";
-    if (!enableS3) {
-      return res
-        .status(400)
-        .json({ success: false, error: "S3 storage is disabled" });
-    }
-
+  // Endpoint per eliminare un upload specifico
+  app.delete("/api/user-uploads/:pubKey/:hash", async (req, res) => {
     try {
-      const s3 = new AWS.S3({
-        accessKeyId: process.env.S3_ACCESS_KEY,
-        secretAccessKey: process.env.S3_SECRET_KEY,
-        endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
-        s3ForcePathStyle: true,
-        region: process.env.S3_REGION || "us-east-1",
-      });
+      const { pubKey, hash } = req.params;
+      if (!pubKey || !hash) {
+        return res
+          .status(400)
+          .json({ success: false, error: "PubKey e hash richiesti" });
+      }
 
-      const bucket = req.params.bucket;
-      const key = req.params.key;
-
-      const params = {
-        Bucket: bucket,
-        Key: key,
-      };
-
-      const headResult = await s3.headObject(params).promise();
+      // Elimina l'upload dal database Gun
+      const uploadNode = gun.get("shogun").get("uploads").get(pubKey).get(hash);
+      uploadNode.put(null);
 
       res.json({
         success: true,
-        file: {
-          name: key,
-          size: headResult.ContentLength,
-          mimetype: headResult.ContentType,
-          etag: headResult.ETag,
-          lastModified: headResult.LastModified,
-          metadata: headResult.Metadata,
-        },
+        message: "Upload eliminato con successo",
+        pubKey,
+        hash,
       });
     } catch (error) {
-      console.error("S3 Info Error:", error);
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
-  // S3/FakeS3 File Delete endpoint
-  app.delete("/s3-file/:bucket/:key", async (req, res) => {
-    const enableS3 = process.env.ENABLE_S3 === "true";
-    if (!enableS3) {
-      return res
-        .status(400)
-        .json({ success: false, error: "S3 storage is disabled" });
-    }
-
-    try {
-      const s3 = new AWS.S3({
-        accessKeyId: process.env.S3_ACCESS_KEY,
-        secretAccessKey: process.env.S3_SECRET_KEY,
-        endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
-        s3ForcePathStyle: true,
-        region: process.env.S3_REGION || "us-east-1",
-      });
-
-      const bucket = req.params.bucket;
-      const key = req.params.key;
-
-      const params = {
-        Bucket: bucket,
-        Key: key,
-      };
-
-      await s3.deleteObject(params).promise();
-
-      res.json({ success: true, message: "File deleted successfully" });
-    } catch (error) {
-      console.error("S3 Delete Error:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -702,57 +759,15 @@ async function initializeServer() {
 
   const server = await startServer();
 
-  // Initialize Gun with S3 using proper fake S3 configuration
-  const s3Config = {
-    bucket: process.env.S3_BUCKET,
-    region: process.env.S3_REGION || "us-east-1",
-    accessKeyId: process.env.S3_ACCESS_KEY,
-    secretAccessKey: process.env.S3_SECRET_KEY,
-    endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
-    s3ForcePathStyle: true,
-    address: process.env.S3_ADDRESS || "127.0.0.1",
-    port: process.env.S3_PORT || 4569,
-    key: process.env.S3_ACCESS_KEY,
-    secret: process.env.S3_SECRET_KEY,
-  };
-
-  console.log("🔧 Gun.js S3 Configuration:", {
-    bucket: s3Config.bucket,
-    //endpoint: `"${s3Config.fakes3}"`,  // Show with quotes to see spaces
-    region: s3Config.region,
-    key: s3Config.key,
-    secret: s3Config.secret,
-    hasCredentials: !!(s3Config.key && s3Config.secret),
-  });
-
-  // Additional debug info
-  console.log("🔍 S3 Configuration Debug:");
-  //console.log(`  Endpoint length: ${s3Config.fakes3.length}`);
-  //console.log(`  Endpoint characters: ${JSON.stringify(s3Config.fakes3.split(''))}`);
-  console.log(`  Environment S3_ENDPOINT: "${process.env.S3_ENDPOINT}"`);
-
-  // Let's also try to test the fake S3 connection directly
-  console.log("🧪 Testing FakeS3 connectivity...");
-  const testReq = http
-    .get(s3Config.endpoint.trim(), (res) => {
-      console.log(`✅ FakeS3 responds with status: ${res.statusCode}`);
-    })
-    .on("error", (err) => {
-      console.log(`❌ FakeS3 connection error: ${err.message}`);
-    });
-
-  // Test S3 connection before initializing Gun
-  console.log("🧪 Testing S3 configuration before Gun initialization...");
-
   const peersString = process.env.RELAY_PEERS;
   const peers = peersString ? peersString.split(",") : [];
   console.log("🔍 Peers:", peers);
 
-  // Initialize Gun with conditional S3 support
+  // Initialize Gun with conditional support
   const gunConfig = {
     super: false,
-    // file: "radata",
-    // radisk: true,
+    file: "radata",
+    radisk: true,
     web: server,
     isValid: hasValidToken,
     uuid: process.env.RELAY_NAME,
@@ -762,17 +777,10 @@ async function initializeServer() {
     rfs: true,
     wait: 500,
     webrtc: true,
-    peers: [peers],
+    peers: peers,
   };
 
-  // Only add S3 if explicitly enabled and configured properly
-  const enableS3 = process.env.ENABLE_S3 === "true";
-  if (enableS3) {
-    console.log("✅ S3 storage enabled");
-    gunConfig.s3 = s3Config;
-  } else {
-    console.log("📁 Using local file storage only (S3 disabled)");
-  }
+  console.log("📁 Using local file storage only");
 
   Gun.on("opt", function (ctx) {
     if (ctx.once) {
@@ -1728,6 +1736,54 @@ async function initializeServer() {
     }
   });
 
+  // --- Peer Management API ---
+  app.get("/api/peers", tokenAuthMiddleware, (req, res) => {
+    try {
+      const peers = gun._.opt.peers || {};
+      const peerList = Object.keys(peers);
+      res.json({ success: true, peers: peerList });
+    } catch (error) {
+      console.error("Error fetching peer list:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to retrieve peer list: " + error.message,
+      });
+    }
+  });
+
+  app.post("/api/peers/add", tokenAuthMiddleware, (req, res) => {
+    try {
+      const { peerUrl } = req.body;
+      if (!peerUrl || typeof peerUrl !== "string") {
+        return res
+          .status(400)
+          .json({ success: false, error: "Invalid 'peerUrl' provided." });
+      }
+
+      try {
+        new URL(peerUrl);
+      } catch (e) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Malformed 'peerUrl'." });
+      }
+
+      console.log(`🔌 Attempting to connect to new peer: ${peerUrl}`);
+      gun.opt({ peers: [peerUrl] });
+
+      res.json({
+        success: true,
+        message: `Connection to peer ${peerUrl} initiated.`,
+      });
+    } catch (error) {
+      console.error(`❌ Error adding peer:`, error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to add peer: " + error.message,
+      });
+    }
+  });
+
   // --- Static Files & Page Routes ---
 
   const cleanReturnString = (value) => {
@@ -1814,13 +1870,8 @@ async function initializeServer() {
   app.get("/pin-manager", (req, res) => {
     res.sendFile(path.resolve(publicPath, "pin-manager.html"));
   });
-
-  app.get("/s3-dashboard", (req, res) => {
-    res.sendFile(path.resolve(publicPath, "s3-dashboard.html"));
-  });
-
-  app.get("/s3-manager", (req, res) => {
-    res.sendFile(path.resolve(publicPath, "s3-manager.html"));
+  app.get("/drive", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "drive.html"));
   });
 
   app.get("/chat", (req, res) => {
@@ -1956,139 +2007,6 @@ async function initializeServer() {
       });
     }
   });
-
-  app.get("/api/s3-stats", tokenAuthMiddleware, async (req, res) => {
-    const enableS3 = process.env.ENABLE_S3 === "true";
-    if (!enableS3) {
-      return res.status(400).json({
-        success: false,
-        error: "S3 is not enabled in the relay configuration.",
-      });
-    }
-
-    try {
-      const s3 = new AWS.S3({
-        accessKeyId: process.env.S3_ACCESS_KEY,
-        secretAccessKey: process.env.S3_SECRET_KEY,
-        endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
-        s3ForcePathStyle: true,
-        region: process.env.S3_REGION || "us-east-1",
-        signatureVersion: "v4",
-      });
-
-      const bucketsData = await s3.listBuckets().promise();
-      const buckets = bucketsData.Buckets || [];
-
-      let totalObjects = 0;
-      let totalSize = 0;
-
-      const bucketDetails = await Promise.all(
-        buckets.map(async (bucket) => {
-          let bucketSize = 0;
-          let objectCount = 0;
-          let isTruncated = false;
-          let continuationToken;
-
-          do {
-            const listObjectsParams = {
-              Bucket: bucket.Name,
-              ContinuationToken: continuationToken,
-            };
-            const objectsData = await s3
-              .listObjectsV2(listObjectsParams)
-              .promise();
-
-            if (objectsData.Contents) {
-              objectsData.Contents.forEach((obj) => {
-                bucketSize += obj.Size;
-                objectCount++;
-              });
-            }
-
-            isTruncated = objectsData.IsTruncated;
-            continuationToken = objectsData.NextContinuationToken;
-          } while (isTruncated);
-
-          totalObjects += objectCount;
-          totalSize += bucketSize;
-
-          return {
-            name: bucket.Name,
-            creationDate: bucket.CreationDate,
-            objectCount: objectCount,
-            size: bucketSize,
-          };
-        })
-      );
-
-      res.json({
-        success: true,
-        stats: {
-          totalBuckets: buckets.length,
-          totalObjects,
-          totalSize,
-          buckets: bucketDetails,
-        },
-      });
-    } catch (error) {
-      console.error("Error getting S3 stats:", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to retrieve S3 statistics.",
-        details: error.message,
-      });
-    }
-  });
-
-  app.get(
-    "/api/s3-buckets/:bucketName/objects",
-    tokenAuthMiddleware,
-    async (req, res) => {
-      const enableS3 = process.env.ENABLE_S3 === "true";
-      if (!enableS3) {
-        return res
-          .status(400)
-          .json({ success: false, error: "S3 is not enabled." });
-      }
-
-      try {
-        const s3 = new AWS.S3({
-          accessKeyId: process.env.S3_ACCESS_KEY,
-          secretAccessKey: process.env.S3_SECRET_KEY,
-          endpoint: process.env.S3_ENDPOINT || "http://127.0.0.1:4569",
-          s3ForcePathStyle: true,
-          region: process.env.S3_REGION || "us-east-1",
-          signatureVersion: "v4",
-        });
-
-        const { bucketName } = req.params;
-        const { continuationToken } = req.query;
-
-        const listObjectsParams = {
-          Bucket: bucketName,
-          ContinuationToken: continuationToken,
-        };
-
-        const objectsData = await s3.listObjectsV2(listObjectsParams).promise();
-
-        res.json({
-          success: true,
-          objects: objectsData.Contents || [],
-          nextContinuationToken: objectsData.NextContinuationToken,
-        });
-      } catch (error) {
-        console.error(
-          `Error listing objects for bucket ${req.params.bucketName}:`,
-          error
-        );
-        res.status(500).json({
-          success: false,
-          error: `Failed to retrieve objects for bucket ${req.params.bucketName}.`,
-          details: error.message,
-        });
-      }
-    }
-  );
 
   // --- Secure IPFS Management Endpoints ---
   const forwardToIpfsApi = (req, res, endpoint, method = "POST") => {
@@ -2410,13 +2328,6 @@ async function initializeServer() {
       const containerMappings = {
         gun: "shogun-relay-stack",
         ipfs: "shogun-relay-stack", // IPFS runs within the main container
-        s3: "shogun-relay-stack", // FakeS3 also runs within the main container
-      };
-
-      const supervisorServiceMappings = {
-        gun: "shogun-stack:relay",
-        ipfs: "shogun-stack:ipfs-daemon",
-        s3: "shogun-stack:fakes3",
       };
 
       const containerName = containerMappings[serviceName];
@@ -2433,64 +2344,30 @@ async function initializeServer() {
 
       const container = docker.getContainer(containerInfo.Id);
 
-      console.log(
-        `🔄 Restarting service '${supervisorService}' in container '${containerName}'`
-      );
-
-      try {
-        // Use supervisorctl to restart the specific service
-        const exec = await container.exec({
-          Cmd: ["supervisorctl", "restart", supervisorService],
-          AttachStdout: true,
-          AttachStderr: true,
-        });
-
-        const stream = await exec.start();
-
-        // Read the output to check if restart was successful
-        let output = "";
-        return new Promise((resolve, reject) => {
-          stream.on("data", (chunk) => {
-            output += chunk.toString();
-          });
-
-          stream.on("end", async () => {
-            console.log(`📋 Supervisorctl output: ${output}`);
-
-            // Check if the restart was successful
-            if (output.includes("ERROR") || output.includes("FAILED")) {
-              console.warn(`⚠️ Service restart failed: ${output}`);
-              // Fallback to container restart
-              console.log(`🔄 Falling back to container restart`);
-              await container.restart();
-              resolve(
-                `Container ${containerName} restarted (service restart failed: ${output.trim()})`
-              );
-            } else {
-              resolve(
-                `Service '${serviceName}' (${supervisorService}) restarted successfully`
-              );
-            }
-          });
-
-          stream.on("error", async (error) => {
-            console.error(`❌ Stream error: ${error.message}`);
-            // Fallback to container restart
-            console.log(
-              `🔄 Falling back to container restart due to stream error`
-            );
-            await container.restart();
-            resolve(
-              `Container ${containerName} restarted (stream error fallback)`
-            );
-          });
-        });
-      } catch (execError) {
-        console.warn(`⚠️ Service restart failed: ${execError.message}`);
-        // Fallback to container restart
-        console.log(`🔄 Falling back to container restart`);
+      // For services within the main container, we'll restart the whole container
+      if (serviceName === "gun") {
+        // For gun service, we can't restart just the Gun part, so we restart the container
+        console.log(`🔄 Restarting Docker container: ${containerName}`);
         await container.restart();
-        return `Container ${containerName} restarted (exec error fallback: ${execError.message})`;
+        return `Container ${containerName} restarted successfully`;
+      } else if (serviceName === "ipfs") {
+        // For IPFS, we can try to restart the IPFS daemon within the container
+        try {
+          const exec = await container.exec({
+            Cmd: ["supervisorctl", "restart", "ipfs"],
+            AttachStdout: true,
+            AttachStderr: true,
+          });
+          const stream = await exec.start();
+          return `IPFS service restarted within container`;
+        } catch (execError) {
+          // Fallback to container restart
+          console.log(
+            `🔄 IPFS service restart failed, restarting container: ${containerName}`
+          );
+          await container.restart();
+          return `Container ${containerName} restarted (IPFS service restart fallback)`;
+        }
       }
     } catch (error) {
       throw new Error(`Docker restart failed: ${error.message}`);
@@ -2504,7 +2381,7 @@ async function initializeServer() {
     async (req, res) => {
       try {
         const { service } = req.params;
-        const allowedServices = ["gun", "ipfs", "s3"];
+        const allowedServices = ["gun", "ipfs"];
 
         if (!allowedServices.includes(service)) {
           return res.status(400).json({
@@ -2535,10 +2412,6 @@ async function initializeServer() {
 
             case "ipfs":
               result = `IPFS restart attempted but Docker unavailable`;
-              break;
-
-            case "s3":
-              result = `S3 restart attempted but Docker unavailable`;
               break;
           }
         }
@@ -2587,31 +2460,6 @@ async function initializeServer() {
           status: "offline",
           error: error.message,
         };
-      }
-
-      // Check S3 (requires auth)
-      const authHeader = req.headers.authorization;
-      if (authHeader) {
-        try {
-          const s3Response = await fetch("/api/s3-stats", {
-            headers: { Authorization: authHeader },
-          });
-          if (s3Response.ok) {
-            const s3Data = await s3Response.json();
-            services.s3 = {
-              status: "online",
-              buckets: s3Data.stats.totalBuckets,
-              objects: s3Data.stats.totalObjects,
-              size: s3Data.stats.totalSize,
-            };
-          } else {
-            services.s3 = { status: "offline", error: "Auth failed" };
-          }
-        } catch (error) {
-          services.s3 = { status: "offline", error: error.message };
-        }
-      } else {
-        services.s3 = { status: "unknown", error: "No auth provided" };
       }
 
       res.json({

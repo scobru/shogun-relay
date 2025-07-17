@@ -289,6 +289,28 @@
                 </div>
                 <div id="updateStatus" class="mt-2 text-sm"></div>
             </div>
+
+            <!-- Peer Management -->
+            <div class="mt-6">
+                <h3 class="text-lg mb-2">Peer Management</h3>
+                <div class="mb-4">
+                    <h4 class="text-md font-semibold mb-2">Connected Peers:</h4>
+                    <ul id="peerList" class="list-disc list-inside bg-base-100 p-3 rounded-md text-sm min-h-[4rem]">
+                        <!-- Peers will be listed here -->
+                        <li>Loading...</li>
+                    </ul>
+                </div>
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Add New Peer</span>
+                    </label>
+                    <div class="flex gap-2">
+                        <input type="text" id="peerUrlInput" class="input input-bordered w-full" placeholder="e.g., wss://gun.shogun.to/gun">
+                        <button id="addPeerBtn" class="btn btn-primary">Add</button>
+                    </div>
+                </div>
+                <div id="peerStatus" class="mt-2 text-sm"></div>
+            </div>
         </div>
 
         <a href="/charts.html" class="view-charts-link">
@@ -308,6 +330,8 @@
         const lastUpdatedEl = document.getElementById('lastUpdated');
         const gcStatusEl = document.getElementById('gcStatus');
         const updateStatusEl = document.getElementById('updateStatus');
+        const peerStatusEl = document.getElementById('peerStatus');
+        const peerListEl = document.getElementById('peerList');
 
         // Get the token from localStorage or prompt the user
         function getAuthToken() {
@@ -390,6 +414,79 @@
 
         // Add event listeners
         document.getElementById('triggerGC').addEventListener('click', triggerGC);
+        document.getElementById('addPeerBtn').addEventListener('click', addPeer);
+
+        // --- Peer Management Functions ---
+        async function fetchPeers() {
+            const token = getAuthToken();
+            if (!token) {
+                peerListEl.innerHTML = '<li>Authentication required to view peers.</li>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/peers', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    peerListEl.innerHTML = ''; // Clear existing list
+                    if (result.peers && result.peers.length > 0) {
+                        result.peers.forEach(peer => {
+                            const li = document.createElement('li');
+                            li.textContent = peer;
+                            peerListEl.appendChild(li);
+                        });
+                    } else {
+                        peerListEl.innerHTML = '<li>No active peer connections found.</li>';
+                    }
+                } else {
+                    peerListEl.innerHTML = `<li>Error: ${result.error}</li>`;
+                }
+            } catch (error) {
+                peerListEl.innerHTML = `<li>Error loading peers: ${error.message}</li>`;
+            }
+        }
+
+        async function addPeer() {
+            const token = getAuthToken();
+            if (!token) {
+                peerStatusEl.innerHTML = '<span class="text-error">Authentication required</span>';
+                return;
+            }
+
+            const peerUrlInput = document.getElementById('peerUrlInput');
+            const peerUrl = peerUrlInput.value.trim();
+
+            if (!peerUrl) {
+                peerStatusEl.innerHTML = '<span class="text-error">Peer URL cannot be empty</span>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/peers/add', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ peerUrl })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    peerStatusEl.innerHTML = `<span class="text-success">✓ ${result.message}</span>`;
+                    peerUrlInput.value = '';
+                    setTimeout(fetchPeers, 1500); // Refresh list
+                } else {
+                    peerStatusEl.innerHTML = `<span class="text-error">✗ Error: ${result.error}</span>`;
+                }
+            } catch (error) {
+                peerStatusEl.innerHTML = `<span class="text-error">✗ Error: ${error.message}</span>`;
+            }
+        }
 
         function formatBytes(bytes, decimals = 2) {
             if (!bytes || bytes === 0) return '0 Bytes';
@@ -441,7 +538,9 @@
         }
 
         fetchStats();
+        fetchPeers();
         setInterval(fetchStats, 5000); // Refresh every 5 seconds
+        setInterval(fetchPeers, 30000); // Refresh peer list every 30 seconds
     </script>
 </body>
 </html> 

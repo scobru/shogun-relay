@@ -92,8 +92,11 @@
             }
             nodePathDisplay.textContent = nodePath;
             
-            const authHeader = getAuthHeader();
-            if (!authHeader) return;
+            const authHeader = ShogunAdmin.getAuthHeaders();
+            if (!authHeader['Authorization']) {
+                showMessage('Auth Token is required. Please set it in the Control Panel.');
+                return;
+            }
             
             try {
                 const response = await fetch(`/node/${nodePath}`, { headers: authHeader });
@@ -112,22 +115,15 @@
             }
         }
 
-        const getAuthHeader = () => {
-            // Use centralized admin password
-            const token = ShogunAdmin.getPassword();
-            if (!token) {
-                showMessage('Auth Token is required. Please set it in the Control Panel.');
-                return null;
-            }
-            return { 'Authorization': `Bearer ${token}` };
-        };
-
         saveBtn.addEventListener('click', async () => {
             let data;
             try { data = JSON.parse(dataArea.value); } catch (e) { showMessage('Invalid JSON format.'); return; }
             
-            const authHeader = getAuthHeader();
-            if (!authHeader) return;
+            const authHeader = ShogunAdmin.getAuthHeaders();
+            if (!authHeader['Authorization']) {
+                showMessage('Auth Token is required. Please set it in the Control Panel.');
+                return;
+            }
             
             try {
                 const response = await fetch(`/node/${nodePath}`, {
@@ -153,8 +149,11 @@
         deleteBtn.addEventListener('click', async () => {
             if (!confirm(`Are you sure you want to delete the node at "${nodePath}"?`)) return;
             
-            const authHeader = getAuthHeader();
-            if (!authHeader) return;
+            const authHeader = ShogunAdmin.getAuthHeaders();
+            if (!authHeader['Authorization']) {
+                showMessage('Auth Token is required. Please set it in the Control Panel.');
+                return;
+            }
             
             try {
                 const response = await fetch(`/node/${nodePath}`, {

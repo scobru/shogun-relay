@@ -41,7 +41,6 @@ if docker-compose ps | grep -q "Up"; then
     echo ""
     echo "🌐 Available services:"
     echo "   📡 Relay Server:    http://localhost:8765"
-    echo "   📁 FakeS3:          http://localhost:4569"
     echo "   🌐 IPFS API:        http://localhost:5001"
     echo "   🖥️  IPFS Gateway:    http://localhost:8080"
     echo ""

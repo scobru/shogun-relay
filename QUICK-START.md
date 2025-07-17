@@ -26,22 +26,10 @@ Get your Shogun Relay running with HTTPS in under 10 minutes!
 git clone https://github.com/your-org/shogun-relay.git
 cd shogun-relay
 
-# Build the Docker image
-docker build -t shogun-relay:latest .
+# Run the quick-start script
+./docker-start.sh
 
-# Start the container with all services
-docker run -d \
-  --name shogun-relay-stack \
-  --rm \
-  -p 8765:8765 \
-  -p 4569:4569 \
-  -p 5001:5001 \
-  -p 8080:8080 \
-  -p 4001:4001 \
-  shogun-relay:latest
-
-# Verify the container is running
-docker ps --filter "name=shogun-relay"
+# The script will build the image, start the services, and show their status.
 ```
 
 ### Step 3: Setup ngrok Tunnel
@@ -71,9 +59,8 @@ ngrok http 8765
 For local testing without HTTPS:
 
 ```bash
-# Build and start container
-docker build -t shogun-relay:latest .
-docker run -d --name shogun-relay-stack -p 8765:8765 -p 4569:4569 shogun-relay:latest
+# From the shogun-relay directory, run the start script
+./docker-start.sh
 
 # Access locally
 open http://localhost:8765
@@ -117,7 +104,7 @@ curl https://your-subdomain.ngrok.io/api/stats
 ## 🌟 Next Steps
 
 1. **Connect your app**: Use `https://your-subdomain.ngrok.io/gun` as your Gun.js peer
-2. **Upload files**: Visit `/upload` to test IPFS and S3 storage
+2. **Upload files**: Visit `/upload` to test IPFS storage
 3. **Monitor performance**: Check `/stats` for real-time metrics
 4. **Explore tools**: Try `/graph` for live data visualization
 

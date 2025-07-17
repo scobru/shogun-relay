@@ -169,34 +169,6 @@
                 </div>
             </div>
 
-            <!-- S3 Service -->
-            <div class="service-card card bg-base-100 shadow-xl">
-                <div class="card-body">
-                    <div class="flex items-center justify-between">
-                        <h2 class="card-title text-lg">
-                            <span class="status-indicator status-unknown pulse" id="s3-status-indicator"></span>
-                            S3 Storage
-                        </h2>
-                        <div class="badge badge-outline" id="s3-buckets">--</div>
-                    </div>
-
-                    <div class="space-y-2 text-sm">
-                        <div class="flex justify-between"><span>Status:</span><span id="s3-status"
-                                class="font-semibold">Checking...</span></div>
-                        <div class="flex justify-between"><span>Endpoint:</span><span>127.0.0.1:4569</span></div>
-                        <div class="flex justify-between"><span>Total Objects:</span><span id="s3-objects">--</span>
-                        </div>
-                        <div class="flex justify-between"><span>Total Size:</span><span id="s3-size">--</span></div>
-                    </div>
-
-                    <div class="card-actions justify-end mt-4">
-                        <button onclick="refreshService('s3')" class="btn btn-sm btn-outline">🔄 Refresh</button>
-                        <button onclick="restartService('s3')" class="btn btn-sm btn-warning restart-btn">🔄
-                            Restart</button>
-                    </div>
-                </div>
-            </div>
-
             <!-- Quick Actions -->
             <div class="service-card card bg-base-100 shadow-xl">
                 <div class="card-body">

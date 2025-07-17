@@ -211,9 +211,8 @@
             }
 
             try {
-                // Use centralized admin password
-                const token = ShogunAdmin.getPassword();
-                if (!token) {
+                const authHeaders = ShogunAdmin.getAuthHeaders();
+                if (!authHeaders['Authorization']) {
                     throw new Error('Admin Token is required. Please set it in the Control Panel.');
                 }
 
@@ -224,7 +223,7 @@
                     method: method,
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
+                        ...authHeaders
                     },
                     body: JSON.stringify(body)
                 });
