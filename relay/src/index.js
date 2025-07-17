@@ -223,10 +223,10 @@ async function initializeRelayContract() {
     );
 
     // Test contract accessibility
-    const subscriptionPrice = await relayContract.SUBSCRIPTION_PRICE();
+    const pricePerGB = await relayContract.PRICE_PER_GB();
     console.log(
-      `✅ Contract initialized successfully. Subscription price: ${ethers.formatEther(
-        subscriptionPrice
+      `✅ Contract initialized successfully. Price per GB: ${ethers.formatEther(
+        pricePerGB
       )} ETH`
     );
 
@@ -387,7 +387,27 @@ async function initializeServer() {
 
   // Initialize relay contract
   console.log("🔧 Initializing relay contract...");
-  const contractInitialized = await initializeRelayContract();
+  let contractInitialized = false;
+
+  try {
+    // Add timeout for contract initialization
+    const contractPromise = initializeRelayContract();
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(
+        () => reject(new Error("Contract initialization timeout")),
+        10000
+      )
+    );
+
+    contractInitialized = await Promise.race([contractPromise, timeoutPromise]);
+  } catch (error) {
+    console.warn(
+      "⚠️ Contract initialization failed or timed out:",
+      error.message
+    );
+    contractInitialized = false;
+  }
+
   if (contractInitialized) {
     console.log("✅ Relay contract ready");
   } else {
@@ -2223,6 +2243,28 @@ async function initializeServer() {
         "/ipfs-status",
       ],
     });
+  });
+
+  // Global error handler
+  app.use((error, req, res, next) => {
+    console.error("Global error handler:", error);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
+      message: error.message,
+      timestamp: Date.now(),
+    });
+  });
+
+  // Handle uncaught exceptions
+  process.on("uncaughtException", (error) => {
+    console.error("Uncaught Exception:", error);
+    logger.error("Uncaught Exception", error);
+  });
+
+  process.on("unhandledRejection", (reason, promise) => {
+    console.error("Unhandled Rejection at:", promise, "reason:", reason);
+    logger.error("Unhandled Rejection", { reason, promise });
   });
 } // End of initializeServer function
 
