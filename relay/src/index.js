@@ -1947,18 +1947,47 @@ async function initializeServer() {
       const relayAddress = allRelays[0];
 
       try {
-        // Prova prima con checkUserSubscription
-        const isSubscribed = await relayContract.checkUserSubscription(
-          userAddress
-        );
+        let isSubscribed = false;
+        let subscriptionDetails = null;
 
-        if (isSubscribed) {
-          // Ottieni i dettagli della sottoscrizione
-          const subscriptionDetails =
-            await relayContract.getSubscriptionDetails(
+        // Se abbiamo una pubKey, usa le funzioni per Gun key
+        if (pubKey) {
+          console.log(`Verificando sottoscrizione per Gun key: ${pubKey}`);
+          isSubscribed = await relayContract.checkGunKeySubscription(pubKey);
+
+          if (isSubscribed) {
+            subscriptionDetails =
+              await relayContract.getSubscriptionDetailsByGunKey(
+                pubKey,
+                relayAddress
+              );
+          }
+        } else {
+          // Fallback per indirizzo
+          console.log(
+            `Verificando sottoscrizione per indirizzo: ${userAddress}`
+          );
+          isSubscribed = await relayContract.checkUserSubscription(userAddress);
+
+          if (isSubscribed) {
+            subscriptionDetails = await relayContract.getSubscriptionDetails(
               userAddress,
               relayAddress
             );
+          }
+        }
+
+        if (isSubscribed && subscriptionDetails) {
+          const [
+            startTime,
+            endTime,
+            amountPaid,
+            mbAllocated,
+            mbUsed,
+            mbRemaining,
+            isActive,
+            userOrGunKey,
+          ] = subscriptionDetails;
 
           res.json({
             success: true,
@@ -1967,21 +1996,19 @@ async function initializeServer() {
             userAddress,
             relayAddress,
             subscription: {
-              isActive: true,
-              startTime: Number(subscriptionDetails.startTime),
-              endTime: Number(subscriptionDetails.endTime),
-              amountPaid: ethers.formatEther(subscriptionDetails.amountPaid),
-              startDate: new Date(
-                Number(subscriptionDetails.startTime) * 1000
-              ).toISOString(),
-              endDate: new Date(
-                Number(subscriptionDetails.endTime) * 1000
-              ).toISOString(),
+              isActive: isActive,
+              startTime: Number(startTime),
+              endTime: Number(endTime),
+              amountPaid: ethers.formatEther(amountPaid),
+              mbAllocated: Number(mbAllocated),
+              mbUsed: Number(mbUsed),
+              mbRemaining: Number(mbRemaining),
+              startDate: new Date(Number(startTime) * 1000).toISOString(),
+              endDate: new Date(Number(endTime) * 1000).toISOString(),
               daysRemaining: Math.max(
                 0,
                 Math.ceil(
-                  (Number(subscriptionDetails.endTime) * 1000 - Date.now()) /
-                    (1000 * 60 * 60 * 24)
+                  (Number(endTime) * 1000 - Date.now()) / (1000 * 60 * 60 * 24)
                 )
               ),
             },
@@ -2004,10 +2031,19 @@ async function initializeServer() {
 
         // Fallback: prova con isSubscriptionActive
         try {
-          const isActive = await relayContract.isSubscriptionActive(
-            userAddress,
-            relayAddress
-          );
+          let isActive = false;
+
+          if (pubKey) {
+            isActive = await relayContract.isSubscriptionActiveByGunKey(
+              pubKey,
+              relayAddress
+            );
+          } else {
+            isActive = await relayContract.isSubscriptionActive(
+              userAddress,
+              relayAddress
+            );
+          }
 
           res.json({
             success: true,
