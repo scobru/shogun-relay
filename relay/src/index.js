@@ -79,14 +79,17 @@ let path_public = process.env.RELAY_PATH || "public";
 let showQr = process.env.RELAY_QR !== "false";
 
 // --- Config per smart contract ---
-const WEB3_PROVIDER_URL =
-  process.env.WEB3_PROVIDER_URL || "http://127.0.0.1:8545";
+const WEB3_PROVIDER_URL = `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`; // Sepolia
 const RELAY_CONTRACT_ADDRESS = process.env.RELAY_CONTRACT_ADDRESS;
 let relayContract;
 let provider;
 let relayAbi = [
-  "function isSubscribed(bytes calldata _pubKey) external view returns (bool)",
-  "function isAuthorizedByPubKey(bytes calldata _pubKey) external view returns (bool)",
+  "function checkUserSubscription(address _user) external view returns (bool)",
+  "function isSubscriptionActive(address _user, address _relayAddress) external view returns (bool)",
+  "function getSubscriptionDetails(address _user, address _relayAddress) external view returns (uint256 startTime, uint256 endTime, uint256 amountPaid, bool isActive)",
+  "function getRelayDetails(address _relayAddress) external view returns (string memory url, address relayAddress, bool isActive, uint256 registeredAt)",
+  "function registerRelay(string memory _url) external",
+  "function deactivateRelay() external",
 ];
 if (RELAY_CONTRACT_ADDRESS) {
   provider = new ethers.JsonRpcProvider(WEB3_PROVIDER_URL);
@@ -100,41 +103,62 @@ if (RELAY_CONTRACT_ADDRESS) {
 // Middleware per autorizzazione smart contract
 const relayContractAuthMiddleware = async (req, res, next) => {
   try {
+    const userAddress = req.headers["x-user-address"];
     const pubKey = req.headers["x-pubkey"];
-    if (!pubKey) {
-      return res
-        .status(401)
-        .json({ success: false, error: "x-pubkey header richiesto" });
+
+    if (!userAddress && !pubKey) {
+      return res.status(401).json({
+        success: false,
+        error: "x-user-address o x-pubkey header richiesto",
+      });
     }
+
     if (!relayContract) {
       return res
         .status(500)
         .json({ success: false, error: "Relay contract non configurato" });
     }
-    // La pubkey può essere stringa esadecimale o base64, qui si assume hex (come da doc)
-    // ethers accetta sia 0x-prefixed che Buffer
+
+    // Ottieni l'indirizzo del relay dal contratto
+    const relayDetails = await relayContract.getRelayDetails(
+      RELAY_CONTRACT_ADDRESS
+    );
+    const relayAddress = relayDetails.relayAddress;
+
     let isAuth = false;
-    try {
-      isAuth = await relayContract.isSubscribed(pubKey);
-    } catch (e) {
-      // fallback su isAuthorizedByPubKey se isSubscribed non esiste
+
+    // Se abbiamo un indirizzo utente, verifica la sottoscrizione
+    if (userAddress) {
       try {
-        isAuth = await relayContract.isAuthorizedByPubKey(pubKey);
-      } catch (e2) {
+        isAuth = await relayContract.checkUserSubscription(userAddress);
+      } catch (e) {
+        console.error("Errore verifica sottoscrizione:", e);
         return res
           .status(500)
           .json({ success: false, error: "Errore chiamata contratto" });
       }
     }
+    // Se abbiamo una pubkey ma non un indirizzo, per ora non autorizziamo
+    // (potrebbe essere implementato un mapping pubkey -> address in futuro)
+    else if (pubKey) {
+      return res.status(401).json({
+        success: false,
+        error: "Indirizzo utente richiesto per autorizzazione",
+      });
+    }
+
     if (!isAuth) {
       return res.status(403).json({
         success: false,
-        error: "Pubkey non autorizzata dal contratto",
+        error: "Utente non autorizzato dal contratto",
       });
     }
+
+    req.userAddress = userAddress;
     req.userPubKey = pubKey;
     next();
   } catch (err) {
+    console.error("Errore middleware smart contract:", err);
     return res
       .status(500)
       .json({ success: false, error: "Errore middleware smart contract" });
@@ -477,6 +501,7 @@ async function initializeServer() {
                 sizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
                 mimetype: req.file.mimetype,
                 uploadedAt: Date.now(),
+                userAddress: req.userAddress,
                 pubKey: req.userPubKey,
                 ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
                   fileResult?.Hash
@@ -485,11 +510,11 @@ async function initializeServer() {
                 publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
               };
 
-              // Salva nel database Gun sotto shogun/uploads/{pubKey}/{hash}
+              // Salva nel database Gun sotto shogun/uploads/{userAddress}/{hash}
               const uploadNode = gun
                 .get("shogun")
                 .get("uploads")
-                .get(req.userPubKey)
+                .get(req.userAddress || req.userPubKey)
                 .get(fileResult?.Hash);
               uploadNode.put(uploadData);
 
@@ -507,7 +532,10 @@ async function initializeServer() {
                   gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
                   publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
                 },
-                user: { pubKey: req.userPubKey },
+                user: {
+                  address: req.userAddress,
+                  pubKey: req.userPubKey,
+                },
                 ipfsResponse: results,
               });
             } catch (parseError) {
@@ -536,22 +564,22 @@ async function initializeServer() {
   );
 
   // Endpoint per recuperare gli upload di un utente
-  app.get("/api/user-uploads/:pubKey", async (req, res) => {
+  app.get("/api/user-uploads/:identifier", async (req, res) => {
     try {
-      const { pubKey } = req.params;
-      if (!pubKey) {
+      const { identifier } = req.params;
+      if (!identifier) {
         return res
           .status(400)
-          .json({ success: false, error: "PubKey richiesto" });
+          .json({ success: false, error: "Identificatore richiesto" });
       }
 
       // Recupera gli upload dal database Gun
-      const uploadsNode = gun.get("shogun").get("uploads").get(pubKey);
+      const uploadsNode = gun.get("shogun").get("uploads").get(identifier);
 
       // Usa once per ottenere i dati una volta
       uploadsNode.once((uploads) => {
         if (!uploads) {
-          return res.json({ success: true, uploads: [], pubKey });
+          return res.json({ success: true, uploads: [], identifier });
         }
 
         // Converte l'oggetto uploads in array
@@ -564,7 +592,7 @@ async function initializeServer() {
         res.json({
           success: true,
           uploads: uploadsArray,
-          pubKey,
+          identifier,
           count: uploadsArray.length,
           totalSizeMB: uploadsArray.reduce(
             (sum, upload) => sum + (upload.sizeMB || 0),
@@ -578,23 +606,27 @@ async function initializeServer() {
   });
 
   // Endpoint per eliminare un upload specifico
-  app.delete("/api/user-uploads/:pubKey/:hash", async (req, res) => {
+  app.delete("/api/user-uploads/:identifier/:hash", async (req, res) => {
     try {
-      const { pubKey, hash } = req.params;
-      if (!pubKey || !hash) {
+      const { identifier, hash } = req.params;
+      if (!identifier || !hash) {
         return res
           .status(400)
-          .json({ success: false, error: "PubKey e hash richiesti" });
+          .json({ success: false, error: "Identificatore e hash richiesti" });
       }
 
       // Elimina l'upload dal database Gun
-      const uploadNode = gun.get("shogun").get("uploads").get(pubKey).get(hash);
+      const uploadNode = gun
+        .get("shogun")
+        .get("uploads")
+        .get(identifier)
+        .get(hash);
       uploadNode.put(null);
 
       res.json({
         success: true,
         message: "Upload eliminato con successo",
-        pubKey,
+        identifier,
         hash,
       });
     } catch (error) {
@@ -1880,6 +1912,14 @@ async function initializeServer() {
 
   app.get("/notes", (req, res) => {
     res.sendFile(path.resolve(publicPath, "notes.html"));
+  });
+
+  app.get("/subscribe", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "subscribe.html"));
+  });
+
+  app.get("/user-upload", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "user-upload.html"));
   });
 
   app.get("/services-dashboard", (req, res) => {

@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="night">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relay Subscription - Smart Contract</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles/wormhole.css" />
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js" type="application/javascript"></script>
+    <style>
+        body {
+            line-height: 1.6;
+            background-color: rgb(25, 25, 25);
+        }
+
+        .status-card {
+            @apply bg-base-300/50 rounded-xl p-6 border border-base-content/20;
+        }
+
+        .step-indicator {
+            @apply flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold;
+        }
+
+        .step-active {
+            @apply bg-accent text-accent-content;
+        }
+
+        .step-completed {
+            @apply bg-success text-success-content;
+        }
+
+        .step-pending {
+            @apply bg-base-content/20 text-base-content/60;
+        }
+
+        .wallet-info {
+            @apply bg-base-200/50 rounded-lg p-4 border border-base-content/10;
+        }
+
+        .pubkey-display {
+            @apply font-mono text-sm bg-base-300 p-3 rounded border break-all;
+        }
+    </style>
+</head>
+
+<body class="antialiased">
+    <div class="container mx-auto p-4">
+        <div class="flex items-center mb-6">
+            <a href="/" class="nav-link">&larr; Back to Control Panel</a>
+        </div>
+
+        <div class="card">
+            <div class="p-8">
+                <div class="flex flex-col items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-4 text-accent" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+
+                    <h1 class="text-3xl font-semibold mb-2">Relay Subscription</h1>
+                    <p class="text-base-content/70 mb-8">Subscribe to the relay using smart contract</p>
+
+                    <!-- Step Progress -->
+                    <div class="flex items-center gap-4 mb-8">
+                        <div class="flex items-center gap-2">
+                            <div id="step1" class="step-indicator step-active">1</div>
+                            <span class="text-sm">Connect Wallet</span>
+                        </div>
+                        <div class="w-8 h-px bg-base-content/30"></div>
+                        <div class="flex items-center gap-2">
+                            <div id="step2" class="step-indicator step-pending">2</div>
+                            <span class="text-sm">Generate Gun Key</span>
+                        </div>
+                        <div class="w-8 h-px bg-base-content/30"></div>
+                        <div class="flex items-center gap-2">
+                            <div id="step3" class="step-indicator step-pending">3</div>
+                            <span class="text-sm">Subscribe</span>
+                        </div>
+                    </div>
+
+                    <!-- Step 1: Wallet Connection -->
+                    <div id="step1Content" class="w-full max-w-2xl space-y-6">
+                        <div class="status-card">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                Connect Your Wallet
+                            </h3>
+                            <p class="text-base-content/70 mb-4">
+                                Connect your MetaMask wallet to proceed with the subscription.
+                            </p>
+                            <button id="connectWalletBtn" class="btn btn-accent">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                                Connect MetaMask
+                            </button>
+                        </div>
+
+                        <div id="walletInfo" class="wallet-info hidden">
+                            <h4 class="font-semibold mb-2">Connected Wallet:</h4>
+                            <div class="flex items-center gap-2">
+                                <span id="walletAddress" class="font-mono text-sm"></span>
+                                <button id="disconnectWalletBtn" class="btn btn-sm btn-outline">Disconnect</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Gun Key Generation -->
+                    <div id="step2Content" class="w-full max-w-2xl space-y-6 hidden">
+                        <div class="status-card">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                </svg>
+                                Generate Gun Public Key
+                            </h3>
+                            <p class="text-base-content/70 mb-4">
+                                Generate a unique Gun public key that will be used for relay authorization.
+                            </p>
+                            <button id="generateKeyBtn" class="btn btn-accent">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                                Generate Key
+                            </button>
+                        </div>
+
+                        <div id="keyInfo" class="wallet-info hidden">
+                            <h4 class="font-semibold mb-2">Generated Gun Public Key:</h4>
+                            <div class="pubkey-display" id="gunPubKey"></div>
+                            <p class="text-xs text-base-content/60 mt-2">
+                                This key will be used to authorize your uploads to the relay.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Subscription -->
+                    <div id="step3Content" class="w-full max-w-2xl space-y-6 hidden">
+                        <div class="status-card">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Subscribe to Relay
+                            </h3>
+                            <p class="text-base-content/70 mb-4">
+                                Subscribe to the relay using your smart contract. Choose the subscription duration.
+                            </p>
+
+                            <div class="form-control mb-4">
+                                <label class="label">
+                                    <span class="label-text">Subscription Duration (months):</span>
+                                </label>
+                                <select id="subscriptionMonths" class="select select-bordered">
+                                    <option value="1">1 Month</option>
+                                    <option value="3">3 Months</option>
+                                    <option value="6">6 Months</option>
+                                    <option value="12">12 Months</option>
+                                </select>
+                            </div>
+
+                            <div class="bg-base-200/50 rounded-lg p-4 mb-4">
+                                <h5 class="font-semibold mb-2">Subscription Details:</h5>
+                                <div class="space-y-1 text-sm">
+                                    <div class="flex justify-between">
+                                        <span>Duration:</span>
+                                        <span id="durationDisplay">1 month</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Price per month:</span>
+                                        <span id="pricePerMonth">Loading...</span>
+                                    </div>
+                                    <div class="flex justify-between font-semibold">
+                                        <span>Total cost:</span>
+                                        <span id="totalCost">Loading...</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button id="subscribeBtn" class="btn btn-accent w-full">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Subscribe to Relay
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Status Messages -->
+                    <div id="statusMessage" class="w-full max-w-2xl mt-6"></div>
+
+                    <!-- Subscription Status -->
+                    <div id="subscriptionStatus" class="w-full max-w-2xl mt-6 hidden">
+                        <div class="status-card">
+                            <h3 class="text-lg font-semibold mb-4">Subscription Status</h3>
+                            <div id="statusContent"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let provider;
+        let signer;
+        let walletAddress;
+        let gunKeyPair;
+        let relayContract;
+
+        // Contract configuration
+        const RELAY_CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000000'; // Replace with actual address
+        const RELAY_ABI = [
+            'function SUBSCRIPTION_PRICE() external view returns (uint256)',
+            'function subscribeToRelay(address _relayAddress) external payable',
+            'function checkUserSubscription(address _user) external view returns (bool)',
+            'function isSubscriptionActive(address _user, address _relayAddress) external view returns (bool)',
+            'function getSubscriptionDetails(address _user, address _relayAddress) external view returns (uint256 startTime, uint256 endTime, uint256 amountPaid, bool isActive)',
+            'function registerRelay(string memory _url) external',
+            'function getRelayDetails(address _relayAddress) external view returns (string memory url, address relayAddress, bool isActive, uint256 registeredAt)'
+        ];
+
+        // DOM elements
+        const connectWalletBtn = document.getElementById('connectWalletBtn');
+        const disconnectWalletBtn = document.getElementById('disconnectWalletBtn');
+        const walletInfo = document.getElementById('walletInfo');
+        const walletAddressEl = document.getElementById('walletAddress');
+        const generateKeyBtn = document.getElementById('generateKeyBtn');
+        const keyInfo = document.getElementById('keyInfo');
+        const gunPubKeyEl = document.getElementById('gunPubKey');
+        const subscriptionMonths = document.getElementById('subscriptionMonths');
+        const subscribeBtn = document.getElementById('subscribeBtn');
+        const statusMessage = document.getElementById('statusMessage');
+        const subscriptionStatus = document.getElementById('subscriptionStatus');
+        const statusContent = document.getElementById('statusContent');
+
+        // Initialize Gun
+        const gun = Gun(['http://localhost:8765/gun']);
+
+        // Event listeners
+        connectWalletBtn.addEventListener('click', connectWallet);
+        disconnectWalletBtn.addEventListener('click', disconnectWallet);
+        generateKeyBtn.addEventListener('click', generateGunKey);
+        subscribeBtn.addEventListener('click', subscribeToRelay);
+        subscriptionMonths.addEventListener('change', updateSubscriptionDetails);
+
+        // Step management
+        function updateStep(step, status) {
+            const stepEl = document.getElementById(`step${step}`);
+            stepEl.className = `step-indicator ${status}`;
+
+            if (status === 'step-completed') {
+                showStep(step + 1);
+            }
+        }
+
+        function showStep(step) {
+            // Hide all step contents
+            document.getElementById('step1Content').classList.add('hidden');
+            document.getElementById('step2Content').classList.add('hidden');
+            document.getElementById('step3Content').classList.add('hidden');
+
+            // Show current step
+            if (step <= 3) {
+                document.getElementById(`step${step}Content`).classList.remove('hidden');
+            }
+        }
+
+        // Wallet connection
+        async function connectWallet() {
+            try {
+                if (typeof window.ethereum === 'undefined') {
+                    showStatus('MetaMask is not installed. Please install MetaMask first.', 'error');
+                    return;
+                }
+
+                provider = new ethers.providers.Web3Provider(window.ethereum);
+                await provider.send("eth_requestAccounts", []);
+                signer = provider.getSigner();
+                walletAddress = await signer.getAddress();
+
+                // Display wallet info
+                walletAddressEl.textContent = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
+                walletInfo.classList.remove('hidden');
+                connectWalletBtn.classList.add('hidden');
+
+                // Initialize contract
+                relayContract = new ethers.Contract(RELAY_CONTRACT_ADDRESS, RELAY_ABI, signer);
+
+                showStatus('Wallet connected successfully!', 'success');
+                updateStep(1, 'step-completed');
+
+                // Load subscription details
+                await loadSubscriptionDetails();
+
+            } catch (error) {
+                showStatus(`Failed to connect wallet: ${error.message}`, 'error');
+            }
+        }
+
+        function disconnectWallet() {
+            provider = null;
+            signer = null;
+            walletAddress = null;
+            relayContract = null;
+
+            walletInfo.classList.add('hidden');
+            connectWalletBtn.classList.remove('hidden');
+            keyInfo.classList.add('hidden');
+
+            showStep(1);
+            updateStep(1, 'step-active');
+            updateStep(2, 'step-pending');
+            updateStep(3, 'step-pending');
+
+            showStatus('Wallet disconnected', 'info');
+        }
+
+        // Gun key generation
+        async function generateGunKey() {
+            try {
+                gunKeyPair = await SEA.pair();
+
+                gunPubKeyEl.textContent = gunKeyPair.pub;
+                keyInfo.classList.remove('hidden');
+                generateKeyBtn.classList.add('hidden');
+
+                showStatus('Gun public key generated successfully!', 'success');
+                updateStep(2, 'step-completed');
+
+                // Check if already subscribed
+                await checkSubscriptionStatus();
+
+            } catch (error) {
+                showStatus(`Failed to generate Gun key: ${error.message}`, 'error');
+            }
+        }
+
+        // Subscription management
+        async function loadSubscriptionDetails() {
+            try {
+                if (!relayContract) return;
+
+                const pricePerMonth = await relayContract.SUBSCRIPTION_PRICE();
+                const priceInEth = ethers.utils.formatEther(pricePerMonth);
+
+                document.getElementById('pricePerMonth').textContent = `${priceInEth} ETH`;
+                updateSubscriptionDetails();
+
+            } catch (error) {
+                console.error('Failed to load subscription details:', error);
+            }
+        }
+
+        function updateSubscriptionDetails() {
+            const months = parseInt(subscriptionMonths.value);
+            const pricePerMonth = document.getElementById('pricePerMonth').textContent;
+            const priceValue = parseFloat(pricePerMonth);
+
+            document.getElementById('durationDisplay').textContent = `${months} month${months > 1 ? 's' : ''}`;
+            document.getElementById('totalCost').textContent = `${(priceValue * months).toFixed(6)} ETH`;
+        }
+
+        async function subscribeToRelay() {
+            try {
+                if (!relayContract || !walletAddress) {
+                    showStatus('Please connect wallet first', 'error');
+                    return;
+                }
+
+                const pricePerMonth = await relayContract.SUBSCRIPTION_PRICE();
+                const totalCost = pricePerMonth; // Prezzo fisso per 30 giorni
+
+                // Subscribe usando l'indirizzo del wallet
+                const tx = await relayContract.subscribeToRelay(RELAY_CONTRACT_ADDRESS, {
+                    value: totalCost
+                });
+
+                showStatus('Transaction sent! Waiting for confirmation...', 'info');
+
+                await tx.wait();
+
+                showStatus('Subscription successful! You can now upload files to the relay.', 'success');
+                updateStep(3, 'step-completed');
+
+                // Update subscription status
+                await checkSubscriptionStatus();
+
+            } catch (error) {
+                showStatus(`Subscription failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkSubscriptionStatus() {
+            try {
+                if (!relayContract || !walletAddress) return;
+
+                let isSubscribed = false;
+
+                try {
+                    isSubscribed = await relayContract.checkUserSubscription(walletAddress);
+                } catch (e) {
+                    // Fallback per compatibilità
+                    isSubscribed = await relayContract.isSubscriptionActive(walletAddress, RELAY_CONTRACT_ADDRESS);
+                }
+
+                if (isSubscribed) {
+                    subscriptionStatus.classList.remove('hidden');
+                    statusContent.innerHTML = `
+                        <div class="flex items-center gap-2 text-success">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>Your wallet address is authorized for relay uploads!</span>
+                        </div>
+                        <p class="text-sm text-base-content/70 mt-2">
+                            You can now use the upload endpoint with your wallet address.
+                        </p>
+                    `;
+                }
+
+            } catch (error) {
+                console.error('Failed to check subscription status:', error);
+            }
+        }
+
+        // Utility functions
+        function showStatus(message, type = 'info') {
+            const colors = {
+                success: 'text-success',
+                error: 'text-error',
+                info: 'text-info',
+                warning: 'text-warning'
+            };
+
+            statusMessage.innerHTML = `
+                <div class="alert ${colors[type]} bg-${type}/10 border border-${type}/20">
+                    <span>${message}</span>
+                </div>
+            `;
+
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                statusMessage.innerHTML = '';
+            }, 5000);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            showStatus('Welcome! Connect your wallet to start the subscription process.', 'info');
+        });
+    </script>
+</body>
+
+</html>

@@ -5,10 +5,10 @@ services:
       dockerfile: Dockerfile
     container_name: shogun-relay-stack
     ports:
-      - "8765:8765"   # Relay Server
-      - "5001:5001"   # IPFS API
-      - "8080:8080"   # IPFS Gateway
-      - "4001:4001"   # IPFS Swarm
+      - "8765:8765" # Relay Server
+      - "5001:5001" # IPFS API
+      - "8080:8080" # IPFS Gateway
+      - "4001:4001" # IPFS Swarm
     volumes:
       # Persist IPFS data
       - ipfs-data:/data/ipfs
@@ -29,6 +29,8 @@ services:
       - RELAY_NAME=--relay-name--
       - RELAY_PEERS=wss://127.0.0.1:8765/gun
       - RELAY_PROTECTED=true
+      - ALCHEMY_API_KEY=
+      - RELAY_CONTRACT_ADDRESS=0x33d613f9BE182161b5d6B06a38ef7554b42Beb08
       - IPFS_API_URL=http://127.0.0.1:5001
       - IPFS_GATEWAY_URL=http://127.0.0.1:8080
       - IPFS_API_TOKEN=--ipfs-api-token--
@@ -51,4 +53,4 @@ volumes:
 
 networks:
   shogun-network:
-    driver: bridge 
+    driver: bridge
