@@ -271,6 +271,27 @@
             }
         }
 
+        // Check contract status
+        async function checkContractStatus() {
+            try {
+                const response = await fetch('/api/contract-status');
+                const status = await response.json();
+
+                if (status.success) {
+                    console.log('Contract status:', status);
+                    return true;
+                } else {
+                    console.error('Contract status error:', status.error);
+                    showStatus(`Contract error: ${status.error}`, 'error');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error checking contract status:', error);
+                showStatus('Error checking contract status', 'error');
+                return false;
+            }
+        }
+
         // DOM elements
         const connectWalletBtn = document.getElementById('connectWalletBtn');
         const disconnectWalletBtn = document.getElementById('disconnectWalletBtn');
@@ -318,8 +339,14 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', async () => {
             // Load contract configuration on page load
-            await loadContractConfig();
-            showStatus('Enter your Ethereum wallet address and Gun public key to start uploading files', 'info');
+            const configLoaded = await loadContractConfig();
+            if (configLoaded) {
+                // Check contract status
+                await checkContractStatus();
+                showStatus('Contract configuration loaded. Connect your wallet to proceed.', 'info');
+            } else {
+                showStatus('Failed to load contract configuration. Please check server settings.', 'error');
+            }
         });
 
         // Wallet connection
@@ -367,6 +394,11 @@
         // Get registered relay address
         async function getRegisteredRelayAddress() {
             try {
+                if (!relayContract) {
+                    console.error('Relay contract not initialized');
+                    return;
+                }
+
                 const allRelays = await relayContract.getAllRelays();
                 if (allRelays.length > 0) {
                     registeredRelayAddress = allRelays[0]; // Usa il primo relay registrato
@@ -376,7 +408,7 @@
                 }
             } catch (error) {
                 console.error('Failed to get registered relay address:', error);
-                showStatus('Failed to get relay information', 'error');
+                showStatus('Failed to get relay information. Contract may not be accessible.', 'error');
             }
         }
 
@@ -439,7 +471,10 @@
         // Subscription management
         async function loadSubscriptionDetails() {
             try {
-                if (!relayContract) return;
+                if (!relayContract) {
+                    console.error('Relay contract not initialized');
+                    return;
+                }
 
                 const pricePerMonth = await relayContract.SUBSCRIPTION_PRICE();
                 const priceInEth = ethers.formatEther(pricePerMonth);
@@ -449,6 +484,7 @@
 
             } catch (error) {
                 console.error('Failed to load subscription details:', error);
+                showStatus('Failed to load subscription details. Contract may not be accessible.', 'error');
             }
         }
 

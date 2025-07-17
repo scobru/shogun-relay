@@ -84,10 +84,13 @@ const RELAY_CONTRACT_ADDRESS = process.env.RELAY_CONTRACT_ADDRESS;
 let relayContract;
 let provider;
 let relayAbi = [
+  "function SUBSCRIPTION_PRICE() view returns (uint256)",
+  "function SUBSCRIPTION_DURATION() view returns (uint256)",
   "function checkUserSubscription(address _user) external view returns (bool)",
   "function isSubscriptionActive(address _user, address _relayAddress) external view returns (bool)",
   "function getSubscriptionDetails(address _user, address _relayAddress) external view returns (uint256 startTime, uint256 endTime, uint256 amountPaid, bool isActive)",
   "function getRelayDetails(address _relayAddress) external view returns (string memory url, address relayAddress, bool isActive, uint256 registeredAt)",
+  "function getAllRelays() external view returns (address[] memory)",
   "function registerRelay(string memory _url) external",
   "function deactivateRelay() external",
 ];
@@ -1491,13 +1494,38 @@ async function initializeServer() {
   // Endpoint per verificare lo stato del contratto
   app.get("/api/contract-status", async (req, res) => {
     try {
+      if (!RELAY_CONTRACT_ADDRESS) {
+        return res.json({
+          success: false,
+          error: "RELAY_CONTRACT_ADDRESS not configured",
+          contract: {
+            address: null,
+            configured: false,
+          },
+        });
+      }
+
+      if (!process.env.ALCHEMY_API_KEY) {
+        return res.json({
+          success: false,
+          error: "ALCHEMY_API_KEY not configured",
+          contract: {
+            address: RELAY_CONTRACT_ADDRESS,
+            configured: true,
+            provider: "not configured",
+          },
+        });
+      }
+
       if (!relayContract) {
         return res.json({
           success: false,
-          error: "Contract not configured",
+          error: "Contract not initialized",
           contract: {
             address: RELAY_CONTRACT_ADDRESS,
-            configured: false,
+            configured: true,
+            provider: "configured",
+            initialized: false,
           },
         });
       }
@@ -1514,6 +1542,7 @@ async function initializeServer() {
           accessible: true,
           subscriptionPrice: ethers.formatEther(subscriptionPrice),
           registeredRelays: allRelays.length,
+          relays: allRelays,
         },
         relay: {
           address: process.env.RELAY_HOST || ip.address(),
@@ -1522,12 +1551,16 @@ async function initializeServer() {
         },
       });
     } catch (error) {
+      console.error("Contract status error:", error);
       res.json({
         success: false,
         error: error.message,
         contract: {
           address: RELAY_CONTRACT_ADDRESS,
-          configured: true,
+          configured: !!RELAY_CONTRACT_ADDRESS,
+          provider: process.env.ALCHEMY_API_KEY
+            ? "configured"
+            : "not configured",
           accessible: false,
         },
       });
