@@ -192,15 +192,21 @@
                             <div class="bg-base-200/50 rounded-lg p-4 mb-4">
                                 <div class="flex items-center justify-between mb-2">
                                     <h5 class="font-semibold">Status:</h5>
-                                    <button id="refreshCurrentStatusBtn" class="btn btn-xs btn-outline"
-                                        onclick="checkCurrentSubscriptionStatus()">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none"
-                                            viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                        </svg>
-                                        Refresh
-                                    </button>
+                                    <div class="flex gap-2">
+                                        <button id="refreshCurrentStatusBtn" class="btn btn-xs btn-outline"
+                                            onclick="checkCurrentSubscriptionStatus()">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none"
+                                                viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                            </svg>
+                                            Refresh
+                                        </button>
+                                        <button id="debugStatusBtn" class="btn btn-xs btn-error"
+                                            onclick="checkSubscriptionStatusFromServer()">
+                                            Debug
+                                        </button>
+                                    </div>
                                 </div>
                                 <div id="currentSubscriptionDetails" class="space-y-2">
                                     <div class="text-center py-4">
@@ -814,7 +820,15 @@
                 await loadSubscriptionDetails();
 
                 // Controlla lo stato della sottoscrizione attuale
-                await checkCurrentSubscriptionStatus();
+                console.log('🔄 Calling checkCurrentSubscriptionStatus...');
+                try {
+                    await checkCurrentSubscriptionStatus();
+                    console.log('✅ checkCurrentSubscriptionStatus completed');
+                } catch (error) {
+                    console.log('⚠️ checkCurrentSubscriptionStatus failed, trying fallback...');
+                    // Fallback: usa la funzione che sappiamo funzionare
+                    await checkSubscriptionStatusFromServer();
+                }
 
             } catch (error) {
                 showNotification(`Failed to connect wallet: ${error.message}`, 'error');
@@ -1085,12 +1099,20 @@
         // Funzione per controllare lo stato della sottoscrizione attuale
         async function checkCurrentSubscriptionStatus() {
             try {
+                console.log('🔍 checkCurrentSubscriptionStatus called');
+
                 if (!walletAddress) {
+                    console.log('❌ No wallet address');
                     showNotification('Please connect your wallet first', 'error');
                     return;
                 }
 
                 const currentSubscriptionDetails = document.getElementById('currentSubscriptionDetails');
+                if (!currentSubscriptionDetails) {
+                    console.log('❌ currentSubscriptionDetails element not found');
+                    return;
+                }
+
                 currentSubscriptionDetails.innerHTML = `
                     <div class="text-center py-4">
                         <div class="loading loading-spinner loading-sm"></div>
@@ -1099,13 +1121,20 @@
                 `;
 
                 const identifier = walletAddress;
+                console.log('🔍 Checking subscription for wallet:', identifier);
+
                 const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
+                console.log('📡 Response status:', response.status);
+
                 const result = await response.json();
+                console.log('📋 Response data:', result);
 
                 if (result.success) {
                     const subscription = result.subscription;
+                    console.log('📊 Subscription object:', subscription);
 
                     if (subscription.isActive) {
+                        console.log('✅ Subscription is ACTIVE');
                         const mbAllocated = subscription.mbAllocated || 0;
                         const mbUsed = subscription.mbUsed || 0;
                         const mbRemaining = subscription.mbRemaining || 0;
@@ -1156,9 +1185,14 @@
                         `;
 
                         // Mostra la sezione per aggiungere MB
-                        document.getElementById('addMbSection').classList.remove('hidden');
+                        const addMbSection = document.getElementById('addMbSection');
+                        if (addMbSection) {
+                            addMbSection.classList.remove('hidden');
+                            console.log('✅ Showing add MB section');
+                        }
 
                     } else {
+                        console.log('❌ Subscription is NOT active. Reason:', subscription.reason);
                         currentSubscriptionDetails.innerHTML = `
                             <div class="text-center">
                                 <div class="flex items-center gap-2 text-warning mb-2">
@@ -1172,9 +1206,13 @@
                         `;
 
                         // Nascondi la sezione per aggiungere MB
-                        document.getElementById('addMbSection').classList.add('hidden');
+                        const addMbSection = document.getElementById('addMbSection');
+                        if (addMbSection) {
+                            addMbSection.classList.add('hidden');
+                        }
                     }
                 } else {
+                    console.log('❌ API call failed:', result.error);
                     currentSubscriptionDetails.innerHTML = `
                         <div class="text-center">
                             <div class="flex items-center gap-2 text-error mb-2">
@@ -1188,19 +1226,21 @@
                     `;
                 }
             } catch (error) {
-                console.error('Error checking current subscription status:', error);
+                console.error('💥 Error in checkCurrentSubscriptionStatus:', error);
                 const currentSubscriptionDetails = document.getElementById('currentSubscriptionDetails');
-                currentSubscriptionDetails.innerHTML = `
-                    <div class="text-center">
-                        <div class="flex items-center gap-2 text-error mb-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                            <span class="font-semibold">Connection Error</span>
+                if (currentSubscriptionDetails) {
+                    currentSubscriptionDetails.innerHTML = `
+                        <div class="text-center">
+                            <div class="flex items-center gap-2 text-error mb-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                                <span class="font-semibold">Connection Error</span>
+                            </div>
+                            <p class="text-sm text-base-content/60">${error.message}</p>
                         </div>
-                        <p class="text-sm text-base-content/60">${error.message}</p>
-                    </div>
-                `;
+                    `;
+                }
             }
         }
 
