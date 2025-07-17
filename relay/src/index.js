@@ -32,83 +32,7 @@ import multer from "multer";
 const namespace = "shogun";
 
 // --- Sistema di Logging Migliorato ---
-class Logger {
-  constructor() {
-    this.logs = [];
-    this.maxLogs = 1000; // Mantieni solo gli ultimi 1000 log
-  }
-
-  log(level, message, data = null) {
-    const logEntry = {
-      timestamp: new Date().toISOString(),
-      level,
-      message,
-      data,
-      pid: process.pid,
-    };
-
-    this.logs.push(logEntry);
-
-    // Mantieni solo gli ultimi maxLogs
-    if (this.logs.length > this.maxLogs) {
-      this.logs.shift();
-    }
-
-    // Console output con colori
-    const colors = {
-      info: "\x1b[36m", // Cyan
-      success: "\x1b[32m", // Green
-      warning: "\x1b[33m", // Yellow
-      error: "\x1b[31m", // Red
-      debug: "\x1b[35m", // Magenta
-    };
-
-    const reset = "\x1b[0m";
-    const color = colors[level] || colors.info;
-
-    console.log(`${color}[${level.toUpperCase()}]${reset} ${message}`);
-
-    if (data) {
-      console.log(`${color}Data:${reset}`, data);
-    }
-  }
-
-  info(message, data = null) {
-    this.log("info", message, data);
-  }
-
-  success(message, data = null) {
-    this.log("success", message, data);
-  }
-
-  warning(message, data = null) {
-    this.log("warning", message, data);
-  }
-
-  error(message, data = null) {
-    this.log("error", message, data);
-  }
-
-  debug(message, data = null) {
-    this.log("debug", message, data);
-  }
-
-  getLogs(level = null, limit = 100) {
-    let filteredLogs = this.logs;
-
-    if (level) {
-      filteredLogs = this.logs.filter((log) => log.level === level);
-    }
-
-    return filteredLogs.slice(-limit);
-  }
-
-  clearLogs() {
-    this.logs = [];
-  }
-}
-
-const logger = new Logger();
+// (logger rimosso, usa solo console.log/error/warn)
 
 // --- IPFS Configuration ---
 const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
@@ -1908,7 +1832,7 @@ async function initializeServer() {
         },
       });
     } catch (error) {
-      logger.error("Contract status check failed", error);
+      console.error("Contract status check failed", error);
       res.status(500).json({
         success: false,
         error: "Failed to check contract status",
@@ -1945,7 +1869,7 @@ async function initializeServer() {
         },
       });
     } catch (error) {
-      logger.error("Performance monitoring failed", error);
+      console.error("Performance monitoring failed", error);
       res.status(500).json({
         success: false,
         error: "Failed to get performance data",
@@ -1958,7 +1882,7 @@ async function initializeServer() {
   app.get("/api/logs", tokenAuthMiddleware, (req, res) => {
     try {
       const { level, limit = 100 } = req.query;
-      const logs = logger.getLogs(level, parseInt(limit));
+      const logs = [];
 
       res.json({
         success: true,
@@ -1970,7 +1894,7 @@ async function initializeServer() {
         },
       });
     } catch (error) {
-      logger.error("Log retrieval failed", error);
+      console.error("Log retrieval failed", error);
       res.status(500).json({
         success: false,
         error: "Failed to retrieve logs",
@@ -1982,13 +1906,9 @@ async function initializeServer() {
   // Endpoint per pulire i log
   app.delete("/api/logs", tokenAuthMiddleware, (req, res) => {
     try {
-      logger.clearLogs();
-      res.json({
-        success: true,
-        message: "Logs cleared successfully",
-      });
+      // (nessuna azione, logs non più gestiti)
     } catch (error) {
-      logger.error("Log clearing failed", error);
+      console.error("Log clearing failed", error);
       res.status(500).json({
         success: false,
         error: "Failed to clear logs",
@@ -2100,7 +2020,7 @@ async function initializeServer() {
           type: isEthereumAddress ? "ethereum_address" : "gun_key",
         });
       } catch (contractError) {
-        logger.error("Contract subscription check failed", contractError);
+        console.error("Contract subscription check failed", contractError);
 
         // Fallback: prova con metodi alternativi
         try {
@@ -2121,7 +2041,7 @@ async function initializeServer() {
             fallback: true,
           });
         } catch (fallbackError) {
-          logger.error("Fallback subscription check failed", fallbackError);
+          console.error("Fallback subscription check failed", fallbackError);
           res.status(500).json({
             success: false,
             error: "Errore verifica sottoscrizione",
@@ -2130,7 +2050,7 @@ async function initializeServer() {
         }
       }
     } catch (error) {
-      logger.error("Subscription status check failed", error);
+      console.error("Subscription status check failed", error);
       res.status(500).json({
         success: false,
         error: "Errore interno del server",
@@ -2159,15 +2079,15 @@ async function initializeServer() {
 
   // Sostituisci i console.log con il logger
   console.log = (...args) => {
-    logger.info(args.join(" "));
+    console.log(...args);
   };
 
   console.error = (...args) => {
-    logger.error(args.join(" "));
+    console.error(...args);
   };
 
   console.warn = (...args) => {
-    logger.warning(args.join(" "));
+    console.warn(...args);
   };
 
   // Graceful shutdown
@@ -2259,12 +2179,12 @@ async function initializeServer() {
   // Handle uncaught exceptions
   process.on("uncaughtException", (error) => {
     console.error("Uncaught Exception:", error);
-    logger.error("Uncaught Exception", error);
+    console.error("Uncaught Exception:", error);
   });
 
   process.on("unhandledRejection", (reason, promise) => {
     console.error("Unhandled Rejection at:", promise, "reason:", reason);
-    logger.error("Unhandled Rejection", { reason, promise });
+    console.error("Unhandled Rejection", { reason, promise });
   });
 } // End of initializeServer function
 
