@@ -377,9 +377,18 @@
         validateKeyBtn.addEventListener('click', validateAndContinue);
         subscribeBtn.addEventListener('click', subscribeToRelay);
         subscriptionMonths.addEventListener('change', updateSubscriptionDetails);
-        checkStatusBtn.addEventListener('click', checkSubscriptionStatus);
-        refreshStatusBtn.addEventListener('click', checkSubscriptionStatus);
-        newSubscriptionBtn.addEventListener('click', () => showStep(3));
+        checkStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
+        refreshStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
+        newSubscriptionBtn.addEventListener('click', () => {
+            if (!gunKeyPair || !gunKeyPair.pub) {
+                showStatus('Please enter and validate your Gun public key first', 'error');
+                showStep(2);
+                updateStep(2, 'step-active');
+                return;
+            }
+            showStep(3);
+            updateStep(3, 'step-active');
+        });
 
         // Listen for network changes
         if (typeof window.ethereum !== 'undefined') {
@@ -523,12 +532,9 @@
                 showStatus('Wallet connected successfully!', 'success');
                 updateStep(1, 'step-completed');
 
-                // Check subscription status automatically
-                await checkSubscriptionStatusFromServer();
-
-                // Show step 4 (subscription status) instead of step 2
-                showStep(4);
-                updateStep(4, 'step-active');
+                // Mostra il Step 2 per inserire la chiave Gun
+                showStep(2);
+                updateStep(2, 'step-active');
 
             } catch (error) {
                 showStatus(`Failed to connect wallet: ${error.message}`, 'error');
@@ -573,6 +579,7 @@
             keyInfo.classList.add('hidden');
             validateKeyBtn.classList.remove('hidden');
             gunPubKeyInput.value = '';
+            subscriptionStatus.classList.add('hidden');
 
             showStep(1);
             updateStep(1, 'step-active');
@@ -610,8 +617,12 @@
                 showStatus('Gun public key validated successfully!', 'success');
                 updateStep(2, 'step-completed');
 
-                // Check if already subscribed
-                await checkSubscriptionStatus();
+                // Mostra il Step 4 per controllare lo stato della sottoscrizione
+                showStep(4);
+                updateStep(4, 'step-active');
+
+                // Controlla automaticamente lo stato della sottoscrizione
+                await checkSubscriptionStatusFromServer();
 
             } catch (error) {
                 showStatus(`Failed to validate Gun public key: ${error.message}`, 'error');
@@ -653,8 +664,13 @@
 
         async function subscribeToRelay() {
             try {
-                if (!relayContract || !walletAddress || !gunKeyPair) {
-                    showStatus('Please connect wallet and generate Gun key first', 'error');
+                if (!relayContract || !walletAddress) {
+                    showStatus('Please connect wallet first', 'error');
+                    return;
+                }
+
+                if (!gunKeyPair || !gunKeyPair.pub) {
+                    showStatus('Please enter and validate your Gun public key first', 'error');
                     return;
                 }
 
@@ -679,7 +695,7 @@
                 updateStep(3, 'step-completed');
 
                 // Update subscription status
-                await checkSubscriptionStatus();
+                await checkSubscriptionStatusFromServer();
 
             } catch (error) {
                 showStatus(`Subscription failed: ${error.message}`, 'error');
