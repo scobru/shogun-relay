@@ -54,6 +54,18 @@
                     <h1 class="text-3xl font-semibold mb-2">User Upload</h1>
                     <p class="text-base-content/70 mb-8">Upload files using your Ethereum wallet and Gun public key</p>
 
+                    <!-- Subscription Status Link -->
+                    <div class="mb-6">
+                        <a href="/subscribe" class="btn btn-outline btn-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            Check Subscription Status
+                        </a>
+                    </div>
+
                     <!-- Setup Section -->
                     <div class="w-full max-w-4xl space-y-6">
                         <div class="upload-card">
@@ -280,7 +292,34 @@
             filesSection.classList.remove('hidden');
 
             showStatus('Authorization set successfully!', 'success');
+
+            // Controlla automaticamente lo stato della sottoscrizione
+            checkSubscriptionStatus(walletAddress);
+
             loadUserFiles();
+        }
+
+        // Controlla lo stato della sottoscrizione
+        async function checkSubscriptionStatus(address) {
+            try {
+                // Usa il nuovo endpoint ibrido che supporta sia pubKey che userAddress
+                const identifier = currentGunPubKey || address;
+                const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    if (result.subscription.isActive) {
+                        showStatus(`✅ Subscription active! Expires in ${result.subscription.daysRemaining} days`, 'success');
+                    } else {
+                        showStatus(`⚠️ No active subscription found. Please subscribe at /subscribe`, 'warning');
+                    }
+                } else {
+                    showStatus(`❌ Error checking subscription: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error checking subscription status:', error);
+                showStatus(`❌ Error checking subscription: ${error.message}`, 'error');
+            }
         }
 
         // File upload
@@ -341,7 +380,9 @@
                 if (result.success) {
                     displayFiles(result.uploads);
                     fileCount.textContent = result.count;
-                    totalSize.textContent = `${result.totalSizeMB.toFixed(2)} MB`;
+                    // Aggiungo controllo per evitare errore toFixed su undefined
+                    const totalSize = result.totalSizeMB || 0;
+                    totalSize.textContent = `${totalSize.toFixed(2)} MB`;
                 } else {
                     showStatus(`Failed to load files: ${result.error}`, 'error');
                 }

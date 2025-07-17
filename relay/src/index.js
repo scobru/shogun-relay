@@ -587,6 +587,29 @@ async function initializeServer() {
                 .get(fileResult?.Hash);
               uploadNode.put(uploadData);
 
+              // Salva il mapping pubKey -> userAddress se disponibili entrambi
+              if (req.userAddress && req.userPubKey) {
+                const mappingData = {
+                  userAddress: req.userAddress,
+                  pubKey: req.userPubKey,
+                  mappedAt: Date.now(),
+                  lastUpload: Date.now(),
+                };
+
+                const mappingNode = gun
+                  .get("shogun")
+                  .get("pubkey_mapping")
+                  .get(req.userPubKey);
+                mappingNode.put(mappingData);
+
+                console.log(
+                  `✅ Mapping salvato: ${req.userPubKey.slice(
+                    0,
+                    10
+                  )}... -> ${req.userAddress.slice(0, 6)}...`
+                );
+              }
+
               res.json({
                 success: true,
                 file: {
@@ -1645,6 +1668,309 @@ async function initializeServer() {
           accessible: false,
         },
         network: networkInfo,
+      });
+    }
+  });
+
+  // Endpoint per verificare lo stato della sottoscrizione di un utente specifico
+  app.get("/api/user-subscription/:userAddress", async (req, res) => {
+    try {
+      const { userAddress } = req.params;
+
+      if (!userAddress) {
+        return res.status(400).json({
+          success: false,
+          error: "Indirizzo utente richiesto",
+        });
+      }
+
+      if (!relayContract) {
+        return res.status(500).json({
+          success: false,
+          error: "Contratto relay non configurato",
+        });
+      }
+
+      // Ottieni tutti i relay registrati
+      const allRelays = await relayContract.getAllRelays();
+
+      if (allRelays.length === 0) {
+        return res.json({
+          success: true,
+          userAddress,
+          subscription: {
+            isActive: false,
+            reason: "Nessun relay registrato nel contratto",
+          },
+        });
+      }
+
+      // Verifica la sottoscrizione per il primo relay (o tutti se necessario)
+      const relayAddress = allRelays[0];
+
+      try {
+        // Prova prima con checkUserSubscription
+        const isSubscribed = await relayContract.checkUserSubscription(
+          userAddress
+        );
+
+        if (isSubscribed) {
+          // Ottieni i dettagli della sottoscrizione
+          const subscriptionDetails =
+            await relayContract.getSubscriptionDetails(
+              userAddress,
+              relayAddress
+            );
+
+          res.json({
+            success: true,
+            userAddress,
+            relayAddress,
+            subscription: {
+              isActive: true,
+              startTime: Number(subscriptionDetails.startTime),
+              endTime: Number(subscriptionDetails.endTime),
+              amountPaid: ethers.formatEther(subscriptionDetails.amountPaid),
+              startDate: new Date(
+                Number(subscriptionDetails.startTime) * 1000
+              ).toISOString(),
+              endDate: new Date(
+                Number(subscriptionDetails.endTime) * 1000
+              ).toISOString(),
+              daysRemaining: Math.max(
+                0,
+                Math.ceil(
+                  (Number(subscriptionDetails.endTime) * 1000 - Date.now()) /
+                    (1000 * 60 * 60 * 24)
+                )
+              ),
+            },
+          });
+        } else {
+          res.json({
+            success: true,
+            userAddress,
+            relayAddress,
+            subscription: {
+              isActive: false,
+              reason: "Nessuna sottoscrizione attiva trovata",
+            },
+          });
+        }
+      } catch (contractError) {
+        console.error("Errore verifica sottoscrizione:", contractError);
+
+        // Fallback: prova con isSubscriptionActive
+        try {
+          const isActive = await relayContract.isSubscriptionActive(
+            userAddress,
+            relayAddress
+          );
+
+          res.json({
+            success: true,
+            userAddress,
+            relayAddress,
+            subscription: {
+              isActive: isActive,
+              reason: isActive
+                ? "Sottoscrizione attiva"
+                : "Sottoscrizione non attiva",
+              fallback: true,
+            },
+          });
+        } catch (fallbackError) {
+          console.error(
+            "Errore fallback verifica sottoscrizione:",
+            fallbackError
+          );
+          res.status(500).json({
+            success: false,
+            error: "Errore verifica sottoscrizione",
+            details: fallbackError.message,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Errore endpoint user-subscription:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore interno del server",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint ibrido per verificare lo stato della sottoscrizione (cerca prima per pubKey, poi per userAddress)
+  app.get("/api/subscription-status/:identifier", async (req, res) => {
+    try {
+      const { identifier } = req.params;
+
+      if (!identifier) {
+        return res.status(400).json({
+          success: false,
+          error: "Identificatore richiesto (pubKey o userAddress)",
+        });
+      }
+
+      if (!relayContract) {
+        return res.status(500).json({
+          success: false,
+          error: "Contratto relay non configurato",
+        });
+      }
+
+      let userAddress = null;
+      let pubKey = null;
+
+      // Determina se l'identificatore è un indirizzo Ethereum o una pubKey
+      if (identifier.startsWith("0x") && identifier.length === 42) {
+        // È un indirizzo Ethereum
+        userAddress = identifier;
+      } else {
+        // Probabilmente è una pubKey, cerca nel mapping
+        pubKey = identifier;
+
+        // Cerca il mapping nel database Gun
+        const mappingNode = gun.get("shogun").get("pubkey_mapping").get(pubKey);
+
+        const mapping = await new Promise((resolve) => {
+          mappingNode.once((data) => {
+            resolve(data);
+          });
+        });
+
+        if (mapping && mapping.userAddress) {
+          userAddress = mapping.userAddress;
+          console.log(`Mapping trovato: ${pubKey} -> ${userAddress}`);
+        } else {
+          return res.json({
+            success: true,
+            identifier,
+            pubKey,
+            userAddress: null,
+            subscription: {
+              isActive: false,
+              reason: "Nessun mapping trovato per questa chiave pubblica Gun",
+            },
+          });
+        }
+      }
+
+      // Ottieni tutti i relay registrati
+      const allRelays = await relayContract.getAllRelays();
+
+      if (allRelays.length === 0) {
+        return res.json({
+          success: true,
+          identifier,
+          pubKey,
+          userAddress,
+          subscription: {
+            isActive: false,
+            reason: "Nessun relay registrato nel contratto",
+          },
+        });
+      }
+
+      // Verifica la sottoscrizione per il primo relay
+      const relayAddress = allRelays[0];
+
+      try {
+        // Prova prima con checkUserSubscription
+        const isSubscribed = await relayContract.checkUserSubscription(
+          userAddress
+        );
+
+        if (isSubscribed) {
+          // Ottieni i dettagli della sottoscrizione
+          const subscriptionDetails =
+            await relayContract.getSubscriptionDetails(
+              userAddress,
+              relayAddress
+            );
+
+          res.json({
+            success: true,
+            identifier,
+            pubKey,
+            userAddress,
+            relayAddress,
+            subscription: {
+              isActive: true,
+              startTime: Number(subscriptionDetails.startTime),
+              endTime: Number(subscriptionDetails.endTime),
+              amountPaid: ethers.formatEther(subscriptionDetails.amountPaid),
+              startDate: new Date(
+                Number(subscriptionDetails.startTime) * 1000
+              ).toISOString(),
+              endDate: new Date(
+                Number(subscriptionDetails.endTime) * 1000
+              ).toISOString(),
+              daysRemaining: Math.max(
+                0,
+                Math.ceil(
+                  (Number(subscriptionDetails.endTime) * 1000 - Date.now()) /
+                    (1000 * 60 * 60 * 24)
+                )
+              ),
+            },
+          });
+        } else {
+          res.json({
+            success: true,
+            identifier,
+            pubKey,
+            userAddress,
+            relayAddress,
+            subscription: {
+              isActive: false,
+              reason: "Nessuna sottoscrizione attiva trovata",
+            },
+          });
+        }
+      } catch (contractError) {
+        console.error("Errore verifica sottoscrizione:", contractError);
+
+        // Fallback: prova con isSubscriptionActive
+        try {
+          const isActive = await relayContract.isSubscriptionActive(
+            userAddress,
+            relayAddress
+          );
+
+          res.json({
+            success: true,
+            identifier,
+            pubKey,
+            userAddress,
+            relayAddress,
+            subscription: {
+              isActive: isActive,
+              reason: isActive
+                ? "Sottoscrizione attiva"
+                : "Sottoscrizione non attiva",
+              fallback: true,
+            },
+          });
+        } catch (fallbackError) {
+          console.error(
+            "Errore fallback verifica sottoscrizione:",
+            fallbackError
+          );
+          res.status(500).json({
+            success: false,
+            error: "Errore verifica sottoscrizione",
+            details: fallbackError.message,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Errore endpoint subscription-status:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore interno del server",
+        details: error.message,
       });
     }
   });
@@ -2866,6 +3192,203 @@ async function initializeServer() {
       res.status(500).json({
         success: false,
         error: "Failed to check services status: " + error.message,
+      });
+    }
+  });
+
+  // Endpoint per gestire il mapping pubKey -> userAddress
+  app.post("/api/pubkey-mapping", tokenAuthMiddleware, async (req, res) => {
+    try {
+      const { pubKey, userAddress } = req.body;
+
+      if (!pubKey || !userAddress) {
+        return res.status(400).json({
+          success: false,
+          error: "pubKey e userAddress sono richiesti",
+        });
+      }
+
+      // Validazione base
+      if (!userAddress.startsWith("0x") || userAddress.length !== 42) {
+        return res.status(400).json({
+          success: false,
+          error: "userAddress deve essere un indirizzo Ethereum valido",
+        });
+      }
+
+      if (pubKey.length < 20) {
+        return res.status(400).json({
+          success: false,
+          error: "pubKey deve essere una chiave pubblica Gun valida",
+        });
+      }
+
+      // Salva il mapping nel database Gun
+      const mappingData = {
+        userAddress: userAddress,
+        pubKey: pubKey,
+        mappedAt: Date.now(),
+        createdBy: "admin",
+      };
+
+      const mappingNode = gun.get("shogun").get("pubkey_mapping").get(pubKey);
+
+      mappingNode.put(mappingData);
+
+      console.log(
+        `✅ Mapping manuale salvato: ${pubKey.slice(
+          0,
+          10
+        )}... -> ${userAddress.slice(0, 6)}...`
+      );
+
+      res.json({
+        success: true,
+        message: "Mapping salvato con successo",
+        mapping: {
+          pubKey: pubKey.slice(0, 10) + "...",
+          userAddress: userAddress.slice(0, 6) + "...",
+          mappedAt: new Date(mappingData.mappedAt).toISOString(),
+        },
+      });
+    } catch (error) {
+      console.error("Errore salvataggio mapping:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore salvataggio mapping",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint per ottenere il mapping di una pubKey
+  app.get("/api/pubkey-mapping/:pubKey", async (req, res) => {
+    try {
+      const { pubKey } = req.params;
+
+      if (!pubKey) {
+        return res.status(400).json({
+          success: false,
+          error: "pubKey richiesta",
+        });
+      }
+
+      // Cerca il mapping nel database Gun
+      const mappingNode = gun.get("shogun").get("pubkey_mapping").get(pubKey);
+
+      const mapping = await new Promise((resolve) => {
+        mappingNode.once((data) => {
+          resolve(data);
+        });
+      });
+
+      if (mapping && mapping.userAddress) {
+        res.json({
+          success: true,
+          mapping: {
+            pubKey: pubKey,
+            userAddress: mapping.userAddress,
+            mappedAt: mapping.mappedAt,
+            lastUpload: mapping.lastUpload,
+          },
+        });
+      } else {
+        res.json({
+          success: true,
+          mapping: null,
+          message: "Nessun mapping trovato per questa pubKey",
+        });
+      }
+    } catch (error) {
+      console.error("Errore ricerca mapping:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore ricerca mapping",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint per eliminare un mapping
+  app.delete(
+    "/api/pubkey-mapping/:pubKey",
+    tokenAuthMiddleware,
+    async (req, res) => {
+      try {
+        const { pubKey } = req.params;
+
+        if (!pubKey) {
+          return res.status(400).json({
+            success: false,
+            error: "pubKey richiesta",
+          });
+        }
+
+        // Elimina il mapping dal database Gun
+        const mappingNode = gun.get("shogun").get("pubkey_mapping").get(pubKey);
+        mappingNode.put(null);
+
+        console.log(`❌ Mapping eliminato: ${pubKey.slice(0, 10)}...`);
+
+        res.json({
+          success: true,
+          message: "Mapping eliminato con successo",
+          pubKey: pubKey.slice(0, 10) + "...",
+        });
+      } catch (error) {
+        console.error("Errore eliminazione mapping:", error);
+        res.status(500).json({
+          success: false,
+          error: "Errore eliminazione mapping",
+          details: error.message,
+        });
+      }
+    }
+  );
+
+  // Endpoint per ottenere tutti i mapping
+  app.get("/api/pubkey-mapping", tokenAuthMiddleware, async (req, res) => {
+    try {
+      // Ottieni tutti i mapping dal database Gun
+      const mappingsNode = gun.get("shogun").get("pubkey_mapping");
+
+      const mappings = await new Promise((resolve) => {
+        mappingsNode.once((data) => {
+          resolve(data);
+        });
+      });
+
+      if (!mappings) {
+        return res.json({
+          success: true,
+          mappings: [],
+          count: 0,
+        });
+      }
+
+      // Converte l'oggetto mappings in array
+      const mappingsArray = Object.keys(mappings)
+        .filter((key) => key !== "_") // Esclude i metadati Gun
+        .map((pubKey) => ({
+          pubKey: pubKey,
+          userAddress: mappings[pubKey].userAddress,
+          mappedAt: mappings[pubKey].mappedAt,
+          lastUpload: mappings[pubKey].lastUpload,
+          createdBy: mappings[pubKey].createdBy,
+        }))
+        .sort((a, b) => b.mappedAt - a.mappedAt); // Ordina per data
+
+      res.json({
+        success: true,
+        mappings: mappingsArray,
+        count: mappingsArray.length,
+      });
+    } catch (error) {
+      console.error("Errore ottenimento mapping:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore ottenimento mapping",
+        details: error.message,
       });
     }
   });

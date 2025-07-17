@@ -217,6 +217,62 @@
                         </div>
                     </div>
 
+                    <!-- Step 4: Subscription Status Check -->
+                    <div id="step4Content" class="w-full max-w-2xl space-y-6 hidden">
+                        <div class="status-card">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                                Subscription Status
+                            </h3>
+                            <p class="text-base-content/70 mb-4">
+                                Check the status of your current subscription and manage your relay access.
+                            </p>
+
+                            <div class="bg-base-200/50 rounded-lg p-4 mb-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h5 class="font-semibold">Current Status:</h5>
+                                    <button id="refreshStatusBtn" class="btn btn-sm btn-outline">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                            viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                        Refresh
+                                    </button>
+                                </div>
+                                <div id="subscriptionDetails" class="space-y-2">
+                                    <div class="text-center py-4">
+                                        <div class="loading loading-spinner loading-md"></div>
+                                        <p class="text-sm text-base-content/60 mt-2">Loading subscription status...</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-2">
+                                <button id="checkStatusBtn" class="btn btn-accent flex-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Check Status
+                                </button>
+                                <button id="newSubscriptionBtn" class="btn btn-outline flex-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                    </svg>
+                                    New Subscription
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Status Message -->
                     <div id="statusMessage" class="mt-6"></div>
                 </div>
@@ -311,6 +367,9 @@
         const statusMessage = document.getElementById('statusMessage');
         const subscriptionStatus = document.getElementById('subscriptionStatus');
         const statusContent = document.getElementById('statusContent');
+        const checkStatusBtn = document.getElementById('checkStatusBtn');
+        const refreshStatusBtn = document.getElementById('refreshStatusBtn');
+        const newSubscriptionBtn = document.getElementById('newSubscriptionBtn');
 
         // Event listeners
         connectWalletBtn.addEventListener('click', connectWallet);
@@ -318,6 +377,9 @@
         validateKeyBtn.addEventListener('click', validateAndContinue);
         subscribeBtn.addEventListener('click', subscribeToRelay);
         subscriptionMonths.addEventListener('change', updateSubscriptionDetails);
+        checkStatusBtn.addEventListener('click', checkSubscriptionStatus);
+        refreshStatusBtn.addEventListener('click', checkSubscriptionStatus);
+        newSubscriptionBtn.addEventListener('click', () => showStep(3));
 
         // Listen for network changes
         if (typeof window.ethereum !== 'undefined') {
@@ -355,9 +417,10 @@
             document.getElementById('step1Content').classList.add('hidden');
             document.getElementById('step2Content').classList.add('hidden');
             document.getElementById('step3Content').classList.add('hidden');
+            document.getElementById('step4Content').classList.add('hidden');
 
             // Show current step
-            if (step <= 3) {
+            if (step <= 4) {
                 document.getElementById(`step${step}Content`).classList.remove('hidden');
             }
         }
@@ -460,8 +523,12 @@
                 showStatus('Wallet connected successfully!', 'success');
                 updateStep(1, 'step-completed');
 
-                // Load subscription details
-                await loadSubscriptionDetails();
+                // Check subscription status automatically
+                await checkSubscriptionStatusFromServer();
+
+                // Show step 4 (subscription status) instead of step 2
+                showStep(4);
+                updateStep(4, 'step-active');
 
             } catch (error) {
                 showStatus(`Failed to connect wallet: ${error.message}`, 'error');
@@ -511,6 +578,7 @@
             updateStep(1, 'step-active');
             updateStep(2, 'step-pending');
             updateStep(3, 'step-pending');
+            updateStep(4, 'step-pending');
 
             showStatus('Wallet disconnected', 'info');
         }
@@ -649,6 +717,123 @@
 
             } catch (error) {
                 console.error('Failed to check subscription status:', error);
+            }
+        }
+
+        // Funzione per controllare lo stato della sottoscrizione dal server
+        async function checkSubscriptionStatusFromServer() {
+            try {
+                if (!walletAddress) {
+                    showStatus('Please connect your wallet first', 'error');
+                    return;
+                }
+
+                // Usa il nuovo endpoint ibrido che supporta sia pubKey che userAddress
+                const identifier = gunKeyPair?.pub || walletAddress;
+                const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    displaySubscriptionStatus(result);
+
+                    // Se la sottoscrizione è attiva, mostra anche lo stato nel step 3
+                    if (result.subscription.isActive) {
+                        subscriptionStatus.classList.remove('hidden');
+                        statusContent.innerHTML = `
+                            <div class="flex items-center gap-2 text-success">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>Your Gun public key is authorized for relay uploads!</span>
+                            </div>
+                            <p class="text-sm text-base-content/70 mt-2">
+                                You can now use the upload endpoint with your Gun public key: <strong>${gunKeyPair?.pub || 'N/A'}</strong>
+                            </p>
+                        `;
+                    }
+                } else {
+                    showStatus(`Failed to check subscription: ${result.error}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('Error checking subscription status:', error);
+                showStatus(`Error checking subscription: ${error.message}`, 'error');
+            }
+        }
+
+        // Funzione per visualizzare lo stato della sottoscrizione
+        function displaySubscriptionStatus(data) {
+            const detailsContainer = document.getElementById('subscriptionDetails');
+            const subscription = data.subscription;
+
+            if (subscription.isActive) {
+                detailsContainer.innerHTML = `
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-2 text-success">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span class="font-semibold">Subscription Active</span>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="text-base-content/60">Start Date:</span>
+                                <div class="font-mono">${new Date(subscription.startDate).toLocaleDateString()}</div>
+                            </div>
+                            <div>
+                                <span class="text-base-content/60">End Date:</span>
+                                <div class="font-mono">${new Date(subscription.endDate).toLocaleDateString()}</div>
+                            </div>
+                            <div>
+                                <span class="text-base-content/60">Amount Paid:</span>
+                                <div class="font-mono">${subscription.amountPaid} ETH</div>
+                            </div>
+                            <div>
+                                <span class="text-base-content/60">Days Remaining:</span>
+                                <div class="font-mono ${subscription.daysRemaining <= 7 ? 'text-warning' : 'text-success'}">${subscription.daysRemaining} days</div>
+                            </div>
+                        </div>
+
+                        ${subscription.daysRemaining <= 7 ? `
+                            <div class="alert alert-warning">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                </svg>
+                                <span>Your subscription expires soon! Consider renewing.</span>
+                            </div>
+                        ` : ''}
+
+                        <div class="bg-base-300/50 rounded-lg p-3">
+                            <p class="text-sm text-base-content/70">
+                                <strong>Gun Public Key:</strong> ${gunKeyPair?.pub || 'Not set'}
+                            </p>
+                            <p class="text-sm text-base-content/70 mt-1">
+                                You can now upload files using the <a href="/user-upload" class="link link-accent">User Upload</a> page.
+                            </p>
+                        </div>
+                    </div>
+                `;
+            } else {
+                detailsContainer.innerHTML = `
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-2 text-error">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            <span class="font-semibold">No Active Subscription</span>
+                        </div>
+                        
+                        <div class="bg-base-300/50 rounded-lg p-3">
+                            <p class="text-sm text-base-content/70 mb-2">
+                                ${subscription.reason || 'You need to subscribe to use the relay services.'}
+                            </p>
+                            <p class="text-sm text-base-content/70">
+                                Click "New Subscription" to subscribe to the relay.
+                            </p>
+                        </div>
+                    </div>
+                `;
             }
         }
 
