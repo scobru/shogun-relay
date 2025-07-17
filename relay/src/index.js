@@ -620,6 +620,12 @@ async function initializeServer() {
 
               // Salva nel database Gun usando la Gun key come identificatore principale
               const identifier = req.userPubKey || req.userAddress;
+              console.log(
+                `💾 Salvando upload con identificatore: ${identifier}`
+              );
+              console.log(`📝 req.userPubKey: ${req.userPubKey}`);
+              console.log(`📝 req.userAddress: ${req.userAddress}`);
+
               const uploadNode = gun
                 .get("shogun")
                 .get("uploads")
@@ -684,10 +690,27 @@ async function initializeServer() {
                         10
                       )}... (richiesti: ${fileSizeMB} MB)`
                     );
+
+                    // BLOCCA l'upload se non ci sono MB sufficienti
+                    return res.status(403).json({
+                      success: false,
+                      error: "Storage insufficiente per questo file",
+                      details: {
+                        requiredMB: fileSizeMB,
+                        pubKey: req.userPubKey.slice(0, 10) + "...",
+                        message:
+                          "Aggiungi più MB alla tua sottoscrizione per caricare questo file",
+                      },
+                    });
                   }
                 } catch (mbError) {
                   console.error("Errore registrazione uso MB:", mbError);
-                  // Non blocchiamo l'upload se fallisce la registrazione MB
+                  // BLOCCA l'upload se c'è un errore nella verifica MB
+                  return res.status(500).json({
+                    success: false,
+                    error: "Errore verifica storage disponibile",
+                    details: mbError.message,
+                  });
                 }
               }
 
@@ -750,12 +773,17 @@ async function initializeServer() {
           .json({ success: false, error: "Identificatore richiesto" });
       }
 
+      console.log(`📂 Caricando upload per identificatore: ${identifier}`);
+
       // Recupera gli upload dal database Gun
       const uploadsNode = gun.get("shogun").get("uploads").get(identifier);
 
       // Usa once per ottenere i dati una volta
       uploadsNode.once((uploads) => {
+        console.log(`📋 Risultato uploads:`, uploads);
+
         if (!uploads) {
+          console.log(`❌ Nessun upload trovato per: ${identifier}`);
           return res.json({ success: true, uploads: [], identifier });
         }
 
@@ -765,6 +793,10 @@ async function initializeServer() {
           .map((hash) => uploads[hash])
           .filter((upload) => upload && upload.hash) // Filtra upload validi
           .sort((a, b) => b.uploadedAt - a.uploadedAt); // Ordina per data
+
+        console.log(
+          `✅ Trovati ${uploadsArray.length} upload per: ${identifier}`
+        );
 
         res.json({
           success: true,
@@ -778,6 +810,7 @@ async function initializeServer() {
         });
       });
     } catch (error) {
+      console.error(`💥 Errore caricamento upload per ${identifier}:`, error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
