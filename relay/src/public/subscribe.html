@@ -179,14 +179,100 @@
 
                     <!-- Step 2: Subscription -->
                     <div id="step2Content" class="w-full max-w-2xl space-y-6 hidden">
+                        <!-- Current Subscription Status -->
                         <div class="status-card">
                             <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
                                     stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                                 </svg>
-                                Subscribe to Relay
+                                Current Subscription Status
+                            </h3>
+                            <div class="bg-base-200/50 rounded-lg p-4 mb-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h5 class="font-semibold">Status:</h5>
+                                    <button id="refreshCurrentStatusBtn" class="btn btn-xs btn-outline"
+                                        onclick="checkCurrentSubscriptionStatus()">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none"
+                                            viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                        Refresh
+                                    </button>
+                                </div>
+                                <div id="currentSubscriptionDetails" class="space-y-2">
+                                    <div class="text-center py-4">
+                                        <div class="loading loading-spinner loading-sm"></div>
+                                        <p class="text-sm text-base-content/60 mt-2">Checking subscription status...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Add MB to Existing Subscription -->
+                        <div id="addMbSection" class="status-card hidden">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                </svg>
+                                Add More Storage
+                            </h3>
+                            <p class="text-base-content/70 mb-4">
+                                Aggiungi più MB alla tua sottoscrizione esistente.
+                            </p>
+
+                            <div class="form-control mb-4">
+                                <label class="label">
+                                    <span class="label-text">Additional Storage (MB):</span>
+                                </label>
+                                <input id="addMbInput" type="number" class="input input-bordered"
+                                    placeholder="Enter additional MB (e.g., 50)" min="1" value="50">
+                                <div class="label">
+                                    <span class="label-text-alt">Additional MB to your current subscription</span>
+                                </div>
+                            </div>
+
+                            <div class="bg-base-200/50 rounded-lg p-4 mb-4">
+                                <h5 class="font-semibold mb-2">Additional Storage Details:</h5>
+                                <div class="space-y-1 text-sm">
+                                    <div class="flex justify-between">
+                                        <span>Additional Storage:</span>
+                                        <span id="addStorageDisplay">50 MB</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Price per GB:</span>
+                                        <span id="addPricePerGB">Loading...</span>
+                                    </div>
+                                    <div class="flex justify-between font-semibold">
+                                        <span>Additional cost:</span>
+                                        <span id="addMbCost">Loading...</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button id="addMbBtn" class="btn btn-accent w-full">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                </svg>
+                                Add Storage
+                            </button>
+                        </div>
+
+                        <!-- New Subscription Form -->
+                        <div class="status-card">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                </svg>
+                                New Subscription
                             </h3>
                             <p class="text-base-content/70 mb-4">
                                 Sottoscrivi lo storage usando il tuo wallet Ethereum. Scegli la quantità di MB
@@ -561,34 +647,23 @@
         disconnectWalletBtn.addEventListener('click', disconnectWallet);
         subscribeBtn.addEventListener('click', subscribeToRelay);
         mbInput.addEventListener('input', updateSubscriptionDetails);
-        if (addMbInput) addMbInput.addEventListener('input', updateAddMBCost);
         checkStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
         refreshStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
         testEndpointBtn.addEventListener('click', testEndpoint);
-        newSubscriptionBtn.addEventListener('click', async () => {
-            if (!walletAddress) {
-                showNotification('Please connect your wallet first', 'error');
-                showStep(1);
-                updateStep(1, 'step-active');
-                return;
-            }
-
-            // Verifica prima se esiste già una sottoscrizione
-            const hasExisting = await checkExistingSubscription();
-            if (hasExisting) {
-                return; // Non procedere se esiste già una sottoscrizione
-            }
-
-            // Mostra il Step 2 per la sottoscrizione
+        newSubscriptionBtn.addEventListener('click', () => {
             showStep(2);
             updateStep(2, 'step-active');
-
-            // Assicurati che i dettagli della sottoscrizione siano caricati
-            if (document.getElementById('pricePerGB').textContent === 'Loading...') {
-                loadSubscriptionDetails();
-            }
+            updateStep(3, 'step-pending');
         });
-        if (addMbBtn) addMbBtn.addEventListener('click', addMBToSubscription);
+
+        // Aggiungi event listeners per le nuove funzioni
+        if (addMbBtn) {
+            addMbBtn.addEventListener('click', addMBToSubscription);
+        }
+
+        if (addMbInput) {
+            addMbInput.addEventListener('input', updateAddMBCost);
+        }
 
         // Listen for network changes
         if (typeof window.ethereum !== 'undefined') {
@@ -737,6 +812,9 @@
 
                 // Carica i dettagli della sottoscrizione per il Step 2
                 await loadSubscriptionDetails();
+
+                // Controlla lo stato della sottoscrizione attuale
+                await checkCurrentSubscriptionStatus();
 
             } catch (error) {
                 showNotification(`Failed to connect wallet: ${error.message}`, 'error');
@@ -962,6 +1040,14 @@
                 const pricePerGB = await relayContract.PRICE_PER_GB();
                 const cost = (BigInt(mbToAdd) * pricePerGB) / 1000n; // Calcola il costo per i MB specificati
 
+                const addMbBtn = document.getElementById('addMbBtn');
+                const originalText = addMbBtn.innerHTML;
+                addMbBtn.disabled = true;
+                addMbBtn.innerHTML = `
+                    <div class="loading loading-spinner loading-sm"></div>
+                    <span>Adding MB...</span>
+                `;
+
                 const tx = await relayContract.addMBToSubscription(registeredRelayAddress, {
                     value: cost
                 });
@@ -971,16 +1057,248 @@
                 await tx.wait();
 
                 showNotification(`${mbToAdd} MB added successfully!`, 'success');
-                updateStep(3, 'step-completed'); // Aggiorna lo stato del passo 3
-                await checkSubscriptionStatusFromServer(); // Aggiorna lo stato della sottoscrizione
-                updateSubscriptionDetails(); // Aggiorna i dettagli della sottoscrizione
-                addMbInput.value = ''; // Pulisci l'input
-                if (addMbCost) {
-                    addMbCost.textContent = 'Loading...'; // Resetta il costo
-                }
+
+                // Aggiorna lo stato della sottoscrizione
+                await checkCurrentSubscriptionStatus();
+
+                // Pulisci l'input
+                addMbInput.value = '50';
+                await updateAddMBCost();
+
             } catch (error) {
                 const errorResult = handleSubscriptionError(error);
                 showNotification(errorResult.message, errorResult.type);
+            } finally {
+                const addMbBtn = document.getElementById('addMbBtn');
+                if (addMbBtn) {
+                    addMbBtn.disabled = false;
+                    addMbBtn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        Add Storage
+                    `;
+                }
+            }
+        }
+
+        // Funzione per controllare lo stato della sottoscrizione attuale
+        async function checkCurrentSubscriptionStatus() {
+            try {
+                if (!walletAddress) {
+                    showNotification('Please connect your wallet first', 'error');
+                    return;
+                }
+
+                const currentSubscriptionDetails = document.getElementById('currentSubscriptionDetails');
+                currentSubscriptionDetails.innerHTML = `
+                    <div class="text-center py-4">
+                        <div class="loading loading-spinner loading-sm"></div>
+                        <p class="text-sm text-base-content/60 mt-2">Checking subscription status...</p>
+                    </div>
+                `;
+
+                const identifier = walletAddress;
+                const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    const subscription = result.subscription;
+
+                    if (subscription.isActive) {
+                        const mbAllocated = subscription.mbAllocated || 0;
+                        const mbUsed = subscription.mbUsed || 0;
+                        const mbRemaining = subscription.mbRemaining || 0;
+                        const usagePercentage = mbAllocated > 0 ? Math.round((mbUsed / mbAllocated) * 100) : 0;
+
+                        currentSubscriptionDetails.innerHTML = `
+                            <div class="space-y-3">
+                                <div class="flex items-center gap-2 text-success">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span class="font-semibold">Active Subscription</span>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-3 text-sm">
+                                    <div>
+                                        <span class="text-base-content/60">Days Remaining:</span>
+                                        <div class="font-semibold ${subscription.daysRemaining <= 7 ? 'text-warning' : 'text-success'}">${subscription.daysRemaining}</div>
+                                    </div>
+                                    <div>
+                                        <span class="text-base-content/60">Total MB:</span>
+                                        <div class="font-semibold">${mbAllocated} MB</div>
+                                    </div>
+                                    <div>
+                                        <span class="text-base-content/60">Used MB:</span>
+                                        <div class="font-semibold">${mbUsed} MB (${usagePercentage}%)</div>
+                                    </div>
+                                    <div>
+                                        <span class="text-base-content/60">Remaining MB:</span>
+                                        <div class="font-semibold text-accent">${mbRemaining} MB</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="w-full bg-base-300 rounded-full h-2">
+                                    <div class="bg-accent h-2 rounded-full" style="width: ${usagePercentage}%"></div>
+                                </div>
+                                <p class="text-xs text-base-content/60">Storage usage: ${usagePercentage}%</p>
+                                
+                                ${mbRemaining <= 100 ? `
+                                    <div class="alert alert-warning text-xs">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                        </svg>
+                                        <span>Storage space running low!</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+
+                        // Mostra la sezione per aggiungere MB
+                        document.getElementById('addMbSection').classList.remove('hidden');
+
+                    } else {
+                        currentSubscriptionDetails.innerHTML = `
+                            <div class="text-center">
+                                <div class="flex items-center gap-2 text-warning mb-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                    </svg>
+                                    <span class="font-semibold">No Active Subscription</span>
+                                </div>
+                                <p class="text-sm text-base-content/60 mb-3">${subscription.reason || 'No subscription found'}</p>
+                            </div>
+                        `;
+
+                        // Nascondi la sezione per aggiungere MB
+                        document.getElementById('addMbSection').classList.add('hidden');
+                    }
+                } else {
+                    currentSubscriptionDetails.innerHTML = `
+                        <div class="text-center">
+                            <div class="flex items-center gap-2 text-error mb-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                                <span class="font-semibold">Error</span>
+                            </div>
+                            <p class="text-sm text-base-content/60">${result.error}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error checking current subscription status:', error);
+                const currentSubscriptionDetails = document.getElementById('currentSubscriptionDetails');
+                currentSubscriptionDetails.innerHTML = `
+                    <div class="text-center">
+                        <div class="flex items-center gap-2 text-error mb-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            <span class="font-semibold">Connection Error</span>
+                        </div>
+                        <p class="text-sm text-base-content/60">${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Funzione per aggiornare il costo dell'aggiunta di MB
+        async function updateAddMBCost() {
+            try {
+                const addMbInput = document.getElementById('addMbInput');
+                const addStorageDisplay = document.getElementById('addStorageDisplay');
+                const addMbCost = document.getElementById('addMbCost');
+
+                if (!addMbInput || !addStorageDisplay || !addMbCost) return;
+
+                const mbToAdd = parseInt(addMbInput.value) || 0;
+                addStorageDisplay.textContent = `${mbToAdd} MB`;
+
+                if (mbToAdd > 0 && relayContract) {
+                    const pricePerGB = await relayContract.PRICE_PER_GB();
+                    const cost = (BigInt(mbToAdd) * pricePerGB) / 1000n;
+                    addMbCost.textContent = ethers.formatEther(cost);
+                } else {
+                    addMbCost.textContent = '0 ETH';
+                }
+            } catch (error) {
+                console.error('Error updating add MB cost:', error);
+                const addMbCost = document.getElementById('addMbCost');
+                if (addMbCost) {
+                    addMbCost.textContent = 'Error';
+                }
+            }
+        }
+
+        // Funzione per aggiungere MB alla sottoscrizione esistente
+        async function addMBToSubscription() {
+            try {
+                if (!relayContract || !walletAddress) {
+                    showNotification('Please connect wallet first', 'error');
+                    return;
+                }
+
+                if (!registeredRelayAddress) {
+                    showNotification('No relay available for adding MB. Please try again later.', 'error');
+                    return;
+                }
+
+                const addMbInput = document.getElementById('addMbInput');
+                if (!addMbInput) {
+                    showNotification('Add MB input not found', 'error');
+                    return;
+                }
+
+                const mbToAdd = parseInt(addMbInput.value) || 0;
+                if (mbToAdd <= 0) {
+                    showNotification('Please enter a valid amount of MB to add', 'error');
+                    return;
+                }
+
+                const pricePerGB = await relayContract.PRICE_PER_GB();
+                const cost = (BigInt(mbToAdd) * pricePerGB) / 1000n;
+
+                const addMbBtn = document.getElementById('addMbBtn');
+                const originalText = addMbBtn.innerHTML;
+                addMbBtn.disabled = true;
+                addMbBtn.innerHTML = `
+                    <div class="loading loading-spinner loading-sm"></div>
+                    <span>Adding MB...</span>
+                `;
+
+                const tx = await relayContract.addMBToSubscription(registeredRelayAddress, {
+                    value: cost
+                });
+
+                showNotification('Transaction sent! Waiting for confirmation...', 'info');
+
+                await tx.wait();
+
+                showNotification(`${mbToAdd} MB added successfully!`, 'success');
+
+                // Aggiorna lo stato della sottoscrizione
+                await checkCurrentSubscriptionStatus();
+
+                // Pulisci l'input
+                addMbInput.value = '50';
+                await updateAddMBCost();
+
+            } catch (error) {
+                const errorResult = handleSubscriptionError(error);
+                showNotification(errorResult.message, errorResult.type);
+            } finally {
+                const addMbBtn = document.getElementById('addMbBtn');
+                if (addMbBtn) {
+                    addMbBtn.disabled = false;
+                    addMbBtn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        Add Storage
+                    `;
+                }
             }
         }
 

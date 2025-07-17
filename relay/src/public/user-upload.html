@@ -121,6 +121,36 @@
                                     <p class="text-sm text-base-content/70 mb-1">Wallet Address:</p>
                                     <div class="pubkey-display" id="currentWalletAddress"></div>
                                 </div>
+
+                                <!-- Subscription Status -->
+                                <div id="subscriptionStatus" class="mt-4">
+                                    <div class="bg-base-200/50 rounded-lg p-4">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <h4 class="font-semibold flex items-center gap-2">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                                    viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                                </svg>
+                                                Subscription Status
+                                            </h4>
+                                            <button id="refreshSubscriptionBtn" class="btn btn-xs btn-outline"
+                                                onclick="checkSubscriptionStatus(walletAddress)">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none"
+                                                    viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                </svg>
+                                                Refresh
+                                            </button>
+                                        </div>
+                                        <div id="subscriptionDetails" class="text-sm space-y-1">
+                                            <p class="text-base-content/60">Loading...</p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="drag-drop-area" id="dropArea">
@@ -210,11 +240,17 @@
         const walletStatus = document.getElementById('walletStatus');
         const walletInfo = document.getElementById('walletInfo');
         const walletAddressEl = document.getElementById('walletAddress');
+        const subscriptionStatusEl = document.getElementById('subscriptionStatus');
+        const subscriptionDetailsEl = document.getElementById('subscriptionDetails');
+        const refreshSubscriptionBtn = document.getElementById('refreshSubscriptionBtn');
+
 
         // Event listeners
         uploadBtn.addEventListener('click', uploadFile);
         refreshFilesBtn.addEventListener('click', loadUserFiles);
         connectWalletBtn.addEventListener('click', connectWallet);
+        refreshSubscriptionBtn.addEventListener('click', () => checkSubscriptionStatus(walletAddress));
+
 
         // Drag and drop functionality
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -249,6 +285,30 @@
             const dt = e.dataTransfer;
             const files = dt.files;
             fileInput.files = files;
+            checkFileSize(files[0]);
+        }
+
+        // Aggiungi event listener per il file input
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                checkFileSize(e.target.files[0]);
+            }
+        });
+
+        // Verifica la dimensione del file
+        function checkFileSize(file) {
+            if (!file) return;
+
+            const fileSizeMB = Math.ceil(file.size / (1024 * 1024)); // Arrotonda sempre verso l'alto
+            const maxFileSize = 100; // MB massimi per file (puoi modificare questo valore)
+
+            if (fileSizeMB > maxFileSize) {
+                showStatus(`❌ File too large! Maximum size is ${maxFileSize} MB`, 'error');
+                fileInput.value = '';
+                return;
+            }
+
+            showStatus(`📁 File selected: ${file.name} (${fileSizeMB} MB)`, 'info');
         }
 
         // Controlla lo stato della sottoscrizione
@@ -259,17 +319,78 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    if (result.subscription.isActive) {
-                        showStatus(`✅ Subscription active! Expires in ${result.subscription.daysRemaining} days`, 'success');
+                    const details = result.subscription;
+
+                    if (details.isActive) {
+                        const mbAllocated = details.mbAllocated || 0;
+                        const mbUsed = details.mbUsed || 0;
+                        const mbRemaining = details.mbRemaining || 0;
+                        const usagePercentage = mbAllocated > 0 ? Math.round((mbUsed / mbAllocated) * 100) : 0;
+
+                        subscriptionDetailsEl.innerHTML = `
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p class="text-base-content/60">Status:</p>
+                                    <p class="text-success font-semibold">✅ Active</p>
+                                </div>
+                                <div>
+                                    <p class="text-base-content/60">Days Remaining:</p>
+                                    <p class="font-semibold">${details.daysRemaining}</p>
+                                </div>
+                                <div>
+                                    <p class="text-base-content/60">Total MB:</p>
+                                    <p class="font-semibold">${mbAllocated} MB</p>
+                                </div>
+                                <div>
+                                    <p class="text-base-content/60">Used MB:</p>
+                                    <p class="font-semibold">${mbUsed} MB (${usagePercentage}%)</p>
+                                </div>
+                                <div class="col-span-2">
+                                    <p class="text-base-content/60">Remaining MB:</p>
+                                    <p class="font-semibold text-accent">${mbRemaining} MB</p>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <div class="w-full bg-base-300 rounded-full h-2">
+                                    <div class="bg-accent h-2 rounded-full" style="width: ${usagePercentage}%"></div>
+                                </div>
+                                <p class="text-xs text-base-content/60 mt-1">Storage usage: ${usagePercentage}%</p>
+                            </div>
+                        `;
+
+                        showStatus(`✅ Subscription active! ${mbRemaining} MB remaining`, 'success');
                     } else {
+                        subscriptionDetailsEl.innerHTML = `
+                            <div class="text-center">
+                                <p class="text-warning font-semibold mb-2">⚠️ No active subscription</p>
+                                <p class="text-base-content/60 mb-3">You need an active subscription to upload files</p>
+                                <a href="/subscribe" class="btn btn-sm btn-accent">
+                                    Subscribe Now
+                                </a>
+                            </div>
+                        `;
                         showStatus(`⚠️ No active subscription found. Please subscribe at /subscribe`, 'warning');
                     }
+
+                    subscriptionStatusEl.classList.remove('hidden');
                 } else {
-                    showStatus(`❌ Error checking subscription: ${result.error}`, 'error');
+                    subscriptionDetailsEl.innerHTML = `
+                        <div class="text-center">
+                            <p class="text-error font-semibold">❌ Error checking subscription</p>
+                            <p class="text-base-content/60">${result.error}</p>
+                        </div>
+                    `;
+                    subscriptionStatusEl.classList.remove('hidden');
                 }
             } catch (error) {
                 console.error('Error checking subscription status:', error);
-                showStatus(`❌ Error checking subscription: ${error.message}`, 'error');
+                subscriptionDetailsEl.innerHTML = `
+                    <div class="text-center">
+                        <p class="text-error font-semibold">❌ Connection error</p>
+                        <p class="text-base-content/60">${error.message}</p>
+                    </div>
+                `;
+                subscriptionStatusEl.classList.remove('hidden');
             }
         }
 
@@ -319,6 +440,11 @@
                     showStatus(`✅ File uploaded successfully! Hash: ${result.file.hash}${sizeInfo}${verificationInfo}`, 'success');
                     fileInput.value = '';
                     loadUserFiles(); // Refresh files list
+
+                    // Aggiorna lo stato della sottoscrizione dopo l'upload
+                    setTimeout(() => {
+                        checkSubscriptionStatus(walletAddress);
+                    }, 1000);
                 } else {
                     let errorMessage = result.error;
 
