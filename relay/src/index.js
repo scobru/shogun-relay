@@ -31,6 +31,85 @@ import multer from "multer";
 
 const namespace = "shogun";
 
+// --- Sistema di Logging Migliorato ---
+class Logger {
+    constructor() {
+        this.logs = [];
+        this.maxLogs = 1000; // Mantieni solo gli ultimi 1000 log
+    }
+
+    log(level, message, data = null) {
+        const logEntry = {
+            timestamp: new Date().toISOString(),
+            level,
+            message,
+            data,
+            pid: process.pid
+        };
+
+        this.logs.push(logEntry);
+
+        // Mantieni solo gli ultimi maxLogs
+        if (this.logs.length > this.maxLogs) {
+            this.logs.shift();
+        }
+
+        // Console output con colori
+        const colors = {
+            info: '\x1b[36m',    // Cyan
+            success: '\x1b[32m',  // Green
+            warning: '\x1b[33m',  // Yellow
+            error: '\x1b[31m',    // Red
+            debug: '\x1b[35m'     // Magenta
+        };
+
+        const reset = '\x1b[0m';
+        const color = colors[level] || colors.info;
+        
+        console.log(`${color}[${level.toUpperCase()}]${reset} ${message}`);
+        
+        if (data) {
+            console.log(`${color}Data:${reset}`, data);
+        }
+    }
+
+    info(message, data = null) {
+        this.log('info', message, data);
+    }
+
+    success(message, data = null) {
+        this.log('success', message, data);
+    }
+
+    warning(message, data = null) {
+        this.log('warning', message, data);
+    }
+
+    error(message, data = null) {
+        this.log('error', message, data);
+    }
+
+    debug(message, data = null) {
+        this.log('debug', message, data);
+    }
+
+    getLogs(level = null, limit = 100) {
+        let filteredLogs = this.logs;
+        
+        if (level) {
+            filteredLogs = this.logs.filter(log => log.level === level);
+        }
+        
+        return filteredLogs.slice(-limit);
+    }
+
+    clearLogs() {
+        this.logs = [];
+    }
+}
+
+const logger = new Logger();
+
 // --- IPFS Configuration ---
 const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
 

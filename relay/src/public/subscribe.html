@@ -103,6 +103,9 @@
 </head>
 
 <body class="antialiased">
+    <!-- Sistema di notifiche -->
+    <div id="notificationContainer" class="notification-container"></div>
+
     <div class="container mx-auto p-4">
         <div class="flex items-center mb-6">
             <a href="/" class="nav-link">&larr; Back to Control Panel</a>
@@ -142,6 +145,9 @@
                             <span class="text-sm">Status</span>
                         </div>
                     </div>
+
+                    <!-- Status Message -->
+                    <div id="statusMessage" class="w-full max-w-2xl mb-6"></div>
 
                     <!-- Step 1: Wallet Connection -->
                     <div id="step1Content" class="w-full max-w-2xl space-y-6">
@@ -393,7 +399,7 @@
                     console.log('Contract configuration loaded:', config);
                     return true;
                 } else {
-                    showStatus('Failed to load contract configuration', 'error');
+                    showNotification('Failed to load contract configuration', 'error');
                     return false;
                 }
             } catch (error) {
