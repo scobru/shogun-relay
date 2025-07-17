@@ -326,6 +326,36 @@ async function initializeServer() {
   console.clear();
   console.log("=== GUN-VUE RELAY SERVER ===\n");
 
+  // Sistema di logging in memoria
+  let systemLogs = [];
+  const MAX_LOGS = 1000;
+
+  // Funzione per aggiungere log
+  function addSystemLog(level, message, data = null) {
+    const logEntry = {
+      timestamp: Date.now(),
+      level: level,
+      message: message,
+      data: data,
+    };
+
+    systemLogs.push(logEntry);
+
+    // Mantieni solo gli ultimi MAX_LOGS
+    if (systemLogs.length > MAX_LOGS) {
+      systemLogs = systemLogs.slice(-MAX_LOGS);
+    }
+
+    // Log anche su console
+    const timestamp = new Date(logEntry.timestamp).toISOString();
+    console.log(
+      `[${timestamp}] [${level.toUpperCase()}] ${message}`,
+      data || ""
+    );
+  }
+
+  addSystemLog("info", "Server initialization started");
+
   // Initialize relay contract
   console.log("🔧 Initializing relay contract...");
   const contractInitialized = await initializeRelayContract();
@@ -342,8 +372,6 @@ async function initializeServer() {
     );
   }
   console.log("");
-
-  addSystemLog("info", "Server initialization started");
 
   // Enhanced stats tracking with time-series data
   let customStats = {
@@ -4279,34 +4307,6 @@ async function initializeServer() {
       });
     }
   });
-
-  // Sistema di logging in memoria
-  let systemLogs = [];
-  const MAX_LOGS = 1000;
-
-  // Funzione per aggiungere log
-  function addSystemLog(level, message, data = null) {
-    const logEntry = {
-      timestamp: Date.now(),
-      level: level,
-      message: message,
-      data: data,
-    };
-
-    systemLogs.push(logEntry);
-
-    // Mantieni solo gli ultimi MAX_LOGS
-    if (systemLogs.length > MAX_LOGS) {
-      systemLogs = systemLogs.slice(-MAX_LOGS);
-    }
-
-    // Log anche su console
-    const timestamp = new Date(logEntry.timestamp).toISOString();
-    console.log(
-      `[${timestamp}] [${level.toUpperCase()}] ${message}`,
-      data || ""
-    );
-  }
 
   // Endpoint per ottenere i log di sistema
   app.get("/api/logs", async (req, res) => {
