@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="styles/wormhole.css" />
     <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
-    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js" type="application/javascript"></script>
+    <script src="https://cdn.ethers.io/lib/ethers-6.15.0.umd.min.js" type="application/javascript"></script>
     <style>
         body {
             line-height: 1.6;
@@ -74,7 +74,7 @@
                         <div class="w-8 h-px bg-base-content/30"></div>
                         <div class="flex items-center gap-2">
                             <div id="step2" class="step-indicator step-pending">2</div>
-                            <span class="text-sm">Generate Gun Key</span>
+                            <span class="text-sm">Enter Gun Key</span>
                         </div>
                         <div class="w-8 h-px bg-base-content/30"></div>
                         <div class="flex items-center gap-2">
@@ -116,7 +116,7 @@
                         </div>
                     </div>
 
-                    <!-- Step 2: Gun Key Generation -->
+                    <!-- Step 2: Gun Key Input -->
                     <div id="step2Content" class="w-full max-w-2xl space-y-6 hidden">
                         <div class="status-card">
                             <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -125,23 +125,32 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                                 </svg>
-                                Generate Gun Public Key
+                                Enter Your Gun Public Key
                             </h3>
                             <p class="text-base-content/70 mb-4">
-                                Generate a unique Gun public key that will be used for relay authorization.
+                                Paste your existing Gun public key that will be used for relay authorization.
                             </p>
-                            <button id="generateKeyBtn" class="btn btn-accent">
+
+                            <div class="form-control mb-4">
+                                <label class="label">
+                                    <span class="label-text">Gun Public Key:</span>
+                                </label>
+                                <textarea id="gunPubKeyInput" class="textarea textarea-bordered h-24 font-mono text-sm"
+                                    placeholder="Paste your Gun public key here..."></textarea>
+                            </div>
+
+                            <button id="validateKeyBtn" class="btn btn-accent">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
                                     viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                Generate Key
+                                Validate & Continue
                             </button>
                         </div>
 
                         <div id="keyInfo" class="wallet-info hidden">
-                            <h4 class="font-semibold mb-2">Generated Gun Public Key:</h4>
+                            <h4 class="font-semibold mb-2">Your Gun Public Key:</h4>
                             <div class="pubkey-display" id="gunPubKey"></div>
                             <p class="text-xs text-base-content/60 mt-2">
                                 This key will be used to authorize your uploads to the relay.
@@ -200,21 +209,17 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                Subscribe to Relay
+                                Subscribe
                             </button>
                         </div>
-                    </div>
 
-                    <!-- Status Messages -->
-                    <div id="statusMessage" class="w-full max-w-2xl mt-6"></div>
-
-                    <!-- Subscription Status -->
-                    <div id="subscriptionStatus" class="w-full max-w-2xl mt-6 hidden">
-                        <div class="status-card">
-                            <h3 class="text-lg font-semibold mb-4">Subscription Status</h3>
+                        <div id="subscriptionStatus" class="wallet-info hidden">
                             <div id="statusContent"></div>
                         </div>
                     </div>
+
+                    <!-- Status Message -->
+                    <div id="statusMessage" class="mt-6"></div>
                 </div>
             </div>
         </div>
@@ -222,22 +227,19 @@
 
     <script>
         // Global variables
-        let provider;
-        let signer;
-        let walletAddress;
-        let gunKeyPair;
-        let relayContract;
+        let provider = null;
+        let signer = null;
+        let walletAddress = null;
+        let relayContract = null;
+        let gunKeyPair = null;
 
         // Contract configuration
-        const RELAY_CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000000'; // Replace with actual address
+        const RELAY_CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000000'; // Sostituisci con l'indirizzo reale
         const RELAY_ABI = [
-            'function SUBSCRIPTION_PRICE() external view returns (uint256)',
-            'function subscribeToRelay(address _relayAddress) external payable',
-            'function checkUserSubscription(address _user) external view returns (bool)',
-            'function isSubscriptionActive(address _user, address _relayAddress) external view returns (bool)',
-            'function getSubscriptionDetails(address _user, address _relayAddress) external view returns (uint256 startTime, uint256 endTime, uint256 amountPaid, bool isActive)',
-            'function registerRelay(string memory _url) external',
-            'function getRelayDetails(address _relayAddress) external view returns (string memory url, address relayAddress, bool isActive, uint256 registeredAt)'
+            "function SUBSCRIPTION_PRICE() view returns (uint256)",
+            "function subscribeToRelay(address) payable",
+            "function checkUserSubscription(address) view returns (bool)",
+            "function isSubscriptionActive(address, address) view returns (bool)"
         ];
 
         // DOM elements
@@ -245,9 +247,10 @@
         const disconnectWalletBtn = document.getElementById('disconnectWalletBtn');
         const walletInfo = document.getElementById('walletInfo');
         const walletAddressEl = document.getElementById('walletAddress');
-        const generateKeyBtn = document.getElementById('generateKeyBtn');
         const keyInfo = document.getElementById('keyInfo');
         const gunPubKeyEl = document.getElementById('gunPubKey');
+        const gunPubKeyInput = document.getElementById('gunPubKeyInput');
+        const validateKeyBtn = document.getElementById('validateKeyBtn');
         const subscriptionMonths = document.getElementById('subscriptionMonths');
         const subscribeBtn = document.getElementById('subscribeBtn');
         const statusMessage = document.getElementById('statusMessage');
@@ -260,7 +263,7 @@
         // Event listeners
         connectWalletBtn.addEventListener('click', connectWallet);
         disconnectWalletBtn.addEventListener('click', disconnectWallet);
-        generateKeyBtn.addEventListener('click', generateGunKey);
+        validateKeyBtn.addEventListener('click', validateAndContinue);
         subscribeBtn.addEventListener('click', subscribeToRelay);
         subscriptionMonths.addEventListener('change', updateSubscriptionDetails);
 
@@ -294,9 +297,9 @@
                     return;
                 }
 
-                provider = new ethers.providers.Web3Provider(window.ethereum);
+                provider = new ethers.BrowserProvider(window.ethereum);
                 await provider.send("eth_requestAccounts", []);
-                signer = provider.getSigner();
+                signer = await provider.getSigner();
                 walletAddress = await signer.getAddress();
 
                 // Display wallet info
@@ -323,10 +326,13 @@
             signer = null;
             walletAddress = null;
             relayContract = null;
+            gunKeyPair = null;
 
             walletInfo.classList.add('hidden');
             connectWalletBtn.classList.remove('hidden');
             keyInfo.classList.add('hidden');
+            validateKeyBtn.classList.remove('hidden');
+            gunPubKeyInput.value = '';
 
             showStep(1);
             updateStep(1, 'step-active');
@@ -336,23 +342,38 @@
             showStatus('Wallet disconnected', 'info');
         }
 
-        // Gun key generation
-        async function generateGunKey() {
+        // Gun key validation
+        async function validateAndContinue() {
+            const gunPubKey = gunPubKeyInput.value.trim();
+
+            if (!gunPubKey) {
+                showStatus('Please enter a Gun public key.', 'warning');
+                return;
+            }
+
             try {
-                gunKeyPair = await SEA.pair();
+                // Validate the public key format (basic check)
+                if (gunPubKey.length < 20) {
+                    showStatus('Invalid Gun public key format. Please check your key.', 'error');
+                    return;
+                }
 
-                gunPubKeyEl.textContent = gunKeyPair.pub;
+                // Store the public key
+                gunKeyPair = { pub: gunPubKey };
+
+                // Display the key
+                gunPubKeyEl.textContent = gunPubKey;
                 keyInfo.classList.remove('hidden');
-                generateKeyBtn.classList.add('hidden');
+                validateKeyBtn.classList.add('hidden');
 
-                showStatus('Gun public key generated successfully!', 'success');
+                showStatus('Gun public key validated successfully!', 'success');
                 updateStep(2, 'step-completed');
 
                 // Check if already subscribed
                 await checkSubscriptionStatus();
 
             } catch (error) {
-                showStatus(`Failed to generate Gun key: ${error.message}`, 'error');
+                showStatus(`Failed to validate Gun public key: ${error.message}`, 'error');
             }
         }
 
@@ -362,7 +383,7 @@
                 if (!relayContract) return;
 
                 const pricePerMonth = await relayContract.SUBSCRIPTION_PRICE();
-                const priceInEth = ethers.utils.formatEther(pricePerMonth);
+                const priceInEth = ethers.formatEther(pricePerMonth);
 
                 document.getElementById('pricePerMonth').textContent = `${priceInEth} ETH`;
                 updateSubscriptionDetails();
@@ -383,8 +404,8 @@
 
         async function subscribeToRelay() {
             try {
-                if (!relayContract || !walletAddress) {
-                    showStatus('Please connect wallet first', 'error');
+                if (!relayContract || !walletAddress || !gunKeyPair) {
+                    showStatus('Please connect wallet and generate Gun key first', 'error');
                     return;
                 }
 
@@ -400,7 +421,7 @@
 
                 await tx.wait();
 
-                showStatus('Subscription successful! You can now upload files to the relay.', 'success');
+                showStatus('Subscription successful! You can now upload files to the relay using your Gun public key.', 'success');
                 updateStep(3, 'step-completed');
 
                 // Update subscription status
@@ -431,10 +452,10 @@
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <span>Your wallet address is authorized for relay uploads!</span>
+                            <span>Your Gun public key is authorized for relay uploads!</span>
                         </div>
                         <p class="text-sm text-base-content/70 mt-2">
-                            You can now use the upload endpoint with your wallet address.
+                            You can now use the upload endpoint with your Gun public key: <strong>${gunKeyPair?.pub || 'N/A'}</strong>
                         </p>
                     `;
                 }
@@ -449,12 +470,12 @@
             const colors = {
                 success: 'text-success',
                 error: 'text-error',
-                info: 'text-info',
-                warning: 'text-warning'
+                warning: 'text-warning',
+                info: 'text-info'
             };
 
             statusMessage.innerHTML = `
-                <div class="alert ${colors[type]} bg-${type}/10 border border-${type}/20">
+                <div class="alert ${colors[type]}">
                     <span>${message}</span>
                 </div>
             `;
@@ -464,11 +485,6 @@
                 statusMessage.innerHTML = '';
             }, 5000);
         }
-
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            showStatus('Welcome! Connect your wallet to start the subscription process.', 'info');
-        });
     </script>
 </body>
 
