@@ -453,6 +453,10 @@
         const refreshStatusBtn = document.getElementById('refreshStatusBtn');
         const newSubscriptionBtn = document.getElementById('newSubscriptionBtn');
         const mbInput = document.getElementById('mbInput');
+        const addMbInput = document.getElementById('addMbInput');
+        const addMbBtn = document.getElementById('addMbBtn');
+        const addMbCost = document.getElementById('addMbCost');
+
 
         // Event listeners
         connectWalletBtn.addEventListener('click', connectWallet);
@@ -460,6 +464,7 @@
         validateKeyBtn.addEventListener('click', validateAndContinue);
         subscribeBtn.addEventListener('click', subscribeToRelay);
         mbInput.addEventListener('input', updateSubscriptionDetails);
+        addMbInput.addEventListener('input', updateAddMBCost);
         checkStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
         refreshStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
         newSubscriptionBtn.addEventListener('click', () => {
@@ -479,6 +484,7 @@
                 loadSubscriptionDetails();
             }
         });
+        addMbBtn.addEventListener('click', addMBToSubscription);
 
         // Listen for network changes
         if (typeof window.ethereum !== 'undefined') {
@@ -740,6 +746,9 @@
                 // Aggiorna automaticamente i dettagli della sottoscrizione
                 updateSubscriptionDetails();
 
+                // Aggiorna anche il costo per aggiungere MB
+                updateAddMBCost();
+
             } catch (error) {
                 console.error('Failed to load subscription details:', error);
                 console.error('Contract address used:', RELAY_CONTRACT_ADDRESS);
@@ -749,6 +758,7 @@
                 // Imposta un valore di fallback
                 document.getElementById('pricePerGB').textContent = '0.001 ETH';
                 updateSubscriptionDetails();
+                updateAddMBCost();
             }
         }
 
@@ -773,6 +783,33 @@
 
             document.getElementById('storageDisplay').textContent = `${mb} MB`;
             document.getElementById('totalCost').textContent = `${totalCost.toFixed(6)} ETH`;
+        }
+
+        // Funzione per calcolare il costo per aggiungere MB
+        async function updateAddMBCost() {
+            try {
+                const mbToAdd = parseInt(addMbInput.value) || 0;
+                const pricePerGBEl = document.getElementById('pricePerGB');
+                const pricePerGBText = pricePerGBEl.textContent;
+
+                // Controlla se il prezzo è ancora in caricamento
+                if (pricePerGBText === 'Loading...') {
+                    addMbCost.textContent = 'Loading...';
+                    return;
+                }
+
+                // Estrai il valore numerico dal testo (es. "0.001 ETH" -> 0.001)
+                const priceMatch = pricePerGBText.match(/(\d+\.?\d*)/);
+                const priceValue = priceMatch ? parseFloat(priceMatch[1]) : 0;
+
+                // Calcola il costo: (MB * PRICE_PER_GB) / 1000
+                const cost = (mbToAdd * priceValue) / 1000;
+
+                addMbCost.textContent = `${cost.toFixed(6)} ETH`;
+            } catch (error) {
+                console.error('Error calculating add MB cost:', error);
+                addMbCost.textContent = 'Error';
+            }
         }
 
         async function subscribeToRelay() {
@@ -816,6 +853,46 @@
 
             } catch (error) {
                 showStatus(`Subscription failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function addMBToSubscription() {
+            try {
+                if (!relayContract || !walletAddress) {
+                    showStatus('Please connect wallet first', 'error');
+                    return;
+                }
+
+                if (!gunKeyPair || !gunKeyPair.pub) {
+                    showStatus('Please enter and validate your Gun public key first', 'error');
+                    return;
+                }
+
+                if (!registeredRelayAddress) {
+                    showStatus('No relay available for adding MB. Please try again later.', 'error');
+                    return;
+                }
+
+                const mbToAdd = parseInt(addMbInput.value) || 100;
+                const pricePerGB = await relayContract.PRICE_PER_GB();
+                const cost = (BigInt(mbToAdd) * pricePerGB) / 1000n; // Calcola il costo per i MB specificati
+
+                const tx = await relayContract.addMBToSubscription(registeredRelayAddress, gunKeyPair.pub, {
+                    value: cost
+                });
+
+                showStatus('Transaction sent! Waiting for confirmation...', 'info');
+
+                await tx.wait();
+
+                showStatus(`${mbToAdd} MB added successfully!`, 'success');
+                updateStep(3, 'step-completed'); // Aggiorna lo stato del passo 3
+                await checkSubscriptionStatusFromServer(); // Aggiorna lo stato della sottoscrizione
+                updateSubscriptionDetails(); // Aggiorna i dettagli della sottoscrizione
+                addMbInput.value = ''; // Pulisci l'input
+                addMbCost.textContent = 'Loading...'; // Resetta il costo
+            } catch (error) {
+                showStatus(`Failed to add MB: ${error.message}`, 'error');
             }
         }
 
@@ -953,6 +1030,24 @@
                                     <span>Storage space running low! Consider adding more MB.</span>
                                 </div>
                             ` : ''}
+                            
+                            <!-- Add MB Section -->
+                            <div class="mt-4 p-3 bg-base-200/50 rounded-lg">
+                                <h6 class="font-semibold mb-2">Add More Storage:</h6>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <input type="number" id="addMbInput" class="input input-sm input-bordered w-20" placeholder="MB" min="1" value="100">
+                                    <span class="text-sm text-base-content/60">MB</span>
+                                    <button id="addMbBtn" class="btn btn-sm btn-accent" onclick="addMBToSubscription()">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                        </svg>
+                                        Add MB
+                                    </button>
+                                </div>
+                                <div class="text-xs text-base-content/60">
+                                    Cost: <span id="addMbCost">Loading...</span> ETH
+                                </div>
+                            </div>
                         </div>
 
                         ${subscription.daysRemaining <= 7 ? `
