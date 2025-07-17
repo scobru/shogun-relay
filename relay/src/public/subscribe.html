@@ -330,16 +330,14 @@
             "function SUBSCRIPTION_DURATION() view returns (uint256)",
             "function calculateMBFromAmount(uint256 _amount) public pure returns (uint256)",
             "function calculateAmountFromMB(uint256 _mb) public pure returns (uint256)",
-            "function subscribeToRelay(address _relayAddress, string memory _gunPubKey) payable",
-            "function addMBToSubscription(address _relayAddress, string memory _gunPubKey) payable",
-            "function recordMBUsage(string memory _gunPubKey, uint256 _mbUsed) external",
+            "function subscribeToRelay(address _relayAddress) payable",
+            "function addMBToSubscription(address _relayAddress) payable",
+            "function recordMBUsage(address _user, uint256 _mbUsed) external",
             "function checkUserSubscription(address _user) external view returns (bool)",
             "function isSubscriptionActive(address _user, address _relayAddress) external view returns (bool)",
-            "function isSubscriptionActiveByGunKey(string memory _gunPubKey, address _relayAddress) external view returns (bool)",
-            "function hasAvailableMB(string memory _gunPubKey, address _relayAddress, uint256 _mbRequired) public view returns (bool)",
-            "function getRemainingMB(string memory _gunPubKey, address _relayAddress) public view returns (uint256)",
-            "function getSubscriptionDetails(address _user, address _relayAddress) external view returns (uint256 startTime, uint256 endTime, uint256 amountPaid, uint256 mbAllocated, uint256 mbUsed, uint256 mbRemaining, bool isActive, string memory gunPubKey)",
-            "function getSubscriptionDetailsByGunKey(string memory _gunPubKey, address _relayAddress) external view returns (uint256 startTime, uint256 endTime, uint256 amountPaid, uint256 mbAllocated, uint256 mbUsed, uint256 mbRemaining, bool isActive, address userAddress)",
+            "function hasAvailableMB(address _user, address _relayAddress, uint256 _mbRequired) public view returns (bool)",
+            "function getRemainingMB(address _user, address _relayAddress) public view returns (uint256)",
+            "function getSubscriptionDetails(address _user, address _relayAddress) external view returns (uint256 startTime, uint256 endTime, uint256 amountPaid, uint256 mbAllocated, uint256 mbUsed, uint256 mbRemaining, bool isActive)",
             "function getRelayDetails(address _relayAddress) external view returns (string memory url, address relayAddress, bool isActive, uint256 registeredAt)",
             "function getAllRelays() external view returns (address[] memory)",
             "function registerRelay(string memory _url) external",
@@ -472,10 +470,10 @@
         function handleSubscriptionError(error) {
             const errorMessage = error.message || '';
 
-            if (errorMessage.includes('Already subscribed with this Gun key')) {
+            if (errorMessage.includes('Already subscribed')) {
                 return {
                     type: 'warning',
-                    message: 'You already have an active subscription with this Gun key!',
+                    message: 'You already have an active subscription with this wallet!',
                     action: 'show_existing'
                 };
             } else if (errorMessage.includes('insufficient funds')) {
@@ -494,6 +492,12 @@
                 return {
                     type: 'error',
                     message: 'Transaction failed. Please check your wallet and try again.',
+                    action: 'none'
+                };
+            } else if (errorMessage.includes('invalid string value')) {
+                return {
+                    type: 'error',
+                    message: 'Contract error: Invalid parameters. Please try again.',
                     action: 'none'
                 };
             } else {
@@ -987,14 +991,12 @@
                 let isSubscribed = false;
 
                 try {
-                    // Usa isSubscriptionActiveByGunKey che verifica la sottoscrizione per questa chiave Gun specifica
-                    // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
-                    // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
+                    // Usa isSubscriptionActive che verifica la sottoscrizione per questo wallet
                     isSubscribed = await relayContract.isSubscriptionActive(walletAddress, registeredRelayAddress);
                 } catch (e) {
-                    // Fallback per compatibilità con il vecchio sistema
-                    console.log('Fallback to address-based check:', e);
-                    isSubscribed = await relayContract.isSubscriptionActive(walletAddress, registeredRelayAddress);
+                    // Fallback per compatibilità
+                    console.log('Fallback to checkUserSubscription:', e);
+                    isSubscribed = await relayContract.checkUserSubscription(walletAddress);
                 }
 
                 if (isSubscribed) {
