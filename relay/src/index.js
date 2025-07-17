@@ -1367,6 +1367,9 @@ async function initializeServer() {
     lastTimestamp = now;
   }, 5000);
 
+  // Test IPFS connectivity
+  await testIPFSConnection();
+
   // Store relay information
   const link = "http://" + host + (port ? ":" + port : "");
   const extLink = "https://" + host;
@@ -1378,6 +1381,15 @@ async function initializeServer() {
   db?.get("store").put(store);
   db?.get("status").put("running");
   db?.get("started").put(Date.now());
+
+  // Display server information
+  console.log(`Internal URL: ${link}/`);
+  console.log(`External URL: ${extLink}/`);
+  console.log(`Gun peer: ${link}/gun`);
+  console.log(`Storage: ${store ? "enabled" : "disabled"}`);
+  console.log(
+    `Admin password: ${process.env.ADMIN_PASSWORD ? "configured" : "not set"}`
+  );
 
   // IPFS API Proxy - for API calls to the IPFS node
   // Example: /api/v0/add, /api/v0/cat, etc.
@@ -2130,38 +2142,6 @@ async function initializeServer() {
   console.warn = (...args) => {
     logger.warning(args.join(" "));
   };
-
-  // Test IPFS connectivity
-  await testIPFSConnection();
-
-  // Display server information
-  console.log(`Internal URL: ${link}/`);
-  console.log(`External URL: ${extLink}/`);
-  console.log(`Gun peer: ${link}/gun`);
-  console.log(`Storage: ${store ? "enabled" : "disabled"}`);
-  console.log(
-    `Admin password: ${process.env.ADMIN_PASSWORD ? "configured" : "not set"}`
-  );
-
-  // Display IPFS proxy information
-  console.log("\n=== IPFS PROXY ENDPOINTS ===");
-  console.log(`📁 IPFS Gateway: ${link}/ipfs/`);
-  console.log(`📁 IPNS Gateway: ${link}/ipns/`);
-  console.log(`🔧 IPFS API: ${link}/api/v0/`);
-  console.log(`📊 IPFS Status: ${link}/ipfs-status`);
-
-  console.log("==============================");
-
-  // Show QR code if enabled
-  if (showQr !== false) {
-    console.log("\n=== QR CODE ===");
-    try {
-      console.log(qr(link, "ascii", { border: 1 }));
-    } catch (error) {
-      console.warn("QR code generation failed:", error.message);
-    }
-    console.log("===============\n");
-  }
 
   // Graceful shutdown
   async function shutdown() {
