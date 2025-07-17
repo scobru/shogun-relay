@@ -1367,8 +1367,15 @@ async function initializeServer() {
     lastTimestamp = now;
   }, 5000);
 
-  // Test IPFS connectivity
-  await testIPFSConnection();
+  // Test IPFS connectivity (optional - don't block server startup)
+  try {
+    await testIPFSConnection();
+  } catch (error) {
+    console.warn(
+      "⚠️ IPFS connectivity test failed, continuing anyway:",
+      error.message
+    );
+  }
 
   // Store relay information
   const link = "http://" + host + (port ? ":" + port : "");
@@ -2180,6 +2187,42 @@ async function initializeServer() {
   process.on("SIGTERM", async () => {
     await shutdown();
     process.exit(0);
+  });
+
+  // Fallback endpoint for root requests
+  app.get("/", (req, res) => {
+    res.json({
+      success: true,
+      message: "Shogun Relay Server is running",
+      version: "1.0.0",
+      endpoints: {
+        health: "/health",
+        relayInfo: "/api/relay-info",
+        contractStatus: "/api/contract-status",
+        performance: "/api/performance",
+        logs: "/api/logs",
+        ipfsStatus: "/ipfs-status",
+      },
+      timestamp: Date.now(),
+    });
+  });
+
+  // Catch-all endpoint for unknown routes
+  app.get("*", (req, res) => {
+    res.status(404).json({
+      success: false,
+      error: "Endpoint not found",
+      path: req.path,
+      availableEndpoints: [
+        "/",
+        "/health",
+        "/api/relay-info",
+        "/api/contract-status",
+        "/api/performance",
+        "/api/logs",
+        "/ipfs-status",
+      ],
+    });
   });
 } // End of initializeServer function
 
