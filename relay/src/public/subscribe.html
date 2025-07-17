@@ -319,6 +319,27 @@
         subscribeBtn.addEventListener('click', subscribeToRelay);
         subscriptionMonths.addEventListener('change', updateSubscriptionDetails);
 
+        // Listen for network changes
+        if (typeof window.ethereum !== 'undefined') {
+            window.ethereum.on('chainChanged', (chainId) => {
+                console.log('Network changed to:', chainId);
+                const sepoliaChainId = '0xaa36a7';
+                if (chainId !== sepoliaChainId) {
+                    showStatus('Please switch to Sepolia network', 'warning');
+                    // Reset wallet connection
+                    disconnectWallet();
+                }
+            });
+
+            window.ethereum.on('accountsChanged', (accounts) => {
+                console.log('Account changed:', accounts);
+                if (accounts.length === 0) {
+                    showStatus('Wallet disconnected', 'info');
+                    disconnectWallet();
+                }
+            });
+        }
+
         // Step management
         function updateStep(step, status) {
             const stepEl = document.getElementById(`step${step}`);
@@ -362,6 +383,45 @@
                     return;
                 }
 
+                // Check if connected to Sepolia network
+                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                const sepoliaChainId = '0xaa36a7'; // Sepolia chain ID in hex
+
+                if (chainId !== sepoliaChainId) {
+                    showStatus('Please switch to Sepolia network in MetaMask', 'warning');
+
+                    // Try to switch to Sepolia
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: sepoliaChainId }],
+                        });
+                    } catch (switchError) {
+                        // If Sepolia is not added, add it
+                        if (switchError.code === 4902) {
+                            await window.ethereum.request({
+                                method: 'wallet_addEthereumChain',
+                                params: [{
+                                    chainId: sepoliaChainId,
+                                    chainName: 'Sepolia',
+                                    nativeCurrency: {
+                                        name: 'Sepolia Ether',
+                                        symbol: 'SEP',
+                                        decimals: 18
+                                    },
+                                    rpcUrls: ['https://eth-sepolia.g.alchemy.com/v2/'],
+                                    blockExplorerUrls: ['https://sepolia.etherscan.io/']
+                                }],
+                            });
+                        } else {
+                            throw switchError;
+                        }
+                    }
+
+                    // Wait a moment for the switch
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+
                 // Load contract configuration first
                 const configLoaded = await loadContractConfig();
                 if (!configLoaded) {
@@ -380,6 +440,10 @@
                 await provider.send("eth_requestAccounts", []);
                 signer = await provider.getSigner();
                 walletAddress = await signer.getAddress();
+
+                // Verify we're on the correct network
+                const network = await provider.getNetwork();
+                console.log('Connected to network:', network);
 
                 // Display wallet info
                 walletAddressEl.textContent = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;

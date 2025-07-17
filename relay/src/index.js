@@ -94,13 +94,55 @@ let relayAbi = [
   "function registerRelay(string memory _url) external",
   "function deactivateRelay() external",
 ];
-if (RELAY_CONTRACT_ADDRESS) {
-  provider = new ethers.JsonRpcProvider(WEB3_PROVIDER_URL);
-  relayContract = new ethers.Contract(
-    RELAY_CONTRACT_ADDRESS,
-    relayAbi,
-    provider
-  );
+
+// Initialize contract with network verification
+async function initializeRelayContract() {
+  if (!RELAY_CONTRACT_ADDRESS) {
+    console.log("⚠️ RELAY_CONTRACT_ADDRESS not configured");
+    return false;
+  }
+
+  if (!process.env.ALCHEMY_API_KEY) {
+    console.log("⚠️ ALCHEMY_API_KEY not configured");
+    return false;
+  }
+
+  try {
+    provider = new ethers.JsonRpcProvider(WEB3_PROVIDER_URL);
+
+    // Verify we're connected to Sepolia
+    const network = await provider.getNetwork();
+    console.log(
+      `🌐 Connected to network: ${network.name} (chainId: ${network.chainId})`
+    );
+
+    if (network.chainId !== 11155111n) {
+      // Sepolia chain ID
+      console.error(
+        `❌ Wrong network! Expected Sepolia (11155111), got ${network.chainId}`
+      );
+      return false;
+    }
+
+    relayContract = new ethers.Contract(
+      RELAY_CONTRACT_ADDRESS,
+      relayAbi,
+      provider
+    );
+
+    // Test contract accessibility
+    const subscriptionPrice = await relayContract.SUBSCRIPTION_PRICE();
+    console.log(
+      `✅ Contract initialized successfully. Subscription price: ${ethers.formatEther(
+        subscriptionPrice
+      )} ETH`
+    );
+
+    return true;
+  } catch (error) {
+    console.error("❌ Failed to initialize relay contract:", error.message);
+    return false;
+  }
 }
 
 // Middleware per autorizzazione smart contract
@@ -184,6 +226,18 @@ const relayContractAuthMiddleware = async (req, res, next) => {
 async function initializeServer() {
   console.clear();
   console.log("=== GUN-VUE RELAY SERVER ===\n");
+
+  // Initialize relay contract
+  console.log("🔧 Initializing relay contract...");
+  const contractInitialized = await initializeRelayContract();
+  if (contractInitialized) {
+    console.log("✅ Relay contract ready");
+  } else {
+    console.log(
+      "⚠️ Relay contract not available - smart contract features disabled"
+    );
+  }
+  console.log("");
 
   // Enhanced stats tracking with time-series data
   let customStats = {
@@ -1530,6 +1584,10 @@ async function initializeServer() {
         });
       }
 
+      // Get network information
+      const network = await provider.getNetwork();
+      const isSepolia = network.chainId === 11155111n;
+
       // Verifica se il contratto è accessibile
       const subscriptionPrice = await relayContract.SUBSCRIPTION_PRICE();
       const allRelays = await relayContract.getAllRelays();
@@ -1544,6 +1602,12 @@ async function initializeServer() {
           registeredRelays: allRelays.length,
           relays: allRelays,
         },
+        network: {
+          name: network.name,
+          chainId: Number(network.chainId),
+          isSepolia: isSepolia,
+          provider: "Alchemy Sepolia",
+        },
         relay: {
           address: process.env.RELAY_HOST || ip.address(),
           port: port,
@@ -1552,6 +1616,23 @@ async function initializeServer() {
       });
     } catch (error) {
       console.error("Contract status error:", error);
+
+      // Try to get network info even if contract fails
+      let networkInfo = null;
+      try {
+        if (provider) {
+          const network = await provider.getNetwork();
+          networkInfo = {
+            name: network.name,
+            chainId: Number(network.chainId),
+            isSepolia: network.chainId === 11155111n,
+            provider: "Alchemy Sepolia",
+          };
+        }
+      } catch (networkError) {
+        console.error("Network info error:", networkError);
+      }
+
       res.json({
         success: false,
         error: error.message,
@@ -1563,6 +1644,7 @@ async function initializeServer() {
             : "not configured",
           accessible: false,
         },
+        network: networkInfo,
       });
     }
   });
