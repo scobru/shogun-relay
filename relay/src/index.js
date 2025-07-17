@@ -296,14 +296,6 @@ const relayContractAuthMiddleware = async (req, res, next) => {
     }
 
     if (!isAuth) {
-      addSystemLog("warning", "Unauthorized access attempt", {
-        userAddress: userAddress
-          ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`
-          : null,
-        pubKey: pubKey ? `${pubKey.slice(0, 10)}...` : null,
-        authMethod: authMethod,
-      });
-
       return res.status(403).json({
         success: false,
         error: "Utente non autorizzato - sottoscrizione non attiva",
@@ -316,14 +308,6 @@ const relayContractAuthMiddleware = async (req, res, next) => {
         },
       });
     }
-
-    addSystemLog("success", "User authorized successfully", {
-      userAddress: userAddress
-        ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`
-        : null,
-      pubKey: pubKey ? `${pubKey.slice(0, 10)}...` : null,
-      authMethod: authMethod,
-    });
 
     req.userAddress = userAddress;
     req.userPubKey = pubKey;
@@ -715,15 +699,6 @@ async function initializeServer() {
                 .get(identifier)
                 .get(fileResult?.Hash);
               uploadNode.put(uploadData);
-
-              addSystemLog("success", "File uploaded successfully", {
-                fileName: req.file.originalname,
-                fileSize: req.file.size,
-                hash: fileResult?.Hash,
-                identifier: identifier,
-                userAddress: req.userAddress,
-                pubKey: req.userPubKey,
-              });
 
               // Salva il mapping pubKey -> userAddress se disponibili entrambi
               if (req.userAddress && req.userPubKey) {
@@ -3954,6 +3929,187 @@ async function initializeServer() {
       });
     }
   });
+
+  // Endpoint per ottenere le statistiche di utilizzo MB di un utente
+  app.get("/api/user-mb-stats/:identifier", async (req, res) => {
+    try {
+      const { identifier } = req.params;
+
+      if (!identifier) {
+        return res.status(400).json({
+          success: false,
+          error: "Identificatore richiesto (userAddress o gunPubKey)",
+        });
+      }
+
+      if (!relayContract) {
+        return res.status(500).json({
+          success: false,
+          error: "Contratto relay non configurato",
+        });
+      }
+
+      let userAddress = null;
+      let gunPubKey = null;
+
+      // Determina se l'identificatore è un indirizzo Ethereum o una Gun key
+      if (identifier.startsWith("0x") && identifier.length === 42) {
+        userAddress = identifier;
+      } else {
+        gunPubKey = identifier;
+
+        // Se è una Gun key, cerca il mapping per ottenere l'indirizzo
+        if (gunPubKey) {
+          const mappingNode = gun
+            .get("shogun")
+            .get("pubkey_mapping")
+            .get(gunPubKey);
+          const mapping = await new Promise((resolve) => {
+            mappingNode.once((data) => {
+              resolve(data);
+            });
+          });
+
+          if (mapping && mapping.userAddress) {
+            userAddress = mapping.userAddress;
+          }
+        }
+      }
+
+      // Ottieni tutti i relay registrati
+      const allRelays = await relayContract.getAllRelays();
+      if (allRelays.length === 0) {
+        return res.json({
+          success: true,
+          identifier,
+          userAddress,
+          gunPubKey,
+          stats: {
+            hasSubscription: false,
+            reason: "Nessun relay registrato nel contratto",
+          },
+        });
+      }
+
+      const relayAddress = allRelays[0];
+
+      try {
+        let subscriptionDetails = null;
+        let isActive = false;
+
+        // Prova prima con l'indirizzo utente
+        if (userAddress) {
+          try {
+            isActive = await relayContract.isSubscriptionActive(
+              userAddress,
+              relayAddress
+            );
+            if (isActive) {
+              subscriptionDetails = await relayContract.getSubscriptionDetails(
+                userAddress,
+                relayAddress
+              );
+            }
+          } catch (e) {
+            console.log(
+              "Errore verifica sottoscrizione per indirizzo:",
+              e.message
+            );
+          }
+        }
+
+        // Se non trovato con indirizzo, prova con Gun key
+        if (!isActive && gunPubKey) {
+          try {
+            isActive = await relayContract.isSubscriptionActiveByGunKey(
+              gunPubKey,
+              relayAddress
+            );
+            if (isActive) {
+              subscriptionDetails =
+                await relayContract.getSubscriptionDetailsByGunKey(
+                  gunPubKey,
+                  relayAddress
+                );
+            }
+          } catch (e) {
+            console.log(
+              "Errore verifica sottoscrizione per Gun key:",
+              e.message
+            );
+          }
+        }
+
+        if (isActive && subscriptionDetails) {
+          const mbAllocated = Number(subscriptionDetails.mbAllocated);
+          const mbUsed = Number(subscriptionDetails.mbUsed);
+          const mbRemaining = Number(subscriptionDetails.mbRemaining);
+          const usagePercentage =
+            mbAllocated > 0 ? (mbUsed / mbAllocated) * 100 : 0;
+
+          res.json({
+            success: true,
+            identifier,
+            userAddress,
+            gunPubKey,
+            relayAddress,
+            stats: {
+              hasSubscription: true,
+              isActive: true,
+              mbAllocated,
+              mbUsed,
+              mbRemaining,
+              usagePercentage: Math.round(usagePercentage * 100) / 100,
+              startTime: Number(subscriptionDetails.startTime),
+              endTime: Number(subscriptionDetails.endTime),
+              startDate: new Date(
+                Number(subscriptionDetails.startTime) * 1000
+              ).toISOString(),
+              endDate: new Date(
+                Number(subscriptionDetails.endTime) * 1000
+              ).toISOString(),
+              daysRemaining: Math.max(
+                0,
+                Math.ceil(
+                  (Number(subscriptionDetails.endTime) * 1000 - Date.now()) /
+                    (1000 * 60 * 60 * 24)
+                )
+              ),
+            },
+          });
+        } else {
+          res.json({
+            success: true,
+            identifier,
+            userAddress,
+            gunPubKey,
+            relayAddress,
+            stats: {
+              hasSubscription: false,
+              reason: "Nessuna sottoscrizione attiva trovata",
+            },
+          });
+        }
+      } catch (error) {
+        console.error("Errore ottenimento statistiche MB:", error);
+        res.status(500).json({
+          success: false,
+          error: "Errore ottenimento statistiche MB",
+          details: error.message,
+        });
+      }
+    } catch (error) {
+      console.error("Errore endpoint user-mb-stats:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore interno del server",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint per registrare il mapping pubKey -> userAddress durante la sottoscrizione
+  // RIMOSSO: Non serve più dato che usiamo solo i dati on-chain
 
   // Endpoint per verificare la proprietà di una Gun key
   app.post("/api/verify-gunkey-ownership", async (req, res) => {
