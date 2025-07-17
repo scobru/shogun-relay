@@ -314,8 +314,8 @@
         // Controlla lo stato della sottoscrizione
         async function checkSubscriptionStatus(walletAddr) {
             try {
-                const identifier = walletAddr;
-                const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
+                // Usa il nuovo endpoint centralizzato
+                const response = await fetch(`/api/user-subscription-details/${encodeURIComponent(walletAddr)}`);
                 const result = await response.json();
 
                 if (result.success) {
@@ -325,7 +325,7 @@
                         const mbAllocated = details.mbAllocated || 0;
                         const mbUsed = details.mbUsed || 0;
                         const mbRemaining = details.mbRemaining || 0;
-                        const usagePercentage = mbAllocated > 0 ? Math.round((mbUsed / mbAllocated) * 100) : 0;
+                        const usagePercentage = details.usagePercentage || 0;
 
                         subscriptionDetailsEl.innerHTML = `
                             <div class="grid grid-cols-2 gap-4">

@@ -184,9 +184,12 @@ const relayContractAuthMiddleware = async (req, res, next) => {
     }
     const relayAddress = allRelays[0];
 
-    // Verifica la sottoscrizione tramite smart contract usando solo l'address
+    // Verifica la sottoscrizione tramite smart contract usando isSubscriptionActive
     try {
-      const isAuth = await relayContract.checkUserSubscription(userAddress);
+      const isAuth = await relayContract.isSubscriptionActive(
+        userAddress,
+        relayAddress
+      );
 
       console.log(
         `🔐 Autorizzazione smart contract per indirizzo: ${userAddress} - ${
@@ -2007,7 +2010,13 @@ async function initializeServer() {
           console.log(
             `Verificando sottoscrizione per indirizzo: ${identifier}`
           );
-          isSubscribed = await relayContract.checkUserSubscription(identifier);
+
+          // IMPORTANTE: Usa isSubscriptionActive invece di checkUserSubscription
+          // perché checkUserSubscription usa msg.sender che è l'indirizzo del relay
+          isSubscribed = await relayContract.isSubscriptionActive(
+            identifier,
+            relayAddress
+          );
 
           if (isSubscribed) {
             subscriptionDetails = await relayContract.getSubscriptionDetails(
@@ -2112,6 +2121,265 @@ async function initializeServer() {
       }
     } catch (error) {
       console.error("Errore endpoint subscription-status:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore interno del server",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint centralizzato per verificare se un utente ha MB sufficienti
+  app.post("/api/check-user-mb", async (req, res) => {
+    try {
+      const { userAddress, mbRequired } = req.body;
+
+      if (!userAddress || !mbRequired) {
+        return res.status(400).json({
+          success: false,
+          error: "userAddress e mbRequired sono richiesti",
+        });
+      }
+
+      if (!relayContract) {
+        return res.status(500).json({
+          success: false,
+          error: "Contratto relay non configurato",
+        });
+      }
+
+      // Ottieni tutti i relay registrati
+      const allRelays = await relayContract.getAllRelays();
+      if (allRelays.length === 0) {
+        return res.status(500).json({
+          success: false,
+          error: "Nessun relay registrato nel contratto",
+        });
+      }
+      const relayAddress = allRelays[0];
+
+      // Verifica se ha MB sufficienti usando hasAvailableMB
+      const hasMB = await relayContract.hasAvailableMB(
+        userAddress,
+        relayAddress,
+        mbRequired
+      );
+
+      // Ottieni i MB rimanenti
+      const remainingMB = await relayContract.getRemainingMB(
+        userAddress,
+        relayAddress
+      );
+
+      res.json({
+        success: true,
+        userAddress,
+        relayAddress,
+        mbRequired: Number(mbRequired),
+        hasSufficientMB: hasMB,
+        remainingMB: Number(remainingMB),
+      });
+    } catch (error) {
+      console.error("Errore verifica MB utente:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore verifica MB utente",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint centralizzato per registrare l'uso di MB
+  app.post("/api/record-user-mb-usage", async (req, res) => {
+    try {
+      const { userAddress, mbUsed } = req.body;
+
+      if (!userAddress || !mbUsed) {
+        return res.status(400).json({
+          success: false,
+          error: "userAddress e mbUsed sono richiesti",
+        });
+      }
+
+      if (!relayContract) {
+        return res.status(500).json({
+          success: false,
+          error: "Contratto relay non configurato",
+        });
+      }
+
+      // Ottieni tutti i relay registrati
+      const allRelays = await relayContract.getAllRelays();
+      if (allRelays.length === 0) {
+        return res.status(500).json({
+          success: false,
+          error: "Nessun relay registrato nel contratto",
+        });
+      }
+      const relayAddress = allRelays[0];
+
+      // Verifica che l'utente abbia una sottoscrizione attiva
+      const isSubscribed = await relayContract.isSubscriptionActive(
+        userAddress,
+        relayAddress
+      );
+      if (!isSubscribed) {
+        return res.status(403).json({
+          success: false,
+          error: "Nessuna sottoscrizione attiva trovata per questo utente",
+        });
+      }
+
+      // Verifica che ci siano MB sufficienti
+      const hasMB = await relayContract.hasAvailableMB(
+        userAddress,
+        relayAddress,
+        mbUsed
+      );
+      if (!hasMB) {
+        return res.status(403).json({
+          success: false,
+          error: "MB insufficienti per questa operazione",
+        });
+      }
+
+      // Registra l'uso di MB
+      const tx = await relayContract.recordMBUsage(userAddress, mbUsed);
+      await tx.wait();
+
+      // Ottieni i MB rimanenti
+      const remainingMB = await relayContract.getRemainingMB(
+        userAddress,
+        relayAddress
+      );
+
+      res.json({
+        success: true,
+        message: "Uso MB registrato con successo",
+        userAddress,
+        mbUsed: Number(mbUsed),
+        remainingMB: Number(remainingMB),
+        transactionHash: tx.hash,
+      });
+    } catch (error) {
+      console.error("Errore registrazione uso MB:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore registrazione uso MB",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint centralizzato per ottenere i dettagli completi della sottoscrizione
+  app.get("/api/user-subscription-details/:userAddress", async (req, res) => {
+    try {
+      const { userAddress } = req.params;
+
+      if (!userAddress) {
+        return res.status(400).json({
+          success: false,
+          error: "Indirizzo utente richiesto",
+        });
+      }
+
+      if (!relayContract) {
+        return res.status(500).json({
+          success: false,
+          error: "Contratto relay non configurato",
+        });
+      }
+
+      // Ottieni tutti i relay registrati
+      const allRelays = await relayContract.getAllRelays();
+      if (allRelays.length === 0) {
+        return res.json({
+          success: true,
+          userAddress,
+          subscription: {
+            isActive: false,
+            reason: "Nessun relay registrato nel contratto",
+          },
+        });
+      }
+
+      const relayAddress = allRelays[0];
+
+      try {
+        // Verifica se l'utente ha una sottoscrizione attiva
+        const isActive = await relayContract.isSubscriptionActive(
+          userAddress,
+          relayAddress
+        );
+
+        if (isActive) {
+          // Ottieni i dettagli completi della sottoscrizione
+          const subscriptionDetails =
+            await relayContract.getSubscriptionDetails(
+              userAddress,
+              relayAddress
+            );
+
+          const [
+            startTime,
+            endTime,
+            amountPaid,
+            mbAllocated,
+            mbUsed,
+            mbRemaining,
+            isActiveStatus,
+          ] = subscriptionDetails;
+
+          const usagePercentage =
+            mbAllocated > 0 ? (mbUsed / mbAllocated) * 100 : 0;
+
+          res.json({
+            success: true,
+            userAddress,
+            relayAddress,
+            subscription: {
+              isActive: isActiveStatus,
+              startTime: Number(startTime),
+              endTime: Number(endTime),
+              amountPaid: ethers.formatEther(amountPaid),
+              mbAllocated: Number(mbAllocated),
+              mbUsed: Number(mbUsed),
+              mbRemaining: Number(mbRemaining),
+              usagePercentage: Math.round(usagePercentage * 100) / 100,
+              startDate: new Date(Number(startTime) * 1000).toISOString(),
+              endDate: new Date(Number(endTime) * 1000).toISOString(),
+              daysRemaining: Math.max(
+                0,
+                Math.ceil(
+                  (Number(endTime) * 1000 - Date.now()) / (1000 * 60 * 60 * 24)
+                )
+              ),
+            },
+          });
+        } else {
+          res.json({
+            success: true,
+            userAddress,
+            relayAddress,
+            subscription: {
+              isActive: false,
+              reason: "Nessuna sottoscrizione attiva trovata",
+            },
+          });
+        }
+      } catch (contractError) {
+        console.error(
+          "Errore verifica dettagli sottoscrizione:",
+          contractError
+        );
+        res.status(500).json({
+          success: false,
+          error: "Errore verifica dettagli sottoscrizione",
+          details: contractError.message,
+        });
+      }
+    } catch (error) {
+      console.error("Errore endpoint user-subscription-details:", error);
       res.status(500).json({
         success: false,
         error: "Errore interno del server",

@@ -1127,11 +1127,10 @@
                     </div>
                 `;
 
-                const identifier = walletAddress;
-                console.log('🔍 Checking subscription for wallet:', identifier);
-                console.log('🔍 Making API call to:', `/api/subscription-status/${encodeURIComponent(identifier)}`);
+                // Usa il nuovo endpoint centralizzato
+                console.log('🔍 Making API call to:', `/api/user-subscription-details/${encodeURIComponent(walletAddress)}`);
 
-                const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
+                const response = await fetch(`/api/user-subscription-details/${encodeURIComponent(walletAddress)}`);
                 console.log('📡 Response status:', response.status);
 
                 const result = await response.json();
@@ -1146,7 +1145,7 @@
                         const mbAllocated = subscription.mbAllocated || 0;
                         const mbUsed = subscription.mbUsed || 0;
                         const mbRemaining = subscription.mbRemaining || 0;
-                        const usagePercentage = mbAllocated > 0 ? Math.round((mbUsed / mbAllocated) * 100) : 0;
+                        const usagePercentage = subscription.usagePercentage || 0;
 
                         currentSubscriptionDetails.innerHTML = `
                             <div class="space-y-3">
@@ -1352,36 +1351,52 @@
 
         async function checkSubscriptionStatus() {
             try {
-                if (!relayContract || !walletAddress || !registeredRelayAddress) return;
-
-                let isSubscribed = false;
-
-                try {
-                    // Usa isSubscriptionActive che verifica la sottoscrizione per questo wallet
-                    isSubscribed = await relayContract.isSubscriptionActive(walletAddress, registeredRelayAddress);
-                } catch (e) {
-                    // Fallback per compatibilità
-                    console.log('Fallback to checkUserSubscription:', e);
-                    isSubscribed = await relayContract.checkUserSubscription(walletAddress);
+                if (!walletAddress) {
+                    showNotification('Please connect your wallet first', 'error');
+                    return;
                 }
 
-                if (isSubscribed) {
-                    subscriptionStatus.classList.remove('hidden');
-                    statusContent.innerHTML = `
-                        <div class="flex items-center gap-2 text-success">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span>Your wallet is authorized for relay uploads!</span>
-                        </div>
-                        <p class="text-sm text-base-content/70 mt-2">
-                            You can now use the upload endpoint with your wallet address: <strong>${walletAddress}</strong>
-                        </p>
-                    `;
+                // Usa il nuovo endpoint centralizzato
+                console.log('🔍 Checking subscription status for wallet:', walletAddress);
+
+                const response = await fetch(`/api/user-subscription-details/${encodeURIComponent(walletAddress)}`);
+                console.log('📡 Response status:', response.status);
+
+                const result = await response.json();
+                console.log('📋 Response data:', result);
+
+                if (result.success) {
+                    console.log('✅ Subscription check successful');
+                    console.log('📊 Subscription details:', result.subscription);
+
+                    displaySubscriptionStatus(result);
+
+                    // Se la sottoscrizione è attiva, mostra anche lo stato nel step 3
+                    if (result.subscription.isActive) {
+                        console.log('🎉 Subscription is ACTIVE!');
+                        subscriptionStatus.classList.remove('hidden');
+                        statusContent.innerHTML = `
+                            <div class="flex items-center gap-2 text-success">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>Your wallet is authorized for relay uploads!</span>
+                            </div>
+                            <p class="text-sm text-base-content/70 mt-2">
+                                You can now use the upload endpoint with your wallet address: <strong>${walletAddress}</strong>
+                            </p>
+                        `;
+                    } else {
+                        console.log('❌ Subscription is NOT active. Reason:', result.subscription.reason);
+                    }
+                } else {
+                    console.error('❌ Subscription check failed:', result.error);
+                    showNotification(`Failed to check subscription: ${result.error}`, 'error');
                 }
 
             } catch (error) {
-                console.error('Failed to check subscription status:', error);
+                console.error('💥 Error checking subscription status:', error);
+                showNotification(`Error checking subscription: ${error.message}`, 'error');
             }
         }
 
