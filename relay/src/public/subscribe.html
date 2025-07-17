@@ -464,7 +464,7 @@
         validateKeyBtn.addEventListener('click', validateAndContinue);
         subscribeBtn.addEventListener('click', subscribeToRelay);
         mbInput.addEventListener('input', updateSubscriptionDetails);
-        addMbInput.addEventListener('input', updateAddMBCost);
+        if (addMbInput) addMbInput.addEventListener('input', updateAddMBCost);
         checkStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
         refreshStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
         newSubscriptionBtn.addEventListener('click', () => {
@@ -484,7 +484,7 @@
                 loadSubscriptionDetails();
             }
         });
-        addMbBtn.addEventListener('click', addMBToSubscription);
+        if (addMbBtn) addMbBtn.addEventListener('click', addMBToSubscription);
 
         // Listen for network changes
         if (typeof window.ethereum !== 'undefined') {
@@ -746,8 +746,10 @@
                 // Aggiorna automaticamente i dettagli della sottoscrizione
                 updateSubscriptionDetails();
 
-                // Aggiorna anche il costo per aggiungere MB
-                updateAddMBCost();
+                // Aggiorna anche il costo per aggiungere MB (solo se gli elementi esistono)
+                if (addMbInput && addMbCost) {
+                    updateAddMBCost();
+                }
 
             } catch (error) {
                 console.error('Failed to load subscription details:', error);
@@ -758,7 +760,9 @@
                 // Imposta un valore di fallback
                 document.getElementById('pricePerGB').textContent = '0.001 ETH';
                 updateSubscriptionDetails();
-                updateAddMBCost();
+                if (addMbInput && addMbCost) {
+                    updateAddMBCost();
+                }
             }
         }
 
@@ -788,8 +792,19 @@
         // Funzione per calcolare il costo per aggiungere MB
         async function updateAddMBCost() {
             try {
+                // Verifica che gli elementi esistano
+                if (!addMbInput || !addMbCost) {
+                    return;
+                }
+
                 const mbToAdd = parseInt(addMbInput.value) || 0;
                 const pricePerGBEl = document.getElementById('pricePerGB');
+
+                if (!pricePerGBEl) {
+                    addMbCost.textContent = 'Loading...';
+                    return;
+                }
+
                 const pricePerGBText = pricePerGBEl.textContent;
 
                 // Controlla se il prezzo è ancora in caricamento
@@ -808,7 +823,9 @@
                 addMbCost.textContent = `${cost.toFixed(6)} ETH`;
             } catch (error) {
                 console.error('Error calculating add MB cost:', error);
-                addMbCost.textContent = 'Error';
+                if (addMbCost) {
+                    addMbCost.textContent = 'Error';
+                }
             }
         }
 
@@ -873,6 +890,12 @@
                     return;
                 }
 
+                // Verifica che l'elemento input esista
+                if (!addMbInput) {
+                    showStatus('Add MB input not found', 'error');
+                    return;
+                }
+
                 const mbToAdd = parseInt(addMbInput.value) || 100;
                 const pricePerGB = await relayContract.PRICE_PER_GB();
                 const cost = (BigInt(mbToAdd) * pricePerGB) / 1000n; // Calcola il costo per i MB specificati
@@ -890,7 +913,9 @@
                 await checkSubscriptionStatusFromServer(); // Aggiorna lo stato della sottoscrizione
                 updateSubscriptionDetails(); // Aggiorna i dettagli della sottoscrizione
                 addMbInput.value = ''; // Pulisci l'input
-                addMbCost.textContent = 'Loading...'; // Resetta il costo
+                if (addMbCost) {
+                    addMbCost.textContent = 'Loading...'; // Resetta il costo
+                }
             } catch (error) {
                 showStatus(`Failed to add MB: ${error.message}`, 'error');
             }
