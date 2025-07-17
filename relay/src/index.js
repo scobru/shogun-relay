@@ -33,79 +33,79 @@ const namespace = "shogun";
 
 // --- Sistema di Logging Migliorato ---
 class Logger {
-    constructor() {
-        this.logs = [];
-        this.maxLogs = 1000; // Mantieni solo gli ultimi 1000 log
+  constructor() {
+    this.logs = [];
+    this.maxLogs = 1000; // Mantieni solo gli ultimi 1000 log
+  }
+
+  log(level, message, data = null) {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+      data,
+      pid: process.pid,
+    };
+
+    this.logs.push(logEntry);
+
+    // Mantieni solo gli ultimi maxLogs
+    if (this.logs.length > this.maxLogs) {
+      this.logs.shift();
     }
 
-    log(level, message, data = null) {
-        const logEntry = {
-            timestamp: new Date().toISOString(),
-            level,
-            message,
-            data,
-            pid: process.pid
-        };
+    // Console output con colori
+    const colors = {
+      info: "\x1b[36m", // Cyan
+      success: "\x1b[32m", // Green
+      warning: "\x1b[33m", // Yellow
+      error: "\x1b[31m", // Red
+      debug: "\x1b[35m", // Magenta
+    };
 
-        this.logs.push(logEntry);
+    const reset = "\x1b[0m";
+    const color = colors[level] || colors.info;
 
-        // Mantieni solo gli ultimi maxLogs
-        if (this.logs.length > this.maxLogs) {
-            this.logs.shift();
-        }
+    console.log(`${color}[${level.toUpperCase()}]${reset} ${message}`);
 
-        // Console output con colori
-        const colors = {
-            info: '\x1b[36m',    // Cyan
-            success: '\x1b[32m',  // Green
-            warning: '\x1b[33m',  // Yellow
-            error: '\x1b[31m',    // Red
-            debug: '\x1b[35m'     // Magenta
-        };
+    if (data) {
+      console.log(`${color}Data:${reset}`, data);
+    }
+  }
 
-        const reset = '\x1b[0m';
-        const color = colors[level] || colors.info;
-        
-        console.log(`${color}[${level.toUpperCase()}]${reset} ${message}`);
-        
-        if (data) {
-            console.log(`${color}Data:${reset}`, data);
-        }
+  info(message, data = null) {
+    this.log("info", message, data);
+  }
+
+  success(message, data = null) {
+    this.log("success", message, data);
+  }
+
+  warning(message, data = null) {
+    this.log("warning", message, data);
+  }
+
+  error(message, data = null) {
+    this.log("error", message, data);
+  }
+
+  debug(message, data = null) {
+    this.log("debug", message, data);
+  }
+
+  getLogs(level = null, limit = 100) {
+    let filteredLogs = this.logs;
+
+    if (level) {
+      filteredLogs = this.logs.filter((log) => log.level === level);
     }
 
-    info(message, data = null) {
-        this.log('info', message, data);
-    }
+    return filteredLogs.slice(-limit);
+  }
 
-    success(message, data = null) {
-        this.log('success', message, data);
-    }
-
-    warning(message, data = null) {
-        this.log('warning', message, data);
-    }
-
-    error(message, data = null) {
-        this.log('error', message, data);
-    }
-
-    debug(message, data = null) {
-        this.log('debug', message, data);
-    }
-
-    getLogs(level = null, limit = 100) {
-        let filteredLogs = this.logs;
-        
-        if (level) {
-            filteredLogs = this.logs.filter(log => log.level === level);
-        }
-        
-        return filteredLogs.slice(-limit);
-    }
-
-    clearLogs() {
-        this.logs = [];
-    }
+  clearLogs() {
+    this.logs = [];
+  }
 }
 
 const logger = new Logger();
@@ -1837,3 +1837,371 @@ async function initializeServer() {
       // Get network information
       const network = await provider.getNetwork();
       const isSepolia = network.chainId === 11155111n;
+
+      // Test contract accessibility
+      let contractTest = null;
+      try {
+        const pricePerGB = await relayContract.PRICE_PER_GB();
+        contractTest = {
+          accessible: true,
+          pricePerGB: ethers.formatEther(pricePerGB),
+        };
+      } catch (testError) {
+        contractTest = {
+          accessible: false,
+          error: testError.message,
+        };
+      }
+
+      res.json({
+        success: true,
+        contract: {
+          address: RELAY_CONTRACT_ADDRESS,
+          configured: true,
+          provider: "configured",
+          initialized: true,
+          network: {
+            name: network.name,
+            chainId: network.chainId.toString(),
+            isSepolia,
+          },
+          test: contractTest,
+        },
+      });
+    } catch (error) {
+      logger.error("Contract status check failed", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to check contract status",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint per il monitoraggio delle prestazioni
+  app.get("/api/performance", (req, res) => {
+    try {
+      const memoryUsage = process.memoryUsage();
+      const uptime = process.uptime();
+
+      res.json({
+        success: true,
+        performance: {
+          uptime: {
+            seconds: uptime,
+            formatted: formatUptime(uptime),
+          },
+          memory: {
+            rss: Math.round(memoryUsage.rss / 1024 / 1024), // MB
+            heapUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024), // MB
+            heapTotal: Math.round(memoryUsage.heapTotal / 1024 / 1024), // MB
+            external: Math.round(memoryUsage.external / 1024 / 1024), // MB
+          },
+          connections: {
+            active: activeWires,
+            total: totalConnections,
+          },
+          stats: customStats,
+          timeSeries: customStats.timeSeries,
+        },
+      });
+    } catch (error) {
+      logger.error("Performance monitoring failed", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to get performance data",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint per i log del sistema
+  app.get("/api/logs", tokenAuthMiddleware, (req, res) => {
+    try {
+      const { level, limit = 100 } = req.query;
+      const logs = logger.getLogs(level, parseInt(limit));
+
+      res.json({
+        success: true,
+        logs,
+        count: logs.length,
+        filters: {
+          level: level || "all",
+          limit: parseInt(limit),
+        },
+      });
+    } catch (error) {
+      logger.error("Log retrieval failed", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to retrieve logs",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint per pulire i log
+  app.delete("/api/logs", tokenAuthMiddleware, (req, res) => {
+    try {
+      logger.clearLogs();
+      res.json({
+        success: true,
+        message: "Logs cleared successfully",
+      });
+    } catch (error) {
+      logger.error("Log clearing failed", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to clear logs",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint per verificare lo stato della sottoscrizione (ibrido)
+  app.get("/api/subscription-status/:identifier", async (req, res) => {
+    try {
+      const { identifier } = req.params;
+
+      if (!identifier) {
+        return res.status(400).json({
+          success: false,
+          error: "Identificatore richiesto",
+        });
+      }
+
+      if (!relayContract) {
+        return res.status(500).json({
+          success: false,
+          error: "Relay contract non configurato",
+        });
+      }
+
+      // Determina se l'identificatore è un indirizzo Ethereum o una chiave Gun
+      const isEthereumAddress = /^0x[a-fA-F0-9]{40}$/.test(identifier);
+
+      let subscription = null;
+      let isActive = false;
+      let reason = null;
+
+      try {
+        if (isEthereumAddress) {
+          // Verifica per indirizzo Ethereum
+          const allRelays = await relayContract.getAllRelays();
+          if (allRelays.length > 0) {
+            const details = await relayContract.getSubscriptionDetails(
+              identifier,
+              allRelays[0]
+            );
+
+            subscription = {
+              userAddress: identifier,
+              relayAddress: allRelays[0],
+              startDate: new Date(Number(details.startTime) * 1000),
+              endDate: new Date(Number(details.endTime) * 1000),
+              amountPaid: ethers.formatEther(details.amountPaid),
+              mbAllocated: Number(details.mbAllocated),
+              mbUsed: Number(details.mbUsed),
+              mbRemaining: Number(details.mbRemaining),
+              isActive: details.isActive,
+              gunPubKey: details.gunPubKey,
+              daysRemaining: Math.ceil(
+                (Number(details.endTime) * 1000 - Date.now()) /
+                  (1000 * 60 * 60 * 24)
+              ),
+            };
+
+            isActive = details.isActive;
+          } else {
+            reason = "Nessun relay registrato nel contratto";
+          }
+        } else {
+          // Verifica per chiave Gun
+          const allRelays = await relayContract.getAllRelays();
+          if (allRelays.length > 0) {
+            const details = await relayContract.getSubscriptionDetailsByGunKey(
+              identifier,
+              allRelays[0]
+            );
+
+            subscription = {
+              userAddress: details.userAddress,
+              relayAddress: allRelays[0],
+              gunPubKey: identifier,
+              startDate: new Date(Number(details.startTime) * 1000),
+              endDate: new Date(Number(details.endTime) * 1000),
+              amountPaid: ethers.formatEther(details.amountPaid),
+              mbAllocated: Number(details.mbAllocated),
+              mbUsed: Number(details.mbUsed),
+              mbRemaining: Number(details.mbRemaining),
+              isActive: details.isActive,
+              daysRemaining: Math.ceil(
+                (Number(details.endTime) * 1000 - Date.now()) /
+                  (1000 * 60 * 60 * 24)
+              ),
+            };
+
+            isActive = details.isActive;
+          } else {
+            reason = "Nessun relay registrato nel contratto";
+          }
+        }
+
+        if (!subscription) {
+          reason = reason || "Nessuna sottoscrizione trovata";
+        }
+
+        res.json({
+          success: true,
+          subscription: subscription || {
+            isActive: false,
+            reason,
+          },
+          identifier,
+          type: isEthereumAddress ? "ethereum_address" : "gun_key",
+        });
+      } catch (contractError) {
+        logger.error("Contract subscription check failed", contractError);
+
+        // Fallback: prova con metodi alternativi
+        try {
+          if (isEthereumAddress) {
+            isActive = await relayContract.checkUserSubscription(identifier);
+          } else {
+            isActive = await relayContract.checkGunKeySubscription(identifier);
+          }
+
+          res.json({
+            success: true,
+            subscription: {
+              isActive,
+              reason: isActive ? null : "Sottoscrizione non attiva",
+            },
+            identifier,
+            type: isEthereumAddress ? "ethereum_address" : "gun_key",
+            fallback: true,
+          });
+        } catch (fallbackError) {
+          logger.error("Fallback subscription check failed", fallbackError);
+          res.status(500).json({
+            success: false,
+            error: "Errore verifica sottoscrizione",
+            details: fallbackError.message,
+          });
+        }
+      }
+    } catch (error) {
+      logger.error("Subscription status check failed", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore interno del server",
+        details: error.message,
+      });
+    }
+  });
+
+  // Funzione helper per formattare l'uptime
+  function formatUptime(seconds) {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+
+    if (days > 0) {
+      return `${days}d ${hours}h ${minutes}m ${secs}s`;
+    } else if (hours > 0) {
+      return `${hours}h ${minutes}m ${secs}s`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${secs}s`;
+    } else {
+      return `${secs}s`;
+    }
+  }
+
+  // Sostituisci i console.log con il logger
+  console.log = (...args) => {
+    logger.info(args.join(" "));
+  };
+
+  console.error = (...args) => {
+    logger.error(args.join(" "));
+  };
+
+  console.warn = (...args) => {
+    logger.warning(args.join(" "));
+  };
+
+  // Test IPFS connectivity
+  await testIPFSConnection();
+
+  // Display server information
+  console.log(`Internal URL: ${link}/`);
+  console.log(`External URL: ${extLink}/`);
+  console.log(`Gun peer: ${link}/gun`);
+  console.log(`Storage: ${store ? "enabled" : "disabled"}`);
+  console.log(
+    `Admin password: ${process.env.ADMIN_PASSWORD ? "configured" : "not set"}`
+  );
+
+  // Display IPFS proxy information
+  console.log("\n=== IPFS PROXY ENDPOINTS ===");
+  console.log(`📁 IPFS Gateway: ${link}/ipfs/`);
+  console.log(`📁 IPNS Gateway: ${link}/ipns/`);
+  console.log(`🔧 IPFS API: ${link}/api/v0/`);
+  console.log(`📊 IPFS Status: ${link}/ipfs-status`);
+
+  console.log("==============================");
+
+  // Show QR code if enabled
+  if (showQr !== false) {
+    console.log("\n=== QR CODE ===");
+    try {
+      console.log(qr(link, "ascii", { border: 1 }));
+    } catch (error) {
+      console.warn("QR code generation failed:", error.message);
+    }
+    console.log("===============\n");
+  }
+
+  // Graceful shutdown
+  async function shutdown() {
+    console.log("\nShutting down relay server...");
+
+    // Clear garbage collector interval
+    if (gcInterval) {
+      clearInterval(gcInterval);
+      console.log("🗑️ Garbage Collector stopped");
+    }
+
+    if (db) {
+      db.get("status").put("stopping");
+    }
+
+    if (server) {
+      await new Promise((resolve) => {
+        server.close(resolve);
+      });
+    }
+
+    if (db) {
+      db.get("status").put("stopped");
+      db.get("stopped").put(Date.now());
+    }
+
+    console.log("Relay server shutdown complete.");
+  }
+
+  // Handle graceful shutdown
+  process.on("SIGINT", async () => {
+    await shutdown();
+    process.exit(0);
+  });
+
+  process.on("SIGTERM", async () => {
+    await shutdown();
+    process.exit(0);
+  });
+} // End of initializeServer function
+
+// Start the server
+initializeServer().catch(console.error);
