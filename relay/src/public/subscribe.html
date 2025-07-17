@@ -404,7 +404,7 @@
                 }
             } catch (error) {
                 console.error('Error loading contract config:', error);
-                showStatus('Error loading contract configuration', 'error');
+                showNotification('Failed to load contract configuration. Please check server settings.', 'error');
                 return false;
             }
         }
@@ -425,12 +425,12 @@
                     return true;
                 } else {
                     console.error('Contract status error:', status.error);
-                    showStatus(`Contract error: ${status.error}`, 'error');
+                    showNotification(`Contract error: ${status.error}`, 'error');
                     return false;
                 }
             } catch (error) {
                 console.error('Error checking contract status:', error);
-                showStatus('Error checking contract status', 'error');
+                showNotification('Error checking contract status', 'error');
                 return false;
             }
         }
@@ -458,6 +458,103 @@
         const addMbCost = document.getElementById('addMbCost');
 
 
+        // Funzione per mostrare notifiche
+        function showNotification(message, type = 'info') {
+            const notificationContainer = document.getElementById('notificationContainer');
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <div class="flex items-center gap-2">
+                    ${type === 'success' ? '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>' : ''}
+                    ${type === 'warning' ? '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>' : ''}
+                    ${type === 'error' ? '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>' : ''}
+                    <span>${message}</span>
+                </div>
+            `;
+
+            notificationContainer.appendChild(notification);
+
+            // Auto-remove after 8 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 8000);
+        }
+
+        // Funzione per gestire gli errori di sottoscrizione
+        function handleSubscriptionError(error) {
+            const errorMessage = error.message || '';
+
+            if (errorMessage.includes('Already subscribed with this Gun key')) {
+                return {
+                    type: 'warning',
+                    message: 'You already have an active subscription with this Gun key!',
+                    action: 'show_existing'
+                };
+            } else if (errorMessage.includes('insufficient funds')) {
+                return {
+                    type: 'error',
+                    message: 'Insufficient funds in your wallet. Please add more ETH.',
+                    action: 'none'
+                };
+            } else if (errorMessage.includes('user rejected')) {
+                return {
+                    type: 'info',
+                    message: 'Transaction was cancelled by user.',
+                    action: 'none'
+                };
+            } else if (errorMessage.includes('execution reverted')) {
+                return {
+                    type: 'error',
+                    message: 'Transaction failed. Please check your wallet and try again.',
+                    action: 'none'
+                };
+            } else {
+                return {
+                    type: 'error',
+                    message: `Subscription failed: ${errorMessage}`,
+                    action: 'none'
+                };
+            }
+        }
+
+        // Funzione per verificare preventivamente se esiste già una sottoscrizione
+        async function checkExistingSubscription() {
+            try {
+                if (!gunKeyPair?.pub) {
+                    showNotification('Please enter and validate your Gun public key first', 'error');
+                    showStep(2);
+                    updateStep(2, 'step-active');
+                    return false;
+                }
+
+                const identifier = gunKeyPair.pub;
+                const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
+                const result = await response.json();
+
+                if (result.success && result.subscription.isActive) {
+                    showNotification('You already have an active subscription!', 'info');
+
+                    // Mostra i dettagli della sottoscrizione esistente
+                    displaySubscriptionStatus(result);
+
+                    // Vai al Step 4 per mostrare lo stato
+                    showStep(4);
+                    updateStep(4, 'step-active');
+                    updateStep(3, 'step-completed');
+
+                    return true;
+                }
+
+                return false;
+            } catch (error) {
+                console.error('Error checking existing subscription:', error);
+                showNotification('Error checking subscription status', 'error');
+                return false;
+            }
+        }
+
         // Event listeners
         connectWalletBtn.addEventListener('click', connectWallet);
         disconnectWalletBtn.addEventListener('click', disconnectWallet);
@@ -467,12 +564,18 @@
         if (addMbInput) addMbInput.addEventListener('input', updateAddMBCost);
         checkStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
         refreshStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
-        newSubscriptionBtn.addEventListener('click', () => {
+        newSubscriptionBtn.addEventListener('click', async () => {
             if (!gunKeyPair || !gunKeyPair.pub) {
-                showStatus('Please enter and validate your Gun public key first', 'error');
+                showNotification('Please enter and validate your Gun public key first', 'error');
                 showStep(2);
                 updateStep(2, 'step-active');
                 return;
+            }
+
+            // Verifica prima se esiste già una sottoscrizione
+            const hasExisting = await checkExistingSubscription();
+            if (hasExisting) {
+                return; // Non procedere se esiste già una sottoscrizione
             }
 
             // Mostra il Step 3 per la sottoscrizione
@@ -492,7 +595,7 @@
                 console.log('Network changed to:', chainId);
                 const sepoliaChainId = '0xaa36a7';
                 if (chainId !== sepoliaChainId) {
-                    showStatus('Please switch to Sepolia network', 'warning');
+                    showNotification('Please switch to Sepolia network', 'warning');
                     // Reset wallet connection
                     disconnectWallet();
                 }
@@ -501,7 +604,7 @@
             window.ethereum.on('accountsChanged', (accounts) => {
                 console.log('Account changed:', accounts);
                 if (accounts.length === 0) {
-                    showStatus('Wallet disconnected', 'info');
+                    showNotification('Wallet disconnected', 'info');
                     disconnectWallet();
                 }
             });
@@ -537,9 +640,9 @@
             if (configLoaded) {
                 // Check contract status
                 await checkContractStatus();
-                showStatus('Contract configuration loaded. Connect your wallet to proceed.', 'info');
+                showNotification('Contract configuration loaded. Connect your wallet to proceed.', 'info');
             } else {
-                showStatus('Failed to load contract configuration. Please check server settings.', 'error');
+                showNotification('Failed to load contract configuration. Please check server settings.', 'error');
             }
         });
 
@@ -547,7 +650,7 @@
         async function connectWallet() {
             try {
                 if (typeof window.ethereum === 'undefined') {
-                    showStatus('MetaMask is not installed. Please install MetaMask first.', 'error');
+                    showNotification('MetaMask is not installed. Please install MetaMask first.', 'error');
                     return;
                 }
 
@@ -556,7 +659,7 @@
                 const sepoliaChainId = '0xaa36a7'; // Sepolia chain ID in hex
 
                 if (chainId !== sepoliaChainId) {
-                    showStatus('Please switch to Sepolia network in MetaMask', 'warning');
+                    showNotification('Please switch to Sepolia network in MetaMask', 'warning');
 
                     // Try to switch to Sepolia
                     try {
@@ -593,14 +696,14 @@
                 // Load contract configuration first
                 const configLoaded = await loadContractConfig();
                 if (!configLoaded) {
-                    showStatus('Failed to load contract configuration. Please try again.', 'error');
+                    showNotification('Failed to load contract configuration. Please try again.', 'error');
                     return;
                 }
 
                 // Check contract status and get the correct address
                 const statusOk = await checkContractStatus();
                 if (!statusOk) {
-                    showStatus('Failed to verify contract status. Please try again.', 'error');
+                    showNotification('Failed to verify contract status. Please try again.', 'error');
                     return;
                 }
 
@@ -625,7 +728,7 @@
                 // Get registered relay address
                 await getRegisteredRelayAddress();
 
-                showStatus('Wallet connected successfully!', 'success');
+                showNotification('Wallet connected successfully!', 'success');
                 updateStep(1, 'step-completed');
 
                 // Mostra il Step 2 per inserire la chiave Gun
@@ -636,7 +739,7 @@
                 await loadSubscriptionDetails();
 
             } catch (error) {
-                showStatus(`Failed to connect wallet: ${error.message}`, 'error');
+                showNotification(`Failed to connect wallet: ${error.message}`, 'error');
             }
         }
 
@@ -656,13 +759,13 @@
                     registeredRelayAddress = allRelays[0]; // Usa il primo relay registrato
                     console.log('Registered relay address:', registeredRelayAddress);
                 } else {
-                    showStatus('No relay registered in the contract. Please register a relay first.', 'warning');
+                    showNotification('No relay registered in the contract. Please register a relay first.', 'warning');
                 }
             } catch (error) {
                 console.error('Failed to get registered relay address:', error);
                 console.error('Contract address used:', RELAY_CONTRACT_ADDRESS);
                 console.error('Provider:', provider);
-                showStatus('Failed to get relay information. Contract may not be accessible.', 'error');
+                showNotification('Failed to get relay information. Contract may not be accessible.', 'error');
             }
         }
 
@@ -686,7 +789,7 @@
             updateStep(3, 'step-pending');
             updateStep(4, 'step-pending');
 
-            showStatus('Wallet disconnected', 'info');
+            showNotification('Wallet disconnected', 'info');
         }
 
         // Gun key validation
@@ -694,14 +797,14 @@
             const gunPubKey = gunPubKeyInput.value.trim();
 
             if (!gunPubKey) {
-                showStatus('Please enter a Gun public key.', 'warning');
+                showNotification('Please enter a Gun public key.', 'warning');
                 return;
             }
 
             try {
                 // Validate the public key format (basic check)
                 if (gunPubKey.length < 20) {
-                    showStatus('Invalid Gun public key format. Please check your key.', 'error');
+                    showNotification('Invalid Gun public key format. Please check your key.', 'error');
                     return;
                 }
 
@@ -713,8 +816,16 @@
                 keyInfo.classList.remove('hidden');
                 validateKeyBtn.classList.add('hidden');
 
-                showStatus('Gun public key validated successfully!', 'success');
+                showNotification('Gun public key validated successfully!', 'success');
                 updateStep(2, 'step-completed');
+
+                // Verifica automaticamente se esiste già una sottoscrizione
+                const hasExisting = await checkExistingSubscription();
+                if (hasExisting) {
+                    // Se esiste già una sottoscrizione, non andare al Step 4 automaticamente
+                    // perché checkExistingSubscription già lo fa
+                    return;
+                }
 
                 // Mostra il Step 4 per controllare lo stato della sottoscrizione
                 showStep(4);
@@ -724,7 +835,7 @@
                 await checkSubscriptionStatusFromServer();
 
             } catch (error) {
-                showStatus(`Failed to validate Gun public key: ${error.message}`, 'error');
+                showNotification(`Failed to validate Gun public key: ${error.message}`, 'error');
             }
         }
 
@@ -755,7 +866,7 @@
                 console.error('Failed to load subscription details:', error);
                 console.error('Contract address used:', RELAY_CONTRACT_ADDRESS);
                 console.error('Provider:', provider);
-                showStatus('Failed to load subscription details. Contract may not be accessible.', 'error');
+                showNotification('Failed to load subscription details. Contract may not be accessible.', 'error');
 
                 // Imposta un valore di fallback
                 document.getElementById('pricePerGB').textContent = '0.001 ETH';
@@ -832,12 +943,12 @@
         async function subscribeToRelay() {
             try {
                 if (!relayContract || !walletAddress) {
-                    showStatus('Please connect wallet first', 'error');
+                    showNotification('Please connect wallet first', 'error');
                     return;
                 }
 
                 if (!gunKeyPair || !gunKeyPair.pub) {
-                    showStatus('Please enter and validate your Gun public key first', 'error');
+                    showNotification('Please enter and validate your Gun public key first', 'error');
                     // Torna al Step 2 per inserire la chiave Gun
                     showStep(2);
                     updateStep(2, 'step-active');
@@ -845,7 +956,7 @@
                 }
 
                 if (!registeredRelayAddress) {
-                    showStatus('No relay available for subscription. Please try again later.', 'error');
+                    showNotification('No relay available for subscription. Please try again later.', 'error');
                     return;
                 }
 
@@ -858,41 +969,51 @@
                     value: totalCost
                 });
 
-                showStatus('Transaction sent! Waiting for confirmation...', 'info');
+                showNotification('Transaction sent! Waiting for confirmation...', 'info');
 
                 await tx.wait();
 
-                showStatus(`Subscription successful! You now have ${mb} MB of storage for 30 days.`, 'success');
+                showNotification(`Subscription successful! You now have ${mb} MB of storage for 30 days.`, 'success');
                 updateStep(3, 'step-completed');
 
                 // Update subscription status
                 await checkSubscriptionStatusFromServer();
 
             } catch (error) {
-                showStatus(`Subscription failed: ${error.message}`, 'error');
+                const errorResult = handleSubscriptionError(error);
+                showNotification(errorResult.message, errorResult.type);
+
+                if (errorResult.action === 'show_existing') {
+                    // Se l'errore è già sottoscritto, mostra i dettagli della sottoscrizione esistente
+                    showNotification('Found existing subscription! Showing details...', 'info');
+                    await checkSubscriptionStatusFromServer();
+                    showStep(4);
+                    updateStep(4, 'step-active');
+                    updateStep(3, 'step-completed');
+                }
             }
         }
 
         async function addMBToSubscription() {
             try {
                 if (!relayContract || !walletAddress) {
-                    showStatus('Please connect wallet first', 'error');
+                    showNotification('Please connect wallet first', 'error');
                     return;
                 }
 
                 if (!gunKeyPair || !gunKeyPair.pub) {
-                    showStatus('Please enter and validate your Gun public key first', 'error');
+                    showNotification('Please enter and validate your Gun public key first', 'error');
                     return;
                 }
 
                 if (!registeredRelayAddress) {
-                    showStatus('No relay available for adding MB. Please try again later.', 'error');
+                    showNotification('No relay available for adding MB. Please try again later.', 'error');
                     return;
                 }
 
                 // Verifica che l'elemento input esista
                 if (!addMbInput) {
-                    showStatus('Add MB input not found', 'error');
+                    showNotification('Add MB input not found', 'error');
                     return;
                 }
 
@@ -904,11 +1025,11 @@
                     value: cost
                 });
 
-                showStatus('Transaction sent! Waiting for confirmation...', 'info');
+                showNotification('Transaction sent! Waiting for confirmation...', 'info');
 
                 await tx.wait();
 
-                showStatus(`${mbToAdd} MB added successfully!`, 'success');
+                showNotification(`${mbToAdd} MB added successfully!`, 'success');
                 updateStep(3, 'step-completed'); // Aggiorna lo stato del passo 3
                 await checkSubscriptionStatusFromServer(); // Aggiorna lo stato della sottoscrizione
                 updateSubscriptionDetails(); // Aggiorna i dettagli della sottoscrizione
@@ -917,7 +1038,8 @@
                     addMbCost.textContent = 'Loading...'; // Resetta il costo
                 }
             } catch (error) {
-                showStatus(`Failed to add MB: ${error.message}`, 'error');
+                const errorResult = handleSubscriptionError(error);
+                showNotification(errorResult.message, errorResult.type);
             }
         }
 
@@ -960,7 +1082,7 @@
         async function checkSubscriptionStatusFromServer() {
             try {
                 if (!walletAddress) {
-                    showStatus('Please connect your wallet first', 'error');
+                    showNotification('Please connect your wallet first', 'error');
                     return;
                 }
 
@@ -988,12 +1110,12 @@
                         `;
                     }
                 } else {
-                    showStatus(`Failed to check subscription: ${result.error}`, 'error');
+                    showNotification(`Failed to check subscription: ${result.error}`, 'error');
                 }
 
             } catch (error) {
                 console.error('Error checking subscription status:', error);
-                showStatus(`Error checking subscription: ${error.message}`, 'error');
+                showNotification(`Error checking subscription: ${error.message}`, 'error');
             }
         }
 
