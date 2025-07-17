@@ -1928,16 +1928,27 @@ async function initializeServer() {
         } else {
           // È una pubKey, usa le funzioni per Gun key
           console.log(`Verificando sottoscrizione per Gun key: ${identifier}`);
-          isSubscribed = await relayContract.checkGunKeySubscription(
-            identifier
+          console.log(`Relay address: ${relayAddress}`);
+
+          isSubscribed = await relayContract.isSubscriptionActiveByGunKey(
+            identifier,
+            relayAddress
           );
 
+          console.log(`isSubscriptionActiveByGunKey result: ${isSubscribed}`);
+
           if (isSubscribed) {
+            console.log(`Sottoscrizione trovata, ottenendo dettagli...`);
             subscriptionDetails =
               await relayContract.getSubscriptionDetailsByGunKey(
                 identifier,
                 relayAddress
               );
+            console.log(`Dettagli sottoscrizione:`, subscriptionDetails);
+          } else {
+            console.log(
+              `Nessuna sottoscrizione attiva trovata per Gun key: ${identifier}`
+            );
           }
         }
 

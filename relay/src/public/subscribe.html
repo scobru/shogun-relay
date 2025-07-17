@@ -331,6 +331,14 @@
                                     </svg>
                                     Check Status
                                 </button>
+                                <button id="testEndpointBtn" class="btn btn-outline btn-sm">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    </svg>
+                                    Test API
+                                </button>
                                 <button id="newSubscriptionBtn" class="btn btn-outline flex-1">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
                                         viewBox="0 0 24 24" stroke="currentColor">
@@ -371,8 +379,6 @@
             "function addMBToSubscription(address _relayAddress, string memory _gunPubKey) payable",
             "function recordMBUsage(string memory _gunPubKey, uint256 _mbUsed) external",
             "function checkUserSubscription(address _user) external view returns (bool)",
-            "function checkGunKeySubscription(string memory _gunPubKey) external view returns (bool)",
-            "function checkGunKeyMB(string memory _gunPubKey, uint256 _mbRequired) external view returns (bool)",
             "function isSubscriptionActive(address _user, address _relayAddress) external view returns (bool)",
             "function isSubscriptionActiveByGunKey(string memory _gunPubKey, address _relayAddress) external view returns (bool)",
             "function hasAvailableMB(string memory _gunPubKey, address _relayAddress, uint256 _mbRequired) public view returns (bool)",
@@ -452,11 +458,42 @@
         const checkStatusBtn = document.getElementById('checkStatusBtn');
         const refreshStatusBtn = document.getElementById('refreshStatusBtn');
         const newSubscriptionBtn = document.getElementById('newSubscriptionBtn');
+        const testEndpointBtn = document.getElementById('testEndpointBtn');
         const mbInput = document.getElementById('mbInput');
         const addMbInput = document.getElementById('addMbInput');
         const addMbBtn = document.getElementById('addMbBtn');
         const addMbCost = document.getElementById('addMbCost');
 
+        // Funzione per testare l'endpoint direttamente
+        async function testEndpoint() {
+            try {
+                if (!gunKeyPair?.pub) {
+                    showNotification('Please enter and validate your Gun public key first', 'error');
+                    return;
+                }
+
+                const identifier = gunKeyPair.pub;
+                console.log('🧪 Testing endpoint directly for:', identifier);
+
+                const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
+                console.log('📡 Test response status:', response.status);
+                console.log('📡 Test response headers:', response.headers);
+
+                const result = await response.json();
+                console.log('📋 Test response data:', result);
+
+                // Mostra il risultato in una notifica
+                if (result.success) {
+                    showNotification(`API Test: ${result.subscription.isActive ? 'ACTIVE' : 'INACTIVE'} - ${result.subscription.reason || 'No reason'}`, result.subscription.isActive ? 'success' : 'warning');
+                } else {
+                    showNotification(`API Test Error: ${result.error}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('💥 Test endpoint error:', error);
+                showNotification(`Test Error: ${error.message}`, 'error');
+            }
+        }
 
         // Funzione per mostrare notifiche
         function showNotification(message, type = 'info') {
@@ -573,6 +610,7 @@
         if (addMbInput) addMbInput.addEventListener('input', updateAddMBCost);
         checkStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
         refreshStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
+        testEndpointBtn.addEventListener('click', testEndpoint);
         newSubscriptionBtn.addEventListener('click', async () => {
             if (!gunKeyPair || !gunKeyPair.pub) {
                 showNotification('Please enter and validate your Gun public key first', 'error');
@@ -1059,12 +1097,12 @@
                 let isSubscribed = false;
 
                 try {
-                    // Usa checkGunKeySubscription che verifica la sottoscrizione per questa chiave Gun specifica
-                    isSubscribed = await relayContract.checkGunKeySubscription(gunKeyPair.pub);
+                    // Usa isSubscriptionActiveByGunKey che verifica la sottoscrizione per questa chiave Gun specifica
+                    isSubscribed = await relayContract.isSubscriptionActiveByGunKey(gunKeyPair.pub, registeredRelayAddress);
                 } catch (e) {
                     // Fallback per compatibilità con il vecchio sistema
                     console.log('Fallback to address-based check:', e);
-                    isSubscribed = await relayContract.isSubscriptionActiveByGunKey(gunKeyPair.pub, registeredRelayAddress);
+                    isSubscribed = await relayContract.isSubscriptionActive(walletAddress, registeredRelayAddress);
                 }
 
                 if (isSubscribed) {
