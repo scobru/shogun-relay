@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="night">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Monitor - Shogun Relay</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles/wormhole.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            line-height: 1.6;
+            background-color: rgb(25, 25, 25);
+        }
+
+        .metric-card {
+            @apply bg-base-300/50 rounded-xl p-6 border border-base-content/20;
+        }
+
+        .metric-value {
+            @apply text-3xl font-bold;
+        }
+
+        .metric-label {
+            @apply text-base-content/60 text-sm;
+        }
+
+        .status-indicator {
+            @apply w-3 h-3 rounded-full;
+        }
+
+        .status-online {
+            @apply bg-success;
+        }
+
+        .status-offline {
+            @apply bg-error;
+        }
+
+        .status-warning {
+            @apply bg-warning;
+        }
+
+        .chart-container {
+            @apply bg-base-300/30 rounded-lg p-4;
+            height: 300px;
+        }
+
+        .log-entry {
+            @apply p-3 rounded border-l-4 mb-2;
+        }
+
+        .log-info {
+            @apply border-info bg-info/10;
+        }
+
+        .log-success {
+            @apply border-success bg-success/10;
+        }
+
+        .log-warning {
+            @apply border-warning bg-warning/10;
+        }
+
+        .log-error {
+            @apply border-error bg-error/10;
+        }
+
+        .log-debug {
+            @apply border-base-content/30 bg-base-content/5;
+        }
+    </style>
+</head>
+
+<body class="antialiased">
+    <div class="container mx-auto p-4">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h1 class="text-3xl font-bold">Performance Monitor</h1>
+                <p class="text-base-content/70">Monitoraggio in tempo reale del relay Shogun</p>
+            </div>
+            <a href="/" class="btn btn-outline">&larr; Back to Control Panel</a>
+        </div>
+
+        <!-- Status Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div class="metric-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="metric-value" id="uptime">--</div>
+                        <div class="metric-label">Uptime</div>
+                    </div>
+                    <div class="status-indicator status-online" id="serverStatus"></div>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="metric-value" id="memoryUsage">--</div>
+                        <div class="metric-label">Memory (MB)</div>
+                    </div>
+                    <div class="status-indicator" id="memoryStatus"></div>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="metric-value" id="activeConnections">--</div>
+                        <div class="metric-label">Active Connections</div>
+                    </div>
+                    <div class="status-indicator" id="connectionStatus"></div>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="metric-value" id="totalConnections">--</div>
+                        <div class="metric-label">Total Connections</div>
+                    </div>
+                    <div class="status-indicator status-online"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="metric-card">
+                <h3 class="text-lg font-semibold mb-4">Memory Usage Over Time</h3>
+                <div class="chart-container">
+                    <canvas id="memoryChart"></canvas>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <h3 class="text-lg font-semibold mb-4">Active Connections Over Time</h3>
+                <div class="chart-container">
+                    <canvas id="connectionsChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Logs -->
+        <div class="metric-card">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold">System Logs</h3>
+                <div class="flex gap-2">
+                    <select id="logLevel" class="select select-sm select-bordered">
+                        <option value="">All Levels</option>
+                        <option value="info">Info</option>
+                        <option value="success">Success</option>
+                        <option value="warning">Warning</option>
+                        <option value="error">Error</option>
+                        <option value="debug">Debug</option>
+                    </select>
+                    <button id="refreshLogs" class="btn btn-sm btn-outline">Refresh</button>
+                    <button id="clearLogs" class="btn btn-sm btn-error">Clear</button>
+                </div>
+            </div>
+            <div id="logsContainer" class="max-h-96 overflow-y-auto">
+                <div class="text-center py-8">
+                    <div class="loading loading-spinner loading-md"></div>
+                    <p class="text-base-content/60 mt-2">Loading logs...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let memoryChart = null;
+        let connectionsChart = null;
+        let updateInterval = null;
+
+        // Chart configurations
+        const chartConfig = {
+            type: 'line',
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'minute',
+                            displayFormats: {
+                                minute: 'HH:mm'
+                            }
+                        },
+                        ticks: {
+                            color: '#9ca3af'
+                        },
+                        grid: {
+                            color: '#374151'
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#9ca3af'
+                        },
+                        grid: {
+                            color: '#374151'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#9ca3af'
+                        }
+                    }
+                }
+            }
+        };
+
+        // Initialize charts
+        function initializeCharts() {
+            const memoryCtx = document.getElementById('memoryChart').getContext('2d');
+            const connectionsCtx = document.getElementById('connectionsChart').getContext('2d');
+
+            memoryChart = new Chart(memoryCtx, {
+                ...chartConfig,
+                data: {
+                    datasets: [{
+                        label: 'Heap Used (MB)',
+                        data: [],
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4
+                    }]
+                }
+            });
+
+            connectionsChart = new Chart(connectionsCtx, {
+                ...chartConfig,
+                data: {
+                    datasets: [{
+                        label: 'Active Connections',
+                        data: [],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4
+                    }]
+                }
+            });
+        }
+
+        // Update performance data
+        async function updatePerformanceData() {
+            try {
+                const response = await fetch('/api/performance');
+                const data = await response.json();
+
+                if (data.success) {
+                    const perf = data.performance;
+
+                    // Update metrics
+                    document.getElementById('uptime').textContent = perf.uptime.formatted;
+                    document.getElementById('memoryUsage').textContent = perf.memory.heapUsed;
+                    document.getElementById('activeConnections').textContent = perf.connections.active;
+                    document.getElementById('totalConnections').textContent = perf.connections.total;
+
+                    // Update status indicators
+                    updateStatusIndicators(perf);
+
+                    // Update charts
+                    updateCharts(perf);
+
+                } else {
+                    console.error('Failed to fetch performance data:', data.error);
+                }
+            } catch (error) {
+                console.error('Error updating performance data:', error);
+                document.getElementById('serverStatus').className = 'status-indicator status-offline';
+            }
+        }
+
+        // Update status indicators
+        function updateStatusIndicators(perf) {
+            // Server status
+            document.getElementById('serverStatus').className = 'status-indicator status-online';
+
+            // Memory status
+            const memoryStatus = document.getElementById('memoryStatus');
+            const memoryPercent = (perf.memory.heapUsed / perf.memory.heapTotal) * 100;
+
+            if (memoryPercent > 80) {
+                memoryStatus.className = 'status-indicator status-error';
+            } else if (memoryPercent > 60) {
+                memoryStatus.className = 'status-indicator status-warning';
+            } else {
+                memoryStatus.className = 'status-indicator status-online';
+            }
+
+            // Connection status
+            const connectionStatus = document.getElementById('connectionStatus');
+            if (perf.connections.active > 0) {
+                connectionStatus.className = 'status-indicator status-online';
+            } else {
+                connectionStatus.className = 'status-indicator status-warning';
+            }
+        }
+
+        // Update charts
+        function updateCharts(perf) {
+            const now = new Date();
+
+            // Update memory chart
+            memoryChart.data.datasets[0].data.push({
+                x: now,
+                y: perf.memory.heapUsed
+            });
+
+            // Update connections chart
+            connectionsChart.data.datasets[0].data.push({
+                x: now,
+                y: perf.connections.active
+            });
+
+            // Keep only last 50 data points
+            if (memoryChart.data.datasets[0].data.length > 50) {
+                memoryChart.data.datasets[0].data.shift();
+            }
+            if (connectionsChart.data.datasets[0].data.length > 50) {
+                connectionsChart.data.datasets[0].data.shift();
+            }
+
+            memoryChart.update('none');
+            connectionsChart.update('none');
+        }
+
+        // Load system logs
+        async function loadLogs() {
+            try {
+                const level = document.getElementById('logLevel').value;
+                const url = level ? `/api/logs?level=${level}` : '/api/logs';
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayLogs(data.logs);
+                } else {
+                    console.error('Failed to load logs:', data.error);
+                }
+            } catch (error) {
+                console.error('Error loading logs:', error);
+            }
+        }
+
+        // Display logs
+        function displayLogs(logs) {
+            const container = document.getElementById('logsContainer');
+
+            if (logs.length === 0) {
+                container.innerHTML = '<div class="text-center py-8 text-base-content/60">No logs found</div>';
+                return;
+            }
+
+            container.innerHTML = logs.reverse().map(log => `
+                <div class="log-entry log-${log.level}">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-xs font-mono text-base-content/60">${new Date(log.timestamp).toLocaleTimeString()}</span>
+                                <span class="badge badge-sm badge-${getLevelBadge(log.level)}">${log.level.toUpperCase()}</span>
+                            </div>
+                            <div class="text-sm">${log.message}</div>
+                            ${log.data ? `<div class="text-xs text-base-content/60 mt-1">${JSON.stringify(log.data)}</div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Get badge class for log level
+        function getLevelBadge(level) {
+            const badges = {
+                info: 'info',
+                success: 'success',
+                warning: 'warning',
+                error: 'error',
+                debug: 'outline'
+            };
+            return badges[level] || 'outline';
+        }
+
+        // Event listeners
+        document.getElementById('refreshLogs').addEventListener('click', loadLogs);
+        document.getElementById('clearLogs').addEventListener('click', async () => {
+            if (confirm('Are you sure you want to clear all logs?')) {
+                try {
+                    const response = await fetch('/api/logs', { method: 'DELETE' });
+                    const data = await response.json();
+
+                    if (data.success) {
+                        loadLogs();
+                    } else {
+                        console.error('Failed to clear logs:', data.error);
+                    }
+                } catch (error) {
+                    console.error('Error clearing logs:', error);
+                }
+            }
+        });
+
+        document.getElementById('logLevel').addEventListener('change', loadLogs);
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeCharts();
+            updatePerformanceData();
+            loadLogs();
+
+            // Update every 5 seconds
+            updateInterval = setInterval(updatePerformanceData, 5000);
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+            }
+        });
+    </script>
+</body>
+
+</html>

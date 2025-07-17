@@ -20,9 +20,9 @@ RUN apk add --no-cache \
 ENV IPFS_VERSION=0.24.0
 RUN ARCH=$(uname -m); \
     case "$ARCH" in \
-        x86_64) ARCH_NAME="amd64" ;; \
-        aarch64) ARCH_NAME="arm64" ;; \
-        *) echo "Unsupported architecture: $ARCH"; exit 1 ;; \
+    x86_64) ARCH_NAME="amd64" ;; \
+    aarch64) ARCH_NAME="arm64" ;; \
+    *) echo "Unsupported architecture: $ARCH"; exit 1 ;; \
     esac; \
     wget https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
     && wget https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
@@ -57,6 +57,7 @@ COPY docker/ /app/docker/
 
 # Convert script line endings from CRLF to LF
 RUN dos2unix /app/docker/init-ipfs.sh
+RUN dos2unix /app/docker/entrypoint.sh
 
 # Create environment files with Docker-optimized settings
 RUN cp /app/docker/relay.env /app/relay/.env
