@@ -119,43 +119,55 @@ const relayContractAuthMiddleware = async (req, res, next) => {
         .json({ success: false, error: "Relay contract non configurato" });
     }
 
-    // Ottieni l'indirizzo del relay dal contratto
-    const relayDetails = await relayContract.getRelayDetails(
-      RELAY_CONTRACT_ADDRESS
-    );
-    const relayAddress = relayDetails.relayAddress;
-
     let isAuth = false;
+    let authMethod = null;
 
-    // Se abbiamo un indirizzo utente, verifica la sottoscrizione
+    // Se abbiamo un indirizzo utente, verifica la sottoscrizione tramite smart contract
     if (userAddress) {
       try {
         isAuth = await relayContract.checkUserSubscription(userAddress);
+        authMethod = "smart_contract_address";
+        console.log(
+          `🔐 Autorizzazione smart contract per indirizzo: ${userAddress} - ${
+            isAuth ? "AUTORIZZATO" : "NON AUTORIZZATO"
+          }`
+        );
       } catch (e) {
-        console.error("Errore verifica sottoscrizione:", e);
+        console.error("Errore verifica sottoscrizione smart contract:", e);
         return res
           .status(500)
           .json({ success: false, error: "Errore chiamata contratto" });
       }
     }
-    // Se abbiamo una pubkey ma non un indirizzo, per ora non autorizziamo
-    // (potrebbe essere implementato un mapping pubkey -> address in futuro)
-    else if (pubKey) {
+
+    // Se abbiamo solo una pubkey, per ora non autorizziamo
+    // (in futuro potrebbe essere implementato un mapping pubkey -> address)
+    if (pubKey && !userAddress) {
       return res.status(401).json({
         success: false,
-        error: "Indirizzo utente richiesto per autorizzazione",
+        error: "Indirizzo Ethereum richiesto per autorizzazione smart contract",
+        details:
+          "La chiave Gun viene usata solo per identificazione, ma serve l'indirizzo Ethereum per verificare la sottoscrizione",
       });
     }
 
     if (!isAuth) {
       return res.status(403).json({
         success: false,
-        error: "Utente non autorizzato dal contratto",
+        error: "Utente non autorizzato - sottoscrizione non attiva",
+        details: {
+          userAddress: userAddress
+            ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`
+            : null,
+          pubKey: pubKey ? `${pubKey.slice(0, 10)}...` : null,
+          authMethod: authMethod,
+        },
       });
     }
 
     req.userAddress = userAddress;
     req.userPubKey = pubKey;
+    req.authMethod = authMethod;
     next();
   } catch (err) {
     console.error("Errore middleware smart contract:", err);
@@ -631,6 +643,170 @@ async function initializeServer() {
       });
     } catch (error) {
       res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Endpoint per registrare una chiave Gun autorizzata
+  app.post("/api/authorize-gun-key", tokenAuthMiddleware, async (req, res) => {
+    try {
+      const { pubKey, userAddress, expiresAt } = req.body;
+
+      if (!pubKey) {
+        return res.status(400).json({
+          success: false,
+          error: "Chiave pubblica Gun richiesta",
+        });
+      }
+
+      // Verifica che l'utente abbia una sottoscrizione attiva
+      if (userAddress && relayContract) {
+        try {
+          const isSubscribed = await relayContract.checkUserSubscription(
+            userAddress
+          );
+          if (!isSubscribed) {
+            return res.status(403).json({
+              success: false,
+              error: "Utente non ha una sottoscrizione attiva",
+            });
+          }
+        } catch (e) {
+          console.error("Errore verifica sottoscrizione:", e);
+          return res.status(500).json({
+            success: false,
+            error: "Errore verifica sottoscrizione",
+          });
+        }
+      }
+
+      // Calcola la data di scadenza (default: 30 giorni)
+      const expirationDate = expiresAt || Date.now() + 30 * 24 * 60 * 60 * 1000;
+
+      // Registra la chiave autorizzata nel database Gun
+      const authData = {
+        pubKey,
+        userAddress,
+        authorized: true,
+        authorizedAt: Date.now(),
+        expiresAt: expirationDate,
+        authMethod: userAddress ? "smart_contract" : "manual",
+      };
+
+      const authNode = gun.get("shogun").get("authorized_keys").get(pubKey);
+
+      authNode.put(authData);
+
+      console.log(
+        `✅ Chiave Gun autorizzata: ${pubKey} (scade: ${new Date(
+          expirationDate
+        ).toISOString()})`
+      );
+
+      res.json({
+        success: true,
+        message: "Chiave Gun autorizzata con successo",
+        pubKey,
+        expiresAt: expirationDate,
+        expiresAtFormatted: new Date(expirationDate).toISOString(),
+      });
+    } catch (error) {
+      console.error("Errore autorizzazione chiave Gun:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore autorizzazione chiave Gun",
+      });
+    }
+  });
+
+  // Endpoint per revocare una chiave Gun autorizzata
+  app.delete(
+    "/api/authorize-gun-key/:pubKey",
+    tokenAuthMiddleware,
+    async (req, res) => {
+      try {
+        const { pubKey } = req.params;
+
+        if (!pubKey) {
+          return res.status(400).json({
+            success: false,
+            error: "Chiave pubblica Gun richiesta",
+          });
+        }
+
+        // Revoca la chiave autorizzata
+        const authNode = gun.get("shogun").get("authorized_keys").get(pubKey);
+
+        authNode.put(null);
+
+        console.log(`❌ Chiave Gun revocata: ${pubKey}`);
+
+        res.json({
+          success: true,
+          message: "Chiave Gun revocata con successo",
+          pubKey,
+        });
+      } catch (error) {
+        console.error("Errore revoca chiave Gun:", error);
+        res.status(500).json({
+          success: false,
+          error: "Errore revoca chiave Gun",
+        });
+      }
+    }
+  );
+
+  // Endpoint per verificare lo stato di autorizzazione di una chiave Gun
+  app.get("/api/authorize-gun-key/:pubKey", async (req, res) => {
+    try {
+      const { pubKey } = req.params;
+
+      if (!pubKey) {
+        return res.status(400).json({
+          success: false,
+          error: "Chiave pubblica Gun richiesta",
+        });
+      }
+
+      // Verifica lo stato della chiave
+      const authNode = gun.get("shogun").get("authorized_keys").get(pubKey);
+
+      authNode.once((authData) => {
+        if (!authData) {
+          return res.json({
+            success: true,
+            authorized: false,
+            message: "Chiave non trovata",
+          });
+        }
+
+        const isExpired = authData.expiresAt < Date.now();
+        const isAuthorized = authData.authorized && !isExpired;
+
+        res.json({
+          success: true,
+          authorized: isAuthorized,
+          data: {
+            pubKey: authData.pubKey,
+            userAddress: authData.userAddress,
+            authorizedAt: authData.authorizedAt,
+            expiresAt: authData.expiresAt,
+            expiresAtFormatted: new Date(authData.expiresAt).toISOString(),
+            authMethod: authData.authMethod,
+            isExpired,
+          },
+          message: isAuthorized
+            ? "Chiave autorizzata"
+            : isExpired
+            ? "Chiave scaduta"
+            : "Chiave non autorizzata",
+        });
+      });
+    } catch (error) {
+      console.error("Errore verifica autorizzazione chiave Gun:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore verifica autorizzazione chiave Gun",
+      });
     }
   });
 
