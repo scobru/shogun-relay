@@ -52,7 +52,7 @@
                     </svg>
 
                     <h1 class="text-3xl font-semibold mb-2">User Upload</h1>
-                    <p class="text-base-content/70 mb-8">Upload files using your Ethereum wallet and Gun public key</p>
+                    <p class="text-base-content/70 mb-8">Upload files using your Ethereum wallet</p>
 
                     <!-- Subscription Status Link -->
                     <div class="mb-6">
@@ -68,7 +68,7 @@
 
                     <!-- Setup Section -->
                     <div class="w-full max-w-4xl space-y-6">
-                        <!-- Authorization Setup -->
+                        <!-- Wallet Setup -->
                         <div class="upload-card">
                             <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
@@ -118,8 +118,8 @@
 
                             <div class="mb-4 space-y-2">
                                 <div>
-                                    <p class="text-sm text-base-content/70 mb-1">Gun Public Key:</p>
-                                    <div class="pubkey-display" id="currentGunKey"></div>
+                                    <p class="text-sm text-base-content/70 mb-1">Wallet Address:</p>
+                                    <div class="pubkey-display" id="currentWalletAddress"></div>
                                 </div>
                             </div>
 
@@ -194,7 +194,7 @@
 
         // DOM elements
         const uploadSection = document.getElementById('uploadSection');
-        const currentGunKeyEl = document.getElementById('currentGunKey');
+        const currentWalletAddressEl = document.getElementById('currentWalletAddress');
         const fileInput = document.getElementById('fileInput');
         const uploadBtn = document.getElementById('uploadBtn');
         const dropArea = document.getElementById('dropArea');
@@ -251,15 +251,10 @@
             fileInput.files = files;
         }
 
-        // Authorization setup
-        // Rimuovo la textarea Gun Public Key, il bottone Set Authorization e la logica JS associata
-        // Aggiorno la logica di upload e caricamento file per usare solo walletAddress
-
         // Controlla lo stato della sottoscrizione
-        async function checkSubscriptionStatus(key) {
+        async function checkSubscriptionStatus(walletAddr) {
             try {
-                // Usa la chiave Gun come identificatore principale (più affidabile)
-                const identifier = key;
+                const identifier = walletAddr;
                 const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
                 const result = await response.json();
 
@@ -435,10 +430,19 @@
                     const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
                     walletAddress = accounts[0];
                     walletAddressEl.textContent = walletAddress;
+                    currentWalletAddressEl.textContent = walletAddress;
                     walletStatus.textContent = `Connected: ${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 4)}`;
                     walletInfo.classList.remove('hidden');
-                    // setAuthBtn.disabled = false; // This button is removed, so no need to re-enable it
+
+                    // Mostra le sezioni di upload e file
+                    uploadSection.classList.remove('hidden');
+                    filesSection.classList.remove('hidden');
+
                     showStatus('Wallet connected!', 'success');
+
+                    // Controlla lo stato della sottoscrizione
+                    checkSubscriptionStatus(walletAddress);
+                    loadUserFiles();
                 } catch (error) {
                     console.error('Error connecting wallet:', error);
                     showStatus('Failed to connect wallet. Please ensure MetaMask is unlocked.', 'error');
@@ -471,7 +475,7 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
-            showStatus('Enter your Gun public key to start uploading files', 'info');
+            showStatus('Connect your wallet to start uploading files', 'info');
         });
     </script>
 </body>

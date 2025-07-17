@@ -510,8 +510,15 @@
             try {
                 // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
                 // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
+                if (!walletAddress) {
+                    showNotification('Please connect your wallet first', 'error');
+                    showStep(1);
+                    updateStep(1, 'step-active');
+                    return false;
+                }
+
                 const identifier = walletAddress;
-                console.log('🔍 Checking existing subscription for Gun key:', identifier);
+                console.log('🔍 Checking existing subscription for wallet:', identifier);
 
                 const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
                 console.log('📡 Existing subscription response status:', response.status);
@@ -526,10 +533,10 @@
                     // Mostra i dettagli della sottoscrizione esistente
                     displaySubscriptionStatus(result);
 
-                    // Vai al Step 4 per mostrare lo stato
-                    showStep(4);
-                    updateStep(4, 'step-active');
-                    updateStep(3, 'step-completed');
+                    // Vai al Step 3 per mostrare lo stato
+                    showStep(3);
+                    updateStep(3, 'step-active');
+                    updateStep(2, 'step-completed');
 
                     return true;
                 } else {
@@ -555,8 +562,6 @@
         refreshStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
         testEndpointBtn.addEventListener('click', testEndpoint);
         newSubscriptionBtn.addEventListener('click', async () => {
-            // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
-            // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
             if (!walletAddress) {
                 showNotification('Please connect your wallet first', 'error');
                 showStep(1);
@@ -570,9 +575,9 @@
                 return; // Non procedere se esiste già una sottoscrizione
             }
 
-            // Mostra il Step 3 per la sottoscrizione
-            showStep(3);
-            updateStep(3, 'step-active');
+            // Mostra il Step 2 per la sottoscrizione
+            showStep(2);
+            updateStep(2, 'step-active');
 
             // Assicurati che i dettagli della sottoscrizione siano caricati
             if (document.getElementById('pricePerGB').textContent === 'Loading...') {
@@ -617,10 +622,9 @@
             document.getElementById('step1Content').classList.add('hidden');
             document.getElementById('step2Content').classList.add('hidden');
             document.getElementById('step3Content').classList.add('hidden');
-            document.getElementById('step4Content').classList.add('hidden');
 
             // Show current step
-            if (step <= 4) {
+            if (step <= 3) {
                 document.getElementById(`step${step}Content`).classList.remove('hidden');
             }
         }
@@ -723,11 +727,11 @@
                 showNotification('Wallet connected successfully!', 'success');
                 updateStep(1, 'step-completed');
 
-                // Mostra il Step 2 per inserire la chiave Gun
+                // Mostra il Step 2 per la sottoscrizione
                 showStep(2);
                 updateStep(2, 'step-active');
 
-                // Carica i dettagli della sottoscrizione per il Step 3
+                // Carica i dettagli della sottoscrizione per il Step 2
                 await loadSubscriptionDetails();
 
             } catch (error) {
@@ -766,17 +770,15 @@
             signer = null;
             walletAddress = null;
             relayContract = null;
-            // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
-            // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
+
             walletInfo.classList.add('hidden');
             connectWalletBtn.classList.remove('hidden');
-            // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
-            // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
-            updateStep(1);
+            subscriptionStatus.classList.add('hidden');
+
+            showStep(1);
             updateStep(1, 'step-active');
             updateStep(2, 'step-pending');
             updateStep(3, 'step-pending');
-            updateStep(4, 'step-pending');
 
             showNotification('Wallet disconnected', 'info');
         }
@@ -925,9 +927,9 @@
                     // Se l'errore è già sottoscritto, mostra i dettagli della sottoscrizione esistente
                     showNotification('Found existing subscription! Showing details...', 'info');
                     await checkSubscriptionStatusFromServer();
-                    showStep(4);
-                    updateStep(4, 'step-active');
-                    updateStep(3, 'step-completed');
+                    showStep(3); // Vai al passo 3 per mostrare lo stato
+                    updateStep(3, 'step-active');
+                    updateStep(2, 'step-completed'); // Aggiorna lo stato del passo 2
                 }
             }
         }
