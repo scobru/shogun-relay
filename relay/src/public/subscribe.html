@@ -43,6 +43,62 @@
         .pubkey-display {
             @apply font-mono text-sm bg-base-300 p-3 rounded border break-all;
         }
+
+        /* Sistema di notifiche migliorato */
+        .notification-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            max-width: 400px;
+        }
+
+        .notification {
+            @apply p-4 rounded-lg shadow-lg mb-3 transform transition-all duration-300;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .notification.success {
+            @apply bg-success text-success-content;
+        }
+
+        .notification.error {
+            @apply bg-error text-error-content;
+        }
+
+        .notification.warning {
+            @apply bg-warning text-warning-content;
+        }
+
+        .notification.info {
+            @apply bg-info text-info-content;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Loading spinner */
+        .loading-spinner {
+            @apply inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin;
+        }
+
+        /* Progress bar per upload */
+        .progress-bar {
+            @apply w-full bg-base-300 rounded-full h-2;
+        }
+
+        .progress-fill {
+            @apply bg-accent h-2 rounded-full transition-all duration-300;
+        }
     </style>
 </head>
 
@@ -79,6 +135,11 @@
                         <div class="flex items-center gap-2">
                             <div id="step3" class="step-indicator step-pending">3</div>
                             <span class="text-sm">Subscribe</span>
+                        </div>
+                        <div class="w-8 h-px bg-base-content/30"></div>
+                        <div class="flex items-center gap-2">
+                            <div id="step4" class="step-indicator step-pending">4</div>
+                            <span class="text-sm">Status</span>
                         </div>
                     </div>
 
@@ -174,30 +235,33 @@
 
                             <div class="form-control mb-4">
                                 <label class="label">
-                                    <span class="label-text">Subscription Duration (months):</span>
+                                    <span class="label-text">Storage (MB):</span>
                                 </label>
-                                <select id="subscriptionMonths" class="select select-bordered">
-                                    <option value="1">1 Month</option>
-                                    <option value="3">3 Months</option>
-                                    <option value="6">6 Months</option>
-                                    <option value="12">12 Months</option>
-                                </select>
+                                <input id="mbInput" type="number" class="input input-bordered"
+                                    placeholder="Enter MB needed (e.g., 100)" min="1" value="100">
+                                <div class="label">
+                                    <span class="label-text-alt">1 GB = 1000 MB</span>
+                                </div>
                             </div>
 
                             <div class="bg-base-200/50 rounded-lg p-4 mb-4">
                                 <h5 class="font-semibold mb-2">Subscription Details:</h5>
                                 <div class="space-y-1 text-sm">
                                     <div class="flex justify-between">
-                                        <span>Duration:</span>
-                                        <span id="durationDisplay">1 month</span>
+                                        <span>Storage:</span>
+                                        <span id="storageDisplay">100 MB</span>
                                     </div>
                                     <div class="flex justify-between">
-                                        <span>Price per month:</span>
-                                        <span id="pricePerMonth">Loading...</span>
+                                        <span>Price per GB:</span>
+                                        <span id="pricePerGB">Loading...</span>
                                     </div>
                                     <div class="flex justify-between font-semibold">
                                         <span>Total cost:</span>
                                         <span id="totalCost">Loading...</span>
+                                    </div>
+                                    <div class="flex justify-between text-xs text-base-content/60">
+                                        <span>Duration:</span>
+                                        <span>30 days</span>
                                     </div>
                                 </div>
                             </div>
@@ -291,12 +355,24 @@
         // Contract configuration - caricata dinamicamente
         let RELAY_CONTRACT_ADDRESS = null;
         const RELAY_ABI = [
-            "function SUBSCRIPTION_PRICE() view returns (uint256)",
+            "function PRICE_PER_GB() view returns (uint256)",
+            "function MB_PER_GB() view returns (uint256)",
+            "function MIN_SUBSCRIPTION_AMOUNT() view returns (uint256)",
             "function SUBSCRIPTION_DURATION() view returns (uint256)",
-            "function subscribeToRelay(address _relayAddress) payable",
+            "function calculateMBFromAmount(uint256 _amount) public pure returns (uint256)",
+            "function calculateAmountFromMB(uint256 _mb) public pure returns (uint256)",
+            "function subscribeToRelay(address _relayAddress, string memory _gunPubKey) payable",
+            "function addMBToSubscription(address _relayAddress, string memory _gunPubKey) payable",
+            "function recordMBUsage(string memory _gunPubKey, uint256 _mbUsed) external",
             "function checkUserSubscription(address _user) external view returns (bool)",
+            "function checkGunKeySubscription(string memory _gunPubKey) external view returns (bool)",
+            "function checkGunKeyMB(string memory _gunPubKey, uint256 _mbRequired) external view returns (bool)",
             "function isSubscriptionActive(address _user, address _relayAddress) external view returns (bool)",
-            "function getSubscriptionDetails(address _user, address _relayAddress) external view returns (uint256 startTime, uint256 endTime, uint256 amountPaid, bool isActive)",
+            "function isSubscriptionActiveByGunKey(string memory _gunPubKey, address _relayAddress) external view returns (bool)",
+            "function hasAvailableMB(string memory _gunPubKey, address _relayAddress, uint256 _mbRequired) public view returns (bool)",
+            "function getRemainingMB(string memory _gunPubKey, address _relayAddress) public view returns (uint256)",
+            "function getSubscriptionDetails(address _user, address _relayAddress) external view returns (uint256 startTime, uint256 endTime, uint256 amountPaid, uint256 mbAllocated, uint256 mbUsed, uint256 mbRemaining, bool isActive, string memory gunPubKey)",
+            "function getSubscriptionDetailsByGunKey(string memory _gunPubKey, address _relayAddress) external view returns (uint256 startTime, uint256 endTime, uint256 amountPaid, uint256 mbAllocated, uint256 mbUsed, uint256 mbRemaining, bool isActive, address userAddress)",
             "function getRelayDetails(address _relayAddress) external view returns (string memory url, address relayAddress, bool isActive, uint256 registeredAt)",
             "function getAllRelays() external view returns (address[] memory)",
             "function registerRelay(string memory _url) external",
@@ -370,13 +446,14 @@
         const checkStatusBtn = document.getElementById('checkStatusBtn');
         const refreshStatusBtn = document.getElementById('refreshStatusBtn');
         const newSubscriptionBtn = document.getElementById('newSubscriptionBtn');
+        const mbInput = document.getElementById('mbInput');
 
         // Event listeners
         connectWalletBtn.addEventListener('click', connectWallet);
         disconnectWalletBtn.addEventListener('click', disconnectWallet);
         validateKeyBtn.addEventListener('click', validateAndContinue);
         subscribeBtn.addEventListener('click', subscribeToRelay);
-        subscriptionMonths.addEventListener('change', updateSubscriptionDetails);
+        mbInput.addEventListener('input', updateSubscriptionDetails);
         checkStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
         refreshStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
         newSubscriptionBtn.addEventListener('click', () => {
@@ -386,8 +463,15 @@
                 updateStep(2, 'step-active');
                 return;
             }
+
+            // Mostra il Step 3 per la sottoscrizione
             showStep(3);
             updateStep(3, 'step-active');
+
+            // Assicurati che i dettagli della sottoscrizione siano caricati
+            if (document.getElementById('pricePerGB').textContent === 'Loading...') {
+                loadSubscriptionDetails();
+            }
         });
 
         // Listen for network changes
@@ -536,6 +620,9 @@
                 showStep(2);
                 updateStep(2, 'step-active');
 
+                // Carica i dettagli della sottoscrizione per il Step 3
+                await loadSubscriptionDetails();
+
             } catch (error) {
                 showStatus(`Failed to connect wallet: ${error.message}`, 'error');
             }
@@ -637,12 +724,14 @@
                     return;
                 }
 
-                console.log('Calling SUBSCRIPTION_PRICE() on contract:', RELAY_CONTRACT_ADDRESS);
-                const pricePerMonth = await relayContract.SUBSCRIPTION_PRICE();
-                console.log('SUBSCRIPTION_PRICE() result:', pricePerMonth);
-                const priceInEth = ethers.formatEther(pricePerMonth);
+                console.log('Calling PRICE_PER_GB() on contract:', RELAY_CONTRACT_ADDRESS);
+                const pricePerGB = await relayContract.PRICE_PER_GB();
+                console.log('PRICE_PER_GB() result:', pricePerGB);
+                const priceInEth = ethers.formatEther(pricePerGB);
 
-                document.getElementById('pricePerMonth').textContent = `${priceInEth} ETH`;
+                document.getElementById('pricePerGB').textContent = `${priceInEth} ETH`;
+
+                // Aggiorna automaticamente i dettagli della sottoscrizione
                 updateSubscriptionDetails();
 
             } catch (error) {
@@ -650,16 +739,34 @@
                 console.error('Contract address used:', RELAY_CONTRACT_ADDRESS);
                 console.error('Provider:', provider);
                 showStatus('Failed to load subscription details. Contract may not be accessible.', 'error');
+
+                // Imposta un valore di fallback
+                document.getElementById('pricePerGB').textContent = '0.001 ETH';
+                updateSubscriptionDetails();
             }
         }
 
         function updateSubscriptionDetails() {
-            const months = parseInt(subscriptionMonths.value);
-            const pricePerMonth = document.getElementById('pricePerMonth').textContent;
-            const priceValue = parseFloat(pricePerMonth);
+            const mb = parseInt(mbInput.value) || 100;
+            const pricePerGBEl = document.getElementById('pricePerGB');
+            const pricePerGBText = pricePerGBEl.textContent;
 
-            document.getElementById('durationDisplay').textContent = `${months} month${months > 1 ? 's' : ''}`;
-            document.getElementById('totalCost').textContent = `${(priceValue * months).toFixed(6)} ETH`;
+            // Controlla se il prezzo è ancora in caricamento
+            if (pricePerGBText === 'Loading...') {
+                document.getElementById('storageDisplay').textContent = `${mb} MB`;
+                document.getElementById('totalCost').textContent = 'Loading...';
+                return;
+            }
+
+            // Estrai il valore numerico dal testo (es. "0.001 ETH" -> 0.001)
+            const priceMatch = pricePerGBText.match(/(\d+\.?\d*)/);
+            const priceValue = priceMatch ? parseFloat(priceMatch[1]) : 0;
+
+            // Calcola il costo totale: (MB * PRICE_PER_GB) / 1000
+            const totalCost = (mb * priceValue) / 1000;
+
+            document.getElementById('storageDisplay').textContent = `${mb} MB`;
+            document.getElementById('totalCost').textContent = `${totalCost.toFixed(6)} ETH`;
         }
 
         async function subscribeToRelay() {
@@ -671,6 +778,9 @@
 
                 if (!gunKeyPair || !gunKeyPair.pub) {
                     showStatus('Please enter and validate your Gun public key first', 'error');
+                    // Torna al Step 2 per inserire la chiave Gun
+                    showStep(2);
+                    updateStep(2, 'step-active');
                     return;
                 }
 
@@ -679,11 +789,12 @@
                     return;
                 }
 
-                const pricePerMonth = await relayContract.SUBSCRIPTION_PRICE();
-                const totalCost = pricePerMonth; // Prezzo fisso per 30 giorni
+                const mb = parseInt(mbInput.value) || 100;
+                const pricePerGB = await relayContract.PRICE_PER_GB();
+                const totalCost = (BigInt(mb) * pricePerGB) / 1000n; // Calcola il costo per i MB specificati
 
                 // Subscribe usando l'indirizzo del relay registrato
-                const tx = await relayContract.subscribeToRelay(registeredRelayAddress, {
+                const tx = await relayContract.subscribeToRelay(registeredRelayAddress, gunKeyPair.pub, {
                     value: totalCost
                 });
 
@@ -691,7 +802,7 @@
 
                 await tx.wait();
 
-                showStatus('Subscription successful! You can now upload files to the relay using your Gun public key.', 'success');
+                showStatus(`Subscription successful! You now have ${mb} MB of storage for 30 days.`, 'success');
                 updateStep(3, 'step-completed');
 
                 // Update subscription status
@@ -704,16 +815,17 @@
 
         async function checkSubscriptionStatus() {
             try {
-                if (!relayContract || !walletAddress || !registeredRelayAddress) return;
+                if (!relayContract || !walletAddress || !registeredRelayAddress || !gunKeyPair?.pub) return;
 
                 let isSubscribed = false;
 
                 try {
-                    // Usa checkUserSubscription che verifica la sottoscrizione per questo relay specifico
-                    isSubscribed = await relayContract.checkUserSubscription(walletAddress);
+                    // Usa checkGunKeySubscription che verifica la sottoscrizione per questa chiave Gun specifica
+                    isSubscribed = await relayContract.checkGunKeySubscription(gunKeyPair.pub);
                 } catch (e) {
-                    // Fallback per compatibilità
-                    isSubscribed = await relayContract.isSubscriptionActive(walletAddress, registeredRelayAddress);
+                    // Fallback per compatibilità con il vecchio sistema
+                    console.log('Fallback to address-based check:', e);
+                    isSubscribed = await relayContract.isSubscriptionActiveByGunKey(gunKeyPair.pub, registeredRelayAddress);
                 }
 
                 if (isSubscribed) {
@@ -809,6 +921,32 @@
                                 <span class="text-base-content/60">Days Remaining:</span>
                                 <div class="font-mono ${subscription.daysRemaining <= 7 ? 'text-warning' : 'text-success'}">${subscription.daysRemaining} days</div>
                             </div>
+                        </div>
+
+                        <div class="bg-base-300/50 rounded-lg p-4">
+                            <h6 class="font-semibold mb-2">Storage Usage:</h6>
+                            <div class="space-y-2">
+                                <div class="flex justify-between">
+                                    <span>Allocated:</span>
+                                    <span class="font-mono">${subscription.mbAllocated || 0} MB</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Used:</span>
+                                    <span class="font-mono">${subscription.mbUsed || 0} MB</span>
+                                </div>
+                                <div class="flex justify-between font-semibold">
+                                    <span>Remaining:</span>
+                                    <span class="font-mono ${(subscription.mbRemaining || 0) <= 100 ? 'text-warning' : 'text-success'}">${subscription.mbRemaining || 0} MB</span>
+                                </div>
+                            </div>
+                            ${subscription.mbRemaining <= 100 ? `
+                                <div class="alert alert-warning mt-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                    </svg>
+                                    <span>Storage space running low! Consider adding more MB.</span>
+                                </div>
+                            ` : ''}
                         </div>
 
                         ${subscription.daysRemaining <= 7 ? `
