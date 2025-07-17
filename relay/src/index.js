@@ -331,16 +331,19 @@ async function initializeServer() {
   const contractInitialized = await initializeRelayContract();
   if (contractInitialized) {
     console.log("✅ Relay contract ready");
-    addSystemLog('success', 'Relay contract initialized successfully');
+    addSystemLog("success", "Relay contract initialized successfully");
   } else {
     console.log(
       "⚠️ Relay contract not available - smart contract features disabled"
     );
-    addSystemLog('warning', 'Relay contract not available - smart contract features disabled');
+    addSystemLog(
+      "warning",
+      "Relay contract not available - smart contract features disabled"
+    );
   }
   console.log("");
 
-  addSystemLog('info', 'Server initialization started');
+  addSystemLog("info", "Server initialization started");
 
   // Enhanced stats tracking with time-series data
   let customStats = {
@@ -4351,6 +4354,19 @@ async function initializeServer() {
         details: error.message,
       });
     }
+  });
+
+  // Track Gun requests for statistics
+  gun.on("out", (msg) => {
+    customStats.getRequests++;
+    addTimeSeriesPoint("gets/s", customStats.getRequests);
+    addSystemLog("debug", "Gun GET request", { msg: msg });
+  });
+
+  gun.on("in", (msg) => {
+    customStats.putRequests++;
+    addTimeSeriesPoint("puts/s", customStats.putRequests);
+    addSystemLog("debug", "Gun PUT request", { msg: msg });
   });
 } // End of initializeServer function
 
