@@ -78,18 +78,8 @@
                                 Authorization Setup
                             </h3>
                             <p class="text-base-content/70 mb-4">
-                                Enter your Ethereum wallet address and Gun public key. The wallet address must be
-                                authorized via
-                                smart contract subscription.
+                                Enter your Gun public key. The key must be authorized via smart contract subscription.
                             </p>
-
-                            <div class="form-control mb-4">
-                                <label class="label">
-                                    <span class="label-text">Wallet Address:</span>
-                                </label>
-                                <input type="text" id="walletAddress" class="input input-bordered"
-                                    placeholder="Enter your Ethereum wallet address (0x...)" />
-                            </div>
 
                             <div class="form-control mb-4">
                                 <label class="label">
@@ -116,10 +106,6 @@
                             </h3>
 
                             <div class="mb-4 space-y-2">
-                                <div>
-                                    <p class="text-sm text-base-content/70 mb-1">Wallet Address:</p>
-                                    <div class="pubkey-display" id="currentWallet"></div>
-                                </div>
                                 <div>
                                     <p class="text-sm text-base-content/70 mb-1">Gun Public Key:</p>
                                     <div class="pubkey-display" id="currentGunKey"></div>
@@ -193,15 +179,12 @@
 
     <script>
         // Global variables
-        let currentWalletAddress = '';
         let currentGunPubKey = '';
 
         // DOM elements
-        const walletAddressInput = document.getElementById('walletAddress');
         const gunPubKeyInput = document.getElementById('gunPubKey');
         const setAuthBtn = document.getElementById('setAuthBtn');
         const uploadSection = document.getElementById('uploadSection');
-        const currentWalletEl = document.getElementById('currentWallet');
         const currentGunKeyEl = document.getElementById('currentGunKey');
         const fileInput = document.getElementById('fileInput');
         const uploadBtn = document.getElementById('uploadBtn');
@@ -257,22 +240,10 @@
 
         // Authorization setup
         function setAuthorization() {
-            const walletAddress = walletAddressInput.value.trim();
             const gunPubKey = gunPubKeyInput.value.trim();
-
-            if (!walletAddress) {
-                showStatus('Please enter a wallet address', 'error');
-                return;
-            }
 
             if (!gunPubKey) {
                 showStatus('Please enter a Gun public key', 'error');
-                return;
-            }
-
-            // Validazione base dell'indirizzo Ethereum
-            if (!walletAddress.startsWith('0x') || walletAddress.length !== 42) {
-                showStatus('Please enter a valid Ethereum wallet address', 'error');
                 return;
             }
 
@@ -282,10 +253,8 @@
                 return;
             }
 
-            currentWalletAddress = walletAddress;
             currentGunPubKey = gunPubKey;
 
-            currentWalletEl.textContent = walletAddress;
             currentGunKeyEl.textContent = gunPubKey;
 
             uploadSection.classList.remove('hidden');
@@ -294,16 +263,16 @@
             showStatus('Authorization set successfully!', 'success');
 
             // Controlla automaticamente lo stato della sottoscrizione
-            checkSubscriptionStatus(walletAddress);
+            checkSubscriptionStatus(gunPubKey);
 
             loadUserFiles();
         }
 
         // Controlla lo stato della sottoscrizione
-        async function checkSubscriptionStatus(address) {
+        async function checkSubscriptionStatus(key) {
             try {
-                // Usa l'indirizzo wallet come identificatore principale (più affidabile)
-                const identifier = address;
+                // Usa la chiave Gun come identificatore principale (più affidabile)
+                const identifier = key;
                 const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
                 const result = await response.json();
 
@@ -330,7 +299,7 @@
                 return;
             }
 
-            if (!currentWalletAddress || !currentGunPubKey) {
+            if (!currentGunPubKey) {
                 showStatus('Please set your authorization first', 'error');
                 return;
             }
@@ -345,7 +314,6 @@
                 const response = await fetch('/ipfs-upload-user', {
                     method: 'POST',
                     headers: {
-                        'x-user-address': currentWalletAddress,
                         'x-pubkey': currentGunPubKey
                     },
                     body: formData
@@ -371,10 +339,10 @@
 
         // Load user files
         async function loadUserFiles() {
-            if (!currentWalletAddress) return;
+            if (!currentGunPubKey) return;
 
             try {
-                const response = await fetch(`/api/user-uploads/${encodeURIComponent(currentWalletAddress)}`);
+                const response = await fetch(`/api/user-uploads/${encodeURIComponent(currentGunPubKey)}`);
                 const result = await response.json();
 
                 if (result.success) {
@@ -432,7 +400,7 @@
             if (!confirm('Are you sure you want to delete this file?')) return;
 
             try {
-                const response = await fetch(`/api/user-uploads/${encodeURIComponent(currentWalletAddress)}/${hash}`, {
+                const response = await fetch(`/api/user-uploads/${encodeURIComponent(currentGunPubKey)}/${hash}`, {
                     method: 'DELETE'
                 });
 
@@ -473,7 +441,7 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
-            showStatus('Enter your Ethereum wallet address and Gun public key to start uploading files', 'info');
+            showStatus('Enter your Gun public key to start uploading files', 'info');
         });
     </script>
 </body>

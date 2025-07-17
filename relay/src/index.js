@@ -184,6 +184,16 @@ const relayContractAuthMiddleware = async (req, res, next) => {
     let isAuth = false;
     let authMethod = null;
 
+    // Ottieni tutti i relay registrati
+    const allRelays = await relayContract.getAllRelays();
+    if (allRelays.length === 0) {
+      return res.status(500).json({
+        success: false,
+        error: "Nessun relay registrato nel contratto",
+      });
+    }
+    const relayAddress = allRelays[0];
+
     // Se abbiamo un indirizzo utente, verifica la sottoscrizione tramite smart contract
     if (userAddress) {
       try {
@@ -205,7 +215,11 @@ const relayContractAuthMiddleware = async (req, res, next) => {
     // Se abbiamo una pubkey, verifica la sottoscrizione tramite Gun key
     if (pubKey && !isAuth) {
       try {
-        isAuth = await relayContract.checkGunKeySubscription(pubKey);
+        // Usa isSubscriptionActiveByGunKey invece di checkGunKeySubscription
+        isAuth = await relayContract.isSubscriptionActiveByGunKey(
+          pubKey,
+          relayAddress
+        );
         authMethod = "smart_contract_gunkey";
         console.log(
           `🔐 Autorizzazione smart contract per Gun key: ${pubKey.slice(
@@ -604,11 +618,12 @@ async function initializeServer() {
                 publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
               };
 
-              // Salva nel database Gun sotto shogun/uploads/{userAddress}/{hash}
+              // Salva nel database Gun usando la Gun key come identificatore principale
+              const identifier = req.userPubKey || req.userAddress;
               const uploadNode = gun
                 .get("shogun")
                 .get("uploads")
-                .get(req.userAddress || req.userPubKey)
+                .get(identifier)
                 .get(fileResult?.Hash);
               uploadNode.put(uploadData);
 
