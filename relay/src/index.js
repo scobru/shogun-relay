@@ -95,7 +95,6 @@ let relayAbi = [
   "function recordMBUsage(string memory _gunPubKey, uint256 _mbUsed) external",
   "function checkUserSubscription(address _user) external view returns (bool)",
   "function checkGunKeySubscription(string memory _gunPubKey) external view returns (bool)",
-  "function checkGunKeyMB(string memory _gunPubKey, uint256 _mbRequired) external view returns (bool)",
   "function isSubscriptionActive(address _user, address _relayAddress) external view returns (bool)",
   "function isSubscriptionActiveByGunKey(string memory _gunPubKey, address _relayAddress) external view returns (bool)",
   "function hasAvailableMB(string memory _gunPubKey, address _relayAddress, uint256 _mbRequired) public view returns (bool)",
@@ -227,6 +226,67 @@ const relayContractAuthMiddleware = async (req, res, next) => {
             10
           )}... - ${isAuth ? "AUTORIZZATO" : "NON AUTORIZZATO"}`
         );
+
+        // Se abbiamo anche un indirizzo wallet, verifica che corrisponda al proprietario della Gun key
+        if (isAuth && userAddress) {
+          try {
+            const subscriptionDetails =
+              await relayContract.getSubscriptionDetailsByGunKey(
+                pubKey,
+                relayAddress
+              );
+            const [
+              startTime,
+              endTime,
+              amountPaid,
+              mbAllocated,
+              mbUsed,
+              mbRemaining,
+              isActive,
+              ownerAddress,
+            ] = subscriptionDetails;
+
+            const isOwner =
+              ownerAddress.toLowerCase() === userAddress.toLowerCase();
+
+            if (!isOwner) {
+              console.log(
+                `❌ Wallet ${userAddress.slice(
+                  0,
+                  6
+                )}... non corrisponde al proprietario ${ownerAddress.slice(
+                  0,
+                  6
+                )}... della Gun key ${pubKey.slice(0, 10)}...`
+              );
+              return res.status(403).json({
+                success: false,
+                error: "Wallet non autorizzato per questa Gun key",
+                details: {
+                  providedWallet: userAddress,
+                  gunKeyOwner: ownerAddress,
+                  message:
+                    "Solo il proprietario della Gun key può caricare file",
+                },
+              });
+            } else {
+              console.log(
+                `✅ Wallet ${userAddress.slice(
+                  0,
+                  6
+                )}... autorizzato per Gun key ${pubKey.slice(0, 10)}...`
+              );
+            }
+          } catch (ownerError) {
+            console.error("Errore verifica proprietario:", ownerError);
+            // Se non riusciamo a verificare il proprietario, blocchiamo per sicurezza
+            return res.status(403).json({
+              success: false,
+              error: "Impossibile verificare la proprietà della Gun key",
+              details: ownerError.message,
+            });
+          }
+        }
       } catch (e) {
         console.error("Errore verifica sottoscrizione Gun key:", e);
         return res
@@ -271,12 +331,16 @@ async function initializeServer() {
   const contractInitialized = await initializeRelayContract();
   if (contractInitialized) {
     console.log("✅ Relay contract ready");
+    addSystemLog('success', 'Relay contract initialized successfully');
   } else {
     console.log(
       "⚠️ Relay contract not available - smart contract features disabled"
     );
+    addSystemLog('warning', 'Relay contract not available - smart contract features disabled');
   }
   console.log("");
+
+  addSystemLog('info', 'Server initialization started');
 
   // Enhanced stats tracking with time-series data
   let customStats = {
@@ -662,11 +726,34 @@ async function initializeServer() {
                 try {
                   const fileSizeMB = +(req.file.size / 1024 / 1024).toFixed(2);
 
-                  // Verifica che ci siano MB sufficienti
-                  const hasMB = await relayContract.checkGunKeyMB(
+                  // Ottieni l'indirizzo del relay
+                  const allRelays = await relayContract.getAllRelays();
+                  if (allRelays.length === 0) {
+                    console.error("❌ Nessun relay registrato nel contratto");
+                    return res.status(500).json({
+                      success: false,
+                      error: "Nessun relay registrato nel contratto",
+                    });
+                  }
+                  const relayAddress = allRelays[0];
+
+                  console.log(
+                    `🔍 Verificando MB per Gun key: ${req.userPubKey.slice(
+                      0,
+                      10
+                    )}...`
+                  );
+                  console.log(`📏 File size: ${fileSizeMB} MB`);
+                  console.log(`🏠 Relay address: ${relayAddress}`);
+
+                  // Verifica che ci siano MB sufficienti usando hasAvailableMB
+                  const hasMB = await relayContract.hasAvailableMB(
                     req.userPubKey,
+                    relayAddress,
                     fileSizeMB
                   );
+
+                  console.log(`✅ hasAvailableMB result: ${hasMB}`);
 
                   if (hasMB) {
                     // Registra l'uso di MB
@@ -3654,7 +3741,20 @@ async function initializeServer() {
       }
 
       // Verifica che ci siano MB sufficienti
-      const hasMB = await relayContract.checkGunKeyMB(gunPubKey, mbUsed);
+      const allRelays = await relayContract.getAllRelays();
+      if (allRelays.length === 0) {
+        return res.status(500).json({
+          success: false,
+          error: "Nessun relay registrato nel contratto",
+        });
+      }
+      const relayAddress = allRelays[0];
+
+      const hasMB = await relayContract.hasAvailableMB(
+        gunPubKey,
+        relayAddress,
+        mbUsed
+      );
       if (!hasMB) {
         return res.status(403).json({
           success: false,
@@ -3750,7 +3850,20 @@ async function initializeServer() {
       }
 
       // Verifica se ha MB sufficienti
-      const hasMB = await relayContract.checkGunKeyMB(gunPubKey, mbRequired);
+      const allRelays = await relayContract.getAllRelays();
+      if (allRelays.length === 0) {
+        return res.status(500).json({
+          success: false,
+          error: "Nessun relay registrato nel contratto",
+        });
+      }
+      const relayAddress = allRelays[0];
+
+      const hasMB = await relayContract.hasAvailableMB(
+        gunPubKey,
+        relayAddress,
+        mbRequired
+      );
 
       res.json({
         success: true,
@@ -3994,6 +4107,251 @@ async function initializeServer() {
 
   // Endpoint per registrare il mapping pubKey -> userAddress durante la sottoscrizione
   // RIMOSSO: Non serve più dato che usiamo solo i dati on-chain
+
+  // Endpoint per verificare la proprietà di una Gun key
+  app.post("/api/verify-gunkey-ownership", async (req, res) => {
+    try {
+      const { gunPubKey, walletAddress } = req.body;
+
+      if (!gunPubKey || !walletAddress) {
+        return res.status(400).json({
+          success: false,
+          error: "gunPubKey e walletAddress sono richiesti",
+        });
+      }
+
+      if (!relayContract) {
+        return res.status(500).json({
+          success: false,
+          error: "Contratto relay non configurato",
+        });
+      }
+
+      console.log(
+        `🔍 Verificando proprietà Gun key: ${gunPubKey.slice(
+          0,
+          10
+        )}... per wallet: ${walletAddress.slice(0, 6)}...`
+      );
+
+      try {
+        // Ottieni tutti i relay registrati
+        const allRelays = await relayContract.getAllRelays();
+        if (allRelays.length === 0) {
+          return res.status(500).json({
+            success: false,
+            error: "Nessun relay registrato nel contratto",
+          });
+        }
+        const relayAddress = allRelays[0];
+
+        // Verifica che la Gun key abbia una sottoscrizione attiva
+        const isSubscribed = await relayContract.isSubscriptionActiveByGunKey(
+          gunPubKey,
+          relayAddress
+        );
+
+        if (!isSubscribed) {
+          return res.json({
+            success: true,
+            isOwner: false,
+            reason: "Gun key non ha una sottoscrizione attiva",
+          });
+        }
+
+        // Ottieni i dettagli della sottoscrizione per verificare il proprietario
+        const subscriptionDetails =
+          await relayContract.getSubscriptionDetailsByGunKey(
+            gunPubKey,
+            relayAddress
+          );
+
+        const [
+          startTime,
+          endTime,
+          amountPaid,
+          mbAllocated,
+          mbUsed,
+          mbRemaining,
+          isActive,
+          ownerAddress,
+        ] = subscriptionDetails;
+
+        console.log(
+          `📋 Dettagli sottoscrizione - Owner: ${ownerAddress}, Wallet: ${walletAddress}`
+        );
+
+        // Verifica che l'indirizzo del wallet corrisponda al proprietario della sottoscrizione
+        const isOwner =
+          ownerAddress.toLowerCase() === walletAddress.toLowerCase();
+
+        res.json({
+          success: true,
+          isOwner: isOwner,
+          gunPubKey: gunPubKey,
+          walletAddress: walletAddress,
+          ownerAddress: ownerAddress,
+          subscriptionActive: isActive,
+          reason: isOwner
+            ? "Wallet corrisponde al proprietario della Gun key"
+            : "Wallet non corrisponde al proprietario della Gun key",
+        });
+      } catch (contractError) {
+        console.error("Errore verifica proprietà:", contractError);
+        res.status(500).json({
+          success: false,
+          error: "Errore verifica proprietà Gun key",
+          details: contractError.message,
+        });
+      }
+    } catch (error) {
+      console.error("Errore endpoint verifica proprietà:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore interno del server",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint per ottenere le statistiche di performance del server
+  app.get("/api/performance", async (req, res) => {
+    try {
+      const startTime = customStats.startTime;
+      const uptime = Date.now() - startTime;
+
+      // Calcola uptime formattato
+      const days = Math.floor(uptime / (1000 * 60 * 60 * 24));
+      const hours = Math.floor(
+        (uptime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+      );
+      const minutes = Math.floor((uptime % (1000 * 60 * 60)) / (1000 * 60));
+
+      let uptimeFormatted = "";
+      if (days > 0) uptimeFormatted += `${days}d `;
+      if (hours > 0) uptimeFormatted += `${hours}h `;
+      uptimeFormatted += `${minutes}m`;
+
+      // Ottieni informazioni sulla memoria
+      const memUsage = process.memoryUsage();
+      const memory = {
+        heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
+        heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024),
+        external: Math.round(memUsage.external / 1024 / 1024),
+        rss: Math.round(memUsage.rss / 1024 / 1024),
+      };
+
+      // Calcola connessioni attive (approssimativo)
+      const activeConnections = gun._.opt.peers
+        ? Object.keys(gun._.opt.peers).length
+        : 0;
+      const totalConnections =
+        customStats.getRequests + customStats.putRequests;
+
+      res.json({
+        success: true,
+        performance: {
+          uptime: {
+            milliseconds: uptime,
+            formatted: uptimeFormatted,
+          },
+          memory: memory,
+          connections: {
+            active: activeConnections,
+            total: totalConnections,
+          },
+          requests: {
+            get: customStats.getRequests,
+            put: customStats.putRequests,
+          },
+          timeSeries: customStats.timeSeries.data,
+        },
+      });
+    } catch (error) {
+      console.error("Errore endpoint performance:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore ottenimento dati performance",
+        details: error.message,
+      });
+    }
+  });
+
+  // Sistema di logging in memoria
+  let systemLogs = [];
+  const MAX_LOGS = 1000;
+
+  // Funzione per aggiungere log
+  function addSystemLog(level, message, data = null) {
+    const logEntry = {
+      timestamp: Date.now(),
+      level: level,
+      message: message,
+      data: data,
+    };
+
+    systemLogs.push(logEntry);
+
+    // Mantieni solo gli ultimi MAX_LOGS
+    if (systemLogs.length > MAX_LOGS) {
+      systemLogs = systemLogs.slice(-MAX_LOGS);
+    }
+
+    // Log anche su console
+    const timestamp = new Date(logEntry.timestamp).toISOString();
+    console.log(
+      `[${timestamp}] [${level.toUpperCase()}] ${message}`,
+      data || ""
+    );
+  }
+
+  // Endpoint per ottenere i log di sistema
+  app.get("/api/logs", async (req, res) => {
+    try {
+      const { level } = req.query;
+
+      let filteredLogs = systemLogs;
+
+      // Filtra per livello se specificato
+      if (level) {
+        filteredLogs = systemLogs.filter((log) => log.level === level);
+      }
+
+      res.json({
+        success: true,
+        logs: filteredLogs,
+        total: systemLogs.length,
+        filtered: filteredLogs.length,
+      });
+    } catch (error) {
+      console.error("Errore endpoint logs:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore ottenimento logs",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint per cancellare i log
+  app.delete("/api/logs", async (req, res) => {
+    try {
+      systemLogs = [];
+      addSystemLog("info", "System logs cleared");
+
+      res.json({
+        success: true,
+        message: "Logs cancellati con successo",
+      });
+    } catch (error) {
+      console.error("Errore cancellazione logs:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore cancellazione logs",
+        details: error.message,
+      });
+    }
+  });
 } // End of initializeServer function
 
 // Start the server

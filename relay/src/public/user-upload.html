@@ -78,8 +78,33 @@
                                 Authorization Setup
                             </h3>
                             <p class="text-base-content/70 mb-4">
-                                Enter your Gun public key. The key must be authorized via smart contract subscription.
+                                Connect your wallet and enter your Gun public key. The wallet must match the one
+                                registered in the smart contract.
                             </p>
+
+                            <!-- Wallet Connection -->
+                            <div class="form-control mb-4">
+                                <label class="label">
+                                    <span class="label-text">Wallet Connection:</span>
+                                </label>
+                                <div class="flex items-center gap-2">
+                                    <button id="connectWalletBtn" class="btn btn-accent">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
+                                            viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                        </svg>
+                                        Connect MetaMask
+                                    </button>
+                                    <span id="walletStatus" class="text-sm text-base-content/60">Not connected</span>
+                                </div>
+                                <div id="walletInfo" class="mt-2 hidden">
+                                    <div class="bg-base-200/50 rounded-lg p-3">
+                                        <p class="text-sm text-base-content/70 mb-1">Connected Wallet:</p>
+                                        <div class="font-mono text-sm" id="walletAddress"></div>
+                                    </div>
+                                </div>
+                            </div>
 
                             <div class="form-control mb-4">
                                 <label class="label">
@@ -89,7 +114,7 @@
                                     placeholder="Enter your Gun public key..."></textarea>
                             </div>
 
-                            <button id="setAuthBtn" class="btn btn-accent">
+                            <button id="setAuthBtn" class="btn btn-accent" disabled>
                                 Set Authorization
                             </button>
                         </div>
@@ -180,6 +205,7 @@
     <script>
         // Global variables
         let currentGunPubKey = '';
+        let walletAddress = '';
 
         // DOM elements
         const gunPubKeyInput = document.getElementById('gunPubKey');
@@ -197,11 +223,16 @@
         const totalSize = document.getElementById('totalSize');
         const refreshFilesBtn = document.getElementById('refreshFilesBtn');
         const statusMessage = document.getElementById('statusMessage');
+        const connectWalletBtn = document.getElementById('connectWalletBtn');
+        const walletStatus = document.getElementById('walletStatus');
+        const walletInfo = document.getElementById('walletInfo');
+        const walletAddressEl = document.getElementById('walletAddress');
 
         // Event listeners
         setAuthBtn.addEventListener('click', setAuthorization);
         uploadBtn.addEventListener('click', uploadFile);
         refreshFilesBtn.addEventListener('click', loadUserFiles);
+        connectWalletBtn.addEventListener('click', connectWallet);
 
         // Drag and drop functionality
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -239,8 +270,13 @@
         }
 
         // Authorization setup
-        function setAuthorization() {
+        async function setAuthorization() {
             const gunPubKey = gunPubKeyInput.value.trim();
+
+            if (!walletAddress) {
+                showStatus('Please connect your wallet first', 'error');
+                return;
+            }
 
             if (!gunPubKey) {
                 showStatus('Please enter a Gun public key', 'error');
@@ -253,19 +289,38 @@
                 return;
             }
 
-            currentGunPubKey = gunPubKey;
+            try {
+                // Verifica che il wallet corrisponda alla Gun key registrata nel contratto
+                const response = await fetch(`/api/verify-gunkey-ownership`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        gunPubKey: gunPubKey,
+                        walletAddress: walletAddress
+                    })
+                });
 
-            currentGunKeyEl.textContent = gunPubKey;
+                const result = await response.json();
 
-            uploadSection.classList.remove('hidden');
-            filesSection.classList.remove('hidden');
+                if (result.success && result.isOwner) {
+                    currentGunPubKey = gunPubKey;
+                    currentGunKeyEl.textContent = gunPubKey;
+                    uploadSection.classList.remove('hidden');
+                    filesSection.classList.remove('hidden');
+                    showStatus('Authorization verified! Wallet matches Gun key.', 'success');
 
-            showStatus('Authorization set successfully!', 'success');
-
-            // Controlla automaticamente lo stato della sottoscrizione
-            checkSubscriptionStatus(gunPubKey);
-
-            loadUserFiles();
+                    // Controlla automaticamente lo stato della sottoscrizione
+                    checkSubscriptionStatus(gunPubKey);
+                    loadUserFiles();
+                } else {
+                    showStatus('❌ Wallet does not match the Gun key registered in the smart contract. Only the owner can upload files.', 'error');
+                }
+            } catch (error) {
+                console.error('Error verifying ownership:', error);
+                showStatus('Error verifying wallet ownership. Please try again.', 'error');
+            }
         }
 
         // Controlla lo stato della sottoscrizione
@@ -299,7 +354,7 @@
                 return;
             }
 
-            if (!currentGunPubKey) {
+            if (!currentGunPubKey || !walletAddress) {
                 showStatus('Please set your authorization first', 'error');
                 return;
             }
@@ -314,7 +369,8 @@
                 const response = await fetch('/ipfs-upload-user', {
                     method: 'POST',
                     headers: {
-                        'x-pubkey': currentGunPubKey
+                        'x-pubkey': currentGunPubKey,
+                        'x-user-address': walletAddress
                     },
                     body: formData
                 });
@@ -415,6 +471,26 @@
 
             } catch (error) {
                 showStatus(`Error deleting file: ${error.message}`, 'error');
+            }
+        }
+
+        // Wallet connection
+        async function connectWallet() {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+                    walletAddress = accounts[0];
+                    walletAddressEl.textContent = walletAddress;
+                    walletStatus.textContent = `Connected: ${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 4)}`;
+                    walletInfo.classList.remove('hidden');
+                    setAuthBtn.disabled = false;
+                    showStatus('Wallet connected!', 'success');
+                } catch (error) {
+                    console.error('Error connecting wallet:', error);
+                    showStatus('Failed to connect wallet. Please ensure MetaMask is unlocked.', 'error');
+                }
+            } else {
+                showStatus('MetaMask is not installed. Please install MetaMask to use this feature.', 'warning');
             }
         }
 
