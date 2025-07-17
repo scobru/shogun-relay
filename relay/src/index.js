@@ -31,9 +31,6 @@ import multer from "multer";
 
 const namespace = "shogun";
 
-// --- Sistema di Logging Migliorato ---
-// (logger rimosso, usa solo console.log/error/warn)
-
 // --- IPFS Configuration ---
 const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
 
@@ -109,6 +106,10 @@ let relayAbi = [
   "function getAllRelays() external view returns (address[] memory)",
   "function registerRelay(string memory _url) external",
   "function deactivateRelay() external",
+  "function getUserSubscriptions(address _user) external view returns (address[] memory)",
+  "function getUserGunKeys(address _user) external view returns (string[] memory)",
+  "function getAddressByGunKey(string memory _gunPubKey) external view returns (address)",
+  "function getRelaySubscribers(address _relayAddress) external view returns (address[] memory)",
 ];
 
 // Initialize contract with network verification
@@ -147,10 +148,10 @@ async function initializeRelayContract() {
     );
 
     // Test contract accessibility
-    const pricePerGB = await relayContract.PRICE_PER_GB();
+    const subscriptionPrice = await relayContract.PRICE_PER_GB();
     console.log(
       `✅ Contract initialized successfully. Price per GB: ${ethers.formatEther(
-        pricePerGB
+        subscriptionPrice
       )} ETH`
     );
 
@@ -166,9 +167,6 @@ const relayContractAuthMiddleware = async (req, res, next) => {
   try {
     const userAddress = req.headers["x-user-address"];
     const pubKey = req.headers["x-pubkey"];
-    const fileSizeMB = req.headers["x-file-size-mb"]
-      ? parseFloat(req.headers["x-file-size-mb"])
-      : 0;
 
     if (!userAddress && !pubKey) {
       return res.status(401).json({
@@ -185,77 +183,9 @@ const relayContractAuthMiddleware = async (req, res, next) => {
 
     let isAuth = false;
     let authMethod = null;
-    let hasEnoughMB = true;
 
-    // Se abbiamo una pubKey, verifica la sottoscrizione tramite chiave Gun
-    if (pubKey) {
-      try {
-        isAuth = await relayContract.checkGunKeySubscription(pubKey);
-
-        // Se c'è una sottoscrizione attiva e abbiamo specificato la dimensione del file, verifica i MB
-        if (isAuth && fileSizeMB > 0) {
-          try {
-            hasEnoughMB = await relayContract.checkGunKeyMB(
-              pubKey,
-              Math.ceil(fileSizeMB)
-            );
-          } catch (mbError) {
-            console.error("Errore verifica MB disponibili:", mbError);
-            // Fallback: prova con hasAvailableMB
-            try {
-              hasEnoughMB = await relayContract.hasAvailableMB(
-                pubKey,
-                await relayContract.getAllRelays().then((relays) => relays[0]),
-                Math.ceil(fileSizeMB)
-              );
-            } catch (fallbackError) {
-              console.error("Errore fallback verifica MB:", fallbackError);
-              hasEnoughMB = false;
-            }
-          }
-        }
-
-        authMethod = "smart_contract_gun_key";
-        console.log(
-          `🔐 Autorizzazione smart contract per chiave Gun: ${pubKey} - ${
-            isAuth ? "AUTORIZZATO" : "NON AUTORIZZATO"
-          }${fileSizeMB > 0 ? ` - MB sufficienti: ${hasEnoughMB}` : ""}`
-        );
-      } catch (e) {
-        console.error("Errore verifica sottoscrizione chiave Gun:", e);
-        // Fallback: prova con isSubscriptionActiveByGunKey
-        try {
-          const allRelays = await relayContract.getAllRelays();
-          if (allRelays.length > 0) {
-            isAuth = await relayContract.isSubscriptionActiveByGunKey(
-              pubKey,
-              allRelays[0]
-            );
-
-            // Verifica MB se necessario
-            if (isAuth && fileSizeMB > 0) {
-              hasEnoughMB = await relayContract.hasAvailableMB(
-                pubKey,
-                allRelays[0],
-                Math.ceil(fileSizeMB)
-              );
-            }
-
-            authMethod = "smart_contract_gun_key_fallback";
-            console.log(
-              `🔐 Autorizzazione fallback per chiave Gun: ${pubKey} - ${
-                isAuth ? "AUTORIZZATO" : "NON AUTORIZZATO"
-              }${fileSizeMB > 0 ? ` - MB sufficienti: ${hasEnoughMB}` : ""}`
-            );
-          }
-        } catch (fallbackError) {
-          console.error("Errore fallback verifica chiave Gun:", fallbackError);
-        }
-      }
-    }
-
-    // Se abbiamo un indirizzo utente e non abbiamo ancora autorizzato, verifica la sottoscrizione tramite indirizzo
-    if (userAddress && !isAuth) {
+    // Se abbiamo un indirizzo utente, verifica la sottoscrizione tramite smart contract
+    if (userAddress) {
       try {
         isAuth = await relayContract.checkUserSubscription(userAddress);
         authMethod = "smart_contract_address";
@@ -272,35 +202,48 @@ const relayContractAuthMiddleware = async (req, res, next) => {
       }
     }
 
-    if (isAuth && hasEnoughMB) {
-      req.authorized = true;
-      req.authMethod = authMethod;
-      req.userAddress = userAddress;
-      req.pubKey = pubKey;
-      req.fileSizeMB = fileSizeMB;
-      next();
-    } else if (isAuth && !hasEnoughMB) {
+    // Se abbiamo una pubkey, verifica la sottoscrizione tramite Gun key
+    if (pubKey && !isAuth) {
+      try {
+        isAuth = await relayContract.checkGunKeySubscription(pubKey);
+        authMethod = "smart_contract_gunkey";
+        console.log(
+          `🔐 Autorizzazione smart contract per Gun key: ${pubKey.slice(
+            0,
+            10
+          )}... - ${isAuth ? "AUTORIZZATO" : "NON AUTORIZZATO"}`
+        );
+      } catch (e) {
+        console.error("Errore verifica sottoscrizione Gun key:", e);
+        return res
+          .status(500)
+          .json({ success: false, error: "Errore chiamata contratto Gun key" });
+      }
+    }
+
+    if (!isAuth) {
       return res.status(403).json({
         success: false,
-        error: "Insufficient storage space",
-        details: `File size (${fileSizeMB} MB) exceeds available storage`,
-        authMethod: authMethod,
-      });
-    } else {
-      return res.status(403).json({
-        success: false,
-        error: "Utente non autorizzato",
-        details: "Nessuna sottoscrizione attiva trovata per questo utente",
-        authMethod: authMethod,
+        error: "Utente non autorizzato - sottoscrizione non attiva",
+        details: {
+          userAddress: userAddress
+            ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`
+            : null,
+          pubKey: pubKey ? `${pubKey.slice(0, 10)}...` : null,
+          authMethod: authMethod,
+        },
       });
     }
-  } catch (error) {
-    console.error("Errore middleware autorizzazione:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Errore interno del server",
-      details: error.message,
-    });
+
+    req.userAddress = userAddress;
+    req.userPubKey = pubKey;
+    req.authMethod = authMethod;
+    next();
+  } catch (err) {
+    console.error("Errore middleware smart contract:", err);
+    return res
+      .status(500)
+      .json({ success: false, error: "Errore middleware smart contract" });
   }
 };
 
@@ -311,27 +254,7 @@ async function initializeServer() {
 
   // Initialize relay contract
   console.log("🔧 Initializing relay contract...");
-  let contractInitialized = false;
-
-  try {
-    // Add timeout for contract initialization
-    const contractPromise = initializeRelayContract();
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(
-        () => reject(new Error("Contract initialization timeout")),
-        10000
-      )
-    );
-
-    contractInitialized = await Promise.race([contractPromise, timeoutPromise]);
-  } catch (error) {
-    console.warn(
-      "⚠️ Contract initialization failed or timed out:",
-      error.message
-    );
-    contractInitialized = false;
-  }
-
+  const contractInitialized = await initializeRelayContract();
   if (contractInitialized) {
     console.log("✅ Relay contract ready");
   } else {
@@ -664,36 +587,16 @@ async function initializeServer() {
                 results.find((r) => r.Name === req.file.originalname) ||
                 results[0];
 
-              // Calcola la dimensione del file in MB
-              const fileSizeMB = +(req.file.size / 1024 / 1024).toFixed(2);
-
-              // Registra l'uso dei MB nel contratto se abbiamo una pubKey
-              if (req.pubKey && relayContract) {
-                try {
-                  const mbUsed = Math.ceil(fileSizeMB);
-                  await relayContract.recordMBUsage(req.pubKey, mbUsed);
-                  console.log(
-                    `📊 MB usage recorded: ${req.pubKey.slice(
-                      0,
-                      10
-                    )}... used ${mbUsed} MB`
-                  );
-                } catch (mbError) {
-                  console.error("Errore registrazione uso MB:", mbError);
-                  // Non blocchiamo l'upload se la registrazione MB fallisce
-                }
-              }
-
               // Salva l'upload nel database Gun
               const uploadData = {
                 hash: fileResult?.Hash,
                 name: req.file.originalname,
                 size: req.file.size,
-                sizeMB: fileSizeMB,
+                sizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
                 mimetype: req.file.mimetype,
                 uploadedAt: Date.now(),
                 userAddress: req.userAddress,
-                pubKey: req.pubKey,
+                pubKey: req.userPubKey,
                 ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
                   fileResult?.Hash
                 }`,
@@ -705,15 +608,15 @@ async function initializeServer() {
               const uploadNode = gun
                 .get("shogun")
                 .get("uploads")
-                .get(req.userAddress || req.pubKey)
+                .get(req.userAddress || req.userPubKey)
                 .get(fileResult?.Hash);
               uploadNode.put(uploadData);
 
               // Salva il mapping pubKey -> userAddress se disponibili entrambi
-              if (req.userAddress && req.pubKey) {
+              if (req.userAddress && req.userPubKey) {
                 const mappingData = {
                   userAddress: req.userAddress,
-                  pubKey: req.pubKey,
+                  pubKey: req.userPubKey,
                   mappedAt: Date.now(),
                   lastUpload: Date.now(),
                 };
@@ -721,15 +624,56 @@ async function initializeServer() {
                 const mappingNode = gun
                   .get("shogun")
                   .get("pubkey_mapping")
-                  .get(req.pubKey);
+                  .get(req.userPubKey);
                 mappingNode.put(mappingData);
 
                 console.log(
-                  `✅ Mapping salvato: ${req.pubKey.slice(
+                  `✅ Mapping salvato: ${req.userPubKey.slice(
                     0,
                     10
                   )}... -> ${req.userAddress.slice(0, 6)}...`
                 );
+              }
+
+              // Registra l'uso di MB tramite smart contract se disponibile
+              let mbUsageRecorded = false;
+              if (relayContract && req.userPubKey) {
+                try {
+                  const fileSizeMB = +(req.file.size / 1024 / 1024).toFixed(2);
+
+                  // Verifica che ci siano MB sufficienti
+                  const hasMB = await relayContract.checkGunKeyMB(
+                    req.userPubKey,
+                    fileSizeMB
+                  );
+
+                  if (hasMB) {
+                    // Registra l'uso di MB
+                    const tx = await relayContract.recordMBUsage(
+                      req.userPubKey,
+                      fileSizeMB
+                    );
+                    await tx.wait();
+
+                    console.log(
+                      `✅ Uso MB registrato: ${fileSizeMB} MB per ${req.userPubKey.slice(
+                        0,
+                        10
+                      )}...`
+                    );
+                    mbUsageRecorded = true;
+                  } else {
+                    console.warn(
+                      `⚠️ MB insufficienti per ${req.userPubKey.slice(
+                        0,
+                        10
+                      )}... (richiesti: ${fileSizeMB} MB)`
+                    );
+                  }
+                } catch (mbError) {
+                  console.error("Errore registrazione uso MB:", mbError);
+                  // Non blocchiamo l'upload se fallisce la registrazione MB
+                }
               }
 
               res.json({
@@ -737,7 +681,7 @@ async function initializeServer() {
                 file: {
                   name: req.file.originalname,
                   size: req.file.size,
-                  sizeMB: fileSizeMB,
+                  sizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
                   mimetype: req.file.mimetype,
                   hash: fileResult?.Hash,
                   ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
@@ -748,9 +692,12 @@ async function initializeServer() {
                 },
                 user: {
                   address: req.userAddress,
-                  pubKey: req.pubKey,
+                  pubKey: req.userPubKey,
                 },
-                mbUsed: Math.ceil(fileSizeMB),
+                mbUsage: {
+                  recorded: mbUsageRecorded,
+                  sizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                },
                 ipfsResponse: results,
               });
             } catch (parseError) {
@@ -862,58 +809,11 @@ async function initializeServer() {
       }
 
       // Verifica che l'utente abbia una sottoscrizione attiva
-      if (relayContract) {
+      if (userAddress && relayContract) {
         try {
-          let isSubscribed = false;
-
-          // Prova prima con la chiave Gun
-          try {
-            isSubscribed = await relayContract.checkGunKeySubscription(pubKey);
-          } catch (gunKeyError) {
-            console.log("Fallback per chiave Gun in authorize:", gunKeyError);
-            // Fallback: prova con isSubscriptionActiveByGunKey
-            try {
-              const allRelays = await relayContract.getAllRelays();
-              if (allRelays.length > 0) {
-                isSubscribed = await relayContract.isSubscriptionActiveByGunKey(
-                  pubKey,
-                  allRelays[0]
-                );
-              }
-            } catch (fallbackError) {
-              console.error(
-                "Errore fallback chiave Gun in authorize:",
-                fallbackError
-              );
-            }
-          }
-
-          // Se non abbiamo trovato una sottoscrizione con pubKey e abbiamo un userAddress, prova con l'indirizzo
-          if (!isSubscribed && userAddress) {
-            try {
-              isSubscribed = await relayContract.checkUserSubscription(
-                userAddress
-              );
-            } catch (addressError) {
-              console.log("Fallback per indirizzo in authorize:", addressError);
-              // Fallback: prova con isSubscriptionActive
-              try {
-                const allRelays = await relayContract.getAllRelays();
-                if (allRelays.length > 0) {
-                  isSubscribed = await relayContract.isSubscriptionActive(
-                    userAddress,
-                    allRelays[0]
-                  );
-                }
-              } catch (fallbackError) {
-                console.error(
-                  "Errore fallback indirizzo in authorize:",
-                  fallbackError
-                );
-              }
-            }
-          }
-
+          const isSubscribed = await relayContract.checkUserSubscription(
+            userAddress
+          );
           if (!isSubscribed) {
             return res.status(403).json({
               success: false,
@@ -960,11 +860,10 @@ async function initializeServer() {
         expiresAtFormatted: new Date(expirationDate).toISOString(),
       });
     } catch (error) {
-      console.error("Errore endpoint authorize-gun-key:", error);
+      console.error("Errore autorizzazione chiave Gun:", error);
       res.status(500).json({
         success: false,
-        error: "Errore interno del server",
-        details: error.message,
+        error: "Errore autorizzazione chiave Gun",
       });
     }
   });
@@ -1311,16 +1210,6 @@ async function initializeServer() {
     lastTimestamp = now;
   }, 5000);
 
-  // Test IPFS connectivity (optional - don't block server startup)
-  try {
-    await testIPFSConnection();
-  } catch (error) {
-    console.warn(
-      "⚠️ IPFS connectivity test failed, continuing anyway:",
-      error.message
-    );
-  }
-
   // Store relay information
   const link = "http://" + host + (port ? ":" + port : "");
   const extLink = "https://" + host;
@@ -1332,15 +1221,6 @@ async function initializeServer() {
   db?.get("store").put(store);
   db?.get("status").put("running");
   db?.get("started").put(Date.now());
-
-  // Display server information
-  console.log(`Internal URL: ${link}/`);
-  console.log(`External URL: ${extLink}/`);
-  console.log(`Gun peer: ${link}/gun`);
-  console.log(`Storage: ${store ? "enabled" : "disabled"}`);
-  console.log(
-    `Admin password: ${process.env.ADMIN_PASSWORD ? "configured" : "not set"}`
-  );
 
   // IPFS API Proxy - for API calls to the IPFS node
   // Example: /api/v0/add, /api/v0/cat, etc.
@@ -1801,247 +1681,179 @@ async function initializeServer() {
       const network = await provider.getNetwork();
       const isSepolia = network.chainId === 11155111n;
 
-      // Test contract accessibility
-      let contractTest = null;
-      try {
-        const pricePerGB = await relayContract.PRICE_PER_GB();
-        contractTest = {
-          accessible: true,
-          pricePerGB: ethers.formatEther(pricePerGB),
-        };
-      } catch (testError) {
-        contractTest = {
-          accessible: false,
-          error: testError.message,
-        };
-      }
+      // Verifica se il contratto è accessibile
+      const pricePerGB = await relayContract.PRICE_PER_GB();
+      const allRelays = await relayContract.getAllRelays();
 
       res.json({
         success: true,
         contract: {
           address: RELAY_CONTRACT_ADDRESS,
           configured: true,
-          provider: "configured",
-          initialized: true,
-          network: {
+          accessible: true,
+          pricePerGB: ethers.formatEther(pricePerGB),
+          registeredRelays: allRelays.length,
+          relays: allRelays,
+        },
+        network: {
+          name: network.name,
+          chainId: Number(network.chainId),
+          isSepolia: isSepolia,
+          provider: "Alchemy Sepolia",
+        },
+        relay: {
+          address: process.env.RELAY_HOST || ip.address(),
+          port: port,
+          url: `http://${process.env.RELAY_HOST || ip.address()}:${port}`,
+        },
+      });
+    } catch (error) {
+      console.error("Contract status error:", error);
+
+      // Try to get network info even if contract fails
+      let networkInfo = null;
+      try {
+        if (provider) {
+          const network = await provider.getNetwork();
+          networkInfo = {
             name: network.name,
-            chainId: network.chainId.toString(),
-            isSepolia,
-          },
-          test: contractTest,
-        },
-      });
-    } catch (error) {
-      console.error("Contract status check failed", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to check contract status",
-        details: error.message,
-      });
-    }
-  });
-
-  // Endpoint per il monitoraggio delle prestazioni
-  app.get("/api/performance", (req, res) => {
-    try {
-      const memoryUsage = process.memoryUsage();
-      const uptime = process.uptime();
+            chainId: Number(network.chainId),
+            isSepolia: network.chainId === 11155111n,
+            provider: "Alchemy Sepolia",
+          };
+        }
+      } catch (networkError) {
+        console.error("Network info error:", networkError);
+      }
 
       res.json({
-        success: true,
-        performance: {
-          uptime: {
-            seconds: uptime,
-            formatted: formatUptime(uptime),
-          },
-          memory: {
-            rss: Math.round(memoryUsage.rss / 1024 / 1024), // MB
-            heapUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024), // MB
-            heapTotal: Math.round(memoryUsage.heapTotal / 1024 / 1024), // MB
-            external: Math.round(memoryUsage.external / 1024 / 1024), // MB
-          },
-          connections: {
-            active: activeWires,
-            total: totalConnections,
-          },
-          stats: customStats,
-          timeSeries: customStats.timeSeries,
+        success: false,
+        error: error.message,
+        contract: {
+          address: RELAY_CONTRACT_ADDRESS,
+          configured: !!RELAY_CONTRACT_ADDRESS,
+          provider: process.env.ALCHEMY_API_KEY
+            ? "configured"
+            : "not configured",
+          accessible: false,
         },
-      });
-    } catch (error) {
-      console.error("Performance monitoring failed", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to get performance data",
-        details: error.message,
+        network: networkInfo,
       });
     }
   });
 
-  // Endpoint per i log del sistema
-  app.get("/api/logs", tokenAuthMiddleware, (req, res) => {
+  // Endpoint per verificare lo stato della sottoscrizione di un utente specifico
+  app.get("/api/user-subscription/:userAddress", async (req, res) => {
     try {
-      const { level, limit = 100 } = req.query;
-      const logs = [];
+      const { userAddress } = req.params;
 
-      res.json({
-        success: true,
-        logs,
-        count: logs.length,
-        filters: {
-          level: level || "all",
-          limit: parseInt(limit),
-        },
-      });
-    } catch (error) {
-      console.error("Log retrieval failed", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to retrieve logs",
-        details: error.message,
-      });
-    }
-  });
-
-  // Endpoint per pulire i log
-  app.delete("/api/logs", tokenAuthMiddleware, (req, res) => {
-    try {
-      // (nessuna azione, logs non più gestiti)
-    } catch (error) {
-      console.error("Log clearing failed", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to clear logs",
-        details: error.message,
-      });
-    }
-  });
-
-  // Endpoint per verificare lo stato della sottoscrizione (ibrido)
-  app.get("/api/subscription-status/:identifier", async (req, res) => {
-    try {
-      const { identifier } = req.params;
-
-      if (!identifier) {
+      if (!userAddress) {
         return res.status(400).json({
           success: false,
-          error: "Identificatore richiesto",
+          error: "Indirizzo utente richiesto",
         });
       }
 
       if (!relayContract) {
         return res.status(500).json({
           success: false,
-          error: "Relay contract non configurato",
+          error: "Contratto relay non configurato",
         });
       }
 
-      // Determina se l'identificatore è un indirizzo Ethereum o una chiave Gun
-      const isEthereumAddress = /^0x[a-fA-F0-9]{40}$/.test(identifier);
+      // Ottieni tutti i relay registrati
+      const allRelays = await relayContract.getAllRelays();
 
-      let subscription = null;
-      let isActive = false;
-      let reason = null;
+      if (allRelays.length === 0) {
+        return res.json({
+          success: true,
+          userAddress,
+          subscription: {
+            isActive: false,
+            reason: "Nessun relay registrato nel contratto",
+          },
+        });
+      }
+
+      // Verifica la sottoscrizione per il primo relay (o tutti se necessario)
+      const relayAddress = allRelays[0];
 
       try {
-        if (isEthereumAddress) {
-          // Verifica per indirizzo Ethereum
-          const allRelays = await relayContract.getAllRelays();
-          if (allRelays.length > 0) {
-            const details = await relayContract.getSubscriptionDetails(
-              identifier,
-              allRelays[0]
+        // Prova prima con checkUserSubscription
+        const isSubscribed = await relayContract.checkUserSubscription(
+          userAddress
+        );
+
+        if (isSubscribed) {
+          // Ottieni i dettagli della sottoscrizione
+          const subscriptionDetails =
+            await relayContract.getSubscriptionDetails(
+              userAddress,
+              relayAddress
             );
-
-            subscription = {
-              userAddress: identifier,
-              relayAddress: allRelays[0],
-              startDate: new Date(Number(details.startTime) * 1000),
-              endDate: new Date(Number(details.endTime) * 1000),
-              amountPaid: ethers.formatEther(details.amountPaid),
-              mbAllocated: Number(details.mbAllocated),
-              mbUsed: Number(details.mbUsed),
-              mbRemaining: Number(details.mbRemaining),
-              isActive: details.isActive,
-              gunPubKey: details.gunPubKey,
-              daysRemaining: Math.ceil(
-                (Number(details.endTime) * 1000 - Date.now()) /
-                  (1000 * 60 * 60 * 24)
-              ),
-            };
-
-            isActive = details.isActive;
-          } else {
-            reason = "Nessun relay registrato nel contratto";
-          }
-        } else {
-          // Verifica per chiave Gun
-          const allRelays = await relayContract.getAllRelays();
-          if (allRelays.length > 0) {
-            const details = await relayContract.getSubscriptionDetailsByGunKey(
-              identifier,
-              allRelays[0]
-            );
-
-            subscription = {
-              userAddress: details.userAddress,
-              relayAddress: allRelays[0],
-              gunPubKey: identifier,
-              startDate: new Date(Number(details.startTime) * 1000),
-              endDate: new Date(Number(details.endTime) * 1000),
-              amountPaid: ethers.formatEther(details.amountPaid),
-              mbAllocated: Number(details.mbAllocated),
-              mbUsed: Number(details.mbUsed),
-              mbRemaining: Number(details.mbRemaining),
-              isActive: details.isActive,
-              daysRemaining: Math.ceil(
-                (Number(details.endTime) * 1000 - Date.now()) /
-                  (1000 * 60 * 60 * 24)
-              ),
-            };
-
-            isActive = details.isActive;
-          } else {
-            reason = "Nessun relay registrato nel contratto";
-          }
-        }
-
-        if (!subscription) {
-          reason = reason || "Nessuna sottoscrizione trovata";
-        }
-
-        res.json({
-          success: true,
-          subscription: subscription || {
-            isActive: false,
-            reason,
-          },
-          identifier,
-          type: isEthereumAddress ? "ethereum_address" : "gun_key",
-        });
-      } catch (contractError) {
-        console.error("Contract subscription check failed", contractError);
-
-        // Fallback: prova con metodi alternativi
-        try {
-          if (isEthereumAddress) {
-            isActive = await relayContract.checkUserSubscription(identifier);
-          } else {
-            isActive = await relayContract.checkGunKeySubscription(identifier);
-          }
 
           res.json({
             success: true,
+            userAddress,
+            relayAddress,
             subscription: {
-              isActive,
-              reason: isActive ? null : "Sottoscrizione non attiva",
+              isActive: true,
+              startTime: Number(subscriptionDetails.startTime),
+              endTime: Number(subscriptionDetails.endTime),
+              amountPaid: ethers.formatEther(subscriptionDetails.amountPaid),
+              startDate: new Date(
+                Number(subscriptionDetails.startTime) * 1000
+              ).toISOString(),
+              endDate: new Date(
+                Number(subscriptionDetails.endTime) * 1000
+              ).toISOString(),
+              daysRemaining: Math.max(
+                0,
+                Math.ceil(
+                  (Number(subscriptionDetails.endTime) * 1000 - Date.now()) /
+                    (1000 * 60 * 60 * 24)
+                )
+              ),
             },
-            identifier,
-            type: isEthereumAddress ? "ethereum_address" : "gun_key",
-            fallback: true,
+          });
+        } else {
+          res.json({
+            success: true,
+            userAddress,
+            relayAddress,
+            subscription: {
+              isActive: false,
+              reason: "Nessuna sottoscrizione attiva trovata",
+            },
+          });
+        }
+      } catch (contractError) {
+        console.error("Errore verifica sottoscrizione:", contractError);
+
+        // Fallback: prova con isSubscriptionActive
+        try {
+          const isActive = await relayContract.isSubscriptionActive(
+            userAddress,
+            relayAddress
+          );
+
+          res.json({
+            success: true,
+            userAddress,
+            relayAddress,
+            subscription: {
+              isActive: isActive,
+              reason: isActive
+                ? "Sottoscrizione attiva"
+                : "Sottoscrizione non attiva",
+              fallback: true,
+            },
           });
         } catch (fallbackError) {
-          console.error("Fallback subscription check failed", fallbackError);
+          console.error(
+            "Errore fallback verifica sottoscrizione:",
+            fallbackError
+          );
           res.status(500).json({
             success: false,
             error: "Errore verifica sottoscrizione",
@@ -2050,7 +1862,7 @@ async function initializeServer() {
         }
       }
     } catch (error) {
-      console.error("Subscription status check failed", error);
+      console.error("Errore endpoint user-subscription:", error);
       res.status(500).json({
         success: false,
         error: "Errore interno del server",
@@ -2059,22 +1871,1146 @@ async function initializeServer() {
     }
   });
 
-  // Funzione helper per formattare l'uptime
-  function formatUptime(seconds) {
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
+  // Endpoint ibrido per verificare lo stato della sottoscrizione (cerca prima per pubKey, poi per userAddress)
+  app.get("/api/subscription-status/:identifier", async (req, res) => {
+    try {
+      const { identifier } = req.params;
 
-    if (days > 0) {
-      return `${days}d ${hours}h ${minutes}m ${secs}s`;
-    } else if (hours > 0) {
-      return `${hours}h ${minutes}m ${secs}s`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${secs}s`;
-    } else {
-      return `${secs}s`;
+      if (!identifier) {
+        return res.status(400).json({
+          success: false,
+          error: "Identificatore richiesto (pubKey o userAddress)",
+        });
+      }
+
+      if (!relayContract) {
+        return res.status(500).json({
+          success: false,
+          error: "Contratto relay non configurato",
+        });
+      }
+
+      let userAddress = null;
+      let pubKey = null;
+
+      // Determina se l'identificatore è un indirizzo Ethereum o una pubKey
+      if (identifier.startsWith("0x") && identifier.length === 42) {
+        // È un indirizzo Ethereum
+        userAddress = identifier;
+      } else {
+        // Probabilmente è una pubKey, cerca nel mapping
+        pubKey = identifier;
+
+        // Cerca il mapping nel database Gun
+        const mappingNode = gun.get("shogun").get("pubkey_mapping").get(pubKey);
+
+        const mapping = await new Promise((resolve) => {
+          mappingNode.once((data) => {
+            resolve(data);
+          });
+        });
+
+        if (mapping && mapping.userAddress) {
+          userAddress = mapping.userAddress;
+          console.log(`Mapping trovato: ${pubKey} -> ${userAddress}`);
+        } else {
+          return res.json({
+            success: true,
+            identifier,
+            pubKey,
+            userAddress: null,
+            subscription: {
+              isActive: false,
+              reason: "Nessun mapping trovato per questa chiave pubblica Gun",
+            },
+          });
+        }
+      }
+
+      // Ottieni tutti i relay registrati
+      const allRelays = await relayContract.getAllRelays();
+
+      if (allRelays.length === 0) {
+        return res.json({
+          success: true,
+          identifier,
+          pubKey,
+          userAddress,
+          subscription: {
+            isActive: false,
+            reason: "Nessun relay registrato nel contratto",
+          },
+        });
+      }
+
+      // Verifica la sottoscrizione per il primo relay
+      const relayAddress = allRelays[0];
+
+      try {
+        // Prova prima con checkUserSubscription
+        const isSubscribed = await relayContract.checkUserSubscription(
+          userAddress
+        );
+
+        if (isSubscribed) {
+          // Ottieni i dettagli della sottoscrizione
+          const subscriptionDetails =
+            await relayContract.getSubscriptionDetails(
+              userAddress,
+              relayAddress
+            );
+
+          res.json({
+            success: true,
+            identifier,
+            pubKey,
+            userAddress,
+            relayAddress,
+            subscription: {
+              isActive: true,
+              startTime: Number(subscriptionDetails.startTime),
+              endTime: Number(subscriptionDetails.endTime),
+              amountPaid: ethers.formatEther(subscriptionDetails.amountPaid),
+              startDate: new Date(
+                Number(subscriptionDetails.startTime) * 1000
+              ).toISOString(),
+              endDate: new Date(
+                Number(subscriptionDetails.endTime) * 1000
+              ).toISOString(),
+              daysRemaining: Math.max(
+                0,
+                Math.ceil(
+                  (Number(subscriptionDetails.endTime) * 1000 - Date.now()) /
+                    (1000 * 60 * 60 * 24)
+                )
+              ),
+            },
+          });
+        } else {
+          res.json({
+            success: true,
+            identifier,
+            pubKey,
+            userAddress,
+            relayAddress,
+            subscription: {
+              isActive: false,
+              reason: "Nessuna sottoscrizione attiva trovata",
+            },
+          });
+        }
+      } catch (contractError) {
+        console.error("Errore verifica sottoscrizione:", contractError);
+
+        // Fallback: prova con isSubscriptionActive
+        try {
+          const isActive = await relayContract.isSubscriptionActive(
+            userAddress,
+            relayAddress
+          );
+
+          res.json({
+            success: true,
+            identifier,
+            pubKey,
+            userAddress,
+            relayAddress,
+            subscription: {
+              isActive: isActive,
+              reason: isActive
+                ? "Sottoscrizione attiva"
+                : "Sottoscrizione non attiva",
+              fallback: true,
+            },
+          });
+        } catch (fallbackError) {
+          console.error(
+            "Errore fallback verifica sottoscrizione:",
+            fallbackError
+          );
+          res.status(500).json({
+            success: false,
+            error: "Errore verifica sottoscrizione",
+            details: fallbackError.message,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Errore endpoint subscription-status:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore interno del server",
+        details: error.message,
+      });
     }
+  });
+
+  // All data endpoint - reads directly from the live in-memory graph.
+  app.get("/api/alldata", tokenAuthMiddleware, (req, res) => {
+    try {
+      // Access the live, in-memory graph from the Gun instance
+      let graphData = gun._.graph;
+
+      // If the graph contains a `!` node, which typically holds the root,
+      // use its contents as the main graph.
+      if (graphData && graphData["!"]) {
+        console.log("Found '!' node in live graph, using it as the root.");
+        graphData = graphData["!"];
+      }
+
+      // Clean the graph data for serialization (remove circular `_` metadata)
+      const cleanGraph = {};
+      for (const soul in graphData) {
+        if (Object.prototype.hasOwnProperty.call(graphData, soul)) {
+          const node = graphData[soul];
+          const cleanNode = {};
+          for (const key in node) {
+            if (key !== "_") {
+              cleanNode[key] = node[key];
+            }
+          }
+          cleanGraph[soul] = cleanNode;
+        }
+      }
+
+      res.json({
+        success: true,
+        data: cleanGraph,
+        rawSize: JSON.stringify(cleanGraph).length,
+        nodeCount: Object.keys(cleanGraph).length,
+      });
+    } catch (error) {
+      console.error("Error reading live graph data:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to read data from live graph: " + error.message,
+      });
+    }
+  });
+
+  // Enhanced stats endpoint with time-series data
+  app.get("/api/stats", (req, res) => {
+    try {
+      const now = Date.now();
+      const uptime = now - customStats.startTime;
+      const memUsage = process.memoryUsage();
+
+      // Calculate current rates
+      const timeDiff = Math.max(1, (now - lastTimestamp) / 1000);
+      const currentGetRate =
+        (customStats.getRequests - lastGetCount) / timeDiff;
+      const currentPutRate =
+        (customStats.putRequests - lastPutCount) / timeDiff;
+
+      const cleanStats = {
+        peers: {
+          count: activeWires,
+          time: uptime / 1000 / 60, // minutes
+        },
+        node: {
+          count: Object.keys(customStats.timeSeries.data).length,
+          memory: {
+            heapUsed: memUsage.heapUsed,
+            heapTotal: memUsage.heapTotal,
+            external: memUsage.external,
+          },
+        },
+        up: {
+          time: uptime,
+        },
+        memory: memUsage.heapUsed,
+        dam: {
+          in: {
+            count: customStats.getRequests,
+            rate: currentGetRate,
+          },
+          out: {
+            count: customStats.putRequests,
+            rate: currentPutRate,
+          },
+        },
+        rad: {
+          get: { count: customStats.getRequests },
+          put: { count: customStats.putRequests },
+        },
+        // Time-series data for charts
+        all: customStats.timeSeries.data,
+        over: 5, // Update interval in seconds
+      };
+
+      res.json({ success: true, ...cleanStats });
+    } catch (error) {
+      console.error("Error in /api/stats:", error);
+      res
+        .status(500)
+        .json({ success: false, error: "Failed to retrieve stats." });
+    }
+  });
+
+  // New endpoint to trigger garbage collection manually
+  app.post("/api/gc/trigger", tokenAuthMiddleware, (req, res) => {
+    try {
+      if (!GC_ENABLED) {
+        return res.status(400).json({
+          success: false,
+          error: "Garbage collector is disabled in configuration",
+        });
+      }
+
+      console.log("🗑️ Manual garbage collection triggered via API");
+      runGarbageCollector();
+
+      res.json({
+        success: true,
+        message: "Garbage collection triggered successfully",
+      });
+    } catch (error) {
+      console.error("Error triggering garbage collection:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to trigger garbage collection: " + error.message,
+      });
+    }
+  });
+
+  // New endpoint to update stats values
+  app.post("/api/stats/update", tokenAuthMiddleware, (req, res) => {
+    try {
+      const { key, value } = req.body;
+
+      if (!key || value === undefined) {
+        return res.status(400).json({
+          success: false,
+          error: "Both key and value are required",
+        });
+      }
+
+      // Add validation for allowed keys
+      const allowedKeys = ["getRequests", "putRequests"];
+      if (!allowedKeys.includes(key)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid key. Allowed keys are: ${allowedKeys.join(", ")}`,
+        });
+      }
+
+      // Update the stat value
+      customStats[key] = parseInt(value, 10);
+
+      res.json({
+        success: true,
+        message: `Stat ${key} updated to ${value}`,
+        newValue: customStats[key],
+      });
+    } catch (error) {
+      console.error("Error updating stats:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to update stats: " + error.message,
+      });
+    }
+  });
+
+  // Stats endpoint compatible with the advanced HTML dashboard
+  app.get("/stats.json", (req, res) => {
+    try {
+      const now = Date.now();
+      const uptime = now - customStats.startTime;
+      const memUsage = process.memoryUsage();
+
+      // Calculate current rates
+      const timeDiff = Math.max(1, (now - lastTimestamp) / 1000);
+      const currentGetRate =
+        (customStats.getRequests - lastGetCount) / timeDiff;
+      const currentPutRate =
+        (customStats.putRequests - lastPutCount) / timeDiff;
+
+      const statsResponse = {
+        peers: {
+          count: activeWires,
+          time: uptime,
+        },
+        node: {
+          count: Object.keys(customStats.timeSeries.data).length,
+        },
+        up: {
+          time: uptime,
+        },
+        memory: {
+          heapUsed: memUsage.heapUsed,
+          heapTotal: memUsage.heapTotal,
+          external: memUsage.external,
+        },
+        dam: {
+          in: {
+            count: customStats.getRequests,
+            done: customStats.getRequests * 1024, // Estimate bytes
+          },
+          out: {
+            count: customStats.putRequests,
+            done: customStats.putRequests * 1024, // Estimate bytes
+          },
+        },
+        // Time-series data for charts - each entry is [timestamp, value]
+        all: customStats.timeSeries.data,
+        over: 5000, // Update interval in milliseconds
+      };
+
+      res.json(statsResponse);
+    } catch (error) {
+      console.error("Error in /stats.json:", error);
+      res.status(500).json({ error: "Failed to retrieve stats." });
+    }
+  });
+
+  app.post("/api/derive", async (req, res) => {
+    try {
+      const { password, extra, options } = req.body;
+      if (!password) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Password is required" });
+      }
+      const derivedKeys = await derive(password, extra, options);
+      return res.json({ success: true, derivedKeys });
+    } catch (error) {
+      console.error("Error in derive API:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message || "Failed to derive keys",
+      });
+    }
+  });
+
+  const getGunNodeFromPath = (pathString) => {
+    const pathSegments = pathString.split("/").filter(Boolean);
+    let node = gun;
+
+    pathSegments.forEach((segment) => {
+      node = node.get(segment);
+    });
+    return node;
+  };
+
+  app.get("/node/*", tokenAuthMiddleware, async (req, res) => {
+    const path = req.params[0];
+    if (!path || path.trim() === "") {
+      return res
+        .status(400)
+        .json({ success: false, error: "Node path cannot be empty." });
+    }
+
+    console.log(`🔍 Reading node at path: "${path}"`);
+
+    const timeout = setTimeout(() => {
+      if (!res.headersSent) {
+        console.log(`⏰ GET timeout for path: "${path}"`);
+        res.status(408).json({ success: false, error: "Request timed out." });
+      }
+    }, 5000); // 5-second timeout
+
+    try {
+      const node = getGunNodeFromPath(path);
+
+      // Properly promisify the Gun get operation
+      const data = await new Promise((resolve, reject) => {
+        let resolved = false;
+
+        const onceTimeout = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            console.log(`⏰ Gun get timeout for path: "${path}"`);
+            resolve(null); // Resolve with null for timeout
+          }
+        }, 4000);
+
+        node.once((nodeData) => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(onceTimeout);
+            console.log(
+              `📖 Gun get result for path "${path}":`,
+              nodeData ? "found" : "not found"
+            );
+            resolve(nodeData);
+          }
+        });
+      });
+
+      clearTimeout(timeout);
+
+      if (!res.headersSent) {
+        // Clean the GunDB metadata (`_`) before sending
+        let cleanData = data;
+        if (data && data._) {
+          cleanData = { ...data };
+          delete cleanData._;
+        }
+
+        console.log(`✅ Successfully read node at path: "${path}"`);
+        res.json({
+          success: true,
+          path,
+          data: cleanData === undefined ? null : cleanData,
+        });
+      }
+    } catch (error) {
+      clearTimeout(timeout);
+      if (!res.headersSent) {
+        console.error(`❌ Error in GET /node/* for path "${path}":`, error);
+        res.status(500).json({
+          success: false,
+          error: "Failed to retrieve node data.",
+          details: error.message,
+          path,
+        });
+      }
+    }
+  });
+
+  app.post("/node/*", tokenAuthMiddleware, async (req, res) => {
+    try {
+      let path = req.params[0];
+      if (!path || path.trim() === "") {
+        return res
+          .status(400)
+          .json({ success: false, error: "Node path cannot be empty." });
+      }
+      let data = req.body;
+      if (data && typeof data === "object" && Object.keys(data).length === 0) {
+        const originalPath = req.params[0];
+        const lastSlashIndex = originalPath.lastIndexOf("/");
+        if (lastSlashIndex !== -1 && lastSlashIndex < originalPath.length - 1) {
+          path = originalPath.substring(0, lastSlashIndex);
+          const dataFromPath = decodeURIComponent(
+            originalPath.substring(lastSlashIndex + 1)
+          );
+          try {
+            data = JSON.parse(dataFromPath);
+          } catch (e) {
+            data = dataFromPath;
+          }
+        }
+      }
+      if (typeof data === "undefined") {
+        return res
+          .status(400)
+          .json({ success: false, error: "No data provided in body or path." });
+      }
+
+      console.log(`📝 Creating node at path: "${path}" with data:`, data);
+
+      const node = getGunNodeFromPath(path);
+
+      // Temporarily allow internal operations during this REST API call
+      allowInternalOperations = true;
+
+      try {
+        // Properly promisify the Gun put operation
+        const putResult = await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error("Put operation timed out after 10 seconds"));
+          }, 10000);
+
+          try {
+            node.put(data, (ack) => {
+              clearTimeout(timeout);
+              if (ack.err) {
+                console.error(`❌ Gun put error for path "${path}":`, ack.err);
+                reject(new Error(ack.err));
+              } else {
+                console.log(`✅ Gun put success for path "${path}":`, ack);
+                resolve(ack);
+              }
+            });
+          } catch (syncError) {
+            clearTimeout(timeout);
+            console.error(
+              `❌ Synchronous error in put for path "${path}":`,
+              syncError
+            );
+            reject(syncError);
+          }
+        });
+      } finally {
+        // Reset flag
+        allowInternalOperations = false;
+      }
+
+      console.log(`✅ Node successfully created/updated at path: "${path}"`);
+      return res.json({ success: true, path, data });
+    } catch (error) {
+      console.error(
+        `❌ Error in POST /node/* for path "${req.params[0]}":`,
+        error
+      );
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+        path: req.params[0],
+      });
+    }
+  });
+
+  app.delete("/node/*", tokenAuthMiddleware, async (req, res) => {
+    try {
+      const path = req.params[0];
+      if (!path || path.trim() === "") {
+        return res
+          .status(400)
+          .json({ success: false, error: "Node path cannot be empty." });
+      }
+
+      console.log(`🗑️ Deleting node at path: "${path}"`);
+
+      const node = getGunNodeFromPath(path);
+
+      // Temporarily allow internal operations during this REST API call
+      allowInternalOperations = true;
+
+      try {
+        // Properly promisify the Gun delete operation
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error("Delete operation timed out after 10 seconds"));
+          }, 10000);
+
+          try {
+            node.put(null, (ack) => {
+              clearTimeout(timeout);
+              if (ack.err) {
+                console.error(
+                  `❌ Gun delete error for path "${path}":`,
+                  ack.err
+                );
+                reject(new Error(ack.err));
+              } else {
+                console.log(`✅ Gun delete success for path "${path}":`, ack);
+                resolve(ack);
+              }
+            });
+          } catch (syncError) {
+            clearTimeout(timeout);
+            console.error(
+              `❌ Synchronous error in delete for path "${path}":`,
+              syncError
+            );
+            reject(syncError);
+          }
+        });
+      } finally {
+        // Reset flag
+        allowInternalOperations = false;
+      }
+
+      console.log(`✅ Node successfully deleted at path: "${path}"`);
+      res.json({ success: true, path, message: "Data deleted." });
+    } catch (error) {
+      console.error(
+        `❌ Error in DELETE /node/* for path "${req.params[0]}":`,
+        error
+      );
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        path: req.params[0],
+      });
+    }
+  });
+
+  // --- Peer Management API ---
+  app.get("/api/peers", tokenAuthMiddleware, (req, res) => {
+    try {
+      const peers = gun._.opt.peers || {};
+      const peerList = Object.keys(peers);
+      res.json({ success: true, peers: peerList });
+    } catch (error) {
+      console.error("Error fetching peer list:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to retrieve peer list: " + error.message,
+      });
+    }
+  });
+
+  app.post("/api/peers/add", tokenAuthMiddleware, (req, res) => {
+    try {
+      const { peerUrl } = req.body;
+      if (!peerUrl || typeof peerUrl !== "string") {
+        return res
+          .status(400)
+          .json({ success: false, error: "Invalid 'peerUrl' provided." });
+      }
+
+      try {
+        new URL(peerUrl);
+      } catch (e) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Malformed 'peerUrl'." });
+      }
+
+      console.log(`🔌 Attempting to connect to new peer: ${peerUrl}`);
+      gun.opt({ peers: [peerUrl] });
+
+      res.json({
+        success: true,
+        message: `Connection to peer ${peerUrl} initiated.`,
+      });
+    } catch (error) {
+      console.error(`❌ Error adding peer:`, error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to add peer: " + error.message,
+      });
+    }
+  });
+
+  // --- Static Files & Page Routes ---
+
+  const cleanReturnString = (value) => {
+    if (!value) return "";
+    return value.replace(/"/g, `'`);
+  };
+
+  app.get("/blog/:id", (req, res) => {
+    const htmlData = fs.readFileSync(indexPath, "utf8");
+    let numberOfTries = 0;
+    const chain = gun
+      .get(`hal9000/post`)
+      .get(req.params.id)
+      .on((post) => {
+        numberOfTries++;
+        if (!post) {
+          if (numberOfTries > 1) {
+            chain.off();
+            return res.sendStatus(404);
+          }
+          return;
+        }
+        if (res.writableEnded) {
+          chain.off();
+          return;
+        }
+        const finalHtml = `
+            <!DOCTYPE html>
+            <html>
+               <head>
+                  <title>${post.title || "Blog Post"}</title>
+                  <meta name="description" content="${cleanReturnString(
+                    post.description || ""
+                  )}" />
+               </head>
+               <body>
+                  ${post.content}
+               </body>
+            </html>
+         `;
+        return res.send(finalHtml);
+      });
+    setTimeout(() => {
+      if (!res.writableEnded) {
+        res.sendStatus(408);
+      }
+      chain.off();
+    }, 5000);
+  });
+
+  app.get("/derive", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "derive.html"));
+  });
+  app.get("/view", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "view.html"));
+  });
+  app.get("/edit", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "edit.html"));
+  });
+  app.get("/stats", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "stats.html"));
+  });
+  app.get("/charts", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "charts.html"));
+  });
+  app.get("/create", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "create.html"));
+  });
+  app.get("/client", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "client.html"));
+  });
+  app.get("/server", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "server.html"));
+  });
+  app.get("/visualGraph", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "visualGraph/visualGraph.html"));
+  });
+  app.get("/graph", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "graph.html"));
+  });
+  app.get("/upload", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "upload.html"));
+  });
+  app.get("/pin-manager", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "pin-manager.html"));
+  });
+  app.get("/drive", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "drive.html"));
+  });
+
+  app.get("/chat", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "chat.html"));
+  });
+
+  app.get("/notes", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "notes.html"));
+  });
+
+  app.get("/subscribe", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "subscribe.html"));
+  });
+
+  app.get("/user-upload", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "user-upload.html"));
+  });
+
+  app.get("/services-dashboard", (req, res) => {
+    res.sendFile(path.resolve(publicPath, "services-dashboard.html"));
+  });
+
+  // Add route to fetch and display IPFS content
+  app.get("/ipfs-content/:cid", async (req, res) => {
+    const { cid } = req.params;
+    const { token } = req.query;
+
+    if (!cid) {
+      return res.status(400).json({
+        success: false,
+        error: "CID is required",
+      });
+    }
+
+    try {
+      // Create request to local gateway
+      const requestOptions = {
+        hostname: new URL(IPFS_GATEWAY_URL).hostname,
+        port: new URL(IPFS_GATEWAY_URL).port,
+        path: `/ipfs/${cid}`,
+        method: "GET",
+      };
+
+      const ipfsReq = http.get(requestOptions, (ipfsRes) => {
+        // If no token, just stream the response
+        if (!token) {
+          res.setHeader(
+            "Content-Type",
+            ipfsRes.headers["content-type"] || "application/octet-stream"
+          );
+          ipfsRes.pipe(res);
+          return;
+        }
+
+        // If token is provided, buffer the response to decrypt it
+        let body = "";
+        ipfsRes.on("data", (chunk) => (body += chunk));
+        ipfsRes.on("end", async () => {
+          try {
+            const decrypted = await SEA.decrypt(body, token);
+
+            if (decrypted) {
+              // It's a Base64 data URL, e.g., "data:image/png;base64,iVBORw0KGgo..."
+              const parts = decrypted.match(/^data:(.+);base64,(.+)$/);
+              if (parts) {
+                const mimeType = parts[1];
+                const fileContents = Buffer.from(parts[2], "base64");
+                res.setHeader("Content-Type", mimeType);
+                res.send(fileContents);
+              } else {
+                // Not a data URL, just plain text
+                res.setHeader("Content-Type", "text/plain");
+                res.send(decrypted);
+              }
+            } else {
+              // Decryption failed, send raw content
+              res.setHeader(
+                "Content-Type",
+                ipfsRes.headers["content-type"] || "application/octet-stream"
+              );
+              res.send(body);
+            }
+          } catch (e) {
+            console.error("Decryption error:", e);
+            // Decryption failed, send raw content
+            res.setHeader(
+              "Content-Type",
+              ipfsRes.headers["content-type"] || "application/octet-stream"
+            );
+            res.send(body);
+          }
+        });
+
+        ipfsRes.on("error", (err) => {
+          console.error(`❌ Error streaming IPFS content: ${err.message}`);
+          if (!res.headersSent) {
+            res.status(500).json({
+              success: false,
+              error: "Failed to stream IPFS content",
+              details: err.message,
+            });
+          }
+        });
+      });
+
+      ipfsReq.on("error", (err) => {
+        console.error(`❌ Error fetching from IPFS gateway: ${err.message}`);
+        if (!res.headersSent) {
+          res.status(502).json({
+            success: false,
+            error: "Failed to fetch from IPFS gateway",
+            details: err.message,
+            fallback: {
+              publicGateway: `https://ipfs.io/ipfs/${cid}`,
+              cloudflareGateway: `https://cloudflare-ipfs.com/ipfs/${cid}`,
+            },
+          });
+        }
+      });
+
+      // Set a timeout
+      ipfsReq.setTimeout(30000, () => {
+        ipfsReq.destroy();
+        if (!res.headersSent) {
+          res.status(504).json({
+            success: false,
+            error: "Gateway timeout",
+            fallback: {
+              publicGateway: `https://ipfs.io/ipfs/${cid}`,
+              cloudflareGateway: `https://cloudflare-ipfs.com/ipfs/${cid}`,
+            },
+          });
+        }
+      });
+    } catch (error) {
+      console.error(`❌ Error handling IPFS content request: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        error: "Internal server error",
+        details: error.message,
+      });
+    }
+  });
+
+  // --- Secure IPFS Management Endpoints ---
+  const forwardToIpfsApi = (req, res, endpoint, method = "POST") => {
+    try {
+      let path = `/api/v0/${endpoint}`;
+
+      const cid = req.body.cid || req.query.cid || req.params.cid || "";
+      if (cid) {
+        path += `?arg=${cid}`;
+      } else if (req.query.type) {
+        path += `?type=${req.query.type}`;
+      }
+
+      const requestOptions = {
+        hostname: new URL(IPFS_API_URL).hostname,
+        port: new URL(IPFS_API_URL).port,
+        path: path,
+        method: "POST",
+        headers: {
+          "Content-Length": "0",
+          Accept: "application/json",
+        },
+      };
+
+      if (IPFS_API_TOKEN) {
+        requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+      }
+
+      const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+        let data = "";
+
+        ipfsRes.on("data", (chunk) => {
+          data += chunk;
+        });
+
+        ipfsRes.on("end", () => {
+          try {
+            // Clean the response data by removing any trailing newlines
+            const cleanData = data.trim();
+            // Try to parse the cleaned JSON
+            const jsonData = JSON.parse(cleanData);
+
+            res.json({
+              success: true,
+              data: jsonData,
+            });
+          } catch (parseError) {
+            console.error("Error parsing IPFS API response:", parseError);
+            res.status(500).json({
+              success: false,
+              error: "Invalid JSON response from IPFS API",
+              details: parseError.message,
+              rawResponse: data,
+            });
+          }
+        });
+      });
+
+      ipfsReq.on("error", (error) => {
+        console.error("Error in IPFS API request:", error);
+        res.status(500).json({
+          success: false,
+          error: "IPFS API request failed",
+          details: error.message,
+        });
+      });
+
+      ipfsReq.end();
+    } catch (error) {
+      console.error("Error in forwardToIpfsApi:", error);
+      res.status(500).json({
+        success: false,
+        error: "Internal server error",
+        details: error.message,
+      });
+    }
+  };
+
+  app.post("/pins/add", tokenAuthMiddleware, (req, res) =>
+    forwardToIpfsApi(req, res, "pin/add")
+  );
+  app.post("/pins/rm", tokenAuthMiddleware, (req, res) =>
+    forwardToIpfsApi(req, res, "pin/rm")
+  );
+  app.post("/pins/ls", tokenAuthMiddleware, (req, res) =>
+    forwardToIpfsApi(req, res, "pin/ls", "POST")
+  );
+
+  // Custom handler for repo/gc to correctly handle streaming responses
+  app.post("/repo/gc", tokenAuthMiddleware, (req, res) => {
+    try {
+      const gcOptions = {
+        hostname: new URL(IPFS_API_URL).hostname,
+        port: new URL(IPFS_API_URL).port,
+        path: "/api/v0/repo/gc",
+        method: "POST",
+        headers: {
+          ...(IPFS_API_TOKEN && { Authorization: `Bearer ${IPFS_API_TOKEN}` }),
+        },
+      };
+
+      const gcReq = http.request(gcOptions, (gcRes) => {
+        let responseBody = "";
+        gcRes.on("data", (chunk) => {
+          responseBody += chunk; // Consume the stream
+        });
+        gcRes.on("end", () => {
+          if (gcRes.statusCode === 200) {
+            console.log("Garbage collection triggered successfully.");
+            res.json({
+              success: true,
+              message: "Garbage collection completed.",
+            });
+          } else {
+            console.error(
+              `IPFS repo/gc failed with status ${gcRes.statusCode}:`,
+              responseBody
+            );
+            res.status(gcRes.statusCode).json({
+              success: false,
+              error: "IPFS garbage collection failed.",
+              details: responseBody,
+            });
+          }
+        });
+      });
+
+      gcReq.on("error", (error) => {
+        console.error("Error calling /repo/gc:", error);
+        res.status(500).json({ success: false, error: error.message });
+      });
+
+      gcReq.end();
+    } catch (error) {
+      console.error("Error setting up /repo/gc request:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/notes", tokenAuthMiddleware, (req, res) => {
+    const notesNode = gun.get("shogun").get("admin").get("notes");
+    notesNode.once((data) => {
+      res.json({ success: true, notes: data || "" });
+    });
+  });
+
+  app.post("/api/notes", tokenAuthMiddleware, (req, res) => {
+    const { notes } = req.body;
+    if (typeof notes !== "string") {
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid notes format." });
+    }
+    gun
+      .get("shogun")
+      .get("admin")
+      .get("notes")
+      .put(notes, (ack) => {
+        if (ack.err) {
+          return res.status(500).json({ success: false, error: ack.err });
+        }
+        res.json({ success: true });
+      });
+  });
+
+  app.delete("/api/notes", tokenAuthMiddleware, (req, res) => {
+    gun
+      .get("shogun")
+      .get("admin")
+      .get("notes")
+      .put(null, (ack) => {
+        if (ack.err) {
+          return res.status(500).json({ success: false, error: ack.err });
+        }
+        res.json({ success: true, message: "Notes deleted." });
+      });
+  });
+
+  // Fallback to index.html
+  app.get("/*", (req, res) => {
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).send("Index file not found");
+    }
+  });
+
+  // Display server information
+  console.log(`Internal URL: ${link}/`);
+  console.log(`External URL: ${extLink}/`);
+  console.log(`Gun peer: ${link}/gun`);
+  console.log(`Storage: ${store ? "enabled" : "disabled"}`);
+  console.log(
+    `Admin password: ${process.env.ADMIN_PASSWORD ? "configured" : "not set"}`
+  );
+
+  // Display IPFS proxy information
+  console.log("\n=== IPFS PROXY ENDPOINTS ===");
+  console.log(`📁 IPFS Gateway: ${link}/ipfs/`);
+  console.log(`📁 IPNS Gateway: ${link}/ipns/`);
+  console.log(`🔧 IPFS API: ${link}/api/v0/`);
+  console.log(`📊 IPFS Status: ${link}/ipfs-status`);
+
+  console.log("==============================");
+
+  // Show QR code if enabled
+  if (showQr !== false) {
+    console.log("\n=== QR CODE ===");
+    try {
+      console.log(qr(link, "ascii", { border: 1 }));
+    } catch (error) {
+      console.warn("QR code generation failed:", error.message);
+    }
+    console.log("===============\n");
   }
 
   // Graceful shutdown
@@ -2116,62 +3052,891 @@ async function initializeServer() {
     process.exit(0);
   });
 
-  // Fallback endpoint for root requests
-  app.get("/", (req, res) => {
-    res.json({
-      success: true,
-      message: "Shogun Relay Server is running",
-      version: "1.0.0",
-      endpoints: {
-        health: "/health",
-        relayInfo: "/api/relay-info",
-        contractStatus: "/api/contract-status",
-        performance: "/api/performance",
-        logs: "/api/logs",
-        ipfsStatus: "/ipfs-status",
-      },
-      timestamp: Date.now(),
-    });
+  // Enhanced system info endpoint
+  app.get("/api/system-info", (req, res) => {
+    try {
+      const memUsage = process.memoryUsage();
+      const cpuUsage = process.cpuUsage();
+
+      res.json({
+        success: true,
+        system: {
+          nodeVersion: process.version,
+          platform: process.platform,
+          arch: process.arch,
+          uptime: process.uptime() * 1000,
+          pid: process.pid,
+          memory: {
+            heapUsed: memUsage.heapUsed,
+            heapTotal: memUsage.heapTotal,
+            external: memUsage.external,
+            rss: memUsage.rss,
+          },
+          cpu: {
+            user: cpuUsage.user,
+            system: cpuUsage.system,
+          },
+          loadAverage:
+            process.platform !== "win32" ? require("os").loadavg() : [0, 0, 0],
+          freeMemory: require("os").freemem(),
+          totalMemory: require("os").totalmem(),
+        },
+        services: {
+          gun: {
+            activeConnections: activeWires,
+            totalConnections: totalConnections,
+            startTime: customStats.startTime,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Error in /api/system-info:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to retrieve system info: " + error.message,
+      });
+    }
   });
 
-  // Catch-all endpoint for unknown routes
-  app.get("*", (req, res) => {
-    res.status(404).json({
-      success: false,
-      error: "Endpoint not found",
-      path: req.path,
-      availableEndpoints: [
-        "/",
-        "/health",
-        "/api/relay-info",
-        "/api/contract-status",
-        "/api/performance",
-        "/api/logs",
-        "/ipfs-status",
-      ],
-    });
+  // Docker service management functions
+  const docker = new Docker();
+
+  async function getDockerContainer(containerName) {
+    try {
+      const containers = await docker.listContainers({ all: true });
+      return containers.find((container) =>
+        container.Names.some((name) => name.includes(containerName))
+      );
+    } catch (error) {
+      console.error(`Error finding container ${containerName}:`, error);
+      return null;
+    }
+  }
+
+  async function restartDockerService(serviceName) {
+    try {
+      const containerMappings = {
+        gun: "shogun-relay-stack",
+        ipfs: "shogun-relay-stack", // IPFS runs within the main container
+      };
+
+      const containerName = containerMappings[serviceName];
+      const supervisorService = supervisorServiceMappings[serviceName];
+
+      if (!containerName || !supervisorService) {
+        throw new Error(`Unknown service: ${serviceName}`);
+      }
+
+      const containerInfo = await getDockerContainer(containerName);
+      if (!containerInfo) {
+        throw new Error(`Container ${containerName} not found`);
+      }
+
+      const container = docker.getContainer(containerInfo.Id);
+
+      // For services within the main container, we'll restart the whole container
+      if (serviceName === "gun") {
+        // For gun service, we can't restart just the Gun part, so we restart the container
+        console.log(`🔄 Restarting Docker container: ${containerName}`);
+        await container.restart();
+        return `Container ${containerName} restarted successfully`;
+      } else if (serviceName === "ipfs") {
+        // For IPFS, we can try to restart the IPFS daemon within the container
+        try {
+          const exec = await container.exec({
+            Cmd: ["supervisorctl", "restart", "ipfs"],
+            AttachStdout: true,
+            AttachStderr: true,
+          });
+          const stream = await exec.start();
+          return `IPFS service restarted within container`;
+        } catch (execError) {
+          // Fallback to container restart
+          console.log(
+            `🔄 IPFS service restart failed, restarting container: ${containerName}`
+          );
+          await container.restart();
+          return `Container ${containerName} restarted (IPFS service restart fallback)`;
+        }
+      }
+    } catch (error) {
+      throw new Error(`Docker restart failed: ${error.message}`);
+    }
+  }
+
+  // Enhanced service restart endpoint with Docker integration
+  app.post(
+    "/api/services/:service/restart",
+    tokenAuthMiddleware,
+    async (req, res) => {
+      try {
+        const { service } = req.params;
+        const allowedServices = ["gun", "ipfs"];
+
+        if (!allowedServices.includes(service)) {
+          return res.status(400).json({
+            success: false,
+            error: `Service '${service}' is not supported. Allowed services: ${allowedServices.join(
+              ", "
+            )}`,
+          });
+        }
+
+        console.log(`🔄 Restart request received for service: ${service}`);
+
+        let result;
+
+        try {
+          // First try Docker restart
+          result = await restartDockerService(service);
+          console.log(`✅ Docker restart successful: ${result}`);
+        } catch (dockerError) {
+          console.warn(`⚠️ Docker restart failed: ${dockerError.message}`);
+
+          // Fallback to internal operations
+          switch (service) {
+            case "gun":
+              await runGarbageCollector();
+              result = `Gun relay cleanup triggered (Docker unavailable)`;
+              break;
+
+            case "ipfs":
+              result = `IPFS restart attempted but Docker unavailable`;
+              break;
+          }
+        }
+
+        res.json({
+          success: true,
+          message: result,
+          service: service,
+          timestamp: Date.now(),
+        });
+      } catch (error) {
+        console.error(`Error restarting service ${req.params.service}:`, error);
+        res.status(500).json({
+          success: false,
+          error: `Failed to restart service: ${error.message}`,
+        });
+      }
+    }
+  );
+
+  // Service status endpoint
+  app.get("/api/services/status", async (req, res) => {
+    try {
+      const services = {};
+
+      // Check Gun Relay
+      services.gun = {
+        status: "online",
+        uptime: process.uptime() * 1000,
+        connections: activeWires,
+        totalConnections: totalConnections,
+        memory: process.memoryUsage().heapUsed,
+      };
+
+      // Check IPFS
+      try {
+        const ipfsResponse = await fetch("/ipfs-status");
+        const ipfsData = await ipfsResponse.json();
+        services.ipfs = {
+          status: ipfsData.success ? "online" : "offline",
+          version: ipfsData.ipfs?.version || "unknown",
+          type: ipfsData.ipfs?.type || "unknown",
+        };
+      } catch (error) {
+        services.ipfs = {
+          status: "offline",
+          error: error.message,
+        };
+      }
+
+      res.json({
+        success: true,
+        services: services,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error("Error in /api/services/status:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to check services status: " + error.message,
+      });
+    }
   });
 
-  // Global error handler
-  app.use((error, req, res, next) => {
-    console.error("Global error handler:", error);
-    res.status(500).json({
-      success: false,
-      error: "Internal server error",
-      message: error.message,
-      timestamp: Date.now(),
-    });
+  // Endpoint per gestire il mapping pubKey -> userAddress
+  app.post("/api/pubkey-mapping", tokenAuthMiddleware, async (req, res) => {
+    try {
+      const { pubKey, userAddress } = req.body;
+
+      if (!pubKey || !userAddress) {
+        return res.status(400).json({
+          success: false,
+          error: "pubKey e userAddress sono richiesti",
+        });
+      }
+
+      // Validazione base
+      if (!userAddress.startsWith("0x") || userAddress.length !== 42) {
+        return res.status(400).json({
+          success: false,
+          error: "userAddress deve essere un indirizzo Ethereum valido",
+        });
+      }
+
+      if (pubKey.length < 20) {
+        return res.status(400).json({
+          success: false,
+          error: "pubKey deve essere una chiave pubblica Gun valida",
+        });
+      }
+
+      // Salva il mapping nel database Gun
+      const mappingData = {
+        userAddress: userAddress,
+        pubKey: pubKey,
+        mappedAt: Date.now(),
+        createdBy: "admin",
+      };
+
+      const mappingNode = gun.get("shogun").get("pubkey_mapping").get(pubKey);
+
+      mappingNode.put(mappingData);
+
+      console.log(
+        `✅ Mapping manuale salvato: ${pubKey.slice(
+          0,
+          10
+        )}... -> ${userAddress.slice(0, 6)}...`
+      );
+
+      res.json({
+        success: true,
+        message: "Mapping salvato con successo",
+        mapping: {
+          pubKey: pubKey.slice(0, 10) + "...",
+          userAddress: userAddress.slice(0, 6) + "...",
+          mappedAt: new Date(mappingData.mappedAt).toISOString(),
+        },
+      });
+    } catch (error) {
+      console.error("Errore salvataggio mapping:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore salvataggio mapping",
+        details: error.message,
+      });
+    }
   });
 
-  // Handle uncaught exceptions
-  process.on("uncaughtException", (error) => {
-    console.error("Uncaught Exception:", error);
-    console.error("Uncaught Exception:", error);
+  // Endpoint per ottenere il mapping di una pubKey
+  app.get("/api/pubkey-mapping/:pubKey", async (req, res) => {
+    try {
+      const { pubKey } = req.params;
+
+      if (!pubKey) {
+        return res.status(400).json({
+          success: false,
+          error: "pubKey richiesta",
+        });
+      }
+
+      // Cerca il mapping nel database Gun
+      const mappingNode = gun.get("shogun").get("pubkey_mapping").get(pubKey);
+
+      const mapping = await new Promise((resolve) => {
+        mappingNode.once((data) => {
+          resolve(data);
+        });
+      });
+
+      if (mapping && mapping.userAddress) {
+        res.json({
+          success: true,
+          mapping: {
+            pubKey: pubKey,
+            userAddress: mapping.userAddress,
+            mappedAt: mapping.mappedAt,
+            lastUpload: mapping.lastUpload,
+          },
+        });
+      } else {
+        res.json({
+          success: true,
+          mapping: null,
+          message: "Nessun mapping trovato per questa pubKey",
+        });
+      }
+    } catch (error) {
+      console.error("Errore ricerca mapping:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore ricerca mapping",
+        details: error.message,
+      });
+    }
   });
 
-  process.on("unhandledRejection", (reason, promise) => {
-    console.error("Unhandled Rejection at:", promise, "reason:", reason);
-    console.error("Unhandled Rejection", { reason, promise });
+  // Endpoint per eliminare un mapping
+  app.delete(
+    "/api/pubkey-mapping/:pubKey",
+    tokenAuthMiddleware,
+    async (req, res) => {
+      try {
+        const { pubKey } = req.params;
+
+        if (!pubKey) {
+          return res.status(400).json({
+            success: false,
+            error: "pubKey richiesta",
+          });
+        }
+
+        // Elimina il mapping dal database Gun
+        const mappingNode = gun.get("shogun").get("pubkey_mapping").get(pubKey);
+        mappingNode.put(null);
+
+        console.log(`❌ Mapping eliminato: ${pubKey.slice(0, 10)}...`);
+
+        res.json({
+          success: true,
+          message: "Mapping eliminato con successo",
+          pubKey: pubKey.slice(0, 10) + "...",
+        });
+      } catch (error) {
+        console.error("Errore eliminazione mapping:", error);
+        res.status(500).json({
+          success: false,
+          error: "Errore eliminazione mapping",
+          details: error.message,
+        });
+      }
+    }
+  );
+
+  // Endpoint per ottenere tutti i mapping
+  app.get("/api/pubkey-mapping", tokenAuthMiddleware, async (req, res) => {
+    try {
+      // Ottieni tutti i mapping dal database Gun
+      const mappingsNode = gun.get("shogun").get("pubkey_mapping");
+
+      const mappings = await new Promise((resolve) => {
+        mappingsNode.once((data) => {
+          resolve(data);
+        });
+      });
+
+      if (!mappings) {
+        return res.json({
+          success: true,
+          mappings: [],
+          count: 0,
+        });
+      }
+
+      // Converte l'oggetto mappings in array
+      const mappingsArray = Object.keys(mappings)
+        .filter((key) => key !== "_") // Esclude i metadati Gun
+        .map((pubKey) => ({
+          pubKey: pubKey,
+          userAddress: mappings[pubKey].userAddress,
+          mappedAt: mappings[pubKey].mappedAt,
+          lastUpload: mappings[pubKey].lastUpload,
+          createdBy: mappings[pubKey].createdBy,
+        }))
+        .sort((a, b) => b.mappedAt - a.mappedAt); // Ordina per data
+
+      res.json({
+        success: true,
+        mappings: mappingsArray,
+        count: mappingsArray.length,
+      });
+    } catch (error) {
+      console.error("Errore ottenimento mapping:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore ottenimento mapping",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint per verificare lo stato della sottoscrizione tramite Gun key
+  app.get("/api/gunkey-subscription/:gunPubKey", async (req, res) => {
+    try {
+      const { gunPubKey } = req.params;
+
+      if (!gunPubKey) {
+        return res.status(400).json({
+          success: false,
+          error: "Gun public key richiesta",
+        });
+      }
+
+      if (!relayContract) {
+        return res.status(500).json({
+          success: false,
+          error: "Contratto relay non configurato",
+        });
+      }
+
+      // Ottieni tutti i relay registrati
+      const allRelays = await relayContract.getAllRelays();
+
+      if (allRelays.length === 0) {
+        return res.json({
+          success: true,
+          gunPubKey,
+          subscription: {
+            isActive: false,
+            reason: "Nessun relay registrato nel contratto",
+          },
+        });
+      }
+
+      // Verifica la sottoscrizione per il primo relay
+      const relayAddress = allRelays[0];
+
+      try {
+        // Verifica se la Gun key ha una sottoscrizione attiva
+        const isSubscribed = await relayContract.checkGunKeySubscription(
+          gunPubKey
+        );
+
+        if (isSubscribed) {
+          // Ottieni i dettagli della sottoscrizione tramite Gun key
+          const subscriptionDetails =
+            await relayContract.getSubscriptionDetailsByGunKey(
+              gunPubKey,
+              relayAddress
+            );
+
+          res.json({
+            success: true,
+            gunPubKey,
+            relayAddress,
+            subscription: {
+              isActive: true,
+              startTime: Number(subscriptionDetails.startTime),
+              endTime: Number(subscriptionDetails.endTime),
+              amountPaid: ethers.formatEther(subscriptionDetails.amountPaid),
+              mbAllocated: Number(subscriptionDetails.mbAllocated),
+              mbUsed: Number(subscriptionDetails.mbUsed),
+              mbRemaining: Number(subscriptionDetails.mbRemaining),
+              startDate: new Date(
+                Number(subscriptionDetails.startTime) * 1000
+              ).toISOString(),
+              endDate: new Date(
+                Number(subscriptionDetails.endTime) * 1000
+              ).toISOString(),
+              daysRemaining: Math.max(
+                0,
+                Math.ceil(
+                  (Number(subscriptionDetails.endTime) * 1000 - Date.now()) /
+                    (1000 * 60 * 60 * 24)
+                )
+              ),
+            },
+          });
+        } else {
+          res.json({
+            success: true,
+            gunPubKey,
+            relayAddress,
+            subscription: {
+              isActive: false,
+              reason:
+                "Nessuna sottoscrizione attiva trovata per questa Gun key",
+            },
+          });
+        }
+      } catch (contractError) {
+        console.error("Errore verifica sottoscrizione Gun key:", contractError);
+        res.status(500).json({
+          success: false,
+          error: "Errore verifica sottoscrizione Gun key",
+          details: contractError.message,
+        });
+      }
+    } catch (error) {
+      console.error("Errore endpoint gunkey-subscription:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore interno del server",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint per registrare l'uso di MB (chiamabile solo dal relay)
+  app.post("/api/record-mb-usage", tokenAuthMiddleware, async (req, res) => {
+    try {
+      const { gunPubKey, mbUsed } = req.body;
+
+      if (!gunPubKey || !mbUsed) {
+        return res.status(400).json({
+          success: false,
+          error: "gunPubKey e mbUsed sono richiesti",
+        });
+      }
+
+      if (!relayContract) {
+        return res.status(500).json({
+          success: false,
+          error: "Contratto relay non configurato",
+        });
+      }
+
+      // Verifica che il relay abbia una sottoscrizione attiva per questa Gun key
+      const isSubscribed = await relayContract.checkGunKeySubscription(
+        gunPubKey
+      );
+      if (!isSubscribed) {
+        return res.status(403).json({
+          success: false,
+          error: "Nessuna sottoscrizione attiva trovata per questa Gun key",
+        });
+      }
+
+      // Verifica che ci siano MB sufficienti
+      const hasMB = await relayContract.checkGunKeyMB(gunPubKey, mbUsed);
+      if (!hasMB) {
+        return res.status(403).json({
+          success: false,
+          error: "MB insufficienti per questa operazione",
+        });
+      }
+
+      // Registra l'uso di MB
+      const tx = await relayContract.recordMBUsage(gunPubKey, mbUsed);
+      await tx.wait();
+
+      // Ottieni i MB rimanenti
+      const remainingMB = await relayContract.getRemainingMB(
+        gunPubKey,
+        process.env.RELAY_CONTRACT_ADDRESS
+      );
+
+      res.json({
+        success: true,
+        message: "Uso MB registrato con successo",
+        gunPubKey,
+        mbUsed: Number(mbUsed),
+        remainingMB: Number(remainingMB),
+        transactionHash: tx.hash,
+      });
+    } catch (error) {
+      console.error("Errore registrazione uso MB:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore registrazione uso MB",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint per ottenere i MB rimanenti di una Gun key
+  app.get("/api/gunkey-mb/:gunPubKey", async (req, res) => {
+    try {
+      const { gunPubKey } = req.params;
+
+      if (!gunPubKey) {
+        return res.status(400).json({
+          success: false,
+          error: "Gun public key richiesta",
+        });
+      }
+
+      if (!relayContract) {
+        return res.status(500).json({
+          success: false,
+          error: "Contratto relay non configurato",
+        });
+      }
+
+      // Ottieni i MB rimanenti
+      const remainingMB = await relayContract.getRemainingMB(
+        gunPubKey,
+        process.env.RELAY_CONTRACT_ADDRESS
+      );
+
+      res.json({
+        success: true,
+        gunPubKey,
+        remainingMB: Number(remainingMB),
+      });
+    } catch (error) {
+      console.error("Errore ottenimento MB rimanenti:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore ottenimento MB rimanenti",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint per verificare se una Gun key ha MB sufficienti
+  app.post("/api/check-gunkey-mb", async (req, res) => {
+    try {
+      const { gunPubKey, mbRequired } = req.body;
+
+      if (!gunPubKey || !mbRequired) {
+        return res.status(400).json({
+          success: false,
+          error: "gunPubKey e mbRequired sono richiesti",
+        });
+      }
+
+      if (!relayContract) {
+        return res.status(500).json({
+          success: false,
+          error: "Contratto relay non configurato",
+        });
+      }
+
+      // Verifica se ha MB sufficienti
+      const hasMB = await relayContract.checkGunKeyMB(gunPubKey, mbRequired);
+
+      res.json({
+        success: true,
+        gunPubKey,
+        mbRequired: Number(mbRequired),
+        hasSufficientMB: hasMB,
+      });
+    } catch (error) {
+      console.error("Errore verifica MB Gun key:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore verifica MB Gun key",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint per ottenere le informazioni del contratto (prezzi, durata, ecc.)
+  app.get("/api/contract-info", async (req, res) => {
+    try {
+      if (!relayContract) {
+        return res.status(500).json({
+          success: false,
+          error: "Contratto relay non configurato",
+        });
+      }
+
+      // Ottieni tutte le informazioni del contratto
+      const pricePerGB = await relayContract.PRICE_PER_GB();
+      const mbPerGB = await relayContract.MB_PER_GB();
+      const minSubscriptionAmount =
+        await relayContract.MIN_SUBSCRIPTION_AMOUNT();
+      const subscriptionDuration = await relayContract.SUBSCRIPTION_DURATION();
+      const allRelays = await relayContract.getAllRelays();
+
+      res.json({
+        success: true,
+        contract: {
+          address: RELAY_CONTRACT_ADDRESS,
+          pricePerGB: ethers.formatEther(pricePerGB),
+          mbPerGB: Number(mbPerGB),
+          minSubscriptionAmount: ethers.formatEther(minSubscriptionAmount),
+          subscriptionDuration: Number(subscriptionDuration),
+          subscriptionDurationDays:
+            Number(subscriptionDuration) / (24 * 60 * 60),
+          registeredRelays: allRelays.length,
+        },
+        pricing: {
+          pricePerMB: ethers.formatEther(pricePerGB / mbPerGB),
+          pricePerGB: ethers.formatEther(pricePerGB),
+          minMB: Number((minSubscriptionAmount * mbPerGB) / pricePerGB),
+        },
+      });
+    } catch (error) {
+      console.error("Errore ottenimento info contratto:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore ottenimento info contratto",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint per ottenere le statistiche di utilizzo MB di un utente
+  app.get("/api/user-mb-stats/:identifier", async (req, res) => {
+    try {
+      const { identifier } = req.params;
+
+      if (!identifier) {
+        return res.status(400).json({
+          success: false,
+          error: "Identificatore richiesto (userAddress o gunPubKey)",
+        });
+      }
+
+      if (!relayContract) {
+        return res.status(500).json({
+          success: false,
+          error: "Contratto relay non configurato",
+        });
+      }
+
+      let userAddress = null;
+      let gunPubKey = null;
+
+      // Determina se l'identificatore è un indirizzo Ethereum o una Gun key
+      if (identifier.startsWith("0x") && identifier.length === 42) {
+        userAddress = identifier;
+      } else {
+        gunPubKey = identifier;
+
+        // Se è una Gun key, cerca il mapping per ottenere l'indirizzo
+        if (gunPubKey) {
+          const mappingNode = gun
+            .get("shogun")
+            .get("pubkey_mapping")
+            .get(gunPubKey);
+          const mapping = await new Promise((resolve) => {
+            mappingNode.once((data) => {
+              resolve(data);
+            });
+          });
+
+          if (mapping && mapping.userAddress) {
+            userAddress = mapping.userAddress;
+          }
+        }
+      }
+
+      // Ottieni tutti i relay registrati
+      const allRelays = await relayContract.getAllRelays();
+      if (allRelays.length === 0) {
+        return res.json({
+          success: true,
+          identifier,
+          userAddress,
+          gunPubKey,
+          stats: {
+            hasSubscription: false,
+            reason: "Nessun relay registrato nel contratto",
+          },
+        });
+      }
+
+      const relayAddress = allRelays[0];
+
+      try {
+        let subscriptionDetails = null;
+        let isActive = false;
+
+        // Prova prima con l'indirizzo utente
+        if (userAddress) {
+          try {
+            isActive = await relayContract.isSubscriptionActive(
+              userAddress,
+              relayAddress
+            );
+            if (isActive) {
+              subscriptionDetails = await relayContract.getSubscriptionDetails(
+                userAddress,
+                relayAddress
+              );
+            }
+          } catch (e) {
+            console.log(
+              "Errore verifica sottoscrizione per indirizzo:",
+              e.message
+            );
+          }
+        }
+
+        // Se non trovato con indirizzo, prova con Gun key
+        if (!isActive && gunPubKey) {
+          try {
+            isActive = await relayContract.isSubscriptionActiveByGunKey(
+              gunPubKey,
+              relayAddress
+            );
+            if (isActive) {
+              subscriptionDetails =
+                await relayContract.getSubscriptionDetailsByGunKey(
+                  gunPubKey,
+                  relayAddress
+                );
+            }
+          } catch (e) {
+            console.log(
+              "Errore verifica sottoscrizione per Gun key:",
+              e.message
+            );
+          }
+        }
+
+        if (isActive && subscriptionDetails) {
+          const mbAllocated = Number(subscriptionDetails.mbAllocated);
+          const mbUsed = Number(subscriptionDetails.mbUsed);
+          const mbRemaining = Number(subscriptionDetails.mbRemaining);
+          const usagePercentage =
+            mbAllocated > 0 ? (mbUsed / mbAllocated) * 100 : 0;
+
+          res.json({
+            success: true,
+            identifier,
+            userAddress,
+            gunPubKey,
+            relayAddress,
+            stats: {
+              hasSubscription: true,
+              isActive: true,
+              mbAllocated,
+              mbUsed,
+              mbRemaining,
+              usagePercentage: Math.round(usagePercentage * 100) / 100,
+              startTime: Number(subscriptionDetails.startTime),
+              endTime: Number(subscriptionDetails.endTime),
+              startDate: new Date(
+                Number(subscriptionDetails.startTime) * 1000
+              ).toISOString(),
+              endDate: new Date(
+                Number(subscriptionDetails.endTime) * 1000
+              ).toISOString(),
+              daysRemaining: Math.max(
+                0,
+                Math.ceil(
+                  (Number(subscriptionDetails.endTime) * 1000 - Date.now()) /
+                    (1000 * 60 * 60 * 24)
+                )
+              ),
+            },
+          });
+        } else {
+          res.json({
+            success: true,
+            identifier,
+            userAddress,
+            gunPubKey,
+            relayAddress,
+            stats: {
+              hasSubscription: false,
+              reason: "Nessuna sottoscrizione attiva trovata",
+            },
+          });
+        }
+      } catch (error) {
+        console.error("Errore ottenimento statistiche MB:", error);
+        res.status(500).json({
+          success: false,
+          error: "Errore ottenimento statistiche MB",
+          details: error.message,
+        });
+      }
+    } catch (error) {
+      console.error("Errore endpoint user-mb-stats:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore interno del server",
+        details: error.message,
+      });
+    }
   });
 } // End of initializeServer function
 
