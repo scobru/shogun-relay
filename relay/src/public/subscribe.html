@@ -530,10 +530,16 @@
                 }
 
                 const identifier = gunKeyPair.pub;
+                console.log('🔍 Checking existing subscription for Gun key:', identifier);
+
                 const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
+                console.log('📡 Existing subscription response status:', response.status);
+
                 const result = await response.json();
+                console.log('📋 Existing subscription response data:', result);
 
                 if (result.success && result.subscription.isActive) {
+                    console.log('🎉 Found existing ACTIVE subscription!');
                     showNotification('You already have an active subscription!', 'info');
 
                     // Mostra i dettagli della sottoscrizione esistente
@@ -545,11 +551,14 @@
                     updateStep(3, 'step-completed');
 
                     return true;
+                } else {
+                    console.log('❌ No existing subscription found or not active');
+                    console.log('📊 Subscription details:', result.subscription);
                 }
 
                 return false;
             } catch (error) {
-                console.error('Error checking existing subscription:', error);
+                console.error('💥 Error checking existing subscription:', error);
                 showNotification('Error checking subscription status', 'error');
                 return false;
             }
@@ -1088,14 +1097,23 @@
 
                 // Usa il nuovo endpoint ibrido che supporta sia pubKey che userAddress
                 const identifier = gunKeyPair?.pub || walletAddress;
+                console.log('🔍 Checking subscription status for identifier:', identifier);
+
                 const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
+                console.log('📡 Response status:', response.status);
+
                 const result = await response.json();
+                console.log('📋 Response data:', result);
 
                 if (result.success) {
+                    console.log('✅ Subscription check successful');
+                    console.log('📊 Subscription details:', result.subscription);
+
                     displaySubscriptionStatus(result);
 
                     // Se la sottoscrizione è attiva, mostra anche lo stato nel step 3
                     if (result.subscription.isActive) {
+                        console.log('🎉 Subscription is ACTIVE!');
                         subscriptionStatus.classList.remove('hidden');
                         statusContent.innerHTML = `
                             <div class="flex items-center gap-2 text-success">
@@ -1108,23 +1126,32 @@
                                 You can now use the upload endpoint with your Gun public key: <strong>${gunKeyPair?.pub || 'N/A'}</strong>
                             </p>
                         `;
+                    } else {
+                        console.log('❌ Subscription is NOT active. Reason:', result.subscription.reason);
                     }
                 } else {
+                    console.error('❌ Subscription check failed:', result.error);
                     showNotification(`Failed to check subscription: ${result.error}`, 'error');
                 }
 
             } catch (error) {
-                console.error('Error checking subscription status:', error);
+                console.error('💥 Error checking subscription status:', error);
                 showNotification(`Error checking subscription: ${error.message}`, 'error');
             }
         }
 
         // Funzione per visualizzare lo stato della sottoscrizione
         function displaySubscriptionStatus(data) {
+            console.log('🎨 Displaying subscription status with data:', data);
+
             const detailsContainer = document.getElementById('subscriptionDetails');
             const subscription = data.subscription;
 
+            console.log('📊 Subscription object:', subscription);
+            console.log('🔍 isActive:', subscription.isActive);
+
             if (subscription.isActive) {
+                console.log('✅ Displaying ACTIVE subscription');
                 detailsContainer.innerHTML = `
                     <div class="space-y-3">
                         <div class="flex items-center gap-2 text-success">
@@ -1217,6 +1244,7 @@
                     </div>
                 `;
             } else {
+                console.log('❌ Displaying INACTIVE subscription. Reason:', subscription.reason);
                 detailsContainer.innerHTML = `
                     <div class="space-y-3">
                         <div class="flex items-center gap-2 text-error">
