@@ -232,14 +232,44 @@
         let relayContract = null;
         let gunKeyPair = null;
 
-        // Contract configuration
-        const RELAY_CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000000'; // Sostituisci con l'indirizzo reale
+        // Contract configuration - caricata dinamicamente
+        let RELAY_CONTRACT_ADDRESS = null;
         const RELAY_ABI = [
             "function SUBSCRIPTION_PRICE() view returns (uint256)",
-            "function subscribeToRelay(address) payable",
-            "function checkUserSubscription(address) view returns (bool)",
-            "function isSubscriptionActive(address, address) view returns (bool)"
+            "function SUBSCRIPTION_DURATION() view returns (uint256)",
+            "function subscribeToRelay(address _relayAddress) payable",
+            "function checkUserSubscription(address _user) external view returns (bool)",
+            "function isSubscriptionActive(address _user, address _relayAddress) external view returns (bool)",
+            "function getSubscriptionDetails(address _user, address _relayAddress) external view returns (uint256 startTime, uint256 endTime, uint256 amountPaid, bool isActive)",
+            "function getRelayDetails(address _relayAddress) external view returns (string memory url, address relayAddress, bool isActive, uint256 registeredAt)",
+            "function getAllRelays() external view returns (address[] memory)",
+            "function registerRelay(string memory _url) external",
+            "function deactivateRelay() external"
         ];
+
+        // Indirizzo del relay registrato (da aggiornare con quello reale)
+        let registeredRelayAddress = null;
+
+        // Load contract configuration
+        async function loadContractConfig() {
+            try {
+                const response = await fetch('/api/contract-config');
+                const config = await response.json();
+
+                if (config.success && config.contract.address) {
+                    RELAY_CONTRACT_ADDRESS = config.contract.address;
+                    console.log('Contract configuration loaded:', config);
+                    return true;
+                } else {
+                    showStatus('Failed to load contract configuration', 'error');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error loading contract config:', error);
+                showStatus('Error loading contract configuration', 'error');
+                return false;
+            }
+        }
 
         // DOM elements
         const connectWalletBtn = document.getElementById('connectWalletBtn');
@@ -285,11 +315,25 @@
             }
         }
 
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Load contract configuration on page load
+            await loadContractConfig();
+            showStatus('Enter your Ethereum wallet address and Gun public key to start uploading files', 'info');
+        });
+
         // Wallet connection
         async function connectWallet() {
             try {
                 if (typeof window.ethereum === 'undefined') {
                     showStatus('MetaMask is not installed. Please install MetaMask first.', 'error');
+                    return;
+                }
+
+                // Load contract configuration first
+                const configLoaded = await loadContractConfig();
+                if (!configLoaded) {
+                    showStatus('Failed to load contract configuration. Please try again.', 'error');
                     return;
                 }
 
@@ -306,6 +350,9 @@
                 // Initialize contract
                 relayContract = new ethers.Contract(RELAY_CONTRACT_ADDRESS, RELAY_ABI, signer);
 
+                // Get registered relay address
+                await getRegisteredRelayAddress();
+
                 showStatus('Wallet connected successfully!', 'success');
                 updateStep(1, 'step-completed');
 
@@ -314,6 +361,22 @@
 
             } catch (error) {
                 showStatus(`Failed to connect wallet: ${error.message}`, 'error');
+            }
+        }
+
+        // Get registered relay address
+        async function getRegisteredRelayAddress() {
+            try {
+                const allRelays = await relayContract.getAllRelays();
+                if (allRelays.length > 0) {
+                    registeredRelayAddress = allRelays[0]; // Usa il primo relay registrato
+                    console.log('Registered relay address:', registeredRelayAddress);
+                } else {
+                    showStatus('No relay registered in the contract. Please register a relay first.', 'warning');
+                }
+            } catch (error) {
+                console.error('Failed to get registered relay address:', error);
+                showStatus('Failed to get relay information', 'error');
             }
         }
 
@@ -405,11 +468,16 @@
                     return;
                 }
 
+                if (!registeredRelayAddress) {
+                    showStatus('No relay available for subscription. Please try again later.', 'error');
+                    return;
+                }
+
                 const pricePerMonth = await relayContract.SUBSCRIPTION_PRICE();
                 const totalCost = pricePerMonth; // Prezzo fisso per 30 giorni
 
-                // Subscribe usando l'indirizzo del wallet
-                const tx = await relayContract.subscribeToRelay(RELAY_CONTRACT_ADDRESS, {
+                // Subscribe usando l'indirizzo del relay registrato
+                const tx = await relayContract.subscribeToRelay(registeredRelayAddress, {
                     value: totalCost
                 });
 
@@ -430,15 +498,16 @@
 
         async function checkSubscriptionStatus() {
             try {
-                if (!relayContract || !walletAddress) return;
+                if (!relayContract || !walletAddress || !registeredRelayAddress) return;
 
                 let isSubscribed = false;
 
                 try {
+                    // Usa checkUserSubscription che verifica la sottoscrizione per questo relay specifico
                     isSubscribed = await relayContract.checkUserSubscription(walletAddress);
                 } catch (e) {
                     // Fallback per compatibilità
-                    isSubscribed = await relayContract.isSubscriptionActive(walletAddress, RELAY_CONTRACT_ADDRESS);
+                    isSubscribed = await relayContract.isSubscriptionActive(walletAddress, registeredRelayAddress);
                 }
 
                 if (isSubscribed) {

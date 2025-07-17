@@ -1471,6 +1471,69 @@ async function initializeServer() {
     });
   });
 
+  // Endpoint per esporre la configurazione del contratto
+  app.get("/api/contract-config", (req, res) => {
+    res.json({
+      success: true,
+      contract: {
+        address: RELAY_CONTRACT_ADDRESS,
+        network: "sepolia",
+        provider: WEB3_PROVIDER_URL ? "configured" : "not configured",
+      },
+      relay: {
+        address: process.env.RELAY_HOST || ip.address(),
+        port: port,
+        url: `http://${process.env.RELAY_HOST || ip.address()}:${port}`,
+      },
+    });
+  });
+
+  // Endpoint per verificare lo stato del contratto
+  app.get("/api/contract-status", async (req, res) => {
+    try {
+      if (!relayContract) {
+        return res.json({
+          success: false,
+          error: "Contract not configured",
+          contract: {
+            address: RELAY_CONTRACT_ADDRESS,
+            configured: false,
+          },
+        });
+      }
+
+      // Verifica se il contratto è accessibile
+      const subscriptionPrice = await relayContract.SUBSCRIPTION_PRICE();
+      const allRelays = await relayContract.getAllRelays();
+
+      res.json({
+        success: true,
+        contract: {
+          address: RELAY_CONTRACT_ADDRESS,
+          configured: true,
+          accessible: true,
+          subscriptionPrice: ethers.formatEther(subscriptionPrice),
+          registeredRelays: allRelays.length,
+        },
+        relay: {
+          address: process.env.RELAY_HOST || ip.address(),
+          port: port,
+          url: `http://${process.env.RELAY_HOST || ip.address()}:${port}`,
+        },
+      });
+    } catch (error) {
+      res.json({
+        success: false,
+        error: error.message,
+        contract: {
+          address: RELAY_CONTRACT_ADDRESS,
+          configured: true,
+          accessible: false,
+        },
+      });
+    }
+  });
+
   // All data endpoint - reads directly from the live in-memory graph.
   app.get("/api/alldata", tokenAuthMiddleware, (req, res) => {
     try {
