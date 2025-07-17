@@ -793,6 +793,8 @@
                 signer = await provider.getSigner();
                 walletAddress = await signer.getAddress();
 
+                console.log('🔑 Wallet address set to:', walletAddress);
+
                 // Verify we're on the correct network
                 const network = await provider.getNetwork();
                 console.log('Connected to network:', network);
@@ -809,6 +811,9 @@
                 // Get registered relay address
                 await getRegisteredRelayAddress();
 
+                console.log('🔑 Wallet address after relay setup:', walletAddress);
+                console.log('🏠 Registered relay address:', registeredRelayAddress);
+
                 showNotification('Wallet connected successfully!', 'success');
                 updateStep(1, 'step-completed');
 
@@ -820,7 +825,7 @@
                 await loadSubscriptionDetails();
 
                 // Controlla lo stato della sottoscrizione attuale
-                console.log('🔄 Calling checkCurrentSubscriptionStatus...');
+                console.log('🔄 Calling checkCurrentSubscriptionStatus with wallet:', walletAddress);
                 try {
                     await checkCurrentSubscriptionStatus();
                     console.log('✅ checkCurrentSubscriptionStatus completed');
@@ -1100,6 +1105,8 @@
         async function checkCurrentSubscriptionStatus() {
             try {
                 console.log('🔍 checkCurrentSubscriptionStatus called');
+                console.log('🔑 Current walletAddress:', walletAddress);
+                console.log('🏠 Current registeredRelayAddress:', registeredRelayAddress);
 
                 if (!walletAddress) {
                     console.log('❌ No wallet address');
@@ -1122,6 +1129,7 @@
 
                 const identifier = walletAddress;
                 console.log('🔍 Checking subscription for wallet:', identifier);
+                console.log('🔍 Making API call to:', `/api/subscription-status/${encodeURIComponent(identifier)}`);
 
                 const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
                 console.log('📡 Response status:', response.status);
