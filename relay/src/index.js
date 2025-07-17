@@ -755,7 +755,9 @@ async function initializeServer() {
               let mbUsageRecorded = false;
               if (relayContract && req.userPubKey) {
                 try {
-                  const fileSizeMB = +(req.file.size / 1024 / 1024).toFixed(2);
+                  // Calcola MB arrotondando sempre verso l'alto e convertendo in intero
+                  const fileSizeBytes = req.file.size;
+                  const fileSizeMB = Math.ceil(fileSizeBytes / (1024 * 1024)); // Arrotonda sempre verso l'alto
 
                   // Ottieni l'indirizzo del relay
                   const allRelays = await relayContract.getAllRelays();
@@ -774,7 +776,9 @@ async function initializeServer() {
                       10
                     )}...`
                   );
-                  console.log(`📏 File size: ${fileSizeMB} MB`);
+                  console.log(
+                    `📏 File size: ${fileSizeBytes} bytes = ${fileSizeMB} MB (arrotondato)`
+                  );
                   console.log(`🏠 Relay address: ${relayAddress}`);
 
                   // Verifica che ci siano MB sufficienti usando hasAvailableMB
@@ -852,7 +856,10 @@ async function initializeServer() {
                 },
                 mbUsage: {
                   recorded: mbUsageRecorded,
-                  sizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                  sizeMB: mbUsageRecorded
+                    ? Math.ceil(req.file.size / (1024 * 1024))
+                    : +(req.file.size / 1024 / 1024).toFixed(2),
+                  actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
                 },
                 ipfsResponse: results,
               });

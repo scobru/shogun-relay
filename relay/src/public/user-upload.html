@@ -290,6 +290,9 @@
             }
 
             try {
+                setAuthBtn.disabled = true;
+                setAuthBtn.textContent = 'Verifying...';
+
                 // Verifica che il wallet corrisponda alla Gun key registrata nel contratto
                 const response = await fetch(`/api/verify-gunkey-ownership`, {
                     method: 'POST',
@@ -301,6 +304,10 @@
                         walletAddress: walletAddress
                     })
                 });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
 
                 const result = await response.json();
 
@@ -319,7 +326,14 @@
                 }
             } catch (error) {
                 console.error('Error verifying ownership:', error);
-                showStatus('Error verifying wallet ownership. Please try again.', 'error');
+                if (error.message.includes('Failed to fetch') || error.message.includes('net::ERR_NAME_NOT_RESOLVED')) {
+                    showStatus('❌ Connection error. Please check your internet connection and try again.', 'error');
+                } else {
+                    showStatus(`❌ Error verifying wallet ownership: ${error.message}`, 'error');
+                }
+            } finally {
+                setAuthBtn.disabled = false;
+                setAuthBtn.textContent = 'Set Authorization';
             }
         }
 
@@ -361,6 +375,7 @@
 
             try {
                 uploadBtn.disabled = true;
+                uploadBtn.textContent = 'Uploading...';
                 uploadProgress.classList.remove('hidden');
 
                 const formData = new FormData();
@@ -378,17 +393,34 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showStatus(`File uploaded successfully! Hash: ${result.file.hash}`, 'success');
+                    const actualSize = result.mbUsage.actualSizeMB;
+                    const chargedSize = result.mbUsage.sizeMB;
+                    const sizeInfo = actualSize !== chargedSize ?
+                        ` (${actualSize} MB actual, ${chargedSize} MB charged)` :
+                        ` (${chargedSize} MB)`;
+
+                    showStatus(`✅ File uploaded successfully! Hash: ${result.file.hash}${sizeInfo}`, 'success');
                     fileInput.value = '';
                     loadUserFiles(); // Refresh files list
                 } else {
-                    showStatus(`Upload failed: ${result.error}`, 'error');
+                    let errorMessage = result.error;
+
+                    // Gestisci errori specifici
+                    if (result.error === 'Storage insufficiente per questo file') {
+                        errorMessage = `❌ Storage insufficiente! File requires ${result.details.requiredMB} MB. Please add more MB to your subscription.`;
+                    } else if (result.error === 'Errore verifica storage disponibile') {
+                        errorMessage = `❌ Storage verification error: ${result.details}`;
+                    }
+
+                    showStatus(errorMessage, 'error');
                 }
 
             } catch (error) {
-                showStatus(`Upload error: ${error.message}`, 'error');
+                console.error('Upload error:', error);
+                showStatus(`❌ Upload error: ${error.message}`, 'error');
             } finally {
                 uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload File';
                 uploadProgress.classList.add('hidden');
             }
         }
