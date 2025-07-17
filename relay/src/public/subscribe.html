@@ -279,6 +279,11 @@
 
                 if (status.success) {
                     console.log('Contract status:', status);
+                    // Usa l'indirizzo del contratto dal backend
+                    if (status.contract.address && status.contract.address !== RELAY_CONTRACT_ADDRESS) {
+                        RELAY_CONTRACT_ADDRESS = status.contract.address;
+                        console.log('Updated contract address from status:', RELAY_CONTRACT_ADDRESS);
+                    }
                     return true;
                 } else {
                     console.error('Contract status error:', status.error);
@@ -364,6 +369,13 @@
                     return;
                 }
 
+                // Check contract status and get the correct address
+                const statusOk = await checkContractStatus();
+                if (!statusOk) {
+                    showStatus('Failed to verify contract status. Please try again.', 'error');
+                    return;
+                }
+
                 provider = new ethers.BrowserProvider(window.ethereum);
                 await provider.send("eth_requestAccounts", []);
                 signer = await provider.getSigner();
@@ -374,8 +386,9 @@
                 walletInfo.classList.remove('hidden');
                 connectWalletBtn.classList.add('hidden');
 
-                // Initialize contract
+                // Initialize contract with the correct address from backend
                 relayContract = new ethers.Contract(RELAY_CONTRACT_ADDRESS, RELAY_ABI, signer);
+                console.log('Contract initialized with address:', RELAY_CONTRACT_ADDRESS);
 
                 // Get registered relay address
                 await getRegisteredRelayAddress();
@@ -399,7 +412,10 @@
                     return;
                 }
 
+                console.log('Calling getAllRelays() on contract:', RELAY_CONTRACT_ADDRESS);
                 const allRelays = await relayContract.getAllRelays();
+                console.log('getAllRelays() result:', allRelays);
+
                 if (allRelays.length > 0) {
                     registeredRelayAddress = allRelays[0]; // Usa il primo relay registrato
                     console.log('Registered relay address:', registeredRelayAddress);
@@ -408,6 +424,8 @@
                 }
             } catch (error) {
                 console.error('Failed to get registered relay address:', error);
+                console.error('Contract address used:', RELAY_CONTRACT_ADDRESS);
+                console.error('Provider:', provider);
                 showStatus('Failed to get relay information. Contract may not be accessible.', 'error');
             }
         }
@@ -476,7 +494,9 @@
                     return;
                 }
 
+                console.log('Calling SUBSCRIPTION_PRICE() on contract:', RELAY_CONTRACT_ADDRESS);
                 const pricePerMonth = await relayContract.SUBSCRIPTION_PRICE();
+                console.log('SUBSCRIPTION_PRICE() result:', pricePerMonth);
                 const priceInEth = ethers.formatEther(pricePerMonth);
 
                 document.getElementById('pricePerMonth').textContent = `${priceInEth} ETH`;
@@ -484,6 +504,8 @@
 
             } catch (error) {
                 console.error('Failed to load subscription details:', error);
+                console.error('Contract address used:', RELAY_CONTRACT_ADDRESS);
+                console.error('Provider:', provider);
                 showStatus('Failed to load subscription details. Contract may not be accessible.', 'error');
             }
         }
