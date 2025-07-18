@@ -37,7 +37,8 @@
                             <h3 class="text-lg font-semibold text-accent">Centralized Admin Authentication</h3>
                         </div>
                         <p class="text-sm text-base-content/70 mb-3">
-                            🔒 Set your password here once - it will auto-load on all admin pages (marked with 🔒)
+                            🔒 Inserisci la password admin per accedere a tutte le applicazioni. Se la password non è
+                            corretta, saranno visibili solo le applicazioni pubbliche.
                         </p>
                         <div class="space-y-3">
                             <div class="form-control">
@@ -218,21 +219,95 @@
                 updatePasswordStatus('⚠️ Please enter a password', 'text-warning');
                 return;
             }
-            ShogunAdmin.savePassword(password);
-            updatePasswordStatus('✅ Password saved successfully', 'text-success');
-            document.getElementById('adminPassword').value = '';
+
+            // Verifica la password con il server
+            verifyAdminPassword(password).then(isValid => {
+                if (isValid) {
+                    ShogunAdmin.savePassword(password);
+                    updatePasswordStatus('✅ Password admin corretta - Accesso completo', 'text-success');
+                    showAllApplications();
+                } else {
+                    updatePasswordStatus('❌ Password admin non corretta - Solo applicazioni pubbliche', 'text-error');
+                    showPublicApplicationsOnly();
+                }
+                document.getElementById('adminPassword').value = '';
+            }).catch(error => {
+                updatePasswordStatus('⚠️ Errore di verifica - Solo applicazioni pubbliche', 'text-warning');
+                showPublicApplicationsOnly();
+                console.error('Errore verifica password:', error);
+            });
+        }
+
+        // Verifica la password admin con il server
+        async function verifyAdminPassword(password) {
+            try {
+                const response = await fetch('/api/relay-info', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${password}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                // Se la risposta è 200, la password è corretta
+                return response.status === 200;
+            } catch (error) {
+                console.error('Errore durante la verifica della password:', error);
+                return false;
+            }
+        }
+
+        // Mostra tutte le applicazioni (admin autenticato)
+        function showAllApplications() {
+            const protectedApps = document.querySelectorAll('a[href*="/"]');
+            protectedApps.forEach(app => {
+                const lockIcon = app.querySelector('.absolute.right-3');
+                if (lockIcon) {
+                    app.style.display = 'flex';
+                    app.style.opacity = '1';
+                }
+            });
+
+            // Aggiorna il messaggio di stato
+            const statusEl = document.getElementById('passwordStatus');
+            if (statusEl) {
+                statusEl.innerHTML = '🔓 <strong>Accesso Admin Completo</strong> - Tutte le applicazioni disponibili';
+                statusEl.className = 'text-sm text-center text-success font-semibold';
+            }
+        }
+
+        // Mostra solo le applicazioni pubbliche
+        function showPublicApplicationsOnly() {
+            const protectedApps = document.querySelectorAll('a[href*="/"]');
+            protectedApps.forEach(app => {
+                const lockIcon = app.querySelector('.absolute.right-3');
+                if (lockIcon) {
+                    app.style.display = 'none';
+                }
+            });
+
+            // Aggiorna il messaggio di stato
+            const statusEl = document.getElementById('passwordStatus');
+            if (statusEl) {
+                statusEl.innerHTML = '🔒 <strong>Accesso Limitato</strong> - Solo applicazioni pubbliche visibili';
+                statusEl.className = 'text-sm text-center text-warning font-semibold';
+            }
         }
 
         function clearAdminPassword() {
             ShogunAdmin.clearPassword();
-            updatePasswordStatus('🗑️ Password cleared', 'text-info');
+            updatePasswordStatus('🗑️ Password cleared - Solo applicazioni pubbliche', 'text-info');
+            showPublicApplicationsOnly();
         }
 
         function updatePasswordStatus(message, className = '') {
             const statusEl = document.getElementById('passwordStatus');
             statusEl.textContent = message;
             statusEl.className = `text-sm text-center opacity-70 ${className}`;
-            setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'text-sm text-center opacity-70'; }, 3000);
+            setTimeout(() => {
+                statusEl.textContent = '';
+                statusEl.className = 'text-sm text-center opacity-70';
+            }, 5000);
         }
 
         function updateAuthSectionsVisibility() {
@@ -269,7 +344,24 @@
         // Load event
         window.addEventListener('DOMContentLoaded', async () => {
             updateAuthSectionsVisibility();
-            if (ShogunAdmin.hasPassword()) updatePasswordStatus('🔑 Admin password is stored', 'text-accent');
+
+            // Verifica se c'è già una password salvata
+            if (ShogunAdmin.hasPassword()) {
+                const savedPassword = ShogunAdmin.getPassword();
+                const isValid = await verifyAdminPassword(savedPassword);
+
+                if (isValid) {
+                    updatePasswordStatus('🔑 Password admin verificata - Accesso completo', 'text-success');
+                    showAllApplications();
+                } else {
+                    updatePasswordStatus('❌ Password admin non più valida - Solo applicazioni pubbliche', 'text-error');
+                    showPublicApplicationsOnly();
+                    ShogunAdmin.clearPassword();
+                }
+            } else {
+                // Nessuna password salvata, mostra solo applicazioni pubbliche
+                showPublicApplicationsOnly();
+            }
 
             try {
                 const response = await fetch('/api/relay-info');
