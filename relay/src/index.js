@@ -715,26 +715,88 @@ async function initializeServer() {
     }
   });
 
-  // Funzione helper per ottenere i MB utilizzati off-chain
+  // Funzione helper per ottenere i MB utilizzati off-chain calcolandoli in tempo reale dai file
   async function getOffChainMBUsage(userAddress) {
     return new Promise((resolve) => {
-      const mbUsageNode = gun.get("shogun").get("mb_usage").get(userAddress);
+      console.log(`📊 Calculating real-time MB usage for user: ${userAddress}`);
+
+      const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
 
       const timeoutId = setTimeout(() => {
         console.warn(
-          `⚠️ MB usage read timeout for ${userAddress}, using 0 as default`
+          `⚠️ MB usage calculation timeout for ${userAddress}, using 0 as default`
         );
         resolve(0);
       }, 10000); // 10 secondi
 
-      mbUsageNode.once((data) => {
+      uploadsNode.once((parentData) => {
         clearTimeout(timeoutId);
-        resolve(data?.mbUsed || 0);
+
+        if (!parentData || typeof parentData !== "object") {
+          console.log(`📊 No files found for ${userAddress}, MB usage: 0`);
+          resolve(0);
+          return;
+        }
+
+        // Ottieni tutte le chiavi dei file (escludendo i metadati Gun)
+        const hashKeys = Object.keys(parentData).filter((key) => key !== "_");
+
+        if (hashKeys.length === 0) {
+          console.log(`📊 No files found for ${userAddress}, MB usage: 0`);
+          resolve(0);
+          return;
+        }
+
+        console.log(
+          `📊 Found ${hashKeys.length} files for ${userAddress}, calculating total MB...`
+        );
+
+        // Calcola i MB totali dai file
+        let totalMB = 0;
+        let completedReads = 0;
+        const totalReads = hashKeys.length;
+
+        // Timeout per il calcolo complessivo
+        const calculationTimeout = setTimeout(() => {
+          console.warn(
+            `⚠️ MB calculation timeout, using partial result: ${totalMB} MB`
+          );
+          resolve(totalMB);
+        }, 8000);
+
+        hashKeys.forEach((hash) => {
+          uploadsNode.get(hash).once((fileData) => {
+            completedReads++;
+
+            if (fileData && fileData.sizeMB) {
+              totalMB += fileData.sizeMB;
+              console.log(
+                `📊 File ${hash}: ${fileData.sizeMB} MB (${fileData.name})`
+              );
+            } else if (fileData && fileData.size) {
+              // Fallback: calcola MB dalla dimensione in bytes
+              const fileMB = Math.ceil(fileData.size / (1024 * 1024));
+              totalMB += fileMB;
+              console.log(
+                `📊 File ${hash}: ${fileMB} MB (calculated from ${fileData.size} bytes)`
+              );
+            }
+
+            // Se abbiamo letto tutti i file, risolvi
+            if (completedReads === totalReads) {
+              clearTimeout(calculationTimeout);
+              console.log(
+                `📊 Total MB usage for ${userAddress}: ${totalMB} MB (${totalReads} files)`
+              );
+              resolve(totalMB);
+            }
+          });
+        });
       });
     });
   }
 
-  // Funzione helper per salvare upload e aggiornare MB in modo sincrono (solo off-chain)
+  // Funzione helper per salvare upload (senza aggiornare MB counter, calcoliamo in tempo reale)
   async function saveUploadAndUpdateMB(
     userAddress,
     fileHash,
@@ -744,10 +806,10 @@ async function initializeServer() {
     return new Promise(async (resolve, reject) => {
       try {
         console.log(
-          `💾 Saving upload and updating MB for user: ${userAddress}`
+          `💾 Saving upload for user: ${userAddress}, file: ${fileHash} (${fileSizeMB} MB)`
         );
 
-        // 1. Salva l'upload nel database Gun
+        // Salva l'upload nel database Gun
         const uploadNode = gun.get("shogun").get("uploads").get(userAddress);
         const dataToSave = {};
         dataToSave[fileHash] = uploadData;
@@ -771,50 +833,9 @@ async function initializeServer() {
 
         await uploadPromise;
 
-        // 2. Aggiorna i MB utilizzati off-chain
-        const mbUsageNode = gun.get("shogun").get("mb_usage").get(userAddress);
-
-        // Ottieni l'uso MB corrente con timeout esteso
-        const currentUsage = await new Promise((resolve) => {
-          const timeoutId = setTimeout(() => {
-            console.warn(`⚠️ MB usage read timeout, using 0 as default`);
-            resolve({ mbUsed: 0, lastUpdated: Date.now() });
-          }, 10000); // 10 secondi
-
-          mbUsageNode.once((data) => {
-            clearTimeout(timeoutId);
-            resolve(data || { mbUsed: 0, lastUpdated: Date.now() });
-          });
-        });
-
-        // Aggiorna l'uso MB
-        const updatedUsage = {
-          mbUsed: currentUsage.mbUsed + fileSizeMB,
-          lastUpdated: Date.now(),
-          updatedBy: "upload-endpoint",
-          fileCount: (currentUsage.fileCount || 0) + 1,
-        };
-
-        // Salva l'aggiornamento MB con timeout esteso
-        const mbUpdatePromise = new Promise((mbResolve, mbReject) => {
-          const timeoutId = setTimeout(() => {
-            mbReject(new Error("MB update timeout"));
-          }, 15000); // 15 secondi
-
-          mbUsageNode.put(updatedUsage, (ack) => {
-            clearTimeout(timeoutId);
-            if (ack.err) {
-              mbReject(new Error(`MB update error: ${ack.err}`));
-            } else {
-              console.log(
-                `✅ MB usage updated off-chain: ${currentUsage.mbUsed} + ${fileSizeMB} = ${updatedUsage.mbUsed} MB`
-              );
-              mbResolve();
-            }
-          });
-        });
-
-        await mbUpdatePromise;
+        // Calcola il nuovo totale MB in tempo reale per logging
+        const newTotalMB = await getOffChainMBUsage(userAddress);
+        console.log(`📊 New total MB usage after upload: ${newTotalMB} MB`);
 
         resolve();
       } catch (error) {
@@ -824,15 +845,15 @@ async function initializeServer() {
     });
   }
 
-  // Funzione helper per eliminare upload e aggiornare MB in modo sincrono (solo off-chain)
+  // Funzione helper per eliminare upload (senza aggiornare MB counter, calcoliamo in tempo reale)
   async function deleteUploadAndUpdateMB(userAddress, fileHash, fileSizeMB) {
     return new Promise(async (resolve, reject) => {
       try {
         console.log(
-          `🗑️ Deleting upload and updating MB for user: ${userAddress}, file: ${fileHash}`
+          `🗑️ Deleting upload for user: ${userAddress}, file: ${fileHash} (${fileSizeMB} MB)`
         );
 
-        // 1. Elimina l'upload dal database Gun
+        // Elimina l'upload dal database Gun
         const uploadNode = gun
           .get("shogun")
           .get("uploads")
@@ -857,53 +878,9 @@ async function initializeServer() {
 
         await deletePromise;
 
-        // 2. Aggiorna i MB utilizzati off-chain (sottrai i MB del file eliminato)
-        const mbUsageNode = gun.get("shogun").get("mb_usage").get(userAddress);
-
-        // Ottieni l'uso MB corrente con timeout esteso
-        const currentUsage = await new Promise((resolve) => {
-          const timeoutId = setTimeout(() => {
-            console.warn(`⚠️ MB usage read timeout, using 0 as default`);
-            resolve({ mbUsed: 0, lastUpdated: Date.now() });
-          }, 10000); // 10 secondi
-
-          mbUsageNode.once((data) => {
-            clearTimeout(timeoutId);
-            resolve(data || { mbUsed: 0, lastUpdated: Date.now() });
-          });
-        });
-
-        // Calcola il nuovo uso MB (non può essere negativo)
-        const newMBUsed = Math.max(0, currentUsage.mbUsed - fileSizeMB);
-
-        // Aggiorna l'uso MB
-        const updatedUsage = {
-          mbUsed: newMBUsed,
-          lastUpdated: Date.now(),
-          updatedBy: "delete-endpoint",
-          fileCount: Math.max(0, (currentUsage.fileCount || 0) - 1),
-        };
-
-        // Salva l'aggiornamento MB con timeout esteso
-        const mbUpdatePromise = new Promise((mbResolve, mbReject) => {
-          const timeoutId = setTimeout(() => {
-            mbReject(new Error("MB update timeout"));
-          }, 15000); // 15 secondi
-
-          mbUsageNode.put(updatedUsage, (ack) => {
-            clearTimeout(timeoutId);
-            if (ack.err) {
-              mbReject(new Error(`MB update error: ${ack.err}`));
-            } else {
-              console.log(
-                `✅ MB usage updated off-chain: ${currentUsage.mbUsed} - ${fileSizeMB} = ${updatedUsage.mbUsed} MB`
-              );
-              mbResolve();
-            }
-          });
-        });
-
-        await mbUpdatePromise;
+        // Calcola il nuovo totale MB in tempo reale per logging
+        const newTotalMB = await getOffChainMBUsage(userAddress);
+        console.log(`📊 New total MB usage after deletion: ${newTotalMB} MB`);
 
         resolve();
       } catch (error) {
@@ -1073,10 +1050,13 @@ async function initializeServer() {
       const fileSizeMB = Math.ceil(fileData.size / (1024 * 1024));
       console.log(`📊 File size: ${fileData.size} bytes (${fileSizeMB} MB)`);
 
-      // 3. Elimina il file e aggiorna i MB utilizzati
+      // 3. Ottieni l'utilizzo MB corrente prima dell'eliminazione
+      const previousMBUsed = await getOffChainMBUsage(identifier);
+
+      // 4. Elimina il file
       await deleteUploadAndUpdateMB(identifier, hash, fileSizeMB);
 
-      // 4. Ottieni il nuovo utilizzo MB per la risposta
+      // 5. Ottieni il nuovo utilizzo MB dopo l'eliminazione
       const newMBUsed = await getOffChainMBUsage(identifier);
 
       res.json({
@@ -1090,9 +1070,9 @@ async function initializeServer() {
           sizeMB: fileData.sizeMB,
         },
         mbUsage: {
-          previousMB: newMBUsed + fileSizeMB,
+          previousMB: previousMBUsed,
           currentMB: newMBUsed,
-          freedMB: fileSizeMB,
+          freedMB: previousMBUsed - newMBUsed,
         },
       });
     } catch (error) {
@@ -4104,117 +4084,37 @@ async function initializeServer() {
 
       console.log(`🔄 Syncing MB usage for user: ${userAddress}`);
 
-      // Calcola i MB totali dai file caricati
+      // Usa la funzione getOffChainMBUsage che ora calcola in tempo reale
+      const totalSizeMB = await getOffChainMBUsage(userAddress);
+
+      // Ottieni anche il numero di file per completezza
       const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
+      const fileCount = await new Promise((resolve) => {
+        const timeoutId = setTimeout(() => {
+          resolve(0);
+        }, 5000);
 
-      const getUploads = () => {
-        return new Promise((resolve, reject) => {
-          let timeoutId;
-          let dataReceived = false;
-
-          timeoutId = setTimeout(() => {
-            if (!dataReceived) {
-              resolve({ uploads: [], totalSizeMB: 0, error: null });
-            }
-          }, 10000);
-
-          uploadsNode.once((parentData) => {
-            dataReceived = true;
-            clearTimeout(timeoutId);
-
-            if (!parentData || typeof parentData !== "object") {
-              // Nessun file caricato - non è un errore, restituisce 0 MB
-              resolve({ uploads: [], totalSizeMB: 0, error: null });
-              return;
-            }
-
-            const hashKeys = Object.keys(parentData).filter(
-              (key) => key !== "_"
-            );
-
-            if (hashKeys.length === 0) {
-              resolve({ uploads: [], totalSizeMB: 0, error: null });
-              return;
-            }
-
-            let uploads = [];
-            let completedReads = 0;
-            const totalReads = hashKeys.length;
-
-            hashKeys.forEach((hash) => {
-              uploadsNode.get(hash).once((fileData) => {
-                completedReads++;
-                if (fileData && fileData.hash) {
-                  uploads.push(fileData);
-                }
-
-                if (completedReads === totalReads) {
-                  const totalSizeMB = uploads.reduce(
-                    (sum, file) => sum + (file.sizeMB || 0),
-                    0
-                  );
-
-                  resolve({
-                    uploads: uploads.sort(
-                      (a, b) => b.uploadedAt - a.uploadedAt
-                    ),
-                    totalSizeMB,
-                    error: null,
-                  });
-                }
-              });
-            });
-          });
+        uploadsNode.once((parentData) => {
+          clearTimeout(timeoutId);
+          if (!parentData || typeof parentData !== "object") {
+            resolve(0);
+            return;
+          }
+          const hashKeys = Object.keys(parentData).filter((key) => key !== "_");
+          resolve(hashKeys.length);
         });
-      };
+      });
 
-      const { uploads, totalSizeMB, error } = await getUploads();
+      console.log(`✅ MB usage synced: ${totalSizeMB} MB (${fileCount} files)`);
 
-      if (error) {
-        return res.status(500).json({
-          success: false,
-          error: `Errore nel calcolo dei MB: ${error}`,
-        });
-      }
-
-      console.log(
-        `📊 Calculated total MB from files: ${totalSizeMB} MB (${uploads.length} files)`
-      );
-
-      // Aggiorna l'uso MB nel database Gun
-      const mbUsageNode = gun.get("shogun").get("mb_usage").get(userAddress);
-
-      const updatedUsage = {
+      res.json({
+        success: true,
+        message: "MB usage synchronized successfully",
+        userAddress,
         mbUsed: totalSizeMB,
-        lastUpdated: Date.now(),
-        updatedBy: "sync-endpoint",
-        fileCount: uploads.length,
-      };
-
-      // Salva nel database Gun
-      mbUsageNode.put(updatedUsage, (ack) => {
-        if (ack.err) {
-          console.error("Error saving MB usage to Gun:", ack.err);
-          return res.status(500).json({
-            success: false,
-            error: "Errore nel salvataggio dei MB nel database",
-            details: ack.err,
-          });
-        }
-
-        console.log(
-          `✅ MB usage synced: ${totalSizeMB} MB (${uploads.length} files)`
-        );
-
-        res.json({
-          success: true,
-          message: "MB usage synchronized successfully",
-          userAddress,
-          mbUsed: totalSizeMB,
-          fileCount: uploads.length,
-          lastUpdated: new Date(updatedUsage.lastUpdated).toISOString(),
-          storage: "off-chain",
-        });
+        fileCount: fileCount,
+        lastUpdated: new Date().toISOString(),
+        storage: "real-time-calculation",
       });
     } catch (error) {
       console.error("Sync MB usage error:", error);
