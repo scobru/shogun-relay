@@ -1741,7 +1741,7 @@ async function initializeServer() {
     web: server,
     isValid: hasValidToken,
     uuid: process.env.RELAY_NAME,
-    localStorage: false, // Abilita localStorage per persistenza
+    localStorage: true, // Abilita localStorage per persistenza
     wire: true,
     axe: true,
     rfs: true,
