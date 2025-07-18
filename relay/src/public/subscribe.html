@@ -464,23 +464,20 @@
             "function subscribeToRelay(address _relayAddress) payable",
             "function addMBToSubscription(address _relayAddress) payable",
             "function recordMBUsage(address _user, uint256 _mbUsed) external",
-            "function checkUserSubscription(address _user) external view returns (bool)",
             "function isSubscriptionActive(address _user, address _relayAddress) external view returns (bool)",
             "function hasAvailableMB(address _user, address _relayAddress, uint256 _mbRequired) public view returns (bool)",
             "function getRemainingMB(address _user, address _relayAddress) public view returns (uint256)",
             "function getSubscriptionDetails(address _user, address _relayAddress) external view returns (uint256 startTime, uint256 endTime, uint256 amountPaid, uint256 mbAllocated, uint256 mbUsed, uint256 mbRemaining, bool isActive)",
             "function getRelayDetails(address _relayAddress) external view returns (string memory url, address relayAddress, bool isActive, uint256 registeredAt)",
             "function getAllRelays() external view returns (address[] memory)",
+            "function getActiveRelays() external view returns (address[] memory)",
+            "function findRelayByURL(string memory _url) external view returns (address)",
+            "function getActiveRelaysWithURLs() external view returns (address[] memory, string[] memory)",
+            "function isRelayRegistered(address _relayAddress) public view returns (bool)",
             "function registerRelay(string memory _url) external",
             "function deactivateRelay() external",
-            "function getRemainingMB(address _user, address _relayAddress) external view returns (uint256)",
-            "function hasAvailableMB(address _user, address _relayAddress, uint256 _mbRequired) external view returns (bool)",
-            "function isSubscriptionActive(address _user, address _relayAddress) external view returns (bool)",
-            "function getSubscriptionDetails(address _user, address _relayAddress) external view returns (uint256, uint256, uint256, uint256, uint256, uint256, bool)",
             "function getUserSubscriptions(address _user) external view returns (address[])",
             "function getRelaySubscribers(address _relayAddress) external view returns (address[])",
-            "function getRelayDetails(address _relayAddress) external view returns (string, address, bool, uint256)",
-            "function getAllRelays() external view returns (address[])",
             "function expireSubscription(address _user, address _relayAddress) external",
             "function updateContractFee(uint256 _newFee) external",
             "function withdrawFees() external",
@@ -912,13 +909,44 @@
                     return;
                 }
 
-                console.log('Calling getAllRelays() on contract:', RELAY_CONTRACT_ADDRESS);
+                // Ottieni l'URL corrente dell'applicazione
+                const currentURL = window.location.origin;
+                const relayURL = currentURL + '/gun';
+                console.log('🔍 Looking for relay with URL:', relayURL);
+
+                // Prova prima a trovare il relay specifico per questo URL
+                try {
+                    const specificRelayAddress = await relayContract.findRelayByURL(relayURL);
+                    if (specificRelayAddress && specificRelayAddress !== '0x0000000000000000000000000000000000000000') {
+                        registeredRelayAddress = specificRelayAddress;
+                        console.log('✅ Found specific relay for this URL:', registeredRelayAddress);
+                        return;
+                    }
+                } catch (error) {
+                    console.log('⚠️ Could not find specific relay by URL, trying fallback...');
+                }
+
+                // Fallback: ottieni tutti i relay e usa il primo
+                console.log('🔄 Using fallback: getting all relays');
                 const allRelays = await relayContract.getAllRelays();
                 console.log('getAllRelays() result:', allRelays);
 
                 if (allRelays.length > 0) {
                     registeredRelayAddress = allRelays[0]; // Usa il primo relay registrato
-                    console.log('Registered relay address:', registeredRelayAddress);
+                    console.log('📋 Using first available relay:', registeredRelayAddress);
+
+                    // Ottieni i dettagli del relay per mostrare informazioni all'utente
+                    try {
+                        const relayDetails = await relayContract.getRelayDetails(registeredRelayAddress);
+                        console.log('📊 Relay details:', relayDetails);
+
+                        // Mostra un avviso se non è il relay specifico
+                        if (relayDetails.url !== relayURL) {
+                            showNotification(`⚠️ Using relay: ${relayDetails.url} (not the current relay)`, 'warning');
+                        }
+                    } catch (detailsError) {
+                        console.log('Could not get relay details:', detailsError);
+                    }
                 } else {
                     showNotification('No relay registered in the contract. Please register a relay first.', 'warning');
                 }

@@ -30,7 +30,7 @@ services:
       - RELAY_PEERS=wss://ruling-mastodon-improved.ngrok-free.app/gun
       - RELAY_PROTECTED=true
       - ALCHEMY_API_KEY=yjhjIoJ3o_at8ALT7nCJtFtjdqFpiBdx
-      - RELAY_CONTRACT_ADDRESS=0x2597d38d0b968998cda2cF13b056E581806994e6
+      - RELAY_CONTRACT_ADDRESS=0xeF579165f21f33CE9768592Bf76FFF0185C82C91
       - IPFS_API_URL=http://127.0.0.1:5001
       - IPFS_GATEWAY_URL=http://127.0.0.1:8080
       - IPFS_API_TOKEN=shogun2025
