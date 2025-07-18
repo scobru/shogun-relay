@@ -509,7 +509,7 @@ async function initializeServer() {
     }
   );
 
-  // Endpoint upload IPFS per utenti smart contract (versione semplificata)
+  // Endpoint upload IPFS per utenti smart contract (versione migliorata)
   app.post("/ipfs-upload-user", upload.single("file"), async (req, res) => {
     try {
       if (!req.file) {
@@ -538,8 +538,9 @@ async function initializeServer() {
       }
 
       // Verifica che l'utente abbia una sottoscrizione attiva
+      let relayAddress;
       try {
-        // Ottieni tutti i relay registrati (stesso metodo di user-subscription-details)
+        // Ottieni tutti i relay registrati
         const allRelays = await relayContract.getAllRelays();
         if (allRelays.length === 0) {
           return res.status(500).json({
@@ -548,7 +549,7 @@ async function initializeServer() {
           });
         }
 
-        const relayAddress = allRelays[0];
+        relayAddress = allRelays[0];
         console.log(`🔍 Using relay address: ${relayAddress}`);
 
         const isSubscribed = await relayContract.isSubscriptionActive(
@@ -564,24 +565,33 @@ async function initializeServer() {
 
         // Verifica che ci siano MB sufficienti per questo file
         const fileSizeMB = Math.ceil(req.file.size / (1024 * 1024));
-        const hasMB = await relayContract.hasAvailableMB(
+
+        // Ottieni i MB utilizzati off-chain
+        const currentMBUsed = await getOffChainMBUsage(userAddress);
+        const subscriptionDetails = await relayContract.getSubscriptionDetails(
           userAddress,
-          relayAddress,
-          fileSizeMB
+          relayAddress
         );
-        if (!hasMB) {
+        const [, , , mbAllocated] = subscriptionDetails;
+        const mbAllocatedNum = Number(mbAllocated);
+
+        // Verifica se ci sono MB sufficienti
+        if (currentMBUsed + fileSizeMB > mbAllocatedNum) {
           return res.status(403).json({
             success: false,
             error: "Insufficient MB for this file",
             details: {
               requiredMB: fileSizeMB,
+              currentMBUsed: currentMBUsed,
+              mbAllocated: mbAllocatedNum,
+              mbRemaining: mbAllocatedNum - currentMBUsed,
               fileSize: req.file.size,
             },
           });
         }
 
         console.log(
-          `✅ User ${userAddress} has sufficient MB (${fileSizeMB} MB required)`
+          `✅ User ${userAddress} has sufficient MB (${fileSizeMB} MB required, ${currentMBUsed}/${mbAllocatedNum} MB used)`
         );
       } catch (contractError) {
         console.error(`❌ Contract verification error:`, contractError);
@@ -592,6 +602,7 @@ async function initializeServer() {
         });
       }
 
+      // Upload su IPFS
       const formData = new FormData();
       formData.append("file", req.file.buffer, {
         filename: req.file.originalname,
@@ -609,6 +620,7 @@ async function initializeServer() {
       if (IPFS_API_TOKEN) {
         requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
       }
+
       const ipfsReq = http.request(requestOptions, (ipfsRes) => {
         let data = "";
         ipfsRes.on("data", (chunk) => (data += chunk));
@@ -620,7 +632,7 @@ async function initializeServer() {
               results.find((r) => r.Name === req.file.originalname) ||
               results[0];
 
-            // Salva l'upload nel database Gun usando l'address come identificatore
+            // Prepara i dati dell'upload
             const uploadData = {
               hash: fileResult?.Hash,
               name: req.file.originalname,
@@ -636,250 +648,47 @@ async function initializeServer() {
               publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
             };
 
-            // Salva nel database Gun usando l'address come identificatore
-            const identifier = userAddress;
-            console.log(`💾 Salvando upload con identificatore: ${identifier}`);
-            console.log(`💾 Upload data:`, uploadData);
-            console.log(`💾 UserAddress:`, userAddress);
-            console.log(`💾 Identifier type:`, typeof identifier);
-            console.log(
-              `💾 Identifier length:`,
-              identifier ? identifier.length : 0
-            );
+            // Salva nel database Gun e aggiorna MB in modo sincrono
+            try {
+              await saveUploadAndUpdateMB(
+                userAddress,
+                fileResult?.Hash,
+                uploadData,
+                fileSizeMB
+              );
 
-            // Verifica che Gun sia disponibile
-            if (!gun) {
-              console.error(`❌ Gun DB non disponibile`);
-              return res.status(500).json({
+              // Risposta di successo
+              res.json({
+                success: true,
+                file: {
+                  hash: fileResult?.Hash,
+                  name: req.file.originalname,
+                  size: req.file.size,
+                  mimetype: req.file.mimetype,
+                  ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
+                    fileResult?.Hash
+                  }`,
+                  gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
+                  publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
+                },
+                user: {
+                  address: userAddress,
+                },
+                mbUsage: {
+                  actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                  sizeMB: fileSizeMB,
+                  verified: true,
+                },
+                ipfsResponse: results,
+              });
+            } catch (saveError) {
+              console.error("Error saving upload:", saveError);
+              res.status(500).json({
                 success: false,
-                error: "Database non disponibile",
+                error: "Error saving upload data",
+                details: saveError.message,
               });
             }
-
-            // Usa una struttura più semplice per Gun - salva direttamente nel nodo padre
-            console.log(`💾 Gun object available:`, !!gun);
-            console.log(`💾 Gun object type:`, typeof gun);
-            console.log(`💾 Gun object keys:`, gun ? Object.keys(gun) : "N/A");
-
-            const uploadNode = gun.get("shogun").get("uploads").get(identifier);
-
-            console.log(
-              `💾 Upload node created for path: shogun/uploads/${identifier}`
-            );
-            console.log(`💾 Upload node object:`, uploadNode);
-            console.log(`💾 Upload node type:`, typeof uploadNode);
-
-            // Salva i dati con Promise per attendere il completamento
-            const saveToGun = () => {
-              return new Promise((resolve, reject) => {
-                console.log(
-                  `💾 Iniziando salvataggio in Gun per hash: ${fileResult?.Hash}`
-                );
-                console.log(
-                  `💾 Upload node path: shogun/uploads/${identifier}`
-                );
-                console.log(
-                  `💾 Upload data to save:`,
-                  JSON.stringify(uploadData, null, 2)
-                );
-
-                // Timeout di 10 secondi per evitare che si blocchi
-                const timeoutId = setTimeout(() => {
-                  console.warn(
-                    `⚠️ Gun save timeout after 10 seconds for hash: ${fileResult?.Hash}`
-                  );
-                  resolve(); // Risolvi comunque per non bloccare l'upload
-                }, 10000);
-
-                // Salva direttamente nel nodo padre usando l'hash come chiave
-                console.log(
-                  `💾 Calling uploadNode.put({ [${fileResult?.Hash}]: uploadData })`
-                );
-                const dataToSave = {};
-                dataToSave[fileResult?.Hash] = uploadData;
-
-                // Usa un approccio più semplice, simile a notes.html
-                uploadNode.put(dataToSave, (ack) => {
-                  clearTimeout(timeoutId);
-                  console.log(`💾 Upload saved to Gun DB - ACK received:`, ack);
-                  console.log(`💾 ACK details:`, {
-                    err: ack.err,
-                    ok: ack.ok,
-                    pub: ack.pub,
-                    get: ack.get,
-                    put: ack.put,
-                    ack: ack.ack,
-                    "@": ack["@"],
-                    ">": ack[">"],
-                    "=": ack["="],
-                    _: ack._,
-                  });
-
-                  if (ack.err) {
-                    console.error(`❌ Error saving to Gun DB:`, ack.err);
-                    console.error(`❌ Full ACK error details:`, ack);
-                    // Non rifiutare, solo logga l'errore
-                    resolve();
-                  } else {
-                    console.log(`✅ Upload saved successfully to Gun DB`);
-                    console.log(`✅ ACK indicates success:`, ack.ok);
-                    resolve();
-                  }
-                });
-              });
-            };
-
-            // Salva in background senza bloccare l'upload
-            saveToGun()
-              .then(async () => {
-                console.log(`✅ File saved to Gun DB successfully`);
-
-                // Aggiorna i MB utilizzati nel contratto PRIMA di inviare la risposta
-                try {
-                  const fileSizeMB = Math.ceil(req.file.size / (1024 * 1024)); // Stesso calcolo usato in mbUsage
-                  console.log(
-                    `📊 Updating MB usage: ${fileSizeMB} MB for user ${userAddress} on relay ${relayAddress}`
-                  );
-
-                  // Registra l'uso MB off-chain nel database Gun
-                  const mbUsageNode = gun
-                    .get("shogun")
-                    .get("mb_usage")
-                    .get(userAddress);
-
-                  // Ottieni l'uso MB corrente
-                  const currentUsage = await new Promise((resolve) => {
-                    mbUsageNode.once((data) => {
-                      resolve(data || { mbUsed: 0, lastUpdated: Date.now() });
-                    });
-                  });
-
-                  // Aggiorna l'uso MB
-                  const updatedUsage = {
-                    mbUsed: currentUsage.mbUsed + fileSizeMB,
-                    lastUpdated: Date.now(),
-                    updatedBy: "upload-endpoint",
-                  };
-
-                  // Salva nel database Gun
-                  mbUsageNode.put(updatedUsage, (ack) => {
-                    if (ack.err) {
-                      console.error("Error saving MB usage to Gun:", ack.err);
-                      addSystemLog(
-                        "error",
-                        `Failed to save MB usage to Gun for ${userAddress}: ${ack.err}`
-                      );
-                    } else {
-                      console.log(
-                        `✅ MB usage updated off-chain: ${currentUsage.mbUsed} + ${fileSizeMB} = ${updatedUsage.mbUsed} MB`
-                      );
-                      addSystemLog(
-                        "info",
-                        `MB usage updated off-chain for ${userAddress}: ${updatedUsage.mbUsed} MB`
-                      );
-                    }
-                  });
-
-                  // Aggiorna anche nel contratto smart contract per sincronizzazione
-                  try {
-                    console.log(
-                      `📊 Recording MB usage in smart contract: ${fileSizeMB} MB`
-                    );
-                    const tx = await relayContract.recordMBUsage(
-                      userAddress,
-                      fileSizeMB
-                    );
-                    await tx.wait();
-                    console.log(
-                      `✅ MB usage recorded in smart contract: ${fileSizeMB} MB`
-                    );
-                  } catch (contractError) {
-                    console.error(
-                      `❌ Error recording MB usage in contract:`,
-                      contractError.message
-                    );
-                    // Non bloccare l'upload se l'aggiornamento del contratto fallisce
-                  }
-                } catch (mbError) {
-                  console.error(`❌ Error updating MB usage:`, mbError.message);
-                  // Non bloccare l'upload se l'aggiornamento MB fallisce
-                }
-
-                // Verifica immediata del salvataggio
-                setTimeout(() => {
-                  console.log(
-                    `🔍 Verifica immediata salvataggio per hash: ${fileResult?.Hash}`
-                  );
-                  console.log(
-                    `🔍 Reading from path: shogun/uploads/${identifier}`
-                  );
-
-                  uploadNode.once((savedData) => {
-                    console.log(`🔍 Dati salvati verificati:`, savedData);
-                    console.log(`🔍 Tipo di dati salvati:`, typeof savedData);
-                    console.log(
-                      `🔍 Dati salvati sono null/undefined:`,
-                      savedData === null || savedData === undefined
-                    );
-
-                    if (savedData && typeof savedData === "object") {
-                      const keys = Object.keys(savedData).filter(
-                        (key) => key !== "_"
-                      );
-                      console.log(`🔍 Chiavi trovate nel nodo:`, keys);
-
-                      if (keys.includes(fileResult?.Hash)) {
-                        console.log(
-                          `✅ Verifica salvataggio OK - hash trovato`
-                        );
-                        console.log(
-                          `✅ Dati salvati completi:`,
-                          JSON.stringify(savedData[fileResult?.Hash], null, 2)
-                        );
-                      } else {
-                        console.warn(
-                          `⚠️ Verifica salvataggio FAILED - hash non trovato`
-                        );
-                        console.warn(`⚠️ Chiavi disponibili:`, keys);
-                      }
-                    } else {
-                      console.warn(
-                        `⚠️ Verifica salvataggio FAILED - dati null o non oggetto`
-                      );
-                    }
-                  });
-                }, 2000); // Aumentato a 2 secondi
-              })
-              .catch((gunError) => {
-                console.error(`❌ Failed to save to Gun DB:`, gunError);
-                // Non blocchiamo l'upload se Gun fallisce
-              });
-
-            // Risposta di successo immediata
-            res.json({
-              success: true,
-              file: {
-                hash: fileResult?.Hash,
-                name: req.file.originalname,
-                size: req.file.size,
-                mimetype: req.file.mimetype,
-                ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
-                  fileResult?.Hash
-                }`,
-                gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
-                publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
-              },
-              user: {
-                address: userAddress,
-                identifier: identifier,
-              },
-              mbUsage: {
-                actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
-                sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
-                verified: true,
-              },
-              ipfsResponse: results,
-            });
           } catch (parseError) {
             res.status(500).json({
               success: false,
@@ -898,11 +707,122 @@ async function initializeServer() {
           res.status(408).json({ success: false, error: "Upload timeout" });
         }
       });
+
       formData.pipe(ipfsReq);
     } catch (error) {
+      console.error("Upload error:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
+
+  // Funzione helper per ottenere i MB utilizzati off-chain
+  async function getOffChainMBUsage(userAddress) {
+    return new Promise((resolve) => {
+      const mbUsageNode = gun.get("shogun").get("mb_usage").get(userAddress);
+
+      const timeoutId = setTimeout(() => {
+        console.warn(
+          `⚠️ MB usage read timeout for ${userAddress}, using 0 as default`
+        );
+        resolve(0);
+      }, 10000); // 10 secondi
+
+      mbUsageNode.once((data) => {
+        clearTimeout(timeoutId);
+        resolve(data?.mbUsed || 0);
+      });
+    });
+  }
+
+  // Funzione helper per salvare upload e aggiornare MB in modo sincrono (solo off-chain)
+  async function saveUploadAndUpdateMB(
+    userAddress,
+    fileHash,
+    uploadData,
+    fileSizeMB
+  ) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        console.log(
+          `💾 Saving upload and updating MB for user: ${userAddress}`
+        );
+
+        // 1. Salva l'upload nel database Gun
+        const uploadNode = gun.get("shogun").get("uploads").get(userAddress);
+        const dataToSave = {};
+        dataToSave[fileHash] = uploadData;
+
+        // Salva l'upload con timeout esteso
+        const uploadPromise = new Promise((uploadResolve, uploadReject) => {
+          const timeoutId = setTimeout(() => {
+            uploadReject(new Error("Upload save timeout"));
+          }, 15000); // 15 secondi
+
+          uploadNode.put(dataToSave, (ack) => {
+            clearTimeout(timeoutId);
+            if (ack.err) {
+              uploadReject(new Error(`Upload save error: ${ack.err}`));
+            } else {
+              console.log(`✅ Upload saved successfully`);
+              uploadResolve();
+            }
+          });
+        });
+
+        await uploadPromise;
+
+        // 2. Aggiorna i MB utilizzati off-chain
+        const mbUsageNode = gun.get("shogun").get("mb_usage").get(userAddress);
+
+        // Ottieni l'uso MB corrente con timeout esteso
+        const currentUsage = await new Promise((resolve) => {
+          const timeoutId = setTimeout(() => {
+            console.warn(`⚠️ MB usage read timeout, using 0 as default`);
+            resolve({ mbUsed: 0, lastUpdated: Date.now() });
+          }, 10000); // 10 secondi
+
+          mbUsageNode.once((data) => {
+            clearTimeout(timeoutId);
+            resolve(data || { mbUsed: 0, lastUpdated: Date.now() });
+          });
+        });
+
+        // Aggiorna l'uso MB
+        const updatedUsage = {
+          mbUsed: currentUsage.mbUsed + fileSizeMB,
+          lastUpdated: Date.now(),
+          updatedBy: "upload-endpoint",
+          fileCount: (currentUsage.fileCount || 0) + 1,
+        };
+
+        // Salva l'aggiornamento MB con timeout esteso
+        const mbUpdatePromise = new Promise((mbResolve, mbReject) => {
+          const timeoutId = setTimeout(() => {
+            mbReject(new Error("MB update timeout"));
+          }, 15000); // 15 secondi
+
+          mbUsageNode.put(updatedUsage, (ack) => {
+            clearTimeout(timeoutId);
+            if (ack.err) {
+              mbReject(new Error(`MB update error: ${ack.err}`));
+            } else {
+              console.log(
+                `✅ MB usage updated off-chain: ${currentUsage.mbUsed} + ${fileSizeMB} = ${updatedUsage.mbUsed} MB`
+              );
+              mbResolve();
+            }
+          });
+        });
+
+        await mbUpdatePromise;
+
+        resolve();
+      } catch (error) {
+        console.error("Error in saveUploadAndUpdateMB:", error);
+        reject(error);
+      }
+    });
+  }
 
   // Endpoint per recuperare gli upload di un utente
   app.get("/api/user-uploads/:identifier", async (req, res) => {
@@ -2793,23 +2713,30 @@ async function initializeServer() {
           ] = subscriptionDetails;
 
           // Ottieni l'uso MB off-chain dal database Gun
-          const mbUsageNode = gun
-            .get("shogun")
-            .get("mb_usage")
-            .get(userAddress);
-          const offChainUsage = await new Promise((resolve) => {
-            mbUsageNode.once((data) => {
-              resolve(data || { mbUsed: 0, lastUpdated: Date.now() });
-            });
-          });
-
-          // Usa i dati off-chain per l'uso MB, fallback al contratto
-          const mbUsedNum = offChainUsage.mbUsed || Number(contractMbUsed);
+          const mbUsedNum = await getOffChainMBUsage(userAddress);
           const mbAllocatedNum = Number(mbAllocated);
           const mbRemainingNum = Math.max(0, mbAllocatedNum - mbUsedNum);
 
           const usagePercentage =
             mbAllocatedNum > 0 ? (mbUsedNum / mbAllocatedNum) * 100 : 0;
+
+          console.log(
+            `📊 user-subscription-details: Final calculation for ${userAddress}:`
+          );
+          console.log(
+            `📊 user-subscription-details: - MB Allocated: ${mbAllocatedNum}`
+          );
+          console.log(
+            `📊 user-subscription-details: - MB Used (off-chain): ${mbUsedNum}`
+          );
+          console.log(
+            `📊 user-subscription-details: - MB Remaining: ${mbRemainingNum}`
+          );
+          console.log(
+            `📊 user-subscription-details: - Usage: ${usagePercentage.toFixed(
+              2
+            )}%`
+          );
 
           res.json({
             success: true,
@@ -2833,7 +2760,7 @@ async function initializeServer() {
                 )
               ),
               storage: "off-chain",
-              lastUpdated: new Date(offChainUsage.lastUpdated).toISOString(),
+              lastUpdated: new Date().toISOString(),
             },
           });
         } else {
@@ -4188,109 +4115,7 @@ async function initializeServer() {
       console.log(`🔍 debug: Checking MB usage for ${userAddress}`);
 
       // Ottieni i dati dal database Gun
-      const mbUsageNode = gun.get("shogun").get("mb_usage").get(userAddress);
-      const offChainUsage = await new Promise((resolve) => {
-        const timeoutId = setTimeout(() => {
-          console.warn(`⚠️ GunDB mb_usage read timeout for ${userAddress}`);
-          resolve({ mbUsed: 0, lastUpdated: Date.now(), timeout: true }); // Risolvi con dati di default in caso di timeout
-        }, 1500); // Timeout ridotto a 1.5 secondi
-
-        mbUsageNode.once((data) => {
-          clearTimeout(timeoutId);
-          resolve(data || { mbUsed: 0, lastUpdated: Date.now() });
-        });
-      });
-
-      // Se i dati off-chain non sono affidabili (timeout o 0), ricalcola dai file esistenti
-      let mbUsedNum = offChainUsage.mbUsed || 0;
-
-      if (offChainUsage.timeout || offChainUsage.mbUsed === 0) {
-        console.log(
-          `🔄 Debug: Recalculating MB usage from existing files for ${userAddress}`
-        );
-
-        try {
-          // Ottieni tutti i file dell'utente
-          const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
-          const userFiles = await new Promise((resolve) => {
-            const timeoutId = setTimeout(() => {
-              console.warn(
-                `⚠️ Debug: GunDB uploads read timeout for ${userAddress}, using fallback calculation`
-              );
-              resolve([]);
-            }, 2500); // Timeout ridotto a 2.5 secondi
-
-            uploadsNode.once((parentData) => {
-              clearTimeout(timeoutId);
-
-              if (!parentData || typeof parentData !== "object") {
-                resolve([]);
-                return;
-              }
-
-              const hashKeys = Object.keys(parentData).filter(
-                (key) => key !== "_"
-              );
-              let uploadsArray = [];
-              let completedReads = 0;
-              const totalReads = hashKeys.length;
-
-              if (totalReads === 0) {
-                resolve([]);
-                return;
-              }
-
-              // Timeout per ogni singola lettura di file
-              const fileReadTimeout = setTimeout(() => {
-                console.warn(`⚠️ Debug: File read timeout, using partial data`);
-                resolve(uploadsArray);
-              }, 3000);
-
-              hashKeys.forEach((hash) => {
-                uploadsNode.get(hash).once((uploadData) => {
-                  completedReads++;
-                  if (uploadData && uploadData.sizeMB) {
-                    uploadsArray.push(uploadData);
-                  }
-                  if (completedReads === totalReads) {
-                    clearTimeout(fileReadTimeout);
-                    resolve(uploadsArray);
-                  }
-                });
-              });
-            });
-          });
-
-          // Calcola il totale dei MB dai file
-          const calculatedMbUsed = userFiles.reduce(
-            (sum, file) => sum + (file.sizeMB || 0),
-            0
-          );
-          console.log(
-            `📊 Debug: Calculated MB usage from files: ${calculatedMbUsed} MB (${userFiles.length} files)`
-          );
-
-          // Usa il valore calcolato se è maggiore di 0
-          if (calculatedMbUsed > 0) {
-            mbUsedNum = calculatedMbUsed;
-          } else {
-            // Se non riusciamo a calcolare dai file, usa il valore del contratto
-            console.log(
-              `📊 Debug: Using contract MB usage as fallback: ${Number(
-                contractData?.mbUsed || 0
-              )} MB`
-            );
-            mbUsedNum = Number(contractData?.mbUsed || 0);
-          }
-        } catch (recalcError) {
-          console.error(
-            "Debug: Error recalculating MB usage from files:",
-            recalcError
-          );
-          // Fallback al valore del contratto
-          mbUsedNum = Number(contractData?.mbUsed || 0);
-        }
-      }
+      const mbUsedNum = await getOffChainMBUsage(userAddress);
 
       // Ottieni anche i dati dal contratto per confronto
       let contractData = null;
@@ -4330,7 +4155,10 @@ async function initializeServer() {
       res.json({
         success: true,
         userAddress,
-        offChainUsage,
+        offChainUsage: {
+          mbUsed: mbUsedNum,
+          lastUpdated: new Date().toISOString(),
+        },
         contractData,
         calculated: {
           mbUsed: mbUsedNum,
@@ -4398,33 +4226,24 @@ async function initializeServer() {
       console.log("🗑️ Garbage Collector stopped");
     }
 
-    if (db) {
-      db.get("status").put("stopping");
-    }
-
+    // Close server
     if (server) {
-      await new Promise((resolve) => {
-        server.close(resolve);
+      server.close(() => {
+        console.log("✅ Server closed");
+        process.exit(0);
       });
+    } else {
+      process.exit(0);
     }
-
-    if (db) {
-      db.get("status").put("stopped");
-      db.get("stopped").put(Date.now());
-    }
-
-    console.log("Relay server shutdown complete.");
   }
 
-  // Handle graceful shutdown
+  // Handle shutdown signals
   process.on("SIGINT", async () => {
     await shutdown();
-    process.exit(0);
   });
 
   process.on("SIGTERM", async () => {
     await shutdown();
-    process.exit(0);
   });
 
   return {
