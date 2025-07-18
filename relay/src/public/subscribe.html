@@ -1693,6 +1693,25 @@
             }, 5000);
         }
 
+        // Funzione per ottenere la firma del wallet per autenticazione
+        async function getWalletSignature() {
+            try {
+                const message = "I Love Shogun";
+                console.log('🔐 subscribe: Requesting signature for authentication:', message);
+
+                const signature = await window.ethereum.request({
+                    method: 'personal_sign',
+                    params: [message, walletAddress]
+                });
+
+                console.log('🔐 subscribe: Authentication signature received:', signature.substring(0, 20) + '...');
+                return signature;
+            } catch (error) {
+                console.error('💥 subscribe: Error getting wallet signature:', error);
+                throw new Error('Failed to get wallet signature for authentication');
+            }
+        }
+
         // Sync MB usage
         async function syncMBUsage() {
             if (!walletAddress) {
@@ -1704,10 +1723,16 @@
                 console.log('🔄 subscribe: Sync MB usage triggered for wallet:', walletAddress);
                 showNotification('🔄 Syncing MB usage...', 'info');
 
+                // Ottieni la firma del wallet per l'autenticazione
+                const authSignature = await getWalletSignature();
+
                 const response = await fetch(`/api/sync-mb-usage/${encodeURIComponent(walletAddress)}`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'x-user-address': walletAddress,
+                        'x-wallet-signature': authSignature,
+                        'x-signature-message': 'I Love Shogun'
                     }
                 });
 
