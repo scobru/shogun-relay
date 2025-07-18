@@ -212,6 +212,14 @@
                                         </svg>
                                         Sync MB
                                     </button>
+                                    <button id="debugMBBtn" class="btn btn-sm btn-outline" onclick="debugMBUsage()">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                            viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                        </svg>
+                                        Debug MB
+                                    </button>
                                 </div>
                             </div>
 
@@ -361,12 +369,31 @@
                     return;
                 }
 
+                // Verifica che l'elemento esista
+                if (!subscriptionDetailsEl) {
+                    console.error('❌ user-upload: subscriptionDetailsEl not found');
+                    return;
+                }
+
+                // Mostra loading state
+                subscriptionDetailsEl.innerHTML = `
+                    <div class="text-center py-4">
+                        <div class="loading loading-spinner loading-sm"></div>
+                        <p class="text-sm text-base-content/60 mt-2">Checking subscription status...</p>
+                    </div>
+                `;
+                subscriptionStatusEl.classList.remove('hidden');
+
                 // Usa il nuovo endpoint centralizzato
                 const url = `/api/user-subscription-details/${encodeURIComponent(walletAddr)}`;
                 console.log('🔍 user-upload: Making API call to:', url);
 
                 const response = await fetch(url);
                 console.log('📡 user-upload: Response status:', response.status);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
 
                 const result = await response.json();
                 console.log('📋 user-upload: Response data:', result);
@@ -413,7 +440,7 @@
                             </div>
                         `;
 
-                        showStatus(`✅ Subscription active! ${mbRemaining} MB remaining`, 'success');
+                        console.log('✅ user-upload: Subscription status updated successfully');
                     } else {
                         console.log('❌ user-upload: Subscription is NOT active. Reason:', details.reason);
                         subscriptionDetailsEl.innerHTML = `
@@ -425,10 +452,7 @@
                                 </a>
                             </div>
                         `;
-                        showStatus(`⚠️ No active subscription found. Please subscribe at /subscribe`, 'warning');
                     }
-
-                    subscriptionStatusEl.classList.remove('hidden');
                 } else {
                     console.log('❌ user-upload: API call failed:', result.error);
                     subscriptionDetailsEl.innerHTML = `
@@ -437,17 +461,25 @@
                             <p class="text-base-content/60">${result.error}</p>
                         </div>
                     `;
-                    subscriptionStatusEl.classList.remove('hidden');
                 }
             } catch (error) {
                 console.error('💥 user-upload: Error checking subscription status:', error);
-                subscriptionDetailsEl.innerHTML = `
-                    <div class="text-center">
-                        <p class="text-error font-semibold">❌ Connection error</p>
-                        <p class="text-base-content/60">${error.message}</p>
-                    </div>
-                `;
-                subscriptionStatusEl.classList.remove('hidden');
+
+                if (subscriptionDetailsEl) {
+                    subscriptionDetailsEl.innerHTML = `
+                        <div class="text-center">
+                            <p class="text-error font-semibold">❌ Connection error</p>
+                            <p class="text-base-content/60">${error.message}</p>
+                            <button onclick="checkSubscriptionStatus('${walletAddr}')" class="btn btn-sm btn-outline mt-2">
+                                Retry
+                            </button>
+                        </div>
+                    `;
+                }
+
+                if (subscriptionStatusEl) {
+                    subscriptionStatusEl.classList.remove('hidden');
+                }
             }
         }
 
@@ -519,15 +551,10 @@
 
                     console.log('📤 user-upload: Calling loadUserFiles after successful upload');
 
-                    // Aspetta un po' prima di ricaricare i file per dare tempo a Gun di sincronizzare
-                    setTimeout(() => {
-                        loadUserFiles(); // Refresh files list
-                    }, 2000);
+                    // Aggiorna immediatamente i file e lo stato della sottoscrizione
+                    await loadUserFiles();
+                    await checkSubscriptionStatus(walletAddress);
 
-                    // Aggiorna lo stato della sottoscrizione dopo l'upload
-                    setTimeout(() => {
-                        checkSubscriptionStatus(walletAddress);
-                    }, 1000);
                 } else {
                     let errorMessage = result.error;
 
@@ -558,13 +585,20 @@
 
         // Load user files
         async function loadUserFiles() {
-            if (!walletAddress) return;
+            if (!walletAddress) {
+                console.log('❌ user-upload: No wallet address for loadUserFiles');
+                return;
+            }
 
             try {
                 console.log('📂 user-upload: Loading files for wallet:', walletAddress);
                 const response = await fetch(`/api/user-uploads/${encodeURIComponent(walletAddress)}`);
-                const result = await response.json();
 
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
                 console.log('📂 user-upload: Load files response:', result);
 
                 if (result.success) {
@@ -573,10 +607,20 @@
                     console.log('📂 user-upload: Total size:', result.totalSizeMB);
 
                     displayFiles(result.uploads);
-                    fileCount.textContent = result.count;
-                    // Aggiungo controllo per evitare errore toFixed su undefined
-                    const totalSizeMB = result.totalSizeMB || 0;
-                    totalSize.textContent = `${totalSizeMB.toFixed(2)} MB`;
+
+                    // Aggiorna i contatori
+                    if (fileCount) {
+                        fileCount.textContent = result.count;
+                        console.log('📂 user-upload: Updated file count to:', result.count);
+                    }
+
+                    if (totalSize) {
+                        const totalSizeMB = result.totalSizeMB || 0;
+                        totalSize.textContent = `${totalSizeMB.toFixed(2)} MB`;
+                        console.log('📂 user-upload: Updated total size to:', totalSizeMB.toFixed(2), 'MB');
+                    }
+
+                    console.log('✅ user-upload: Files loaded and displayed successfully');
                 } else {
                     console.error('❌ user-upload: Failed to load files:', result.error);
                     showStatus(`Failed to load files: ${result.error}`, 'error');
@@ -612,10 +656,11 @@
                 if (result.success) {
                     showStatus(`✅ MB usage synced successfully! Used: ${result.mbUsed} MB (${result.fileCount} files)`, 'success');
 
-                    // Aggiorna lo stato della sottoscrizione
-                    setTimeout(() => {
-                        checkSubscriptionStatus(walletAddress);
-                    }, 1000);
+                    // Aggiorna immediatamente lo stato della sottoscrizione
+                    await checkSubscriptionStatus(walletAddress);
+
+                    // Ricarica anche i file per aggiornare i totali
+                    await loadUserFiles();
                 } else {
                     showStatus(`❌ Failed to sync MB usage: ${result.error}`, 'error');
                 }
@@ -623,6 +668,37 @@
             } catch (error) {
                 console.error('💥 user-upload: Error syncing MB usage:', error);
                 showStatus(`❌ Error syncing MB usage: ${error.message}`, 'error');
+            }
+        }
+
+        // Debug MB usage
+        async function debugMBUsage() {
+            if (!walletAddress) {
+                showStatus('Please connect your wallet first', 'error');
+                return;
+            }
+
+            try {
+                console.log('🐛 user-upload: Debug MB usage triggered for wallet:', walletAddress);
+                showStatus('🐛 Debugging MB usage...', 'info');
+
+                const response = await fetch(`/api/debug/mb-usage/${encodeURIComponent(walletAddress)}`, {
+                    method: 'GET'
+                });
+
+                const result = await response.json();
+                console.log('🐛 user-upload: Debug MB response:', result);
+
+                if (result.success) {
+                    const details = `Off-chain: ${result.offChainUsage.mbUsed} MB, Contract: ${result.contractData?.mbUsed || 0} MB, Calculated: ${result.calculated.mbRemaining} MB remaining`;
+                    showStatus(`✅ Debug MB usage: ${details}`, 'success');
+                    console.log('🐛 user-upload: Full debug data:', result);
+                } else {
+                    showStatus(`❌ Debug MB usage failed: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('💥 user-upload: Error debugging MB usage:', error);
+                showStatus(`❌ Error debugging MB usage: ${error.message}`, 'error');
             }
         }
 
@@ -678,7 +754,10 @@
 
                 if (result.success) {
                     showStatus('File deleted successfully', 'success');
-                    loadUserFiles(); // Refresh files list
+
+                    // Ricarica i file e aggiorna lo stato della sottoscrizione
+                    await loadUserFiles();
+                    await checkSubscriptionStatus(walletAddress);
                 } else {
                     showStatus(`Failed to delete file: ${result.error}`, 'error');
                 }

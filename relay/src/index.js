@@ -2330,10 +2330,30 @@ async function initializeServer() {
             });
           });
 
+          console.log(
+            `📊 user-subscription-details: Off-chain usage data for ${userAddress}:`,
+            offChainUsage
+          );
+          console.log(
+            `📊 user-subscription-details: Contract MB used: ${contractMbUsed}`
+          );
+          console.log(
+            `📊 user-subscription-details: Contract MB allocated: ${mbAllocated}`
+          );
+
           // Usa i dati off-chain per l'uso MB, fallback al contratto
           const mbUsedNum = offChainUsage.mbUsed || Number(contractMbUsed);
           const mbAllocatedNum = Number(mbAllocated);
           const mbRemainingNum = Math.max(0, mbAllocatedNum - mbUsedNum);
+
+          console.log(
+            `📊 user-subscription-details: Final calculation for ${userAddress}:`
+          );
+          console.log(`  - MB Used (off-chain): ${offChainUsage.mbUsed}`);
+          console.log(`  - MB Used (contract): ${Number(contractMbUsed)}`);
+          console.log(`  - MB Used (final): ${mbUsedNum}`);
+          console.log(`  - MB Allocated: ${mbAllocatedNum}`);
+          console.log(`  - MB Remaining: ${mbRemainingNum}`);
 
           const usagePercentage =
             mbAllocatedNum > 0 ? (mbUsedNum / mbAllocatedNum) * 100 : 0;
@@ -4015,6 +4035,89 @@ async function initializeServer() {
       });
     } catch (error) {
       console.error("Sync MB usage error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore interno del server",
+        details: error.message,
+      });
+    }
+  });
+
+  // Debug endpoint per verificare i dati MB usage
+  app.get("/api/debug/mb-usage/:userAddress", async (req, res) => {
+    try {
+      const { userAddress } = req.params;
+
+      if (!userAddress) {
+        return res.status(400).json({
+          success: false,
+          error: "Indirizzo utente richiesto",
+        });
+      }
+
+      console.log(`🔍 debug: Checking MB usage for ${userAddress}`);
+
+      // Ottieni i dati dal database Gun
+      const mbUsageNode = gun.get("shogun").get("mb_usage").get(userAddress);
+      const offChainUsage = await new Promise((resolve) => {
+        mbUsageNode.once((data) => {
+          resolve(data || { mbUsed: 0, lastUpdated: Date.now() });
+        });
+      });
+
+      // Ottieni anche i dati dal contratto per confronto
+      let contractData = null;
+      try {
+        if (relayContract) {
+          const allRelays = await relayContract.getAllRelays();
+          if (allRelays.length > 0) {
+            const relayAddress = allRelays[0];
+            const subscriptionDetails =
+              await relayContract.getSubscriptionDetails(
+                userAddress,
+                relayAddress
+              );
+            const [
+              startTime,
+              endTime,
+              amountPaid,
+              mbAllocated,
+              contractMbUsed,
+              contractMbRemaining,
+              isActiveStatus,
+            ] = subscriptionDetails;
+
+            contractData = {
+              isActive: isActiveStatus,
+              mbAllocated: Number(mbAllocated),
+              mbUsed: Number(contractMbUsed),
+              mbRemaining: Number(contractMbRemaining),
+              relayAddress,
+            };
+          }
+        }
+      } catch (contractError) {
+        console.error("Error getting contract data:", contractError);
+      }
+
+      res.json({
+        success: true,
+        userAddress,
+        offChainUsage,
+        contractData,
+        calculated: {
+          mbUsed: offChainUsage.mbUsed || 0,
+          mbAllocated: contractData?.mbAllocated || 0,
+          mbRemaining: contractData
+            ? Math.max(
+                0,
+                contractData.mbAllocated - (offChainUsage.mbUsed || 0)
+              )
+            : 0,
+        },
+      });
+    } catch (error) {
+      console.error("Debug MB usage error:", error);
       res.status(500).json({
         success: false,
         error: "Errore interno del server",
