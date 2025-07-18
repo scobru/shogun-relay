@@ -491,30 +491,39 @@
             if (!walletAddress) return;
 
             try {
+                console.log('📂 user-upload: Loading files for wallet:', walletAddress);
                 const response = await fetch(`/api/user-uploads/${encodeURIComponent(walletAddress)}`);
                 const result = await response.json();
+
+                console.log('📂 user-upload: Load files response:', result);
 
                 if (result.success) {
                     displayFiles(result.uploads);
                     fileCount.textContent = result.count;
                     // Aggiungo controllo per evitare errore toFixed su undefined
-                    const totalSize = result.totalSizeMB || 0;
-                    totalSize.textContent = `${totalSize.toFixed(2)} MB`;
+                    const totalSizeMB = result.totalSizeMB || 0;
+                    totalSize.textContent = `${totalSizeMB.toFixed(2)} MB`;
                 } else {
+                    console.error('❌ user-upload: Failed to load files:', result.error);
                     showStatus(`Failed to load files: ${result.error}`, 'error');
                 }
 
             } catch (error) {
+                console.error('💥 user-upload: Error loading files:', error);
                 showStatus(`Error loading files: ${error.message}`, 'error');
             }
         }
 
         function displayFiles(files) {
+            console.log('🎨 user-upload: Displaying files:', files);
+
             if (files.length === 0) {
+                console.log('📭 user-upload: No files to display');
                 filesList.innerHTML = '<p class="text-base-content/60 text-center py-8">No files uploaded yet</p>';
                 return;
             }
 
+            console.log(`📁 user-upload: Displaying ${files.length} files`);
             filesList.innerHTML = files.map(file => `
                 <div class="file-item">
                     <div class="flex items-center justify-between">
