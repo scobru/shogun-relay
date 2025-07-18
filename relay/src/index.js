@@ -627,13 +627,30 @@ async function initializeServer() {
               console.log(
                 `💾 Salvando upload con identificatore: ${identifier}`
               );
+              console.log(`💾 Upload data:`, uploadData);
 
               const uploadNode = gun
                 .get("shogun")
                 .get("uploads")
                 .get(identifier)
                 .get(fileResult?.Hash);
-              uploadNode.put(uploadData);
+
+              // Salva i dati e aspetta il completamento
+              uploadNode.put(uploadData, (ack) => {
+                console.log(`💾 Upload saved to Gun DB:`, ack);
+                if (ack.err) {
+                  console.error(`❌ Error saving to Gun DB:`, ack.err);
+                } else {
+                  console.log(`✅ Upload saved successfully to Gun DB`);
+                }
+              });
+
+              // Verifica che il salvataggio sia avvenuto
+              setTimeout(() => {
+                uploadNode.once((savedData) => {
+                  console.log(`🔍 Verifica salvataggio:`, savedData);
+                });
+              }, 100);
 
               // Registra l'uso di MB tramite smart contract se disponibile
               let mbUsageRecorded = false;
@@ -830,7 +847,12 @@ async function initializeServer() {
 
       // Usa once per ottenere i dati una volta
       uploadsNode.once((uploads) => {
-        console.log(`📋 Risultato uploads:`, uploads);
+        console.log(`📋 Risultato uploads raw:`, uploads);
+        console.log(`📋 Tipo di uploads:`, typeof uploads);
+        console.log(
+          `📋 Uploads è null/undefined:`,
+          uploads === null || uploads === undefined
+        );
 
         if (!uploads) {
           console.log(`❌ Nessun upload trovato per: ${identifier}`);
@@ -838,12 +860,20 @@ async function initializeServer() {
         }
 
         // Converte l'oggetto uploads in array
-        const uploadsArray = Object.keys(uploads)
+        const uploadKeys = Object.keys(uploads);
+        console.log(`📋 Chiavi trovate:`, uploadKeys);
+
+        const uploadsArray = uploadKeys
           .filter((key) => key !== "_") // Esclude i metadati Gun
-          .map((hash) => uploads[hash])
+          .map((hash) => {
+            const upload = uploads[hash];
+            console.log(`📋 Upload per hash ${hash}:`, upload);
+            return upload;
+          })
           .filter((upload) => upload && upload.hash) // Filtra upload validi
           .sort((a, b) => b.uploadedAt - a.uploadedAt); // Ordina per data
 
+        console.log(`📋 Uploads array finale:`, uploadsArray);
         console.log(
           `✅ Trovati ${uploadsArray.length} upload per: ${identifier}`
         );
