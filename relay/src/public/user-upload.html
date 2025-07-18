@@ -539,8 +539,7 @@
                         progressBar.textContent = "Signing with MetaMask...";
 
                         // Genera un messaggio unico per la firma
-                        const timestamp = Date.now();
-                        const message = `Shogun File Encryption\nWallet: ${walletAddress}\nTimestamp: ${timestamp}\nFile: ${file.name}`;
+                        const message = `I Love Shogun`;
 
                         console.log('🔐 user-upload: Requesting signature for message:', message);
 
@@ -553,7 +552,7 @@
                         console.log('🔐 user-upload: Signature received:', signature.substring(0, 20) + '...');
 
                         // Genera una chiave deterministica dalla firma
-                        encryptionKey = await generateDeterministicKey(signature, walletAddress, file.name);
+                        encryptionKey = await generateDeterministicKey(signature, walletAddress);
                         console.log('🔐 user-upload: Encryption key generated');
 
                         progressBar.style.width = "50%";
@@ -670,10 +669,10 @@
         }
 
         // Funzione per generare una chiave deterministica dalla firma
-        async function generateDeterministicKey(signature, walletAddress, fileName) {
+        async function generateDeterministicKey(signature, walletAddress) {
             try {
-                // Combina la firma con l'address e il nome del file per creare una chiave unica
-                const combinedData = signature + walletAddress + fileName;
+                // Combina la firma con l'address per creare una chiave unica
+                const combinedData = signature + walletAddress;
 
                 // Usa SHA-256 per creare un hash deterministico
                 const encoder = new TextEncoder();
@@ -870,8 +869,7 @@
                     showStatus('🔐 Requesting signature for decryption...', 'info');
 
                     // Genera lo stesso messaggio usato per la crittografia
-                    const timestamp = Date.now();
-                    const message = `Shogun File Encryption\nWallet: ${walletAddress}\nTimestamp: ${timestamp}\nFile: ${fileName}`;
+                    const message = `I Love Shogun`;
 
                     // Richiedi la firma a MetaMask
                     const signature = await ethereum.request({
@@ -880,7 +878,7 @@
                     });
 
                     // Genera la stessa chiave deterministica
-                    const encryptionKey = await generateDeterministicKey(signature, walletAddress, fileName);
+                    const encryptionKey = await generateDeterministicKey(signature, walletAddress);
 
                     showStatus('🔐 Decrypting file...', 'info');
 
