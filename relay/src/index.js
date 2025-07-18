@@ -629,24 +629,41 @@ async function initializeServer() {
               );
               console.log(`💾 Upload data:`, uploadData);
 
+              // Usa una struttura più semplice per Gun
               const uploadNode = gun
                 .get("shogun")
                 .get("uploads")
-                .get(identifier)
-                .get(fileResult?.Hash);
+                .get(identifier);
 
               // Salva i dati con Promise per attendere il completamento
               const saveToGun = () => {
                 return new Promise((resolve, reject) => {
+                  console.log(
+                    `💾 Iniziando salvataggio in Gun per hash: ${fileResult?.Hash}`
+                  );
+                  console.log(
+                    `💾 Upload node path: shogun/uploads/${identifier}`
+                  );
+
                   // Timeout di 3 secondi per evitare che si blocchi
                   const timeoutId = setTimeout(() => {
-                    console.warn(`⚠️ Gun save timeout after 3 seconds`);
+                    console.warn(
+                      `⚠️ Gun save timeout after 3 seconds for hash: ${fileResult?.Hash}`
+                    );
                     resolve(); // Risolvi comunque per non bloccare l'upload
                   }, 3000);
 
-                  uploadNode.put(uploadData, (ack) => {
+                  // Salva usando l'hash come chiave
+                  uploadNode.get(fileResult?.Hash).put(uploadData, (ack) => {
                     clearTimeout(timeoutId);
                     console.log(`💾 Upload saved to Gun DB:`, ack);
+                    console.log(`💾 Ack details:`, {
+                      err: ack.err,
+                      ok: ack.ok,
+                      pub: ack.pub,
+                      get: ack.get,
+                    });
+
                     if (ack.err) {
                       console.error(`❌ Error saving to Gun DB:`, ack.err);
                       // Non rifiutare, solo logga l'errore
@@ -663,6 +680,25 @@ async function initializeServer() {
               saveToGun()
                 .then(() => {
                   console.log(`✅ File saved to Gun DB successfully`);
+
+                  // Verifica immediata del salvataggio
+                  setTimeout(() => {
+                    console.log(
+                      `🔍 Verifica immediata salvataggio per hash: ${fileResult?.Hash}`
+                    );
+                    uploadNode.get(fileResult?.Hash).once((savedData) => {
+                      console.log(`🔍 Dati salvati verificati:`, savedData);
+                      if (savedData) {
+                        console.log(
+                          `✅ Verifica salvataggio OK - dati trovati`
+                        );
+                      } else {
+                        console.warn(
+                          `⚠️ Verifica salvataggio FAILED - dati non trovati`
+                        );
+                      }
+                    });
+                  }, 500);
                 })
                 .catch((gunError) => {
                   console.error(`❌ Failed to save to Gun DB:`, gunError);
@@ -1121,6 +1157,85 @@ async function initializeServer() {
         success: false,
         error: error.message,
         message: "Gun DB test failed",
+      });
+    }
+  });
+
+  // Endpoint di test per verificare il salvataggio di un file specifico
+  app.get("/api/test-gun-save/:identifier/:hash", async (req, res) => {
+    try {
+      const { identifier, hash } = req.params;
+      console.log(`🧪 Test: Verificando salvataggio per ${identifier}/${hash}`);
+
+      const uploadNode = gun.get("shogun").get("uploads").get(identifier);
+
+      // Test di scrittura
+      const testData = {
+        hash: hash,
+        name: "test-file.jpg",
+        size: 1024,
+        sizeMB: 0.001,
+        mimetype: "image/jpeg",
+        uploadedAt: Date.now(),
+        userAddress: identifier,
+        test: true,
+      };
+
+      const writeTest = () => {
+        return new Promise((resolve, reject) => {
+          uploadNode.get(hash).put(testData, (ack) => {
+            if (ack.err) {
+              reject(new Error(`Write test failed: ${ack.err}`));
+            } else {
+              resolve("Write test passed");
+            }
+          });
+        });
+      };
+
+      // Test di lettura
+      const readTest = () => {
+        return new Promise((resolve, reject) => {
+          let timeoutId = setTimeout(() => {
+            reject(new Error("Read test timeout"));
+          }, 5000);
+
+          uploadNode.get(hash).once((data) => {
+            clearTimeout(timeoutId);
+            if (data && data.hash === hash) {
+              resolve("Read test passed");
+            } else {
+              reject(new Error("Read test failed - data mismatch"));
+            }
+          });
+        });
+      };
+
+      // Esegui i test
+      const writeResult = await writeTest();
+      console.log(`🧪 ${writeResult}`);
+
+      // Aspetta un po' prima di leggere
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      const readResult = await readTest();
+      console.log(`🧪 ${readResult}`);
+
+      res.json({
+        success: true,
+        message: "Gun save test completed successfully",
+        identifier,
+        hash,
+        writeTest: writeResult,
+        readTest: readResult,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error(`💥 Gun save test error:`, error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: "Gun save test failed",
       });
     }
   });

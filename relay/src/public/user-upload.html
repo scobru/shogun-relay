@@ -212,6 +212,15 @@
                                         </svg>
                                         Test Gun
                                     </button>
+                                    <button id="testGunSaveBtn" class="btn btn-sm btn-secondary"
+                                        onclick="testGunSave()">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                            viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                        </svg>
+                                        Test Save
+                                    </button>
                                     <button id="refreshFilesBtn" class="btn btn-sm btn-outline">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
                                             viewBox="0 0 24 24" stroke="currentColor">
@@ -782,6 +791,35 @@
             } catch (error) {
                 console.error('💥 user-upload: Error testing Gun DB:', error);
                 showStatus(`❌ Error testing Gun DB: ${error.message}`, 'error');
+            }
+        };
+
+        // Test Gun Save specifico
+        window.testGunSave = async function () {
+            if (!walletAddress) {
+                showStatus('Please connect your wallet first', 'error');
+                return;
+            }
+
+            try {
+                const testHash = 'test-hash-' + Date.now();
+                console.log('🧪 user-upload: Testing Gun save for wallet:', walletAddress, 'hash:', testHash);
+
+                const response = await fetch(`/api/test-gun-save/${encodeURIComponent(walletAddress)}/${testHash}`);
+                const result = await response.json();
+
+                console.log('🧪 user-upload: Gun save test response:', result);
+
+                if (result.success) {
+                    showStatus(`✅ Gun save test successful! Write: ${result.writeTest}, Read: ${result.readTest}`, 'success');
+                    console.log('✅ Gun save test successful!', result);
+                } else {
+                    showStatus(`❌ Gun save test failed: ${result.error}`, 'error');
+                    console.error('❌ Gun save test failed:', result.error);
+                }
+            } catch (error) {
+                console.error('💥 user-upload: Error testing Gun save:', error);
+                showStatus(`❌ Error testing Gun save: ${error.message}`, 'error');
             }
         };
     </script>
