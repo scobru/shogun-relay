@@ -608,6 +608,9 @@ async function initializeServer() {
           });
         }
 
+        // Calcola la dimensione del file in MB
+        const fileSizeMB = Math.ceil(req.file.size / (1024 * 1024));
+
         // Verifica che il contratto sia disponibile
         if (!relayContract) {
           return res.status(500).json({
@@ -641,9 +644,6 @@ async function initializeServer() {
               error: "No active subscription found for this user",
             });
           }
-
-          // Verifica che ci siano MB sufficienti per questo file
-          const fileSizeMB = Math.ceil(req.file.size / (1024 * 1024));
 
           // Ottieni i MB utilizzati off-chain
           const currentMBUsed = await getOffChainMBUsage(userAddress);
