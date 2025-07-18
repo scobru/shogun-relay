@@ -638,11 +638,19 @@ async function initializeServer() {
               // Salva i dati con Promise per attendere il completamento
               const saveToGun = () => {
                 return new Promise((resolve, reject) => {
+                  // Timeout di 3 secondi per evitare che si blocchi
+                  const timeoutId = setTimeout(() => {
+                    console.warn(`⚠️ Gun save timeout after 3 seconds`);
+                    resolve(); // Risolvi comunque per non bloccare l'upload
+                  }, 3000);
+
                   uploadNode.put(uploadData, (ack) => {
+                    clearTimeout(timeoutId);
                     console.log(`💾 Upload saved to Gun DB:`, ack);
                     if (ack.err) {
                       console.error(`❌ Error saving to Gun DB:`, ack.err);
-                      reject(new Error(ack.err));
+                      // Non rifiutare, solo logga l'errore
+                      resolve();
                     } else {
                       console.log(`✅ Upload saved successfully to Gun DB`);
                       resolve();
@@ -651,14 +659,15 @@ async function initializeServer() {
                 });
               };
 
-              // Salva e attendi il completamento
-              try {
-                await saveToGun();
-                console.log(`✅ File saved to Gun DB successfully`);
-              } catch (gunError) {
-                console.error(`❌ Failed to save to Gun DB:`, gunError);
-                // Non blocchiamo l'upload se Gun fallisce, ma logghiamo l'errore
-              }
+              // Salva in background senza bloccare l'upload
+              saveToGun()
+                .then(() => {
+                  console.log(`✅ File saved to Gun DB successfully`);
+                })
+                .catch((gunError) => {
+                  console.error(`❌ Failed to save to Gun DB:`, gunError);
+                  // Non blocchiamo l'upload se Gun fallisce
+                });
 
               // Verifica che il salvataggio sia avvenuto
               setTimeout(() => {
@@ -796,6 +805,8 @@ async function initializeServer() {
                 );
               }
 
+              // Invia la risposta immediatamente dopo aver completato le verifiche
+              console.log(`📤 Invio risposta di successo per upload`);
               res.json({
                 success: true,
                 file: {
