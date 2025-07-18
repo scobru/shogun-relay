@@ -629,7 +629,7 @@ async function initializeServer() {
               );
               console.log(`💾 Upload data:`, uploadData);
 
-              // Usa una struttura più semplice per Gun
+              // Usa una struttura più semplice per Gun - salva direttamente nel nodo padre
               const uploadNode = gun
                 .get("shogun")
                 .get("uploads")
@@ -657,11 +657,14 @@ async function initializeServer() {
                     resolve(); // Risolvi comunque per non bloccare l'upload
                   }, 5000);
 
-                  // Salva usando l'hash come chiave
+                  // Salva direttamente nel nodo padre usando l'hash come chiave
                   console.log(
-                    `💾 Calling uploadNode.get(${fileResult?.Hash}).put(...)`
+                    `💾 Calling uploadNode.put({ [${fileResult?.Hash}]: uploadData })`
                   );
-                  uploadNode.get(fileResult?.Hash).put(uploadData, (ack) => {
+                  const dataToSave = {};
+                  dataToSave[fileResult?.Hash] = uploadData;
+
+                  uploadNode.put(dataToSave, (ack) => {
                     clearTimeout(timeoutId);
                     console.log(
                       `💾 Upload saved to Gun DB - ACK received:`,
@@ -705,10 +708,10 @@ async function initializeServer() {
                       `🔍 Verifica immediata salvataggio per hash: ${fileResult?.Hash}`
                     );
                     console.log(
-                      `🔍 Reading from path: shogun/uploads/${identifier}/${fileResult?.Hash}`
+                      `🔍 Reading from path: shogun/uploads/${identifier}`
                     );
 
-                    uploadNode.get(fileResult?.Hash).once((savedData) => {
+                    uploadNode.once((savedData) => {
                       console.log(`🔍 Dati salvati verificati:`, savedData);
                       console.log(`🔍 Tipo di dati salvati:`, typeof savedData);
                       console.log(
@@ -716,29 +719,30 @@ async function initializeServer() {
                         savedData === null || savedData === undefined
                       );
 
-                      if (savedData) {
-                        console.log(
-                          `✅ Verifica salvataggio OK - dati trovati`
+                      if (savedData && typeof savedData === "object") {
+                        const keys = Object.keys(savedData).filter(
+                          (key) => key !== "_"
                         );
-                        console.log(
-                          `✅ Dati salvati completi:`,
-                          JSON.stringify(savedData, null, 2)
-                        );
+                        console.log(`🔍 Chiavi trovate nel nodo:`, keys);
+
+                        if (keys.includes(fileResult?.Hash)) {
+                          console.log(
+                            `✅ Verifica salvataggio OK - hash trovato`
+                          );
+                          console.log(
+                            `✅ Dati salvati completi:`,
+                            JSON.stringify(savedData[fileResult?.Hash], null, 2)
+                          );
+                        } else {
+                          console.warn(
+                            `⚠️ Verifica salvataggio FAILED - hash non trovato`
+                          );
+                          console.warn(`⚠️ Chiavi disponibili:`, keys);
+                        }
                       } else {
                         console.warn(
-                          `⚠️ Verifica salvataggio FAILED - dati non trovati`
+                          `⚠️ Verifica salvataggio FAILED - dati null o non oggetto`
                         );
-                        console.warn(`⚠️ Prova a leggere il nodo padre...`);
-
-                        // Prova a leggere il nodo padre per vedere se ci sono dati
-                        uploadNode.once((parentData) => {
-                          console.log(`🔍 Dati nodo padre:`, parentData);
-                          console.log(`🔍 Tipo nodo padre:`, typeof parentData);
-                          console.log(
-                            `🔍 Chiavi nodo padre:`,
-                            parentData ? Object.keys(parentData) : "N/A"
-                          );
-                        });
                       }
                     });
                   }, 1000); // Aumentato a 1 secondo
@@ -769,10 +773,15 @@ async function initializeServer() {
                       console.log(
                         `✅ Hash trovato nel nodo padre: ${fileResult?.Hash}`
                       );
+                      console.log(
+                        `✅ Dati completi per hash:`,
+                        savedData[fileResult?.Hash]
+                      );
                     } else {
                       console.warn(
                         `⚠️ Hash NON trovato nel nodo padre: ${fileResult?.Hash}`
                       );
+                      console.warn(`⚠️ Chiavi disponibili:`, keys);
                     }
                   } else {
                     console.warn(`⚠️ Nodo padre vuoto o null`);
@@ -991,8 +1000,11 @@ async function initializeServer() {
             }
           }, 10000);
 
-          // Prima leggi il nodo padre per vedere se ci sono dati
+          // Leggi direttamente il nodo padre
           uploadsNode.once((parentData) => {
+            dataReceived = true;
+            clearTimeout(timeoutId);
+
             console.log(`📋 Parent node data:`, parentData);
             console.log(`📋 Parent data type:`, typeof parentData);
             console.log(
@@ -1002,8 +1014,6 @@ async function initializeServer() {
 
             if (!parentData || typeof parentData !== "object") {
               console.log(`❌ Nessun dato nel nodo padre per: ${identifier}`);
-              dataReceived = true;
-              clearTimeout(timeoutId);
               resolve([]);
               return;
             }
@@ -1016,50 +1026,26 @@ async function initializeServer() {
 
             if (hashKeys.length === 0) {
               console.log(`❌ Nessun hash trovato per: ${identifier}`);
-              dataReceived = true;
-              clearTimeout(timeoutId);
               resolve([]);
               return;
             }
 
-            // Leggi ogni hash individualmente
-            let uploadsArray = [];
-            let completedReads = 0;
-            const totalReads = hashKeys.length;
-
-            hashKeys.forEach((hash) => {
-              console.log(`📋 Reading hash: ${hash}`);
-              uploadsNode.get(hash).once((uploadData) => {
-                completedReads++;
+            // I dati sono già nel nodo padre, non serve leggere individualmente
+            const uploadsArray = hashKeys
+              .map((hash) => {
+                const uploadData = parentData[hash];
                 console.log(`📋 Upload data for ${hash}:`, uploadData);
+                return uploadData;
+              })
+              .filter((upload) => upload && upload.hash) // Filtra upload validi
+              .sort((a, b) => b.uploadedAt - a.uploadedAt); // Ordina per data
 
-                if (uploadData && uploadData.hash) {
-                  uploadsArray.push(uploadData);
-                  console.log(`✅ Added upload for hash: ${hash}`);
-                } else {
-                  console.warn(
-                    `⚠️ Invalid upload data for hash: ${hash}`,
-                    uploadData
-                  );
-                }
+            console.log(`📋 Final uploads array:`, uploadsArray);
+            console.log(
+              `✅ Found ${uploadsArray.length} uploads for: ${identifier}`
+            );
 
-                // Se abbiamo letto tutti gli hash, risolvi
-                if (completedReads === totalReads) {
-                  dataReceived = true;
-                  clearTimeout(timeoutId);
-
-                  // Ordina per data di upload
-                  uploadsArray.sort((a, b) => b.uploadedAt - a.uploadedAt);
-
-                  console.log(`📋 Final uploads array:`, uploadsArray);
-                  console.log(
-                    `✅ Found ${uploadsArray.length} uploads for: ${identifier}`
-                  );
-
-                  resolve(uploadsArray);
-                }
-              });
-            });
+            resolve(uploadsArray);
           });
         });
       };
@@ -1174,38 +1160,18 @@ async function initializeServer() {
               hashKeys
             );
 
-            // Leggi ogni hash individualmente per il debug dettagliato
+            // I dati sono già nel nodo padre
             let detailedData = {};
-            let completedReads = 0;
-            const totalReads = hashKeys.length;
-
-            if (totalReads === 0) {
-              console.log(`🔍 Debug: No hash keys found`);
-              resolve({
-                rawData: parentData,
-                detailedData: {},
-                error: "No hash keys",
-              });
-              return;
-            }
-
             hashKeys.forEach((hash) => {
-              console.log(`🔍 Debug: Reading hash ${hash}`);
-              uploadsNode.get(hash).once((hashData) => {
-                completedReads++;
-                console.log(`🔍 Debug: Hash ${hash} data:`, hashData);
-                detailedData[hash] = hashData;
-
-                // Se abbiamo letto tutti gli hash, risolvi
-                if (completedReads === totalReads) {
-                  console.log(
-                    `🔍 Debug: All hashes read, detailed data:`,
-                    detailedData
-                  );
-                  resolve({ rawData: parentData, detailedData, error: null });
-                }
-              });
+              detailedData[hash] = parentData[hash];
+              console.log(`🔍 Debug: Hash ${hash} data:`, parentData[hash]);
             });
+
+            console.log(
+              `🔍 Debug: All data collected, detailed data:`,
+              detailedData
+            );
+            resolve({ rawData: parentData, detailedData, error: null });
           });
         });
       };
