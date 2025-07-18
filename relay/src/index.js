@@ -18,7 +18,7 @@ import { ethers } from "ethers";
 dotenv.config();
 
 import Gun from "gun";
-import SEA from "gun/sea.js";
+import { SEA } from "gun/sea";
 import "gun/lib/stats.js";
 import "gun/lib/webrtc.js";
 import "gun/lib/rfs.js";
