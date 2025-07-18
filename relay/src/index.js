@@ -848,7 +848,7 @@ async function initializeServer() {
           let timeoutId;
           let dataReceived = false;
 
-          // Timeout di 10 secondi (aumentato per dare più tempo)
+          // Timeout di 15 secondi (aumentato per dare più tempo)
           timeoutId = setTimeout(() => {
             if (!dataReceived) {
               console.log(
@@ -856,9 +856,9 @@ async function initializeServer() {
               );
               resolve([]);
             }
-          }, 10000);
+          }, 15000);
 
-          // Leggi direttamente il nodo padre
+          // Prima leggi il nodo padre per vedere se ci sono dati
           uploadsNode.once((parentData) => {
             dataReceived = true;
             clearTimeout(timeoutId);
@@ -888,22 +888,41 @@ async function initializeServer() {
               return;
             }
 
-            // I dati sono già nel nodo padre, non serve leggere individualmente
-            const uploadsArray = hashKeys
-              .map((hash) => {
-                const uploadData = parentData[hash];
+            // Leggi ogni hash individualmente dalla struttura nidificata
+            let uploadsArray = [];
+            let completedReads = 0;
+            const totalReads = hashKeys.length;
+
+            hashKeys.forEach((hash) => {
+              console.log(`📋 Reading hash: ${hash}`);
+              uploadsNode.get(hash).once((uploadData) => {
+                completedReads++;
                 console.log(`📋 Upload data for ${hash}:`, uploadData);
-                return uploadData;
-              })
-              .filter((upload) => upload && upload.hash) // Filtra upload validi
-              .sort((a, b) => b.uploadedAt - a.uploadedAt); // Ordina per data
 
-            console.log(`📋 Final uploads array:`, uploadsArray);
-            console.log(
-              `✅ Found ${uploadsArray.length} uploads for: ${identifier}`
-            );
+                if (uploadData && uploadData.hash) {
+                  uploadsArray.push(uploadData);
+                  console.log(`✅ Added upload for hash: ${hash}`);
+                } else {
+                  console.warn(
+                    `⚠️ Invalid upload data for hash: ${hash}`,
+                    uploadData
+                  );
+                }
 
-            resolve(uploadsArray);
+                // Se abbiamo letto tutti gli hash, risolvi
+                if (completedReads === totalReads) {
+                  // Ordina per data di upload
+                  uploadsArray.sort((a, b) => b.uploadedAt - a.uploadedAt);
+
+                  console.log(`📋 Final uploads array:`, uploadsArray);
+                  console.log(
+                    `✅ Found ${uploadsArray.length} uploads for: ${identifier}`
+                  );
+
+                  resolve(uploadsArray);
+                }
+              });
+            });
           });
         });
       };
@@ -979,13 +998,13 @@ async function initializeServer() {
           let timeoutId;
           let dataReceived = false;
 
-          // Timeout di 15 secondi per debug
+          // Timeout di 20 secondi per debug
           timeoutId = setTimeout(() => {
             if (!dataReceived) {
               console.log(`⏰ Debug timeout per ${identifier}`);
               resolve({ rawData: null, detailedData: {}, error: "Timeout" });
             }
-          }, 15000);
+          }, 20000);
 
           // Listener per i dati del nodo padre
           uploadsNode.once((parentData) => {
@@ -1018,18 +1037,38 @@ async function initializeServer() {
               hashKeys
             );
 
-            // I dati sono già nel nodo padre
+            // Leggi ogni hash individualmente per il debug dettagliato
             let detailedData = {};
-            hashKeys.forEach((hash) => {
-              detailedData[hash] = parentData[hash];
-              console.log(`🔍 Debug: Hash ${hash} data:`, parentData[hash]);
-            });
+            let completedReads = 0;
+            const totalReads = hashKeys.length;
 
-            console.log(
-              `🔍 Debug: All data collected, detailed data:`,
-              detailedData
-            );
-            resolve({ rawData: parentData, detailedData, error: null });
+            if (totalReads === 0) {
+              console.log(`🔍 Debug: No hash keys found`);
+              resolve({
+                rawData: parentData,
+                detailedData: {},
+                error: "No hash keys",
+              });
+              return;
+            }
+
+            hashKeys.forEach((hash) => {
+              console.log(`🔍 Debug: Reading hash ${hash}`);
+              uploadsNode.get(hash).once((hashData) => {
+                completedReads++;
+                console.log(`🔍 Debug: Hash ${hash} data:`, hashData);
+                detailedData[hash] = hashData;
+
+                // Se abbiamo letto tutti gli hash, risolvi
+                if (completedReads === totalReads) {
+                  console.log(
+                    `🔍 Debug: All hashes read, detailed data:`,
+                    detailedData
+                  );
+                  resolve({ rawData: parentData, detailedData, error: null });
+                }
+              });
+            });
           });
         });
       };
@@ -3254,6 +3293,20 @@ async function initializeServer() {
     const { cid } = req.params;
     const { token } = req.query;
 
+    console.log(
+      `🔍 IPFS Content Request - CID: ${cid}, Token: ${
+        token ? "present" : "missing"
+      }`
+    );
+    if (token) {
+      console.log(
+        `🔑 Token length: ${token.length}, Token preview: ${token.substring(
+          0,
+          10
+        )}...`
+      );
+    }
+
     if (!cid) {
       return res.status(400).json({
         success: false,
@@ -3273,6 +3326,9 @@ async function initializeServer() {
       const ipfsReq = http.get(requestOptions, (ipfsRes) => {
         // If no token, just stream the response
         if (!token) {
+          console.log(
+            `📤 Streaming content without decryption for CID: ${cid}`
+          );
           res.setHeader(
             "Content-Type",
             ipfsRes.headers["content-type"] || "application/octet-stream"
@@ -3282,26 +3338,36 @@ async function initializeServer() {
         }
 
         // If token is provided, buffer the response to decrypt it
+        console.log(`🔓 Attempting decryption for CID: ${cid}`);
         let body = "";
         ipfsRes.on("data", (chunk) => (body += chunk));
         ipfsRes.on("end", async () => {
           try {
+            console.log(
+              `📦 Received encrypted content, length: ${body.length}`
+            );
             const decrypted = await SEA.decrypt(body, token);
 
             if (decrypted) {
+              console.log(`✅ Decryption successful for CID: ${cid}`);
               // It's a Base64 data URL, e.g., "data:image/png;base64,iVBORw0KGgo..."
               const parts = decrypted.match(/^data:(.+);base64,(.+)$/);
               if (parts) {
                 const mimeType = parts[1];
                 const fileContents = Buffer.from(parts[2], "base64");
+                console.log(
+                  `📄 Decrypted data URL with MIME type: ${mimeType}`
+                );
                 res.setHeader("Content-Type", mimeType);
                 res.send(fileContents);
               } else {
                 // Not a data URL, just plain text
+                console.log(`📝 Decrypted plain text content`);
                 res.setHeader("Content-Type", "text/plain");
                 res.send(decrypted);
               }
             } else {
+              console.log(`❌ Decryption returned null for CID: ${cid}`);
               // Decryption failed, send raw content
               res.setHeader(
                 "Content-Type",
@@ -3310,7 +3376,7 @@ async function initializeServer() {
               res.send(body);
             }
           } catch (e) {
-            console.error("Decryption error:", e);
+            console.error(`❌ Decryption error for CID ${cid}:`, e.message);
             // Decryption failed, send raw content
             res.setHeader(
               "Content-Type",
