@@ -823,21 +823,36 @@ async function initializeServer() {
                     `📊 Updating MB usage: ${fileSizeMB} MB for user ${userAddress} on relay ${relayAddress}`
                   );
 
-                  // Chiama il contratto per aggiornare i MB utilizzati
-                  if (relayContract) {
-                    const tx = await relayContract.recordMBUsage(
-                      userAddress,
-                      fileSizeMB
-                    );
-                    await tx.wait();
-                    console.log(
-                      `✅ MB usage updated successfully. Transaction: ${tx.hash}`
-                    );
-                  } else {
-                    console.warn(
-                      `⚠️ Relay contract not available, skipping MB update`
-                    );
-                  }
+                  // Registra l'uso MB off-chain nel database Gun
+                  const mbUsageNode = gun
+                    .get("shogun")
+                    .get("mb_usage")
+                    .get(userAddress);
+
+                  // Ottieni l'uso MB corrente
+                  const currentUsage = await new Promise((resolve) => {
+                    mbUsageNode.once((data) => {
+                      resolve(data || { mbUsed: 0, lastUpdated: Date.now() });
+                    });
+                  });
+
+                  // Aggiorna l'uso MB
+                  const updatedUsage = {
+                    mbUsed: currentUsage.mbUsed + fileSizeMB,
+                    lastUpdated: Date.now(),
+                    updatedBy: "upload-endpoint",
+                  };
+
+                  // Salva nel database Gun
+                  mbUsageNode.put(updatedUsage, (ack) => {
+                    if (ack.err) {
+                      console.error("Error saving MB usage to Gun:", ack.err);
+                    } else {
+                      console.log(
+                        `✅ MB usage updated off-chain: ${currentUsage.mbUsed} + ${fileSizeMB} = ${updatedUsage.mbUsed} MB`
+                      );
+                    }
+                  });
                 } catch (mbError) {
                   console.error(`❌ Error updating MB usage:`, mbError.message);
                   // Non bloccare l'upload se l'aggiornamento MB fallisce
@@ -2401,35 +2416,65 @@ async function initializeServer() {
         );
 
         if (isSubscribed) {
-          // Ottieni i dettagli della sottoscrizione
+          // Ottieni i dettagli della sottoscrizione dal contratto
           const subscriptionDetails =
             await relayContract.getSubscriptionDetails(
               userAddress,
               relayAddress
             );
 
+          const [
+            startTime,
+            endTime,
+            amountPaid,
+            mbAllocated,
+            contractMbUsed,
+            contractMbRemaining,
+            isActiveStatus,
+          ] = subscriptionDetails;
+
+          // Ottieni l'uso MB off-chain dal database Gun
+          const mbUsageNode = gun
+            .get("shogun")
+            .get("mb_usage")
+            .get(userAddress);
+          const offChainUsage = await new Promise((resolve) => {
+            mbUsageNode.once((data) => {
+              resolve(data || { mbUsed: 0, lastUpdated: Date.now() });
+            });
+          });
+
+          // Usa i dati off-chain per l'uso MB, fallback al contratto
+          const mbUsedNum = offChainUsage.mbUsed || Number(contractMbUsed);
+          const mbAllocatedNum = Number(mbAllocated);
+          const mbRemainingNum = Math.max(0, mbAllocatedNum - mbUsedNum);
+
+          const usagePercentage =
+            mbAllocatedNum > 0 ? (mbUsedNum / mbAllocatedNum) * 100 : 0;
+
           res.json({
             success: true,
             userAddress,
             relayAddress,
             subscription: {
-              isActive: true,
-              startTime: Number(subscriptionDetails.startTime),
-              endTime: Number(subscriptionDetails.endTime),
-              amountPaid: ethers.formatEther(subscriptionDetails.amountPaid),
-              startDate: new Date(
-                Number(subscriptionDetails.startTime) * 1000
-              ).toISOString(),
-              endDate: new Date(
-                Number(subscriptionDetails.endTime) * 1000
-              ).toISOString(),
+              isActive: isActiveStatus,
+              startTime: Number(startTime),
+              endTime: Number(endTime),
+              amountPaid: ethers.formatEther(amountPaid),
+              mbAllocated: mbAllocatedNum,
+              mbUsed: mbUsedNum,
+              mbRemaining: mbRemainingNum,
+              usagePercentage: Math.round(usagePercentage * 100) / 100,
+              startDate: new Date(Number(startTime) * 1000).toISOString(),
+              endDate: new Date(Number(endTime) * 1000).toISOString(),
               daysRemaining: Math.max(
                 0,
                 Math.ceil(
-                  (Number(subscriptionDetails.endTime) * 1000 - Date.now()) /
-                    (1000 * 60 * 60 * 24)
+                  (Number(endTime) * 1000 - Date.now()) / (1000 * 60 * 60 * 24)
                 )
               ),
+              storage: "off-chain",
+              lastUpdated: new Date(offChainUsage.lastUpdated).toISOString(),
             },
           });
         } else {
@@ -2694,7 +2739,7 @@ async function initializeServer() {
         );
 
         if (isActive) {
-          // Ottieni i dettagli completi della sottoscrizione
+          // Ottieni i dettagli completi della sottoscrizione dal contratto
           const subscriptionDetails =
             await relayContract.getSubscriptionDetails(
               userAddress,
@@ -2706,14 +2751,27 @@ async function initializeServer() {
             endTime,
             amountPaid,
             mbAllocated,
-            mbUsed,
-            mbRemaining,
+            contractMbUsed,
+            contractMbRemaining,
             isActiveStatus,
           ] = subscriptionDetails;
 
-          // Converti BigInt a Number per il calcolo della percentuale
+          // Ottieni l'uso MB off-chain dal database Gun
+          const mbUsageNode = gun
+            .get("shogun")
+            .get("mb_usage")
+            .get(userAddress);
+          const offChainUsage = await new Promise((resolve) => {
+            mbUsageNode.once((data) => {
+              resolve(data || { mbUsed: 0, lastUpdated: Date.now() });
+            });
+          });
+
+          // Usa i dati off-chain per l'uso MB, fallback al contratto
+          const mbUsedNum = offChainUsage.mbUsed || Number(contractMbUsed);
           const mbAllocatedNum = Number(mbAllocated);
-          const mbUsedNum = Number(mbUsed);
+          const mbRemainingNum = Math.max(0, mbAllocatedNum - mbUsedNum);
+
           const usagePercentage =
             mbAllocatedNum > 0 ? (mbUsedNum / mbAllocatedNum) * 100 : 0;
 
@@ -2728,7 +2786,7 @@ async function initializeServer() {
               amountPaid: ethers.formatEther(amountPaid),
               mbAllocated: mbAllocatedNum,
               mbUsed: mbUsedNum,
-              mbRemaining: Number(mbRemaining),
+              mbRemaining: mbRemainingNum,
               usagePercentage: Math.round(usagePercentage * 100) / 100,
               startDate: new Date(Number(startTime) * 1000).toISOString(),
               endDate: new Date(Number(endTime) * 1000).toISOString(),
@@ -2738,6 +2796,8 @@ async function initializeServer() {
                   (Number(endTime) * 1000 - Date.now()) / (1000 * 60 * 60 * 24)
                 )
               ),
+              storage: "off-chain",
+              lastUpdated: new Date(offChainUsage.lastUpdated).toISOString(),
             },
           });
         } else {
@@ -3460,63 +3520,56 @@ async function initializeServer() {
         ipfsRes.on("data", (chunk) => (body += chunk));
         ipfsRes.on("end", async () => {
           try {
-            console.log(
-              `📦 Received encrypted content, length: ${body.length}`
-            );
-            console.log(`🔑 Token being used: ${token.substring(0, 20)}...`);
-            console.log(`📄 Content preview: ${body.substring(0, 100)}...`);
+            console.log(`🧪 Received content length: ${body.length}`);
+            console.log(`🧪 Content preview: ${body.substring(0, 100)}...`);
+            console.log(`🧪 Token being used: ${token.substring(0, 20)}...`);
+            console.log(`🧪 Token length: ${token.length}`);
 
             const decrypted = await SEA.decrypt(body, token);
 
             if (decrypted) {
-              console.log(`✅ Decryption successful for CID: ${cid}`);
+              console.log(`🧪 Decryption successful!`);
               console.log(
-                `📄 Decrypted content preview: ${decrypted.substring(
-                  0,
-                  100
-                )}...`
+                `🧪 Decrypted preview: ${decrypted.substring(0, 100)}...`
               );
 
-              // It's a Base64 data URL, e.g., "data:image/png;base64,iVBORw0KGgo..."
-              const parts = decrypted.match(/^data:(.+);base64,(.+)$/);
-              if (parts) {
-                const mimeType = parts[1];
-                const fileContents = Buffer.from(parts[2], "base64");
-                console.log(
-                  `📄 Decrypted data URL with MIME type: ${mimeType}`
-                );
-                console.log(
-                  `📄 File contents length: ${fileContents.length} bytes`
-                );
-                res.setHeader("Content-Type", mimeType);
-                res.send(fileContents);
-              } else {
-                // Not a data URL, just plain text
-                console.log(`📝 Decrypted plain text content`);
-                res.setHeader("Content-Type", "text/plain");
-                res.send(decrypted);
-              }
+              res.json({
+                success: true,
+                message: "Decryption successful",
+                decryptedData: decrypted,
+                originalLength: body.length,
+                decryptedLength: decrypted.length,
+                extractedCid: cid,
+              });
             } else {
-              console.log(`❌ Decryption returned null for CID: ${cid}`);
               console.log(
-                `❌ This usually means the token is incorrect or the content is not encrypted`
+                `🧪 Decryption returned null - token might be wrong or content not encrypted`
               );
-              // Decryption failed, send raw content
-              res.setHeader(
-                "Content-Type",
-                ipfsRes.headers["content-type"] || "application/octet-stream"
-              );
-              res.send(body);
+              res.json({
+                success: false,
+                error:
+                  "Decryption returned null - token might be wrong or content not encrypted",
+                contentPreview: body.substring(0, 100) + "...",
+                tokenLength: token.length,
+                tokenPreview: token.substring(0, 20) + "...",
+                extractedCid: cid,
+              });
             }
           } catch (e) {
-            console.error(`❌ Decryption error for CID ${cid}:`, e.message);
-            console.error(`❌ Full error:`, e);
-            // Decryption failed, send raw content
-            res.setHeader(
-              "Content-Type",
-              ipfsRes.headers["content-type"] || "application/octet-stream"
-            );
-            res.send(body);
+            console.error(`🧪 Decryption error:`, e);
+            console.error(`🧪 Error name:`, e.name);
+            console.error(`🧪 Error message:`, e.message);
+            console.error(`🧪 Error stack:`, e.stack);
+            res.json({
+              success: false,
+              error: "Decryption error",
+              details: e.message,
+              errorName: e.name,
+              contentPreview: body.substring(0, 100) + "...",
+              tokenLength: token.length,
+              tokenPreview: token.substring(0, 20) + "...",
+              extractedCid: cid,
+            });
           }
         });
 
@@ -3542,6 +3595,7 @@ async function initializeServer() {
             fallback: {
               publicGateway: `https://ipfs.io/ipfs/${cid}`,
               cloudflareGateway: `https://cloudflare-ipfs.com/ipfs/${cid}`,
+              dweb: `https://dweb.link/ipfs/${cid}`,
             },
           });
         }
@@ -3557,6 +3611,7 @@ async function initializeServer() {
             fallback: {
               publicGateway: `https://ipfs.io/ipfs/${cid}`,
               cloudflareGateway: `https://cloudflare-ipfs.com/ipfs/${cid}`,
+              dweb: `https://dweb.link/ipfs/${cid}`,
             },
           });
         }
@@ -3816,12 +3871,14 @@ async function initializeServer() {
                 decryptedData: decrypted,
                 originalLength: body.length,
                 decryptedLength: decrypted.length,
+                extractedCid: cid,
               });
             } else {
               res.json({
                 success: false,
                 error: "Decryption returned null",
                 contentPreview: body.substring(0, 100) + "...",
+                extractedCid: cid,
               });
             }
           } catch (e) {
@@ -3831,6 +3888,7 @@ async function initializeServer() {
               error: "Decryption error",
               details: e.message,
               contentPreview: body.substring(0, 100) + "...",
+              extractedCid: cid,
             });
           }
         });
@@ -3992,82 +4050,47 @@ async function initializeServer() {
         });
       }
 
-      if (!relayContract) {
-        return res.status(500).json({
-          success: false,
-          error: "Relay contract not configured",
+      // Registra l'uso MB off-chain nel database Gun
+      const mbUsageNode = gun.get("shogun").get("mb_usage").get(userAddress);
+
+      // Ottieni l'uso MB corrente
+      const currentUsage = await new Promise((resolve) => {
+        mbUsageNode.once((data) => {
+          resolve(data || { mbUsed: 0, lastUpdated: Date.now() });
         });
-      }
+      });
 
-      // Ottieni tutti i relay registrati
-      const allRelays = await relayContract.getAllRelays();
-      if (allRelays.length === 0) {
-        return res.status(500).json({
-          success: false,
-          error: "No relays registered in contract",
-        });
-      }
+      // Aggiorna l'uso MB
+      const updatedUsage = {
+        mbUsed: mbUsed,
+        lastUpdated: Date.now(),
+        updatedBy: "force-update-endpoint",
+      };
 
-      const relayAddress = allRelays[0];
-
-      // Verifica che l'utente abbia una sottoscrizione attiva
-      const isActive = await relayContract.isSubscriptionActive(
-        userAddress,
-        relayAddress
-      );
-      if (!isActive) {
-        return res.status(403).json({
-          success: false,
-          error: "No active subscription found for this user",
-        });
-      }
-
-      // Ottieni i dettagli della sottoscrizione
-      const subscriptionDetails = await relayContract.getSubscriptionDetails(
-        userAddress,
-        relayAddress
-      );
-      const currentMBUsed = Number(subscriptionDetails.mbUsed);
-      const mbAllocated = Number(subscriptionDetails.mbAllocated);
-
-      // Calcola i MB da aggiungere (differenza tra richiesto e attuale)
-      const mbToAdd = Math.max(0, mbUsed - currentMBUsed);
-
-      if (mbToAdd > 0) {
-        // Verifica che ci siano MB sufficienti
-        if (currentMBUsed + mbToAdd > mbAllocated) {
-          return res.status(403).json({
+      // Salva nel database Gun
+      mbUsageNode.put(updatedUsage, (ack) => {
+        if (ack.err) {
+          console.error("Error saving MB usage to Gun:", ack.err);
+          return res.status(500).json({
             success: false,
-            error: "MB usage would exceed allocation",
-            currentMBUsed,
-            mbAllocated,
-            requestedMB: mbUsed,
+            error: "Failed to save MB usage",
+            details: ack.err,
           });
         }
 
-        // Registra l'uso di MB
-        const tx = await relayContract.recordMBUsage(userAddress, mbToAdd);
-        await tx.wait();
-
         console.log(
-          `✅ Force update MB successful. Added ${mbToAdd} MB for user ${userAddress}`
+          `✅ MB usage updated off-chain for user ${userAddress}: ${mbUsed} MB`
         );
-      }
 
-      // Ottieni i MB rimanenti aggiornati
-      const remainingMB = await relayContract.getRemainingMB(
-        userAddress,
-        relayAddress
-      );
-
-      res.json({
-        success: true,
-        message: "MB usage updated successfully",
-        userAddress,
-        relayAddress,
-        mbUsed: mbUsed,
-        remainingMB: Number(remainingMB),
-        mbAdded: mbToAdd,
+        res.json({
+          success: true,
+          message: "MB usage updated successfully (off-chain)",
+          userAddress,
+          mbUsed: mbUsed,
+          previousMBUsed: currentUsage.mbUsed,
+          lastUpdated: new Date(updatedUsage.lastUpdated).toISOString(),
+          storage: "off-chain",
+        });
       });
     } catch (error) {
       console.error("Force update MB error:", error);

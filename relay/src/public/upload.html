@@ -247,6 +247,7 @@
             reader.readAsDataURL(file);
           });
 
+
           const encryptedData = await SEA.encrypt(base64data, token);
           fileToUpload = new File([encryptedData], file.name + ".enc", {
             type: "text/plain",
@@ -382,9 +383,12 @@
                     `;
           showMessage(successMessage, "success");
         } else {
-          throw new Error(
-            result.error || "Decryption failed for an unknown reason."
-          );
+          // Mostra i dettagli dell'errore se disponibili
+          const errorMessage = result.error || "Decryption failed for an unknown reason.";
+          const errorDetails = result.details ? `\nDetails: ${result.details}` : '';
+          const contentPreview = result.contentPreview ? `\nContent preview: ${result.contentPreview}` : '';
+
+          throw new Error(`${errorMessage}${errorDetails}${contentPreview}`);
         }
       } catch (err) {
         showMessage(`Decryption failed: ${err.message}`);
@@ -445,9 +449,13 @@
                     `;
           showMessage(successMessage, "success");
         } else {
-          throw new Error(
-            result.error || "URL Decryption failed for an unknown reason."
-          );
+          // Mostra i dettagli dell'errore se disponibili
+          const errorMessage = result.error || "URL Decryption failed for an unknown reason.";
+          const errorDetails = result.details ? `\nDetails: ${result.details}` : '';
+          const contentPreview = result.contentPreview ? `\nContent preview: ${result.contentPreview}` : '';
+          const extractedCid = result.extractedCid ? `\nExtracted CID: ${result.extractedCid}` : '';
+
+          throw new Error(`${errorMessage}${errorDetails}${contentPreview}${extractedCid}`);
         }
       } catch (err) {
         showMessage(`URL Decryption failed: ${err.message}`);
