@@ -637,6 +637,8 @@ async function initializeServer() {
 
               // Registra l'uso di MB tramite smart contract se disponibile
               let mbUsageRecorded = false;
+              let mbVerified = false; // Inizializza la variabile fuori dal blocco
+
               if (relayContract && req.userAddress) {
                 try {
                   // Calcola MB arrotondando sempre verso l'alto e convertendo in intero
@@ -666,7 +668,6 @@ async function initializeServer() {
                   console.log(`🏠 Relay address: ${relayAddress}`);
 
                   // Verifica MB disponibili tramite smart contract
-                  let mbVerified = false;
                   if (relayContract && req.userAddress) {
                     try {
                       // Verifica che ci siano MB sufficienti usando hasAvailableMB
@@ -755,6 +756,12 @@ async function initializeServer() {
                     details: mbError.message,
                   });
                 }
+              } else {
+                // Se non c'è contratto relay, considera la verifica come passata
+                mbVerified = true;
+                console.log(
+                  "ℹ️ Nessun contratto relay disponibile, saltando verifica MB"
+                );
               }
 
               res.json({
