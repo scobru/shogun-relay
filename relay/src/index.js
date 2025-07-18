@@ -644,32 +644,50 @@ async function initializeServer() {
                   console.log(
                     `💾 Upload node path: shogun/uploads/${identifier}`
                   );
+                  console.log(
+                    `💾 Upload data to save:`,
+                    JSON.stringify(uploadData, null, 2)
+                  );
 
-                  // Timeout di 3 secondi per evitare che si blocchi
+                  // Timeout di 5 secondi per evitare che si blocchi
                   const timeoutId = setTimeout(() => {
                     console.warn(
-                      `⚠️ Gun save timeout after 3 seconds for hash: ${fileResult?.Hash}`
+                      `⚠️ Gun save timeout after 5 seconds for hash: ${fileResult?.Hash}`
                     );
                     resolve(); // Risolvi comunque per non bloccare l'upload
-                  }, 3000);
+                  }, 5000);
 
                   // Salva usando l'hash come chiave
+                  console.log(
+                    `💾 Calling uploadNode.get(${fileResult?.Hash}).put(...)`
+                  );
                   uploadNode.get(fileResult?.Hash).put(uploadData, (ack) => {
                     clearTimeout(timeoutId);
-                    console.log(`💾 Upload saved to Gun DB:`, ack);
-                    console.log(`💾 Ack details:`, {
+                    console.log(
+                      `💾 Upload saved to Gun DB - ACK received:`,
+                      ack
+                    );
+                    console.log(`💾 ACK details:`, {
                       err: ack.err,
                       ok: ack.ok,
                       pub: ack.pub,
                       get: ack.get,
+                      put: ack.put,
+                      ack: ack.ack,
+                      "@": ack["@"],
+                      ">": ack[">"],
+                      "=": ack["="],
+                      _: ack._,
                     });
 
                     if (ack.err) {
                       console.error(`❌ Error saving to Gun DB:`, ack.err);
+                      console.error(`❌ Full ACK error details:`, ack);
                       // Non rifiutare, solo logga l'errore
                       resolve();
                     } else {
                       console.log(`✅ Upload saved successfully to Gun DB`);
+                      console.log(`✅ ACK indicates success:`, ack.ok);
                       resolve();
                     }
                   });
@@ -686,19 +704,44 @@ async function initializeServer() {
                     console.log(
                       `🔍 Verifica immediata salvataggio per hash: ${fileResult?.Hash}`
                     );
+                    console.log(
+                      `🔍 Reading from path: shogun/uploads/${identifier}/${fileResult?.Hash}`
+                    );
+
                     uploadNode.get(fileResult?.Hash).once((savedData) => {
                       console.log(`🔍 Dati salvati verificati:`, savedData);
+                      console.log(`🔍 Tipo di dati salvati:`, typeof savedData);
+                      console.log(
+                        `🔍 Dati salvati sono null/undefined:`,
+                        savedData === null || savedData === undefined
+                      );
+
                       if (savedData) {
                         console.log(
                           `✅ Verifica salvataggio OK - dati trovati`
+                        );
+                        console.log(
+                          `✅ Dati salvati completi:`,
+                          JSON.stringify(savedData, null, 2)
                         );
                       } else {
                         console.warn(
                           `⚠️ Verifica salvataggio FAILED - dati non trovati`
                         );
+                        console.warn(`⚠️ Prova a leggere il nodo padre...`);
+
+                        // Prova a leggere il nodo padre per vedere se ci sono dati
+                        uploadNode.once((parentData) => {
+                          console.log(`🔍 Dati nodo padre:`, parentData);
+                          console.log(`🔍 Tipo nodo padre:`, typeof parentData);
+                          console.log(
+                            `🔍 Chiavi nodo padre:`,
+                            parentData ? Object.keys(parentData) : "N/A"
+                          );
+                        });
                       }
                     });
-                  }, 500);
+                  }, 1000); // Aumentato a 1 secondo
                 })
                 .catch((gunError) => {
                   console.error(`❌ Failed to save to Gun DB:`, gunError);
@@ -707,10 +750,35 @@ async function initializeServer() {
 
               // Verifica che il salvataggio sia avvenuto
               setTimeout(() => {
+                console.log(`🔍 Verifica persistenza salvataggio...`);
                 uploadNode.once((savedData) => {
-                  console.log(`🔍 Verifica salvataggio:`, savedData);
+                  console.log(`🔍 Verifica salvataggio nodo padre:`, savedData);
+                  console.log(`🔍 Tipo verifica:`, typeof savedData);
+                  console.log(
+                    `🔍 Chiavi verifica:`,
+                    savedData ? Object.keys(savedData) : "N/A"
+                  );
+
+                  if (savedData && typeof savedData === "object") {
+                    const keys = Object.keys(savedData).filter(
+                      (key) => key !== "_"
+                    );
+                    console.log(`🔍 Chiavi trovate (esclusi metadati):`, keys);
+
+                    if (keys.includes(fileResult?.Hash)) {
+                      console.log(
+                        `✅ Hash trovato nel nodo padre: ${fileResult?.Hash}`
+                      );
+                    } else {
+                      console.warn(
+                        `⚠️ Hash NON trovato nel nodo padre: ${fileResult?.Hash}`
+                      );
+                    }
+                  } else {
+                    console.warn(`⚠️ Nodo padre vuoto o null`);
+                  }
                 });
-              }, 100);
+              }, 2000); // Aumentato a 2 secondi
 
               // Registra l'uso di MB tramite smart contract se disponibile
               let mbUsageRecorded = false;
