@@ -755,7 +755,7 @@ async function initializeServer() {
 
                 // Aggiorna i MB utilizzati nel contratto
                 try {
-                  const fileSizeMB = +(req.file.size / 1024 / 1024).toFixed(2);
+                  const fileSizeMB = Math.ceil(req.file.size / (1024 * 1024)); // Stesso calcolo usato in mbUsage
                   console.log(
                     `📊 Updating MB usage: ${fileSizeMB} MB for user ${userAddress}`
                   );
