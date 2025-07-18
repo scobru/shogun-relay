@@ -628,12 +628,31 @@ async function initializeServer() {
                 `💾 Salvando upload con identificatore: ${identifier}`
               );
               console.log(`💾 Upload data:`, uploadData);
+              console.log(`💾 Req.userAddress:`, req.userAddress);
+              console.log(`💾 Identifier type:`, typeof identifier);
+              console.log(
+                `💾 Identifier length:`,
+                identifier ? identifier.length : 0
+              );
 
               // Usa una struttura più semplice per Gun - salva direttamente nel nodo padre
+              console.log(`💾 Gun object available:`, !!gun);
+              console.log(`💾 Gun object type:`, typeof gun);
+              console.log(
+                `💾 Gun object keys:`,
+                gun ? Object.keys(gun) : "N/A"
+              );
+
               const uploadNode = gun
                 .get("shogun")
                 .get("uploads")
                 .get(identifier);
+
+              console.log(
+                `💾 Upload node created for path: shogun/uploads/${identifier}`
+              );
+              console.log(`💾 Upload node object:`, uploadNode);
+              console.log(`💾 Upload node type:`, typeof uploadNode);
 
               // Salva i dati con Promise per attendere il completamento
               const saveToGun = () => {
@@ -1722,7 +1741,7 @@ async function initializeServer() {
     web: server,
     isValid: hasValidToken,
     uuid: process.env.RELAY_NAME,
-    localStorage: true, // Abilita localStorage per persistenza
+    localStorage: false, // Abilita localStorage per persistenza
     wire: true,
     axe: true,
     rfs: true,
