@@ -97,13 +97,17 @@ let relayAbi = [
   "function isSubscriptionActive(address _user, address _relayAddress) external view returns (bool)",
   "function hasAvailableMB(address _user, address _relayAddress, uint256 _mbRequired) public view returns (bool)",
   "function getRemainingMB(address _user, address _relayAddress) public view returns (uint256)",
-  "function getSubscriptionDetails(address _user, address _relayAddress) external view returns (uint256 startTime, uint256 endTime, uint256 amountPaid, uint256 mbAllocated, uint256 mbUsed, uint256 mbRemaining, bool isActive)",
-  "function getRelayDetails(address _relayAddress) external view returns (string memory url, address relayAddress, bool isActive, uint256 registeredAt)",
-  "function getAllRelays() external view returns (address[] memory)",
-  "function registerRelay(string memory _url) external",
-  "function deactivateRelay() external",
-  "function getUserSubscriptions(address _user) external view returns (address[] memory)",
-  "function getRelaySubscribers(address _relayAddress) external view returns (address[] memory)",
+  "function getSubscriptionDetails(address _user, address _relayAddress) external view returns (uint256, uint256, uint256, uint256, uint256, uint256, bool)",
+  "function getUserSubscriptions(address _user) external view returns (address[])",
+  "function getRelaySubscribers(address _relayAddress) external view returns (address[])",
+  "function getRelayDetails(address _relayAddress) external view returns (string, address, bool, uint256)",
+  "function getAllRelays() external view returns (address[])",
+  "function expireSubscription(address _user, address _relayAddress) external",
+  "function updateContractFee(uint256 _newFee) external",
+  "function withdrawFees() external",
+  "function transferOwnership(address _newOwner) external",
+  "function toggleEmergencyPause() external",
+  "function emergencyPause() external view returns (bool)",
 ];
 
 // Initialize contract with network verification
@@ -714,15 +718,9 @@ async function initializeServer() {
                   }
 
                   if (mbVerified) {
-                    // Registra l'uso di MB
-                    const tx = await relayContract.recordMBUsage(
-                      req.userAddress,
-                      fileSizeMB
-                    );
-                    await tx.wait();
-
+                    // MB sufficienti verificati - non serve registrare on-chain
                     console.log(
-                      `✅ Uso MB registrato: ${fileSizeMB} MB per ${req.userAddress.slice(
+                      `✅ MB sufficienti verificati: ${fileSizeMB} MB per ${req.userAddress.slice(
                         0,
                         6
                       )}...`
@@ -2124,148 +2122,6 @@ async function initializeServer() {
       res.status(500).json({
         success: false,
         error: "Errore interno del server",
-        details: error.message,
-      });
-    }
-  });
-
-  // Endpoint centralizzato per verificare se un utente ha MB sufficienti
-  app.post("/api/check-user-mb", async (req, res) => {
-    try {
-      const { userAddress, mbRequired } = req.body;
-
-      if (!userAddress || !mbRequired) {
-        return res.status(400).json({
-          success: false,
-          error: "userAddress e mbRequired sono richiesti",
-        });
-      }
-
-      if (!relayContract) {
-        return res.status(500).json({
-          success: false,
-          error: "Contratto relay non configurato",
-        });
-      }
-
-      // Ottieni tutti i relay registrati
-      const allRelays = await relayContract.getAllRelays();
-      if (allRelays.length === 0) {
-        return res.status(500).json({
-          success: false,
-          error: "Nessun relay registrato nel contratto",
-        });
-      }
-      const relayAddress = allRelays[0];
-
-      // Verifica se ha MB sufficienti usando hasAvailableMB
-      const hasMB = await relayContract.hasAvailableMB(
-        userAddress,
-        relayAddress,
-        mbRequired
-      );
-
-      // Ottieni i MB rimanenti
-      const remainingMB = await relayContract.getRemainingMB(
-        userAddress,
-        relayAddress
-      );
-
-      res.json({
-        success: true,
-        userAddress,
-        relayAddress,
-        mbRequired: Number(mbRequired),
-        hasSufficientMB: hasMB,
-        remainingMB: Number(remainingMB),
-      });
-    } catch (error) {
-      console.error("Errore verifica MB utente:", error);
-      res.status(500).json({
-        success: false,
-        error: "Errore verifica MB utente",
-        details: error.message,
-      });
-    }
-  });
-
-  // Endpoint centralizzato per registrare l'uso di MB
-  app.post("/api/record-user-mb-usage", async (req, res) => {
-    try {
-      const { userAddress, mbUsed } = req.body;
-
-      if (!userAddress || !mbUsed) {
-        return res.status(400).json({
-          success: false,
-          error: "userAddress e mbUsed sono richiesti",
-        });
-      }
-
-      if (!relayContract) {
-        return res.status(500).json({
-          success: false,
-          error: "Contratto relay non configurato",
-        });
-      }
-
-      // Ottieni tutti i relay registrati
-      const allRelays = await relayContract.getAllRelays();
-      if (allRelays.length === 0) {
-        return res.status(500).json({
-          success: false,
-          error: "Nessun relay registrato nel contratto",
-        });
-      }
-      const relayAddress = allRelays[0];
-
-      // Verifica che l'utente abbia una sottoscrizione attiva
-      const isSubscribed = await relayContract.isSubscriptionActive(
-        userAddress,
-        relayAddress
-      );
-      if (!isSubscribed) {
-        return res.status(403).json({
-          success: false,
-          error: "Nessuna sottoscrizione attiva trovata per questo utente",
-        });
-      }
-
-      // Verifica che ci siano MB sufficienti
-      const hasMB = await relayContract.hasAvailableMB(
-        userAddress,
-        relayAddress,
-        mbUsed
-      );
-      if (!hasMB) {
-        return res.status(403).json({
-          success: false,
-          error: "MB insufficienti per questa operazione",
-        });
-      }
-
-      // Registra l'uso di MB
-      const tx = await relayContract.recordMBUsage(userAddress, mbUsed);
-      await tx.wait();
-
-      // Ottieni i MB rimanenti
-      const remainingMB = await relayContract.getRemainingMB(
-        userAddress,
-        relayAddress
-      );
-
-      res.json({
-        success: true,
-        message: "Uso MB registrato con successo",
-        userAddress,
-        mbUsed: Number(mbUsed),
-        remainingMB: Number(remainingMB),
-        transactionHash: tx.hash,
-      });
-    } catch (error) {
-      console.error("Errore registrazione uso MB:", error);
-      res.status(500).json({
-        success: false,
-        error: "Errore registrazione uso MB",
         details: error.message,
       });
     }

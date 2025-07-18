@@ -433,7 +433,21 @@
             "function getRelayDetails(address _relayAddress) external view returns (string memory url, address relayAddress, bool isActive, uint256 registeredAt)",
             "function getAllRelays() external view returns (address[] memory)",
             "function registerRelay(string memory _url) external",
-            "function deactivateRelay() external"
+            "function deactivateRelay() external",
+            "function getRemainingMB(address _user, address _relayAddress) external view returns (uint256)",
+            "function hasAvailableMB(address _user, address _relayAddress, uint256 _mbRequired) external view returns (bool)",
+            "function isSubscriptionActive(address _user, address _relayAddress) external view returns (bool)",
+            "function getSubscriptionDetails(address _user, address _relayAddress) external view returns (uint256, uint256, uint256, uint256, uint256, uint256, bool)",
+            "function getUserSubscriptions(address _user) external view returns (address[])",
+            "function getRelaySubscribers(address _relayAddress) external view returns (address[])",
+            "function getRelayDetails(address _relayAddress) external view returns (string, address, bool, uint256)",
+            "function getAllRelays() external view returns (address[])",
+            "function expireSubscription(address _user, address _relayAddress) external",
+            "function updateContractFee(uint256 _newFee) external",
+            "function withdrawFees() external",
+            "function transferOwnership(address _newOwner) external",
+            "function toggleEmergencyPause() external",
+            "function emergencyPause() external view returns (bool)"
         ];
 
         // Indirizzo del relay registrato (da aggiornare con quello reale)
