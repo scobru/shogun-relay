@@ -123,6 +123,49 @@
                     <h1 class="text-3xl font-semibold mb-2">Relay Subscription</h1>
                     <p class="text-base-content/70 mb-8">Subscribe to the relay using smart contract</p>
 
+                    <!-- Contract Information -->
+                    <div class="w-full max-w-2xl mb-8 p-6 bg-base-300/50 rounded-xl border border-base-content/20">
+                        <div class="flex items-center gap-3 mb-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-accent" fill="none"
+                                viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <h3 class="text-lg font-semibold text-accent">Smart Contract Information</h3>
+                        </div>
+                        <div class="space-y-3 text-sm">
+                            <div class="flex items-center gap-2">
+                                <span class="text-base-content/60">Network:</span>
+                                <span class="badge badge-accent">Sepolia Testnet</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-base-content/60">Contract Address:</span>
+                                <span id="contractAddress" class="font-mono text-accent">Loading...</span>
+                                <button id="copyContractBtn" class="btn btn-xs btn-outline"
+                                    onclick="copyContractAddress()">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                    Copy
+                                </button>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-base-content/60">Chain ID:</span>
+                                <span class="font-mono">0xaa36a7 (11155111)</span>
+                            </div>
+                            <div class="alert alert-info text-xs">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>Make sure your wallet is connected to Sepolia network before proceeding</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Step Progress -->
                     <div class="flex items-center gap-4 mb-8">
                         <div class="flex items-center gap-2">
@@ -458,6 +501,13 @@
                 if (config.success && config.contract.address) {
                     RELAY_CONTRACT_ADDRESS = config.contract.address;
                     console.log('Contract configuration loaded:', config);
+
+                    // Aggiorna l'indirizzo del contratto nell'interfaccia
+                    const contractAddressEl = document.getElementById('contractAddress');
+                    if (contractAddressEl) {
+                        contractAddressEl.textContent = RELAY_CONTRACT_ADDRESS;
+                    }
+
                     return true;
                 } else {
                     showNotification('Failed to load contract configuration', 'error');
@@ -482,6 +532,12 @@
                     if (status.contract.address && status.contract.address !== RELAY_CONTRACT_ADDRESS) {
                         RELAY_CONTRACT_ADDRESS = status.contract.address;
                         console.log('Updated contract address from status:', RELAY_CONTRACT_ADDRESS);
+
+                        // Aggiorna l'indirizzo del contratto nell'interfaccia
+                        const contractAddressEl = document.getElementById('contractAddress');
+                        if (contractAddressEl) {
+                            contractAddressEl.textContent = RELAY_CONTRACT_ADDRESS;
+                        }
                     }
                     return true;
                 } else {
@@ -1647,7 +1703,40 @@
             }
         }
 
-        // Funzione per mostrare notifiche
+        // Funzione per copiare l'indirizzo del contratto negli appunti
+        async function copyContractAddress() {
+            try {
+                if (RELAY_CONTRACT_ADDRESS) {
+                    await navigator.clipboard.writeText(RELAY_CONTRACT_ADDRESS);
+
+                    // Mostra feedback visivo
+                    const copyBtn = document.getElementById('copyContractBtn');
+                    const originalText = copyBtn.innerHTML;
+                    copyBtn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Copied!
+                    `;
+                    copyBtn.classList.add('btn-success');
+                    copyBtn.classList.remove('btn-outline');
+
+                    showNotification('Contract address copied to clipboard!', 'success');
+
+                    // Ripristina il pulsante dopo 2 secondi
+                    setTimeout(() => {
+                        copyBtn.innerHTML = originalText;
+                        copyBtn.classList.remove('btn-success');
+                        copyBtn.classList.add('btn-outline');
+                    }, 2000);
+                } else {
+                    showNotification('Contract address not loaded yet', 'warning');
+                }
+            } catch (error) {
+                console.error('Error copying contract address:', error);
+                showNotification('Failed to copy contract address', 'error');
+            }
+        }
     </script>
 </body>
 
