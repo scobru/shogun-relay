@@ -4068,7 +4068,13 @@ async function initializeServer() {
       // Ottieni i dati dal database Gun
       const mbUsageNode = gun.get("shogun").get("mb_usage").get(userAddress);
       const offChainUsage = await new Promise((resolve) => {
+        const timeoutId = setTimeout(() => {
+          console.warn(`⚠️ GunDB mb_usage read timeout for ${userAddress}`);
+          resolve({ mbUsed: 0, lastUpdated: Date.now(), timeout: true }); // Risolvi con dati di default in caso di timeout
+        }, 5000); // Timeout di 5 secondi
+
         mbUsageNode.once((data) => {
+          clearTimeout(timeoutId);
           resolve(data || { mbUsed: 0, lastUpdated: Date.now() });
         });
       });
