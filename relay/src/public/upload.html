@@ -109,24 +109,6 @@
                 </svg>
                 Upload File
               </button>
-
-              <button class="btn btn-outline btn-sm mt-2" id="testDecryptionBtn" style="display: none;">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24"
-                  stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-                Test Decryption
-              </button>
-
-              <button class="btn btn-outline btn-sm mt-2" id="testUrlDecryptionBtn" style="display: none;">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24"
-                  stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-                Test URL Decryption
-              </button>
             </div>
 
             <div id="message" class="message"></div>
@@ -146,13 +128,6 @@
     const dropArea = document.getElementById("dropArea");
     const uploadProgress = document.getElementById("uploadProgress");
     const progressBar = document.getElementById("progressBar");
-    const testDecryptionBtn = document.getElementById("testDecryptionBtn");
-    const testUrlDecryptionBtn = document.getElementById("testUrlDecryptionBtn");
-
-    // Variabili globali per il test
-    let lastUploadedHash = null;
-    let lastUploadedToken = null;
-    let lastGeneratedUrl = null;
 
     // Drag and drop functionality
     ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
@@ -310,15 +285,6 @@
                         </div>
                     `;
           showMessage(successMessage, "success");
-          lastUploadedHash = hash;
-          lastUploadedToken = token;
-          testDecryptionBtn.style.display = "block";
-          lastGeneratedUrl = finalIpfsUrl; // Store the generated URL
-
-          // Show URL decryption button for encrypted files
-          if (isEncrypted) {
-            testUrlDecryptionBtn.style.display = "block";
-          }
         } else {
           throw new Error(
             result.error || "Upload failed for an unknown reason."
@@ -329,139 +295,6 @@
       } finally {
         uploadBtn.disabled = false;
         uploadBtn.classList.remove("loading");
-      }
-    });
-
-    testDecryptionBtn.addEventListener("click", async () => {
-      if (!lastUploadedHash || !lastUploadedToken) {
-        showMessage("No file uploaded or token not available for decryption test.");
-        return;
-      }
-
-      testDecryptionBtn.disabled = true;
-      testDecryptionBtn.classList.add("loading");
-      messageEl.style.display = "none";
-      uploadProgress.style.display = "block";
-      progressBar.style.width = "0%";
-      progressBar.textContent = "0%";
-
-      try {
-        progressBar.style.width = "25%";
-        progressBar.textContent = "Decrypting...";
-
-        const response = await fetch(`/ipfs-decrypt/${lastUploadedHash}`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${lastUploadedToken}`,
-          },
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `HTTP error ${response.status}`);
-        }
-
-        const result = await response.json();
-
-        if (result.success && result.decryptedData) {
-          progressBar.style.width = "100%";
-          progressBar.textContent = "Decryption Complete!";
-
-          console.log(`🔓 Decryption successful!`);
-          console.log(`📄 Decrypted data preview: ${result.decryptedData.substring(0, 200)}...`);
-
-          const successMessage = `
-                        <div class="flex flex-col gap-2">
-                            <div class="font-semibold text-success">✅ Decryption successful!</div>
-                            <div class="font-mono text-sm">Original length: ${result.originalLength} bytes</div>
-                            <div class="font-mono text-sm">Decrypted length: ${result.decryptedLength} bytes</div>
-                            <div class="text-sm text-base-content/70 mt-2">
-                                <strong>Decrypted content preview:</strong><br>
-                                <code class="text-xs">${result.decryptedData.substring(0, 500)}${result.decryptedData.length > 500 ? '...' : ''}</code>
-                            </div>
-                        </div>
-                    `;
-          showMessage(successMessage, "success");
-        } else {
-          // Mostra i dettagli dell'errore se disponibili
-          const errorMessage = result.error || "Decryption failed for an unknown reason.";
-          const errorDetails = result.details ? `\nDetails: ${result.details}` : '';
-          const contentPreview = result.contentPreview ? `\nContent preview: ${result.contentPreview}` : '';
-
-          throw new Error(`${errorMessage}${errorDetails}${contentPreview}`);
-        }
-      } catch (err) {
-        showMessage(`Decryption failed: ${err.message}`);
-      } finally {
-        testDecryptionBtn.disabled = false;
-        testDecryptionBtn.classList.remove("loading");
-      }
-    });
-
-    testUrlDecryptionBtn.addEventListener("click", async () => {
-      if (!lastGeneratedUrl) {
-        showMessage("No file uploaded or URL not available for URL decryption test.");
-        return;
-      }
-
-      testUrlDecryptionBtn.disabled = true;
-      testUrlDecryptionBtn.classList.add("loading");
-      messageEl.style.display = "none";
-      uploadProgress.style.display = "block";
-      progressBar.style.width = "0%";
-      progressBar.textContent = "0%";
-
-      try {
-        progressBar.style.width = "25%";
-        progressBar.textContent = "Decrypting...";
-
-        const response = await fetch(`/ipfs-decrypt-url/${encodeURIComponent(lastGeneratedUrl)}`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${lastUploadedToken}`,
-          },
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `HTTP error ${response.status}`);
-        }
-
-        const result = await response.json();
-
-        if (result.success && result.decryptedData) {
-          progressBar.style.width = "100%";
-          progressBar.textContent = "Decryption Complete!";
-
-          console.log(`🔓 URL Decryption successful!`);
-          console.log(`📄 Decrypted data preview: ${result.decryptedData.substring(0, 200)}...`);
-
-          const successMessage = `
-                        <div class="flex flex-col gap-2">
-                            <div class="font-semibold text-success">✅ URL Decryption successful!</div>
-                            <div class="font-mono text-sm">Original length: ${result.originalLength} bytes</div>
-                            <div class="font-mono text-sm">Decrypted length: ${result.decryptedLength} bytes</div>
-                            <div class="text-sm text-base-content/70 mt-2">
-                                <strong>Decrypted content preview:</strong><br>
-                                <code class="text-xs">${result.decryptedData.substring(0, 500)}${result.decryptedData.length > 500 ? '...' : ''}</code>
-                            </div>
-                        </div>
-                    `;
-          showMessage(successMessage, "success");
-        } else {
-          // Mostra i dettagli dell'errore se disponibili
-          const errorMessage = result.error || "URL Decryption failed for an unknown reason.";
-          const errorDetails = result.details ? `\nDetails: ${result.details}` : '';
-          const contentPreview = result.contentPreview ? `\nContent preview: ${result.contentPreview}` : '';
-          const extractedCid = result.extractedCid ? `\nExtracted CID: ${result.extractedCid}` : '';
-
-          throw new Error(`${errorMessage}${errorDetails}${contentPreview}${extractedCid}`);
-        }
-      } catch (err) {
-        showMessage(`URL Decryption failed: ${err.message}`);
-      } finally {
-        testUrlDecryptionBtn.disabled = false;
-        testUrlDecryptionBtn.classList.remove("loading");
       }
     });
   </script>

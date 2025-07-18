@@ -202,10 +202,6 @@
                                             </svg>
                                             Refresh
                                         </button>
-                                        <button id="debugStatusBtn" class="btn btn-xs btn-error"
-                                            onclick="checkSubscriptionStatusFromServer()">
-                                            Debug
-                                        </button>
                                     </div>
                                 </div>
                                 <div id="currentSubscriptionDetails" class="space-y-2">
@@ -377,14 +373,6 @@
                                     </svg>
                                     Check Status
                                 </button>
-                                <button id="testEndpointBtn" class="btn btn-outline btn-sm">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                    </svg>
-                                    Test API
-                                </button>
                                 <button id="newSubscriptionBtn" class="btn btn-outline flex-1">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
                                         viewBox="0 0 24 24" stroke="currentColor">
@@ -514,7 +502,6 @@
         const checkStatusBtn = document.getElementById('checkStatusBtn');
         const refreshStatusBtn = document.getElementById('refreshStatusBtn');
         const newSubscriptionBtn = document.getElementById('newSubscriptionBtn');
-        const testEndpointBtn = document.getElementById('testEndpointBtn');
         const mbInput = document.getElementById('mbInput');
         const addMbInput = document.getElementById('addMbInput');
         const addMbBtn = document.getElementById('addMbBtn');
@@ -669,7 +656,6 @@
         mbInput.addEventListener('input', updateSubscriptionDetails);
         checkStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
         refreshStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
-        testEndpointBtn.addEventListener('click', testEndpoint);
         newSubscriptionBtn.addEventListener('click', () => {
             showStep(2);
             updateStep(2, 'step-active');

@@ -12,13 +12,11 @@ import qr from "qr";
 import setSelfAdjustingInterval from "self-adjusting-interval";
 import FormData from "form-data";
 import "./utils/bullet-catcher.js";
-import Docker from "dockerode";
 import { ethers } from "ethers";
 
 dotenv.config();
 
 import Gun from "gun";
-import { SEA } from "gun/sea";
 import "gun/lib/stats.js";
 import "gun/lib/webrtc.js";
 import "gun/lib/rfs.js";
@@ -50,17 +48,6 @@ const GC_INTERVAL = 5 * 60 * 1000; // 5 minutes
 // ES Module equivalent for __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Port testing function
-const testPort = (port) => {
-  return new Promise((resolve, reject) => {
-    const server = express()
-      .listen(port, () => {
-        server.close(() => resolve(true));
-      })
-      .on("error", () => resolve(false));
-  });
-};
 
 // Configuration
 let host = process.env.RELAY_HOST || ip.address();
@@ -160,76 +147,7 @@ async function initializeRelayContract() {
   }
 }
 
-// Middleware per autorizzazione smart contract
-const relayContractAuthMiddleware = async (req, res, next) => {
-  try {
-    const userAddress = req.headers["x-user-address"];
 
-    if (!userAddress) {
-      return res.status(401).json({
-        success: false,
-        error: "x-user-address header richiesto",
-      });
-    }
-
-    if (!relayContract) {
-      return res
-        .status(500)
-        .json({ success: false, error: "Relay contract non configurato" });
-    }
-
-    // Ottieni tutti i relay registrati
-    const allRelays = await relayContract.getAllRelays();
-    if (allRelays.length === 0) {
-      return res.status(500).json({
-        success: false,
-        error: "Nessun relay registrato nel contratto",
-      });
-    }
-    const relayAddress = allRelays[0];
-
-    // Verifica la sottoscrizione tramite smart contract usando isSubscriptionActive
-    try {
-      const isAuth = await relayContract.isSubscriptionActive(
-        userAddress,
-        relayAddress
-      );
-
-      console.log(
-        `🔐 Autorizzazione smart contract per indirizzo: ${userAddress} - ${
-          isAuth ? "AUTORIZZATO" : "NON AUTORIZZATO"
-        }`
-      );
-
-      if (!isAuth) {
-        return res.status(403).json({
-          success: false,
-          error: "Utente non autorizzato - sottoscrizione non attiva",
-          details: {
-            userAddress: `${userAddress.slice(0, 6)}...${userAddress.slice(
-              -4
-            )}`,
-            authMethod: "smart_contract_address",
-          },
-        });
-      }
-
-      req.userAddress = userAddress;
-      req.authMethod = "smart_contract_address";
-      next();
-    } catch (e) {
-      console.error("Errore verifica sottoscrizione smart contract:", e);
-      return res
-        .status(500)
-        .json({ success: false, error: "Errore chiamata contratto" });
-    }
-  } catch (err) {
-    console.error("Errore middleware smart contract:", err);
-    return res
-      .status(500)
-      .json({ success: false, error: "Errore middleware smart contract" });
-  }
-};
 
 // Main async function to initialize the server
 async function initializeServer() {
@@ -1599,40 +1517,6 @@ async function initializeServer() {
   console.log(`🌐 IPFS Gateway Proxy: ${IPFS_GATEWAY_URL}`);
   console.log(`🔐 IPFS Auth: ${IPFS_API_TOKEN ? "configured" : "not set"}`);
 
-  // Test IPFS connectivity on startup
-  console.log("🧪 Testing IPFS connectivity...");
-  const testIPFSConnection = () => {
-    return new Promise((resolve) => {
-      const testReq = http
-        .get(`${IPFS_API_URL}/api/v0/version`, (response) => {
-          if (response.statusCode === 200 || response.statusCode === 405) {
-            console.log("✅ IPFS node is responsive");
-            resolve(true);
-          } else {
-            console.log(
-              `⚠️ IPFS node responded with status ${response.statusCode}`
-            );
-            resolve(false);
-          }
-        })
-        .on("error", (err) => {
-          console.log(`❌ IPFS node unreachable: ${err.message}`);
-          console.log(
-            "💡 Make sure IPFS Desktop is running or IPFS daemon is started"
-          );
-          resolve(false);
-        });
-
-      testReq.setTimeout(3000, () => {
-        testReq.destroy();
-        console.log("⏰ IPFS connection test timed out");
-        resolve(false);
-      });
-
-      testReq.end();
-    });
-  };
-
   // IPFS Gateway Proxy with fallback - for accessing files via IPFS hash
   app.use(
     "/ipfs",
@@ -1717,21 +1601,13 @@ async function initializeServer() {
 
   // --- Start Server Function ---
   async function startServer() {
-    // Test and find available port
-    let currentPort = parseInt(port);
-    while (!(await testPort(currentPort))) {
-      console.log(`Port ${currentPort} in use, trying next...`);
-      currentPort++;
-    }
-
-    const server = app.listen(currentPort, (error) => {
+    const server = app.listen(port, (error) => {
       if (error) {
         return console.log("Error during app startup", error);
       }
-      console.log(`Server listening on port ${currentPort}...`);
+      console.log(`Server listening on port ${port}...`);
     });
 
-    port = currentPort; // Update port for later use
     return server;
   }
 
@@ -1775,17 +1651,6 @@ async function initializeServer() {
   });
 
   const gun = Gun(gunConfig);
-
-  // Test di inizializzazione di Gun
-  console.log("🧪 Testing Gun initialization...");
-  const testNode = gun.get("test-init");
-  testNode.put({ message: "Gun test", timestamp: Date.now() }, (ack) => {
-    if (ack.err) {
-      console.error("❌ Gun initialization test failed:", ack.err);
-    } else {
-      console.log("✅ Gun initialization test passed");
-    }
-  });
 
   // Initialize garbage collector now that gun is ready
   initializeGarbageCollector();
@@ -3801,305 +3666,6 @@ async function initializeServer() {
         }
         res.json({ success: true, message: "Notes deleted." });
       });
-  });
-
-  // Endpoint per testare la decrittazione di un file specifico
-  app.get("/ipfs-decrypt/:cid", tokenAuthMiddleware, async (req, res) => {
-    const { cid } = req.params;
-    const token = req.headers.authorization?.split(" ")[1];
-
-    console.log(`🧪 Test decryption for CID: ${cid}`);
-    console.log(
-      `🧪 Token from header: ${
-        token ? token.substring(0, 20) + "..." : "missing"
-      }`
-    );
-
-    if (!cid) {
-      return res.status(400).json({
-        success: false,
-        error: "CID is required",
-      });
-    }
-
-    if (!token) {
-      return res.status(400).json({
-        success: false,
-        error: "Token is required",
-      });
-    }
-
-    try {
-      // Estrai il CID dall'URL se necessario
-      let actualCid = cid;
-      if (cid.includes("/ipfs-content/")) {
-        actualCid = cid.split("/ipfs-content/")[1];
-      }
-      if (actualCid.includes("?")) {
-        actualCid = actualCid.split("?")[0];
-      }
-
-      console.log(`🧪 Extracted CID: ${actualCid}`);
-
-      // Crea richiesta al gateway locale
-      const requestOptions = {
-        hostname: new URL(IPFS_GATEWAY_URL).hostname,
-        port: new URL(IPFS_GATEWAY_URL).port,
-        path: `/ipfs/${actualCid}`,
-        method: "GET",
-      };
-
-      const ipfsReq = http.get(requestOptions, (ipfsRes) => {
-        let body = "";
-        ipfsRes.on("data", (chunk) => (body += chunk));
-        ipfsRes.on("end", async () => {
-          try {
-            console.log(`🧪 Received content length: ${body.length}`);
-            console.log(`🧪 Content preview: ${body.substring(0, 100)}...`);
-
-            const decrypted = await SEA.decrypt(body, token);
-
-            if (decrypted) {
-              console.log(`🧪 Decryption successful!`);
-              console.log(
-                `🧪 Decrypted preview: ${decrypted.substring(0, 100)}...`
-              );
-
-              res.json({
-                success: true,
-                message: "Decryption successful",
-                decryptedData: decrypted,
-                originalLength: body.length,
-                decryptedLength: decrypted.length,
-                extractedCid: cid,
-              });
-            } else {
-              res.json({
-                success: false,
-                error: "Decryption returned null",
-                contentPreview: body.substring(0, 100) + "...",
-                extractedCid: cid,
-              });
-            }
-          } catch (e) {
-            console.error(`🧪 Decryption error:`, e);
-            res.json({
-              success: false,
-              error: "Decryption error",
-              details: e.message,
-              contentPreview: body.substring(0, 100) + "...",
-              extractedCid: cid,
-            });
-          }
-        });
-      });
-
-      ipfsReq.on("error", (err) => {
-        res.status(500).json({
-          success: false,
-          error: "Failed to fetch from IPFS",
-          details: err.message,
-        });
-      });
-    } catch (error) {
-      console.error("Test decryption error:", error);
-      res.status(500).json({
-        success: false,
-        error: "Internal server error",
-        details: error.message,
-      });
-    }
-  });
-
-  // Endpoint per testare la decrittazione da URL completo
-  app.get("/ipfs-decrypt-url/*", tokenAuthMiddleware, async (req, res) => {
-    const fullUrl = req.params[0]; // Express cattura tutto dopo /ipfs-decrypt-url/
-    const token = req.headers.authorization?.split(" ")[1];
-
-    console.log(`🧪 Test decryption from URL: ${fullUrl}`);
-    console.log(
-      `🧪 Token from header: ${
-        token ? token.substring(0, 20) + "..." : "missing"
-      }`
-    );
-
-    if (!fullUrl) {
-      return res.status(400).json({
-        success: false,
-        error: "URL is required",
-      });
-    }
-
-    if (!token) {
-      return res.status(400).json({
-        success: false,
-        error: "Token is required",
-      });
-    }
-
-    try {
-      // Estrai il CID dall'URL
-      let cid = null;
-      if (fullUrl.includes("/ipfs-content/")) {
-        cid = fullUrl.split("/ipfs-content/")[1];
-      }
-      if (cid && cid.includes("?")) {
-        cid = cid.split("?")[0];
-      }
-
-      if (!cid) {
-        return res.status(400).json({
-          success: false,
-          error: "Could not extract CID from URL",
-        });
-      }
-
-      console.log(`🧪 Extracted CID from URL: ${cid}`);
-
-      // Crea richiesta al gateway locale
-      const requestOptions = {
-        hostname: new URL(IPFS_GATEWAY_URL).hostname,
-        port: new URL(IPFS_GATEWAY_URL).port,
-        path: `/ipfs/${cid}`,
-        method: "GET",
-      };
-
-      const ipfsReq = http.get(requestOptions, (ipfsRes) => {
-        let body = "";
-        ipfsRes.on("data", (chunk) => (body += chunk));
-        ipfsRes.on("end", async () => {
-          try {
-            console.log(`🧪 Received content length: ${body.length}`);
-            console.log(`🧪 Content preview: ${body.substring(0, 100)}...`);
-
-            const decrypted = await SEA.decrypt(body, token);
-
-            if (decrypted) {
-              console.log(`🧪 Decryption successful!`);
-              console.log(
-                `🧪 Decrypted preview: ${decrypted.substring(0, 100)}...`
-              );
-
-              res.json({
-                success: true,
-                message: "Decryption successful",
-                decryptedData: decrypted,
-                originalLength: body.length,
-                decryptedLength: decrypted.length,
-                extractedCid: cid,
-              });
-            } else {
-              res.json({
-                success: false,
-                error: "Decryption returned null",
-                contentPreview: body.substring(0, 100) + "...",
-                extractedCid: cid,
-              });
-            }
-          } catch (e) {
-            console.error(`🧪 Decryption error:`, e);
-            res.json({
-              success: false,
-              error: "Decryption error",
-              details: e.message,
-              contentPreview: body.substring(0, 100) + "...",
-              extractedCid: cid,
-            });
-          }
-        });
-      });
-
-      ipfsReq.on("error", (err) => {
-        res.status(500).json({
-          success: false,
-          error: "Failed to fetch from IPFS",
-          details: err.message,
-        });
-      });
-    } catch (error) {
-      console.error("Test decryption error:", error);
-      res.status(500).json({
-        success: false,
-        error: "Internal server error",
-        details: error.message,
-      });
-    }
-  });
-
-  // Endpoint per forzare l'aggiornamento dei MB utilizzati (senza autenticazione admin)
-  app.post("/api/force-update-mb/:userAddress", async (req, res) => {
-    try {
-      const { userAddress } = req.params;
-      const { mbUsed } = req.body;
-
-      console.log(
-        `🔧 Force update MB request for user: ${userAddress}, MB: ${mbUsed}`
-      );
-
-      if (!userAddress) {
-        return res.status(400).json({
-          success: false,
-          error: "User address is required",
-        });
-      }
-
-      if (!mbUsed || mbUsed <= 0) {
-        return res.status(400).json({
-          success: false,
-          error: "Valid MB usage is required",
-        });
-      }
-
-      // Registra l'uso MB off-chain nel database Gun
-      const mbUsageNode = gun.get("shogun").get("mb_usage").get(userAddress);
-
-      // Ottieni l'uso MB corrente
-      const currentUsage = await new Promise((resolve) => {
-        mbUsageNode.once((data) => {
-          resolve(data || { mbUsed: 0, lastUpdated: Date.now() });
-        });
-      });
-
-      // Aggiorna l'uso MB
-      const updatedUsage = {
-        mbUsed: mbUsed,
-        lastUpdated: Date.now(),
-        updatedBy: "force-update-endpoint",
-      };
-
-      // Salva nel database Gun
-      mbUsageNode.put(updatedUsage, (ack) => {
-        if (ack.err) {
-          console.error("Error saving MB usage to Gun:", ack.err);
-          return res.status(500).json({
-            success: false,
-            error: "Failed to save MB usage",
-            details: ack.err,
-          });
-        }
-
-        console.log(
-          `✅ MB usage updated off-chain for user ${userAddress}: ${mbUsed} MB`
-        );
-
-        res.json({
-          success: true,
-          message: "MB usage updated successfully (off-chain)",
-          userAddress,
-          mbUsed: mbUsed,
-          previousMBUsed: currentUsage.mbUsed,
-          lastUpdated: new Date(updatedUsage.lastUpdated).toISOString(),
-          storage: "off-chain",
-        });
-      });
-    } catch (error) {
-      console.error("Force update MB error:", error);
-      res.status(500).json({
-        success: false,
-        error: "Internal server error",
-        details: error.message,
-      });
-    }
   });
 
   // Fallback to index.html

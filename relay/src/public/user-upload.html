@@ -196,48 +196,6 @@
                                     <span id="totalSize">0 MB</span> total
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <button id="debugBtn" class="btn btn-sm btn-warning" onclick="debugUserUploads()">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
-                                            viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                                        </svg>
-                                        Debug
-                                    </button>
-                                    <button id="testGunBtn" class="btn btn-sm btn-info" onclick="testGunDB()">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
-                                            viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        Test Gun
-                                    </button>
-                                    <button id="testGunSaveBtn" class="btn btn-sm btn-secondary"
-                                        onclick="testGunSave()">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
-                                            viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                        </svg>
-                                        Test Save
-                                    </button>
-                                    <button id="forceRefreshBtn" class="btn btn-sm btn-accent" onclick="forceRefresh()">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
-                                            viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                        </svg>
-                                        Force Refresh
-                                    </button>
-                                    <button id="forceUpdateMBBtn" class="btn btn-sm btn-warning"
-                                        onclick="forceUpdateMB()">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
-                                            viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
-                                        </svg>
-                                        Force Update MB
-                                    </button>
                                     <button id="refreshFilesBtn" class="btn btn-sm btn-outline">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
                                             viewBox="0 0 24 24" stroke="currentColor">
@@ -622,79 +580,6 @@
             }
         }
 
-        // Force refresh with debug
-        window.forceRefresh = async function () {
-            if (!walletAddress) {
-                showStatus('Please connect your wallet first', 'error');
-                return;
-            }
-
-            console.log('🔄 user-upload: Force refresh triggered');
-            showStatus('🔄 Force refreshing files...', 'info');
-
-            // Prima fai il debug
-            await debugUserUploads();
-
-            // Poi ricarica i file
-            setTimeout(() => {
-                loadUserFiles();
-            }, 1000);
-        };
-
-        // Force update MB usage
-        window.forceUpdateMB = async function () {
-            if (!walletAddress) {
-                showStatus('Please connect your wallet first', 'error');
-                return;
-            }
-
-            try {
-                console.log('🔧 user-upload: Force update MB triggered for wallet:', walletAddress);
-                showStatus('🔧 Force updating MB usage...', 'info');
-
-                // Calcola i MB totali dai file caricati
-                const response = await fetch(`/api/user-uploads/${encodeURIComponent(walletAddress)}`);
-                const result = await response.json();
-
-                if (result.success && result.uploads) {
-                    const totalSizeMB = Math.ceil(result.totalSizeMB);
-                    console.log('🔧 user-upload: Total size from files:', totalSizeMB, 'MB');
-
-                    // Chiama l'endpoint per forzare l'aggiornamento
-                    const updateResponse = await fetch(`/api/force-update-mb/${encodeURIComponent(walletAddress)}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': 'Bearer ' + localStorage.getItem('adminToken') // Usa il token admin se disponibile
-                        },
-                        body: JSON.stringify({
-                            mbUsed: totalSizeMB
-                        })
-                    });
-
-                    const updateResult = await updateResponse.json();
-                    console.log('🔧 user-upload: Force update response:', updateResult);
-
-                    if (updateResult.success) {
-                        showStatus(`✅ MB usage updated successfully! Used: ${updateResult.mbUsed} MB, Remaining: ${updateResult.remainingMB} MB`, 'success');
-
-                        // Aggiorna lo stato della sottoscrizione
-                        setTimeout(() => {
-                            checkSubscriptionStatus(walletAddress);
-                        }, 1000);
-                    } else {
-                        showStatus(`❌ Failed to update MB usage: ${updateResult.error}`, 'error');
-                    }
-                } else {
-                    showStatus('❌ Failed to get file information', 'error');
-                }
-
-            } catch (error) {
-                console.error('💥 user-upload: Error force updating MB:', error);
-                showStatus(`❌ Error force updating MB: ${error.message}`, 'error');
-            }
-        };
-
         function displayFiles(files) {
             console.log('🎨 user-upload: Displaying files:', files);
 
@@ -783,12 +668,6 @@
                     console.log('🔗 user-upload: Calling checkSubscriptionStatus with walletAddress:', walletAddress);
                     checkSubscriptionStatus(walletAddress);
                     loadUserFiles();
-
-                    // Test automatico del salvataggio Gun
-                    setTimeout(() => {
-                        console.log('🧪 user-upload: Running automatic Gun save test...');
-                        testGunSave();
-                    }, 2000);
                 } catch (error) {
                     console.error('💥 user-upload: Error connecting wallet:', error);
                     showStatus('Failed to connect wallet. Please ensure MetaMask is unlocked.', 'error');
@@ -823,111 +702,7 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             showStatus('Connect your wallet to start uploading files', 'info');
-
-            // Test manuale dell'endpoint di debug
-            console.log('🔍 user-upload: Testing debug endpoint availability...');
-            fetch('/api/debug/user-uploads/test')
-                .then(response => {
-                    console.log('🔍 user-upload: Debug endpoint status:', response.status);
-                })
-                .catch(error => {
-                    console.log('🔍 user-upload: Debug endpoint error:', error.message);
-                });
         });
-
-        // Debug function (moved to global scope)
-        window.debugUserUploads = async function () {
-            if (!walletAddress) {
-                showStatus('Please connect your wallet first', 'error');
-                return;
-            }
-
-            try {
-                console.log('🔍 user-upload: Debug chiamato per wallet:', walletAddress);
-                const response = await fetch(`/api/debug/user-uploads/${encodeURIComponent(walletAddress)}`);
-                const result = await response.json();
-
-                console.log('🔍 user-upload: Debug response:', result);
-
-                if (result.success) {
-                    const debugInfo = result.debug;
-                    const debugMessage = `
-🔍 Debug Info:
-- Data Type: ${debugInfo.dataType}
-- Data Keys: ${debugInfo.dataKeys.join(', ') || 'None'}
-- Error: ${debugInfo.error || 'None'}
-- Timestamp: ${new Date(debugInfo.timestamp).toLocaleString()}
-- Raw Data: ${JSON.stringify(debugInfo.rawData, null, 2)}
-                    `;
-
-                    console.log(debugMessage);
-                    showStatus(`Debug info logged to console. Check browser console for details.`, 'info');
-                } else {
-                    showStatus(`Debug failed: ${result.error}`, 'error');
-                }
-
-            } catch (error) {
-                console.error('💥 user-upload: Debug error:', error);
-                showStatus(`Debug error: ${error.message}`, 'error');
-            }
-        };
-
-        // Test Gun DB
-        window.testGunDB = async function () {
-            try {
-                console.log('🧪 user-upload: Testing Gun DB connection...');
-                const response = await fetch('/api/test-gun');
-                const result = await response.json();
-
-                console.log('🧪 user-upload: Gun DB test response:', result);
-
-                if (result.success) {
-                    showStatus(`✅ Gun DB test successful! Write: ${result.writeTest}, Read: ${result.readTest}`, 'success');
-                    console.log('✅ Gun DB test successful!', result);
-                } else {
-                    showStatus(`❌ Gun DB test failed: ${result.error}`, 'error');
-                    console.error('❌ Gun DB test failed:', result.error);
-                }
-            } catch (error) {
-                console.error('💥 user-upload: Error testing Gun DB:', error);
-                showStatus(`❌ Error testing Gun DB: ${error.message}`, 'error');
-            }
-        };
-
-        // Test Gun Save specifico
-        window.testGunSave = async function () {
-            if (!walletAddress) {
-                showStatus('Please connect your wallet first', 'error');
-                return;
-            }
-
-            try {
-                const testHash = 'test-hash-' + Date.now();
-                console.log('🧪 user-upload: Testing Gun save for wallet:', walletAddress, 'hash:', testHash);
-
-                const response = await fetch(`/api/test-gun-save/${encodeURIComponent(walletAddress)}/${testHash}`);
-                const result = await response.json();
-
-                console.log('🧪 user-upload: Gun save test response:', result);
-
-                if (result.success) {
-                    showStatus(`✅ Gun save test successful! Write: ${result.writeTest}, Read: ${result.readTest}`, 'success');
-                    console.log('✅ Gun save test successful!', result);
-
-                    // Aspetta un po' e poi prova a caricare i file
-                    setTimeout(() => {
-                        console.log('🧪 user-upload: Testing file loading after save...');
-                        loadUserFiles();
-                    }, 2000);
-                } else {
-                    showStatus(`❌ Gun save test failed: ${result.error}`, 'error');
-                    console.error('❌ Gun save test failed:', result.error);
-                }
-            } catch (error) {
-                console.error('💥 user-upload: Error testing Gun save:', error);
-                showStatus(`❌ Error testing Gun save: ${error.message}`, 'error');
-            }
-        };
     </script>
 </body>
 
