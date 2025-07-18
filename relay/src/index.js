@@ -1044,6 +1044,76 @@ async function initializeServer() {
     }
   });
 
+  // Endpoint di test per verificare se Gun sta funzionando
+  app.get("/api/test-gun", async (req, res) => {
+    try {
+      console.log(`🧪 Test: Verificando funzionamento Gun DB`);
+
+      const testNode = gun.get("shogun").get("test");
+      const testData = {
+        message: "Test Gun DB",
+        timestamp: Date.now(),
+        random: Math.random(),
+      };
+
+      // Test di scrittura
+      const writeTest = () => {
+        return new Promise((resolve, reject) => {
+          testNode.put(testData, (ack) => {
+            if (ack.err) {
+              reject(new Error(`Write test failed: ${ack.err}`));
+            } else {
+              resolve("Write test passed");
+            }
+          });
+        });
+      };
+
+      // Test di lettura
+      const readTest = () => {
+        return new Promise((resolve, reject) => {
+          let timeoutId = setTimeout(() => {
+            reject(new Error("Read test timeout"));
+          }, 5000);
+
+          testNode.once((data) => {
+            clearTimeout(timeoutId);
+            if (data && data.message === testData.message) {
+              resolve("Read test passed");
+            } else {
+              reject(new Error("Read test failed - data mismatch"));
+            }
+          });
+        });
+      };
+
+      // Esegui i test
+      const writeResult = await writeTest();
+      console.log(`🧪 ${writeResult}`);
+
+      // Aspetta un po' prima di leggere
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      const readResult = await readTest();
+      console.log(`🧪 ${readResult}`);
+
+      res.json({
+        success: true,
+        message: "Gun DB test completed successfully",
+        writeTest: writeResult,
+        readTest: readResult,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error(`💥 Gun test error:`, error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: "Gun DB test failed",
+      });
+    }
+  });
+
   // Endpoint per registrare una chiave Gun autorizzata
   app.post("/api/authorize-gun-key", tokenAuthMiddleware, async (req, res) => {
     try {

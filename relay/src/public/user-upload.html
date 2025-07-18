@@ -204,6 +204,14 @@
                                         </svg>
                                         Debug
                                     </button>
+                                    <button id="testGunBtn" class="btn btn-sm btn-info" onclick="testGunDB()">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                            viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        Test Gun
+                                    </button>
                                     <button id="refreshFilesBtn" class="btn btn-sm btn-outline">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
                                             viewBox="0 0 24 24" stroke="currentColor">
@@ -509,7 +517,11 @@
                     fileInput.value = '';
 
                     console.log('📤 user-upload: Calling loadUserFiles after successful upload');
-                    loadUserFiles(); // Refresh files list
+
+                    // Aspetta un po' prima di ricaricare i file per dare tempo a Gun di sincronizzare
+                    setTimeout(() => {
+                        loadUserFiles(); // Refresh files list
+                    }, 2000);
 
                     // Aggiorna lo stato della sottoscrizione dopo l'upload
                     setTimeout(() => {
@@ -688,7 +700,76 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             showStatus('Connect your wallet to start uploading files', 'info');
+
+            // Test manuale dell'endpoint di debug
+            console.log('🔍 user-upload: Testing debug endpoint availability...');
+            fetch('/api/debug/user-uploads/test')
+                .then(response => {
+                    console.log('🔍 user-upload: Debug endpoint status:', response.status);
+                })
+                .catch(error => {
+                    console.log('🔍 user-upload: Debug endpoint error:', error.message);
+                });
         });
+
+        // Debug function (moved to global scope)
+        window.debugUserUploads = async function () {
+            if (!walletAddress) {
+                showStatus('Please connect your wallet first', 'error');
+                return;
+            }
+
+            try {
+                console.log('🔍 user-upload: Debug chiamato per wallet:', walletAddress);
+                const response = await fetch(`/api/debug/user-uploads/${encodeURIComponent(walletAddress)}`);
+                const result = await response.json();
+
+                console.log('🔍 user-upload: Debug response:', result);
+
+                if (result.success) {
+                    const debugInfo = result.debug;
+                    const debugMessage = `
+🔍 Debug Info:
+- Data Type: ${debugInfo.dataType}
+- Data Keys: ${debugInfo.dataKeys.join(', ') || 'None'}
+- Error: ${debugInfo.error || 'None'}
+- Timestamp: ${new Date(debugInfo.timestamp).toLocaleString()}
+- Raw Data: ${JSON.stringify(debugInfo.rawData, null, 2)}
+                    `;
+
+                    console.log(debugMessage);
+                    showStatus(`Debug info logged to console. Check browser console for details.`, 'info');
+                } else {
+                    showStatus(`Debug failed: ${result.error}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('💥 user-upload: Debug error:', error);
+                showStatus(`Debug error: ${error.message}`, 'error');
+            }
+        };
+
+        // Test Gun DB
+        window.testGunDB = async function () {
+            try {
+                console.log('🧪 user-upload: Testing Gun DB connection...');
+                const response = await fetch('/api/test-gun');
+                const result = await response.json();
+
+                console.log('🧪 user-upload: Gun DB test response:', result);
+
+                if (result.success) {
+                    showStatus(`✅ Gun DB test successful! Write: ${result.writeTest}, Read: ${result.readTest}`, 'success');
+                    console.log('✅ Gun DB test successful!', result);
+                } else {
+                    showStatus(`❌ Gun DB test failed: ${result.error}`, 'error');
+                    console.error('❌ Gun DB test failed:', result.error);
+                }
+            } catch (error) {
+                console.error('💥 user-upload: Error testing Gun DB:', error);
+                showStatus(`❌ Error testing Gun DB: ${error.message}`, 'error');
+            }
+        };
     </script>
 </body>
 
