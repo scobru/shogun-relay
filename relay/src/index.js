@@ -4166,3 +4166,6 @@ async function initializeServer() {
     shutdown,
   };
 }
+
+// Avvia il server
+initializeServer().catch(console.error);
