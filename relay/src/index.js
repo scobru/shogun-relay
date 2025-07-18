@@ -2330,8 +2330,11 @@ async function initializeServer() {
             isActiveStatus,
           ] = subscriptionDetails;
 
+          // Converti BigInt a Number per il calcolo della percentuale
+          const mbAllocatedNum = Number(mbAllocated);
+          const mbUsedNum = Number(mbUsed);
           const usagePercentage =
-            mbAllocated > 0 ? (mbUsed / mbAllocated) * 100 : 0;
+            mbAllocatedNum > 0 ? (mbUsedNum / mbAllocatedNum) * 100 : 0;
 
           res.json({
             success: true,
@@ -2342,8 +2345,8 @@ async function initializeServer() {
               startTime: Number(startTime),
               endTime: Number(endTime),
               amountPaid: ethers.formatEther(amountPaid),
-              mbAllocated: Number(mbAllocated),
-              mbUsed: Number(mbUsed),
+              mbAllocated: mbAllocatedNum,
+              mbUsed: mbUsedNum,
               mbRemaining: Number(mbRemaining),
               usagePercentage: Math.round(usagePercentage * 100) / 100,
               startDate: new Date(Number(startTime) * 1000).toISOString(),
