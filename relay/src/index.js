@@ -611,6 +611,57 @@ async function initializeServer() {
 
       console.log(`📤 Upload request for user: ${userAddress}`);
 
+      // Verifica che il contratto sia disponibile
+      if (!relayContract) {
+        return res.status(500).json({
+          success: false,
+          error: "Relay contract not available",
+        });
+      }
+
+      // Verifica che l'utente abbia una sottoscrizione attiva
+      try {
+        const isSubscribed = await relayContract.isSubscriptionActive(
+          userAddress,
+          process.env.RELAY_CONTRACT_ADDRESS
+        );
+        if (!isSubscribed) {
+          return res.status(403).json({
+            success: false,
+            error: "No active subscription found for this user",
+          });
+        }
+
+        // Verifica che ci siano MB sufficienti per questo file
+        const fileSizeMB = Math.ceil(req.file.size / (1024 * 1024));
+        const hasMB = await relayContract.hasAvailableMB(
+          userAddress,
+          process.env.RELAY_CONTRACT_ADDRESS,
+          fileSizeMB
+        );
+        if (!hasMB) {
+          return res.status(403).json({
+            success: false,
+            error: "Insufficient MB for this file",
+            details: {
+              requiredMB: fileSizeMB,
+              fileSize: req.file.size,
+            },
+          });
+        }
+
+        console.log(
+          `✅ User ${userAddress} has sufficient MB (${fileSizeMB} MB required)`
+        );
+      } catch (contractError) {
+        console.error(`❌ Contract verification error:`, contractError);
+        return res.status(500).json({
+          success: false,
+          error: "Error verifying subscription status",
+          details: contractError.message,
+        });
+      }
+
       const formData = new FormData();
       formData.append("file", req.file.buffer, {
         filename: req.file.originalname,
@@ -753,7 +804,7 @@ async function initializeServer() {
               .then(async () => {
                 console.log(`✅ File saved to Gun DB successfully`);
 
-                // Aggiorna i MB utilizzati nel contratto
+                // Aggiorna i MB utilizzati nel contratto PRIMA di inviare la risposta
                 try {
                   const fileSizeMB = Math.ceil(req.file.size / (1024 * 1024)); // Stesso calcolo usato in mbUsage
                   console.log(
@@ -4944,6 +4995,62 @@ async function initializeServer() {
         .json({ success: false, error: "Failed to calculate user MB used" });
     }
   });
+
+  // Endpoint per forzare l'aggiornamento dei MB utilizzati
+  app.post(
+    "/api/force-update-mb/:userAddress",
+    tokenAuthMiddleware,
+    async (req, res) => {
+      try {
+        const { userAddress } = req.params;
+        const { mbUsed } = req.body;
+
+        if (!userAddress || !mbUsed) {
+          return res.status(400).json({
+            success: false,
+            error: "userAddress e mbUsed sono richiesti",
+          });
+        }
+
+        if (!relayContract) {
+          return res.status(500).json({
+            success: false,
+            error: "Contratto relay non configurato",
+          });
+        }
+
+        console.log(
+          `🔧 Force updating MB usage: ${mbUsed} MB for user ${userAddress}`
+        );
+
+        // Chiama il contratto per aggiornare i MB utilizzati
+        const tx = await relayContract.recordMBUsage(userAddress, mbUsed);
+        await tx.wait();
+
+        // Ottieni i MB rimanenti
+        const remainingMB = await relayContract.getRemainingMB(
+          userAddress,
+          process.env.RELAY_CONTRACT_ADDRESS
+        );
+
+        res.json({
+          success: true,
+          message: "MB usage updated successfully",
+          userAddress,
+          mbUsed: Number(mbUsed),
+          remainingMB: Number(remainingMB),
+          transactionHash: tx.hash,
+        });
+      } catch (error) {
+        console.error("Errore aggiornamento forzato MB:", error);
+        res.status(500).json({
+          success: false,
+          error: "Errore aggiornamento forzato MB",
+          details: error.message,
+        });
+      }
+    }
+  );
 } // End of initializeServer function
 
 // Start the server

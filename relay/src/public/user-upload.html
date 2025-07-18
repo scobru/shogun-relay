@@ -229,6 +229,15 @@
                                         </svg>
                                         Force Refresh
                                     </button>
+                                    <button id="forceUpdateMBBtn" class="btn btn-sm btn-warning"
+                                        onclick="forceUpdateMB()">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                            viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+                                        </svg>
+                                        Force Update MB
+                                    </button>
                                     <button id="refreshFilesBtn" class="btn btn-sm btn-outline">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
                                             viewBox="0 0 24 24" stroke="currentColor">
@@ -630,6 +639,60 @@
             setTimeout(() => {
                 loadUserFiles();
             }, 1000);
+        };
+
+        // Force update MB usage
+        window.forceUpdateMB = async function () {
+            if (!walletAddress) {
+                showStatus('Please connect your wallet first', 'error');
+                return;
+            }
+
+            try {
+                console.log('🔧 user-upload: Force update MB triggered for wallet:', walletAddress);
+                showStatus('🔧 Force updating MB usage...', 'info');
+
+                // Calcola i MB totali dai file caricati
+                const response = await fetch(`/api/user-uploads/${encodeURIComponent(walletAddress)}`);
+                const result = await response.json();
+
+                if (result.success && result.uploads) {
+                    const totalSizeMB = Math.ceil(result.totalSizeMB);
+                    console.log('🔧 user-upload: Total size from files:', totalSizeMB, 'MB');
+
+                    // Chiama l'endpoint per forzare l'aggiornamento
+                    const updateResponse = await fetch(`/api/force-update-mb/${encodeURIComponent(walletAddress)}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + localStorage.getItem('adminToken') // Usa il token admin se disponibile
+                        },
+                        body: JSON.stringify({
+                            mbUsed: totalSizeMB
+                        })
+                    });
+
+                    const updateResult = await updateResponse.json();
+                    console.log('🔧 user-upload: Force update response:', updateResult);
+
+                    if (updateResult.success) {
+                        showStatus(`✅ MB usage updated successfully! Used: ${updateResult.mbUsed} MB, Remaining: ${updateResult.remainingMB} MB`, 'success');
+
+                        // Aggiorna lo stato della sottoscrizione
+                        setTimeout(() => {
+                            checkSubscriptionStatus(walletAddress);
+                        }, 1000);
+                    } else {
+                        showStatus(`❌ Failed to update MB usage: ${updateResult.error}`, 'error');
+                    }
+                } else {
+                    showStatus('❌ Failed to get file information', 'error');
+                }
+
+            } catch (error) {
+                console.error('💥 user-upload: Error force updating MB:', error);
+                showStatus(`❌ Error force updating MB: ${error.message}`, 'error');
+            }
         };
 
         function displayFiles(files) {
