@@ -2333,38 +2333,145 @@ async function initializeServer() {
             .get("mb_usage")
             .get(userAddress);
           const offChainUsage = await new Promise((resolve) => {
+            const timeoutId = setTimeout(() => {
+              console.warn(
+                `⚠️ GunDB mb_usage read timeout for ${userAddress}, will recalculate from files`
+              );
+              resolve({ mbUsed: 0, lastUpdated: Date.now(), timeout: true });
+            }, 3000); // Timeout di 3 secondi
+
             mbUsageNode.once((data) => {
+              clearTimeout(timeoutId);
               resolve(data || { mbUsed: 0, lastUpdated: Date.now() });
             });
           });
 
-          console.log(
-            `📊 user-subscription-details: Off-chain usage data for ${userAddress}:`,
-            offChainUsage
-          );
-          console.log(
-            `📊 user-subscription-details: Contract MB used: ${contractMbUsed}`
-          );
-          console.log(
-            `📊 user-subscription-details: Contract MB allocated: ${mbAllocated}`
-          );
+          // Se i dati off-chain non sono affidabili (timeout o 0), ricalcola dai file esistenti
+          let mbUsedNum = offChainUsage.mbUsed || Number(contractMbUsed);
 
-          // Usa i dati off-chain per l'uso MB, fallback al contratto
-          const mbUsedNum = offChainUsage.mbUsed || Number(contractMbUsed);
+          if (offChainUsage.timeout || offChainUsage.mbUsed === 0) {
+            console.log(
+              `🔄 Recalculating MB usage from existing files for ${userAddress}`
+            );
+
+            try {
+              // Ottieni tutti i file dell'utente
+              const uploadsNode = gun
+                .get("shogun")
+                .get("uploads")
+                .get(userAddress);
+              const userFiles = await new Promise((resolve) => {
+                const timeoutId = setTimeout(() => {
+                  console.warn(
+                    `⚠️ GunDB uploads read timeout for ${userAddress}`
+                  );
+                  resolve([]);
+                }, 5000);
+
+                uploadsNode.once((parentData) => {
+                  clearTimeout(timeoutId);
+
+                  if (!parentData || typeof parentData !== "object") {
+                    resolve([]);
+                    return;
+                  }
+
+                  const hashKeys = Object.keys(parentData).filter(
+                    (key) => key !== "_"
+                  );
+                  let uploadsArray = [];
+                  let completedReads = 0;
+                  const totalReads = hashKeys.length;
+
+                  if (totalReads === 0) {
+                    resolve([]);
+                    return;
+                  }
+
+                  hashKeys.forEach((hash) => {
+                    uploadsNode.get(hash).once((uploadData) => {
+                      completedReads++;
+                      if (uploadData && uploadData.sizeMB) {
+                        uploadsArray.push(uploadData);
+                      }
+                      if (completedReads === totalReads) {
+                        resolve(uploadsArray);
+                      }
+                    });
+                  });
+                });
+              });
+
+              // Calcola il totale dei MB dai file
+              const calculatedMbUsed = userFiles.reduce(
+                (sum, file) => sum + (file.sizeMB || 0),
+                0
+              );
+              console.log(
+                `📊 Calculated MB usage from files: ${calculatedMbUsed} MB (${userFiles.length} files)`
+              );
+
+              // Usa il valore calcolato se è maggiore di 0
+              if (calculatedMbUsed > 0) {
+                mbUsedNum = calculatedMbUsed;
+
+                // Aggiorna anche i dati off-chain per futuri utilizzi
+                const updatedUsage = {
+                  mbUsed: calculatedMbUsed,
+                  lastUpdated: Date.now(),
+                  updatedBy: "recalculation-from-files",
+                };
+
+                mbUsageNode.put(updatedUsage, (ack) => {
+                  if (ack.err) {
+                    console.error(
+                      "Error updating recalculated MB usage:",
+                      ack.err
+                    );
+                  } else {
+                    console.log(
+                      `✅ Updated off-chain MB usage with recalculated value: ${calculatedMbUsed} MB`
+                    );
+                  }
+                });
+              }
+            } catch (recalcError) {
+              console.error(
+                "Error recalculating MB usage from files:",
+                recalcError
+              );
+              // Fallback al valore del contratto
+              mbUsedNum = Number(contractMbUsed);
+            }
+          }
+
           const mbAllocatedNum = Number(mbAllocated);
           const mbRemainingNum = Math.max(0, mbAllocatedNum - mbUsedNum);
+
+          const usagePercentage =
+            mbAllocatedNum > 0 ? (mbUsedNum / mbAllocatedNum) * 100 : 0;
 
           console.log(
             `📊 user-subscription-details: Final calculation for ${userAddress}:`
           );
-          console.log(`  - MB Used (off-chain): ${offChainUsage.mbUsed}`);
-          console.log(`  - MB Used (contract): ${Number(contractMbUsed)}`);
-          console.log(`  - MB Used (final): ${mbUsedNum}`);
-          console.log(`  - MB Allocated: ${mbAllocatedNum}`);
-          console.log(`  - MB Remaining: ${mbRemainingNum}`);
-
-          const usagePercentage =
-            mbAllocatedNum > 0 ? (mbUsedNum / mbAllocatedNum) * 100 : 0;
+          console.log(
+            `📊 user-subscription-details: - MB Allocated: ${mbAllocatedNum}`
+          );
+          console.log(
+            `📊 user-subscription-details: - MB Used: ${mbUsedNum} (${
+              offChainUsage.timeout
+                ? "recalculated from files"
+                : "from off-chain"
+            })`
+          );
+          console.log(
+            `📊 user-subscription-details: - MB Remaining: ${mbRemainingNum}`
+          );
+          console.log(
+            `📊 user-subscription-details: - Usage: ${usagePercentage.toFixed(
+              2
+            )}%`
+          );
 
           res.json({
             success: true,
