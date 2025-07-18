@@ -621,9 +621,21 @@ async function initializeServer() {
 
       // Verifica che l'utente abbia una sottoscrizione attiva
       try {
+        // Ottieni tutti i relay registrati (stesso metodo di user-subscription-details)
+        const allRelays = await relayContract.getAllRelays();
+        if (allRelays.length === 0) {
+          return res.status(500).json({
+            success: false,
+            error: "Nessun relay registrato nel contratto",
+          });
+        }
+
+        const relayAddress = allRelays[0];
+        console.log(`🔍 Using relay address: ${relayAddress}`);
+
         const isSubscribed = await relayContract.isSubscriptionActive(
           userAddress,
-          process.env.RELAY_CONTRACT_ADDRESS
+          relayAddress
         );
         if (!isSubscribed) {
           return res.status(403).json({
@@ -636,7 +648,7 @@ async function initializeServer() {
         const fileSizeMB = Math.ceil(req.file.size / (1024 * 1024));
         const hasMB = await relayContract.hasAvailableMB(
           userAddress,
-          process.env.RELAY_CONTRACT_ADDRESS,
+          relayAddress,
           fileSizeMB
         );
         if (!hasMB) {
@@ -808,7 +820,7 @@ async function initializeServer() {
                 try {
                   const fileSizeMB = Math.ceil(req.file.size / (1024 * 1024)); // Stesso calcolo usato in mbUsage
                   console.log(
-                    `📊 Updating MB usage: ${fileSizeMB} MB for user ${userAddress}`
+                    `📊 Updating MB usage: ${fileSizeMB} MB for user ${userAddress} on relay ${relayAddress}`
                   );
 
                   // Chiama il contratto per aggiornare i MB utilizzati
@@ -5191,11 +5203,22 @@ async function initializeServer() {
     }
 
     try {
+      // Estrai il CID dall'URL se necessario
+      let actualCid = cid;
+      if (cid.includes("/ipfs-content/")) {
+        actualCid = cid.split("/ipfs-content/")[1];
+      }
+      if (actualCid.includes("?")) {
+        actualCid = actualCid.split("?")[0];
+      }
+
+      console.log(`🧪 Extracted CID: ${actualCid}`);
+
       // Crea richiesta al gateway locale
       const requestOptions = {
         hostname: new URL(IPFS_GATEWAY_URL).hostname,
         port: new URL(IPFS_GATEWAY_URL).port,
-        path: `/ipfs/${cid}`,
+        path: `/ipfs/${actualCid}`,
         method: "GET",
       };
 
@@ -5418,6 +5441,226 @@ async function initializeServer() {
       });
     } catch (error) {
       console.error(`❌ Error handling IPFS content request: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        error: "Internal server error",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint per testare la decrittazione da URL completo
+  app.get("/ipfs-decrypt-url/*", tokenAuthMiddleware, async (req, res) => {
+    const fullUrl = req.params[0]; // Express cattura tutto dopo /ipfs-decrypt-url/
+    const token = req.headers.authorization?.split(" ")[1];
+
+    console.log(`🧪 Test decryption from URL: ${fullUrl}`);
+    console.log(
+      `🧪 Token from header: ${
+        token ? token.substring(0, 20) + "..." : "missing"
+      }`
+    );
+
+    if (!fullUrl) {
+      return res.status(400).json({
+        success: false,
+        error: "URL is required",
+      });
+    }
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        error: "Token is required",
+      });
+    }
+
+    try {
+      // Estrai il CID dall'URL
+      let cid = null;
+      if (fullUrl.includes("/ipfs-content/")) {
+        cid = fullUrl.split("/ipfs-content/")[1];
+      }
+      if (cid && cid.includes("?")) {
+        cid = cid.split("?")[0];
+      }
+
+      if (!cid) {
+        return res.status(400).json({
+          success: false,
+          error: "Could not extract CID from URL",
+        });
+      }
+
+      console.log(`🧪 Extracted CID from URL: ${cid}`);
+
+      // Crea richiesta al gateway locale
+      const requestOptions = {
+        hostname: new URL(IPFS_GATEWAY_URL).hostname,
+        port: new URL(IPFS_GATEWAY_URL).port,
+        path: `/ipfs/${cid}`,
+        method: "GET",
+      };
+
+      const ipfsReq = http.get(requestOptions, (ipfsRes) => {
+        let body = "";
+        ipfsRes.on("data", (chunk) => (body += chunk));
+        ipfsRes.on("end", async () => {
+          try {
+            console.log(`🧪 Received content length: ${body.length}`);
+            console.log(`🧪 Content preview: ${body.substring(0, 100)}...`);
+
+            const decrypted = await SEA.decrypt(body, token);
+
+            if (decrypted) {
+              console.log(`🧪 Decryption successful!`);
+              console.log(
+                `🧪 Decrypted preview: ${decrypted.substring(0, 100)}...`
+              );
+
+              res.json({
+                success: true,
+                message: "Decryption successful",
+                decryptedData: decrypted,
+                originalLength: body.length,
+                decryptedLength: decrypted.length,
+                extractedCid: cid,
+              });
+            } else {
+              res.json({
+                success: false,
+                error: "Decryption returned null",
+                contentPreview: body.substring(0, 100) + "...",
+                extractedCid: cid,
+              });
+            }
+          } catch (e) {
+            console.error(`🧪 Decryption error:`, e);
+            res.json({
+              success: false,
+              error: "Decryption error",
+              details: e.message,
+              contentPreview: body.substring(0, 100) + "...",
+              extractedCid: cid,
+            });
+          }
+        });
+      });
+
+      ipfsReq.on("error", (err) => {
+        res.status(500).json({
+          success: false,
+          error: "Failed to fetch from IPFS",
+          details: err.message,
+        });
+      });
+    } catch (error) {
+      console.error("Test decryption error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Internal server error",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint per testare la decrittazione di un file specifico
+  app.get("/ipfs-decrypt/:cid", tokenAuthMiddleware, async (req, res) => {
+    const { cid } = req.params;
+    const token = req.headers.authorization?.split(" ")[1];
+
+    console.log(`🧪 Test decryption for CID: ${cid}`);
+    console.log(
+      `🧪 Token from header: ${
+        token ? token.substring(0, 20) + "..." : "missing"
+      }`
+    );
+
+    if (!cid) {
+      return res.status(400).json({
+        success: false,
+        error: "CID is required",
+      });
+    }
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        error: "Token is required",
+      });
+    }
+
+    try {
+      // Estrai il CID dall'URL se necessario
+      let actualCid = cid;
+      if (cid.includes("/ipfs-content/")) {
+        actualCid = cid.split("/ipfs-content/")[1];
+      }
+      if (actualCid.includes("?")) {
+        actualCid = actualCid.split("?")[0];
+      }
+
+      console.log(`🧪 Extracted CID: ${actualCid}`);
+
+      // Crea richiesta al gateway locale
+      const requestOptions = {
+        hostname: new URL(IPFS_GATEWAY_URL).hostname,
+        port: new URL(IPFS_GATEWAY_URL).port,
+        path: `/ipfs/${actualCid}`,
+        method: "GET",
+      };
+
+      const ipfsReq = http.get(requestOptions, (ipfsRes) => {
+        let body = "";
+        ipfsRes.on("data", (chunk) => (body += chunk));
+        ipfsRes.on("end", async () => {
+          try {
+            console.log(`🧪 Received content length: ${body.length}`);
+            console.log(`🧪 Content preview: ${body.substring(0, 100)}...`);
+
+            const decrypted = await SEA.decrypt(body, token);
+
+            if (decrypted) {
+              console.log(`🧪 Decryption successful!`);
+              console.log(
+                `🧪 Decrypted preview: ${decrypted.substring(0, 100)}...`
+              );
+
+              res.json({
+                success: true,
+                message: "Decryption successful",
+                decryptedData: decrypted,
+                originalLength: body.length,
+                decryptedLength: decrypted.length,
+              });
+            } else {
+              res.json({
+                success: false,
+                error: "Decryption returned null",
+                contentPreview: body.substring(0, 100) + "...",
+              });
+            }
+          } catch (e) {
+            console.error(`🧪 Decryption error:`, e);
+            res.json({
+              success: false,
+              error: "Decryption error",
+              details: e.message,
+              contentPreview: body.substring(0, 100) + "...",
+            });
+          }
+        });
+      });
+
+      ipfsReq.on("error", (err) => {
+        res.status(500).json({
+          success: false,
+          error: "Failed to fetch from IPFS",
+          details: err.message,
+        });
+      });
+    } catch (error) {
+      console.error("Test decryption error:", error);
       res.status(500).json({
         success: false,
         error: "Internal server error",
