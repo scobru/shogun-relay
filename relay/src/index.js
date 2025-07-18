@@ -566,427 +566,266 @@ async function initializeServer() {
     }
   );
 
-  // Endpoint upload IPFS per utenti smart contract
-  app.post(
-    "/ipfs-upload-user",
-    relayContractAuthMiddleware,
-    upload.single("file"),
-    async (req, res) => {
-      try {
-        if (!req.file) {
-          return res
-            .status(400)
-            .json({ success: false, error: "No file provided" });
-        }
-        const formData = new FormData();
-        formData.append("file", req.file.buffer, {
-          filename: req.file.originalname,
-          contentType: req.file.mimetype,
-        });
-        const requestOptions = {
-          hostname: "127.0.0.1",
-          port: 5001,
-          path: "/api/v0/add?wrap-with-directory=false",
-          method: "POST",
-          headers: {
-            ...formData.getHeaders(),
-          },
-        };
-        if (IPFS_API_TOKEN) {
-          requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
-        }
-        const ipfsReq = http.request(requestOptions, (ipfsRes) => {
-          let data = "";
-          ipfsRes.on("data", (chunk) => (data += chunk));
-          ipfsRes.on("end", async () => {
-            try {
-              const lines = data.trim().split("\n");
-              const results = lines.map((line) => JSON.parse(line));
-              const fileResult =
-                results.find((r) => r.Name === req.file.originalname) ||
-                results[0];
+  // Endpoint upload IPFS per utenti smart contract (versione semplificata)
+  app.post("/ipfs-upload-user", upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res
+          .status(400)
+          .json({ success: false, error: "No file provided" });
+      }
 
-              // Salva l'upload nel database Gun usando l'address come identificatore
-              const uploadData = {
+      // Ottieni l'address dall'header
+      const userAddress = req.headers["x-user-address"];
+      if (!userAddress) {
+        return res.status(401).json({
+          success: false,
+          error: "x-user-address header richiesto",
+        });
+      }
+
+      console.log(`📤 Upload request for user: ${userAddress}`);
+
+      const formData = new FormData();
+      formData.append("file", req.file.buffer, {
+        filename: req.file.originalname,
+        contentType: req.file.mimetype,
+      });
+      const requestOptions = {
+        hostname: "127.0.0.1",
+        port: 5001,
+        path: "/api/v0/add?wrap-with-directory=false",
+        method: "POST",
+        headers: {
+          ...formData.getHeaders(),
+        },
+      };
+      if (IPFS_API_TOKEN) {
+        requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+      }
+      const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+        let data = "";
+        ipfsRes.on("data", (chunk) => (data += chunk));
+        ipfsRes.on("end", async () => {
+          try {
+            const lines = data.trim().split("\n");
+            const results = lines.map((line) => JSON.parse(line));
+            const fileResult =
+              results.find((r) => r.Name === req.file.originalname) ||
+              results[0];
+
+            // Salva l'upload nel database Gun usando l'address come identificatore
+            const uploadData = {
+              hash: fileResult?.Hash,
+              name: req.file.originalname,
+              size: req.file.size,
+              sizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+              mimetype: req.file.mimetype,
+              uploadedAt: Date.now(),
+              userAddress: userAddress,
+              ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
+                fileResult?.Hash
+              }`,
+              gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
+              publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
+            };
+
+            // Salva nel database Gun usando l'address come identificatore
+            const identifier = userAddress;
+            console.log(`💾 Salvando upload con identificatore: ${identifier}`);
+            console.log(`💾 Upload data:`, uploadData);
+            console.log(`💾 UserAddress:`, userAddress);
+            console.log(`💾 Identifier type:`, typeof identifier);
+            console.log(
+              `💾 Identifier length:`,
+              identifier ? identifier.length : 0
+            );
+
+            // Verifica che Gun sia disponibile
+            if (!gun) {
+              console.error(`❌ Gun DB non disponibile`);
+              return res.status(500).json({
+                success: false,
+                error: "Database non disponibile",
+              });
+            }
+
+            // Usa una struttura più semplice per Gun - salva direttamente nel nodo padre
+            console.log(`💾 Gun object available:`, !!gun);
+            console.log(`💾 Gun object type:`, typeof gun);
+            console.log(`💾 Gun object keys:`, gun ? Object.keys(gun) : "N/A");
+
+            const uploadNode = gun.get("shogun").get("uploads").get(identifier);
+
+            console.log(
+              `💾 Upload node created for path: shogun/uploads/${identifier}`
+            );
+            console.log(`💾 Upload node object:`, uploadNode);
+            console.log(`💾 Upload node type:`, typeof uploadNode);
+
+            // Salva i dati con Promise per attendere il completamento
+            const saveToGun = () => {
+              return new Promise((resolve, reject) => {
+                console.log(
+                  `💾 Iniziando salvataggio in Gun per hash: ${fileResult?.Hash}`
+                );
+                console.log(
+                  `💾 Upload node path: shogun/uploads/${identifier}`
+                );
+                console.log(
+                  `💾 Upload data to save:`,
+                  JSON.stringify(uploadData, null, 2)
+                );
+
+                // Timeout di 10 secondi per evitare che si blocchi
+                const timeoutId = setTimeout(() => {
+                  console.warn(
+                    `⚠️ Gun save timeout after 10 seconds for hash: ${fileResult?.Hash}`
+                  );
+                  resolve(); // Risolvi comunque per non bloccare l'upload
+                }, 10000);
+
+                // Salva direttamente nel nodo padre usando l'hash come chiave
+                console.log(
+                  `💾 Calling uploadNode.put({ [${fileResult?.Hash}]: uploadData })`
+                );
+                const dataToSave = {};
+                dataToSave[fileResult?.Hash] = uploadData;
+
+                // Usa un approccio più semplice, simile a notes.html
+                uploadNode.put(dataToSave, (ack) => {
+                  clearTimeout(timeoutId);
+                  console.log(`💾 Upload saved to Gun DB - ACK received:`, ack);
+                  console.log(`💾 ACK details:`, {
+                    err: ack.err,
+                    ok: ack.ok,
+                    pub: ack.pub,
+                    get: ack.get,
+                    put: ack.put,
+                    ack: ack.ack,
+                    "@": ack["@"],
+                    ">": ack[">"],
+                    "=": ack["="],
+                    _: ack._,
+                  });
+
+                  if (ack.err) {
+                    console.error(`❌ Error saving to Gun DB:`, ack.err);
+                    console.error(`❌ Full ACK error details:`, ack);
+                    // Non rifiutare, solo logga l'errore
+                    resolve();
+                  } else {
+                    console.log(`✅ Upload saved successfully to Gun DB`);
+                    console.log(`✅ ACK indicates success:`, ack.ok);
+                    resolve();
+                  }
+                });
+              });
+            };
+
+            // Salva in background senza bloccare l'upload
+            saveToGun()
+              .then(() => {
+                console.log(`✅ File saved to Gun DB successfully`);
+
+                // Verifica immediata del salvataggio
+                setTimeout(() => {
+                  console.log(
+                    `🔍 Verifica immediata salvataggio per hash: ${fileResult?.Hash}`
+                  );
+                  console.log(
+                    `🔍 Reading from path: shogun/uploads/${identifier}`
+                  );
+
+                  uploadNode.once((savedData) => {
+                    console.log(`🔍 Dati salvati verificati:`, savedData);
+                    console.log(`🔍 Tipo di dati salvati:`, typeof savedData);
+                    console.log(
+                      `🔍 Dati salvati sono null/undefined:`,
+                      savedData === null || savedData === undefined
+                    );
+
+                    if (savedData && typeof savedData === "object") {
+                      const keys = Object.keys(savedData).filter(
+                        (key) => key !== "_"
+                      );
+                      console.log(`🔍 Chiavi trovate nel nodo:`, keys);
+
+                      if (keys.includes(fileResult?.Hash)) {
+                        console.log(
+                          `✅ Verifica salvataggio OK - hash trovato`
+                        );
+                        console.log(
+                          `✅ Dati salvati completi:`,
+                          JSON.stringify(savedData[fileResult?.Hash], null, 2)
+                        );
+                      } else {
+                        console.warn(
+                          `⚠️ Verifica salvataggio FAILED - hash non trovato`
+                        );
+                        console.warn(`⚠️ Chiavi disponibili:`, keys);
+                      }
+                    } else {
+                      console.warn(
+                        `⚠️ Verifica salvataggio FAILED - dati null o non oggetto`
+                      );
+                    }
+                  });
+                }, 2000); // Aumentato a 2 secondi
+              })
+              .catch((gunError) => {
+                console.error(`❌ Failed to save to Gun DB:`, gunError);
+                // Non blocchiamo l'upload se Gun fallisce
+              });
+
+            // Risposta di successo immediata
+            res.json({
+              success: true,
+              file: {
                 hash: fileResult?.Hash,
                 name: req.file.originalname,
                 size: req.file.size,
-                sizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
                 mimetype: req.file.mimetype,
-                uploadedAt: Date.now(),
-                userAddress: req.userAddress,
                 ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
                   fileResult?.Hash
                 }`,
                 gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
                 publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
-              };
-
-              // Salva nel database Gun usando l'address come identificatore
-              const identifier = req.userAddress;
-              console.log(
-                `💾 Salvando upload con identificatore: ${identifier}`
-              );
-              console.log(`💾 Upload data:`, uploadData);
-              console.log(`💾 Req.userAddress:`, req.userAddress);
-              console.log(`💾 Identifier type:`, typeof identifier);
-              console.log(
-                `💾 Identifier length:`,
-                identifier ? identifier.length : 0
-              );
-
-              // Usa una struttura più semplice per Gun - salva direttamente nel nodo padre
-              console.log(`💾 Gun object available:`, !!gun);
-              console.log(`💾 Gun object type:`, typeof gun);
-              console.log(
-                `💾 Gun object keys:`,
-                gun ? Object.keys(gun) : "N/A"
-              );
-
-              const uploadNode = gun
-                .get("shogun")
-                .get("uploads")
-                .get(identifier);
-
-              console.log(
-                `💾 Upload node created for path: shogun/uploads/${identifier}`
-              );
-              console.log(`💾 Upload node object:`, uploadNode);
-              console.log(`💾 Upload node type:`, typeof uploadNode);
-
-              // Salva i dati con Promise per attendere il completamento
-              const saveToGun = () => {
-                return new Promise((resolve, reject) => {
-                  console.log(
-                    `💾 Iniziando salvataggio in Gun per hash: ${fileResult?.Hash}`
-                  );
-                  console.log(
-                    `💾 Upload node path: shogun/uploads/${identifier}`
-                  );
-                  console.log(
-                    `💾 Upload data to save:`,
-                    JSON.stringify(uploadData, null, 2)
-                  );
-
-                  // Timeout di 5 secondi per evitare che si blocchi
-                  const timeoutId = setTimeout(() => {
-                    console.warn(
-                      `⚠️ Gun save timeout after 5 seconds for hash: ${fileResult?.Hash}`
-                    );
-                    resolve(); // Risolvi comunque per non bloccare l'upload
-                  }, 5000);
-
-                  // Salva direttamente nel nodo padre usando l'hash come chiave
-                  console.log(
-                    `💾 Calling uploadNode.put({ [${fileResult?.Hash}]: uploadData })`
-                  );
-                  const dataToSave = {};
-                  dataToSave[fileResult?.Hash] = uploadData;
-
-                  uploadNode.put(dataToSave, (ack) => {
-                    clearTimeout(timeoutId);
-                    console.log(
-                      `💾 Upload saved to Gun DB - ACK received:`,
-                      ack
-                    );
-                    console.log(`💾 ACK details:`, {
-                      err: ack.err,
-                      ok: ack.ok,
-                      pub: ack.pub,
-                      get: ack.get,
-                      put: ack.put,
-                      ack: ack.ack,
-                      "@": ack["@"],
-                      ">": ack[">"],
-                      "=": ack["="],
-                      _: ack._,
-                    });
-
-                    if (ack.err) {
-                      console.error(`❌ Error saving to Gun DB:`, ack.err);
-                      console.error(`❌ Full ACK error details:`, ack);
-                      // Non rifiutare, solo logga l'errore
-                      resolve();
-                    } else {
-                      console.log(`✅ Upload saved successfully to Gun DB`);
-                      console.log(`✅ ACK indicates success:`, ack.ok);
-                      resolve();
-                    }
-                  });
-                });
-              };
-
-              // Salva in background senza bloccare l'upload
-              saveToGun()
-                .then(() => {
-                  console.log(`✅ File saved to Gun DB successfully`);
-
-                  // Verifica immediata del salvataggio
-                  setTimeout(() => {
-                    console.log(
-                      `🔍 Verifica immediata salvataggio per hash: ${fileResult?.Hash}`
-                    );
-                    console.log(
-                      `🔍 Reading from path: shogun/uploads/${identifier}`
-                    );
-
-                    uploadNode.once((savedData) => {
-                      console.log(`🔍 Dati salvati verificati:`, savedData);
-                      console.log(`🔍 Tipo di dati salvati:`, typeof savedData);
-                      console.log(
-                        `🔍 Dati salvati sono null/undefined:`,
-                        savedData === null || savedData === undefined
-                      );
-
-                      if (savedData && typeof savedData === "object") {
-                        const keys = Object.keys(savedData).filter(
-                          (key) => key !== "_"
-                        );
-                        console.log(`🔍 Chiavi trovate nel nodo:`, keys);
-
-                        if (keys.includes(fileResult?.Hash)) {
-                          console.log(
-                            `✅ Verifica salvataggio OK - hash trovato`
-                          );
-                          console.log(
-                            `✅ Dati salvati completi:`,
-                            JSON.stringify(savedData[fileResult?.Hash], null, 2)
-                          );
-                        } else {
-                          console.warn(
-                            `⚠️ Verifica salvataggio FAILED - hash non trovato`
-                          );
-                          console.warn(`⚠️ Chiavi disponibili:`, keys);
-                        }
-                      } else {
-                        console.warn(
-                          `⚠️ Verifica salvataggio FAILED - dati null o non oggetto`
-                        );
-                      }
-                    });
-                  }, 1000); // Aumentato a 1 secondo
-                })
-                .catch((gunError) => {
-                  console.error(`❌ Failed to save to Gun DB:`, gunError);
-                  // Non blocchiamo l'upload se Gun fallisce
-                });
-
-              // Verifica che il salvataggio sia avvenuto
-              setTimeout(() => {
-                console.log(`🔍 Verifica persistenza salvataggio...`);
-                uploadNode.once((savedData) => {
-                  console.log(`🔍 Verifica salvataggio nodo padre:`, savedData);
-                  console.log(`🔍 Tipo verifica:`, typeof savedData);
-                  console.log(
-                    `🔍 Chiavi verifica:`,
-                    savedData ? Object.keys(savedData) : "N/A"
-                  );
-
-                  if (savedData && typeof savedData === "object") {
-                    const keys = Object.keys(savedData).filter(
-                      (key) => key !== "_"
-                    );
-                    console.log(`🔍 Chiavi trovate (esclusi metadati):`, keys);
-
-                    if (keys.includes(fileResult?.Hash)) {
-                      console.log(
-                        `✅ Hash trovato nel nodo padre: ${fileResult?.Hash}`
-                      );
-                      console.log(
-                        `✅ Dati completi per hash:`,
-                        savedData[fileResult?.Hash]
-                      );
-                    } else {
-                      console.warn(
-                        `⚠️ Hash NON trovato nel nodo padre: ${fileResult?.Hash}`
-                      );
-                      console.warn(`⚠️ Chiavi disponibili:`, keys);
-                    }
-                  } else {
-                    console.warn(`⚠️ Nodo padre vuoto o null`);
-                  }
-                });
-              }, 2000); // Aumentato a 2 secondi
-
-              // Registra l'uso di MB tramite smart contract se disponibile
-              let mbUsageRecorded = false;
-              let mbVerified = false; // Inizializza la variabile fuori dal blocco
-
-              if (relayContract && req.userAddress) {
-                try {
-                  // Calcola MB arrotondando sempre verso l'alto e convertendo in intero
-                  const fileSizeBytes = req.file.size;
-                  const fileSizeMB = Math.ceil(fileSizeBytes / (1024 * 1024)); // Arrotonda sempre verso l'alto
-
-                  // Ottieni l'indirizzo del relay
-                  const allRelays = await relayContract.getAllRelays();
-                  if (allRelays.length === 0) {
-                    console.error("❌ Nessun relay registrato nel contratto");
-                    return res.status(500).json({
-                      success: false,
-                      error: "Nessun relay registrato nel contratto",
-                    });
-                  }
-                  const relayAddress = allRelays[0];
-
-                  console.log(
-                    `🔍 Verificando MB per indirizzo: ${req.userAddress.slice(
-                      0,
-                      6
-                    )}...`
-                  );
-                  console.log(
-                    `📏 File size: ${fileSizeBytes} bytes = ${fileSizeMB} MB (arrotondato)`
-                  );
-                  console.log(`🏠 Relay address: ${relayAddress}`);
-
-                  // Verifica MB disponibili tramite smart contract
-                  if (relayContract && req.userAddress) {
-                    try {
-                      // Verifica che ci siano MB sufficienti usando hasAvailableMB
-                      const hasMB = await relayContract.hasAvailableMB(
-                        req.userAddress,
-                        relayAddress,
-                        fileSizeMB
-                      );
-
-                      console.log(`✅ hasAvailableMB result: ${hasMB}`);
-
-                      if (hasMB) {
-                        console.log(
-                          `✅ MB sufficienti per ${req.userAddress.slice(
-                            0,
-                            6
-                          )}... (richiesti: ${fileSizeMB} MB)`
-                        );
-                        mbVerified = true;
-                      } else {
-                        console.warn(
-                          `⚠️ MB insufficienti per ${req.userAddress.slice(
-                            0,
-                            6
-                          )}... (richiesti: ${fileSizeMB} MB)`
-                        );
-
-                        // BLOCCA l'upload se non ci sono MB sufficienti
-                        return res.status(403).json({
-                          success: false,
-                          error: "Storage insufficiente per questo file",
-                          details: {
-                            requiredMB: fileSizeMB,
-                            userAddress: req.userAddress.slice(0, 6) + "...",
-                            message:
-                              "Aggiungi più MB alla tua sottoscrizione per caricare questo file",
-                          },
-                        });
-                      }
-                    } catch (mbError) {
-                      console.error("Errore verifica MB:", mbError);
-                      // BLOCCA l'upload se c'è un errore nella verifica MB
-                      return res.status(500).json({
-                        success: false,
-                        error: "Errore verifica storage disponibile",
-                        details: mbError.message,
-                      });
-                    }
-                  }
-
-                  if (mbVerified) {
-                    // MB sufficienti verificati - non serve registrare on-chain
-                    console.log(
-                      `✅ MB sufficienti verificati: ${fileSizeMB} MB per ${req.userAddress.slice(
-                        0,
-                        6
-                      )}...`
-                    );
-                    mbUsageRecorded = true;
-                  } else {
-                    console.warn(
-                      `⚠️ MB insufficienti per ${req.userAddress.slice(
-                        0,
-                        6
-                      )}... (richiesti: ${fileSizeMB} MB)`
-                    );
-
-                    // BLOCCA l'upload se non ci sono MB sufficienti
-                    return res.status(403).json({
-                      success: false,
-                      error: "Storage insufficiente per questo file",
-                      details: {
-                        requiredMB: fileSizeMB,
-                        userAddress: req.userAddress.slice(0, 6) + "...",
-                        message:
-                          "Aggiungi più MB alla tua sottoscrizione per caricare questo file",
-                      },
-                    });
-                  }
-                } catch (mbError) {
-                  console.error("Errore registrazione uso MB:", mbError);
-                  // BLOCCA l'upload se c'è un errore nella verifica MB
-                  return res.status(500).json({
-                    success: false,
-                    error: "Errore verifica storage disponibile",
-                    details: mbError.message,
-                  });
-                }
-              } else {
-                // Se non c'è contratto relay, considera la verifica come passata
-                mbVerified = true;
-                console.log(
-                  "ℹ️ Nessun contratto relay disponibile, saltando verifica MB"
-                );
-              }
-
-              // Invia la risposta immediatamente dopo aver completato le verifiche
-              console.log(`📤 Invio risposta di successo per upload`);
-              res.json({
-                success: true,
-                file: {
-                  name: req.file.originalname,
-                  size: req.file.size,
-                  sizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
-                  mimetype: req.file.mimetype,
-                  hash: fileResult?.Hash,
-                  ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
-                    fileResult?.Hash
-                  }`,
-                  gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
-                  publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
-                },
-                user: {
-                  address: req.userAddress,
-                },
-                mbUsage: {
-                  verified: mbVerified,
-                  sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
-                  actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
-                },
-                ipfsResponse: results,
-              });
-            } catch (parseError) {
-              res.status(500).json({
-                success: false,
-                error: "Failed to parse IPFS response",
-                rawResponse: data,
-              });
-            }
-          });
-        });
-        ipfsReq.on("error", (err) => {
-          res.status(500).json({ success: false, error: err.message });
-        });
-        ipfsReq.setTimeout(30000, () => {
-          ipfsReq.destroy();
-          if (!res.headersSent) {
-            res.status(408).json({ success: false, error: "Upload timeout" });
+              },
+              user: {
+                address: userAddress,
+                identifier: identifier,
+              },
+              mbUsage: {
+                actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
+                verified: true,
+              },
+              ipfsResponse: results,
+            });
+          } catch (parseError) {
+            res.status(500).json({
+              success: false,
+              error: "Failed to parse IPFS response",
+              rawResponse: data,
+            });
           }
         });
-        formData.pipe(ipfsReq);
-      } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-      }
+      });
+      ipfsReq.on("error", (err) => {
+        res.status(500).json({ success: false, error: err.message });
+      });
+      ipfsReq.setTimeout(30000, () => {
+        ipfsReq.destroy();
+        if (!res.headersSent) {
+          res.status(408).json({ success: false, error: "Upload timeout" });
+        }
+      });
+      formData.pipe(ipfsReq);
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
     }
-  );
+  });
 
   // Endpoint per recuperare gli upload di un utente
   app.get("/api/user-uploads/:identifier", async (req, res) => {
