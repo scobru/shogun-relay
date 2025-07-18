@@ -1064,18 +1064,33 @@ async function initializeServer() {
               rawData ? Object.keys(rawData) : "N/A"
             );
 
-            resolve({ rawData, error: null });
+            // Se ci sono dati, prova a leggere ogni chiave individualmente
+            let detailedData = {};
+            if (rawData && typeof rawData === "object") {
+              const keys = Object.keys(rawData).filter((key) => key !== "_");
+              console.log(`🔍 Debug: Found ${keys.length} keys:`, keys);
+
+              keys.forEach((key) => {
+                uploadsNode.get(key).once((keyData) => {
+                  console.log(`🔍 Debug: Key ${key} data:`, keyData);
+                  detailedData[key] = keyData;
+                });
+              });
+            }
+
+            resolve({ rawData, detailedData, error: null });
           });
         });
       };
 
-      const { rawData, error } = await getDebugData();
+      const { rawData, detailedData, error } = await getDebugData();
 
       const response = {
         success: true,
         identifier,
         debug: {
           rawData,
+          detailedData,
           dataType: typeof rawData,
           dataKeys: rawData ? Object.keys(rawData) : [],
           error,
