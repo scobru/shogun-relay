@@ -401,6 +401,80 @@ async function initializeServer() {
     next();
   };
 
+  // Funzione per verificare la firma del wallet
+  function verifyWalletSignature(message, signature, expectedAddress) {
+    try {
+      // Verifica che l'address sia valido
+      if (
+        !expectedAddress ||
+        !expectedAddress.startsWith("0x") ||
+        expectedAddress.length !== 42
+      ) {
+        return false;
+      }
+
+      // Verifica che la firma sia valida
+      if (
+        !signature ||
+        !signature.startsWith("0x") ||
+        signature.length !== 132
+      ) {
+        return false;
+      }
+
+      // Per ora restituiamo true se i formati sono corretti
+      // In futuro potremmo implementare la verifica crittografica completa
+      console.log(`🔐 Verifying signature for address: ${expectedAddress}`);
+      console.log(`🔐 Message: ${message}`);
+      console.log(`🔐 Signature: ${signature.substring(0, 20)}...`);
+
+      return true;
+    } catch (error) {
+      console.error("❌ Error verifying wallet signature:", error);
+      return false;
+    }
+  }
+
+  // Middleware per autenticare le richieste con firma del wallet
+  const walletSignatureMiddleware = (req, res, next) => {
+    try {
+      const userAddress = req.headers["x-user-address"];
+      const signature = req.headers["x-wallet-signature"];
+      const message = req.headers["x-signature-message"] || "I Love Shogun";
+
+      if (!userAddress) {
+        return res.status(401).json({
+          success: false,
+          error: "x-user-address header richiesto",
+        });
+      }
+
+      if (!signature) {
+        return res.status(401).json({
+          success: false,
+          error: "x-wallet-signature header richiesto per autenticazione",
+        });
+      }
+
+      // Verifica la firma
+      if (!verifyWalletSignature(message, signature, userAddress)) {
+        return res.status(401).json({
+          success: false,
+          error: "Firma del wallet non valida",
+        });
+      }
+
+      console.log(`✅ Wallet signature verified for: ${userAddress}`);
+      next();
+    } catch (error) {
+      console.error("❌ Wallet signature middleware error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore di autenticazione",
+      });
+    }
+  };
+
   // IPFS File Upload Endpoint (Consolidated and Fixed)
   app.post(
     "/ipfs-upload",
@@ -4572,80 +4646,6 @@ async function initializeServer() {
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
-  // Funzione per verificare la firma del wallet
-  function verifyWalletSignature(message, signature, expectedAddress) {
-    try {
-      // Verifica che l'address sia valido
-      if (
-        !expectedAddress ||
-        !expectedAddress.startsWith("0x") ||
-        expectedAddress.length !== 42
-      ) {
-        return false;
-      }
-
-      // Verifica che la firma sia valida
-      if (
-        !signature ||
-        !signature.startsWith("0x") ||
-        signature.length !== 132
-      ) {
-        return false;
-      }
-
-      // Per ora restituiamo true se i formati sono corretti
-      // In futuro potremmo implementare la verifica crittografica completa
-      console.log(`🔐 Verifying signature for address: ${expectedAddress}`);
-      console.log(`🔐 Message: ${message}`);
-      console.log(`🔐 Signature: ${signature.substring(0, 20)}...`);
-
-      return true;
-    } catch (error) {
-      console.error("❌ Error verifying wallet signature:", error);
-      return false;
-    }
-  }
-
-  // Middleware per autenticare le richieste con firma del wallet
-  const walletSignatureMiddleware = (req, res, next) => {
-    try {
-      const userAddress = req.headers["x-user-address"];
-      const signature = req.headers["x-wallet-signature"];
-      const message = req.headers["x-signature-message"] || "I Love Shogun";
-
-      if (!userAddress) {
-        return res.status(401).json({
-          success: false,
-          error: "x-user-address header richiesto",
-        });
-      }
-
-      if (!signature) {
-        return res.status(401).json({
-          success: false,
-          error: "x-wallet-signature header richiesto per autenticazione",
-        });
-      }
-
-      // Verifica la firma
-      if (!verifyWalletSignature(message, signature, userAddress)) {
-        return res.status(401).json({
-          success: false,
-          error: "Firma del wallet non valida",
-        });
-      }
-
-      console.log(`✅ Wallet signature verified for: ${userAddress}`);
-      next();
-    } catch (error) {
-      console.error("❌ Wallet signature middleware error:", error);
-      res.status(500).json({
-        success: false,
-        error: "Errore di autenticazione",
-      });
-    }
-  };
 
   // Funzione helper per ottenere i MB utilizzati off-chain calcolandoli in tempo reale dai file
   async function getOffChainMBUsage(userAddress) {
