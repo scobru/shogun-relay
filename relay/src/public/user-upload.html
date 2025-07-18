@@ -290,24 +290,41 @@
 
         // Aggiungi event listener per il file input
         fileInput.addEventListener('change', (e) => {
+            console.log('📁 user-upload: File input change event triggered');
             if (e.target.files.length > 0) {
-                checkFileSize(e.target.files[0]);
+                const file = e.target.files[0];
+                console.log('📁 user-upload: File selected:', {
+                    name: file.name,
+                    size: file.size,
+                    type: file.type
+                });
+                checkFileSize(file);
+            } else {
+                console.log('📁 user-upload: No file selected');
             }
         });
 
         // Verifica la dimensione del file
         function checkFileSize(file) {
-            if (!file) return;
+            if (!file) {
+                console.log('📁 user-upload: No file provided to checkFileSize');
+                return;
+            }
 
+            console.log('📁 user-upload: Checking file size for:', file.name);
             const fileSizeMB = Math.ceil(file.size / (1024 * 1024)); // Arrotonda sempre verso l'alto
             const maxFileSize = 100; // MB massimi per file (puoi modificare questo valore)
 
+            console.log('📁 user-upload: File size:', fileSizeMB, 'MB (max:', maxFileSize, 'MB)');
+
             if (fileSizeMB > maxFileSize) {
+                console.log('❌ user-upload: File too large');
                 showStatus(`❌ File too large! Maximum size is ${maxFileSize} MB`, 'error');
                 fileInput.value = '';
                 return;
             }
 
+            console.log('✅ user-upload: File size OK');
             showStatus(`📁 File selected: ${file.name} (${fileSizeMB} MB)`, 'info');
         }
 
@@ -426,6 +443,14 @@
             }
 
             try {
+                console.log('📤 user-upload: Starting file upload');
+                console.log('📤 user-upload: File details:', {
+                    name: file.name,
+                    size: file.size,
+                    type: file.type
+                });
+                console.log('📤 user-upload: Wallet address:', walletAddress);
+
                 uploadBtn.disabled = true;
                 uploadBtn.textContent = 'Uploading...';
                 uploadProgress.classList.remove('hidden');
@@ -433,6 +458,7 @@
                 const formData = new FormData();
                 formData.append('file', file);
 
+                console.log('📤 user-upload: Sending request to /ipfs-upload-user');
                 const response = await fetch('/ipfs-upload-user', {
                     method: 'POST',
                     headers: {
@@ -441,7 +467,9 @@
                     body: formData
                 });
 
+                console.log('📤 user-upload: Response status:', response.status);
                 const result = await response.json();
+                console.log('📤 user-upload: Response data:', result);
 
                 if (result.success) {
                     const actualSize = result.mbUsage.actualSizeMB;
@@ -457,6 +485,8 @@
 
                     showStatus(`✅ File uploaded successfully! Hash: ${result.file.hash}${sizeInfo}${verificationInfo}`, 'success');
                     fileInput.value = '';
+
+                    console.log('📤 user-upload: Calling loadUserFiles after successful upload');
                     loadUserFiles(); // Refresh files list
 
                     // Aggiorna lo stato della sottoscrizione dopo l'upload
@@ -477,7 +507,7 @@
                 }
 
             } catch (error) {
-                console.error('Upload error:', error);
+                console.error('💥 user-upload: Upload error:', error);
                 showStatus(`❌ Upload error: ${error.message}`, 'error');
             } finally {
                 uploadBtn.disabled = false;
