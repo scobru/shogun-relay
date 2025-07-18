@@ -765,9 +765,17 @@ async function initializeServer() {
                   mbUsageNode.put(updatedUsage, (ack) => {
                     if (ack.err) {
                       console.error("Error saving MB usage to Gun:", ack.err);
+                      addSystemLog(
+                        "error",
+                        `Failed to save MB usage to Gun for ${userAddress}: ${ack.err}`
+                      );
                     } else {
                       console.log(
                         `✅ MB usage updated off-chain: ${currentUsage.mbUsed} + ${fileSizeMB} = ${updatedUsage.mbUsed} MB`
+                      );
+                      addSystemLog(
+                        "info",
+                        `MB usage updated off-chain for ${userAddress}: ${updatedUsage.mbUsed} MB`
                       );
                     }
                   });
