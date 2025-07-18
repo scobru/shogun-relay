@@ -17,8 +17,8 @@ import { ethers } from "ethers";
 dotenv.config();
 
 import Gun from "gun";
-
 import SEA from "gun/sea.js";
+
 import "gun/lib/stats.js";
 import "gun/lib/webrtc.js";
 import "gun/lib/rfs.js";
@@ -3419,14 +3419,76 @@ async function initializeServer() {
                 `🧪 Decrypted preview: ${decrypted.substring(0, 100)}...`
               );
 
-              res.json({
-                success: true,
-                message: "Decryption successful",
-                decryptedData: decrypted,
-                originalLength: body.length,
-                decryptedLength: decrypted.length,
-                extractedCid: cid,
-              });
+              // Controlla se i dati decrittati sono un data URL (es. data:image/jpeg;base64,...)
+              if (decrypted.startsWith("data:")) {
+                console.log(
+                  `📁 Detected data URL, extracting content type and data`
+                );
+
+                // Estrai il content type e i dati dal data URL
+                const matches = decrypted.match(/^data:([^;]+);base64,(.+)$/);
+                if (matches) {
+                  const contentType = matches[1];
+                  const base64Data = matches[2];
+
+                  console.log(`📁 Content type: ${contentType}`);
+                  console.log(`📁 Base64 data length: ${base64Data.length}`);
+
+                  // Decodifica il base64 e restituisci direttamente
+                  const buffer = Buffer.from(base64Data, "base64");
+
+                  res.setHeader("Content-Type", contentType);
+                  res.setHeader("Content-Length", buffer.length);
+                  res.setHeader("Cache-Control", "public, max-age=3600");
+                  res.send(buffer);
+                } else {
+                  // Fallback: restituisci come JSON se non riesci a parsare il data URL
+                  res.json({
+                    success: true,
+                    message:
+                      "Decryption successful but could not parse data URL",
+                    decryptedData: decrypted,
+                    originalLength: body.length,
+                    decryptedLength: decrypted.length,
+                    extractedCid: cid,
+                  });
+                }
+              } else {
+                // Se non è un data URL, potrebbe essere testo o altri dati
+                // Prova a determinare il content type basandosi sui primi byte
+                let contentType = "text/plain";
+
+                if (decrypted.startsWith("\xff\xd8\xff")) {
+                  contentType = "image/jpeg";
+                } else if (decrypted.startsWith("\x89PNG\r\n\x1a\n")) {
+                  contentType = "image/png";
+                } else if (
+                  decrypted.startsWith("GIF87a") ||
+                  decrypted.startsWith("GIF89a")
+                ) {
+                  contentType = "image/gif";
+                } else if (
+                  decrypted.startsWith("RIFF") &&
+                  decrypted.includes("WEBP")
+                ) {
+                  contentType = "image/webp";
+                } else if (decrypted.startsWith("PK")) {
+                  contentType = "application/zip";
+                } else if (
+                  decrypted.startsWith("{") ||
+                  decrypted.startsWith("[")
+                ) {
+                  contentType = "application/json";
+                }
+
+                console.log(`📁 Detected content type: ${contentType}`);
+
+                const buffer = Buffer.from(decrypted, "utf8");
+                res.setHeader("Content-Type", contentType);
+                res.setHeader("Content-Length", buffer.length);
+                res.setHeader("Cache-Control", "public, max-age=3600");
+                res.send(buffer);
+              }
             } else {
               console.log(
                 `🧪 Decryption returned null - token might be wrong or content not encrypted`
@@ -3504,6 +3566,142 @@ async function initializeServer() {
       });
     } catch (error) {
       console.error(`❌ Error handling IPFS content request: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        error: "Internal server error",
+        details: error.message,
+      });
+    }
+  });
+
+  // Endpoint alternativo che restituisce sempre JSON per la decrittazione
+  app.get("/ipfs-content-json/:cid", async (req, res) => {
+    const { cid } = req.params;
+    const { token } = req.query;
+
+    console.log(
+      `🔍 IPFS Content JSON Request - CID: ${cid}, Token: ${
+        token ? "present" : "missing"
+      }`
+    );
+
+    if (!cid) {
+      return res.status(400).json({
+        success: false,
+        error: "CID is required",
+      });
+    }
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        error: "Token is required for decryption",
+      });
+    }
+
+    try {
+      // Create request to local gateway
+      const requestOptions = {
+        hostname: new URL(IPFS_GATEWAY_URL).hostname,
+        port: new URL(IPFS_GATEWAY_URL).port,
+        path: `/ipfs/${cid}`,
+        method: "GET",
+      };
+
+      const ipfsReq = http.get(requestOptions, (ipfsRes) => {
+        console.log(`🔓 Attempting decryption for CID: ${cid}`);
+        let body = "";
+        ipfsRes.on("data", (chunk) => (body += chunk));
+        ipfsRes.on("end", async () => {
+          try {
+            console.log(`🧪 Received content length: ${body.length}`);
+            console.log(`🧪 Content preview: ${body.substring(0, 100)}...`);
+
+            const decrypted = await SEA.decrypt(body, token);
+
+            if (decrypted) {
+              console.log(`🧪 Decryption successful!`);
+              console.log(
+                `🧪 Decrypted preview: ${decrypted.substring(0, 100)}...`
+              );
+
+              res.json({
+                success: true,
+                message: "Decryption successful",
+                decryptedData: decrypted,
+                originalLength: body.length,
+                decryptedLength: decrypted.length,
+                extractedCid: cid,
+                contentType: decrypted.startsWith("data:")
+                  ? decrypted.match(/^data:([^;]+);/)?.[1] || "unknown"
+                  : "raw-data",
+              });
+            } else {
+              console.log(
+                `🧪 Decryption returned null - token might be wrong or content not encrypted`
+              );
+              res.json({
+                success: false,
+                error:
+                  "Decryption returned null - token might be wrong or content not encrypted",
+                contentPreview: body.substring(0, 100) + "...",
+                tokenLength: token.length,
+                tokenPreview: token.substring(0, 20) + "...",
+                extractedCid: cid,
+              });
+            }
+          } catch (e) {
+            console.error(`🧪 Decryption error:`, e);
+            res.json({
+              success: false,
+              error: "Decryption error",
+              details: e.message,
+              errorName: e.name,
+              contentPreview: body.substring(0, 100) + "...",
+              tokenLength: token.length,
+              tokenPreview: token.substring(0, 20) + "...",
+              extractedCid: cid,
+            });
+          }
+        });
+
+        ipfsReq.on("error", (err) => {
+          console.error(`❌ Error streaming IPFS content: ${err.message}`);
+          if (!res.headersSent) {
+            res.status(500).json({
+              success: false,
+              error: "Failed to stream IPFS content",
+              details: err.message,
+            });
+          }
+        });
+      });
+
+      ipfsReq.on("error", (err) => {
+        console.error(`❌ Error fetching from IPFS gateway: ${err.message}`);
+        if (!res.headersSent) {
+          res.status(502).json({
+            success: false,
+            error: "Failed to fetch from IPFS gateway",
+            details: err.message,
+          });
+        }
+      });
+
+      // Set a timeout
+      ipfsReq.setTimeout(30000, () => {
+        ipfsReq.destroy();
+        if (!res.headersSent) {
+          res.status(504).json({
+            success: false,
+            error: "Gateway timeout",
+          });
+        }
+      });
+    } catch (error) {
+      console.error(
+        `❌ Error handling IPFS content JSON request: ${error.message}`
+      );
       res.status(500).json({
         success: false,
         error: "Internal server error",
@@ -3713,7 +3911,7 @@ async function initializeServer() {
 
           timeoutId = setTimeout(() => {
             if (!dataReceived) {
-              resolve({ uploads: [], totalSizeMB: 0, error: "Timeout" });
+              resolve({ uploads: [], totalSizeMB: 0, error: null });
             }
           }, 10000);
 
@@ -3722,7 +3920,8 @@ async function initializeServer() {
             clearTimeout(timeoutId);
 
             if (!parentData || typeof parentData !== "object") {
-              resolve({ uploads: [], totalSizeMB: 0, error: "No data" });
+              // Nessun file caricato - non è un errore, restituisce 0 MB
+              resolve({ uploads: [], totalSizeMB: 0, error: null });
               return;
             }
 
