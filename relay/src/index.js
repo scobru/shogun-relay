@@ -586,91 +586,99 @@ async function initializeServer() {
         if (!req.file) {
           return res
             .status(400)
-            .json({ success: false, error: "No file provided" });
+            .json({ success: false, error: "Nessun file fornito" });
         }
 
-        // Ottieni l'address dall'header
         const userAddress = req.headers["x-user-address"];
         if (!userAddress) {
           return res.status(401).json({
             success: false,
-            error: "x-user-address header richiesto",
+            error: "Header 'x-user-address' richiesto",
           });
         }
 
-        console.log(`📤 Upload request for user: ${userAddress}`);
+        console.log(`📤 Richiesta di upload per utente: ${userAddress}`);
 
-        // Verifica se il file deve essere crittografato
         const shouldEncrypt = req.body.encrypt === "true";
         const encryptionKey = req.body.encryptionKey;
 
-        console.log(`🔒 Encryption requested: ${shouldEncrypt}`);
+        console.log(`🔒 Crittografia richiesta: ${shouldEncrypt}`);
         if (shouldEncrypt && !encryptionKey) {
           return res.status(400).json({
             success: false,
-            error: "Encryption key required when encryption is enabled",
+            error:
+              "Chiave di crittografia richiesta quando la crittografia è abilitata",
           });
         }
 
-        // Calcola la dimensione del file in MB
         const fileSizeMB = Math.ceil(req.file.size / (1024 * 1024));
 
-        // Verifica che il contratto sia disponibile
         if (!relayContract) {
           return res.status(500).json({
             success: false,
-            error: "Relay contract not available",
+            error: "Contratto Relay non disponibile",
           });
         }
 
-        // Verifica che l'utente abbia una sottoscrizione attiva
-        if (userAddress && relayContract) {
-          try {
-            // Ottieni il primo relay registrato per verificare la sottoscrizione
-            const allRelays = await relayContract.getAllRelays();
-            if (allRelays.length === 0) {
-              return res.status(500).json({
-                success: false,
-                error: "Nessun relay registrato nel contratto",
-              });
-            }
-            
-            const relayAddress = allRelays[0];
-            // Verifica la sottoscrizione usando isSubscriptionActive
-            const isSubscribed = await relayContract.isSubscriptionActive(
-              userAddress,
-              relayAddress
-            );
-            if (!isSubscribed) {
-              return res.status(403).json({
-                success: false,
-                error: "Utente non ha una sottoscrizione attiva",
-              });
-            }
-          } catch (e) {
-            console.error("Errore verifica sottoscrizione:", e);
+        let activeRelayAddress = null;
+        let mbAllocatedNum = 0; // Inizializza a 0
+
+        try {
+          // Ottieni tutti i relay registrati
+          const allRelays = await relayContract.getAllRelays();
+          if (allRelays.length === 0) {
             return res.status(500).json({
               success: false,
-              error: "Errore verifica sottoscrizione",
+              error: "Nessun relay registrato nel contratto",
             });
           }
+
+          let isSubscribed = false;
+          for (const rAddress of allRelays) {
+            const subscribed = await relayContract.isSubscriptionActive(
+              userAddress,
+              rAddress
+            );
+            if (subscribed) {
+              isSubscribed = true;
+              activeRelayAddress = rAddress;
+              break; // Trovata una sottoscrizione attiva, non serve controllare oltre
+            }
+          }
+
+          if (!isSubscribed) {
+            return res.status(403).json({
+              success: false,
+              error:
+                "Utente non ha una sottoscrizione attiva con nessun relay registrato",
+            });
+          }
+
+          // Ottieni i dettagli della sottoscrizione dal relay attivo trovato
+          const subscriptionDetails =
+            await relayContract.getSubscriptionDetails(
+              userAddress,
+              activeRelayAddress
+            );
+          const [, , , mbAllocated] = subscriptionDetails;
+          mbAllocatedNum = Number(mbAllocated); // Assegna alla variabile con scope esterno
+        } catch (e) {
+          console.error("Errore verifica sottoscrizione o dettagli:", e);
+          return res.status(500).json({
+            success: false,
+            error: "Errore verifica sottoscrizione o dettagli",
+            details: e.message,
+          });
         }
 
         // Ottieni i MB utilizzati off-chain
         const currentMBUsed = await getOffChainMBUsage(userAddress);
-        const subscriptionDetails =
-          await relayContract.getSubscriptionDetails(
-            userAddress,
-            relayAddress
-          );
-        const [, , , mbAllocated] = subscriptionDetails;
-        const mbAllocatedNum = Number(mbAllocated);
 
         // Verifica se ci sono MB sufficienti
         if (currentMBUsed + fileSizeMB > mbAllocatedNum) {
           return res.status(403).json({
             success: false,
-            error: "Insufficient MB for this file",
+            error: "MB insufficienti per questo file",
             details: {
               requiredMB: fileSizeMB,
               currentMBUsed: currentMBUsed,
@@ -682,144 +690,134 @@ async function initializeServer() {
         }
 
         console.log(
-          `✅ User ${userAddress} has sufficient MB (${fileSizeMB} MB required, ${currentMBUsed}/${mbAllocatedNum} MB used)`
+          `✅ L'utente ${userAddress} ha MB sufficienti (${fileSizeMB} MB richiesti, ${currentMBUsed}/${mbAllocatedNum} MB usati) tramite relay ${activeRelayAddress}`
         );
-      } catch (contractError) {
-        console.error(`❌ Contract verification error:`, contractError);
-        return res.status(500).json({
-          success: false,
-          error: "Error verifying subscription status",
-          details: contractError.message,
+
+        // Upload su IPFS
+        const formData = new FormData();
+        formData.append("file", req.file.buffer, {
+          filename: req.file.originalname,
+          contentType: req.file.mimetype,
         });
-      }
+        const requestOptions = {
+          hostname: "127.0.0.1",
+          port: 5001,
+          path: "/api/v0/add?wrap-with-directory=false",
+          method: "POST",
+          headers: {
+            ...formData.getHeaders(),
+          },
+        };
+        if (IPFS_API_TOKEN) {
+          requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+        }
 
-      // Upload su IPFS
-      const formData = new FormData();
-      formData.append("file", req.file.buffer, {
-        filename: req.file.originalname,
-        contentType: req.file.mimetype,
-      });
-      const requestOptions = {
-        hostname: "127.0.0.1",
-        port: 5001,
-        path: "/api/v0/add?wrap-with-directory=false",
-        method: "POST",
-        headers: {
-          ...formData.getHeaders(),
-        },
-      };
-      if (IPFS_API_TOKEN) {
-        requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
-      }
-
-      const ipfsReq = http.request(requestOptions, (ipfsRes) => {
-        let data = "";
-        ipfsRes.on("data", (chunk) => (data += chunk));
-        ipfsRes.on("end", async () => {
-          try {
-            const lines = data.trim().split("\n");
-            const results = lines.map((line) => JSON.parse(line));
-            const fileResult =
-              results.find((r) => r.Name === req.file.originalname) ||
-              results[0];
-
-            // Prepara i dati dell'upload
-            const originalFileName = shouldEncrypt
-              ? req.file.originalname.replace(".enc", "")
-              : req.file.originalname;
-
-            const uploadData = {
-              hash: fileResult?.Hash,
-              name: req.file.originalname, // Mantieni il nome con .enc se crittografato
-              originalName: originalFileName, // Nome originale senza .enc
-              size: req.file.size,
-              sizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
-              mimetype: req.file.mimetype,
-              uploadedAt: Date.now(),
-              userAddress: userAddress,
-              encrypted: shouldEncrypt,
-              encryptionKey: shouldEncrypt ? encryptionKey : null,
-              ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
-                fileResult?.Hash
-              }`,
-              gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
-              publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
-            };
-
-            // Salva nel database Gun e aggiorna MB in modo sincrono
+        const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+          let data = "";
+          ipfsRes.on("data", (chunk) => (data += chunk));
+          ipfsRes.on("end", async () => {
             try {
-              await saveUploadAndUpdateMB(
-                userAddress,
-                fileResult?.Hash,
-                uploadData,
-                fileSizeMB
-              );
+              const lines = data.trim().split("\n");
+              const results = lines.map((line) => JSON.parse(line));
+              const fileResult =
+                results.find((r) => r.Name === req.file.originalname) ||
+                results[0];
 
-              // Risposta di successo
-              res.json({
-                success: true,
-                file: {
-                  hash: fileResult?.Hash,
-                  name: req.file.originalname,
-                  originalName: originalFileName,
-                  size: req.file.size,
-                  mimetype: req.file.mimetype,
-                  encrypted: shouldEncrypt,
-                  ipfsUrl: `${req.protocol}://${req.get(
-                    "host"
-                  )}/ipfs-content/${fileResult?.Hash}`,
-                  gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
-                  publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
-                },
-                user: {
-                  address: userAddress,
-                },
-                mbUsage: {
-                  actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
-                  sizeMB: fileSizeMB,
-                  verified: true,
-                },
-                encryption: {
-                  enabled: shouldEncrypt,
-                  method: shouldEncrypt
-                    ? "wallet-signature-deterministic"
-                    : "none",
-                },
-                ipfsResponse: results,
-              });
-            } catch (saveError) {
-              console.error("Error saving upload:", saveError);
+              const originalFileName = shouldEncrypt
+                ? req.file.originalname.replace(".enc", "")
+                : req.file.originalname;
+
+              const uploadData = {
+                hash: fileResult?.Hash,
+                name: req.file.originalname,
+                originalName: originalFileName,
+                size: req.file.size,
+                sizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                mimetype: req.file.mimetype,
+                uploadedAt: Date.now(),
+                userAddress: userAddress,
+                encrypted: shouldEncrypt,
+                encryptionKey: shouldEncrypt ? encryptionKey : null,
+                ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
+                  fileResult?.Hash
+                }`,
+                gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
+                publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
+              };
+
+              try {
+                await saveUploadAndUpdateMB(
+                  userAddress,
+                  fileResult?.Hash,
+                  uploadData,
+                  fileSizeMB
+                );
+
+                res.json({
+                  success: true,
+                  file: {
+                    hash: fileResult?.Hash,
+                    name: req.file.originalname,
+                    originalName: originalFileName,
+                    size: req.file.size,
+                    mimetype: req.file.mimetype,
+                    encrypted: shouldEncrypt,
+                    ipfsUrl: `${req.protocol}://${req.get(
+                      "host"
+                    )}/ipfs-content/${fileResult?.Hash}`,
+                    gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
+                    publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
+                  },
+                  user: {
+                    address: userAddress,
+                  },
+                  mbUsage: {
+                    actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                    sizeMB: fileSizeMB,
+                    verified: true,
+                  },
+                  encryption: {
+                    enabled: shouldEncrypt,
+                    method: shouldEncrypt
+                      ? "wallet-signature-deterministic"
+                      : "none",
+                  },
+                  ipfsResponse: results,
+                });
+              } catch (saveError) {
+                console.error("Errore salvataggio upload:", saveError);
+                res.status(500).json({
+                  success: false,
+                  error: "Errore salvataggio dati upload",
+                  details: saveError.message,
+                });
+              }
+            } catch (parseError) {
               res.status(500).json({
                 success: false,
-                error: "Error saving upload data",
-                details: saveError.message,
+                error: "Impossibile parsare la risposta IPFS",
+                rawResponse: data,
               });
             }
-          } catch (parseError) {
-            res.status(500).json({
-              success: false,
-              error: "Failed to parse IPFS response",
-              rawResponse: data,
-            });
+          });
+        });
+        ipfsReq.on("error", (err) => {
+          res.status(500).json({ success: false, error: err.message });
+        });
+        ipfsReq.setTimeout(30000, () => {
+          ipfsReq.destroy();
+          if (!res.headersSent) {
+            res.status(408).json({ success: false, error: "Timeout upload" });
           }
         });
-      });
-      ipfsReq.on("error", (err) => {
-        res.status(500).json({ success: false, error: err.message });
-      });
-      ipfsReq.setTimeout(30000, () => {
-        ipfsReq.destroy();
-        if (!res.headersSent) {
-          res.status(408).json({ success: false, error: "Upload timeout" });
-        }
-      });
 
-      formData.pipe(ipfsReq);
-    } catch (error) {
-      console.error("Upload error:", error);
-      res.status(500).json({ success: false, error: error.message });
+        formData.pipe(ipfsReq);
+      } catch (error) {
+        console.error("Errore upload:", error);
+        res.status(500).json({ success: false, error: error.message });
+      }
     }
-  });
+  );
 
   // Funzione helper per ottenere i MB utilizzati off-chain calcolandoli in tempo reale dai file
   async function getOffChainMBUsage(userAddress) {
@@ -917,10 +915,7 @@ async function initializeServer() {
 
             mbUsageNode.put(updatedUsage, (ack) => {
               if (ack.err) {
-                console.error(
-                  "Error updating recalculated MB usage:",
-                  ack.err
-                );
+                console.error("Error updating recalculated MB usage:", ack.err);
               } else {
                 console.log(
                   `✅ Updated off-chain MB usage with recalculated value: ${calculatedMbUsed} MB`
@@ -949,55 +944,69 @@ async function initializeServer() {
   async function getCurrentRelayAddress() {
     try {
       if (!relayContract) {
-        console.error('Relay contract not initialized');
+        console.error("Relay contract not initialized");
         return null;
       }
 
       // Ottieni l'URL corrente del server
-      const serverURL = process.env.SERVER_URL || 'http://localhost:3000';
-      const relayURL = serverURL + '/gun';
-      console.log('🔍 Looking for relay with URL:', relayURL);
+      const serverURL = process.env.SERVER_URL || "http://localhost:3000";
+      const relayURL = serverURL + "/gun";
+      console.log("🔍 Looking for relay with URL:", relayURL);
 
       // Prova prima a trovare il relay specifico per questo URL
       try {
-        const specificRelayAddress = await relayContract.findRelayByURL(relayURL);
-        if (specificRelayAddress && specificRelayAddress !== '0x0000000000000000000000000000000000000000') {
-          console.log('✅ Found specific relay for this URL:', specificRelayAddress);
+        const specificRelayAddress = await relayContract.findRelayByURL(
+          relayURL
+        );
+        if (
+          specificRelayAddress &&
+          specificRelayAddress !== "0x0000000000000000000000000000000000000000"
+        ) {
+          console.log(
+            "✅ Found specific relay for this URL:",
+            specificRelayAddress
+          );
           return specificRelayAddress;
         }
       } catch (error) {
-        console.log('⚠️ Could not find specific relay by URL, trying fallback...');
+        console.log(
+          "⚠️ Could not find specific relay by URL, trying fallback..."
+        );
       }
 
       // Fallback: ottieni tutti i relay e usa il primo
-      console.log('🔄 Using fallback: getting all relays');
+      console.log("🔄 Using fallback: getting all relays");
       const allRelays = await relayContract.getAllRelays();
-      console.log('getAllRelays() result:', allRelays);
+      console.log("getAllRelays() result:", allRelays);
 
       if (allRelays.length > 0) {
         const fallbackRelayAddress = allRelays[0];
-        console.log('📋 Using first available relay:', fallbackRelayAddress);
-        
+        console.log("📋 Using first available relay:", fallbackRelayAddress);
+
         // Ottieni i dettagli del relay per logging
         try {
-          const relayDetails = await relayContract.getRelayDetails(fallbackRelayAddress);
-          console.log('📊 Relay details:', relayDetails);
-          
+          const relayDetails = await relayContract.getRelayDetails(
+            fallbackRelayAddress
+          );
+          console.log("📊 Relay details:", relayDetails);
+
           // Log un avviso se non è il relay specifico
           if (relayDetails.url !== relayURL) {
-            console.warn(`⚠️ Using relay: ${relayDetails.url} (not the current relay)`);
+            console.warn(
+              `⚠️ Using relay: ${relayDetails.url} (not the current relay)`
+            );
           }
         } catch (detailsError) {
-          console.log('Could not get relay details:', detailsError);
+          console.log("Could not get relay details:", detailsError);
         }
-        
+
         return fallbackRelayAddress;
       } else {
-        console.warn('No relay registered in the contract');
+        console.warn("No relay registered in the contract");
         return null;
       }
     } catch (error) {
-      console.error('Failed to get current relay address:', error);
+      console.error("Failed to get current relay address:", error);
       return null;
     }
   }
@@ -4862,10 +4871,7 @@ async function initializeServer() {
 
             mbUsageNode.put(updatedUsage, (ack) => {
               if (ack.err) {
-                console.error(
-                  "Error updating recalculated MB usage:",
-                  ack.err
-                );
+                console.error("Error updating recalculated MB usage:", ack.err);
               } else {
                 console.log(
                   `✅ Updated off-chain MB usage with recalculated value: ${calculatedMbUsed} MB`
@@ -4894,55 +4900,69 @@ async function initializeServer() {
   async function getCurrentRelayAddress() {
     try {
       if (!relayContract) {
-        console.error('Relay contract not initialized');
+        console.error("Relay contract not initialized");
         return null;
       }
 
       // Ottieni l'URL corrente del server
-      const serverURL = process.env.SERVER_URL || 'http://localhost:3000';
-      const relayURL = serverURL + '/gun';
-      console.log('🔍 Looking for relay with URL:', relayURL);
+      const serverURL = process.env.SERVER_URL || "http://localhost:3000";
+      const relayURL = serverURL + "/gun";
+      console.log("🔍 Looking for relay with URL:", relayURL);
 
       // Prova prima a trovare il relay specifico per questo URL
       try {
-        const specificRelayAddress = await relayContract.findRelayByURL(relayURL);
-        if (specificRelayAddress && specificRelayAddress !== '0x0000000000000000000000000000000000000000') {
-          console.log('✅ Found specific relay for this URL:', specificRelayAddress);
+        const specificRelayAddress = await relayContract.findRelayByURL(
+          relayURL
+        );
+        if (
+          specificRelayAddress &&
+          specificRelayAddress !== "0x0000000000000000000000000000000000000000"
+        ) {
+          console.log(
+            "✅ Found specific relay for this URL:",
+            specificRelayAddress
+          );
           return specificRelayAddress;
         }
       } catch (error) {
-        console.log('⚠️ Could not find specific relay by URL, trying fallback...');
+        console.log(
+          "⚠️ Could not find specific relay by URL, trying fallback..."
+        );
       }
 
       // Fallback: ottieni tutti i relay e usa il primo
-      console.log('🔄 Using fallback: getting all relays');
+      console.log("🔄 Using fallback: getting all relays");
       const allRelays = await relayContract.getAllRelays();
-      console.log('getAllRelays() result:', allRelays);
+      console.log("getAllRelays() result:", allRelays);
 
       if (allRelays.length > 0) {
         const fallbackRelayAddress = allRelays[0];
-        console.log('📋 Using first available relay:', fallbackRelayAddress);
-        
+        console.log("📋 Using first available relay:", fallbackRelayAddress);
+
         // Ottieni i dettagli del relay per logging
         try {
-          const relayDetails = await relayContract.getRelayDetails(fallbackRelayAddress);
-          console.log('📊 Relay details:', relayDetails);
-          
+          const relayDetails = await relayContract.getRelayDetails(
+            fallbackRelayAddress
+          );
+          console.log("📊 Relay details:", relayDetails);
+
           // Log un avviso se non è il relay specifico
           if (relayDetails.url !== relayURL) {
-            console.warn(`⚠️ Using relay: ${relayDetails.url} (not the current relay)`);
+            console.warn(
+              `⚠️ Using relay: ${relayDetails.url} (not the current relay)`
+            );
           }
         } catch (detailsError) {
-          console.log('Could not get relay details:', detailsError);
+          console.log("Could not get relay details:", detailsError);
         }
-        
+
         return fallbackRelayAddress;
       } else {
-        console.warn('No relay registered in the contract');
+        console.warn("No relay registered in the contract");
         return null;
       }
     } catch (error) {
-      console.error('Failed to get current relay address:', error);
+      console.error("Failed to get current relay address:", error);
       return null;
     }
   }
