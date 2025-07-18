@@ -27,7 +27,7 @@ services:
       - RELAY_PATH=public
       - RELAY_QR=true
       - RELAY_NAME=OP1
-      - RELAY_PEERS=wss://127.0.0.1:8765/gun
+      - RELAY_PEERS=wss://ruling-mastodon-improved.ngrok-free.app/gun
       - RELAY_PROTECTED=true
       - ALCHEMY_API_KEY=yjhjIoJ3o_at8ALT7nCJtFtjdqFpiBdx
       - RELAY_CONTRACT_ADDRESS=0x2597d38d0b968998cda2cF13b056E581806994e6
