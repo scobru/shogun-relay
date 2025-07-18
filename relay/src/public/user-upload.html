@@ -34,57 +34,34 @@
             @apply font-mono text-sm bg-base-300 p-3 rounded border break-all;
         }
 
-        /* Stili migliorati per il badge Encrypted */
+        /* Stili migliorati per i badge - design elegante e minimalista */
         .encrypted-badge {
-            @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300 transform hover:scale-105;
-            background: linear-gradient(135deg, #ff6b9d 0%, #c44569 100%);
+            @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all duration-200;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             color: white;
-            box-shadow: 0 2px 8px rgba(255, 107, 157, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            animation: badgeGlow 2s ease-in-out infinite alternate;
+            box-shadow: 0 1px 3px rgba(16, 185, 129, 0.2);
+            border: 1px solid rgba(16, 185, 129, 0.3);
         }
 
         .encrypted-badge:hover {
-            box-shadow: 0 4px 12px rgba(255, 107, 157, 0.4);
+            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
             transform: translateY(-1px);
         }
 
         .encrypted-badge .lock-icon {
-            animation: lockPulse 1.5s ease-in-out infinite;
-        }
-
-        @keyframes badgeGlow {
-            0% {
-                box-shadow: 0 2px 8px rgba(255, 107, 157, 0.3);
-            }
-
-            100% {
-                box-shadow: 0 2px 12px rgba(255, 107, 157, 0.5);
-            }
-        }
-
-        @keyframes lockPulse {
-
-            0%,
-            100% {
-                transform: scale(1);
-            }
-
-            50% {
-                transform: scale(1.1);
-            }
+            opacity: 0.9;
         }
 
         .plain-badge {
-            @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300;
-            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all duration-200;
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
             color: white;
-            box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 1px 3px rgba(107, 114, 128, 0.2);
+            border: 1px solid rgba(107, 114, 128, 0.3);
         }
 
         .plain-badge:hover {
-            box-shadow: 0 4px 12px rgba(108, 117, 125, 0.4);
+            box-shadow: 0 2px 6px rgba(107, 114, 128, 0.3);
             transform: translateY(-1px);
         }
     </style>
@@ -917,7 +894,7 @@
                         <div class="flex-1">
                             <div class="flex items-center gap-2 mb-1">
                                 <h4 class="font-semibold">${displayName}</h4>
-                                ${isEncrypted ? '<span class="encrypted-badge"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></svg> Encrypted</span>' : '<span class="plain-badge">Plain</span>'}
+                                ${isEncrypted ? '<span class="encrypted-badge"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></svg> 🔒</span>' : '<span class="plain-badge">📄</span>'}
                             </div>
                             <p class="text-sm text-base-content/60">
                                 ${file.sizeMB} MB • ${new Date(file.uploadedAt).toLocaleString()}
@@ -1013,6 +990,7 @@
                 const response = await fetch(`/api/user-uploads/${encodeURIComponent(walletAddress)}/${hash}`, {
                     method: 'DELETE',
                     headers: {
+                        'x-user-address': walletAddress,
                         'x-wallet-signature': authSignature,
                         'x-signature-message': 'I Love Shogun'
                     }
