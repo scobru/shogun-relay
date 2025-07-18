@@ -246,10 +246,22 @@
 
 
         // Event listeners
-        uploadBtn.addEventListener('click', uploadFile);
-        refreshFilesBtn.addEventListener('click', loadUserFiles);
-        connectWalletBtn.addEventListener('click', connectWallet);
-        refreshSubscriptionBtn.addEventListener('click', () => checkSubscriptionStatus(walletAddress));
+        uploadBtn.addEventListener('click', () => {
+            console.log('🖱️ user-upload: Upload button clicked');
+            uploadFile();
+        });
+        refreshFilesBtn.addEventListener('click', () => {
+            console.log('🖱️ user-upload: Refresh button clicked');
+            loadUserFiles();
+        });
+        connectWalletBtn.addEventListener('click', () => {
+            console.log('🖱️ user-upload: Connect wallet button clicked');
+            connectWallet();
+        });
+        refreshSubscriptionBtn.addEventListener('click', () => {
+            console.log('🖱️ user-upload: Refresh subscription button clicked');
+            checkSubscriptionStatus(walletAddress);
+        });
 
 
         // Drag and drop functionality

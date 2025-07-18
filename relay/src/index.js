@@ -853,6 +853,14 @@ async function initializeServer() {
           `📋 Uploads è null/undefined:`,
           uploads === null || uploads === undefined
         );
+        console.log(
+          `📋 Uploads è un oggetto:`,
+          uploads && typeof uploads === "object"
+        );
+        console.log(
+          `📋 Uploads ha proprietà:`,
+          uploads ? Object.keys(uploads) : "N/A"
+        );
 
         if (!uploads) {
           console.log(`❌ Nessun upload trovato per: ${identifier}`);
@@ -878,7 +886,7 @@ async function initializeServer() {
           `✅ Trovati ${uploadsArray.length} upload per: ${identifier}`
         );
 
-        res.json({
+        const response = {
           success: true,
           uploads: uploadsArray,
           identifier,
@@ -887,7 +895,10 @@ async function initializeServer() {
             (sum, upload) => sum + (upload.sizeMB || 0),
             0
           ),
-        });
+        };
+
+        console.log(`📋 Response finale:`, response);
+        res.json(response);
       });
     } catch (error) {
       console.error(`💥 Errore caricamento upload per ${identifier}:`, error);
