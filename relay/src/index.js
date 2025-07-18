@@ -824,6 +824,95 @@ async function initializeServer() {
     });
   }
 
+  // Funzione helper per eliminare upload e aggiornare MB in modo sincrono (solo off-chain)
+  async function deleteUploadAndUpdateMB(userAddress, fileHash, fileSizeMB) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        console.log(
+          `🗑️ Deleting upload and updating MB for user: ${userAddress}, file: ${fileHash}`
+        );
+
+        // 1. Elimina l'upload dal database Gun
+        const uploadNode = gun
+          .get("shogun")
+          .get("uploads")
+          .get(userAddress)
+          .get(fileHash);
+
+        const deletePromise = new Promise((deleteResolve, deleteReject) => {
+          const timeoutId = setTimeout(() => {
+            deleteReject(new Error("Upload delete timeout"));
+          }, 15000); // 15 secondi
+
+          uploadNode.put(null, (ack) => {
+            clearTimeout(timeoutId);
+            if (ack.err) {
+              deleteReject(new Error(`Upload delete error: ${ack.err}`));
+            } else {
+              console.log(`✅ Upload deleted successfully`);
+              deleteResolve();
+            }
+          });
+        });
+
+        await deletePromise;
+
+        // 2. Aggiorna i MB utilizzati off-chain (sottrai i MB del file eliminato)
+        const mbUsageNode = gun.get("shogun").get("mb_usage").get(userAddress);
+
+        // Ottieni l'uso MB corrente con timeout esteso
+        const currentUsage = await new Promise((resolve) => {
+          const timeoutId = setTimeout(() => {
+            console.warn(`⚠️ MB usage read timeout, using 0 as default`);
+            resolve({ mbUsed: 0, lastUpdated: Date.now() });
+          }, 10000); // 10 secondi
+
+          mbUsageNode.once((data) => {
+            clearTimeout(timeoutId);
+            resolve(data || { mbUsed: 0, lastUpdated: Date.now() });
+          });
+        });
+
+        // Calcola il nuovo uso MB (non può essere negativo)
+        const newMBUsed = Math.max(0, currentUsage.mbUsed - fileSizeMB);
+
+        // Aggiorna l'uso MB
+        const updatedUsage = {
+          mbUsed: newMBUsed,
+          lastUpdated: Date.now(),
+          updatedBy: "delete-endpoint",
+          fileCount: Math.max(0, (currentUsage.fileCount || 0) - 1),
+        };
+
+        // Salva l'aggiornamento MB con timeout esteso
+        const mbUpdatePromise = new Promise((mbResolve, mbReject) => {
+          const timeoutId = setTimeout(() => {
+            mbReject(new Error("MB update timeout"));
+          }, 15000); // 15 secondi
+
+          mbUsageNode.put(updatedUsage, (ack) => {
+            clearTimeout(timeoutId);
+            if (ack.err) {
+              mbReject(new Error(`MB update error: ${ack.err}`));
+            } else {
+              console.log(
+                `✅ MB usage updated off-chain: ${currentUsage.mbUsed} - ${fileSizeMB} = ${updatedUsage.mbUsed} MB`
+              );
+              mbResolve();
+            }
+          });
+        });
+
+        await mbUpdatePromise;
+
+        resolve();
+      } catch (error) {
+        console.error("Error in deleteUploadAndUpdateMB:", error);
+        reject(error);
+      }
+    });
+  }
+
   // Endpoint per recuperare gli upload di un utente
   app.get("/api/user-uploads/:identifier", async (req, res) => {
     try {
@@ -956,21 +1045,58 @@ async function initializeServer() {
           .json({ success: false, error: "Identificatore e hash richiesti" });
       }
 
-      // Elimina l'upload dal database Gun
+      console.log(`🗑️ Delete request for user: ${identifier}, file: ${hash}`);
+
+      // 1. Prima recupera i dati del file per ottenere la dimensione
       const uploadNode = gun
         .get("shogun")
         .get("uploads")
         .get(identifier)
         .get(hash);
-      uploadNode.put(null);
+
+      const fileData = await new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          reject(new Error("File data read timeout"));
+        }, 10000);
+
+        uploadNode.once((data) => {
+          clearTimeout(timeoutId);
+          if (!data) {
+            reject(new Error("File not found"));
+          } else {
+            resolve(data);
+          }
+        });
+      });
+
+      // 2. Calcola la dimensione in MB del file
+      const fileSizeMB = Math.ceil(fileData.size / (1024 * 1024));
+      console.log(`📊 File size: ${fileData.size} bytes (${fileSizeMB} MB)`);
+
+      // 3. Elimina il file e aggiorna i MB utilizzati
+      await deleteUploadAndUpdateMB(identifier, hash, fileSizeMB);
+
+      // 4. Ottieni il nuovo utilizzo MB per la risposta
+      const newMBUsed = await getOffChainMBUsage(identifier);
 
       res.json({
         success: true,
         message: "Upload eliminato con successo",
         identifier,
         hash,
+        deletedFile: {
+          name: fileData.name,
+          size: fileData.size,
+          sizeMB: fileData.sizeMB,
+        },
+        mbUsage: {
+          previousMB: newMBUsed + fileSizeMB,
+          currentMB: newMBUsed,
+          freedMB: fileSizeMB,
+        },
       });
     } catch (error) {
+      console.error("Delete error:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -4178,6 +4304,201 @@ async function initializeServer() {
     }
   });
 
+  // Endpoint per verificare l'utilizzo MB di un utente
+  app.get("/api/user-mb-usage/:identifier", async (req, res) => {
+    try {
+      const { identifier } = req.params;
+      if (!identifier) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Identificatore richiesto" });
+      }
+
+      console.log(`📊 MB usage request for user: ${identifier}`);
+
+      // Ottieni l'utilizzo MB corrente
+      const currentMBUsed = await getOffChainMBUsage(identifier);
+
+      // Se l'utente ha un contratto, ottieni anche i dettagli della sottoscrizione
+      let subscriptionDetails = null;
+      if (relayContract) {
+        try {
+          const allRelays = await relayContract.getAllRelays();
+          if (allRelays.length > 0) {
+            const relayAddress = allRelays[0];
+            const isSubscribed = await relayContract.isSubscriptionActive(
+              identifier,
+              relayAddress
+            );
+
+            if (isSubscribed) {
+              const details = await relayContract.getSubscriptionDetails(
+                identifier,
+                relayAddress
+              );
+              const [, , , mbAllocated] = details;
+              subscriptionDetails = {
+                isActive: true,
+                mbAllocated: Number(mbAllocated),
+                mbRemaining: Number(mbAllocated) - currentMBUsed,
+                relayAddress,
+              };
+            } else {
+              subscriptionDetails = {
+                isActive: false,
+                mbAllocated: 0,
+                mbRemaining: 0,
+                relayAddress,
+              };
+            }
+          }
+        } catch (contractError) {
+          console.warn(
+            `⚠️ Contract error for ${identifier}:`,
+            contractError.message
+          );
+          subscriptionDetails = {
+            isActive: false,
+            error: contractError.message,
+          };
+        }
+      }
+
+      res.json({
+        success: true,
+        user: {
+          identifier,
+        },
+        mbUsage: {
+          currentMB: currentMBUsed,
+          lastUpdated: Date.now(),
+        },
+        subscription: subscriptionDetails,
+      });
+    } catch (error) {
+      console.error("MB usage check error:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Endpoint di debug per verificare il contenuto Gun di un utente
+  app.get("/api/debug/user-uploads/:identifier", async (req, res) => {
+    try {
+      const { identifier } = req.params;
+      if (!identifier) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Identificatore richiesto" });
+      }
+
+      console.log(`🔍 Debug: Caricando contenuto Gun per: ${identifier}`);
+
+      const uploadsNode = gun.get("shogun").get("uploads").get(identifier);
+
+      // Usa una Promise per gestire l'asincronia di Gun
+      const getDebugData = () => {
+        return new Promise((resolve, reject) => {
+          let timeoutId;
+          let dataReceived = false;
+
+          // Timeout di 20 secondi per debug
+          timeoutId = setTimeout(() => {
+            if (!dataReceived) {
+              console.log(`⏰ Debug timeout per ${identifier}`);
+              resolve({ rawData: null, detailedData: {}, error: "Timeout" });
+            }
+          }, 20000);
+
+          // Listener per i dati del nodo padre
+          uploadsNode.once((parentData) => {
+            dataReceived = true;
+            clearTimeout(timeoutId);
+
+            console.log(`🔍 Debug parent data:`, parentData);
+            console.log(`🔍 Debug parent data type:`, typeof parentData);
+            console.log(
+              `🔍 Debug parent data keys:`,
+              parentData ? Object.keys(parentData) : "N/A"
+            );
+
+            if (!parentData || typeof parentData !== "object") {
+              console.log(`🔍 Debug: No parent data for ${identifier}`);
+              resolve({
+                rawData: parentData,
+                detailedData: {},
+                error: "No parent data",
+              });
+              return;
+            }
+
+            // Ottieni tutte le chiavi (escludendo i metadati Gun)
+            const hashKeys = Object.keys(parentData).filter(
+              (key) => key !== "_"
+            );
+            console.log(
+              `🔍 Debug: Found ${hashKeys.length} hash keys:`,
+              hashKeys
+            );
+
+            // Leggi ogni hash individualmente per il debug dettagliato
+            let detailedData = {};
+            let completedReads = 0;
+            const totalReads = hashKeys.length;
+
+            if (totalReads === 0) {
+              console.log(`🔍 Debug: No hash keys found`);
+              resolve({
+                rawData: parentData,
+                detailedData: {},
+                error: "No hash keys",
+              });
+              return;
+            }
+
+            hashKeys.forEach((hash) => {
+              console.log(`🔍 Debug: Reading hash ${hash}`);
+              uploadsNode.get(hash).once((hashData) => {
+                completedReads++;
+                console.log(`🔍 Debug: Hash ${hash} data:`, hashData);
+                detailedData[hash] = hashData;
+
+                // Se abbiamo letto tutti gli hash, risolvi
+                if (completedReads === totalReads) {
+                  console.log(
+                    `🔍 Debug: All hashes read, detailed data:`,
+                    detailedData
+                  );
+                  resolve({ rawData: parentData, detailedData, error: null });
+                }
+              });
+            });
+          });
+        });
+      };
+
+      const { rawData, detailedData, error } = await getDebugData();
+
+      const response = {
+        success: true,
+        identifier,
+        debug: {
+          rawData,
+          detailedData,
+          dataType: typeof rawData,
+          dataKeys: rawData ? Object.keys(rawData) : [],
+          error,
+          timestamp: Date.now(),
+        },
+      };
+
+      console.log(`🔍 Debug response:`, response);
+      res.json(response);
+    } catch (error) {
+      console.error(`💥 Debug error per ${identifier}:`, error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Fallback to index.html
   app.get("/*", (req, res) => {
     if (fs.existsSync(indexPath)) {
@@ -4244,6 +4565,78 @@ async function initializeServer() {
 
   process.on("SIGTERM", async () => {
     await shutdown();
+  });
+
+  // Endpoint per resettare l'utilizzo MB di un utente (solo per debug/admin)
+  app.post("/api/user-mb-usage/:identifier/reset", async (req, res) => {
+    try {
+      const { identifier } = req.params;
+      if (!identifier) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Identificatore richiesto" });
+      }
+
+      console.log(`🔄 MB usage reset request for user: ${identifier}`);
+
+      // Verifica che sia una richiesta admin (puoi aggiungere autenticazione se necessario)
+      const adminToken = req.headers.authorization?.replace("Bearer ", "");
+      if (!adminToken || adminToken !== process.env.ADMIN_TOKEN) {
+        return res.status(401).json({
+          success: false,
+          error: "Admin token required for MB reset",
+        });
+      }
+
+      // Ottieni l'utilizzo MB corrente prima del reset
+      const previousMBUsed = await getOffChainMBUsage(identifier);
+
+      // Reset dell'utilizzo MB
+      const mbUsageNode = gun.get("shogun").get("mb_usage").get(identifier);
+
+      const resetPromise = new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          reject(new Error("MB reset timeout"));
+        }, 15000);
+
+        const resetData = {
+          mbUsed: 0,
+          lastUpdated: Date.now(),
+          updatedBy: "admin-reset",
+          fileCount: 0,
+          resetAt: Date.now(),
+          previousMB: previousMBUsed,
+        };
+
+        mbUsageNode.put(resetData, (ack) => {
+          clearTimeout(timeoutId);
+          if (ack.err) {
+            reject(new Error(`MB reset error: ${ack.err}`));
+          } else {
+            console.log(`✅ MB usage reset for user: ${identifier}`);
+            resolve();
+          }
+        });
+      });
+
+      await resetPromise;
+
+      res.json({
+        success: true,
+        message: "MB usage reset successfully",
+        user: {
+          identifier,
+        },
+        reset: {
+          previousMB: previousMBUsed,
+          currentMB: 0,
+          resetAt: Date.now(),
+        },
+      });
+    } catch (error) {
+      console.error("MB reset error:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
   });
 
   return {
