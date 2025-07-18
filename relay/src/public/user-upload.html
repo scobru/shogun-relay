@@ -34,6 +34,9 @@
             @apply font-mono text-sm bg-base-300 p-3 rounded border break-all;
         }
     </style>
+    <!-- Include Gun and SEA for encryption -->
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
 </head>
 
 <body class="antialiased">
@@ -164,6 +167,16 @@
                                 <input type="file" id="fileInput" class="hidden" />
                             </div>
 
+                            <div class="form-control mb-4">
+                                <label class="label cursor-pointer justify-start gap-3">
+                                    <input type="checkbox" id="encryptCheck" class="checkbox checkbox-accent" />
+                                    <span class="label-text">🔒 Encrypt file with wallet signature</span>
+                                </label>
+                                <div class="label-text-alt text-base-content/60 mt-1">
+                                    Files will be encrypted with a deterministic key derived from your wallet signature
+                                </div>
+                            </div>
+
                             <div class="upload-progress hidden" id="uploadProgress">
                                 <div class="progress-bar" id="progressBar">0%</div>
                             </div>
@@ -261,6 +274,7 @@
         const subscriptionStatusEl = document.getElementById('subscriptionStatus');
         const subscriptionDetailsEl = document.getElementById('subscriptionDetails');
         const refreshSubscriptionBtn = document.getElementById('refreshSubscriptionBtn');
+        const encryptCheck = document.getElementById('encryptCheck');
 
 
         // Event listeners
@@ -279,6 +293,11 @@
         refreshSubscriptionBtn.addEventListener('click', () => {
             console.log('🖱️ user-upload: Refresh subscription button clicked');
             checkSubscriptionStatus(walletAddress);
+        });
+        encryptCheck.addEventListener('change', (e) => {
+            console.log('🔒 user-upload: Encrypt checkbox changed:', e.target.checked);
+            // This checkbox is for user-facing, so we don't need to store its state globally
+            // The actual encryption logic will be handled on the backend or client-side
         });
 
 
@@ -504,13 +523,76 @@
                     type: file.type
                 });
                 console.log('📤 user-upload: Wallet address:', walletAddress);
+                console.log('🔒 user-upload: Encryption enabled:', encryptCheck.checked);
 
                 uploadBtn.disabled = true;
                 uploadBtn.textContent = 'Uploading...';
                 uploadProgress.classList.remove('hidden');
 
+                let fileToUpload = file;
+                let encryptionKey = null;
+
+                // Se la crittografia è abilitata, genera la chiave dalla firma MetaMask
+                if (encryptCheck.checked) {
+                    try {
+                        progressBar.style.width = "25%";
+                        progressBar.textContent = "Signing with MetaMask...";
+
+                        // Genera un messaggio unico per la firma
+                        const timestamp = Date.now();
+                        const message = `Shogun File Encryption\nWallet: ${walletAddress}\nTimestamp: ${timestamp}\nFile: ${file.name}`;
+
+                        console.log('🔐 user-upload: Requesting signature for message:', message);
+
+                        // Richiedi la firma a MetaMask
+                        const signature = await ethereum.request({
+                            method: 'personal_sign',
+                            params: [message, walletAddress]
+                        });
+
+                        console.log('🔐 user-upload: Signature received:', signature.substring(0, 20) + '...');
+
+                        // Genera una chiave deterministica dalla firma
+                        encryptionKey = await generateDeterministicKey(signature, walletAddress, file.name);
+                        console.log('🔐 user-upload: Encryption key generated');
+
+                        progressBar.style.width = "50%";
+                        progressBar.textContent = "Encrypting file...";
+
+                        // Converti il file in base64
+                        const base64data = await new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = (e) => resolve(e.target.result);
+                            reader.onerror = (err) => reject(err);
+                            reader.readAsDataURL(file);
+                        });
+
+                        // Cripta il file
+                        const encryptedData = await SEA.encrypt(base64data, encryptionKey);
+                        fileToUpload = new File([encryptedData], file.name + ".enc", {
+                            type: "text/plain",
+                        });
+
+                        console.log('🔐 user-upload: File encrypted successfully');
+                        progressBar.style.width = "75%";
+                        progressBar.textContent = "Encrypted! Uploading...";
+
+                    } catch (encryptionError) {
+                        console.error('💥 user-upload: Encryption error:', encryptionError);
+                        showStatus(`❌ Encryption failed: ${encryptionError.message}`, 'error');
+                        uploadBtn.disabled = false;
+                        uploadBtn.textContent = 'Upload File';
+                        uploadProgress.classList.add('hidden');
+                        return;
+                    }
+                }
+
                 const formData = new FormData();
-                formData.append('file', file);
+                formData.append('file', fileToUpload);
+                formData.append('encrypt', encryptCheck.checked);
+                if (encryptionKey) {
+                    formData.append('encryptionKey', encryptionKey);
+                }
 
                 console.log('📤 user-upload: Sending request to /ipfs-upload-user');
 
@@ -546,7 +628,11 @@
                         ` ✅ Storage verified` :
                         ` ⚠️ Storage not verified`;
 
-                    showStatus(`✅ File uploaded successfully! Hash: ${result.file.hash}${sizeInfo}${verificationInfo}`, 'success');
+                    const encryptionInfo = encryptCheck.checked ?
+                        ` 🔒 File encrypted with wallet signature` :
+                        ` 📄 File uploaded as plain text`;
+
+                    showStatus(`✅ File uploaded successfully! Hash: ${result.file.hash}${sizeInfo}${verificationInfo}${encryptionInfo}`, 'success');
                     fileInput.value = '';
 
                     console.log('📤 user-upload: Calling loadUserFiles after successful upload');
@@ -580,6 +666,32 @@
                 uploadBtn.disabled = false;
                 uploadBtn.textContent = 'Upload File';
                 uploadProgress.classList.add('hidden');
+            }
+        }
+
+        // Funzione per generare una chiave deterministica dalla firma
+        async function generateDeterministicKey(signature, walletAddress, fileName) {
+            try {
+                // Combina la firma con l'address e il nome del file per creare una chiave unica
+                const combinedData = signature + walletAddress + fileName;
+
+                // Usa SHA-256 per creare un hash deterministico
+                const encoder = new TextEncoder();
+                const data = encoder.encode(combinedData);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+
+                // Converti in stringa esadecimale
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+                // Prendi i primi 32 caratteri come chiave (128 bit)
+                const key = hashHex.substring(0, 32);
+
+                console.log('🔐 user-upload: Generated deterministic key:', key.substring(0, 8) + '...');
+                return key;
+            } catch (error) {
+                console.error('💥 user-upload: Error generating deterministic key:', error);
+                throw new Error('Failed to generate encryption key');
             }
         }
 
@@ -712,23 +824,31 @@
             }
 
             console.log(`📁 user-upload: Displaying ${files.length} files`);
-            filesList.innerHTML = files.map(file => `
+            filesList.innerHTML = files.map(file => {
+                // Usa originalName se disponibile, altrimenti rimuovi .enc dal nome
+                const displayName = file.originalName || (file.name && file.name.endsWith('.enc') ? file.name.replace('.enc', '') : file.name);
+                const isEncrypted = file.encrypted || (file.name && file.name.endsWith('.enc'));
+
+                return `
                 <div class="file-item">
                     <div class="flex items-center justify-between">
                         <div class="flex-1">
-                            <h4 class="font-semibold">${file.name}</h4>
+                            <div class="flex items-center gap-2 mb-1">
+                                <h4 class="font-semibold">${displayName}</h4>
+                                ${isEncrypted ? '<span class="badge badge-accent badge-sm">🔒 Encrypted</span>' : '<span class="badge badge-outline badge-sm">📄 Plain</span>'}
+                            </div>
                             <p class="text-sm text-base-content/60">
                                 ${file.sizeMB} MB • ${new Date(file.uploadedAt).toLocaleString()}
                             </p>
                             <p class="text-xs font-mono text-accent mt-1">${file.hash}</p>
                         </div>
                         <div class="flex items-center gap-2">
-                            <a href="${file.ipfsUrl}" target="_blank" class="btn btn-sm btn-outline">
+                            <button onclick="viewFile('${file.hash}', '${displayName}', ${isEncrypted})" class="btn btn-sm btn-outline">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                                 </svg>
-                                View
-                            </a>
+                                ${isEncrypted ? 'Decrypt & View' : 'View'}
+                            </button>
                             <button onclick="deleteFile('${file.hash}')" class="btn btn-sm btn-error">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -738,7 +858,67 @@
                         </div>
                     </div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
+        }
+
+        // View/Decrypt file
+        async function viewFile(hash, fileName, isEncrypted) {
+            try {
+                if (isEncrypted) {
+                    console.log('🔐 user-upload: Decrypting file:', fileName);
+                    showStatus('🔐 Requesting signature for decryption...', 'info');
+
+                    // Genera lo stesso messaggio usato per la crittografia
+                    const timestamp = Date.now();
+                    const message = `Shogun File Encryption\nWallet: ${walletAddress}\nTimestamp: ${timestamp}\nFile: ${fileName}`;
+
+                    // Richiedi la firma a MetaMask
+                    const signature = await ethereum.request({
+                        method: 'personal_sign',
+                        params: [message, walletAddress]
+                    });
+
+                    // Genera la stessa chiave deterministica
+                    const encryptionKey = await generateDeterministicKey(signature, walletAddress, fileName);
+
+                    showStatus('🔐 Decrypting file...', 'info');
+
+                    // Scarica il file crittografato
+                    const response = await fetch(`/ipfs-content/${hash}`);
+                    const encryptedData = await response.text();
+
+                    // Decripta il file
+                    const decryptedData = await SEA.decrypt(encryptedData, encryptionKey);
+
+                    if (!decryptedData) {
+                        throw new Error('Decryption failed - invalid key or corrupted data');
+                    }
+
+                    // Converti da base64 a blob
+                    const base64Response = await fetch(decryptedData);
+                    const blob = await base64Response.blob();
+
+                    // Crea un URL per il download
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+
+                    showStatus('✅ File decrypted and downloaded successfully!', 'success');
+                } else {
+                    // File non crittografato - apri direttamente
+                    console.log('📄 user-upload: Opening plain file:', fileName);
+                    window.open(`/ipfs-content/${hash}`, '_blank');
+                }
+            } catch (error) {
+                console.error('💥 user-upload: Error viewing/decrypting file:', error);
+                showStatus(`❌ Error: ${error.message}`, 'error');
+            }
         }
 
         // Delete file

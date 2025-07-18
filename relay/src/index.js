@@ -529,6 +529,18 @@ async function initializeServer() {
 
       console.log(`📤 Upload request for user: ${userAddress}`);
 
+      // Verifica se il file deve essere crittografato
+      const shouldEncrypt = req.body.encrypt === "true";
+      const encryptionKey = req.body.encryptionKey;
+
+      console.log(`🔒 Encryption requested: ${shouldEncrypt}`);
+      if (shouldEncrypt && !encryptionKey) {
+        return res.status(400).json({
+          success: false,
+          error: "Encryption key required when encryption is enabled",
+        });
+      }
+
       // Verifica che il contratto sia disponibile
       if (!relayContract) {
         return res.status(500).json({
@@ -633,14 +645,21 @@ async function initializeServer() {
               results[0];
 
             // Prepara i dati dell'upload
+            const originalFileName = shouldEncrypt
+              ? req.file.originalname.replace(".enc", "")
+              : req.file.originalname;
+
             const uploadData = {
               hash: fileResult?.Hash,
-              name: req.file.originalname,
+              name: req.file.originalname, // Mantieni il nome con .enc se crittografato
+              originalName: originalFileName, // Nome originale senza .enc
               size: req.file.size,
               sizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
               mimetype: req.file.mimetype,
               uploadedAt: Date.now(),
               userAddress: userAddress,
+              encrypted: shouldEncrypt,
+              encryptionKey: shouldEncrypt ? encryptionKey : null,
               ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
                 fileResult?.Hash
               }`,
@@ -663,8 +682,10 @@ async function initializeServer() {
                 file: {
                   hash: fileResult?.Hash,
                   name: req.file.originalname,
+                  originalName: originalFileName,
                   size: req.file.size,
                   mimetype: req.file.mimetype,
+                  encrypted: shouldEncrypt,
                   ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
                     fileResult?.Hash
                   }`,
@@ -678,6 +699,12 @@ async function initializeServer() {
                   actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
                   sizeMB: fileSizeMB,
                   verified: true,
+                },
+                encryption: {
+                  enabled: shouldEncrypt,
+                  method: shouldEncrypt
+                    ? "wallet-signature-deterministic"
+                    : "none",
                 },
                 ipfsResponse: results,
               });
