@@ -489,14 +489,23 @@
                 formData.append('file', file);
 
                 console.log('📤 user-upload: Sending request to /ipfs-upload-user');
+
+                // Timeout per l'upload di 60 secondi
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => {
+                    controller.abort();
+                }, 60000);
+
                 const response = await fetch('/ipfs-upload-user', {
                     method: 'POST',
                     headers: {
                         'x-user-address': walletAddress
                     },
-                    body: formData
+                    body: formData,
+                    signal: controller.signal
                 });
 
+                clearTimeout(timeoutId);
                 console.log('📤 user-upload: Response status:', response.status);
                 const result = await response.json();
                 console.log('📤 user-upload: Response data:', result);
@@ -542,7 +551,12 @@
 
             } catch (error) {
                 console.error('💥 user-upload: Upload error:', error);
-                showStatus(`❌ Upload error: ${error.message}`, 'error');
+
+                if (error.name === 'AbortError') {
+                    showStatus('❌ Upload timeout after 60 seconds', 'error');
+                } else {
+                    showStatus(`❌ Upload error: ${error.message}`, 'error');
+                }
             } finally {
                 uploadBtn.disabled = false;
                 uploadBtn.textContent = 'Upload File';
