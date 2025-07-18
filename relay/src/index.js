@@ -913,7 +913,7 @@ async function initializeServer() {
           let timeoutId;
           let dataReceived = false;
 
-          // Timeout di 5 secondi
+          // Timeout di 10 secondi (aumentato per dare più tempo)
           timeoutId = setTimeout(() => {
             if (!dataReceived) {
               console.log(
@@ -921,54 +921,77 @@ async function initializeServer() {
               );
               resolve([]);
             }
-          }, 5000);
+          }, 10000);
 
-          // Listener per i dati
-          uploadsNode.once((uploads) => {
-            dataReceived = true;
-            clearTimeout(timeoutId);
-
-            console.log(`📋 Risultato uploads raw:`, uploads);
-            console.log(`📋 Tipo di uploads:`, typeof uploads);
+          // Prima leggi il nodo padre per vedere se ci sono dati
+          uploadsNode.once((parentData) => {
+            console.log(`📋 Parent node data:`, parentData);
+            console.log(`📋 Parent data type:`, typeof parentData);
             console.log(
-              `📋 Uploads è null/undefined:`,
-              uploads === null || uploads === undefined
-            );
-            console.log(
-              `📋 Uploads è un oggetto:`,
-              uploads && typeof uploads === "object"
-            );
-            console.log(
-              `📋 Uploads ha proprietà:`,
-              uploads ? Object.keys(uploads) : "N/A"
+              `📋 Parent data keys:`,
+              parentData ? Object.keys(parentData) : "N/A"
             );
 
-            if (!uploads) {
-              console.log(`❌ Nessun upload trovato per: ${identifier}`);
+            if (!parentData || typeof parentData !== "object") {
+              console.log(`❌ Nessun dato nel nodo padre per: ${identifier}`);
+              dataReceived = true;
+              clearTimeout(timeoutId);
               resolve([]);
               return;
             }
 
-            // Converte l'oggetto uploads in array
-            const uploadKeys = Object.keys(uploads);
-            console.log(`📋 Chiavi trovate:`, uploadKeys);
-
-            const uploadsArray = uploadKeys
-              .filter((key) => key !== "_") // Esclude i metadati Gun
-              .map((hash) => {
-                const upload = uploads[hash];
-                console.log(`📋 Upload per hash ${hash}:`, upload);
-                return upload;
-              })
-              .filter((upload) => upload && upload.hash) // Filtra upload validi
-              .sort((a, b) => b.uploadedAt - a.uploadedAt); // Ordina per data
-
-            console.log(`📋 Uploads array finale:`, uploadsArray);
-            console.log(
-              `✅ Trovati ${uploadsArray.length} upload per: ${identifier}`
+            // Ottieni tutte le chiavi (escludendo i metadati Gun)
+            const hashKeys = Object.keys(parentData).filter(
+              (key) => key !== "_"
             );
+            console.log(`📋 Hash keys found:`, hashKeys);
 
-            resolve(uploadsArray);
+            if (hashKeys.length === 0) {
+              console.log(`❌ Nessun hash trovato per: ${identifier}`);
+              dataReceived = true;
+              clearTimeout(timeoutId);
+              resolve([]);
+              return;
+            }
+
+            // Leggi ogni hash individualmente
+            let uploadsArray = [];
+            let completedReads = 0;
+            const totalReads = hashKeys.length;
+
+            hashKeys.forEach((hash) => {
+              console.log(`📋 Reading hash: ${hash}`);
+              uploadsNode.get(hash).once((uploadData) => {
+                completedReads++;
+                console.log(`📋 Upload data for ${hash}:`, uploadData);
+
+                if (uploadData && uploadData.hash) {
+                  uploadsArray.push(uploadData);
+                  console.log(`✅ Added upload for hash: ${hash}`);
+                } else {
+                  console.warn(
+                    `⚠️ Invalid upload data for hash: ${hash}`,
+                    uploadData
+                  );
+                }
+
+                // Se abbiamo letto tutti gli hash, risolvi
+                if (completedReads === totalReads) {
+                  dataReceived = true;
+                  clearTimeout(timeoutId);
+
+                  // Ordina per data di upload
+                  uploadsArray.sort((a, b) => b.uploadedAt - a.uploadedAt);
+
+                  console.log(`📋 Final uploads array:`, uploadsArray);
+                  console.log(
+                    `✅ Found ${uploadsArray.length} uploads for: ${identifier}`
+                  );
+
+                  resolve(uploadsArray);
+                }
+              });
+            });
           });
         });
       };
@@ -1044,41 +1067,77 @@ async function initializeServer() {
           let timeoutId;
           let dataReceived = false;
 
-          // Timeout di 10 secondi per debug
+          // Timeout di 15 secondi per debug
           timeoutId = setTimeout(() => {
             if (!dataReceived) {
               console.log(`⏰ Debug timeout per ${identifier}`);
-              resolve({ rawData: null, error: "Timeout" });
+              resolve({ rawData: null, detailedData: {}, error: "Timeout" });
             }
-          }, 10000);
+          }, 15000);
 
-          // Listener per i dati
-          uploadsNode.once((rawData) => {
+          // Listener per i dati del nodo padre
+          uploadsNode.once((parentData) => {
             dataReceived = true;
             clearTimeout(timeoutId);
 
-            console.log(`🔍 Debug raw data:`, rawData);
-            console.log(`🔍 Debug data type:`, typeof rawData);
+            console.log(`🔍 Debug parent data:`, parentData);
+            console.log(`🔍 Debug parent data type:`, typeof parentData);
             console.log(
-              `🔍 Debug data keys:`,
-              rawData ? Object.keys(rawData) : "N/A"
+              `🔍 Debug parent data keys:`,
+              parentData ? Object.keys(parentData) : "N/A"
             );
 
-            // Se ci sono dati, prova a leggere ogni chiave individualmente
-            let detailedData = {};
-            if (rawData && typeof rawData === "object") {
-              const keys = Object.keys(rawData).filter((key) => key !== "_");
-              console.log(`🔍 Debug: Found ${keys.length} keys:`, keys);
-
-              keys.forEach((key) => {
-                uploadsNode.get(key).once((keyData) => {
-                  console.log(`🔍 Debug: Key ${key} data:`, keyData);
-                  detailedData[key] = keyData;
-                });
+            if (!parentData || typeof parentData !== "object") {
+              console.log(`🔍 Debug: No parent data for ${identifier}`);
+              resolve({
+                rawData: parentData,
+                detailedData: {},
+                error: "No parent data",
               });
+              return;
             }
 
-            resolve({ rawData, detailedData, error: null });
+            // Ottieni tutte le chiavi (escludendo i metadati Gun)
+            const hashKeys = Object.keys(parentData).filter(
+              (key) => key !== "_"
+            );
+            console.log(
+              `🔍 Debug: Found ${hashKeys.length} hash keys:`,
+              hashKeys
+            );
+
+            // Leggi ogni hash individualmente per il debug dettagliato
+            let detailedData = {};
+            let completedReads = 0;
+            const totalReads = hashKeys.length;
+
+            if (totalReads === 0) {
+              console.log(`🔍 Debug: No hash keys found`);
+              resolve({
+                rawData: parentData,
+                detailedData: {},
+                error: "No hash keys",
+              });
+              return;
+            }
+
+            hashKeys.forEach((hash) => {
+              console.log(`🔍 Debug: Reading hash ${hash}`);
+              uploadsNode.get(hash).once((hashData) => {
+                completedReads++;
+                console.log(`🔍 Debug: Hash ${hash} data:`, hashData);
+                detailedData[hash] = hashData;
+
+                // Se abbiamo letto tutti gli hash, risolvi
+                if (completedReads === totalReads) {
+                  console.log(
+                    `🔍 Debug: All hashes read, detailed data:`,
+                    detailedData
+                  );
+                  resolve({ rawData: parentData, detailedData, error: null });
+                }
+              });
+            });
           });
         });
       };
