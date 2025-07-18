@@ -635,15 +635,30 @@ async function initializeServer() {
                 .get(identifier)
                 .get(fileResult?.Hash);
 
-              // Salva i dati e aspetta il completamento
-              uploadNode.put(uploadData, (ack) => {
-                console.log(`💾 Upload saved to Gun DB:`, ack);
-                if (ack.err) {
-                  console.error(`❌ Error saving to Gun DB:`, ack.err);
-                } else {
-                  console.log(`✅ Upload saved successfully to Gun DB`);
-                }
-              });
+              // Salva i dati con Promise per attendere il completamento
+              const saveToGun = () => {
+                return new Promise((resolve, reject) => {
+                  uploadNode.put(uploadData, (ack) => {
+                    console.log(`💾 Upload saved to Gun DB:`, ack);
+                    if (ack.err) {
+                      console.error(`❌ Error saving to Gun DB:`, ack.err);
+                      reject(new Error(ack.err));
+                    } else {
+                      console.log(`✅ Upload saved successfully to Gun DB`);
+                      resolve();
+                    }
+                  });
+                });
+              };
+
+              // Salva e attendi il completamento
+              try {
+                await saveToGun();
+                console.log(`✅ File saved to Gun DB successfully`);
+              } catch (gunError) {
+                console.error(`❌ Failed to save to Gun DB:`, gunError);
+                // Non blocchiamo l'upload se Gun fallisce, ma logghiamo l'errore
+              }
 
               // Verifica che il salvataggio sia avvenuto
               setTimeout(() => {
@@ -845,61 +860,88 @@ async function initializeServer() {
       // Recupera gli upload dal database Gun
       const uploadsNode = gun.get("shogun").get("uploads").get(identifier);
 
-      // Usa once per ottenere i dati una volta
-      uploadsNode.once((uploads) => {
-        console.log(`📋 Risultato uploads raw:`, uploads);
-        console.log(`📋 Tipo di uploads:`, typeof uploads);
-        console.log(
-          `📋 Uploads è null/undefined:`,
-          uploads === null || uploads === undefined
-        );
-        console.log(
-          `📋 Uploads è un oggetto:`,
-          uploads && typeof uploads === "object"
-        );
-        console.log(
-          `📋 Uploads ha proprietà:`,
-          uploads ? Object.keys(uploads) : "N/A"
-        );
+      // Usa una Promise per gestire l'asincronia di Gun
+      const getUploads = () => {
+        return new Promise((resolve, reject) => {
+          let timeoutId;
+          let dataReceived = false;
 
-        if (!uploads) {
-          console.log(`❌ Nessun upload trovato per: ${identifier}`);
-          return res.json({ success: true, uploads: [], identifier });
-        }
+          // Timeout di 5 secondi
+          timeoutId = setTimeout(() => {
+            if (!dataReceived) {
+              console.log(
+                `⏰ Timeout raggiunto per ${identifier}, restituendo array vuoto`
+              );
+              resolve([]);
+            }
+          }, 5000);
 
-        // Converte l'oggetto uploads in array
-        const uploadKeys = Object.keys(uploads);
-        console.log(`📋 Chiavi trovate:`, uploadKeys);
+          // Listener per i dati
+          uploadsNode.once((uploads) => {
+            dataReceived = true;
+            clearTimeout(timeoutId);
 
-        const uploadsArray = uploadKeys
-          .filter((key) => key !== "_") // Esclude i metadati Gun
-          .map((hash) => {
-            const upload = uploads[hash];
-            console.log(`📋 Upload per hash ${hash}:`, upload);
-            return upload;
-          })
-          .filter((upload) => upload && upload.hash) // Filtra upload validi
-          .sort((a, b) => b.uploadedAt - a.uploadedAt); // Ordina per data
+            console.log(`📋 Risultato uploads raw:`, uploads);
+            console.log(`📋 Tipo di uploads:`, typeof uploads);
+            console.log(
+              `📋 Uploads è null/undefined:`,
+              uploads === null || uploads === undefined
+            );
+            console.log(
+              `📋 Uploads è un oggetto:`,
+              uploads && typeof uploads === "object"
+            );
+            console.log(
+              `📋 Uploads ha proprietà:`,
+              uploads ? Object.keys(uploads) : "N/A"
+            );
 
-        console.log(`📋 Uploads array finale:`, uploadsArray);
-        console.log(
-          `✅ Trovati ${uploadsArray.length} upload per: ${identifier}`
-        );
+            if (!uploads) {
+              console.log(`❌ Nessun upload trovato per: ${identifier}`);
+              resolve([]);
+              return;
+            }
 
-        const response = {
-          success: true,
-          uploads: uploadsArray,
-          identifier,
-          count: uploadsArray.length,
-          totalSizeMB: uploadsArray.reduce(
-            (sum, upload) => sum + (upload.sizeMB || 0),
-            0
-          ),
-        };
+            // Converte l'oggetto uploads in array
+            const uploadKeys = Object.keys(uploads);
+            console.log(`📋 Chiavi trovate:`, uploadKeys);
 
-        console.log(`📋 Response finale:`, response);
-        res.json(response);
-      });
+            const uploadsArray = uploadKeys
+              .filter((key) => key !== "_") // Esclude i metadati Gun
+              .map((hash) => {
+                const upload = uploads[hash];
+                console.log(`📋 Upload per hash ${hash}:`, upload);
+                return upload;
+              })
+              .filter((upload) => upload && upload.hash) // Filtra upload validi
+              .sort((a, b) => b.uploadedAt - a.uploadedAt); // Ordina per data
+
+            console.log(`📋 Uploads array finale:`, uploadsArray);
+            console.log(
+              `✅ Trovati ${uploadsArray.length} upload per: ${identifier}`
+            );
+
+            resolve(uploadsArray);
+          });
+        });
+      };
+
+      // Attendi i dati con timeout
+      const uploadsArray = await getUploads();
+
+      const response = {
+        success: true,
+        uploads: uploadsArray,
+        identifier,
+        count: uploadsArray.length,
+        totalSizeMB: uploadsArray.reduce(
+          (sum, upload) => sum + (upload.sizeMB || 0),
+          0
+        ),
+      };
+
+      console.log(`📋 Response finale:`, response);
+      res.json(response);
     } catch (error) {
       console.error(`💥 Errore caricamento upload per ${identifier}:`, error);
       res.status(500).json({ success: false, error: error.message });
@@ -931,6 +973,73 @@ async function initializeServer() {
         hash,
       });
     } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Endpoint di debug per verificare il contenuto Gun di un utente
+  app.get("/api/debug/user-uploads/:identifier", async (req, res) => {
+    try {
+      const { identifier } = req.params;
+      if (!identifier) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Identificatore richiesto" });
+      }
+
+      console.log(`🔍 Debug: Caricando contenuto Gun per: ${identifier}`);
+
+      const uploadsNode = gun.get("shogun").get("uploads").get(identifier);
+
+      // Usa una Promise per gestire l'asincronia di Gun
+      const getDebugData = () => {
+        return new Promise((resolve, reject) => {
+          let timeoutId;
+          let dataReceived = false;
+
+          // Timeout di 10 secondi per debug
+          timeoutId = setTimeout(() => {
+            if (!dataReceived) {
+              console.log(`⏰ Debug timeout per ${identifier}`);
+              resolve({ rawData: null, error: "Timeout" });
+            }
+          }, 10000);
+
+          // Listener per i dati
+          uploadsNode.once((rawData) => {
+            dataReceived = true;
+            clearTimeout(timeoutId);
+
+            console.log(`🔍 Debug raw data:`, rawData);
+            console.log(`🔍 Debug data type:`, typeof rawData);
+            console.log(
+              `🔍 Debug data keys:`,
+              rawData ? Object.keys(rawData) : "N/A"
+            );
+
+            resolve({ rawData, error: null });
+          });
+        });
+      };
+
+      const { rawData, error } = await getDebugData();
+
+      const response = {
+        success: true,
+        identifier,
+        debug: {
+          rawData,
+          dataType: typeof rawData,
+          dataKeys: rawData ? Object.keys(rawData) : [],
+          error,
+          timestamp: Date.now(),
+        },
+      };
+
+      console.log(`🔍 Debug response:`, response);
+      res.json(response);
+    } catch (error) {
+      console.error(`💥 Debug error per ${identifier}:`, error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
