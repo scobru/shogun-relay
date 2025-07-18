@@ -314,14 +314,30 @@
         // Controlla lo stato della sottoscrizione
         async function checkSubscriptionStatus(walletAddr) {
             try {
+                console.log('🔍 user-upload: checkSubscriptionStatus called with walletAddr:', walletAddr);
+
+                if (!walletAddr) {
+                    console.log('❌ user-upload: No wallet address provided');
+                    showStatus('No wallet address provided', 'error');
+                    return;
+                }
+
                 // Usa il nuovo endpoint centralizzato
-                const response = await fetch(`/api/user-subscription-details/${encodeURIComponent(walletAddr)}`);
+                const url = `/api/user-subscription-details/${encodeURIComponent(walletAddr)}`;
+                console.log('🔍 user-upload: Making API call to:', url);
+
+                const response = await fetch(url);
+                console.log('📡 user-upload: Response status:', response.status);
+
                 const result = await response.json();
+                console.log('📋 user-upload: Response data:', result);
 
                 if (result.success) {
                     const details = result.subscription;
+                    console.log('📊 user-upload: Subscription details:', details);
 
                     if (details.isActive) {
+                        console.log('✅ user-upload: Subscription is ACTIVE');
                         const mbAllocated = details.mbAllocated || 0;
                         const mbUsed = details.mbUsed || 0;
                         const mbRemaining = details.mbRemaining || 0;
@@ -360,6 +376,7 @@
 
                         showStatus(`✅ Subscription active! ${mbRemaining} MB remaining`, 'success');
                     } else {
+                        console.log('❌ user-upload: Subscription is NOT active. Reason:', details.reason);
                         subscriptionDetailsEl.innerHTML = `
                             <div class="text-center">
                                 <p class="text-warning font-semibold mb-2">⚠️ No active subscription</p>
@@ -374,6 +391,7 @@
 
                     subscriptionStatusEl.classList.remove('hidden');
                 } else {
+                    console.log('❌ user-upload: API call failed:', result.error);
                     subscriptionDetailsEl.innerHTML = `
                         <div class="text-center">
                             <p class="text-error font-semibold">❌ Error checking subscription</p>
@@ -383,7 +401,7 @@
                     subscriptionStatusEl.classList.remove('hidden');
                 }
             } catch (error) {
-                console.error('Error checking subscription status:', error);
+                console.error('💥 user-upload: Error checking subscription status:', error);
                 subscriptionDetailsEl.innerHTML = `
                     <div class="text-center">
                         <p class="text-error font-semibold">❌ Connection error</p>
@@ -551,10 +569,15 @@
 
         // Wallet connection
         async function connectWallet() {
+            console.log('🔗 user-upload: connectWallet called');
+
             if (typeof window.ethereum !== 'undefined') {
                 try {
+                    console.log('🔗 user-upload: Requesting accounts from MetaMask');
                     const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
                     walletAddress = accounts[0];
+                    console.log('🔗 user-upload: Wallet connected:', walletAddress);
+
                     walletAddressEl.textContent = walletAddress;
                     currentWalletAddressEl.textContent = walletAddress;
                     walletStatus.textContent = `Connected: ${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 4)}`;
@@ -567,13 +590,15 @@
                     showStatus('Wallet connected!', 'success');
 
                     // Controlla lo stato della sottoscrizione
+                    console.log('🔗 user-upload: Calling checkSubscriptionStatus with walletAddress:', walletAddress);
                     checkSubscriptionStatus(walletAddress);
                     loadUserFiles();
                 } catch (error) {
-                    console.error('Error connecting wallet:', error);
+                    console.error('💥 user-upload: Error connecting wallet:', error);
                     showStatus('Failed to connect wallet. Please ensure MetaMask is unlocked.', 'error');
                 }
             } else {
+                console.log('❌ user-upload: MetaMask not found');
                 showStatus('MetaMask is not installed. Please install MetaMask to use this feature.', 'warning');
             }
         }
