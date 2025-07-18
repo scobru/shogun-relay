@@ -409,6 +409,7 @@ async function initializeServer() {
         firstSoul.startsWith("!") || // Root namespace
         firstSoul === "shogun" || // Shogun internal operations
         firstSoul.startsWith("shogun/relays") || // Relay health data
+        firstSoul.startsWith("shogun/uploads") || // User uploads (permette salvataggio upload user)
         !firstSoul.includes("/") || // Single level keys (internal Gun operations)
         firstSoul.match(
           /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
@@ -467,6 +468,30 @@ async function initializeServer() {
       console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
       res.status(401).json({ success: false, error: "Unauthorized" });
     }
+  };
+
+  // Middleware per endpoint user che verifica l'header x-user-address
+  const userAuthMiddleware = (req, res, next) => {
+    const userAddress = req.headers["x-user-address"];
+
+    if (!userAddress) {
+      return res.status(401).json({
+        success: false,
+        error: "x-user-address header richiesto per endpoint user",
+      });
+    }
+
+    // Verifica che l'address sia valido (formato Ethereum)
+    if (!/^0x[a-fA-F0-9]{40}$/.test(userAddress)) {
+      return res.status(400).json({
+        success: false,
+        error: "Formato indirizzo Ethereum non valido",
+      });
+    }
+
+    // Aggiungi l'address alla request per uso successivo
+    req.userAddress = userAddress;
+    next();
   };
 
   // IPFS File Upload Endpoint (Consolidated and Fixed)
@@ -725,8 +750,35 @@ async function initializeServer() {
 
             // Salva in background senza bloccare l'upload
             saveToGun()
-              .then(() => {
+              .then(async () => {
                 console.log(`✅ File saved to Gun DB successfully`);
+
+                // Aggiorna i MB utilizzati nel contratto
+                try {
+                  const fileSizeMB = +(req.file.size / 1024 / 1024).toFixed(2);
+                  console.log(
+                    `📊 Updating MB usage: ${fileSizeMB} MB for user ${userAddress}`
+                  );
+
+                  // Chiama il contratto per aggiornare i MB utilizzati
+                  if (relayContract) {
+                    const tx = await relayContract.recordMBUsage(
+                      userAddress,
+                      fileSizeMB
+                    );
+                    await tx.wait();
+                    console.log(
+                      `✅ MB usage updated successfully. Transaction: ${tx.hash}`
+                    );
+                  } else {
+                    console.warn(
+                      `⚠️ Relay contract not available, skipping MB update`
+                    );
+                  }
+                } catch (mbError) {
+                  console.error(`❌ Error updating MB usage:`, mbError.message);
+                  // Non bloccare l'upload se l'aggiornamento MB fallisce
+                }
 
                 // Verifica immediata del salvataggio
                 setTimeout(() => {
