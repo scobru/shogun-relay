@@ -390,25 +390,14 @@ async function initializeServer() {
 
   // Middleware per endpoint user che verifica l'header x-user-address
   const userAuthMiddleware = (req, res, next) => {
-    const userAddress = req.headers["x-user-address"];
-
-    if (!userAddress) {
+    const pubKey = req.headers["x-pubkey"];
+    if (!pubKey) {
       return res.status(401).json({
         success: false,
-        error: "x-user-address header richiesto per endpoint user",
+        error: "x-pubkey header richiesto",
       });
     }
-
-    // Verifica che l'address sia valido (formato Ethereum)
-    if (!/^0x[a-fA-F0-9]{40}$/.test(userAddress)) {
-      return res.status(400).json({
-        success: false,
-        error: "Formato indirizzo Ethereum non valido",
-      });
-    }
-
-    // Aggiungi l'address alla request per uso successivo
-    req.userAddress = userAddress;
+    req.userPubKey = pubKey;
     next();
   };
 
