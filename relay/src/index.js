@@ -1159,11 +1159,26 @@ async function initializeServer() {
       const readResult = await readTest();
       console.log(`🧪 ${readResult}`);
 
+      // Verifica lo stato dei peer
+      const peerInfo = {
+        activeWires,
+        totalConnections,
+        peers: peers,
+        gunConfig: {
+          file: gunConfig.file,
+          radisk: gunConfig.radisk,
+          localStorage: gunConfig.localStorage,
+          wire: gunConfig.wire,
+          webrtc: gunConfig.webrtc,
+        },
+      };
+
       res.json({
         success: true,
         message: "Gun DB test completed successfully",
         writeTest: writeResult,
         readTest: readResult,
+        peerInfo,
         timestamp: Date.now(),
       });
     } catch (error) {
@@ -1226,6 +1241,27 @@ async function initializeServer() {
         });
       };
 
+      // Test di persistenza (verifica dopo riavvio)
+      const persistenceTest = () => {
+        return new Promise((resolve, reject) => {
+          let timeoutId = setTimeout(() => {
+            reject(new Error("Persistence test timeout"));
+          }, 3000);
+
+          // Prova a leggere i dati dopo un breve delay
+          setTimeout(() => {
+            uploadNode.get(hash).once((data) => {
+              clearTimeout(timeoutId);
+              if (data && data.hash === hash) {
+                resolve("Persistence test passed");
+              } else {
+                reject(new Error("Persistence test failed - data not found"));
+              }
+            });
+          }, 1000);
+        });
+      };
+
       // Esegui i test
       const writeResult = await writeTest();
       console.log(`🧪 ${writeResult}`);
@@ -1236,6 +1272,10 @@ async function initializeServer() {
       const readResult = await readTest();
       console.log(`🧪 ${readResult}`);
 
+      // Test di persistenza
+      const persistenceResult = await persistenceTest();
+      console.log(`🧪 ${persistenceResult}`);
+
       res.json({
         success: true,
         message: "Gun save test completed successfully",
@@ -1243,6 +1283,7 @@ async function initializeServer() {
         hash,
         writeTest: writeResult,
         readTest: readResult,
+        persistenceTest: persistenceResult,
         timestamp: Date.now(),
       });
     } catch (error) {
@@ -1588,7 +1629,7 @@ async function initializeServer() {
     web: server,
     isValid: hasValidToken,
     uuid: process.env.RELAY_NAME,
-    localStorage: false,
+    localStorage: true, // Abilita localStorage per persistenza
     wire: true,
     axe: true,
     rfs: true,
@@ -1604,7 +1645,7 @@ async function initializeServer() {
       return;
     }
     ctx.on("out", function (msg) {
-      var to = this.to;
+      let to = this.to;
       // Adds headers for put
       msg.headers = {
         token: process.env.ADMIN_PASSWORD,
@@ -1614,6 +1655,17 @@ async function initializeServer() {
   });
 
   const gun = Gun(gunConfig);
+
+  // Test di inizializzazione di Gun
+  console.log("🧪 Testing Gun initialization...");
+  const testNode = gun.get("test-init");
+  testNode.put({ message: "Gun test", timestamp: Date.now() }, (ack) => {
+    if (ack.err) {
+      console.error("❌ Gun initialization test failed:", ack.err);
+    } else {
+      console.log("✅ Gun initialization test passed");
+    }
+  });
 
   // Initialize garbage collector now that gun is ready
   initializeGarbageCollector();
