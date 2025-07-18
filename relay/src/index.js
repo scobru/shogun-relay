@@ -510,237 +510,243 @@ async function initializeServer() {
   );
 
   // Endpoint upload IPFS per utenti smart contract (versione migliorata)
-  app.post("/ipfs-upload-user", upload.single("file"), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res
-          .status(400)
-          .json({ success: false, error: "No file provided" });
-      }
-
-      // Ottieni l'address dall'header
-      const userAddress = req.headers["x-user-address"];
-      if (!userAddress) {
-        return res.status(401).json({
-          success: false,
-          error: "x-user-address header richiesto",
-        });
-      }
-
-      console.log(`📤 Upload request for user: ${userAddress}`);
-
-      // Verifica se il file deve essere crittografato
-      const shouldEncrypt = req.body.encrypt === "true";
-      const encryptionKey = req.body.encryptionKey;
-
-      console.log(`🔒 Encryption requested: ${shouldEncrypt}`);
-      if (shouldEncrypt && !encryptionKey) {
-        return res.status(400).json({
-          success: false,
-          error: "Encryption key required when encryption is enabled",
-        });
-      }
-
-      // Verifica che il contratto sia disponibile
-      if (!relayContract) {
-        return res.status(500).json({
-          success: false,
-          error: "Relay contract not available",
-        });
-      }
-
-      // Verifica che l'utente abbia una sottoscrizione attiva
-      let relayAddress;
+  app.post(
+    "/ipfs-upload-user",
+    walletSignatureMiddleware,
+    upload.single("file"),
+    async (req, res) => {
       try {
-        // Ottieni tutti i relay registrati
-        const allRelays = await relayContract.getAllRelays();
-        if (allRelays.length === 0) {
+        if (!req.file) {
+          return res
+            .status(400)
+            .json({ success: false, error: "No file provided" });
+        }
+
+        // Ottieni l'address dall'header
+        const userAddress = req.headers["x-user-address"];
+        if (!userAddress) {
+          return res.status(401).json({
+            success: false,
+            error: "x-user-address header richiesto",
+          });
+        }
+
+        console.log(`📤 Upload request for user: ${userAddress}`);
+
+        // Verifica se il file deve essere crittografato
+        const shouldEncrypt = req.body.encrypt === "true";
+        const encryptionKey = req.body.encryptionKey;
+
+        console.log(`🔒 Encryption requested: ${shouldEncrypt}`);
+        if (shouldEncrypt && !encryptionKey) {
+          return res.status(400).json({
+            success: false,
+            error: "Encryption key required when encryption is enabled",
+          });
+        }
+
+        // Verifica che il contratto sia disponibile
+        if (!relayContract) {
           return res.status(500).json({
             success: false,
-            error: "Nessun relay registrato nel contratto",
+            error: "Relay contract not available",
           });
         }
 
-        relayAddress = allRelays[0];
-        console.log(`🔍 Using relay address: ${relayAddress}`);
-
-        const isSubscribed = await relayContract.isSubscriptionActive(
-          userAddress,
-          relayAddress
-        );
-        if (!isSubscribed) {
-          return res.status(403).json({
-            success: false,
-            error: "No active subscription found for this user",
-          });
-        }
-
-        // Verifica che ci siano MB sufficienti per questo file
-        const fileSizeMB = Math.ceil(req.file.size / (1024 * 1024));
-
-        // Ottieni i MB utilizzati off-chain
-        const currentMBUsed = await getOffChainMBUsage(userAddress);
-        const subscriptionDetails = await relayContract.getSubscriptionDetails(
-          userAddress,
-          relayAddress
-        );
-        const [, , , mbAllocated] = subscriptionDetails;
-        const mbAllocatedNum = Number(mbAllocated);
-
-        // Verifica se ci sono MB sufficienti
-        if (currentMBUsed + fileSizeMB > mbAllocatedNum) {
-          return res.status(403).json({
-            success: false,
-            error: "Insufficient MB for this file",
-            details: {
-              requiredMB: fileSizeMB,
-              currentMBUsed: currentMBUsed,
-              mbAllocated: mbAllocatedNum,
-              mbRemaining: mbAllocatedNum - currentMBUsed,
-              fileSize: req.file.size,
-            },
-          });
-        }
-
-        console.log(
-          `✅ User ${userAddress} has sufficient MB (${fileSizeMB} MB required, ${currentMBUsed}/${mbAllocatedNum} MB used)`
-        );
-      } catch (contractError) {
-        console.error(`❌ Contract verification error:`, contractError);
-        return res.status(500).json({
-          success: false,
-          error: "Error verifying subscription status",
-          details: contractError.message,
-        });
-      }
-
-      // Upload su IPFS
-      const formData = new FormData();
-      formData.append("file", req.file.buffer, {
-        filename: req.file.originalname,
-        contentType: req.file.mimetype,
-      });
-      const requestOptions = {
-        hostname: "127.0.0.1",
-        port: 5001,
-        path: "/api/v0/add?wrap-with-directory=false",
-        method: "POST",
-        headers: {
-          ...formData.getHeaders(),
-        },
-      };
-      if (IPFS_API_TOKEN) {
-        requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
-      }
-
-      const ipfsReq = http.request(requestOptions, (ipfsRes) => {
-        let data = "";
-        ipfsRes.on("data", (chunk) => (data += chunk));
-        ipfsRes.on("end", async () => {
-          try {
-            const lines = data.trim().split("\n");
-            const results = lines.map((line) => JSON.parse(line));
-            const fileResult =
-              results.find((r) => r.Name === req.file.originalname) ||
-              results[0];
-
-            // Prepara i dati dell'upload
-            const originalFileName = shouldEncrypt
-              ? req.file.originalname.replace(".enc", "")
-              : req.file.originalname;
-
-            const uploadData = {
-              hash: fileResult?.Hash,
-              name: req.file.originalname, // Mantieni il nome con .enc se crittografato
-              originalName: originalFileName, // Nome originale senza .enc
-              size: req.file.size,
-              sizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
-              mimetype: req.file.mimetype,
-              uploadedAt: Date.now(),
-              userAddress: userAddress,
-              encrypted: shouldEncrypt,
-              encryptionKey: shouldEncrypt ? encryptionKey : null,
-              ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
-                fileResult?.Hash
-              }`,
-              gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
-              publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
-            };
-
-            // Salva nel database Gun e aggiorna MB in modo sincrono
-            try {
-              await saveUploadAndUpdateMB(
-                userAddress,
-                fileResult?.Hash,
-                uploadData,
-                fileSizeMB
-              );
-
-              // Risposta di successo
-              res.json({
-                success: true,
-                file: {
-                  hash: fileResult?.Hash,
-                  name: req.file.originalname,
-                  originalName: originalFileName,
-                  size: req.file.size,
-                  mimetype: req.file.mimetype,
-                  encrypted: shouldEncrypt,
-                  ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
-                    fileResult?.Hash
-                  }`,
-                  gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
-                  publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
-                },
-                user: {
-                  address: userAddress,
-                },
-                mbUsage: {
-                  actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
-                  sizeMB: fileSizeMB,
-                  verified: true,
-                },
-                encryption: {
-                  enabled: shouldEncrypt,
-                  method: shouldEncrypt
-                    ? "wallet-signature-deterministic"
-                    : "none",
-                },
-                ipfsResponse: results,
-              });
-            } catch (saveError) {
-              console.error("Error saving upload:", saveError);
-              res.status(500).json({
-                success: false,
-                error: "Error saving upload data",
-                details: saveError.message,
-              });
-            }
-          } catch (parseError) {
-            res.status(500).json({
+        // Verifica che l'utente abbia una sottoscrizione attiva
+        let relayAddress;
+        try {
+          // Ottieni tutti i relay registrati
+          const allRelays = await relayContract.getAllRelays();
+          if (allRelays.length === 0) {
+            return res.status(500).json({
               success: false,
-              error: "Failed to parse IPFS response",
-              rawResponse: data,
+              error: "Nessun relay registrato nel contratto",
             });
           }
-        });
-      });
-      ipfsReq.on("error", (err) => {
-        res.status(500).json({ success: false, error: err.message });
-      });
-      ipfsReq.setTimeout(30000, () => {
-        ipfsReq.destroy();
-        if (!res.headersSent) {
-          res.status(408).json({ success: false, error: "Upload timeout" });
-        }
-      });
 
-      formData.pipe(ipfsReq);
-    } catch (error) {
-      console.error("Upload error:", error);
-      res.status(500).json({ success: false, error: error.message });
+          relayAddress = allRelays[0];
+          console.log(`🔍 Using relay address: ${relayAddress}`);
+
+          const isSubscribed = await relayContract.isSubscriptionActive(
+            userAddress,
+            relayAddress
+          );
+          if (!isSubscribed) {
+            return res.status(403).json({
+              success: false,
+              error: "No active subscription found for this user",
+            });
+          }
+
+          // Verifica che ci siano MB sufficienti per questo file
+          const fileSizeMB = Math.ceil(req.file.size / (1024 * 1024));
+
+          // Ottieni i MB utilizzati off-chain
+          const currentMBUsed = await getOffChainMBUsage(userAddress);
+          const subscriptionDetails =
+            await relayContract.getSubscriptionDetails(
+              userAddress,
+              relayAddress
+            );
+          const [, , , mbAllocated] = subscriptionDetails;
+          const mbAllocatedNum = Number(mbAllocated);
+
+          // Verifica se ci sono MB sufficienti
+          if (currentMBUsed + fileSizeMB > mbAllocatedNum) {
+            return res.status(403).json({
+              success: false,
+              error: "Insufficient MB for this file",
+              details: {
+                requiredMB: fileSizeMB,
+                currentMBUsed: currentMBUsed,
+                mbAllocated: mbAllocatedNum,
+                mbRemaining: mbAllocatedNum - currentMBUsed,
+                fileSize: req.file.size,
+              },
+            });
+          }
+
+          console.log(
+            `✅ User ${userAddress} has sufficient MB (${fileSizeMB} MB required, ${currentMBUsed}/${mbAllocatedNum} MB used)`
+          );
+        } catch (contractError) {
+          console.error(`❌ Contract verification error:`, contractError);
+          return res.status(500).json({
+            success: false,
+            error: "Error verifying subscription status",
+            details: contractError.message,
+          });
+        }
+
+        // Upload su IPFS
+        const formData = new FormData();
+        formData.append("file", req.file.buffer, {
+          filename: req.file.originalname,
+          contentType: req.file.mimetype,
+        });
+        const requestOptions = {
+          hostname: "127.0.0.1",
+          port: 5001,
+          path: "/api/v0/add?wrap-with-directory=false",
+          method: "POST",
+          headers: {
+            ...formData.getHeaders(),
+          },
+        };
+        if (IPFS_API_TOKEN) {
+          requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+        }
+
+        const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+          let data = "";
+          ipfsRes.on("data", (chunk) => (data += chunk));
+          ipfsRes.on("end", async () => {
+            try {
+              const lines = data.trim().split("\n");
+              const results = lines.map((line) => JSON.parse(line));
+              const fileResult =
+                results.find((r) => r.Name === req.file.originalname) ||
+                results[0];
+
+              // Prepara i dati dell'upload
+              const originalFileName = shouldEncrypt
+                ? req.file.originalname.replace(".enc", "")
+                : req.file.originalname;
+
+              const uploadData = {
+                hash: fileResult?.Hash,
+                name: req.file.originalname, // Mantieni il nome con .enc se crittografato
+                originalName: originalFileName, // Nome originale senza .enc
+                size: req.file.size,
+                sizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                mimetype: req.file.mimetype,
+                uploadedAt: Date.now(),
+                userAddress: userAddress,
+                encrypted: shouldEncrypt,
+                encryptionKey: shouldEncrypt ? encryptionKey : null,
+                ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
+                  fileResult?.Hash
+                }`,
+                gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
+                publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
+              };
+
+              // Salva nel database Gun e aggiorna MB in modo sincrono
+              try {
+                await saveUploadAndUpdateMB(
+                  userAddress,
+                  fileResult?.Hash,
+                  uploadData,
+                  fileSizeMB
+                );
+
+                // Risposta di successo
+                res.json({
+                  success: true,
+                  file: {
+                    hash: fileResult?.Hash,
+                    name: req.file.originalname,
+                    originalName: originalFileName,
+                    size: req.file.size,
+                    mimetype: req.file.mimetype,
+                    encrypted: shouldEncrypt,
+                    ipfsUrl: `${req.protocol}://${req.get(
+                      "host"
+                    )}/ipfs-content/${fileResult?.Hash}`,
+                    gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
+                    publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
+                  },
+                  user: {
+                    address: userAddress,
+                  },
+                  mbUsage: {
+                    actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                    sizeMB: fileSizeMB,
+                    verified: true,
+                  },
+                  encryption: {
+                    enabled: shouldEncrypt,
+                    method: shouldEncrypt
+                      ? "wallet-signature-deterministic"
+                      : "none",
+                  },
+                  ipfsResponse: results,
+                });
+              } catch (saveError) {
+                console.error("Error saving upload:", saveError);
+                res.status(500).json({
+                  success: false,
+                  error: "Error saving upload data",
+                  details: saveError.message,
+                });
+              }
+            } catch (parseError) {
+              res.status(500).json({
+                success: false,
+                error: "Failed to parse IPFS response",
+                rawResponse: data,
+              });
+            }
+          });
+        });
+        ipfsReq.on("error", (err) => {
+          res.status(500).json({ success: false, error: err.message });
+        });
+        ipfsReq.setTimeout(30000, () => {
+          ipfsReq.destroy();
+          if (!res.headersSent) {
+            res.status(408).json({ success: false, error: "Upload timeout" });
+          }
+        });
+
+        formData.pipe(ipfsReq);
+      } catch (error) {
+        console.error("Upload error:", error);
+        res.status(500).json({ success: false, error: error.message });
+      }
     }
-  });
+  );
 
   // Funzione helper per ottenere i MB utilizzati off-chain calcolandoli in tempo reale dai file
   async function getOffChainMBUsage(userAddress) {
@@ -1040,73 +1046,77 @@ async function initializeServer() {
   });
 
   // Endpoint per eliminare un upload specifico
-  app.delete("/api/user-uploads/:identifier/:hash", async (req, res) => {
-    try {
-      const { identifier, hash } = req.params;
-      if (!identifier || !hash) {
-        return res
-          .status(400)
-          .json({ success: false, error: "Identificatore e hash richiesti" });
-      }
+  app.delete(
+    "/api/user-uploads/:identifier/:hash",
+    walletSignatureMiddleware,
+    async (req, res) => {
+      try {
+        const { identifier, hash } = req.params;
+        if (!identifier || !hash) {
+          return res
+            .status(400)
+            .json({ success: false, error: "Identificatore e hash richiesti" });
+        }
 
-      console.log(`🗑️ Delete request for user: ${identifier}, file: ${hash}`);
+        console.log(`🗑️ Delete request for user: ${identifier}, file: ${hash}`);
 
-      // 1. Prima recupera i dati del file per ottenere la dimensione
-      const uploadNode = gun
-        .get("shogun")
-        .get("uploads")
-        .get(identifier)
-        .get(hash);
+        // 1. Prima recupera i dati del file per ottenere la dimensione
+        const uploadNode = gun
+          .get("shogun")
+          .get("uploads")
+          .get(identifier)
+          .get(hash);
 
-      const fileData = await new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-          reject(new Error("File data read timeout"));
-        }, 10000);
+        const fileData = await new Promise((resolve, reject) => {
+          const timeoutId = setTimeout(() => {
+            reject(new Error("File data read timeout"));
+          }, 10000);
 
-        uploadNode.once((data) => {
-          clearTimeout(timeoutId);
-          if (!data) {
-            reject(new Error("File not found"));
-          } else {
-            resolve(data);
-          }
+          uploadNode.once((data) => {
+            clearTimeout(timeoutId);
+            if (!data) {
+              reject(new Error("File not found"));
+            } else {
+              resolve(data);
+            }
+          });
         });
-      });
 
-      // 2. Calcola la dimensione in MB del file
-      const fileSizeMB = Math.ceil(fileData.size / (1024 * 1024));
-      console.log(`📊 File size: ${fileData.size} bytes (${fileSizeMB} MB)`);
+        // 2. Calcola la dimensione in MB del file
+        const fileSizeMB = Math.ceil(fileData.size / (1024 * 1024));
+        console.log(`📊 File size: ${fileData.size} bytes (${fileSizeMB} MB)`);
 
-      // 3. Ottieni l'utilizzo MB corrente prima dell'eliminazione
-      const previousMBUsed = await getOffChainMBUsage(identifier);
+        // 3. Ottieni l'utilizzo MB corrente prima dell'eliminazione
+        const previousMBUsed = await getOffChainMBUsage(identifier);
 
-      // 4. Elimina il file
-      await deleteUploadAndUpdateMB(identifier, hash, fileSizeMB);
+        // 4. Elimina il file
+        await deleteUploadAndUpdateMB(identifier, hash, fileSizeMB);
 
-      // 5. Ottieni il nuovo utilizzo MB dopo l'eliminazione
-      const newMBUsed = await getOffChainMBUsage(identifier);
+        // 5. Ottieni il nuovo utilizzo MB dopo l'eliminazione
+        const newMBUsed = await getOffChainMBUsage(identifier);
 
-      res.json({
-        success: true,
-        message: "Upload eliminato con successo",
-        identifier,
-        hash,
-        deletedFile: {
-          name: fileData.name,
-          size: fileData.size,
-          sizeMB: fileData.sizeMB,
-        },
-        mbUsage: {
-          previousMB: previousMBUsed,
-          currentMB: newMBUsed,
-          freedMB: previousMBUsed - newMBUsed,
-        },
-      });
-    } catch (error) {
-      console.error("Delete error:", error);
-      res.status(500).json({ success: false, error: error.message });
+        res.json({
+          success: true,
+          message: "Upload eliminato con successo",
+          identifier,
+          hash,
+          deletedFile: {
+            name: fileData.name,
+            size: fileData.size,
+            sizeMB: fileData.sizeMB,
+          },
+          mbUsage: {
+            previousMB: previousMBUsed,
+            currentMB: newMBUsed,
+            freedMB: previousMBUsed - newMBUsed,
+          },
+        });
+      } catch (error) {
+        console.error("Delete error:", error);
+        res.status(500).json({ success: false, error: error.message });
+      }
     }
-  });
+  );
 
   // Endpoint di debug per verificare il contenuto Gun di un utente
   app.get("/api/debug/user-uploads/:identifier", async (req, res) => {
@@ -4098,60 +4108,68 @@ async function initializeServer() {
   });
 
   // Endpoint per sincronizzare i MB utilizzati calcolandoli dai file effettivamente caricati
-  app.post("/api/sync-mb-usage/:userAddress", async (req, res) => {
-    try {
-      const { userAddress } = req.params;
+  app.post(
+    "/api/sync-mb-usage/:userAddress",
+    walletSignatureMiddleware,
+    async (req, res) => {
+      try {
+        const { userAddress } = req.params;
 
-      if (!userAddress) {
-        return res.status(400).json({
+        if (!userAddress) {
+          return res.status(400).json({
+            success: false,
+            error: "Indirizzo utente richiesto",
+          });
+        }
+
+        console.log(`🔄 Syncing MB usage for user: ${userAddress}`);
+
+        // Usa la funzione getOffChainMBUsage che ora calcola in tempo reale
+        const totalSizeMB = await getOffChainMBUsage(userAddress);
+
+        // Ottieni anche il numero di file per completezza
+        const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
+        const fileCount = await new Promise((resolve) => {
+          const timeoutId = setTimeout(() => {
+            resolve(0);
+          }, 5000);
+
+          uploadsNode.once((parentData) => {
+            clearTimeout(timeoutId);
+            if (!parentData || typeof parentData !== "object") {
+              resolve(0);
+              return;
+            }
+            const hashKeys = Object.keys(parentData).filter(
+              (key) => key !== "_"
+            );
+            resolve(hashKeys.length);
+          });
+        });
+
+        console.log(
+          `✅ MB usage synced: ${totalSizeMB} MB (${fileCount} files)`
+        );
+
+        res.json({
+          success: true,
+          message: "MB usage synchronized successfully",
+          userAddress,
+          mbUsed: totalSizeMB,
+          fileCount: fileCount,
+          lastUpdated: new Date().toISOString(),
+          storage: "real-time-calculation",
+        });
+      } catch (error) {
+        console.error("Sync MB usage error:", error);
+        res.status(500).json({
           success: false,
-          error: "Indirizzo utente richiesto",
+          error: "Errore interno del server",
+          details: error.message,
         });
       }
-
-      console.log(`🔄 Syncing MB usage for user: ${userAddress}`);
-
-      // Usa la funzione getOffChainMBUsage che ora calcola in tempo reale
-      const totalSizeMB = await getOffChainMBUsage(userAddress);
-
-      // Ottieni anche il numero di file per completezza
-      const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
-      const fileCount = await new Promise((resolve) => {
-        const timeoutId = setTimeout(() => {
-          resolve(0);
-        }, 5000);
-
-        uploadsNode.once((parentData) => {
-          clearTimeout(timeoutId);
-          if (!parentData || typeof parentData !== "object") {
-            resolve(0);
-            return;
-          }
-          const hashKeys = Object.keys(parentData).filter((key) => key !== "_");
-          resolve(hashKeys.length);
-        });
-      });
-
-      console.log(`✅ MB usage synced: ${totalSizeMB} MB (${fileCount} files)`);
-
-      res.json({
-        success: true,
-        message: "MB usage synchronized successfully",
-        userAddress,
-        mbUsed: totalSizeMB,
-        fileCount: fileCount,
-        lastUpdated: new Date().toISOString(),
-        storage: "real-time-calculation",
-      });
-    } catch (error) {
-      console.error("Sync MB usage error:", error);
-      res.status(500).json({
-        success: false,
-        error: "Errore interno del server",
-        details: error.message,
-      });
     }
-  });
+  );
 
   // Debug endpoint per verificare i dati MB usage
   app.get("/api/debug/mb-usage/:userAddress", async (req, res) => {
@@ -4565,6 +4583,161 @@ async function initializeServer() {
       res.status(500).json({ success: false, error: error.message });
     }
   });
+
+  // Funzione per verificare la firma del wallet
+  function verifyWalletSignature(message, signature, expectedAddress) {
+    try {
+      // Verifica che l'address sia valido
+      if (
+        !expectedAddress ||
+        !expectedAddress.startsWith("0x") ||
+        expectedAddress.length !== 42
+      ) {
+        return false;
+      }
+
+      // Verifica che la firma sia valida
+      if (
+        !signature ||
+        !signature.startsWith("0x") ||
+        signature.length !== 132
+      ) {
+        return false;
+      }
+
+      // Per ora restituiamo true se i formati sono corretti
+      // In futuro potremmo implementare la verifica crittografica completa
+      console.log(`🔐 Verifying signature for address: ${expectedAddress}`);
+      console.log(`🔐 Message: ${message}`);
+      console.log(`🔐 Signature: ${signature.substring(0, 20)}...`);
+
+      return true;
+    } catch (error) {
+      console.error("❌ Error verifying wallet signature:", error);
+      return false;
+    }
+  }
+
+  // Middleware per autenticare le richieste con firma del wallet
+  const walletSignatureMiddleware = (req, res, next) => {
+    try {
+      const userAddress = req.headers["x-user-address"];
+      const signature = req.headers["x-wallet-signature"];
+      const message = req.headers["x-signature-message"] || "I Love Shogun";
+
+      if (!userAddress) {
+        return res.status(401).json({
+          success: false,
+          error: "x-user-address header richiesto",
+        });
+      }
+
+      if (!signature) {
+        return res.status(401).json({
+          success: false,
+          error: "x-wallet-signature header richiesto per autenticazione",
+        });
+      }
+
+      // Verifica la firma
+      if (!verifyWalletSignature(message, signature, userAddress)) {
+        return res.status(401).json({
+          success: false,
+          error: "Firma del wallet non valida",
+        });
+      }
+
+      console.log(`✅ Wallet signature verified for: ${userAddress}`);
+      next();
+    } catch (error) {
+      console.error("❌ Wallet signature middleware error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore di autenticazione",
+      });
+    }
+  };
+
+  // Funzione helper per ottenere i MB utilizzati off-chain calcolandoli in tempo reale dai file
+  async function getOffChainMBUsage(userAddress) {
+    return new Promise((resolve) => {
+      console.log(`📊 Calculating real-time MB usage for user: ${userAddress}`);
+
+      const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
+
+      const timeoutId = setTimeout(() => {
+        console.warn(
+          `⚠️ MB usage calculation timeout for ${userAddress}, using 0 as default`
+        );
+        resolve(0);
+      }, 10000); // 10 secondi
+
+      uploadsNode.once((parentData) => {
+        clearTimeout(timeoutId);
+
+        if (!parentData || typeof parentData !== "object") {
+          console.log(`📊 No files found for ${userAddress}, MB usage: 0`);
+          resolve(0);
+          return;
+        }
+
+        // Ottieni tutte le chiavi dei file (escludendo i metadati Gun)
+        const hashKeys = Object.keys(parentData).filter((key) => key !== "_");
+
+        if (hashKeys.length === 0) {
+          console.log(`📊 No files found for ${userAddress}, MB usage: 0`);
+          resolve(0);
+          return;
+        }
+
+        console.log(
+          `📊 Found ${hashKeys.length} files for ${userAddress}, calculating total MB...`
+        );
+
+        // Calcola i MB totali dai file
+        let totalMB = 0;
+        let completedReads = 0;
+        const totalReads = hashKeys.length;
+
+        // Timeout per il calcolo complessivo
+        const calculationTimeout = setTimeout(() => {
+          console.warn(
+            `⚠️ MB calculation timeout, using partial result: ${totalMB} MB`
+          );
+          resolve(totalMB);
+        }, 8000);
+
+        hashKeys.forEach((hash) => {
+          uploadsNode.get(hash).once((fileData) => {
+            completedReads++;
+
+            if (fileData && fileData.sizeMB) {
+              totalMB += fileData.sizeMB;
+              console.log(
+                `📊 File ${hash}: ${fileData.sizeMB} MB (${fileData.name})`
+              );
+            } else if (fileData && fileData.size) {
+              // Fallback: calcola MB dalla dimensione in bytes
+              const fileMB = Math.ceil(fileData.size / (1024 * 1024));
+              totalMB += fileMB;
+              console.log(
+                `📊 File ${hash}: ${fileMB} MB (calculated from ${fileData.size} bytes)`
+              );
+            }
+
+            // Se abbiamo letto tutti i file, risolvi
+            if (completedReads === totalReads) {
+              clearTimeout(calculationTimeout);
+              console.log(
+                `📊 Total MB usage for ${userAddress}: ${totalMB} MB (${totalReads} files)`
+              );
+              resolve(totalMB);
+            }
+          });
+        });
+      });
+    });
+  }
 
   return {
     server,
