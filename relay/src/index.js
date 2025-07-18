@@ -2338,7 +2338,7 @@ async function initializeServer() {
                 `⚠️ GunDB mb_usage read timeout for ${userAddress}, will recalculate from files`
               );
               resolve({ mbUsed: 0, lastUpdated: Date.now(), timeout: true });
-            }, 3000); // Timeout di 3 secondi
+            }, 1500); // Timeout ridotto a 1.5 secondi
 
             mbUsageNode.once((data) => {
               clearTimeout(timeoutId);
@@ -2348,7 +2348,7 @@ async function initializeServer() {
 
           // Se i dati off-chain non sono affidabili (timeout o 0), ricalcola dai file esistenti
           let mbUsedNum = offChainUsage.mbUsed || Number(contractMbUsed);
-
+          
           if (offChainUsage.timeout || offChainUsage.mbUsed === 0) {
             console.log(
               `🔄 Recalculating MB usage from existing files for ${userAddress}`
@@ -2363,14 +2363,14 @@ async function initializeServer() {
               const userFiles = await new Promise((resolve) => {
                 const timeoutId = setTimeout(() => {
                   console.warn(
-                    `⚠️ GunDB uploads read timeout for ${userAddress}`
+                    `⚠️ GunDB uploads read timeout for ${userAddress}, using fallback calculation`
                   );
                   resolve([]);
-                }, 5000);
+                }, 2500); // Timeout ridotto a 2.5 secondi
 
                 uploadsNode.once((parentData) => {
                   clearTimeout(timeoutId);
-
+                  
                   if (!parentData || typeof parentData !== "object") {
                     resolve([]);
                     return;
@@ -2388,6 +2388,12 @@ async function initializeServer() {
                     return;
                   }
 
+                  // Timeout per ogni singola lettura di file
+                  const fileReadTimeout = setTimeout(() => {
+                    console.warn(`⚠️ File read timeout, using partial data`);
+                    resolve(uploadsArray);
+                  }, 3000);
+
                   hashKeys.forEach((hash) => {
                     uploadsNode.get(hash).once((uploadData) => {
                       completedReads++;
@@ -2395,6 +2401,7 @@ async function initializeServer() {
                         uploadsArray.push(uploadData);
                       }
                       if (completedReads === totalReads) {
+                        clearTimeout(fileReadTimeout);
                         resolve(uploadsArray);
                       }
                     });
@@ -2414,14 +2421,14 @@ async function initializeServer() {
               // Usa il valore calcolato se è maggiore di 0
               if (calculatedMbUsed > 0) {
                 mbUsedNum = calculatedMbUsed;
-
-                // Aggiorna anche i dati off-chain per futuri utilizzi
+                
+                // Aggiorna anche i dati off-chain per futuri utilizzi (in background)
                 const updatedUsage = {
                   mbUsed: calculatedMbUsed,
                   lastUpdated: Date.now(),
                   updatedBy: "recalculation-from-files",
                 };
-
+                
                 mbUsageNode.put(updatedUsage, (ack) => {
                   if (ack.err) {
                     console.error(
@@ -2434,6 +2441,10 @@ async function initializeServer() {
                     );
                   }
                 });
+              } else {
+                // Se non riusciamo a calcolare dai file, usa il valore del contratto
+                console.log(`📊 Using contract MB usage as fallback: ${Number(contractMbUsed)} MB`);
+                mbUsedNum = Number(contractMbUsed);
               }
             } catch (recalcError) {
               console.error(
