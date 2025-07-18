@@ -17,12 +17,13 @@ import { ethers } from "ethers";
 dotenv.config();
 
 import Gun from "gun";
+import SEA from "gun/sea";
 import "gun/lib/stats.js";
 import "gun/lib/webrtc.js";
 import "gun/lib/rfs.js";
 
 import ShogunCoreModule from "shogun-core";
-const { derive, SEA } = ShogunCoreModule;
+const { derive } = ShogunCoreModule;
 import http from "http";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import multer from "multer";
@@ -146,8 +147,6 @@ async function initializeRelayContract() {
     return false;
   }
 }
-
-
 
 // Main async function to initialize the server
 async function initializeServer() {
@@ -771,6 +770,27 @@ async function initializeServer() {
                       );
                     }
                   });
+
+                  // Aggiorna anche nel contratto smart contract per sincronizzazione
+                  try {
+                    console.log(
+                      `📊 Recording MB usage in smart contract: ${fileSizeMB} MB`
+                    );
+                    const tx = await relayContract.recordMBUsage(
+                      userAddress,
+                      fileSizeMB
+                    );
+                    await tx.wait();
+                    console.log(
+                      `✅ MB usage recorded in smart contract: ${fileSizeMB} MB`
+                    );
+                  } catch (contractError) {
+                    console.error(
+                      `❌ Error recording MB usage in contract:`,
+                      contractError.message
+                    );
+                    // Non bloccare l'upload se l'aggiornamento del contratto fallisce
+                  }
                 } catch (mbError) {
                   console.error(`❌ Error updating MB usage:`, mbError.message);
                   // Non bloccare l'upload se l'aggiornamento MB fallisce
@@ -3666,6 +3686,141 @@ async function initializeServer() {
         }
         res.json({ success: true, message: "Notes deleted." });
       });
+  });
+
+  // Endpoint per sincronizzare i MB utilizzati calcolandoli dai file effettivamente caricati
+  app.post("/api/sync-mb-usage/:userAddress", async (req, res) => {
+    try {
+      const { userAddress } = req.params;
+
+      if (!userAddress) {
+        return res.status(400).json({
+          success: false,
+          error: "Indirizzo utente richiesto",
+        });
+      }
+
+      console.log(`🔄 Syncing MB usage for user: ${userAddress}`);
+
+      // Calcola i MB totali dai file caricati
+      const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
+
+      const getUploads = () => {
+        return new Promise((resolve, reject) => {
+          let timeoutId;
+          let dataReceived = false;
+
+          timeoutId = setTimeout(() => {
+            if (!dataReceived) {
+              resolve({ uploads: [], totalSizeMB: 0, error: "Timeout" });
+            }
+          }, 10000);
+
+          uploadsNode.once((parentData) => {
+            dataReceived = true;
+            clearTimeout(timeoutId);
+
+            if (!parentData || typeof parentData !== "object") {
+              resolve({ uploads: [], totalSizeMB: 0, error: "No data" });
+              return;
+            }
+
+            const hashKeys = Object.keys(parentData).filter(
+              (key) => key !== "_"
+            );
+
+            if (hashKeys.length === 0) {
+              resolve({ uploads: [], totalSizeMB: 0, error: null });
+              return;
+            }
+
+            let uploads = [];
+            let completedReads = 0;
+            const totalReads = hashKeys.length;
+
+            hashKeys.forEach((hash) => {
+              uploadsNode.get(hash).once((fileData) => {
+                completedReads++;
+                if (fileData && fileData.hash) {
+                  uploads.push(fileData);
+                }
+
+                if (completedReads === totalReads) {
+                  const totalSizeMB = uploads.reduce(
+                    (sum, file) => sum + (file.sizeMB || 0),
+                    0
+                  );
+
+                  resolve({
+                    uploads: uploads.sort(
+                      (a, b) => b.uploadedAt - a.uploadedAt
+                    ),
+                    totalSizeMB,
+                    error: null,
+                  });
+                }
+              });
+            });
+          });
+        });
+      };
+
+      const { uploads, totalSizeMB, error } = await getUploads();
+
+      if (error) {
+        return res.status(500).json({
+          success: false,
+          error: `Errore nel calcolo dei MB: ${error}`,
+        });
+      }
+
+      console.log(
+        `📊 Calculated total MB from files: ${totalSizeMB} MB (${uploads.length} files)`
+      );
+
+      // Aggiorna l'uso MB nel database Gun
+      const mbUsageNode = gun.get("shogun").get("mb_usage").get(userAddress);
+
+      const updatedUsage = {
+        mbUsed: totalSizeMB,
+        lastUpdated: Date.now(),
+        updatedBy: "sync-endpoint",
+        fileCount: uploads.length,
+      };
+
+      // Salva nel database Gun
+      mbUsageNode.put(updatedUsage, (ack) => {
+        if (ack.err) {
+          console.error("Error saving MB usage to Gun:", ack.err);
+          return res.status(500).json({
+            success: false,
+            error: "Errore nel salvataggio dei MB nel database",
+            details: ack.err,
+          });
+        }
+
+        console.log(
+          `✅ MB usage synced: ${totalSizeMB} MB (${uploads.length} files)`
+        );
+
+        res.json({
+          success: true,
+          message: "MB usage synchronized successfully",
+          userAddress,
+          mbUsed: totalSizeMB,
+          fileCount: uploads.length,
+          lastUpdated: new Date(updatedUsage.lastUpdated).toISOString(),
+          storage: "off-chain",
+        });
+      });
+    } catch (error) {
+      console.error("Sync MB usage error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Errore interno del server",
+        details: error.message,
+      });
+    }
   });
 
   // Fallback to index.html

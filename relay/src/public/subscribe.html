@@ -202,6 +202,14 @@
                                             </svg>
                                             Refresh
                                         </button>
+                                        <button id="syncMBBtn" class="btn btn-xs btn-accent" onclick="syncMBUsage()">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none"
+                                                viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                            </svg>
+                                            Sync MB
+                                        </button>
                                     </div>
                                 </div>
                                 <div id="currentSubscriptionDetails" class="space-y-2">
@@ -1600,6 +1608,46 @@
                 statusMessage.innerHTML = '';
             }, 5000);
         }
+
+        // Sync MB usage
+        async function syncMBUsage() {
+            if (!walletAddress) {
+                showNotification('Please connect your wallet first', 'error');
+                return;
+            }
+
+            try {
+                console.log('🔄 subscribe: Sync MB usage triggered for wallet:', walletAddress);
+                showNotification('🔄 Syncing MB usage...', 'info');
+
+                const response = await fetch(`/api/sync-mb-usage/${encodeURIComponent(walletAddress)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+                console.log('🔄 subscribe: Sync MB response:', result);
+
+                if (result.success) {
+                    showNotification(`✅ MB usage synced successfully! Used: ${result.mbUsed} MB (${result.fileCount} files)`, 'success');
+
+                    // Aggiorna lo stato della sottoscrizione
+                    setTimeout(() => {
+                        checkCurrentSubscriptionStatus();
+                    }, 1000);
+                } else {
+                    showNotification(`❌ Failed to sync MB usage: ${result.error}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('💥 subscribe: Error syncing MB usage:', error);
+                showNotification(`❌ Error syncing MB usage: ${error.message}`, 'error');
+            }
+        }
+
+        // Funzione per mostrare notifiche
     </script>
 </body>
 
