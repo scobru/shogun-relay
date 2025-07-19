@@ -36,11 +36,12 @@
 
         /* Stili migliorati per i badge - design elegante e minimalista */
         .encrypted-badge {
-            @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all duration-200;
+            @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200;
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             color: white;
             box-shadow: 0 1px 3px rgba(16, 185, 129, 0.2);
             border: 1px solid rgba(16, 185, 129, 0.3);
+            min-width: 80px;
         }
 
         .encrypted-badge:hover {
@@ -49,15 +50,18 @@
         }
 
         .encrypted-badge .lock-icon {
-            opacity: 0.9;
+            width: 12px;
+            height: 12px;
+            opacity: 0.95;
         }
 
         .plain-badge {
-            @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all duration-200;
+            @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200;
             background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
             color: white;
             box-shadow: 0 1px 3px rgba(107, 114, 128, 0.2);
             border: 1px solid rgba(107, 114, 128, 0.3);
+            min-width: 80px;
         }
 
         .plain-badge:hover {
@@ -894,7 +898,7 @@
                         <div class="flex-1">
                             <div class="flex items-center gap-2 mb-1">
                                 <h4 class="font-semibold">${displayName}</h4>
-                                ${isEncrypted ? '<span class="encrypted-badge"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></svg> 🔒</span>' : '<span class="plain-badge">📄</span>'}
+                                ${isEncrypted ? '<span class="encrypted-badge"><svg xmlns="http://www.w3.org/2000/svg" class="lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></svg> Encrypted</span>' : '<span class="plain-badge">📄 Plain</span>'}
                             </div>
                             <p class="text-sm text-base-content/60">
                                 ${file.sizeMB} MB • ${new Date(file.uploadedAt).toLocaleString()}
