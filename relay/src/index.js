@@ -29,6 +29,9 @@ import http from "http";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import multer from "multer";
 
+// Importa i contratti dal pacchetto shogun-contracts
+import { DEPLOYMENTS } from "shogun-contracts/deployments.js";
+
 const namespace = "shogun";
 
 // --- IPFS Configuration ---
@@ -69,39 +72,12 @@ let showQr = process.env.RELAY_QR !== "false";
 
 // --- Config per smart contract ---
 const WEB3_PROVIDER_URL = `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`; // Sepolia
-const RELAY_CONTRACT_ADDRESS = process.env.RELAY_CONTRACT_ADDRESS;
+const RELAY_CONTRACT_ADDRESS = DEPLOYMENTS.sepolia["Relay#RelayPaymentRouter"].address;
 let relayContract;
 let provider;
-const RELAY_ABI = [
-  "function PRICE_PER_GB() view returns (uint256)",
-  "function MB_PER_GB() view returns (uint256)",
-  "function MIN_SUBSCRIPTION_AMOUNT() view returns (uint256)",
-  "function SUBSCRIPTION_DURATION() view returns (uint256)",
-  "function calculateMBFromAmount(uint256 _amount) public pure returns (uint256)",
-  "function calculateAmountFromMB(uint256 _mb) public pure returns (uint256)",
-  "function subscribeToRelay(address _relayAddress) payable",
-  "function addMBToSubscription(address _relayAddress) payable",
-  "function recordMBUsage(address _user, uint256 _mbUsed) external",
-  "function isSubscriptionActive(address _user, address _relayAddress) external view returns (bool)",
-  "function hasAvailableMB(address _user, address _relayAddress, uint256 _mbRequired) public view returns (bool)",
-  "function getRemainingMB(address _user, address _relayAddress) public view returns (uint256)",
-  "function getSubscriptionDetails(address _user, address _relayAddress) external view returns (uint256 startTime, uint256 endTime, uint256 amountPaid, uint256 mbAllocated, uint256 mbUsed, uint256 mbRemaining, bool isActive)",
-  "function getRelayDetails(address _relayAddress) external view returns (string memory url, address relayAddress, bool isActive, uint256 registeredAt)",
-  "function getAllRelays() external view returns (address[] memory)",
-  "function getActiveRelays() external view returns (address[] memory)",
-  "function isRelayRegistered(address _relayAddress) public view returns (bool)",
-  "function registerRelay(string memory _url) external",
-  "function deactivateRelay() external",
-  "function getUserSubscriptions(address _user) external view returns (address[])",
-  "function getRelaySubscribers(address _relayAddress) external view returns (address[])",
-  "function expireSubscription(address _user, address _relayAddress) external",
-  "function updateContractFee(uint256 _newFee) external",
-  "function withdrawFees() external",
-  "function transferOwnership(address _newOwner) external",
-  "function toggleEmergencyPause() external",
-  "function emergencyPause() external view returns (bool)",
-  "function findRelayByURL(string memory _url) external view returns (address)",
-];
+
+// Utilizza l'ABI dal pacchetto shogun-contracts
+const RELAY_ABI = DEPLOYMENTS.sepolia["Relay#RelayPaymentRouter"].abi;
 
 // Initialize contract with network verification
 async function initializeRelayContract() {

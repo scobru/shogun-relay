@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "activitypub-express": "^4.4.2",
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10",
+    "shogun-core": "^1.5.20"
   }
 }
