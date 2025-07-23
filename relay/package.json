@@ -21,7 +21,6 @@
   "author": "Shogun Team",
   "license": "MIT",
   "dependencies": {
-    "aws-sdk": "^2.1692.0",
     "cors": "^2.8.5",
     "dockerode": "^4.0.0",
     "dotenv": "^16.5.0",
@@ -40,7 +39,6 @@
     "self-adjusting-interval": "^1.0.0",
     "shogun-contracts": "^1.1.0",
     "shogun-core": "^1.5.1",
-    "shogun-ipfs": "^1.0.2",
     "ws": "^8.14.2"
   },
   "devDependencies": {

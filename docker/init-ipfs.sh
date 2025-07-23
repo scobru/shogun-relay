@@ -90,6 +90,27 @@ if [ ! -f "$IPFS_PATH/config" ]; then
     /usr/local/bin/ipfs config Datastore.GCPeriod '"1h"'
     /usr/local/bin/ipfs config Datastore.StorageMax '"10GB"'
     
+    # Configure API authentication using IPFS native JWT tokens
+    echo "🔐 Configuring IPFS API authentication..."
+    if [ -n "$IPFS_API_TOKEN" ]; then
+        echo "🔐 Setting up JWT authentication for IPFS API..."
+        # Create JWT token for API authentication
+        /usr/local/bin/ipfs config --json API.HTTPHeaders.Access-Control-Allow-Headers '["Authorization", "Content-Type"]'
+        /usr/local/bin/ipfs config --json API.HTTPHeaders.Access-Control-Expose-Headers '["Authorization"]'
+        
+        # Generate JWT token for the API
+        echo "🔑 Generating JWT token for API access..."
+        JWT_TOKEN=$(/usr/local/bin/ipfs auth create --api /ip4/127.0.0.1/tcp/5001 --perm admin)
+        echo "✅ JWT token generated: ${JWT_TOKEN:0:20}..."
+        
+        # Store the token for the relay to use
+        echo "$JWT_TOKEN" > /tmp/ipfs-jwt-token
+        chmod 600 /tmp/ipfs-jwt-token
+        echo "🔐 JWT token stored for relay authentication"
+    else
+        echo "⚠️ No IPFS_API_TOKEN provided, API will be publicly accessible"
+    fi
+    
     echo "✅ IPFS initialization completed"
 else
     echo "✅ IPFS already initialized"
@@ -101,6 +122,20 @@ else
         echo "❌ Failed to update critical configuration"
         exit 1
     fi
+    
+    # Update API authentication headers
+    echo "🔐 Updating API authentication configuration..."
+    /usr/local/bin/ipfs config --json API.HTTPHeaders.Access-Control-Allow-Headers '["Authorization", "Content-Type"]'
+    /usr/local/bin/ipfs config --json API.HTTPHeaders.Access-Control-Expose-Headers '["Authorization"]'
+    
+    # Regenerate JWT token if needed
+    if [ -n "$IPFS_API_TOKEN" ]; then
+        echo "🔑 Regenerating JWT token for API access..."
+        JWT_TOKEN=$(/usr/local/bin/ipfs auth create --api /ip4/127.0.0.1/tcp/5001 --perm admin)
+        echo "✅ JWT token regenerated: ${JWT_TOKEN:0:20}..."
+        echo "$JWT_TOKEN" > /tmp/ipfs-jwt-token
+        chmod 600 /tmp/ipfs-jwt-token
+    fi
 fi
 
 # Verify configuration
@@ -111,4 +146,10 @@ if ! /usr/local/bin/ipfs config show; then
 fi
 
 echo "🚀 IPFS initialization successful"
+if [ -n "$IPFS_API_TOKEN" ]; then
+    echo "🔐 API authentication configured with JWT token"
+    echo "🔑 JWT token available at: /tmp/ipfs-jwt-token"
+else
+    echo "⚠️ API authentication not configured - API is publicly accessible"
+fi
 exit 0 

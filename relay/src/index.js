@@ -491,6 +491,11 @@ async function initializeServer() {
           requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
         }
 
+        const authHeader = getIpfsAuthHeader();
+        if (authHeader) {
+          requestOptions.headers["Authorization"] = authHeader;
+        }
+
         const ipfsReq = http.request(requestOptions, (ipfsRes) => {
           let data = "";
           ipfsRes.on("data", (chunk) => (data += chunk));
@@ -686,6 +691,11 @@ async function initializeServer() {
         };
         if (IPFS_API_TOKEN) {
           requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+        }
+
+        const authHeader = getIpfsAuthHeader();
+        if (authHeader) {
+          requestOptions.headers["Authorization"] = authHeader;
         }
 
         const ipfsReq = http.request(requestOptions, (ipfsRes) => {
@@ -2163,6 +2173,11 @@ async function initializeServer() {
 
         if (IPFS_API_TOKEN) {
           requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+        }
+
+        const authHeader = getIpfsAuthHeader();
+        if (authHeader) {
+          requestOptions.headers["Authorization"] = authHeader;
         }
 
         const ipfsReq = http.request(requestOptions, (ipfsRes) => {
@@ -3694,12 +3709,6 @@ async function initializeServer() {
   app.get("/create", (req, res) => {
     res.sendFile(path.resolve(publicPath, "create.html"));
   });
-  app.get("/client", (req, res) => {
-    res.sendFile(path.resolve(publicPath, "client.html"));
-  });
-  app.get("/server", (req, res) => {
-    res.sendFile(path.resolve(publicPath, "server.html"));
-  });
   app.get("/visualGraph", (req, res) => {
     res.sendFile(path.resolve(publicPath, "visualGraph/visualGraph.html"));
   });
@@ -4941,6 +4950,35 @@ async function initializeServer() {
       console.error("Failed to get current relay address:", error);
       return null;
     }
+  }
+
+  // Function to read IPFS JWT token
+  function getIpfsJwtToken() {
+    try {
+      const fs = require('fs');
+      if (fs.existsSync('/tmp/ipfs-jwt-token')) {
+        return fs.readFileSync('/tmp/ipfs-jwt-token', 'utf8').trim();
+      }
+    } catch (error) {
+      console.log('⚠️ Could not read IPFS JWT token:', error.message);
+    }
+    return null;
+  }
+
+  // Function to get IPFS authentication header
+  function getIpfsAuthHeader() {
+    const jwtToken = getIpfsJwtToken();
+    if (jwtToken) {
+      return `Bearer ${jwtToken}`;
+    }
+    
+    // Fallback to environment variable if JWT not available
+    const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN || process.env.IPFS_API_KEY;
+    if (IPFS_API_TOKEN) {
+      return `Bearer ${IPFS_API_TOKEN}`;
+    }
+    
+    return null;
   }
 
   return {
