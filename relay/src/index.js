@@ -349,6 +349,8 @@ async function initializeServer() {
   // 🔗 CONTRACT CONFIGURATION API ROUTES (DEFINITE PRIMA DELLE ROUTE STATICHE)
   // *********************************************************************************************************
 
+  console.log('🔗 Registering contract API routes...');
+
   // Route per ottenere la configurazione completa dei contratti
   app.get('/api/contracts/config', async (req, res) => {
     try {
@@ -356,7 +358,7 @@ async function initializeServer() {
       
       // Importa le configurazioni dal pacchetto shogun-contracts
       const { DEPLOYMENTS } = await import('shogun-contracts/deployments.js');
-      const chainId = process.env.CHAIN_ID || '11155111'; // Sepolia di default
+      const chainId = process.env.CHAIN_ID || 'sepolia'; // Sepolia di default
       
       if (!DEPLOYMENTS[chainId]) {
         return res.status(404).json({
@@ -403,7 +405,7 @@ async function initializeServer() {
       console.log(`📋 contracts/${contractName}: Requesting contract details`);
       
       const { DEPLOYMENTS } = await import('shogun-contracts/deployments.js');
-      const chainId = process.env.CHAIN_ID || '11155111';
+      const chainId = process.env.CHAIN_ID || 'sepolia';
       
       if (!DEPLOYMENTS[chainId]) {
         return res.status(404).json({
@@ -461,7 +463,7 @@ async function initializeServer() {
       console.log(`📋 contracts/${contractName}/abi: Requesting contract ABI`);
       
       const { DEPLOYMENTS } = await import('shogun-contracts/deployments.js');
-      const chainId = process.env.CHAIN_ID || '11155111';
+      const chainId = process.env.CHAIN_ID || 'sepolia';
       
       if (!DEPLOYMENTS[chainId]) {
         return res.status(404).json({
@@ -518,7 +520,7 @@ async function initializeServer() {
       console.log(`📋 contracts/${contractName}/address: Requesting contract address`);
       
       const { DEPLOYMENTS } = await import('shogun-contracts/deployments.js');
-      const chainId = process.env.CHAIN_ID || '11155111';
+      const chainId = process.env.CHAIN_ID || 'sepolia';
       
       if (!DEPLOYMENTS[chainId]) {
         return res.status(404).json({
@@ -574,7 +576,7 @@ async function initializeServer() {
       console.log('📋 contracts: Requesting available contracts list');
       
       const { DEPLOYMENTS } = await import('shogun-contracts/deployments.js');
-      const chainId = process.env.CHAIN_ID || '11155111';
+      const chainId = process.env.CHAIN_ID || 'sepolia';
       
       if (!DEPLOYMENTS[chainId]) {
         return res.status(404).json({
@@ -612,6 +614,8 @@ async function initializeServer() {
       });
     }
   });
+
+  console.log('✅ Contract API routes registered successfully');
 
   // Route statiche (DEFINITE DOPO LE API)
   app.use(express.static(publicPath));
