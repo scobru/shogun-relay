@@ -141,6 +141,22 @@ curl -X POST https://your-subdomain.ngrok.io/api/v1/auth/login \
   -d '{"email":"test@example.com","passphrase":"password123"}'
 ```
 
+### Test Contract APIs
+
+```bash
+# Get all available contracts
+curl https://your-subdomain.ngrok.io/api/contracts
+
+# Get relay payment router ABI
+curl https://your-subdomain.ngrok.io/api/contracts/relay-payment-router/abi
+
+# Get contract address
+curl https://your-subdomain.ngrok.io/api/contracts/relay-payment-router/address
+
+# Get complete configuration
+curl https://your-subdomain.ngrok.io/api/contracts/config
+```
+
 ## 🏠 Option 2: Local Development (HTTP Only)
 
 For local testing without HTTPS:

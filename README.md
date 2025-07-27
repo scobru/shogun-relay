@@ -2,6 +2,59 @@
 
 A complete IPFS relay server with integrated authentication and decentralized user management system.
 
+## 🔗 Contract Configuration APIs
+
+The relay includes comprehensive APIs for accessing contract configurations, ABIs, and addresses directly from the `shogun-contracts` package:
+
+### Contract API Endpoints
+
+```bash
+# Get all available contracts
+GET /api/contracts
+
+# Get complete contract configuration
+GET /api/contracts/config
+
+# Get specific contract details
+GET /api/contracts/:contractName
+
+# Get contract ABI only
+GET /api/contracts/:contractName/abi
+
+# Get contract address only
+GET /api/contracts/:contractName/address
+```
+
+### Available Contract Names
+
+- `relay-payment-router` - RelayPaymentRouter contract
+- `stealth-pool` - StealthPool contract
+- `pair-recovery` - PairRecovery contract
+- `integrity` - Integrity contract
+- `payment-forwarder` - PaymentForwarder contract
+- `stealth-key-registry` - StealthKeyRegistry contract
+- `bridge-dex` - BridgeDex contract
+
+### Example Usage
+
+```javascript
+// Dynamic contract loading
+const abiResponse = await fetch('/api/contracts/relay-payment-router/abi');
+const addressResponse = await fetch('/api/contracts/relay-payment-router/address');
+
+const abiData = await abiResponse.json();
+const addressData = await addressResponse.json();
+
+// Use with ethers.js
+const contract = new ethers.Contract(
+  addressData.address,
+  abiData.abi,
+  provider
+);
+```
+
+For detailed documentation, see [CONTRACT_APIS.md](relay/CONTRACT_APIS.md).
+
 ## 🔐 User Authentication
 
 The relay includes a complete user authentication system based on GunDB:
