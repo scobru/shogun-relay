@@ -72,7 +72,8 @@ let showQr = process.env.RELAY_QR !== "false";
 
 // --- Config per smart contract ---
 const WEB3_PROVIDER_URL = `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`; // Sepolia
-const RELAY_CONTRACT_ADDRESS = DEPLOYMENTS.sepolia["Relay#RelayPaymentRouter"].address;
+const RELAY_CONTRACT_ADDRESS =
+  DEPLOYMENTS.sepolia["Relay#RelayPaymentRouter"].address;
 let relayContract;
 let provider;
 
@@ -344,6 +345,288 @@ async function initializeServer() {
   // Middleware
   app.use(cors());
   app.use(Gun.serve);
+  // Route per ottenere la configurazione completa dei contratti
+  app.get("/api/contracts/config", async (req, res) => {
+    try {
+      console.log("📋 contracts/config: Requesting contract configuration");
+
+      // Importa le configurazioni dal pacchetto shogun-contracts
+      const { DEPLOYMENTS } = await import("shogun-contracts/deployments.js");
+      const chainId = process.env.CHAIN_ID || "11155111"; // Sepolia di default
+
+      if (!DEPLOYMENTS[chainId]) {
+        return res.status(404).json({
+          success: false,
+          error: `No deployments found for chain ID: ${chainId}`,
+        });
+      }
+
+      const chainDeployments = DEPLOYMENTS[chainId];
+
+      // Estrai solo i contratti che ci interessano
+      const contracts = {
+        relayPaymentRouter:
+          chainDeployments["Relay#RelayPaymentRouter"] || null,
+        stealthPool: chainDeployments["Stealth#StealthPool"] || null,
+        pairRecovery: chainDeployments["Recovery#PairRecovery"] || null,
+        integrity: chainDeployments["Security#Integrity"] || null,
+        paymentForwarder: chainDeployments["Stealth#PayamentForwarder"] || null,
+        stealthKeyRegistry:
+          chainDeployments["Stealth#StealthKeyRegistry"] || null,
+        bridgeDex: chainDeployments["Bridge#BridgeDex"] || null,
+      };
+
+      console.log(
+        "📋 contracts/config: Returning contract configuration for chain:",
+        chainId
+      );
+
+      res.json({
+        success: true,
+        chainId: chainId,
+        contracts: contracts,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error("❌ contracts/config: Error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to load contract configuration",
+        details: error.message,
+      });
+    }
+  });
+
+  // Route per ottenere un contratto specifico
+  app.get("/api/contracts/:contractName", async (req, res) => {
+    try {
+      const { contractName } = req.params;
+      console.log(`📋 contracts/${contractName}: Requesting contract details`);
+
+      const { DEPLOYMENTS } = await import("shogun-contracts/deployments.js");
+      const chainId = process.env.CHAIN_ID || "11155111";
+
+      if (!DEPLOYMENTS[chainId]) {
+        return res.status(404).json({
+          success: false,
+          error: `No deployments found for chain ID: ${chainId}`,
+        });
+      }
+
+      const chainDeployments = DEPLOYMENTS[chainId];
+
+      // Mappa dei nomi dei contratti
+      const contractMapping = {
+        "relay-payment-router": "Relay#RelayPaymentRouter",
+        "stealth-pool": "Stealth#StealthPool",
+        "pair-recovery": "Recovery#PairRecovery",
+        integrity: "Security#Integrity",
+        "payment-forwarder": "Stealth#PayamentForwarder",
+        "stealth-key-registry": "Stealth#StealthKeyRegistry",
+        "bridge-dex": "Bridge#BridgeDex",
+      };
+
+      const fullContractName = contractMapping[contractName];
+      if (!fullContractName || !chainDeployments[fullContractName]) {
+        return res.status(404).json({
+          success: false,
+          error: `Contract not found: ${contractName}`,
+        });
+      }
+
+      const contract = chainDeployments[fullContractName];
+
+      console.log(`📋 contracts/${contractName}: Returning contract details`);
+
+      res.json({
+        success: true,
+        chainId: chainId,
+        contractName: contractName,
+        contract: contract,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error(`❌ contracts/${req.params.contractName}: Error:`, error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to load contract details",
+        details: error.message,
+      });
+    }
+  });
+
+  // Route per ottenere solo l'ABI di un contratto
+  app.get("/api/contracts/:contractName/abi", async (req, res) => {
+    try {
+      const { contractName } = req.params;
+      console.log(`📋 contracts/${contractName}/abi: Requesting contract ABI`);
+
+      const { DEPLOYMENTS } = await import("shogun-contracts/deployments.js");
+      const chainId = process.env.CHAIN_ID || "11155111";
+
+      if (!DEPLOYMENTS[chainId]) {
+        return res.status(404).json({
+          success: false,
+          error: `No deployments found for chain ID: ${chainId}`,
+        });
+      }
+
+      const chainDeployments = DEPLOYMENTS[chainId];
+
+      const contractMapping = {
+        "relay-payment-router": "Relay#RelayPaymentRouter",
+        "stealth-pool": "Stealth#StealthPool",
+        "pair-recovery": "Recovery#PairRecovery",
+        integrity: "Security#Integrity",
+        "payment-forwarder": "Stealth#PayamentForwarder",
+        "stealth-key-registry": "Stealth#StealthKeyRegistry",
+        "bridge-dex": "Bridge#BridgeDex",
+      };
+
+      const fullContractName = contractMapping[contractName];
+      if (!fullContractName || !chainDeployments[fullContractName]) {
+        return res.status(404).json({
+          success: false,
+          error: `Contract not found: ${contractName}`,
+        });
+      }
+
+      const contract = chainDeployments[fullContractName];
+
+      console.log(`📋 contracts/${contractName}/abi: Returning contract ABI`);
+
+      res.json({
+        success: true,
+        chainId: chainId,
+        contractName: contractName,
+        abi: contract.abi,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error(
+        `❌ contracts/${req.params.contractName}/abi: Error:`,
+        error
+      );
+      res.status(500).json({
+        success: false,
+        error: "Failed to load contract ABI",
+        details: error.message,
+      });
+    }
+  });
+
+  // Route per ottenere solo l'indirizzo di un contratto
+  app.get("/api/contracts/:contractName/address", async (req, res) => {
+    try {
+      const { contractName } = req.params;
+      console.log(
+        `📋 contracts/${contractName}/address: Requesting contract address`
+      );
+
+      const { DEPLOYMENTS } = await import("shogun-contracts/deployments.js");
+      const chainId = process.env.CHAIN_ID || "11155111";
+
+      if (!DEPLOYMENTS[chainId]) {
+        return res.status(404).json({
+          success: false,
+          error: `No deployments found for chain ID: ${chainId}`,
+        });
+      }
+
+      const chainDeployments = DEPLOYMENTS[chainId];
+
+      const contractMapping = {
+        "relay-payment-router": "Relay#RelayPaymentRouter",
+        "stealth-pool": "Stealth#StealthPool",
+        "pair-recovery": "Recovery#PairRecovery",
+        integrity: "Security#Integrity",
+        "payment-forwarder": "Stealth#PayamentForwarder",
+        "stealth-key-registry": "Stealth#StealthKeyRegistry",
+        "bridge-dex": "Bridge#BridgeDex",
+      };
+
+      const fullContractName = contractMapping[contractName];
+      if (!fullContractName || !chainDeployments[fullContractName]) {
+        return res.status(404).json({
+          success: false,
+          error: `Contract not found: ${contractName}`,
+        });
+      }
+
+      const contract = chainDeployments[fullContractName];
+
+      console.log(
+        `📋 contracts/${contractName}/address: Returning contract address`
+      );
+
+      res.json({
+        success: true,
+        chainId: chainId,
+        contractName: contractName,
+        address: contract.address,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error(
+        `❌ contracts/${req.params.contractName}/address: Error:`,
+        error
+      );
+      res.status(500).json({
+        success: false,
+        error: "Failed to load contract address",
+        details: error.message,
+      });
+    }
+  });
+
+  // Route per ottenere la lista di tutti i contratti disponibili
+  app.get("/api/contracts", async (req, res) => {
+    try {
+      console.log("📋 contracts: Requesting available contracts list");
+
+      const { DEPLOYMENTS } = await import("shogun-contracts/deployments.js");
+      const chainId = process.env.CHAIN_ID || "11155111";
+
+      if (!DEPLOYMENTS[chainId]) {
+        return res.status(404).json({
+          success: false,
+          error: `No deployments found for chain ID: ${chainId}`,
+        });
+      }
+
+      const chainDeployments = DEPLOYMENTS[chainId];
+
+      // Estrai solo i nomi dei contratti disponibili
+      const availableContracts = Object.keys(chainDeployments).map(
+        (contractName) => {
+          const shortName = contractName.split("#")[1] || contractName;
+          return {
+            name: shortName,
+            fullName: contractName,
+            address: chainDeployments[contractName].address,
+          };
+        }
+      );
+
+      console.log("📋 contracts: Returning available contracts list");
+
+      res.json({
+        success: true,
+        chainId: chainId,
+        contracts: availableContracts,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error("❌ contracts: Error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to load contracts list",
+        details: error.message,
+      });
+    }
+  });
+
+  // Route statiche (DEFINITE DOPO LE API)
   app.use(express.static(publicPath));
 
   // IPFS File Upload Endpoint
@@ -1913,18 +2196,21 @@ async function initializeServer() {
   const gun = Gun(gunConfig);
 
   // Configura l'istanza Gun per le route di autenticazione
-  app.set('gunInstance', gun);
-  
+  app.set("gunInstance", gun);
+
   // Esponi l'istanza Gun globalmente per le route
   global.gunInstance = gun;
 
   // Importa e configura le route di autenticazione
   try {
-    const routes = require('./routes/index.js');
+    const routes = require("./routes/index.js");
     routes(app);
-    console.log('✅ Route di autenticazione configurate con successo');
+    console.log("✅ Route di autenticazione configurate con successo");
   } catch (error) {
-    console.error('❌ Errore nel caricamento delle route di autenticazione:', error);
+    console.error(
+      "❌ Errore nel caricamento delle route di autenticazione:",
+      error
+    );
   }
 
   // Initialize garbage collector now that gun is ready
@@ -2577,13 +2863,8 @@ async function initializeServer() {
               relayAddress
             );
 
-          const [
-            startTime,
-            endTime,
-            amountPaid,
-            mbAllocated,
-            isActiveStatus,
-          ] = subscriptionDetails;
+          const [startTime, endTime, amountPaid, mbAllocated, isActiveStatus] =
+            subscriptionDetails;
 
           // Ottieni l'uso MB off-chain dal database Gun
           const mbUsedNum = await getOffChainMBUsage(userAddress);
@@ -2744,13 +3025,8 @@ async function initializeServer() {
         }
 
         if (isSubscribed && subscriptionDetails) {
-          const [
-            startTime,
-            endTime,
-            amountPaid,
-            mbAllocated,
-            isActive,
-          ] = subscriptionDetails;
+          const [startTime, endTime, amountPaid, mbAllocated, isActive] =
+            subscriptionDetails;
 
           res.json({
             success: true,
@@ -2882,13 +3158,8 @@ async function initializeServer() {
               relayAddress
             );
 
-          const [
-            startTime,
-            endTime,
-            amountPaid,
-            mbAllocated,
-            isActiveStatus,
-          ] = subscriptionDetails;
+          const [startTime, endTime, amountPaid, mbAllocated, isActiveStatus] =
+            subscriptionDetails;
 
           // Ottieni l'uso MB off-chain dal database Gun
           const mbUsedNum = await getOffChainMBUsage(userAddress);
@@ -4808,12 +5079,12 @@ async function initializeServer() {
   // Function to read IPFS JWT token
   function getIpfsJwtToken() {
     try {
-      const fs = require('fs');
-      if (fs.existsSync('/tmp/ipfs-jwt-token')) {
-        return fs.readFileSync('/tmp/ipfs-jwt-token', 'utf8').trim();
+      const fs = require("fs");
+      if (fs.existsSync("/tmp/ipfs-jwt-token")) {
+        return fs.readFileSync("/tmp/ipfs-jwt-token", "utf8").trim();
       }
     } catch (error) {
-      console.log('⚠️ Could not read IPFS JWT token:', error.message);
+      console.log("⚠️ Could not read IPFS JWT token:", error.message);
     }
     return null;
   }
@@ -4824,280 +5095,16 @@ async function initializeServer() {
     if (jwtToken) {
       return `Bearer ${jwtToken}`;
     }
-    
+
     // Fallback to environment variable if JWT not available
-    const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN || process.env.IPFS_API_KEY;
+    const IPFS_API_TOKEN =
+      process.env.IPFS_API_TOKEN || process.env.IPFS_API_KEY;
     if (IPFS_API_TOKEN) {
       return `Bearer ${IPFS_API_TOKEN}`;
     }
-    
+
     return null;
   }
-
-  // *********************************************************************************************************
-  // 🔗 CONTRACT CONFIGURATION API ROUTES
-  // *********************************************************************************************************
-
-  // Route per ottenere la configurazione completa dei contratti
-  app.get('/api/contracts/config', async (req, res) => {
-    try {
-      console.log('📋 contracts/config: Requesting contract configuration');
-      
-      // Importa le configurazioni dal pacchetto shogun-contracts
-      const deployments = require('shogun-contracts/deployments.json');
-      const chainId = process.env.CHAIN_ID || '11155111'; // Sepolia di default
-      
-      if (!deployments[chainId]) {
-        return res.status(404).json({
-          success: false,
-          error: `No deployments found for chain ID: ${chainId}`
-        });
-      }
-
-      const chainDeployments = deployments[chainId];
-      
-      // Estrai solo i contratti che ci interessano
-      const contracts = {
-        relayPaymentRouter: chainDeployments['Relay#RelayPaymentRouter'] || null,
-        stealthPool: chainDeployments['Stealth#StealthPool'] || null,
-        pairRecovery: chainDeployments['Recovery#PairRecovery'] || null,
-        integrity: chainDeployments['Security#Integrity'] || null,
-        paymentForwarder: chainDeployments['Stealth#PayamentForwarder'] || null,
-        stealthKeyRegistry: chainDeployments['Stealth#StealthKeyRegistry'] || null,
-        bridgeDex: chainDeployments['Bridge#BridgeDex'] || null
-      };
-
-      console.log('📋 contracts/config: Returning contract configuration for chain:', chainId);
-      
-      res.json({
-        success: true,
-        chainId: chainId,
-        contracts: contracts,
-        timestamp: Date.now()
-      });
-    } catch (error) {
-      console.error('❌ contracts/config: Error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to load contract configuration',
-        details: error.message
-      });
-    }
-  });
-
-  // Route per ottenere un contratto specifico
-  app.get('/api/contracts/:contractName', async (req, res) => {
-    try {
-      const { contractName } = req.params;
-      console.log(`📋 contracts/${contractName}: Requesting contract details`);
-      
-      const deployments = require('shogun-contracts/deployments.json');
-      const chainId = process.env.CHAIN_ID || '11155111';
-      
-      if (!deployments[chainId]) {
-        return res.status(404).json({
-          success: false,
-          error: `No deployments found for chain ID: ${chainId}`
-        });
-      }
-
-      const chainDeployments = deployments[chainId];
-      
-      // Mappa dei nomi dei contratti
-      const contractMapping = {
-        'relay-payment-router': 'Relay#RelayPaymentRouter',
-        'stealth-pool': 'Stealth#StealthPool',
-        'pair-recovery': 'Recovery#PairRecovery',
-        'integrity': 'Security#Integrity',
-        'payment-forwarder': 'Stealth#PayamentForwarder',
-        'stealth-key-registry': 'Stealth#StealthKeyRegistry',
-        'bridge-dex': 'Bridge#BridgeDex'
-      };
-
-      const fullContractName = contractMapping[contractName];
-      if (!fullContractName || !chainDeployments[fullContractName]) {
-        return res.status(404).json({
-          success: false,
-          error: `Contract not found: ${contractName}`
-        });
-      }
-
-      const contract = chainDeployments[fullContractName];
-      
-      console.log(`📋 contracts/${contractName}: Returning contract details`);
-      
-      res.json({
-        success: true,
-        chainId: chainId,
-        contractName: contractName,
-        contract: contract,
-        timestamp: Date.now()
-      });
-    } catch (error) {
-      console.error(`❌ contracts/${req.params.contractName}: Error:`, error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to load contract details',
-        details: error.message
-      });
-    }
-  });
-
-  // Route per ottenere solo l'ABI di un contratto
-  app.get('/api/contracts/:contractName/abi', async (req, res) => {
-    try {
-      const { contractName } = req.params;
-      console.log(`📋 contracts/${contractName}/abi: Requesting contract ABI`);
-      
-      const deployments = require('shogun-contracts/deployments.json');
-      const chainId = process.env.CHAIN_ID || '11155111';
-      
-      if (!deployments[chainId]) {
-        return res.status(404).json({
-          success: false,
-          error: `No deployments found for chain ID: ${chainId}`
-        });
-      }
-
-      const chainDeployments = deployments[chainId];
-      
-      const contractMapping = {
-        'relay-payment-router': 'Relay#RelayPaymentRouter',
-        'stealth-pool': 'Stealth#StealthPool',
-        'pair-recovery': 'Recovery#PairRecovery',
-        'integrity': 'Security#Integrity',
-        'payment-forwarder': 'Stealth#PayamentForwarder',
-        'stealth-key-registry': 'Stealth#StealthKeyRegistry',
-        'bridge-dex': 'Bridge#BridgeDex'
-      };
-
-      const fullContractName = contractMapping[contractName];
-      if (!fullContractName || !chainDeployments[fullContractName]) {
-        return res.status(404).json({
-          success: false,
-          error: `Contract not found: ${contractName}`
-        });
-      }
-
-      const contract = chainDeployments[fullContractName];
-      
-      console.log(`📋 contracts/${contractName}/abi: Returning contract ABI`);
-      
-      res.json({
-        success: true,
-        chainId: chainId,
-        contractName: contractName,
-        abi: contract.abi,
-        timestamp: Date.now()
-      });
-    } catch (error) {
-      console.error(`❌ contracts/${req.params.contractName}/abi: Error:`, error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to load contract ABI',
-        details: error.message
-      });
-    }
-  });
-
-  // Route per ottenere solo l'indirizzo di un contratto
-  app.get('/api/contracts/:contractName/address', async (req, res) => {
-    try {
-      const { contractName } = req.params;
-      console.log(`📋 contracts/${contractName}/address: Requesting contract address`);
-      
-      const deployments = require('shogun-contracts/deployments.json');
-      const chainId = process.env.CHAIN_ID || '11155111';
-      
-      if (!deployments[chainId]) {
-        return res.status(404).json({
-          success: false,
-          error: `No deployments found for chain ID: ${chainId}`
-        });
-      }
-
-      const chainDeployments = deployments[chainId];
-      
-      const contractMapping = {
-        'relay-payment-router': 'Relay#RelayPaymentRouter',
-        'stealth-pool': 'Stealth#StealthPool',
-        'pair-recovery': 'Recovery#PairRecovery',
-        'integrity': 'Security#Integrity',
-        'payment-forwarder': 'Stealth#PayamentForwarder',
-        'stealth-key-registry': 'Stealth#StealthKeyRegistry',
-        'bridge-dex': 'Bridge#BridgeDex'
-      };
-
-      const fullContractName = contractMapping[contractName];
-      if (!fullContractName || !chainDeployments[fullContractName]) {
-        return res.status(404).json({
-          success: false,
-          error: `Contract not found: ${contractName}`
-        });
-      }
-
-      const contract = chainDeployments[fullContractName];
-      
-      console.log(`📋 contracts/${contractName}/address: Returning contract address`);
-      
-      res.json({
-        success: true,
-        chainId: chainId,
-        contractName: contractName,
-        address: contract.address,
-        timestamp: Date.now()
-      });
-    } catch (error) {
-      console.error(`❌ contracts/${req.params.contractName}/address: Error:`, error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to load contract address',
-        details: error.message
-      });
-    }
-  });
-
-  // Route per ottenere la lista di tutti i contratti disponibili
-  app.get('/api/contracts', async (req, res) => {
-    try {
-      console.log('📋 contracts: Requesting available contracts list');
-      
-      const deployments = require('shogun-contracts/deployments.json');
-      const chainId = process.env.CHAIN_ID || '11155111';
-      
-      if (!deployments[chainId]) {
-        return res.status(404).json({
-          success: false,
-          error: `No deployments found for chain ID: ${chainId}`
-        });
-      }
-
-      const chainDeployments = deployments[chainId];
-      const availableContracts = Object.keys(chainDeployments).map(name => ({
-        name: name,
-        address: chainDeployments[name].address,
-        shortName: name.split('#')[1]?.toLowerCase().replace(/([a-z])([A-Z])/g, '$1-$2') || name.toLowerCase()
-      }));
-      
-      console.log('📋 contracts: Returning available contracts list');
-      
-      res.json({
-        success: true,
-        chainId: chainId,
-        contracts: availableContracts,
-        timestamp: Date.now()
-      });
-    } catch (error) {
-      console.error('❌ contracts: Error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to load contracts list',
-        details: error.message
-      });
-    }
-  });
-
-  // *********************************************************************************************************
 
   return {
     server,
