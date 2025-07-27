@@ -820,6 +820,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'x-user-address': walletAddress,
                         'x-wallet-signature': authSignature,
                         'x-signature-message': 'I Love Shogun'
                     }
