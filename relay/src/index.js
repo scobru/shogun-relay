@@ -2887,8 +2887,6 @@ async function initializeServer() {
             endTime,
             amountPaid,
             mbAllocated,
-            contractMbUsed,
-            contractMbRemaining,
             isActiveStatus,
           ] = subscriptionDetails;
 
