@@ -1912,6 +1912,21 @@ async function initializeServer() {
 
   const gun = Gun(gunConfig);
 
+  // Configura l'istanza Gun per le route di autenticazione
+  app.set('gunInstance', gun);
+  
+  // Esponi l'istanza Gun globalmente per le route
+  global.gunInstance = gun;
+
+  // Importa e configura le route di autenticazione
+  try {
+    const routes = require('./routes/index.js');
+    routes(app);
+    console.log('✅ Route di autenticazione configurate con successo');
+  } catch (error) {
+    console.error('❌ Errore nel caricamento delle route di autenticazione:', error);
+  }
+
   // Initialize garbage collector now that gun is ready
   initializeGarbageCollector();
 

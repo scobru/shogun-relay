@@ -20,7 +20,13 @@ const getGunInstance = (req) => {
 // Middleware per verificare l'autorizzazione
 const getUserByPubKey = (pubkey, callback) => {
   try {
-    const gun = getGunInstance({ app: { get: () => gun } })
+    // Ottieni l'istanza Gun dal database globale
+    const gun = global.gunInstance || require('../index.js').gun
+    
+    if (!gun) {
+      return callback(new Error('Gun instance non disponibile'), null)
+    }
+    
     gun.user(pubkey).once(data => {
       if (!data) {
         return callback(null, {

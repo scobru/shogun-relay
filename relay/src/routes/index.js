@@ -11,12 +11,9 @@ const generalLimiter = rateLimit({
   }
 })
 
-module.exports = (app, swaggerUi, swaggerUiSetup) => {
+module.exports = (app) => {
   // Configurazione generale delle route
   const baseRoute = '/api/v1'
-  
-  // Route per la documentazione API
-  app.use(`${baseRoute}/docs`, generalLimiter, swaggerUi.serve, swaggerUiSetup)
   
   // Route di autenticazione
   app.use(`${baseRoute}/auth`, require('./auth'))
@@ -25,7 +22,7 @@ module.exports = (app, swaggerUi, swaggerUiSetup) => {
   app.use(`${baseRoute}/users`, require('./users'))
   
   // Route per la gestione file IPFS (esistenti)
-  app.use(`${baseRoute}/ipfs`, generalLimiter, (req, res, next) => {
+  app.use(`${baseRoute}/ipfs`, (req, res, next) => {
     // Reindirizza le route IPFS esistenti
     if (req.path.startsWith('/upload')) {
       req.url = req.url.replace('/ipfs/upload', '/ipfs-upload')
