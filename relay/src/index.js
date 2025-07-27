@@ -2582,175 +2582,20 @@ async function initializeServer() {
             endTime,
             amountPaid,
             mbAllocated,
-            contractMbUsed,
-            contractMbRemaining,
             isActiveStatus,
           ] = subscriptionDetails;
 
           // Ottieni l'uso MB off-chain dal database Gun
-          const mbUsageNode = gun
-            .get("shogun")
-            .get("mb_usage")
-            .get(userAddress);
-          const offChainUsage = await new Promise((resolve) => {
-            const timeoutId = setTimeout(() => {
-              console.warn(
-                `⚠️ GunDB mb_usage read timeout for ${userAddress}, will recalculate from files`
-              );
-              resolve({ mbUsed: 0, lastUpdated: Date.now(), timeout: true });
-            }, 1500); // Timeout ridotto a 1.5 secondi
-
-            mbUsageNode.once((data) => {
-              clearTimeout(timeoutId);
-              resolve(data || { mbUsed: 0, lastUpdated: Date.now() });
-            });
-          });
-
-          // Se i dati off-chain non sono affidabili (timeout o 0), ricalcola dai file esistenti
-          let mbUsedNum = offChainUsage.mbUsed || Number(contractMbUsed);
-
-          if (offChainUsage.timeout || offChainUsage.mbUsed === 0) {
-            console.log(
-              `🔄 Recalculating MB usage from existing files for ${userAddress}`
-            );
-
-            try {
-              // Ottieni tutti i file dell'utente
-              const uploadsNode = gun
-                .get("shogun")
-                .get("uploads")
-                .get(userAddress);
-              const userFiles = await new Promise((resolve) => {
-                const timeoutId = setTimeout(() => {
-                  console.warn(
-                    `⚠️ GunDB uploads read timeout for ${userAddress}, using fallback calculation`
-                  );
-                  resolve([]);
-                }, 2500); // Timeout ridotto a 2.5 secondi
-
-                uploadsNode.once((parentData) => {
-                  clearTimeout(timeoutId);
-
-                  if (!parentData || typeof parentData !== "object") {
-                    resolve([]);
-                    return;
-                  }
-
-                  const hashKeys = Object.keys(parentData).filter(
-                    (key) => key !== "_"
-                  );
-                  let uploadsArray = [];
-                  let completedReads = 0;
-                  const totalReads = hashKeys.length;
-
-                  if (totalReads === 0) {
-                    resolve([]);
-                    return;
-                  }
-
-                  // Timeout per ogni singola lettura di file
-                  const fileReadTimeout = setTimeout(() => {
-                    console.warn(`⚠️ File read timeout, using partial data`);
-                    resolve(uploadsArray);
-                  }, 3000);
-
-                  hashKeys.forEach((hash) => {
-                    uploadsNode.get(hash).once((uploadData) => {
-                      completedReads++;
-                      if (uploadData && uploadData.sizeMB) {
-                        uploadsArray.push(uploadData);
-                      }
-                      if (completedReads === totalReads) {
-                        clearTimeout(fileReadTimeout);
-                        resolve(uploadsArray);
-                      }
-                    });
-                  });
-                });
-              });
-
-              // Calcola il totale dei MB dai file
-              const calculatedMbUsed = userFiles.reduce(
-                (sum, file) => sum + (file.sizeMB || 0),
-                0
-              );
-              console.log(
-                `📊 Calculated MB usage from files: ${calculatedMbUsed} MB (${userFiles.length} files)`
-              );
-
-              // Usa il valore calcolato se è maggiore di 0
-              if (calculatedMbUsed > 0) {
-                mbUsedNum = calculatedMbUsed;
-
-                // Aggiorna anche i dati off-chain per futuri utilizzi (in background)
-                const updatedUsage = {
-                  mbUsed: calculatedMbUsed,
-                  lastUpdated: Date.now(),
-                  updatedBy: "recalculation-from-files",
-                };
-
-                mbUsageNode.put(updatedUsage, (ack) => {
-                  if (ack.err) {
-                    console.error(
-                      "Error updating recalculated MB usage:",
-                      ack.err
-                    );
-                  } else {
-                    console.log(
-                      `✅ Updated off-chain MB usage with recalculated value: ${calculatedMbUsed} MB`
-                    );
-                  }
-                });
-              } else {
-                // Se non riusciamo a calcolare dai file, usa il valore del contratto
-                console.log(
-                  `📊 Using contract MB usage as fallback: ${Number(
-                    contractMbUsed
-                  )} MB`
-                );
-                mbUsedNum = Number(contractMbUsed);
-              }
-            } catch (recalcError) {
-              console.error(
-                "Error recalculating MB usage from files:",
-                recalcError
-              );
-              // Fallback al valore del contratto
-              mbUsedNum = Number(contractMbUsed);
-            }
-          }
-
+          const mbUsedNum = await getOffChainMBUsage(userAddress);
           const mbAllocatedNum = Number(mbAllocated);
           const mbRemainingNum = Math.max(0, mbAllocatedNum - mbUsedNum);
 
           const usagePercentage =
             mbAllocatedNum > 0 ? (mbUsedNum / mbAllocatedNum) * 100 : 0;
 
-          console.log(
-            `📊 user-subscription-details: Final calculation for ${userAddress}:`
-          );
-          console.log(
-            `📊 user-subscription-details: - MB Allocated: ${mbAllocatedNum}`
-          );
-          console.log(
-            `📊 user-subscription-details: - MB Used: ${mbUsedNum} (${
-              offChainUsage.timeout
-                ? "recalculated from files"
-                : "from off-chain"
-            })`
-          );
-          console.log(
-            `📊 user-subscription-details: - MB Remaining: ${mbRemainingNum}`
-          );
-          console.log(
-            `📊 user-subscription-details: - Usage: ${usagePercentage.toFixed(
-              2
-            )}%`
-          );
-
           res.json({
             success: true,
-            userAddress,
+            identifier,
             relayAddress,
             subscription: {
               isActive: isActiveStatus,
@@ -2760,7 +2605,6 @@ async function initializeServer() {
               mbAllocated: mbAllocatedNum,
               mbUsed: mbUsedNum,
               mbRemaining: mbRemainingNum,
-              usagePercentage: Math.round(usagePercentage * 100) / 100,
               startDate: new Date(Number(startTime) * 1000).toISOString(),
               endDate: new Date(Number(endTime) * 1000).toISOString(),
               daysRemaining: Math.max(
@@ -2769,8 +2613,6 @@ async function initializeServer() {
                   (Number(endTime) * 1000 - Date.now()) / (1000 * 60 * 60 * 24)
                 )
               ),
-              storage: "off-chain",
-              lastUpdated: new Date(offChainUsage.lastUpdated).toISOString(),
             },
           });
         } else {
@@ -2907,8 +2749,6 @@ async function initializeServer() {
             endTime,
             amountPaid,
             mbAllocated,
-            mbUsed,
-            mbRemaining,
             isActive,
           ] = subscriptionDetails;
 
@@ -2922,8 +2762,8 @@ async function initializeServer() {
               endTime: Number(endTime),
               amountPaid: ethers.formatEther(amountPaid),
               mbAllocated: Number(mbAllocated),
-              mbUsed: Number(mbUsed),
-              mbRemaining: Number(mbRemaining),
+              mbUsed: 0, // Non disponibile dal contratto
+              mbRemaining: Number(mbAllocated), // Assumiamo che non sia stato usato
               startDate: new Date(Number(startTime) * 1000).toISOString(),
               endDate: new Date(Number(endTime) * 1000).toISOString(),
               daysRemaining: Math.max(
