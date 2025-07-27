@@ -683,7 +683,7 @@ async function initializeServer() {
         const requestOptions = {
           hostname: "127.0.0.1",
           port: 5001,
-          path: "/api/v0/add?wrap-with-directory=false",
+          path: "/api/v0/add?wrap-with-directory=false&pin=false",
           method: "POST",
           headers: {
             ...formData.getHeaders(),
