@@ -355,17 +355,17 @@ async function initializeServer() {
       console.log('📋 contracts/config: Requesting contract configuration');
       
       // Importa le configurazioni dal pacchetto shogun-contracts
-      const deployments = require('shogun-contracts/deployments.json');
+      const { DEPLOYMENTS } = await import('shogun-contracts/deployments.js');
       const chainId = process.env.CHAIN_ID || '11155111'; // Sepolia di default
       
-      if (!deployments[chainId]) {
+      if (!DEPLOYMENTS[chainId]) {
         return res.status(404).json({
           success: false,
           error: `No deployments found for chain ID: ${chainId}`
         });
       }
 
-      const chainDeployments = deployments[chainId];
+      const chainDeployments = DEPLOYMENTS[chainId];
       
       // Estrai solo i contratti che ci interessano
       const contracts = {
@@ -402,17 +402,17 @@ async function initializeServer() {
       const { contractName } = req.params;
       console.log(`📋 contracts/${contractName}: Requesting contract details`);
       
-      const deployments = require('shogun-contracts/deployments.json');
+      const { DEPLOYMENTS } = await import('shogun-contracts/deployments.js');
       const chainId = process.env.CHAIN_ID || '11155111';
       
-      if (!deployments[chainId]) {
+      if (!DEPLOYMENTS[chainId]) {
         return res.status(404).json({
           success: false,
           error: `No deployments found for chain ID: ${chainId}`
         });
       }
 
-      const chainDeployments = deployments[chainId];
+      const chainDeployments = DEPLOYMENTS[chainId];
       
       // Mappa dei nomi dei contratti
       const contractMapping = {
@@ -460,17 +460,17 @@ async function initializeServer() {
       const { contractName } = req.params;
       console.log(`📋 contracts/${contractName}/abi: Requesting contract ABI`);
       
-      const deployments = require('shogun-contracts/deployments.json');
+      const { DEPLOYMENTS } = await import('shogun-contracts/deployments.js');
       const chainId = process.env.CHAIN_ID || '11155111';
       
-      if (!deployments[chainId]) {
+      if (!DEPLOYMENTS[chainId]) {
         return res.status(404).json({
           success: false,
           error: `No deployments found for chain ID: ${chainId}`
         });
       }
 
-      const chainDeployments = deployments[chainId];
+      const chainDeployments = DEPLOYMENTS[chainId];
       
       const contractMapping = {
         'relay-payment-router': 'Relay#RelayPaymentRouter',
@@ -517,17 +517,17 @@ async function initializeServer() {
       const { contractName } = req.params;
       console.log(`📋 contracts/${contractName}/address: Requesting contract address`);
       
-      const deployments = require('shogun-contracts/deployments.json');
+      const { DEPLOYMENTS } = await import('shogun-contracts/deployments.js');
       const chainId = process.env.CHAIN_ID || '11155111';
       
-      if (!deployments[chainId]) {
+      if (!DEPLOYMENTS[chainId]) {
         return res.status(404).json({
           success: false,
           error: `No deployments found for chain ID: ${chainId}`
         });
       }
 
-      const chainDeployments = deployments[chainId];
+      const chainDeployments = DEPLOYMENTS[chainId];
       
       const contractMapping = {
         'relay-payment-router': 'Relay#RelayPaymentRouter',
@@ -573,17 +573,17 @@ async function initializeServer() {
     try {
       console.log('📋 contracts: Requesting available contracts list');
       
-      const deployments = require('shogun-contracts/deployments.json');
+      const { DEPLOYMENTS } = await import('shogun-contracts/deployments.js');
       const chainId = process.env.CHAIN_ID || '11155111';
       
-      if (!deployments[chainId]) {
+      if (!DEPLOYMENTS[chainId]) {
         return res.status(404).json({
           success: false,
           error: `No deployments found for chain ID: ${chainId}`
         });
       }
 
-      const chainDeployments = deployments[chainId];
+      const chainDeployments = DEPLOYMENTS[chainId];
       
       // Estrai solo i nomi dei contratti disponibili
       const availableContracts = Object.keys(chainDeployments).map(contractName => {
