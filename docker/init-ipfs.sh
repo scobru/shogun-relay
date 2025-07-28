@@ -90,23 +90,14 @@ if [ ! -f "$IPFS_PATH/config" ]; then
     /usr/local/bin/ipfs config Datastore.GCPeriod '"1h"'
     /usr/local/bin/ipfs config Datastore.StorageMax '"10GB"'
     
-    # Configure API authentication using IPFS native JWT tokens
+    # Configure API authentication using custom token
     echo "🔐 Configuring IPFS API authentication..."
     if [ -n "$IPFS_API_TOKEN" ]; then
-        echo "🔐 Setting up JWT authentication for IPFS API..."
-        # Create JWT token for API authentication
-        /usr/local/bin/ipfs config --json API.HTTPHeaders.Access-Control-Allow-Headers '["Authorization", "Content-Type"]'
-        /usr/local/bin/ipfs config --json API.HTTPHeaders.Access-Control-Expose-Headers '["Authorization"]'
-        
-        # Generate JWT token for the API
-        echo "🔑 Generating JWT token for API access..."
-        JWT_TOKEN=$(/usr/local/bin/ipfs auth create --api /ip4/127.0.0.1/tcp/5001 --perm admin)
-        echo "✅ JWT token generated: ${JWT_TOKEN:0:20}..."
-        
+        echo "🔐 Setting up custom authentication for IPFS API..."
         # Store the token for the relay to use
-        echo "$JWT_TOKEN" > /tmp/ipfs-jwt-token
-        chmod 600 /tmp/ipfs-jwt-token
-        echo "🔐 JWT token stored for relay authentication"
+        echo "$IPFS_API_TOKEN" > /tmp/ipfs-api-token
+        chmod 600 /tmp/ipfs-api-token
+        echo "🔐 API token stored for relay authentication"
     else
         echo "⚠️ No IPFS_API_TOKEN provided, API will be publicly accessible"
     fi
@@ -115,40 +106,46 @@ if [ ! -f "$IPFS_PATH/config" ]; then
 else
     echo "✅ IPFS already initialized"
     
-    # Update critical configuration
-    echo "🔄 Updating critical configuration..."
-    if ! /usr/local/bin/ipfs config Addresses.API /ip4/0.0.0.0/tcp/5001 || \
-       ! /usr/local/bin/ipfs config Addresses.Gateway /ip4/0.0.0.0/tcp/8080; then
-        echo "❌ Failed to update critical configuration"
-        exit 1
-    fi
-    
-    # Update API authentication headers
-    echo "🔐 Updating API authentication configuration..."
-    /usr/local/bin/ipfs config --json API.HTTPHeaders.Access-Control-Allow-Headers '["Authorization", "Content-Type"]'
-    /usr/local/bin/ipfs config --json API.HTTPHeaders.Access-Control-Expose-Headers '["Authorization"]'
-    
-    # Regenerate JWT token if needed
-    if [ -n "$IPFS_API_TOKEN" ]; then
-        echo "🔑 Regenerating JWT token for API access..."
-        JWT_TOKEN=$(/usr/local/bin/ipfs auth create --api /ip4/127.0.0.1/tcp/5001 --perm admin)
-        echo "✅ JWT token regenerated: ${JWT_TOKEN:0:20}..."
-        echo "$JWT_TOKEN" > /tmp/ipfs-jwt-token
-        chmod 600 /tmp/ipfs-jwt-token
+    # Check if IPFS daemon is running and has the lock
+    if [ -f "$IPFS_PATH/repo.lock" ]; then
+        echo "⚠️ IPFS daemon is running, skipping configuration update"
+        echo "✅ IPFS is ready for use"
+    else
+        # Update critical configuration only if no lock exists
+        echo "🔄 Updating critical configuration..."
+        if ! /usr/local/bin/ipfs config Addresses.API /ip4/0.0.0.0/tcp/5001 || \
+           ! /usr/local/bin/ipfs config Addresses.Gateway /ip4/0.0.0.0/tcp/8080; then
+            echo "❌ Failed to update critical configuration"
+            exit 1
+        fi
+        
+        # Update API authentication headers
+        echo "🔐 Updating API authentication configuration..."
+        /usr/local/bin/ipfs config --json API.HTTPHeaders.Access-Control-Allow-Headers '["Authorization", "Content-Type"]'
+        /usr/local/bin/ipfs config --json API.HTTPHeaders.Access-Control-Expose-Headers '["Authorization"]'
+        
+        # Store API token if provided
+        if [ -n "$IPFS_API_TOKEN" ]; then
+            echo "🔑 Storing API token for relay authentication..."
+            echo "$IPFS_API_TOKEN" > /tmp/ipfs-api-token
+            chmod 600 /tmp/ipfs-api-token
+        fi
     fi
 fi
 
-# Verify configuration
-echo "🔍 Verifying IPFS configuration..."
-if ! /usr/local/bin/ipfs config show; then
-    echo "❌ Failed to verify IPFS configuration"
-    exit 1
+# Verify configuration (only if no lock exists)
+if [ ! -f "$IPFS_PATH/repo.lock" ]; then
+    echo "🔍 Verifying IPFS configuration..."
+    if ! /usr/local/bin/ipfs config show; then
+        echo "❌ Failed to verify IPFS configuration"
+        exit 1
+    fi
 fi
 
 echo "🚀 IPFS initialization successful"
 if [ -n "$IPFS_API_TOKEN" ]; then
-    echo "🔐 API authentication configured with JWT token"
-    echo "🔑 JWT token available at: /tmp/ipfs-jwt-token"
+    echo "🔐 API authentication configured with custom token"
+    echo "🔑 API token available at: /tmp/ipfs-api-token"
 else
     echo "⚠️ API authentication not configured - API is publicly accessible"
 fi
