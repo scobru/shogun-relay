@@ -800,7 +800,13 @@
 
             try {
                 console.log('📂 user-upload: Loading files for wallet:', walletAddress);
+                console.log('📂 user-upload: Making request to:', `/api/v1/user-uploads/${encodeURIComponent(walletAddress)}`);
+                
                 const response = await fetch(`/api/v1/user-uploads/${encodeURIComponent(walletAddress)}`);
+                
+                console.log('📂 user-upload: Response status:', response.status);
+                console.log('📂 user-upload: Response ok:', response.ok);
+                console.log('📂 user-upload: Response headers:', Object.fromEntries(response.headers.entries()));
 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -808,24 +814,42 @@
 
                 const result = await response.json();
                 console.log('📂 user-upload: Load files response:', result);
+                console.log('📂 user-upload: Response success:', result.success);
+                console.log('📂 user-upload: Response uploads:', result.uploads);
+                console.log('📂 user-upload: Response count:', result.count);
+                console.log('📂 user-upload: Response totalSizeMB:', result.totalSizeMB);
 
                 if (result.success) {
                     console.log('📂 user-upload: Files found:', result.uploads);
                     console.log('📂 user-upload: Files count:', result.count);
                     console.log('📂 user-upload: Total size:', result.totalSizeMB);
+                    console.log('📂 user-upload: Files array type:', Array.isArray(result.uploads));
+                    console.log('📂 user-upload: Files array length:', result.uploads ? result.uploads.length : 'null');
 
+                    // Verifica che filesList esista
+                    if (!filesList) {
+                        console.error('❌ user-upload: filesList element not found!');
+                        showStatus('Error: filesList element not found', 'error');
+                        return;
+                    }
+
+                    console.log('📂 user-upload: Calling displayFiles with:', result.uploads);
                     displayFiles(result.uploads);
 
                     // Aggiorna i contatori
                     if (fileCount) {
                         fileCount.textContent = result.count;
                         console.log('📂 user-upload: Updated file count to:', result.count);
+                    } else {
+                        console.warn('⚠️ user-upload: fileCount element not found');
                     }
 
                     if (totalSize) {
                         const totalSizeMB = result.totalSizeMB || 0;
                         totalSize.textContent = `${totalSizeMB.toFixed(2)} MB`;
                         console.log('📂 user-upload: Updated total size to:', totalSizeMB.toFixed(2), 'MB');
+                    } else {
+                        console.warn('⚠️ user-upload: totalSize element not found');
                     }
 
                     console.log('✅ user-upload: Files loaded and displayed successfully');
@@ -836,6 +860,7 @@
 
             } catch (error) {
                 console.error('💥 user-upload: Error loading files:', error);
+                console.error('💥 user-upload: Error stack:', error.stack);
                 showStatus(`Error loading files: ${error.message}`, 'error');
             }
         }
@@ -1004,50 +1029,82 @@
 
         function displayFiles(files) {
             console.log('🎨 user-upload: Displaying files:', files);
+            console.log('🎨 user-upload: Files type:', typeof files);
+            console.log('🎨 user-upload: Files is array:', Array.isArray(files));
+            console.log('🎨 user-upload: Files length:', files ? files.length : 'null');
 
-            if (files.length === 0) {
+            // Verifica che filesList esista
+            if (!filesList) {
+                console.error('❌ user-upload: filesList element not found in displayFiles!');
+                return;
+            }
+
+            console.log('🎨 user-upload: filesList element found:', filesList);
+
+            if (!files || files.length === 0) {
                 console.log('📭 user-upload: No files to display');
                 filesList.innerHTML = '<p class="text-base-content/60 text-center py-8">No files uploaded yet</p>';
                 return;
             }
 
             console.log(`📁 user-upload: Displaying ${files.length} files`);
-            filesList.innerHTML = files.map(file => {
-                // Usa originalName se disponibile, altrimenti rimuovi .enc dal nome
-                const displayName = file.originalName || (file.name && file.name.endsWith('.enc') ? file.name.replace('.enc', '') : file.name);
-                const isEncrypted = file.encrypted || (file.name && file.name.endsWith('.enc'));
+            
+            try {
+                const filesHTML = files.map((file, index) => {
+                    console.log(`🎨 user-upload: Processing file ${index}:`, file);
+                    
+                    // Usa originalName se disponibile, altrimenti rimuovi .enc dal nome
+                    const displayName = file.originalName || (file.name && file.name.endsWith('.enc') ? file.name.replace('.enc', '') : file.name);
+                    const isEncrypted = file.encrypted || (file.name && file.name.endsWith('.enc'));
 
-                return `
-                <div class="file-item">
-                    <div class="flex items-center justify-between">
-                        <div class="flex-1">
-                            <div class="flex items-center gap-2 mb-1">
-                                <h4 class="font-semibold">${displayName}</h4>
-                                ${isEncrypted ? '<span class="encrypted-badge"><svg xmlns="http://www.w3.org/2000/svg" class="lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></svg> Encrypted</span>' : '<span class="plain-badge">📄 Plain</span>'}
+                    console.log(`🎨 user-upload: File ${index} - displayName:`, displayName);
+                    console.log(`🎨 user-upload: File ${index} - isEncrypted:`, isEncrypted);
+
+                    return `
+                    <div class="file-item">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <h4 class="font-semibold">${displayName}</h4>
+                                    ${isEncrypted ? '<span class="encrypted-badge"><svg xmlns="http://www.w3.org/2000/svg" class="lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></svg> Encrypted</span>' : '<span class="plain-badge">📄 Plain</span>'}
+                                </div>
+                                <p class="text-sm text-base-content/60">
+                                    ${file.sizeMB} MB • ${new Date(file.uploadedAt).toLocaleString()}
+                                </p>
+                                <p class="text-xs font-mono text-accent mt-1">${file.hash}</p>
                             </div>
-                            <p class="text-sm text-base-content/60">
-                                ${file.sizeMB} MB • ${new Date(file.uploadedAt).toLocaleString()}
-                            </p>
-                            <p class="text-xs font-mono text-accent mt-1">${file.hash}</p>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <button onclick="viewFile('${file.hash}', '${displayName}', ${isEncrypted})" class="btn btn-sm btn-outline">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                </svg>
-                                ${isEncrypted ? 'Decrypt & View' : 'View'}
-                            </button>
-                            <button onclick="deleteFile('${file.hash}')" class="btn btn-sm btn-error">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                                Delete
-                            </button>
+                            <div class="flex items-center gap-2">
+                                <button onclick="viewFile('${file.hash}', '${displayName}', ${isEncrypted})" class="btn btn-sm btn-outline">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    </svg>
+                                    ${isEncrypted ? 'Decrypt & View' : 'View'}
+                                </button>
+                                <button onclick="deleteFile('${file.hash}')" class="btn btn-sm btn-error">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    Delete
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
-            }).join('');
+                `;
+                }).join('');
+
+                console.log('🎨 user-upload: Generated HTML length:', filesHTML.length);
+                console.log('🎨 user-upload: Setting filesList.innerHTML');
+                
+                filesList.innerHTML = filesHTML;
+                
+                console.log('🎨 user-upload: HTML set successfully');
+                console.log('🎨 user-upload: filesList.innerHTML length:', filesList.innerHTML.length);
+                
+            } catch (error) {
+                console.error('💥 user-upload: Error in displayFiles:', error);
+                console.error('💥 user-upload: Error stack:', error.stack);
+                filesList.innerHTML = '<p class="text-error text-center py-8">Error displaying files</p>';
+            }
         }
 
         // View/Decrypt file
