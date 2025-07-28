@@ -103,6 +103,7 @@
                                 </div>
                             </div>
                             <div class="flex flex-col sm:flex-row gap-2 mt-2">
+                                <button onclick="testIpfsConnection()" class="btn btn-info flex-1 sm:flex-none">🔍 Test IPFS Connection</button>
                                 <button onclick="listPins()" class="btn btn-primary flex-1 sm:flex-none">List All Pins</button>
                                 <button onclick="garbageCollect()" class="btn btn-secondary flex-1 sm:flex-none">Garbage Collect</button>
                             </div>
@@ -532,6 +533,24 @@
                     ? `Garbage collection completed. Removed ${result.data.length} items.`
                     : 'Garbage collection completed successfully';
                 showMessage(message);
+            }
+        }
+
+        async function testIpfsConnection() {
+            showLoader();
+            setWorking(true);
+            try {
+                const result = await apiCall('/api/v1/ipfs/version', 'GET');
+                if (result && result.success) {
+                    showMessage(`✅ IPFS is connected! Version: ${result.version}`, false);
+                } else {
+                    showMessage(`❌ IPFS connection failed. API returned: ${result?.error || 'Unknown error'}`, true);
+                }
+            } catch (error) {
+                showMessage(error.message, true);
+            } finally {
+                setWorking(false);
+                hideLoader();
             }
         }
 

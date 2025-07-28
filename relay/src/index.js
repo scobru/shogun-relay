@@ -758,184 +758,22 @@ async function initializeServer() {
     }
   });
 
-  // IPFS upload endpoint (admin)
+  // IPFS upload endpoint (admin) - DEPRECATED: use /api/v1/ipfs/upload instead
   app.post("/ipfs-upload", tokenAuthMiddleware, upload.single("file"), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          error: "No file provided",
-        });
-      }
-
-      const formData = new FormData();
-      formData.append("file", req.file.buffer, {
-        filename: req.file.originalname,
-        contentType: req.file.mimetype,
-      });
-
-      const requestOptions = {
-        hostname: "127.0.0.1",
-        port: 5001,
-        path: "/api/v0/add?wrap-with-directory=false",
-        method: "POST",
-        headers: {
-          ...formData.getHeaders(),
-        },
-      };
-
-      if (IPFS_API_TOKEN) {
-        requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
-      }
-
-      const http = await import('http');
-      const ipfsReq = http.request(requestOptions, (ipfsRes) => {
-        let data = "";
-        ipfsRes.on("data", (chunk) => (data += chunk));
-        ipfsRes.on("end", () => {
-          try {
-            const lines = data.trim().split("\n");
-            const results = lines.map((line) => JSON.parse(line));
-            const fileResult = results.find((r) => r.Name === req.file.originalname) || results[0];
-
-            res.json({
-              success: true,
-              file: {
-                name: req.file.originalname,
-                size: req.file.size,
-                mimetype: req.file.mimetype,
-                hash: fileResult.Hash,
-                sizeBytes: fileResult.Size,
-              },
-            });
-          } catch (parseError) {
-            console.error("❌ IPFS Upload parse error:", parseError);
-            res.status(500).json({
-              success: false,
-              error: "Failed to parse IPFS response",
-              rawResponse: data,
-            });
-          }
-        });
-      });
-
-      ipfsReq.on("error", (err) => {
-        console.error("❌ IPFS Upload error:", err);
-        res.status(500).json({
-          success: false,
-          error: err.message,
-        });
-      });
-
-      formData.pipe(ipfsReq);
-    } catch (error) {
-      console.error("❌ IPFS Upload error:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
-    }
+    res.status(410).json({
+      success: false,
+      error: "This endpoint is deprecated. Use /api/v1/ipfs/upload instead.",
+      message: "Please update your client to use the new API endpoint."
+    });
   });
 
-  // IPFS upload endpoint (user)
+  // IPFS upload endpoint (user) - DEPRECATED: use /api/v1/ipfs/upload instead
   app.post("/ipfs-upload-user", walletSignatureMiddleware, upload.single("file"), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          error: "No file provided",
-        });
-      }
-
-      const userAddress = req.headers["x-user-address"];
-      const fileSizeMB = req.file.size / (1024 * 1024);
-
-      const formData = new FormData();
-      formData.append("file", req.file.buffer, {
-        filename: req.file.originalname,
-        contentType: req.file.mimetype,
-      });
-
-      const requestOptions = {
-        hostname: "127.0.0.1",
-        port: 5001,
-        path: "/api/v0/add?wrap-with-directory=false",
-        method: "POST",
-        headers: {
-          ...formData.getHeaders(),
-        },
-      };
-
-      if (IPFS_API_TOKEN) {
-        requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
-      }
-
-      const http = await import('http');
-      const ipfsReq = http.request(requestOptions, (ipfsRes) => {
-        let data = "";
-        ipfsRes.on("data", (chunk) => (data += chunk));
-        ipfsRes.on("end", () => {
-          try {
-            const lines = data.trim().split("\n");
-            const results = lines.map((line) => JSON.parse(line));
-            const fileResult = results.find((r) => r.Name === req.file.originalname) || results[0];
-
-            // Save upload to Gun database and update MB usage
-            const uploadData = {
-              name: req.file.originalname,
-              size: req.file.size,
-              sizeMB: fileSizeMB,
-              mimetype: req.file.mimetype,
-              hash: fileResult.Hash,
-              uploadedAt: Date.now(),
-              userAddress: userAddress,
-            };
-
-            const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
-            uploadsNode.get(fileResult.Hash).put(uploadData);
-
-            // Update MB usage
-            const mbUsageNode = gun.get("shogun").get("mb_usage").get(userAddress);
-            mbUsageNode.once((currentUsage) => {
-              const newUsage = {
-                mbUsed: (currentUsage?.mbUsed || 0) + fileSizeMB,
-                lastUpdated: Date.now(),
-                updatedBy: "file-upload",
-              };
-              mbUsageNode.put(newUsage);
-            });
-
-            res.json({
-              success: true,
-              file: uploadData,
-            });
-          } catch (parseError) {
-            console.error("❌ IPFS Upload parse error:", parseError);
-            res.status(500).json({
-              success: false,
-              error: "Failed to parse IPFS response",
-              rawResponse: data,
-            });
-          }
-        });
-      });
-
-      ipfsReq.on("error", (err) => {
-        console.error("❌ IPFS Upload error:", err);
-        res.status(500).json({
-          success: false,
-          error: err.message,
-        });
-      });
-
-      formData.pipe(ipfsReq);
-    } catch (error) {
-      console.error("❌ IPFS Upload error:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
-    }
+    res.status(410).json({
+      success: false,
+      error: "This endpoint is deprecated. Use /api/v1/ipfs/upload instead.",
+      message: "Please update your client to use the new API endpoint."
+    });
   });
 
   // Importa e configura le route modulari

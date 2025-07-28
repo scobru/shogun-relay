@@ -212,20 +212,39 @@ router.post("/api/:endpoint(*)", async (req, res) => {
   }
 });
 
-// IPFS File Upload endpoint
+// IPFS File Upload endpoint with dual authentication
 router.post("/upload", 
   (req, res, next) => {
-    // Middleware di autenticazione per upload
+    // Check both admin and user authentication
     const authHeader = req.headers["authorization"];
     const bearerToken = authHeader && authHeader.split(" ")[1];
     const customToken = req.headers["token"];
-    const token = bearerToken || customToken;
-
-    if (token === process.env.ADMIN_PASSWORD) {
+    const userAddress = req.headers["x-user-address"];
+    const signature = req.headers["x-wallet-signature"];
+    
+    const adminToken = bearerToken || customToken;
+    const isAdmin = adminToken === process.env.ADMIN_PASSWORD;
+    const isUser = userAddress && signature;
+    
+    if (isAdmin) {
+      req.authType = 'admin';
       next();
+    } else if (isUser) {
+      // Verify wallet signature for user uploads
+      const message = req.headers["x-signature-message"] || "I Love Shogun";
+      const verifyWalletSignature = req.app.get('verifyWalletSignature');
+      
+      if (verifyWalletSignature && verifyWalletSignature(message, signature, userAddress)) {
+        req.authType = 'user';
+        req.userAddress = userAddress;
+        next();
+      } else {
+        console.log("User auth failed - Address:", userAddress, "Signature:", signature?.substring(0, 20) + "...");
+        res.status(401).json({ success: false, error: "Invalid wallet signature" });
+      }
     } else {
-      console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
-      res.status(401).json({ success: false, error: "Unauthorized" });
+      console.log("Auth failed - Admin token:", adminToken ? "provided" : "missing", "User:", userAddress ? "provided" : "missing");
+      res.status(401).json({ success: false, error: "Unauthorized - Admin token or valid wallet signature required" });
     }
   },
   upload.single("file"),
@@ -271,15 +290,45 @@ router.post("/upload",
               results.find((r) => r.Name === req.file.originalname) ||
               results[0];
 
+            const uploadData = {
+              name: req.file.originalname,
+              size: req.file.size,
+              mimetype: req.file.mimetype,
+              hash: fileResult.Hash,
+              sizeBytes: fileResult.Size,
+              uploadedAt: Date.now(),
+            };
+
+            // If user upload, save to Gun database and update MB usage
+            if (req.authType === 'user' && req.userAddress) {
+              const gun = req.app.get('gunInstance');
+              const fileSizeMB = req.file.size / (1024 * 1024);
+              
+              uploadData.sizeMB = fileSizeMB;
+              uploadData.userAddress = req.userAddress;
+
+              // Save upload to Gun database
+              const uploadsNode = gun.get("shogun").get("uploads").get(req.userAddress);
+              uploadsNode.get(fileResult.Hash).put(uploadData);
+
+              // Update MB usage
+              const mbUsageNode = gun.get("shogun").get("mb_usage").get(req.userAddress);
+              mbUsageNode.once((currentUsage) => {
+                const newUsage = {
+                  mbUsed: (currentUsage?.mbUsed || 0) + fileSizeMB,
+                  lastUpdated: Date.now(),
+                  updatedBy: "file-upload",
+                };
+                mbUsageNode.put(newUsage);
+              });
+
+              console.log(`📊 User upload saved: ${req.userAddress} - ${fileSizeMB} MB`);
+            }
+
             res.json({
               success: true,
-              file: {
-                name: req.file.originalname,
-                size: req.file.size,
-                mimetype: req.file.mimetype,
-                hash: fileResult.Hash,
-                sizeBytes: fileResult.Size,
-              },
+              file: uploadData,
+              authType: req.authType,
             });
           } catch (parseError) {
             console.error("❌ IPFS Upload parse error:", parseError);
@@ -865,6 +914,77 @@ router.get("/test", async (req, res) => {
     ipfsReq.end();
   } catch (error) {
     console.error("❌ IPFS API test unexpected error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// IPFS Version endpoint for connectivity testing
+router.get("/version", async (req, res) => {
+  try {
+    console.log("🔍 Testing IPFS API connectivity via /version endpoint...");
+    
+    const requestOptions = {
+      hostname: "127.0.0.1",
+      port: 5001,
+      path: "/api/v0/version",
+      method: "POST",
+      headers: {
+        "Content-Length": "0",
+      },
+    };
+
+    if (IPFS_API_TOKEN) {
+      requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+    }
+
+    console.log(`📡 Testing IPFS API at: ${requestOptions.hostname}:${requestOptions.port}${requestOptions.path}`);
+
+    const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+      console.log(`📡 IPFS API version response status: ${ipfsRes.statusCode}`);
+      
+      let data = "";
+      ipfsRes.on("data", (chunk) => (data += chunk));
+      ipfsRes.on("end", () => {
+        console.log(`📡 IPFS API version response: ${data}`);
+        
+        try {
+          const result = JSON.parse(data);
+          res.json({
+            success: true,
+            message: "IPFS API is reachable",
+            version: result.Version,
+            apiVersion: result["Api-Version"],
+            commit: result.Commit,
+            go: result.Golang,
+            statusCode: ipfsRes.statusCode,
+          });
+        } catch (parseError) {
+          res.json({
+            success: false,
+            error: "IPFS API responded but with invalid JSON",
+            rawResponse: data,
+            statusCode: ipfsRes.statusCode,
+          });
+        }
+      });
+    });
+
+    ipfsReq.on("error", (err) => {
+      console.error("❌ IPFS API version error:", err);
+      res.status(500).json({
+        success: false,
+        error: "IPFS API is not reachable",
+        details: err.message,
+      });
+    });
+
+    ipfsReq.setTimeout(10000);
+    ipfsReq.end();
+  } catch (error) {
+    console.error("❌ IPFS API version unexpected error:", error);
     res.status(500).json({
       success: false,
       error: error.message,
