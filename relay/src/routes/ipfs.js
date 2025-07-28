@@ -578,7 +578,10 @@ router.post("/pins/add", async (req, res) => {
 router.post("/pins/rm", async (req, res) => {
   try {
     const { cid } = req.body;
+    console.log(`🔍 IPFS Pin rm request for CID: ${cid}`);
+    
     if (!cid) {
+      console.log("❌ IPFS Pin rm error: CID is required");
       return res.status(400).json({
         success: false,
         error: "CID is required",
@@ -597,43 +600,76 @@ router.post("/pins/rm", async (req, res) => {
 
     if (IPFS_API_TOKEN) {
       requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+      console.log("🔐 IPFS API token found, adding authorization header");
+    } else {
+      console.log("⚠️ No IPFS API token configured");
     }
 
+    console.log(`📡 Making IPFS API request to: ${requestOptions.hostname}:${requestOptions.port}${requestOptions.path}`);
+
     const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+      console.log(`📡 IPFS API response status: ${ipfsRes.statusCode}`);
+      console.log(`📡 IPFS API response headers:`, ipfsRes.headers);
+      
       let data = "";
-      ipfsRes.on("data", (chunk) => (data += chunk));
+      ipfsRes.on("data", (chunk) => {
+        data += chunk;
+        console.log(`📡 IPFS API data chunk: ${chunk.toString()}`);
+      });
+      
       ipfsRes.on("end", () => {
+        console.log(`📡 IPFS API complete response: ${data}`);
+        
         try {
           const result = JSON.parse(data);
+          console.log(`✅ IPFS Pin rm success for CID: ${cid}`, result);
           res.json({
             success: true,
             message: "CID unpinned successfully",
             result: result,
           });
         } catch (parseError) {
+          console.error(`❌ IPFS Pin rm parse error for CID: ${cid}`, parseError);
+          console.error(`❌ Raw response: ${data}`);
           res.status(500).json({
             success: false,
             error: "Failed to parse IPFS response",
             rawResponse: data,
+            parseError: parseError.message,
           });
         }
       });
     });
 
     ipfsReq.on("error", (err) => {
-      console.error("❌ IPFS Pin rm error:", err);
+      console.error(`❌ IPFS Pin rm network error for CID: ${cid}`, err);
       res.status(500).json({
         success: false,
         error: err.message,
+        details: "Network error connecting to IPFS API",
       });
     });
 
+    ipfsReq.on("timeout", () => {
+      console.error(`❌ IPFS Pin rm timeout for CID: ${cid}`);
+      ipfsReq.destroy();
+      res.status(408).json({
+        success: false,
+        error: "IPFS API request timeout",
+      });
+    });
+
+    // Set timeout to 30 seconds
+    ipfsReq.setTimeout(30000);
+    
+    console.log(`📡 Sending IPFS API request for CID: ${cid}`);
     ipfsReq.end();
   } catch (error) {
-    console.error("❌ IPFS Pin rm error:", error);
+    console.error(`❌ IPFS Pin rm unexpected error for CID: ${req.body?.cid}`, error);
     res.status(500).json({
       success: false,
       error: error.message,
+      details: "Unexpected error in pin removal",
     });
   }
 });
@@ -760,6 +796,75 @@ router.post("/repo/gc", async (req, res) => {
     ipfsReq.end();
   } catch (error) {
     console.error("❌ IPFS Repo GC error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// IPFS API connectivity test endpoint
+router.get("/test", async (req, res) => {
+  try {
+    console.log("🔍 Testing IPFS API connectivity...");
+    
+    const requestOptions = {
+      hostname: "127.0.0.1",
+      port: 5001,
+      path: "/api/v0/version",
+      method: "POST",
+      headers: {
+        "Content-Length": "0",
+      },
+    };
+
+    if (IPFS_API_TOKEN) {
+      requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+    }
+
+    console.log(`📡 Testing IPFS API at: ${requestOptions.hostname}:${requestOptions.port}${requestOptions.path}`);
+
+    const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+      console.log(`📡 IPFS API test response status: ${ipfsRes.statusCode}`);
+      
+      let data = "";
+      ipfsRes.on("data", (chunk) => (data += chunk));
+      ipfsRes.on("end", () => {
+        console.log(`📡 IPFS API test response: ${data}`);
+        
+        try {
+          const result = JSON.parse(data);
+          res.json({
+            success: true,
+            message: "IPFS API is reachable",
+            version: result.Version,
+            apiVersion: result["Api-Version"],
+            statusCode: ipfsRes.statusCode,
+          });
+        } catch (parseError) {
+          res.json({
+            success: false,
+            error: "IPFS API responded but with invalid JSON",
+            rawResponse: data,
+            statusCode: ipfsRes.statusCode,
+          });
+        }
+      });
+    });
+
+    ipfsReq.on("error", (err) => {
+      console.error("❌ IPFS API test error:", err);
+      res.status(500).json({
+        success: false,
+        error: "IPFS API is not reachable",
+        details: err.message,
+      });
+    });
+
+    ipfsReq.setTimeout(10000);
+    ipfsReq.end();
+  } catch (error) {
+    console.error("❌ IPFS API test unexpected error:", error);
     res.status(500).json({
       success: false,
       error: error.message,
