@@ -28,17 +28,28 @@ router.get("/config", async (req, res) => {
     console.log("📋 contracts/config: Requesting contract configuration");
 
     // Supporta chain ID come query parameter o usa quello di default
-    const chainId = req.query.chainId || process.env.CHAIN_ID || "11155111";
+    let chainId = req.query.chainId || process.env.CHAIN_ID || "11155111";
+    
+    // Mappa chain ID numerici ai nomi delle chain
+    const chainIdMapping = {
+      "11155111": "sepolia",
+      "sepolia": "sepolia"
+    };
+    
+    // Converti chain ID numerico in nome della chain se necessario
+    const chainKey = chainIdMapping[chainId] || chainId;
 
-    if (!DEPLOYMENTS[chainId]) {
+    if (!DEPLOYMENTS[chainKey]) {
       return res.status(404).json({
         success: false,
         error: `No deployments found for chain ID: ${chainId}`,
         availableChains: Object.keys(DEPLOYMENTS),
+        chainKey: chainKey,
+        originalChainId: chainId
       });
     }
 
-    const chainDeployments = DEPLOYMENTS[chainId];
+    const chainDeployments = DEPLOYMENTS[chainKey];
 
     // Estrai solo i contratti che ci interessano
     const contracts = {
@@ -55,12 +66,16 @@ router.get("/config", async (req, res) => {
 
     console.log(
       "📋 contracts/config: Returning contract configuration for chain:",
-      chainId
+      chainId,
+      "(key:",
+      chainKey,
+      ")"
     );
 
     res.json({
       success: true,
       chainId: chainId,
+      chainKey: chainKey,
       contracts: contracts,
       timestamp: Date.now(),
     });
@@ -78,19 +93,30 @@ router.get("/config", async (req, res) => {
 router.get("/:contractName", async (req, res) => {
   try {
     const { contractName } = req.params;
-    const chainId = req.query.chainId || process.env.CHAIN_ID || "11155111";
+    let chainId = req.query.chainId || process.env.CHAIN_ID || "11155111";
     
-    console.log(`📋 contracts/${contractName}: Requesting contract details for chain: ${chainId}`);
+    // Mappa chain ID numerici ai nomi delle chain
+    const chainIdMapping = {
+      "11155111": "sepolia",
+      "sepolia": "sepolia"
+    };
+    
+    // Converti chain ID numerico in nome della chain se necessario
+    const chainKey = chainIdMapping[chainId] || chainId;
+    
+    console.log(`📋 contracts/${contractName}: Requesting contract details for chain: ${chainId} (key: ${chainKey})`);
 
-    if (!DEPLOYMENTS[chainId]) {
+    if (!DEPLOYMENTS[chainKey]) {
       return res.status(404).json({
         success: false,
         error: `No deployments found for chain ID: ${chainId}`,
         availableChains: Object.keys(DEPLOYMENTS),
+        chainKey: chainKey,
+        originalChainId: chainId
       });
     }
 
-    const chainDeployments = DEPLOYMENTS[chainId];
+    const chainDeployments = DEPLOYMENTS[chainKey];
 
     // Mappa dei nomi dei contratti
     const contractMapping = {
@@ -138,19 +164,30 @@ router.get("/:contractName", async (req, res) => {
 router.get("/:contractName/abi", async (req, res) => {
   try {
     const { contractName } = req.params;
-    const chainId = req.query.chainId || process.env.CHAIN_ID || "11155111";
+    let chainId = req.query.chainId || process.env.CHAIN_ID || "11155111";
     
-    console.log(`📋 contracts/${contractName}/abi: Requesting contract ABI for chain: ${chainId}`);
+    // Mappa chain ID numerici ai nomi delle chain
+    const chainIdMapping = {
+      "11155111": "sepolia",
+      "sepolia": "sepolia"
+    };
+    
+    // Converti chain ID numerico in nome della chain se necessario
+    const chainKey = chainIdMapping[chainId] || chainId;
+    
+    console.log(`📋 contracts/${contractName}/abi: Requesting contract ABI for chain: ${chainId} (key: ${chainKey})`);
 
-    if (!DEPLOYMENTS[chainId]) {
+    if (!DEPLOYMENTS[chainKey]) {
       return res.status(404).json({
         success: false,
         error: `No deployments found for chain ID: ${chainId}`,
         availableChains: Object.keys(DEPLOYMENTS),
+        chainKey: chainKey,
+        originalChainId: chainId
       });
     }
 
-    const chainDeployments = DEPLOYMENTS[chainId];
+    const chainDeployments = DEPLOYMENTS[chainKey];
 
     // Mappa dei nomi dei contratti
     const contractMapping = {
@@ -198,19 +235,30 @@ router.get("/:contractName/abi", async (req, res) => {
 router.get("/:contractName/address", async (req, res) => {
   try {
     const { contractName } = req.params;
-    const chainId = req.query.chainId || process.env.CHAIN_ID || "11155111";
+    let chainId = req.query.chainId || process.env.CHAIN_ID || "11155111";
     
-    console.log(`📋 contracts/${contractName}/address: Requesting contract address for chain: ${chainId}`);
+    // Mappa chain ID numerici ai nomi delle chain
+    const chainIdMapping = {
+      "11155111": "sepolia",
+      "sepolia": "sepolia"
+    };
+    
+    // Converti chain ID numerico in nome della chain se necessario
+    const chainKey = chainIdMapping[chainId] || chainId;
+    
+    console.log(`📋 contracts/${contractName}/address: Requesting contract address for chain: ${chainId} (key: ${chainKey})`);
 
-    if (!DEPLOYMENTS[chainId]) {
+    if (!DEPLOYMENTS[chainKey]) {
       return res.status(404).json({
         success: false,
         error: `No deployments found for chain ID: ${chainId}`,
         availableChains: Object.keys(DEPLOYMENTS),
+        chainKey: chainKey,
+        originalChainId: chainId
       });
     }
 
-    const chainDeployments = DEPLOYMENTS[chainId];
+    const chainDeployments = DEPLOYMENTS[chainKey];
 
     // Mappa dei nomi dei contratti
     const contractMapping = {

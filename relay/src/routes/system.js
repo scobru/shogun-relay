@@ -450,23 +450,24 @@ router.get("/stats.json", (req, res) => {
 // Derive endpoint
 router.post("/derive", async (req, res) => {
   try {
-    const { data } = req.body;
+    const { password, extra, options } = req.body;
     
-    if (!data) {
+    if (!password) {
       return res.status(400).json({
         success: false,
-        error: "Data is required",
+        error: "Password is required",
       });
     }
 
     const ShogunCoreModule = await import("shogun-core");
     const { derive } = ShogunCoreModule;
 
-    const result = derive(data);
+    // Chiama la funzione derive con i parametri corretti
+    const derivedKeys = await derive(password, extra, options);
 
     res.json({
       success: true,
-      result: result,
+      derivedKeys: derivedKeys,
       timestamp: Date.now(),
     });
   } catch (error) {
