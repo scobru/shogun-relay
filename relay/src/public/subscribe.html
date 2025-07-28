@@ -40,11 +40,6 @@
             @apply bg-base-200/50 rounded-lg p-4 border border-base-content/10;
         }
 
-        .pubkey-display {
-            @apply font-mono text-sm bg-base-300 p-3 rounded border break-all;
-        }
-
-        /* Sistema di notifiche migliorato */
         .notification-container {
             position: fixed;
             top: 20px;
@@ -79,25 +74,10 @@
                 transform: translateX(100%);
                 opacity: 0;
             }
-
             to {
                 transform: translateX(0);
                 opacity: 1;
             }
-        }
-
-        /* Loading spinner */
-        .loading-spinner {
-            @apply inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin;
-        }
-
-        /* Progress bar per upload */
-        .progress-bar {
-            @apply w-full bg-base-300 rounded-full h-2;
-        }
-
-        .progress-fill {
-            @apply bg-accent h-2 rounded-full transition-all duration-300;
         }
     </style>
 </head>
@@ -184,9 +164,6 @@
                         </div>
                     </div>
 
-                    <!-- Status Message -->
-                    <div id="statusMessage" class="w-full max-w-2xl mb-6"></div>
-
                     <!-- Step 1: Wallet Connection -->
                     <div id="step1Content" class="w-full max-w-2xl space-y-6">
                         <div class="status-card">
@@ -244,7 +221,7 @@
                                         Subscription Status
                                     </h4>
                                     <button id="refreshSubscriptionBtn" class="btn btn-xs btn-outline"
-                                        onclick="checkSubscriptionStatus(walletAddress)">
+                                        onclick="checkSubscriptionStatus()">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none"
                                             viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -258,59 +235,6 @@
                                     <p class="text-base-content/60">Loading...</p>
                                 </div>
                             </div>
-                        </div>
-
-                        <!-- Add MB to Existing Subscription -->
-                        <div id="addMbSection" class="status-card hidden">
-                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
-                                    stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                </svg>
-                                Add More Storage
-                            </h3>
-                            <p class="text-base-content/70 mb-4">
-                                Aggiungi più MB alla tua sottoscrizione esistente.
-                            </p>
-
-                            <div class="form-control mb-4">
-                                <label class="label">
-                                    <span class="label-text">Additional Storage (MB):</span>
-                                </label>
-                                <input id="addMbInput" type="number" class="input input-bordered"
-                                    placeholder="Enter additional MB (e.g., 50)" min="1" value="50">
-                                <div class="label">
-                                    <span class="label-text-alt">Additional MB to your current subscription</span>
-                                </div>
-                            </div>
-
-                            <div class="bg-base-200/50 rounded-lg p-4 mb-4">
-                                <h5 class="font-semibold mb-2">Additional Storage Details:</h5>
-                                <div class="space-y-1 text-sm">
-                                    <div class="flex justify-between">
-                                        <span>Additional Storage:</span>
-                                        <span id="addStorageDisplay">50 MB</span>
-                                    </div>
-                                    <div class="flex justify-between">
-                                        <span>Price per GB:</span>
-                                        <span id="addPricePerGB">Loading...</span>
-                                    </div>
-                                    <div class="flex justify-between font-semibold">
-                                        <span>Additional cost:</span>
-                                        <span id="addMbCost">Loading...</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <button id="addMbBtn" class="btn btn-accent w-full">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
-                                    viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                </svg>
-                                Add Storage
-                            </button>
                         </div>
 
                         <!-- New Subscription Form -->
@@ -370,10 +294,6 @@
                                 Subscribe
                             </button>
                         </div>
-
-                        <div id="subscriptionStatus" class="wallet-info hidden">
-                            <div id="statusContent"></div>
-                        </div>
                     </div>
 
                     <!-- Step 3: Subscription Status Check -->
@@ -403,7 +323,7 @@
                                         Refresh
                                     </button>
                                 </div>
-                                <div id="subscriptionDetails" class="space-y-2">
+                                <div id="step3SubscriptionDetails" class="space-y-2">
                                     <div class="text-center py-4">
                                         <div class="loading loading-spinner loading-md"></div>
                                         <p class="text-sm text-base-content/60 mt-2">Loading subscription status...</p>
@@ -431,9 +351,6 @@
                             </div>
                         </div>
                     </div>
-
-                    <!-- Status Message -->
-                    <div id="statusMessage" class="mt-6"></div>
                 </div>
             </div>
         </div>
@@ -445,21 +362,25 @@
         let signer = null;
         let walletAddress = null;
         let relayContract = null;
-        // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
-        // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
-
-        // Contract configuration - caricata dinamicamente
         let RELAY_CONTRACT_ADDRESS = null;
         let RELAY_ABI = null;
-
-        // Indirizzo del relay registrato (da aggiornare con quello reale)
         let registeredRelayAddress = null;
+
+        // DOM elements
+        const connectWalletBtn = document.getElementById('connectWalletBtn');
+        const disconnectWalletBtn = document.getElementById('disconnectWalletBtn');
+        const walletInfo = document.getElementById('walletInfo');
+        const walletAddressEl = document.getElementById('walletAddress');
+        const subscribeBtn = document.getElementById('subscribeBtn');
+        const checkStatusBtn = document.getElementById('checkStatusBtn');
+        const refreshStatusBtn = document.getElementById('refreshStatusBtn');
+        const newSubscriptionBtn = document.getElementById('newSubscriptionBtn');
+        const mbInput = document.getElementById('mbInput');
 
         // Load contract configuration
         async function loadContractConfig() {
             try {
-                // Carica l'ABI e l'indirizzo dalle nuove API con supporto per chain ID
-                const chainId = document.getElementById('chainSelect')?.value || '11155111';
+                const chainId = '11155111';
                 
                 const [abiResponse, addressResponse] = await Promise.all([
                     fetch(`/api/v1/contracts/relay-payment-router/abi?chainId=${chainId}`),
@@ -473,13 +394,11 @@
                     RELAY_CONTRACT_ADDRESS = addressData.address;
                     RELAY_ABI = abiData.abi;
                     
-                    console.log('Contract configuration loaded dynamically:', {
-                        chainId: chainId,
+                    console.log('Contract configuration loaded:', {
                         address: RELAY_CONTRACT_ADDRESS,
                         abiLength: RELAY_ABI.length
                     });
 
-                    // Aggiorna l'indirizzo del contratto nell'interfaccia
                     const contractAddressEl = document.getElementById('contractAddress');
                     if (contractAddressEl) {
                         contractAddressEl.textContent = RELAY_CONTRACT_ADDRESS;
@@ -487,149 +406,87 @@
 
                     return true;
                 } else {
-                    showNotification('Failed to load contract configuration from API', 'error');
+                    showNotification('Failed to load contract configuration', 'error');
                     return false;
                 }
             } catch (error) {
                 console.error('Error loading contract config:', error);
-                showNotification('Failed to load contract configuration. Please check server settings.', 'error');
+                showNotification('Failed to load contract configuration', 'error');
                 return false;
             }
         }
 
-        // Check contract status
-        async function checkContractStatus() {
-            try {
-                // Ora che usiamo le API dinamiche, questa funzione non è più necessaria
-                // ma la manteniamo per compatibilità
-                console.log('Contract status check - using dynamic APIs');
-                return true;
-            } catch (error) {
-                console.error('Error checking contract status:', error);
-                showNotification('Error checking contract status', 'error');
-                return false;
-            }
-        }
+        // Show notification
+        function showNotification(message, type = 'info') {
+            const notificationContainer = document.getElementById('notificationContainer');
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <div class="flex items-center gap-2">
+                    ${type === 'success' ? '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>' : ''}
+                    ${type === 'warning' ? '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>' : ''}
+                    ${type === 'error' ? '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>' : ''}
+                    <span>${message}</span>
+                </div>
+            `;
 
-        // DOM elements
-        const connectWalletBtn = document.getElementById('connectWalletBtn');
-        const disconnectWalletBtn = document.getElementById('disconnectWalletBtn');
-        const walletInfo = document.getElementById('walletInfo');
-        const walletAddressEl = document.getElementById('walletAddress');
-        // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
-        // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
-        const subscribeBtn = document.getElementById('subscribeBtn');
-        const statusMessage = document.getElementById('statusMessage');
-        const subscriptionStatus = document.getElementById('subscriptionStatus');
-        const statusContent = document.getElementById('statusContent');
-        const checkStatusBtn = document.getElementById('checkStatusBtn');
-        const refreshStatusBtn = document.getElementById('refreshStatusBtn');
-        const newSubscriptionBtn = document.getElementById('newSubscriptionBtn');
-        const mbInput = document.getElementById('mbInput');
-        const addMbInput = document.getElementById('addMbInput');
-        const addMbBtn = document.getElementById('addMbBtn');
-        const addMbCost = document.getElementById('addMbCost');
+            notificationContainer.appendChild(notification);
 
-        // Funzione per testare l'endpoint direttamente
-        async function testEndpoint() {
-            try {
-                const identifier = walletAddress;
-                const chainId = document.getElementById('chainSelect')?.value || '11155111';
-                console.log('🧪 Testing endpoint directly for:', identifier, 'on chain:', chainId);
-
-                const response = await fetch(`/api/v1/subscriptions/subscription-status/${encodeURIComponent(identifier)}?chainId=${chainId}`);
-                console.log('📡 Test response status:', response.status);
-                console.log('📡 Test response headers:', response.headers);
-
-                const result = await response.json();
-                console.log('📋 Test response data:', result);
-
-                // Mostra il risultato in una notifica
-                if (result.success) {
-                    showNotification(`API Test: ${result.subscription.isActive ? 'ACTIVE' : 'INACTIVE'} - ${result.subscription.reason || 'No reason'}`, result.subscription.isActive ? 'success' : 'warning');
-                } else {
-                    showNotification(`API Test Error: ${result.error}`, 'error');
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
                 }
-
-            } catch (error) {
-                console.error('💥 Test endpoint error:', error);
-                showNotification(`Test Error: ${error.message}`, 'error');
-            }
+            }, 8000);
         }
 
-        // Controlla lo stato della sottoscrizione
-        async function checkSubscriptionStatus(walletAddr) {
+        // Check subscription status
+        async function checkSubscriptionStatus() {
             try {
-                console.log('🔍 subscribe: checkSubscriptionStatus called with walletAddr:', walletAddr);
-
-                if (!walletAddr) {
-                    console.log('❌ subscribe: No wallet address provided');
-                    showNotification('No wallet address provided', 'error');
+                if (!walletAddress) {
+                    showNotification('Please connect your wallet first', 'error');
                     return;
                 }
 
-                // Verifica che l'elemento esista
                 const subscriptionDetailsEl = document.getElementById('subscriptionDetails');
-                if (!subscriptionDetailsEl) {
-                    console.error('❌ subscribe: subscriptionDetailsEl not found');
-                    return;
+                const step3DetailsEl = document.getElementById('step3SubscriptionDetails');
+                
+                if (subscriptionDetailsEl) {
+                    subscriptionDetailsEl.innerHTML = `
+                        <div class="text-center py-4">
+                            <div class="loading loading-spinner loading-sm"></div>
+                            <p class="text-sm text-base-content/60 mt-2">Checking subscription status...</p>
+                        </div>
+                    `;
                 }
 
-                // Mostra loading state
-                subscriptionDetailsEl.innerHTML = `
-                    <div class="text-center py-4">
-                        <div class="loading loading-spinner loading-sm"></div>
-                        <p class="text-sm text-base-content/60 mt-2">Checking subscription status...</p>
-                    </div>
-                `;
+                if (step3DetailsEl) {
+                    step3DetailsEl.innerHTML = `
+                        <div class="text-center py-4">
+                            <div class="loading loading-spinner loading-sm"></div>
+                            <p class="text-sm text-base-content/60 mt-2">Checking subscription status...</p>
+                        </div>
+                    `;
+                }
 
-                // Usa il nuovo endpoint centralizzato
-                const url = `/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(walletAddr)}`;
-                console.log(`🔍 subscribe: Making API call to: ${url}`);
-                
-                // Log dettagliato della richiesta
-                console.log(`🔍 subscribe: Request details:`, {
-                  url: url,
-                  method: 'GET',
-                  headers: {
-                    'Content-Type': 'application/json'
-                  }
-                });
-                
-                const response = await fetch(url);
-                console.log(`📡 subscribe: Response status: ${response.status}`);
-                console.log(`📡 subscribe: Response headers:`, Object.fromEntries(response.headers.entries()));
+                const response = await fetch(`/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(walletAddress)}`);
                 
                 if (!response.ok) {
                     throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
                 }
 
                 const result = await response.json();
-                console.log(`📋 subscribe: Response data:`, result);
-                
-                // Log dettagliato della risposta
-                console.log(`📋 subscribe: Subscription response details:`, {
-                  success: result.success,
-                  chainId: result.chainId,
-                  userAddress: result.userAddress,
-                  subscription: result.subscription,
-                  mbUsed: result.subscription?.mbUsed,
-                  mbRemaining: result.subscription?.mbRemaining,
-                  usagePercentage: result.subscription?.usagePercentage
-                });
+                console.log('Subscription response:', result);
 
                 if (result.success) {
                     const details = result.subscription;
-                    console.log('📊 subscribe: Subscription details:', details);
 
                     if (details.isActive) {
-                        console.log('✅ subscribe: Subscription is ACTIVE');
                         const mbAllocated = details.mbAllocated || 0;
                         const mbUsed = details.mbUsed || 0;
                         const mbRemaining = details.mbRemaining || 0;
                         const usagePercentage = details.usagePercentage || 0;
 
-                        subscriptionDetailsEl.innerHTML = `
+                        const statusHTML = `
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
                                     <p class="text-base-content/60">Status:</p>
@@ -660,303 +517,81 @@
                             </div>
                         `;
 
-                        console.log('✅ subscribe: Subscription status updated successfully');
+                        if (subscriptionDetailsEl) {
+                            subscriptionDetailsEl.innerHTML = statusHTML;
+                        }
+                        if (step3DetailsEl) {
+                            step3DetailsEl.innerHTML = statusHTML;
+                        }
+
+                        showNotification('Subscription is active!', 'success');
                     } else {
-                        console.log('❌ subscribe: Subscription is NOT active. Reason:', details.reason);
-                        subscriptionDetailsEl.innerHTML = `
+                        const noSubscriptionHTML = `
                             <div class="text-center">
                                 <p class="text-warning font-semibold mb-2">⚠️ No active subscription</p>
                                 <p class="text-base-content/60 mb-3">You need an active subscription to upload files</p>
-                                <a href="/subscribe" class="btn btn-sm btn-accent">
-                                    Subscribe Now
-                                </a>
                             </div>
                         `;
+
+                        if (subscriptionDetailsEl) {
+                            subscriptionDetailsEl.innerHTML = noSubscriptionHTML;
+                        }
+                        if (step3DetailsEl) {
+                            step3DetailsEl.innerHTML = noSubscriptionHTML;
+                        }
+
+                        showNotification('No active subscription found', 'warning');
                     }
                 } else {
-                    console.log('❌ subscribe: API call failed:', result.error);
-                    subscriptionDetailsEl.innerHTML = `
+                    const errorHTML = `
                         <div class="text-center">
                             <p class="text-error font-semibold">❌ Error checking subscription</p>
                             <p class="text-base-content/60">${result.error}</p>
                         </div>
                     `;
+
+                    if (subscriptionDetailsEl) {
+                        subscriptionDetailsEl.innerHTML = errorHTML;
+                    }
+                    if (step3DetailsEl) {
+                        step3DetailsEl.innerHTML = errorHTML;
+                    }
+
+                    showNotification(`Failed to check subscription: ${result.error}`, 'error');
                 }
             } catch (error) {
-                console.error('💥 subscribe: Error checking subscription status:', error);
+                console.error('Error checking subscription status:', error);
+                
+                const errorHTML = `
+                    <div class="text-center">
+                        <p class="text-error font-semibold">❌ Connection error</p>
+                        <p class="text-base-content/60">${error.message}</p>
+                        <button onclick="checkSubscriptionStatus()" class="btn btn-sm btn-outline mt-2">
+                            Retry
+                        </button>
+                    </div>
+                `;
 
                 const subscriptionDetailsEl = document.getElementById('subscriptionDetails');
+                const step3DetailsEl = document.getElementById('step3SubscriptionDetails');
+                
                 if (subscriptionDetailsEl) {
-                    subscriptionDetailsEl.innerHTML = `
-                        <div class="text-center">
-                            <p class="text-error font-semibold">❌ Connection error</p>
-                            <p class="text-base-content/60">${error.message}</p>
-                            <button onclick="checkSubscriptionStatus('${walletAddr}')" class="btn btn-sm btn-outline mt-2">
-                                Retry
-                            </button>
-                        </div>
-                    `;
+                    subscriptionDetailsEl.innerHTML = errorHTML;
                 }
+                if (step3DetailsEl) {
+                    step3DetailsEl.innerHTML = errorHTML;
+                }
+
+                showNotification(`Error checking subscription: ${error.message}`, 'error');
             }
-        }
-
-        // Check subscription status (alternate function)
-        async function checkSubscriptionStatusAlt(identifier) {
-            try {
-                const chainId = document.getElementById('chainSelect')?.value || '11155111';
-                console.log('🔍 Checking subscription status (alt) for:', identifier, 'on chain:', chainId);
-
-                const response = await fetch(`/api/v1/subscriptions/subscription-status/${encodeURIComponent(identifier)}?chainId=${chainId}`);
-                const result = await response.json();
-
-                if (result.success) {
-                    return result.subscription;
-                } else {
-                    console.error('❌ Subscription status check failed:', result.error);
-                    return null;
-                }
-            } catch (error) {
-                console.error('💥 Subscription status check error:', error);
-                return null;
-            }
-        }
-
-        // Get user subscription details
-        async function getUserSubscriptionDetails(walletAddress) {
-            try {
-                const chainId = document.getElementById('chainSelect')?.value || '11155111';
-                console.log('📋 Getting user subscription details for:', walletAddress, 'on chain:', chainId);
-
-                const response = await fetch(`/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(walletAddress)}?chainId=${chainId}`);
-                const result = await response.json();
-
-                if (result.success) {
-                    return result.subscription;
-                } else {
-                    console.error('❌ Failed to get user subscription details:', result.error);
-                    return null;
-                }
-            } catch (error) {
-                console.error('💥 Error getting user subscription details:', error);
-                return null;
-            }
-        }
-
-        // Get user subscription details (alternate function)
-        async function getUserSubscriptionDetailsAlt(walletAddress) {
-            try {
-                const chainId = document.getElementById('chainSelect')?.value || '11155111';
-                console.log('📋 Getting user subscription details (alt) for:', walletAddress, 'on chain:', chainId);
-
-                const response = await fetch(`/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(walletAddress)}?chainId=${chainId}`);
-                const result = await response.json();
-
-                if (result.success) {
-                    return result.subscription;
-                } else {
-                    console.error('❌ Failed to get user subscription details:', result.error);
-                    return null;
-                }
-            } catch (error) {
-                console.error('💥 Error getting user subscription details:', error);
-                return null;
-            }
-        }
-
-        // Check subscription status (third function)
-        async function checkSubscriptionStatusThird(identifier) {
-            try {
-                const chainId = document.getElementById('chainSelect')?.value || '11155111';
-                console.log('🔍 Checking subscription status (third) for:', identifier, 'on chain:', chainId);
-
-                const response = await fetch(`/api/v1/subscriptions/subscription-status/${encodeURIComponent(identifier)}?chainId=${chainId}`);
-                const result = await response.json();
-
-                if (result.success) {
-                    return result.subscription;
-                } else {
-                    console.error('❌ Subscription status check failed:', result.error);
-                    return null;
-                }
-            } catch (error) {
-                console.error('💥 Subscription status check error:', error);
-                return null;
-            }
-        }
-
-        // Funzione per mostrare notifiche
-        function showNotification(message, type = 'info') {
-            const notificationContainer = document.getElementById('notificationContainer');
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.innerHTML = `
-                <div class="flex items-center gap-2">
-                    ${type === 'success' ? '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>' : ''}
-                    ${type === 'warning' ? '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>' : ''}
-                    ${type === 'error' ? '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>' : ''}
-                    <span>${message}</span>
-                </div>
-            `;
-
-            notificationContainer.appendChild(notification);
-
-            // Auto-remove after 8 seconds
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
-                }
-            }, 8000);
-        }
-
-        // Funzione per gestire gli errori di sottoscrizione
-        function handleSubscriptionError(error) {
-            const errorMessage = error.message || '';
-
-            if (errorMessage.includes('Already subscribed')) {
-                return {
-                    type: 'warning',
-                    message: 'You already have an active subscription with this wallet!',
-                    action: 'show_existing'
-                };
-            } else if (errorMessage.includes('insufficient funds')) {
-                return {
-                    type: 'error',
-                    message: 'Insufficient funds in your wallet. Please add more ETH.',
-                    action: 'none'
-                };
-            } else if (errorMessage.includes('user rejected')) {
-                return {
-                    type: 'info',
-                    message: 'Transaction was cancelled by user.',
-                    action: 'none'
-                };
-            } else if (errorMessage.includes('execution reverted')) {
-                return {
-                    type: 'error',
-                    message: 'Transaction failed. Please check your wallet and try again.',
-                    action: 'none'
-                };
-            } else if (errorMessage.includes('invalid string value')) {
-                return {
-                    type: 'error',
-                    message: 'Contract error: Invalid parameters. Please try again.',
-                    action: 'none'
-                };
-            } else {
-                return {
-                    type: 'error',
-                    message: `Subscription failed: ${errorMessage}`,
-                    action: 'none'
-                };
-            }
-        }
-
-        // Funzione per verificare preventivamente se esiste già una sottoscrizione
-        async function checkExistingSubscription() {
-            try {
-                // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
-                // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
-                if (!walletAddress) {
-                    showNotification('Please connect your wallet first', 'error');
-                    showStep(1);
-                    updateStep(1, 'step-active');
-                    return false;
-                }
-
-                const identifier = walletAddress;
-                console.log('🔍 Checking existing subscription for wallet:', identifier);
-
-                const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
-                console.log('📡 Existing subscription response status:', response.status);
-
-                const result = await response.json();
-                console.log('📋 Existing subscription response data:', result);
-
-                if (result.success && result.subscription.isActive) {
-                    console.log('🎉 Found existing ACTIVE subscription!');
-                    showNotification('You already have an active subscription!', 'info');
-
-                    // Mostra i dettagli della sottoscrizione esistente
-                    displaySubscriptionStatus(result);
-
-                    // Vai al Step 3 per mostrare lo stato
-                    showStep(3);
-                    updateStep(3, 'step-active');
-                    updateStep(2, 'step-completed');
-
-                    return true;
-                } else {
-                    console.log('❌ No existing subscription found or not active');
-                    console.log('📊 Subscription details:', result.subscription);
-                }
-
-                return false;
-            } catch (error) {
-                console.error('💥 Error checking existing subscription:', error);
-                showNotification('Error checking subscription status', 'error');
-                return false;
-            }
-        }
-
-        // Event listeners
-        connectWalletBtn.addEventListener('click', connectWallet);
-        disconnectWalletBtn.addEventListener('click', disconnectWallet);
-        subscribeBtn.addEventListener('click', subscribeToRelay);
-        mbInput.addEventListener('input', updateSubscriptionDetails);
-        checkStatusBtn.addEventListener('click', async () => {
-            await syncMBUsage();
-            // Aggiungi un delay per permettere a GunDB di sincronizzare
-            setTimeout(async () => {
-                await checkSubscriptionStatus(walletAddress);
-            }, 1000); // 1 secondo di delay
-        });
-        refreshStatusBtn.addEventListener('click', async () => {
-            await syncMBUsage();
-            // Aggiungi un delay per permettere a GunDB di sincronizzare
-            setTimeout(async () => {
-                await checkSubscriptionStatus(walletAddress);
-            }, 1000); // 1 secondo di delay
-        });
-        newSubscriptionBtn.addEventListener('click', () => {
-            showStep(2);
-            updateStep(2, 'step-active');
-            updateStep(3, 'step-pending');
-        });
-
-        // Aggiungi event listeners per le nuove funzioni
-        if (addMbBtn) {
-            addMbBtn.addEventListener('click', addMBToSubscription);
-        }
-
-        if (addMbInput) {
-            addMbInput.addEventListener('input', updateAddMBCost);
-        }
-
-        // Listen for network changes
-        if (typeof window.ethereum !== 'undefined') {
-            window.ethereum.on('chainChanged', (chainId) => {
-                console.log('Network changed to:', chainId);
-                const sepoliaChainId = '0xaa36a7';
-                if (chainId !== sepoliaChainId) {
-                    showNotification('Please switch to Sepolia network', 'warning');
-                    // Reset wallet connection
-                    disconnectWallet();
-                }
-            });
-
-            window.ethereum.on('accountsChanged', (accounts) => {
-                console.log('Account changed:', accounts);
-                if (accounts.length === 0) {
-                    showNotification('Wallet disconnected', 'info');
-                    disconnectWallet();
-                }
-            });
         }
 
         // Step management
         function updateStep(step, status) {
             const stepEl = document.getElementById(`step${step}`);
-            stepEl.className = `step-indicator ${status}`;
+            if (stepEl) {
+                stepEl.className = `step-indicator ${status}`;
+            }
 
             if (status === 'step-completed') {
                 showStep(step + 1);
@@ -964,53 +599,113 @@
         }
 
         function showStep(step) {
-            // Hide all step contents
             document.getElementById('step1Content').classList.add('hidden');
             document.getElementById('step2Content').classList.add('hidden');
             document.getElementById('step3Content').classList.add('hidden');
 
-            // Show current step
             if (step <= 3) {
                 document.getElementById(`step${step}Content`).classList.remove('hidden');
             }
         }
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', async () => {
-            // Load contract configuration on page load
-            const configLoaded = await loadContractConfig();
-            if (configLoaded) {
-                // Check contract status
-                await checkContractStatus();
-                showNotification('Contract configuration loaded. Connect your wallet to proceed.', 'info');
-            } else {
-                showNotification('Failed to load contract configuration. Please check server settings.', 'error');
-            }
-        });
-
-        // Wallet connection
-        async function connectWallet() {
+        // Load subscription details
+        async function loadSubscriptionDetails() {
             try {
-                if (typeof window.ethereum === 'undefined') {
-                    showNotification('MetaMask is not installed. Please install MetaMask first.', 'error');
+                if (!relayContract) {
+                    console.error('Relay contract not initialized');
                     return;
                 }
 
-                // Check if connected to Sepolia network
+                const pricePerGB = await relayContract.PRICE_PER_GB();
+                const priceInEth = ethers.formatEther(pricePerGB);
+
+                document.getElementById('pricePerGB').textContent = `${priceInEth} ETH`;
+                updateSubscriptionDetails();
+
+            } catch (error) {
+                console.error('Failed to load subscription details:', error);
+                document.getElementById('pricePerGB').textContent = '0.001 ETH';
+                updateSubscriptionDetails();
+            }
+        }
+
+        function updateSubscriptionDetails() {
+            const mb = parseInt(mbInput.value) || 100;
+            const pricePerGBEl = document.getElementById('pricePerGB');
+            const pricePerGBText = pricePerGBEl.textContent;
+
+            if (pricePerGBText === 'Loading...') {
+                document.getElementById('storageDisplay').textContent = `${mb} MB`;
+                document.getElementById('totalCost').textContent = 'Loading...';
+                return;
+            }
+
+            const priceMatch = pricePerGBText.match(/(\d+\.?\d*)/);
+            const priceValue = priceMatch ? parseFloat(priceMatch[1]) : 0;
+            const totalCost = (mb * priceValue) / 1000;
+
+            document.getElementById('storageDisplay').textContent = `${mb} MB`;
+            document.getElementById('totalCost').textContent = `${totalCost.toFixed(6)} ETH`;
+        }
+
+        // Get registered relay address
+        async function getRegisteredRelayAddress() {
+            try {
+                if (!relayContract) {
+                    console.error('Relay contract not initialized');
+                    return;
+                }
+
+                const currentURL = window.location.origin;
+                const relayURL = currentURL + '/gun';
+                console.log('Looking for relay with URL:', relayURL);
+
+                try {
+                    const specificRelayAddress = await relayContract.findRelayByURL(relayURL);
+                    if (specificRelayAddress && specificRelayAddress !== '0x0000000000000000000000000000000000000000') {
+                        registeredRelayAddress = specificRelayAddress;
+                        console.log('Found specific relay for this URL:', registeredRelayAddress);
+                        return;
+                    }
+                } catch (error) {
+                    console.log('Could not find specific relay by URL, trying fallback...');
+                }
+
+                const allRelays = await relayContract.getAllRelays();
+                console.log('getAllRelays() result:', allRelays);
+
+                if (allRelays.length > 0) {
+                    registeredRelayAddress = allRelays[0];
+                    console.log('Using first available relay:', registeredRelayAddress);
+                } else {
+                    showNotification('No relay registered in the contract', 'warning');
+                }
+            } catch (error) {
+                console.error('Failed to get registered relay address:', error);
+                showNotification('Failed to get relay information', 'error');
+            }
+        }
+
+        // Connect wallet
+        async function connectWallet() {
+            try {
+                if (typeof window.ethereum === 'undefined') {
+                    showNotification('MetaMask is not installed', 'error');
+                    return;
+                }
+
                 const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-                const sepoliaChainId = '0xaa36a7'; // Sepolia chain ID in hex
+                const sepoliaChainId = '0xaa36a7';
 
                 if (chainId !== sepoliaChainId) {
-                    showNotification('Please switch to Sepolia network in MetaMask', 'warning');
+                    showNotification('Please switch to Sepolia network', 'warning');
 
-                    // Try to switch to Sepolia
                     try {
                         await window.ethereum.request({
                             method: 'wallet_switchEthereumChain',
                             params: [{ chainId: sepoliaChainId }],
                         });
                     } catch (switchError) {
-                        // If Sepolia is not added, add it
                         if (switchError.code === 4902) {
                             await window.ethereum.request({
                                 method: 'wallet_addEthereumChain',
@@ -1031,21 +726,12 @@
                         }
                     }
 
-                    // Wait a moment for the switch
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
 
-                // Load contract configuration first
                 const configLoaded = await loadContractConfig();
                 if (!configLoaded) {
-                    showNotification('Failed to load contract configuration. Please try again.', 'error');
-                    return;
-                }
-
-                // Check contract status and get the correct address
-                const statusOk = await checkContractStatus();
-                if (!statusOk) {
-                    showNotification('Failed to verify contract status. Please try again.', 'error');
+                    showNotification('Failed to load contract configuration', 'error');
                     return;
                 }
 
@@ -1054,116 +740,37 @@
                 signer = await provider.getSigner();
                 walletAddress = await signer.getAddress();
 
-                console.log('🔑 Wallet address set to:', walletAddress);
+                console.log('Wallet address:', walletAddress);
 
-                // Verify we're on the correct network
-                const network = await provider.getNetwork();
-                console.log('Connected to network:', network);
-
-                // Display wallet info
                 walletAddressEl.textContent = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
                 walletInfo.classList.remove('hidden');
                 connectWalletBtn.classList.add('hidden');
 
-                // Initialize contract with the correct address from backend
                 if (!RELAY_ABI) {
-                    showNotification('Contract ABI not loaded. Please refresh the page.', 'error');
+                    showNotification('Contract ABI not loaded', 'error');
                     return;
                 }
                 
                 relayContract = new ethers.Contract(RELAY_CONTRACT_ADDRESS, RELAY_ABI, signer);
                 console.log('Contract initialized with address:', RELAY_CONTRACT_ADDRESS);
-                console.log('Contract ABI loaded with', RELAY_ABI.length, 'functions');
 
-                // Get registered relay address
                 await getRegisteredRelayAddress();
-
-                console.log('🔑 Wallet address after relay setup:', walletAddress);
-                console.log('🏠 Registered relay address:', registeredRelayAddress);
 
                 showNotification('Wallet connected successfully!', 'success');
                 updateStep(1, 'step-completed');
 
-                // Mostra il Step 2 per la sottoscrizione
                 showStep(2);
                 updateStep(2, 'step-active');
 
-                // Carica i dettagli della sottoscrizione per il Step 2
                 await loadSubscriptionDetails();
-
-                // Controlla lo stato della sottoscrizione attuale
-                console.log('🔄 Calling checkSubscriptionStatus with wallet:', walletAddress);
-                try {
-                    await checkSubscriptionStatus(walletAddress);
-                    console.log('✅ checkSubscriptionStatus completed');
-                } catch (error) {
-                    console.log('⚠️ checkSubscriptionStatus failed, trying fallback...');
-                    // Fallback: usa la funzione che sappiamo funzionare
-                    await checkSubscriptionStatusFromServer();
-                }
+                await checkSubscriptionStatus();
 
             } catch (error) {
                 showNotification(`Failed to connect wallet: ${error.message}`, 'error');
             }
         }
 
-        // Get registered relay address
-        async function getRegisteredRelayAddress() {
-            try {
-                if (!relayContract) {
-                    console.error('Relay contract not initialized');
-                    return;
-                }
-
-                // Ottieni l'URL corrente dell'applicazione
-                const currentURL = window.location.origin;
-                const relayURL = currentURL + '/gun';
-                console.log('🔍 Looking for relay with URL:', relayURL);
-
-                // Prova prima a trovare il relay specifico per questo URL
-                try {
-                    const specificRelayAddress = await relayContract.findRelayByURL(relayURL);
-                    if (specificRelayAddress && specificRelayAddress !== '0x0000000000000000000000000000000000000000') {
-                        registeredRelayAddress = specificRelayAddress;
-                        console.log('✅ Found specific relay for this URL:', registeredRelayAddress);
-                        return;
-                    }
-                } catch (error) {
-                    console.log('⚠️ Could not find specific relay by URL, trying fallback...');
-                }
-
-                // Fallback: ottieni tutti i relay e usa il primo
-                console.log('🔄 Using fallback: getting all relays');
-                const allRelays = await relayContract.getAllRelays();
-                console.log('getAllRelays() result:', allRelays);
-
-                if (allRelays.length > 0) {
-                    registeredRelayAddress = allRelays[0]; // Usa il primo relay registrato
-                    console.log('📋 Using first available relay:', registeredRelayAddress);
-
-                    // Ottieni i dettagli del relay per mostrare informazioni all'utente
-                    try {
-                        const relayDetails = await relayContract.getRelayDetails(registeredRelayAddress);
-                        console.log('📊 Relay details:', relayDetails);
-
-                        // Mostra un avviso se non è il relay specifico
-                        if (relayDetails.url !== relayURL) {
-                            showNotification(`⚠️ Using relay: ${relayDetails.url} (not the current relay)`, 'warning');
-                        }
-                    } catch (detailsError) {
-                        console.log('Could not get relay details:', detailsError);
-                    }
-                } else {
-                    showNotification('No relay registered in the contract. Please register a relay first.', 'warning');
-                }
-            } catch (error) {
-                console.error('Failed to get registered relay address:', error);
-                console.error('Contract address used:', RELAY_CONTRACT_ADDRESS);
-                console.error('Provider:', provider);
-                showNotification('Failed to get relay information. Contract may not be accessible.', 'error');
-            }
-        }
-
+        // Disconnect wallet
         function disconnectWallet() {
             provider = null;
             signer = null;
@@ -1172,7 +779,6 @@
 
             walletInfo.classList.add('hidden');
             connectWalletBtn.classList.remove('hidden');
-            subscriptionStatus.classList.add('hidden');
 
             showStep(1);
             updateStep(1, 'step-active');
@@ -1182,109 +788,7 @@
             showNotification('Wallet disconnected', 'info');
         }
 
-        // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
-        // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
-        // Subscription management
-        async function loadSubscriptionDetails() {
-            try {
-                if (!relayContract) {
-                    console.error('Relay contract not initialized');
-                    return;
-                }
-
-                console.log('Calling PRICE_PER_GB() on contract:', RELAY_CONTRACT_ADDRESS);
-                const pricePerGB = await relayContract.PRICE_PER_GB();
-                console.log('PRICE_PER_GB() result:', pricePerGB);
-                const priceInEth = ethers.formatEther(pricePerGB);
-
-                document.getElementById('pricePerGB').textContent = `${priceInEth} ETH`;
-
-                // Aggiorna automaticamente i dettagli della sottoscrizione
-                updateSubscriptionDetails();
-
-                // Aggiorna anche il costo per aggiungere MB (solo se gli elementi esistono)
-                if (addMbInput && addMbCost) {
-                    updateAddMBCost();
-                }
-
-            } catch (error) {
-                console.error('Failed to load subscription details:', error);
-                console.error('Contract address used:', RELAY_CONTRACT_ADDRESS);
-                console.error('Provider:', provider);
-                showNotification('Failed to load subscription details. Contract may not be accessible.', 'error');
-
-                // Imposta un valore di fallback
-                document.getElementById('pricePerGB').textContent = '0.001 ETH';
-                updateSubscriptionDetails();
-                if (addMbInput && addMbCost) {
-                    updateAddMBCost();
-                }
-            }
-        }
-
-        function updateSubscriptionDetails() {
-            const mb = parseInt(mbInput.value) || 100;
-            const pricePerGBEl = document.getElementById('pricePerGB');
-            const pricePerGBText = pricePerGBEl.textContent;
-
-            // Controlla se il prezzo è ancora in caricamento
-            if (pricePerGBText === 'Loading...') {
-                document.getElementById('storageDisplay').textContent = `${mb} MB`;
-                document.getElementById('totalCost').textContent = 'Loading...';
-                return;
-            }
-
-            // Estrai il valore numerico dal testo (es. "0.001 ETH" -> 0.001)
-            const priceMatch = pricePerGBText.match(/(\d+\.?\d*)/);
-            const priceValue = priceMatch ? parseFloat(priceMatch[1]) : 0;
-
-            // Calcola il costo totale: (MB * PRICE_PER_GB) / 1000
-            const totalCost = (mb * priceValue) / 1000;
-
-            document.getElementById('storageDisplay').textContent = `${mb} MB`;
-            document.getElementById('totalCost').textContent = `${totalCost.toFixed(6)} ETH`;
-        }
-
-        // Funzione per calcolare il costo per aggiungere MB
-        async function updateAddMBCost() {
-            try {
-                // Verifica che gli elementi esistano
-                if (!addMbInput || !addMbCost) {
-                    return;
-                }
-
-                const mbToAdd = parseInt(addMbInput.value) || 0;
-                const pricePerGBEl = document.getElementById('pricePerGB');
-
-                if (!pricePerGBEl) {
-                    addMbCost.textContent = 'Loading...';
-                    return;
-                }
-
-                const pricePerGBText = pricePerGBEl.textContent;
-
-                // Controlla se il prezzo è ancora in caricamento
-                if (pricePerGBText === 'Loading...') {
-                    addMbCost.textContent = 'Loading...';
-                    return;
-                }
-
-                // Estrai il valore numerico dal testo (es. "0.001 ETH" -> 0.001)
-                const priceMatch = pricePerGBText.match(/(\d+\.?\d*)/);
-                const priceValue = priceMatch ? parseFloat(priceMatch[1]) : 0;
-
-                // Calcola il costo: (MB * PRICE_PER_GB) / 1000
-                const cost = (mbToAdd * priceValue) / 1000;
-
-                addMbCost.textContent = `${cost.toFixed(6)} ETH`;
-            } catch (error) {
-                console.error('Error calculating add MB cost:', error);
-                if (addMbCost) {
-                    addMbCost.textContent = 'Error';
-                }
-            }
-        }
-
+        // Subscribe to relay
         async function subscribeToRelay() {
             try {
                 if (!relayContract || !walletAddress) {
@@ -1292,18 +796,15 @@
                     return;
                 }
 
-                // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
-                // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
                 if (!registeredRelayAddress) {
-                    showNotification('No relay available for subscription. Please try again later.', 'error');
+                    showNotification('No relay available for subscription', 'error');
                     return;
                 }
 
                 const mb = parseInt(mbInput.value) || 100;
                 const pricePerGB = await relayContract.PRICE_PER_GB();
-                const totalCost = (BigInt(mb) * pricePerGB) / 1000n; // Calcola il costo per i MB specificati
+                const totalCost = (BigInt(mb) * pricePerGB) / 1000n;
 
-                // Subscribe usando l'indirizzo del relay registrato
                 const tx = await relayContract.subscribeToRelay(registeredRelayAddress, {
                     value: totalCost
                 });
@@ -1313,704 +814,24 @@
                 await tx.wait();
 
                 showNotification(`Subscription successful! You now have ${mb} MB of storage for 30 days.`, 'success');
-                updateStep(3, 'step-completed');
+                updateStep(2, 'step-completed');
 
-                // Update subscription status with delay
                 setTimeout(async () => {
-                    await checkSubscriptionStatus(walletAddress);
-                }, 1000); // 1 secondo di delay
+                    await checkSubscriptionStatus();
+                }, 1000);
 
             } catch (error) {
-                const errorResult = handleSubscriptionError(error);
-                showNotification(errorResult.message, errorResult.type);
-
-                if (errorResult.action === 'show_existing') {
-                    // Se l'errore è già sottoscritto, mostra i dettagli della sottoscrizione esistente
-                    showNotification('Found existing subscription! Showing details...', 'info');
-                    setTimeout(async () => {
-                        await checkSubscriptionStatusFromServer();
-                    }, 1000); // 1 secondo di delay
-                    showStep(3); // Vai al passo 3 per mostrare lo stato
-                    updateStep(3, 'step-active');
-                    updateStep(2, 'step-completed'); // Aggiorna lo stato del passo 2
-                }
+                console.error('Subscription error:', error);
+                showNotification(`Subscription failed: ${error.message}`, 'error');
             }
         }
 
-        async function addMBToSubscription() {
-            try {
-                if (!relayContract || !walletAddress) {
-                    showNotification('Please connect wallet first', 'error');
-                    return;
-                }
-
-                // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
-                // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
-                if (!registeredRelayAddress) {
-                    showNotification('No relay available for adding MB. Please try again later.', 'error');
-                    return;
-                }
-
-                // Verifica che l'elemento input esista
-                if (!addMbInput) {
-                    showNotification('Add MB input not found', 'error');
-                    return;
-                }
-
-                const mbToAdd = parseInt(addMbInput.value) || 100;
-                const pricePerGB = await relayContract.PRICE_PER_GB();
-                const cost = (BigInt(mbToAdd) * pricePerGB) / 1000n; // Calcola il costo per i MB specificati
-
-                const addMbBtn = document.getElementById('addMbBtn');
-                const originalText = addMbBtn.innerHTML;
-                addMbBtn.disabled = true;
-                addMbBtn.innerHTML = `
-                    <div class="loading loading-spinner loading-sm"></div>
-                    <span>Adding MB...</span>
-                `;
-
-                const tx = await relayContract.addMBToSubscription(registeredRelayAddress, {
-                    value: cost
-                });
-
-                showNotification('Transaction sent! Waiting for confirmation...', 'info');
-
-                await tx.wait();
-
-                showNotification(`${mbToAdd} MB added successfully!`, 'success');
-
-                // Aggiorna lo stato della sottoscrizione con delay
-                setTimeout(async () => {
-                    await checkSubscriptionStatus(walletAddress);
-                }, 1000); // 1 secondo di delay
-
-                // Pulisci l'input
-                addMbInput.value = '50';
-                await updateAddMBCost();
-
-            } catch (error) {
-                const errorResult = handleSubscriptionError(error);
-                showNotification(errorResult.message, errorResult.type);
-            } finally {
-                const addMbBtn = document.getElementById('addMbBtn');
-                if (addMbBtn) {
-                    addMbBtn.disabled = false;
-                    addMbBtn.innerHTML = `
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                        Add Storage
-                    `;
-                }
-            }
-        }
-
-        // Funzione per controllare lo stato della sottoscrizione attuale
-        async function checkCurrentSubscriptionStatus() {
-            try {
-                console.log('🔍 checkCurrentSubscriptionStatus called');
-                console.log('🔑 Current walletAddress:', walletAddress);
-                console.log('🏠 Current registeredRelayAddress:', registeredRelayAddress);
-
-                if (!walletAddress) {
-                    console.log('❌ No wallet address');
-                    showNotification('Please connect your wallet first', 'error');
-                    return;
-                }
-
-                const currentSubscriptionDetails = document.getElementById('currentSubscriptionDetails');
-                if (!currentSubscriptionDetails) {
-                    console.log('❌ currentSubscriptionDetails element not found');
-                    return;
-                }
-
-                currentSubscriptionDetails.innerHTML = `
-                    <div class="text-center py-4">
-                        <div class="loading loading-spinner loading-sm"></div>
-                        <p class="text-sm text-base-content/60 mt-2">Checking subscription status...</p>
-                    </div>
-                `;
-
-                // Usa il nuovo endpoint centralizzato
-                const chainId = document.getElementById('chainSelect')?.value || '11155111';
-                console.log('🔍 Making API call to:', `/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(walletAddress)}?chainId=${chainId}`);
-
-                const response = await fetch(`/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(walletAddress)}?chainId=${chainId}`);
-                console.log('📡 Response status:', response.status);
-
-                const result = await response.json();
-                console.log('📋 Response data:', result);
-
-                if (result.success) {
-                    const subscription = result.subscription;
-                    console.log('📊 Subscription object:', subscription);
-
-                    if (subscription.isActive) {
-                        console.log('✅ Subscription is ACTIVE');
-                        const mbAllocated = subscription.mbAllocated || 0;
-                        const mbUsed = subscription.mbUsed || 0;
-                        const mbRemaining = subscription.mbRemaining || 0;
-                        const usagePercentage = subscription.usagePercentage || 0;
-
-                        currentSubscriptionDetails.innerHTML = `
-                            <div class="space-y-3">
-                                <div class="flex items-center gap-2 text-success">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <span class="font-semibold">Active Subscription</span>
-                                </div>
-                                
-                                <div class="grid grid-cols-2 gap-3 text-sm">
-                                    <div>
-                                        <span class="text-base-content/60">Days Remaining:</span>
-                                        <div class="font-semibold ${subscription.daysRemaining <= 7 ? 'text-warning' : 'text-success'}">${subscription.daysRemaining}</div>
-                                    </div>
-                                    <div>
-                                        <span class="text-base-content/60">Total MB:</span>
-                                        <div class="font-semibold">${mbAllocated} MB</div>
-                                    </div>
-                                    <div>
-                                        <span class="text-base-content/60">Used MB:</span>
-                                        <div class="font-semibold">${mbUsed} MB (${usagePercentage}%)</div>
-                                    </div>
-                                    <div>
-                                        <span class="text-base-content/60">Remaining MB:</span>
-                                        <div class="font-semibold text-accent">${mbRemaining} MB</div>
-                                    </div>
-                                </div>
-                                
-                                <div class="w-full bg-base-300 rounded-full h-2">
-                                    <div class="bg-accent h-2 rounded-full" style="width: ${usagePercentage}%"></div>
-                                </div>
-                                <p class="text-xs text-base-content/60">Storage usage: ${usagePercentage}%</p>
-                                
-                                ${mbRemaining <= 100 ? `
-                                    <div class="alert alert-warning text-xs">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                                        </svg>
-                                        <span>Storage space running low!</span>
-                                    </div>
-                                ` : ''}
-                            </div>
-                        `;
-
-                        // Mostra la sezione per aggiungere MB
-                        const addMbSection = document.getElementById('addMbSection');
-                        if (addMbSection) {
-                            addMbSection.classList.remove('hidden');
-                            console.log('✅ Showing add MB section');
-                        }
-
-                    } else {
-                        console.log('❌ Subscription is NOT active. Reason:', subscription.reason);
-                        currentSubscriptionDetails.innerHTML = `
-                            <div class="text-center">
-                                <div class="flex items-center gap-2 text-warning mb-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                                    </svg>
-                                    <span class="font-semibold">No Active Subscription</span>
-                                </div>
-                                <p class="text-sm text-base-content/60 mb-3">${subscription.reason || 'No subscription found'}</p>
-                            </div>
-                        `;
-
-                        // Nascondi la sezione per aggiungere MB
-                        const addMbSection = document.getElementById('addMbSection');
-                        if (addMbSection) {
-                            addMbSection.classList.add('hidden');
-                        }
-                    }
-                } else {
-                    console.log('❌ API call failed:', result.error);
-                    currentSubscriptionDetails.innerHTML = `
-                        <div class="text-center">
-                            <div class="flex items-center gap-2 text-error mb-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                                <span class="font-semibold">Error</span>
-                            </div>
-                            <p class="text-sm text-base-content/60">${result.error}</p>
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                console.error('💥 Error in checkCurrentSubscriptionStatus:', error);
-                const currentSubscriptionDetails = document.getElementById('currentSubscriptionDetails');
-                if (currentSubscriptionDetails) {
-                    currentSubscriptionDetails.innerHTML = `
-                        <div class="text-center">
-                            <div class="flex items-center gap-2 text-error mb-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                                <span class="font-semibold">Connection Error</span>
-                            </div>
-                            <p class="text-sm text-base-content/60">${error.message}</p>
-                        </div>
-                    `;
-                }
-            }
-        }
-
-        // Funzione per aggiornare il costo dell'aggiunta di MB
-        async function updateAddMBCost() {
-            try {
-                const addMbInput = document.getElementById('addMbInput');
-                const addStorageDisplay = document.getElementById('addStorageDisplay');
-                const addMbCost = document.getElementById('addMbCost');
-
-                if (!addMbInput || !addStorageDisplay || !addMbCost) return;
-
-                const mbToAdd = parseInt(addMbInput.value) || 0;
-                addStorageDisplay.textContent = `${mbToAdd} MB`;
-
-                if (mbToAdd > 0 && relayContract) {
-                    const pricePerGB = await relayContract.PRICE_PER_GB();
-                    const cost = (BigInt(mbToAdd) * pricePerGB) / 1000n;
-                    addMbCost.textContent = ethers.formatEther(cost);
-                } else {
-                    addMbCost.textContent = '0 ETH';
-                }
-            } catch (error) {
-                console.error('Error updating add MB cost:', error);
-                const addMbCost = document.getElementById('addMbCost');
-                if (addMbCost) {
-                    addMbCost.textContent = 'Error';
-                }
-            }
-        }
-
-        // Funzione per aggiungere MB alla sottoscrizione esistente
-        async function addMBToSubscription() {
-            try {
-                if (!relayContract || !walletAddress) {
-                    showNotification('Please connect wallet first', 'error');
-                    return;
-                }
-
-                if (!registeredRelayAddress) {
-                    showNotification('No relay available for adding MB. Please try again later.', 'error');
-                    return;
-                }
-
-                const addMbInput = document.getElementById('addMbInput');
-                if (!addMbInput) {
-                    showNotification('Add MB input not found', 'error');
-                    return;
-                }
-
-                const mbToAdd = parseInt(addMbInput.value) || 0;
-                if (mbToAdd <= 0) {
-                    showNotification('Please enter a valid amount of MB to add', 'error');
-                    return;
-                }
-
-                const pricePerGB = await relayContract.PRICE_PER_GB();
-                const cost = (BigInt(mbToAdd) * pricePerGB) / 1000n;
-
-                const addMbBtn = document.getElementById('addMbBtn');
-                const originalText = addMbBtn.innerHTML;
-                addMbBtn.disabled = true;
-                addMbBtn.innerHTML = `
-                    <div class="loading loading-spinner loading-sm"></div>
-                    <span>Adding MB...</span>
-                `;
-
-                const tx = await relayContract.addMBToSubscription(registeredRelayAddress, {
-                    value: cost
-                });
-
-                showNotification('Transaction sent! Waiting for confirmation...', 'info');
-
-                await tx.wait();
-
-                showNotification(`${mbToAdd} MB added successfully!`, 'success');
-
-                // Aggiorna lo stato della sottoscrizione
-                await checkSubscriptionStatus(walletAddress);
-
-                // Pulisci l'input
-                addMbInput.value = '50';
-                await updateAddMBCost();
-
-            } catch (error) {
-                const errorResult = handleSubscriptionError(error);
-                showNotification(errorResult.message, errorResult.type);
-            } finally {
-                const addMbBtn = document.getElementById('addMbBtn');
-                if (addMbBtn) {
-                    addMbBtn.disabled = false;
-                    addMbBtn.innerHTML = `
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                        Add Storage
-                    `;
-                }
-            }
-        }
-
-        async function checkSubscriptionStatus() {
-            try {
-                if (!walletAddress) {
-                    showNotification('Please connect your wallet first', 'error');
-                    return;
-                }
-
-                const chainId = document.getElementById('chainSelect')?.value || '11155111';
-                console.log('🔍 Checking subscription status for wallet:', walletAddress, 'on chain:', chainId);
-
-                const response = await fetch(`/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(walletAddress)}?chainId=${chainId}`);
-                console.log('📡 Response status:', response.status);
-
-                const result = await response.json();
-                console.log('📋 Response data:', result);
-
-                if (result.success) {
-                    console.log('✅ Subscription check successful');
-                    console.log('📊 Subscription details:', result.subscription);
-
-                    displaySubscriptionStatus(result);
-
-                    // Se la sottoscrizione è attiva, mostra anche lo stato nel step 3
-                    if (result.subscription.isActive) {
-                        console.log('🎉 Subscription is ACTIVE!');
-                        subscriptionStatus.classList.remove('hidden');
-                        statusContent.innerHTML = `
-                            <div class="flex items-center gap-2 text-success">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span>Your wallet is authorized for relay uploads!</span>
-                            </div>
-                            <p class="text-sm text-base-content/70 mt-2">
-                                You can now use the upload endpoint with your wallet address: <strong>${walletAddress}</strong>
-                            </p>
-                        `;
-                    } else {
-                        console.log('❌ Subscription is NOT active. Reason:', result.subscription.reason);
-                    }
-                } else {
-                    console.error('❌ Subscription check failed:', result.error);
-                    showNotification(`Failed to check subscription: ${result.error}`, 'error');
-                }
-
-            } catch (error) {
-                console.error('💥 Error checking subscription status:', error);
-                showNotification(`Error checking subscription: ${error.message}`, 'error');
-            }
-        }
-
-        // Funzione per controllare lo stato della sottoscrizione dal server
-        async function checkSubscriptionStatusFromServer() {
-            try {
-                if (!walletAddress) {
-                    showNotification('Please connect your wallet first', 'error');
-                    return;
-                }
-
-                const chainId = document.getElementById('chainSelect')?.value || '11155111';
-                const identifier = walletAddress;
-                console.log('🔍 Checking subscription status for identifier:', identifier, 'on chain:', chainId);
-
-                // Usa l'endpoint user-subscription-details che include il calcolo off-chain dei MB
-                const url = `/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(identifier)}?chainId=${chainId}`;
-                console.log('🔍 Making API call to:', url);
-                
-                // Log dettagliato della richiesta
-                console.log('🔍 Request details:', {
-                    url: url,
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                const response = await fetch(url);
-                console.log('📡 Response status:', response.status);
-                console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
-                }
-
-                const result = await response.json();
-                console.log('📋 Response data:', result);
-                
-                // Log dettagliato della risposta
-                console.log('📋 Subscription response details:', {
-                    success: result.success,
-                    chainId: result.chainId,
-                    userAddress: result.userAddress,
-                    subscription: result.subscription,
-                    mbUsed: result.subscription?.mbUsed,
-                    mbRemaining: result.subscription?.mbRemaining,
-                    usagePercentage: result.subscription?.usagePercentage
-                });
-
-                if (result.success) {
-                    console.log('✅ Subscription check successful');
-                    console.log('📊 Subscription details:', result.subscription);
-
-                    displaySubscriptionStatus(result);
-
-                    // Se la sottoscrizione è attiva, mostra anche lo stato nel step 3
-                    if (result.subscription.isActive) {
-                        console.log('🎉 Subscription is ACTIVE!');
-                        subscriptionStatus.classList.remove('hidden');
-                        statusContent.innerHTML = `
-                            <div class="flex items-center gap-2 text-success">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span>Your wallet is authorized for relay uploads!</span>
-                            </div>
-                            <p class="text-sm text-base-content/70 mt-2">
-                                You can now use the upload endpoint with your wallet address: <strong>${walletAddress}</strong>
-                            </p>
-                        `;
-                    } else {
-                        console.log('❌ Subscription is NOT active. Reason:', result.subscription.reason);
-                    }
-                } else {
-                    console.error('❌ Subscription check failed:', result.error);
-                    showNotification(`Failed to check subscription: ${result.error}`, 'error');
-                }
-
-            } catch (error) {
-                console.error('💥 Error checking subscription status:', error);
-                showNotification(`Error checking subscription: ${error.message}`, 'error');
-            }
-        }
-
-        // Funzione per visualizzare lo stato della sottoscrizione
-        function displaySubscriptionStatus(data) {
-            console.log('🎨 Displaying subscription status with data:', data);
-
-            const detailsContainer = document.getElementById('subscriptionDetails');
-            const subscription = data.subscription;
-
-            console.log('📊 Subscription object:', subscription);
-            console.log('🔍 isActive:', subscription.isActive);
-
-            if (subscription.isActive) {
-                console.log('✅ Displaying ACTIVE subscription');
-                detailsContainer.innerHTML = `
-                    <div class="space-y-3">
-                        <div class="flex items-center gap-2 text-success">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span class="font-semibold">Subscription Active</span>
-                        </div>
-                        
-                        <div class="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                                <span class="text-base-content/60">Start Date:</span>
-                                <div class="font-mono">${new Date(subscription.startDate).toLocaleDateString()}</div>
-                            </div>
-                            <div>
-                                <span class="text-base-content/60">End Date:</span>
-                                <div class="font-mono">${new Date(subscription.endDate).toLocaleDateString()}</div>
-                            </div>
-                            <div>
-                                <span class="text-base-content/60">Amount Paid:</span>
-                                <div class="font-mono">${subscription.amountPaid} ETH</div>
-                            </div>
-                            <div>
-                                <span class="text-base-content/60">Days Remaining:</span>
-                                <div class="font-mono ${subscription.daysRemaining <= 7 ? 'text-warning' : 'text-success'}">${subscription.daysRemaining} days</div>
-                            </div>
-                        </div>
-
-                        <div class="bg-base-300/50 rounded-lg p-4">
-                            <h6 class="font-semibold mb-2">Storage Usage:</h6>
-                            <div class="space-y-2">
-                                <div class="flex justify-between">
-                                    <span>Allocated:</span>
-                                    <span class="font-mono">${subscription.mbAllocated || 0} MB</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span>Used:</span>
-                                    <span class="font-mono">${subscription.mbUsed || 0} MB</span>
-                                </div>
-                                <div class="flex justify-between font-semibold">
-                                    <span>Remaining:</span>
-                                    <span class="font-mono ${(subscription.mbRemaining || 0) <= 100 ? 'text-warning' : 'text-success'}">${subscription.mbRemaining || 0} MB</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span>Usage:</span>
-                                    <span class="font-mono">${subscription.usagePercentage || 0}%</span>
-                                </div>
-                            </div>
-                            
-                            <!-- Progress bar per l'utilizzo -->
-                            <div class="mt-3">
-                                <div class="w-full bg-base-300 rounded-full h-2">
-                                    <div class="bg-accent h-2 rounded-full" style="width: ${subscription.usagePercentage || 0}%"></div>
-                                </div>
-                                <p class="text-xs text-base-content/60 mt-1">Storage usage: ${subscription.usagePercentage || 0}%</p>
-                            </div>
-                            
-                            <!-- Sync MB button -->
-                            <div class="mt-3">
-                                <button id="syncMBBtn" class="btn btn-sm btn-accent" onclick="syncMBUsage()">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
-                                    Sync MB
-                                </button>
-                            </div>
-                            
-                            ${subscription.mbRemaining <= 100 ? `
-                                <div class="alert alert-warning mt-3">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                                    </svg>
-                                    <span>Storage space running low! Consider adding more MB.</span>
-                                </div>
-                            ` : ''}
-                        </div>
-
-                        ${subscription.daysRemaining <= 7 ? `
-                            <div class="alert alert-warning">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                                </svg>
-                                <span>Your subscription expires soon! Consider renewing.</span>
-                            </div>
-                        ` : ''}
-
-                        <div class="bg-base-300/50 rounded-lg p-3">
-                            <p class="text-sm text-base-content/70">
-                                <strong>Wallet Address:</strong> ${walletAddress}
-                            </p>
-                            <p class="text-sm text-base-content/70 mt-1">
-                                You can now upload files using the <a href="/user-upload" class="link link-accent">User Upload</a> page.
-                            </p>
-                        </div>
-                    </div>
-                `;
-            } else {
-                console.log('❌ Displaying INACTIVE subscription. Reason:', subscription.reason);
-                detailsContainer.innerHTML = `
-                    <div class="space-y-3">
-                        <div class="flex items-center gap-2 text-error">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                            <span class="font-semibold">No Active Subscription</span>
-                        </div>
-                        
-                        <div class="bg-base-300/50 rounded-lg p-3">
-                            <p class="text-sm text-base-content/70 mb-2">
-                                ${subscription.reason || 'You need to subscribe to use the relay services.'}
-                            </p>
-                            <p class="text-sm text-base-content/70">
-                                Click "New Subscription" to subscribe to the relay.
-                            </p>
-                        </div>
-                    </div>
-                `;
-            }
-        }
-
-        // Utility functions
-        function showStatus(message, type = 'info') {
-            const colors = {
-                success: 'text-success',
-                error: 'text-error',
-                warning: 'text-warning',
-                info: 'text-info'
-            };
-
-            statusMessage.innerHTML = `
-                <div class="alert ${colors[type]}">
-                    <span>${message}</span>
-                </div>
-            `;
-
-            // Auto-hide after 5 seconds
-            setTimeout(() => {
-                statusMessage.innerHTML = '';
-            }, 5000);
-        }
-
-        // Funzione per ottenere la firma del wallet per autenticazione
-        async function getWalletSignature() {
-            try {
-                const message = "I Love Shogun";
-                console.log('🔐 subscribe: Requesting signature for authentication:', message);
-
-                const signature = await ethereum.request({
-                    method: 'personal_sign',
-                    params: [message, walletAddress]
-                });
-
-                console.log('🔐 subscribe: Authentication signature received:', signature.substring(0, 20) + '...');
-                return signature;
-            } catch (error) {
-                console.error('💥 subscribe: Error getting wallet signature:', error);
-                throw new Error('Failed to get wallet signature for authentication');
-            }
-        }
-
-        // Sync MB usage
-        async function syncMBUsage() {
-            if (!walletAddress) {
-                showNotification('Please connect your wallet first', 'error');
-                return;
-            }
-
-            try {
-                console.log('🔄 subscribe: Sync MB usage triggered for wallet:', walletAddress);
-                showNotification('🔄 Syncing MB usage...', 'info');
-
-                // Ottieni la firma del wallet per l'autenticazione
-                const authSignature = await getWalletSignature();
-
-                const response = await fetch(`/api/v1/user-uploads/sync-mb-usage/${encodeURIComponent(walletAddress)}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-user-address': walletAddress,
-                        'x-wallet-signature': authSignature,
-                        'x-signature-message': 'I Love Shogun'
-                    }
-                });
-
-                const result = await response.json();
-                console.log('🔄 subscribe: Sync MB response:', result);
-
-                if (result.success) {
-                    showNotification(`✅ MB usage synced successfully! Used: ${result.mbUsed} MB (${result.fileCount} files)`, 'success');
-
-                    // Aggiungi un delay per permettere a GunDB di sincronizzare
-                    setTimeout(async () => {
-                        // Aggiorna immediatamente lo stato della sottoscrizione
-                        await checkSubscriptionStatus(walletAddress);
-                    }, 1000); // 1 secondo di delay
-                } else {
-                    showNotification(`❌ Failed to sync MB usage: ${result.error}`, 'error');
-                }
-
-            } catch (error) {
-                console.error('💥 subscribe: Error syncing MB usage:', error);
-                showNotification(`❌ Error syncing MB usage: ${error.message}`, 'error');
-            }
-        }
-
-        // Funzione per copiare l'indirizzo del contratto negli appunti
+        // Copy contract address
         async function copyContractAddress() {
             try {
                 if (RELAY_CONTRACT_ADDRESS) {
                     await navigator.clipboard.writeText(RELAY_CONTRACT_ADDRESS);
 
-                    // Mostra feedback visivo
                     const copyBtn = document.getElementById('copyContractBtn');
                     const originalText = copyBtn.innerHTML;
                     copyBtn.innerHTML = `
@@ -2024,7 +845,6 @@
 
                     showNotification('Contract address copied to clipboard!', 'success');
 
-                    // Ripristina il pulsante dopo 2 secondi
                     setTimeout(() => {
                         copyBtn.innerHTML = originalText;
                         copyBtn.classList.remove('btn-success');
@@ -2039,16 +859,48 @@
             }
         }
 
-        function refreshCurrentStatusWithSync() {
-            syncMBUsage().then(() => {
-                // Aggiungi un delay per permettere a GunDB di sincronizzare
-                setTimeout(() => {
-                    checkCurrentSubscriptionStatus();
-                }, 1000); // 1 secondo di delay
-            }).catch(error => {
-                console.error('Error in refreshCurrentStatusWithSync:', error);
+        // Event listeners
+        connectWalletBtn.addEventListener('click', connectWallet);
+        disconnectWalletBtn.addEventListener('click', disconnectWallet);
+        subscribeBtn.addEventListener('click', subscribeToRelay);
+        mbInput.addEventListener('input', updateSubscriptionDetails);
+        checkStatusBtn.addEventListener('click', checkSubscriptionStatus);
+        refreshStatusBtn.addEventListener('click', checkSubscriptionStatus);
+        newSubscriptionBtn.addEventListener('click', () => {
+            showStep(2);
+            updateStep(2, 'step-active');
+            updateStep(3, 'step-pending');
+        });
+
+        // Network change listeners
+        if (typeof window.ethereum !== 'undefined') {
+            window.ethereum.on('chainChanged', (chainId) => {
+                console.log('Network changed to:', chainId);
+                const sepoliaChainId = '0xaa36a7';
+                if (chainId !== sepoliaChainId) {
+                    showNotification('Please switch to Sepolia network', 'warning');
+                    disconnectWallet();
+                }
+            });
+
+            window.ethereum.on('accountsChanged', (accounts) => {
+                console.log('Account changed:', accounts);
+                if (accounts.length === 0) {
+                    showNotification('Wallet disconnected', 'info');
+                    disconnectWallet();
+                }
             });
         }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            const configLoaded = await loadContractConfig();
+            if (configLoaded) {
+                showNotification('Contract configuration loaded. Connect your wallet to proceed.', 'info');
+            } else {
+                showNotification('Failed to load contract configuration', 'error');
+            }
+        });
     </script>
 </body>
 
