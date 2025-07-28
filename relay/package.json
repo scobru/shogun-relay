@@ -38,7 +38,7 @@
     "node-fetch": "^3.3.2",
     "qr": "^0.5.0",
     "self-adjusting-interval": "^1.0.0",
-    "shogun-contracts": "^1.2.1",
+    "shogun-contracts": "^1.2.2",
     "shogun-core": "^1.6.0",
     "ws": "^8.14.2"
   },

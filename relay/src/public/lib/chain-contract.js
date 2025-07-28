@@ -126,25 +126,13 @@ async function connectWallet() {
     }
 }
 
-// Genera hash keccak256 per il contratto e GunDB
-function keccak256(input) {
-    return ethers.utils.keccak256(ethers.utils.toUtf8Bytes(input));
+// Funzioni di utilità per la conversione dei dati
+function stringToBytes(str) {
+    return ethers.utils.toUtf8Bytes(str);
 }
 
-// Converte keccak256 hash in formato compatibile con GunDB
-function keccak256ToGunFormat(keccakHash) {
-    // Rimuovi il prefisso "0x" e prendi i primi 16 caratteri
-    const cleanHash = keccakHash.replace('0x', '');
-    return cleanHash.substring(0, 16);
-}
-
-// Genera soul per GunDB (usa keccak256 ma in formato compatibile)
-function generateGunSoul(input) {
-    if (!input) {
-        input = Date.now().toString();
-    }
-    const keccakHash = keccak256(input);
-    return keccak256ToGunFormat(keccakHash);
+function bytesToString(bytes) {
+    return ethers.utils.toUtf8String(bytes);
 }
 
 // Scrivi su contratto (transazione utente)
@@ -174,12 +162,12 @@ async function writeToContract() {
         }
         
         // Genera soul se non fornito
-        const soul = soulInput ? keccak256(soulInput) : keccak256(Date.now().toString());
-        const key = keccak256(keyInput);
-        const value = ethers.utils.toUtf8Bytes(valueInput);
+        const soul = soulInput || Date.now().toString();
+        const key = keyInput;
+        const value = stringToBytes(valueInput);
         
         // Scrivi su contratto (transazione utente)
-        const tx = await contract.put(soul, key, value);
+        const tx = await contract.put(stringToBytes(soul), stringToBytes(key), value);
         addToSyncLog(`⏳ Transazione inviata: ${tx.hash}`);
         
         // Aspetta conferma
@@ -187,12 +175,10 @@ async function writeToContract() {
         addToSyncLog(`✅ Transazione confermata: ${receipt.transactionHash}`);
         
         // Scrivi anche su GunDB localmente (usando i dati originali leggibili)
-        const gunSoul = soulInput || Date.now().toString();
-        const gunKey = keyInput;
-        await writeToGun(gunSoul, gunKey, valueInput);
+        await writeToGun(soul, key, valueInput);
         
-        addToSyncLog(`✅ Dati scritti su contratto e GunDB. Soul: ${soulInput || 'auto'}, Key: ${keyInput}`);
-        addToEventLog(`📝 Scrittura: Soul=${soulInput || 'auto'}, Key=${keyInput}, Value=${valueInput}`);
+        addToSyncLog(`✅ Dati scritti su contratto e GunDB. Soul: ${soul}, Key: ${key}`);
+        addToEventLog(`📝 Scrittura: Soul=${soul}, Key=${key}, Value=${valueInput}`);
         
     } catch (error) {
         console.error('Errore scrittura contratto:', error);
@@ -265,10 +251,10 @@ async function readFromContract() {
             return;
         }
         
-        const soul = keccak256(soulInput);
+        const soul = soulInput;
         
         // Verifica se il nodo esiste
-        const exists = await contract.nodeExists(soul);
+        const exists = await contract.nodeExists(stringToBytes(soul));
         if (!exists) {
             document.getElementById('readResult').value = 'Nodo non trovato nel contratto';
             return;
@@ -276,9 +262,9 @@ async function readFromContract() {
         
         if (keyInput) {
             // Leggi campo specifico
-            const key = keccak256(keyInput);
-            const value = await contract.get(soul, key);
-            const decodedValue = ethers.utils.toUtf8String(value);
+            const key = keyInput;
+            const value = await contract.get(stringToBytes(soul), stringToBytes(key));
+            const decodedValue = bytesToString(value);
             
             document.getElementById('readResult').value = JSON.stringify({
                 soul: soulInput,

@@ -2870,10 +2870,10 @@ setprototypeof@1.2.0:
   resolved "https://registry.yarnpkg.com/setprototypeof/-/setprototypeof-1.2.0.tgz#66c9a24a73f9fc28cbe66b09fed3d33dcaf1b424"
   integrity sha512-E5LDX7Wrp85Kil5bhZv46j8jOeboKq5JMmYM3gVGdGH8xFpPWXUMsNrlODCrkoxMEeNi/XZIwuRvY4XNwYMJpw==
 
-shogun-contracts@^1.2.1:
-  version "1.2.1"
-  resolved "https://registry.yarnpkg.com/shogun-contracts/-/shogun-contracts-1.2.1.tgz#112dcdde9b18f04e869977c4ea5a7c88e3c9288d"
-  integrity sha512-+t1q+r28t4qXRGl86dajrOiI/KVa+VObLy15UH0OnacAKhM0Y/Q+IpaWiDHd/xKGI4QvpWA9y4nPUGG5XL4yQA==
+shogun-contracts@^1.2.2:
+  version "1.2.2"
+  resolved "https://registry.yarnpkg.com/shogun-contracts/-/shogun-contracts-1.2.2.tgz#e4a368ef8216eb61676c489213f47d4f2e194f8f"
+  integrity sha512-4Us5nhTPMkjA/KA5heZN20kpWsQwDrEDgd0LyJU17g+1BGIYGiS+8Du672Sqw2p89gzEkSLpDVRKPMtOkpZ2dw==
   dependencies:
     "@openzeppelin/contracts" "^5.3.0"
     dotenv "^16.5.0"

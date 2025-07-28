@@ -170,7 +170,7 @@ async function startChainEventListener() {
     console.log("🎧 Starting Chain contract event listener...");
     
     // Listen for NodeUpdated events
-    chainContract.on("NodeUpdated", (soul, key, value, event) => {
+    chainContract.on("NodeUpdated", async (soul, key, value, event) => {
       console.log("📡 Chain contract event received:", {
         soul: soul,
         key: key,
@@ -188,12 +188,19 @@ async function startChainEventListener() {
         decodedValue = value;
       }
 
-      // Converti bytes32 in stringhe leggibili per GunDB
-      // Per ora usiamo un approccio semplice: prendiamo i primi 16 caratteri dell'hash
-      const soulString = soul.substring(0, 16);
-      const keyString = key.substring(0, 16);
+      // Decode soul and key from bytes to string
+      let soulString, keyString;
+      try {
+        soulString = ethers.toUtf8String(soul);
+        keyString = ethers.toUtf8String(key);
+        console.log(`🔄 Decoded: soul="${soulString}", key="${keyString}"`);
+      } catch (error) {
+        console.warn("⚠️ Could not decode soul/key as UTF-8, using hex");
+        soulString = soul;
+        keyString = key;
+      }
 
-      // Propagate to GunDB with readable strings
+      // Propagate to GunDB with original readable data
       propagateChainEventToGun(soulString, keyString, decodedValue, event);
     });
 
@@ -346,9 +353,17 @@ async function initializeServer() {
             decodedValue = value;
           }
           
-          // Converti bytes32 in stringhe leggibili per GunDB
-          const soulString = soul.substring(0, 16);
-          const keyString = key.substring(0, 16);
+          // Decode soul and key from bytes to string
+          let soulString, keyString;
+          try {
+            soulString = ethers.toUtf8String(soul);
+            keyString = ethers.toUtf8String(key);
+            console.log(`🔄 Decoded for sync: soul="${soulString}", key="${keyString}"`);
+          } catch (error) {
+            console.warn("⚠️ Could not decode soul/key as UTF-8 for sync, using hex");
+            soulString = soul;
+            keyString = key;
+          }
           
           // Crea un ID univoco per questo evento
           const eventId = `${event.transactionHash}-${event.logIndex}`;
@@ -387,7 +402,7 @@ async function initializeServer() {
             });
           });
           
-          // Salva anche i dati nel nodo principale usando stringhe leggibili
+          // Salva anche i dati nel nodo principale usando dati originali leggibili
           const dataNode = gun.get(soulString);
           await new Promise((resolve, reject) => {
             dataNode.get(keyString).put(decodedValue, (ack) => {
