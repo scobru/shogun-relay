@@ -19,9 +19,63 @@ async function getOffChainMBUsage(userAddress, req) {
   
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => {
-      console.log(`⏰ Timeout for MB usage calculation for: ${userAddress}`);
-      reject(new Error("MB usage calculation timeout"));
-    }, 15000);
+      console.log(`⏰ Timeout for MB usage calculation for: ${userAddress}, trying again...`);
+      // Retry una volta
+      setTimeout(() => {
+        console.log(`🔄 Retry attempt for MB usage calculation for: ${userAddress}`);
+        const retryTimeoutId = setTimeout(() => {
+          console.log(`⏰ Final timeout for MB usage calculation for: ${userAddress}`);
+          reject(new Error("MB usage calculation timeout after retry"));
+        }, 20000);
+
+        const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
+        uploadsNode.once((parentData) => {
+          clearTimeout(retryTimeoutId);
+          console.log(`📋 Retry - Uploads parent data for ${userAddress}:`, parentData);
+          
+          if (!parentData || typeof parentData !== "object") {
+            console.log(`📋 Retry - No uploads found for ${userAddress}, returning 0 MB`);
+            resolve(0);
+            return;
+          }
+
+          const hashKeys = Object.keys(parentData).filter(
+            (key) => key !== "_" && key !== "#" && key !== ">" && key !== "<"
+          );
+          console.log(`📋 Retry - Hash keys found:`, hashKeys);
+
+          if (hashKeys.length === 0) {
+            console.log(`📋 Retry - No files found for ${userAddress}, returning 0 MB`);
+            resolve(0);
+            return;
+          }
+
+          let totalMB = 0;
+          let completedReads = 0;
+          const totalReads = hashKeys.length;
+
+          hashKeys.forEach((hash) => {
+            console.log(`📋 Retry - Reading file data for hash: ${hash}`);
+            uploadsNode.get(hash).once((uploadData) => {
+              completedReads++;
+              console.log(`📋 Retry - File data for ${hash}:`, uploadData);
+
+              if (uploadData && uploadData.sizeMB) {
+                totalMB += uploadData.sizeMB;
+                console.log(`📊 Retry - Added ${uploadData.sizeMB} MB from ${hash}, total now: ${totalMB}`);
+              } else {
+                console.warn(`⚠️ Retry - Invalid file data for hash: ${hash}`, uploadData);
+              }
+
+              if (completedReads === totalReads) {
+                console.log(`📊 Retry - Final MB calculation for ${userAddress}: ${totalMB} MB from ${totalReads} files`);
+                resolve(totalMB);
+              }
+            });
+          });
+        });
+      }, 1000);
+    }, 25000); // Aumentato il timeout iniziale
 
     // Calcola i MB dai file effettivamente caricati
     const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
@@ -594,6 +648,121 @@ router.post("/debug-mb-usage/:userAddress", async (req, res) => {
 
   } catch (error) {
     console.error("Debug MB usage error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore interno del server",
+      details: error.message,
+    });
+  }
+});
+
+// Endpoint per riparare i file corrotti
+router.post("/repair-files/:userAddress", async (req, res) => {
+  try {
+    const { userAddress } = req.params;
+
+    if (!userAddress) {
+      return res.status(400).json({
+        success: false,
+        error: "Indirizzo utente richiesto",
+      });
+    }
+
+    console.log(`🔧 Repairing files for user: ${userAddress}`);
+
+    const gun = getGunInstance(req);
+    const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
+
+    // Leggi tutti i file
+    const files = await new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        resolve([]);
+      }, 15000);
+
+      uploadsNode.once((parentData) => {
+        clearTimeout(timeoutId);
+        if (!parentData || typeof parentData !== "object") {
+          resolve([]);
+          return;
+        }
+
+        const hashKeys = Object.keys(parentData).filter(
+          (key) => key !== "_" && key !== "#" && key !== ">" && key !== "<"
+        );
+
+        if (hashKeys.length === 0) {
+          resolve([]);
+          return;
+        }
+
+        let filesArray = [];
+        let completedReads = 0;
+        const totalReads = hashKeys.length;
+
+        hashKeys.forEach((hash) => {
+          uploadsNode.get(hash).once((fileData) => {
+            completedReads++;
+            if (fileData) {
+              filesArray.push({ hash, data: fileData });
+            }
+
+            if (completedReads === totalReads) {
+              resolve(filesArray);
+            }
+          });
+        });
+      });
+    });
+
+    // Ripara i file corrotti
+    let repairedCount = 0;
+    let errors = [];
+
+    for (const file of files) {
+      const { hash, data } = file;
+      
+      // Se manca sizeMB ma c'è size, calcola sizeMB
+      if ((!data.sizeMB || isNaN(data.sizeMB)) && data.size && !isNaN(data.size)) {
+        try {
+          const sizeMB = data.size / (1024 * 1024);
+          const updatedData = {
+            ...data,
+            sizeMB: sizeMB
+          };
+
+          // Salva il file riparato
+          await new Promise((resolve, reject) => {
+            uploadsNode.get(hash).put(updatedData, (ack) => {
+              if (ack && ack.err) {
+                reject(new Error(ack.err));
+              } else {
+                resolve();
+              }
+            });
+          });
+
+          console.log(`🔧 Repaired file ${hash}: ${sizeMB.toFixed(2)} MB`);
+          repairedCount++;
+        } catch (error) {
+          console.error(`❌ Error repairing file ${hash}:`, error);
+          errors.push({ hash, error: error.message });
+        }
+      }
+    }
+
+    console.log(`🔧 Repair completed: ${repairedCount} files repaired, ${errors.length} errors`);
+
+    res.json({
+      success: true,
+      message: "File repair completed",
+      userAddress,
+      repairedCount,
+      errors,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error("Repair files error:", error);
     res.status(500).json({
       success: false,
       error: "Errore interno del server",

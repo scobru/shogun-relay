@@ -260,13 +260,19 @@
                                         </svg>
                                         Sync MB
                                     </button>
-                                    <button id="debugMBBtn" class="btn btn-sm btn-outline" onclick="debugMBUsage()">
+                                    <button id="debugMBBtn" class="btn btn-sm btn-neutral" onclick="debugMBUsage()">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
                                             viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                                         </svg>
                                         Debug MB
+                                    </button>
+                                    <button id="repairFilesBtn" class="btn btn-sm btn-warning" onclick="repairFiles()">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                        Repair Files
                                     </button>
                                 </div>
                             </div>
@@ -886,19 +892,38 @@
                     // Mostra i dettagli del debug nella console
                     console.log('🐛 Debug details:', result.debug);
                     
+                    // Mostra dettagli di ogni file
+                    if (result.debug.files && result.debug.files.length > 0) {
+                        console.log('🐛 File details:');
+                        result.debug.files.forEach((file, index) => {
+                            console.log(`🐛 File ${index + 1}:`, {
+                                hash: file.hash,
+                                name: file.name,
+                                sizeMB: file.sizeMB,
+                                data: file.data,
+                                hasSizeMB: file.data && file.data.sizeMB !== undefined,
+                                hasSize: file.data && file.data.size !== undefined
+                            });
+                        });
+                    }
+                    
                     // Calcola il totale dei MB dai file
                     let totalMB = 0;
                     let validFiles = 0;
+                    let corruptedFiles = 0;
                     if (result.debug.files && result.debug.files.length > 0) {
                         result.debug.files.forEach(file => {
                             if (file.sizeMB && !isNaN(file.sizeMB)) {
                                 totalMB += file.sizeMB;
                                 validFiles++;
+                            } else {
+                                corruptedFiles++;
+                                console.warn(`🐛 Corrupted file: ${file.hash}`, file.data);
                             }
                         });
                     }
                     
-                    showStatus(`✅ Debug completed! Found ${validFiles} valid files, total: ${totalMB.toFixed(2)} MB. Check console for details.`, 'success');
+                    showStatus(`✅ Debug completed! Found ${validFiles} valid files (${corruptedFiles} corrupted), total: ${totalMB.toFixed(2)} MB. Check console for details.`, 'success');
                 } else {
                     showStatus(`❌ Failed to debug MB usage: ${result.error}`, 'error');
                 }
@@ -906,6 +931,50 @@
             } catch (error) {
                 console.error('💥 user-upload: Error debugging MB usage:', error);
                 showStatus(`❌ Error debugging MB usage: ${error.message}`, 'error');
+            }
+        }
+
+        // Repair Files
+        async function repairFiles() {
+            if (!walletAddress) {
+                showStatus('Please connect your wallet first', 'error');
+                return;
+            }
+
+            if (!confirm('Are you sure you want to repair corrupted files? This will re-upload all your files to verify their integrity.')) {
+                return;
+            }
+
+            try {
+                console.log('🔧 user-upload: Repairing files triggered for wallet:', walletAddress);
+                showStatus('🔧 Repairing files...', 'info');
+
+                // Ottieni la firma del wallet per l'autenticazione
+                const authSignature = await getWalletSignature();
+
+                const response = await fetch(`/api/v1/user-uploads/repair-files/${encodeURIComponent(walletAddress)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-user-address': walletAddress,
+                        'x-wallet-signature': authSignature,
+                        'x-signature-message': 'I Love Shogun'
+                    }
+                });
+
+                const result = await response.json();
+                console.log('🔧 user-upload: Repair files response:', result);
+
+                if (result.success) {
+                    showStatus(`✅ Files repaired successfully! Total files repaired: ${result.repairedCount}`, 'success');
+                    await loadUserFiles(); // Ricarica i file per aggiornare la lista
+                    await checkSubscriptionStatus(walletAddress); // Aggiorna lo stato della sottoscrizione
+                } else {
+                    showStatus(`❌ Failed to repair files: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('💥 user-upload: Error repairing files:', error);
+                showStatus(`❌ Error repairing files: ${error.message}`, 'error');
             }
         }
 
