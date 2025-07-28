@@ -293,6 +293,9 @@
                 console.log('Pins object:', pins);
                 console.log('Pins count:', Object.keys(pins).length);
                 
+                // Clear any previous error messages since we have a successful response
+                messageEl.style.display = 'none';
+                
                 if (Object.keys(pins).length === 0) {
                     pinListEl.innerHTML = '<div class="pin-item">No pins found</div>';
                     return;

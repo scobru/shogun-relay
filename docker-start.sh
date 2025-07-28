@@ -20,16 +20,6 @@ if [ ! -f .env ]; then
     echo "⚠️  IMPORTANT: Edit the .env file to configure the admin password!"
 fi
 
-# Update Tailwind CSS to use local files instead of CDN
-echo "🎨 Updating Tailwind CSS to use local files..."
-if [ -f update-tailwind.sh ]; then
-    chmod +x update-tailwind.sh
-    ./update-tailwind.sh
-    echo "✅ Tailwind CSS updated successfully!"
-else
-    echo "⚠️  update-tailwind.sh not found, skipping Tailwind update"
-fi
-
 # Stop existing container if running
 echo "🛑 Stopping existing containers..."
 docker-compose down 2>/dev/null || true
