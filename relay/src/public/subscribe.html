@@ -1587,11 +1587,40 @@
                 const identifier = walletAddress;
                 console.log('🔍 Checking subscription status for identifier:', identifier, 'on chain:', chainId);
 
-                const response = await fetch(`/api/v1/subscriptions/subscription-status/${encodeURIComponent(identifier)}`);
+                // Usa l'endpoint user-subscription-details che include il calcolo off-chain dei MB
+                const url = `/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(identifier)}?chainId=${chainId}`;
+                console.log('🔍 Making API call to:', url);
+                
+                // Log dettagliato della richiesta
+                console.log('🔍 Request details:', {
+                    url: url,
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const response = await fetch(url);
                 console.log('📡 Response status:', response.status);
+                console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+                }
 
                 const result = await response.json();
                 console.log('📋 Response data:', result);
+                
+                // Log dettagliato della risposta
+                console.log('📋 Subscription response details:', {
+                    success: result.success,
+                    chainId: result.chainId,
+                    userAddress: result.userAddress,
+                    subscription: result.subscription,
+                    mbUsed: result.subscription?.mbUsed,
+                    mbRemaining: result.subscription?.mbRemaining,
+                    usagePercentage: result.subscription?.usagePercentage
+                });
 
                 if (result.success) {
                     console.log('✅ Subscription check successful');
@@ -1683,7 +1712,30 @@
                                     <span>Remaining:</span>
                                     <span class="font-mono ${(subscription.mbRemaining || 0) <= 100 ? 'text-warning' : 'text-success'}">${subscription.mbRemaining || 0} MB</span>
                                 </div>
+                                <div class="flex justify-between">
+                                    <span>Usage:</span>
+                                    <span class="font-mono">${subscription.usagePercentage || 0}%</span>
+                                </div>
                             </div>
+                            
+                            <!-- Progress bar per l'utilizzo -->
+                            <div class="mt-3">
+                                <div class="w-full bg-base-300 rounded-full h-2">
+                                    <div class="bg-accent h-2 rounded-full" style="width: ${subscription.usagePercentage || 0}%"></div>
+                                </div>
+                                <p class="text-xs text-base-content/60 mt-1">Storage usage: ${subscription.usagePercentage || 0}%</p>
+                            </div>
+                            
+                            <!-- Sync MB button -->
+                            <div class="mt-3">
+                                <button id="syncMBBtn" class="btn btn-sm btn-accent" onclick="syncMBUsage()">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                    Sync MB
+                                </button>
+                            </div>
+                            
                             ${subscription.mbRemaining <= 100 ? `
                                 <div class="alert alert-warning mt-3">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1692,24 +1744,6 @@
                                     <span>Storage space running low! Consider adding more MB.</span>
                                 </div>
                             ` : ''}
-                            
-                            <!-- Add MB Section -->
-                            <div class="mt-4 p-3 bg-base-200/50 rounded-lg">
-                                <h6 class="font-semibold mb-2">Add More Storage:</h6>
-                                <div class="flex items-center gap-2 mb-2">
-                                    <input type="number" id="addMbInput" class="input input-sm input-bordered w-20" placeholder="MB" min="1" value="100">
-                                    <span class="text-sm text-base-content/60">MB</span>
-                                    <button id="addMbBtn" class="btn btn-sm btn-accent" onclick="addMBToSubscription()">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                        </svg>
-                                        Add MB
-                                    </button>
-                                </div>
-                                <div class="text-xs text-base-content/60">
-                                    Cost: <span id="addMbCost">Loading...</span> ETH
-                                </div>
-                            </div>
                         </div>
 
                         ${subscription.daysRemaining <= 7 ? `
@@ -1782,7 +1816,7 @@
                 const message = "I Love Shogun";
                 console.log('🔐 subscribe: Requesting signature for authentication:', message);
 
-                const signature = await window.ethereum.request({
+                const signature = await ethereum.request({
                     method: 'personal_sign',
                     params: [message, walletAddress]
                 });
@@ -1825,10 +1859,8 @@
                 if (result.success) {
                     showNotification(`✅ MB usage synced successfully! Used: ${result.mbUsed} MB (${result.fileCount} files)`, 'success');
 
-                    // Aggiorna lo stato della sottoscrizione
-                    setTimeout(() => {
-                        checkCurrentSubscriptionStatus();
-                    }, 1000);
+                    // Aggiorna immediatamente lo stato della sottoscrizione
+                    await checkSubscriptionStatusFromServer();
                 } else {
                     showNotification(`❌ Failed to sync MB usage: ${result.error}`, 'error');
                 }

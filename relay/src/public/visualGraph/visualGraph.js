@@ -412,38 +412,121 @@ var DFS = (function(){
 
   var dfs = {};
 
+  // Funzione per caricare tutti i nodi direttamente (come Graph Explorer)
+  function loadAllNodesDirectly(soul) {
+    console.log('🔄 Loading all nodes directly for soul:', soul);
+    
+    // Reset state
+    visited = new Set();
+    edges = new Map();
+    nodes = new Map();
+    visitedCount = 0;
+    
+    // Carica il nodo principale
+    window.gun.get(soul).once(function(node) {
+      if (!node) {
+        console.log('❌ No data found for soul:', soul);
+        return;
+      }
+      
+      console.log('📋 Main node data:', node);
+      const mainSoul = Gun.node.soul(node);
+      nodes.set(mainSoul, { id: mainSoul, label: mainSoul });
+      visited.add(mainSoul);
+      visitedCount++;
+      
+      // Trova tutti i riferimenti nel nodo principale
+      const references = [];
+      Object.keys(node).forEach(prop => {
+        if (prop !== '_' && node[prop] && typeof node[prop] === 'object' && node[prop]['#']) {
+          references.push({
+            source: mainSoul,
+            target: node[prop]['#'],
+            property: prop
+          });
+        }
+      });
+      
+      console.log('🔗 Found references:', references);
+      
+      // Carica tutti i nodi referenziati
+      let loadedCount = 0;
+      const totalRefs = references.length;
+      
+      if (totalRefs === 0) {
+        console.log('📋 No references found, rendering single node');
+        dfs.render();
+        return;
+      }
+      
+      references.forEach(ref => {
+        console.log('🔗 Loading referenced node:', ref.target);
+        
+        window.gun.get(ref.target).once(function(refNode) {
+          loadedCount++;
+          
+          if (refNode) {
+            const refSoul = Gun.node.soul(refNode);
+            console.log('📋 Referenced node loaded:', refSoul, refNode);
+            
+            nodes.set(refSoul, { id: refSoul, label: refSoul });
+            visited.add(refSoul);
+            visitedCount++;
+            
+            // Aggiungi l'edge
+            edges.set(ref.source + ref.target, {
+              source: ref.source,
+              target: ref.target,
+              property: ref.property
+            });
+            
+            // Trova riferimenti secondari
+            Object.keys(refNode).forEach(prop => {
+              if (prop !== '_' && refNode[prop] && typeof refNode[prop] === 'object' && refNode[prop]['#']) {
+                const secondaryRef = refNode[prop]['#'];
+                if (!visited.has(secondaryRef)) {
+                  console.log('🔗 Found secondary reference:', refSoul, '->', secondaryRef);
+                  
+                  window.gun.get(secondaryRef).once(function(secondaryNode) {
+                    if (secondaryNode) {
+                      const secondarySoul = Gun.node.soul(secondaryNode);
+                      console.log('📋 Secondary node loaded:', secondarySoul);
+                      
+                      nodes.set(secondarySoul, { id: secondarySoul, label: secondarySoul });
+                      visited.add(secondarySoul);
+                      visitedCount++;
+                      
+                      // Aggiungi l'edge secondario
+                      edges.set(refSoul + secondaryRef, {
+                        source: refSoul,
+                        target: secondaryRef,
+                        property: prop
+                      });
+                    }
+                  });
+                }
+              }
+            });
+          }
+          
+          // Quando tutti i nodi principali sono caricati, renderizza
+          if (loadedCount === totalRefs) {
+            console.log('✅ All primary nodes loaded, rendering graph');
+            setTimeout(() => {
+              dfs.render();
+            }, 500);
+          }
+        });
+      });
+    });
+  }
+
   dfs.search = function(soul, label, limit, opt) {
     console.log('Starting DFS with soul:', soul);
     console.log('DFS configuration:', { soul: soul, label: label, limit: limit, opt: opt });
     
-    start = soul;
-    visited = new Set();
-    edges = new Map();
-    nodes = new Map();
-    stack = [];
-    visitedCount = 0;
-    stop = false;
-    
-    if (label) {
-      this.label = label;
-    }
-    if (limit) {
-      this.limit = limit;
-    }
-    if (opt) {
-      this.opt = opt;
-    }
-    
-    // Add timeout to ensure rendering happens
-    setTimeout(function() {
-      if (!stop && visitedCount > 0) {
-        console.log('DFS timeout reached, forcing render with', visitedCount, 'nodes');
-        dfs.render();
-      }
-    }, 10000); // 10 second timeout
-    
-    // Start the search
-    window.gun.get(soul).once(dfs.node);
+    // Usa il nuovo metodo di caricamento diretto per ottenere tutti i nodi
+    loadAllNodesDirectly(soul);
   };
 
   dfs.node = function(node) {
@@ -648,3 +731,35 @@ var bfs = (async function () {
   // Currently disabled due to incomplete implementation
 })(root = gun);
 */
+
+  // Funzione per aggiornare lo stato
+  function updateStatus(message, isError = false) {
+    const statusEl = document.getElementById("status");
+    if (statusEl) {
+      statusEl.textContent = message;
+      statusEl.style.color = isError ? "#ff0000" : "#666";
+    }
+    console.log(isError ? "ERROR:" : "INFO:", message);
+  }
+  
+  // Make functions available globally
+  window.dfs = dfs;
+  window.loadAllNodesDirectly = loadAllNodesDirectly;
+  
+  // Funzione per attivare la modalità "Load All Nodes"
+  function loadAllNodesMode() {
+    const keyInput = document.getElementById('key');
+    const key = keyInput ? keyInput.value.trim() : 'shogun';
+    
+    if (!key) {
+      console.log('❌ No key provided, using default: shogun');
+    }
+    
+    console.log('🕸️ Switching to Load All Nodes mode for key:', key);
+    updateStatus(`🕸️ Loading all nodes for: ${key}`);
+    
+    // Usa il nuovo metodo di caricamento diretto
+    loadAllNodesDirectly(key);
+  }
+  
+  window.loadAllNodesMode = loadAllNodesMode;
