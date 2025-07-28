@@ -27,7 +27,7 @@
     "ethers": "^6.4.0",
     "express": "^4.18.2",
     "express-basic-auth": "^1.2.1",
-    "express-rate-limit": "^7.1.5",
+    "express-rate-limit": "^8.0.1",
     "form-data": "^4.0.3",
     "gun": "^0.2020.1235",
     "gun-avatar": "^2.2.4",

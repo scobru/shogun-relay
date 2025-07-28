@@ -466,11 +466,13 @@ async function initializeServer() {
   if (showQr) {
     const url = `http://${host}:${port}`;
     console.log(`📱 QR Code for: ${url}`);
-    qr.generate(url, { small: true }, (err, qrCode) => {
-      if (!err) {
-        console.log(qrCode);
-      }
-    });
+    try {
+      const qrCode = qr.image(url, { type: 'terminal', small: true });
+      console.log(qrCode);
+    } catch (qrError) {
+      console.log(`📱 QR Code generation failed: ${qrError.message}`);
+      console.log(`📱 URL: ${url}`);
+    }
   }
 
   console.log(`🚀 Shogun Relay Server running on http://${host}:${port}`);
