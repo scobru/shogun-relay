@@ -500,4 +500,106 @@ router.post("/sync-mb-usage/:userAddress", async (req, res) => {
   }
 });
 
+// Endpoint di debug per analizzare i dati MB
+router.post("/debug-mb-usage/:userAddress", async (req, res) => {
+  try {
+    const { userAddress } = req.params;
+
+    if (!userAddress) {
+      return res.status(400).json({
+        success: false,
+        error: "Indirizzo utente richiesto",
+      });
+    }
+
+    console.log(`🐛 Debug MB usage for user: ${userAddress}`);
+
+    const gun = getGunInstance(req);
+    const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
+    const mbUsageNode = gun.get("shogun").get("mbUsage").get(userAddress);
+
+    // Debug uploads
+    const uploadsDebug = await new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        resolve({ error: "Timeout reading uploads" });
+      }, 10000);
+
+      uploadsNode.once((parentData) => {
+        clearTimeout(timeoutId);
+        resolve({
+          parentData: parentData,
+          parentDataType: typeof parentData,
+          parentDataKeys: parentData ? Object.keys(parentData) : null,
+          hashKeys: parentData ? Object.keys(parentData).filter(
+            (key) => key !== "_" && key !== "#" && key !== ">" && key !== "<"
+          ) : []
+        });
+      });
+    });
+
+    // Debug MB usage
+    const mbUsageDebug = await new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        resolve({ error: "Timeout reading MB usage" });
+      }, 10000);
+
+      mbUsageNode.once((data) => {
+        clearTimeout(timeoutId);
+        resolve({
+          data: data,
+          dataType: typeof data,
+          mbUsed: data ? data.mbUsed : null
+        });
+      });
+    });
+
+    // Debug individual files
+    let filesDebug = [];
+    if (uploadsDebug.hashKeys && uploadsDebug.hashKeys.length > 0) {
+      filesDebug = await Promise.all(uploadsDebug.hashKeys.map(async (hash) => {
+        return new Promise((resolve) => {
+          const timeoutId = setTimeout(() => {
+            resolve({ hash, error: "Timeout reading file" });
+          }, 5000);
+
+          uploadsNode.get(hash).once((fileData) => {
+            clearTimeout(timeoutId);
+            resolve({
+              hash: hash,
+              data: fileData,
+              dataType: typeof fileData,
+              sizeMB: fileData ? fileData.sizeMB : null,
+              name: fileData ? fileData.name : null,
+              uploadedAt: fileData ? fileData.uploadedAt : null
+            });
+          });
+        });
+      }));
+    }
+
+    const debugResult = {
+      userAddress: userAddress,
+      uploads: uploadsDebug,
+      mbUsage: mbUsageDebug,
+      files: filesDebug,
+      timestamp: new Date().toISOString()
+    };
+
+    console.log(`🐛 Debug result:`, debugResult);
+
+    res.json({
+      success: true,
+      debug: debugResult
+    });
+
+  } catch (error) {
+    console.error("Debug MB usage error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore interno del server",
+      details: error.message,
+    });
+  }
+});
+
 export default router;

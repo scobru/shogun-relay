@@ -869,7 +869,7 @@
                 // Ottieni la firma del wallet per l'autenticazione
                 const authSignature = await getWalletSignature();
 
-                const response = await fetch(`/api/v1/debug/mb-usage/${encodeURIComponent(walletAddress)}`, {
+                const response = await fetch(`/api/v1/user-uploads/debug-mb-usage/${encodeURIComponent(walletAddress)}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -883,7 +883,22 @@
                 console.log('🐛 user-upload: Debug MB response:', result);
 
                 if (result.success) {
-                    showStatus(`✅ MB usage debug completed! Details: ${JSON.stringify(result.details)}`, 'success');
+                    // Mostra i dettagli del debug nella console
+                    console.log('🐛 Debug details:', result.debug);
+                    
+                    // Calcola il totale dei MB dai file
+                    let totalMB = 0;
+                    let validFiles = 0;
+                    if (result.debug.files && result.debug.files.length > 0) {
+                        result.debug.files.forEach(file => {
+                            if (file.sizeMB && !isNaN(file.sizeMB)) {
+                                totalMB += file.sizeMB;
+                                validFiles++;
+                            }
+                        });
+                    }
+                    
+                    showStatus(`✅ Debug completed! Found ${validFiles} valid files, total: ${totalMB.toFixed(2)} MB. Check console for details.`, 'success');
                 } else {
                     showStatus(`❌ Failed to debug MB usage: ${result.error}`, 'error');
                 }
