@@ -802,6 +802,12 @@
                 console.log('📂 user-upload: Loading files for wallet:', walletAddress);
                 console.log('📂 user-upload: Making request to:', `/api/v1/user-uploads/${encodeURIComponent(walletAddress)}`);
                 
+                // Verifica che gli elementi DOM esistano
+                console.log('📂 user-upload: filesSection element:', filesSection);
+                console.log('📂 user-upload: filesList element:', filesList);
+                console.log('📂 user-upload: fileCount element:', fileCount);
+                console.log('📂 user-upload: totalSize element:', totalSize);
+                
                 const response = await fetch(`/api/v1/user-uploads/${encodeURIComponent(walletAddress)}`);
                 
                 console.log('📂 user-upload: Response status:', response.status);
@@ -831,6 +837,12 @@
                         console.error('❌ user-upload: filesList element not found!');
                         showStatus('Error: filesList element not found', 'error');
                         return;
+                    }
+
+                    // Assicurati che la sezione files sia visibile
+                    if (filesSection && filesSection.classList.contains('hidden')) {
+                        console.log('📂 user-upload: Making filesSection visible');
+                        filesSection.classList.remove('hidden');
                     }
 
                     console.log('📂 user-upload: Calling displayFiles with:', result.uploads);
