@@ -16,18 +16,22 @@ async function getAllSystemHashes(req) {
   }
   
   console.log('🔍 Getting all system file hashes...');
+  console.log('🔍 Gun instance available:', !!gun);
   
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => {
       console.log('⏰ Timeout for system hashes retrieval');
-      reject(new Error("System hashes retrieval timeout"));
-    }, 30000);
+      resolve([]); // Return empty array instead of rejecting
+    }, 15000); // Reduced timeout to 15 seconds
 
     const uploadsNode = gun.get("shogun").get("uploads");
+    console.log('🔍 Reading from path: shogun.uploads');
     
     uploadsNode.once((uploadsData) => {
       clearTimeout(timeoutId);
       console.log('📋 Uploads data:', uploadsData);
+      console.log('📋 Uploads data type:', typeof uploadsData);
+      console.log('📋 Uploads data keys:', uploadsData ? Object.keys(uploadsData) : 'N/A');
       
       if (!uploadsData || typeof uploadsData !== "object") {
         console.log('📋 No uploads found, returning empty array');
@@ -58,6 +62,8 @@ async function getAllSystemHashes(req) {
         userUploadsNode.once((userData) => {
           completedUsers++;
           console.log(`📋 User data for ${userAddress}:`, userData);
+          console.log(`📋 User data type for ${userAddress}:`, typeof userData);
+          console.log(`📋 User data keys for ${userAddress}:`, userData ? Object.keys(userData) : 'N/A');
 
           if (userData && typeof userData === "object") {
             // Ottieni tutti gli hash per questo utente
@@ -807,6 +813,71 @@ router.get("/system-hashes", async (req, res) => {
 
   } catch (error) {
     console.error("System hashes error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore interno del server",
+      details: error.message,
+    });
+  }
+});
+
+// Endpoint di debug per testare la funzione getAllSystemHashes
+router.get("/debug-system-hashes", async (req, res) => {
+  try {
+    console.log('🐛 Debug system hashes endpoint called');
+    
+    const gun = getGunInstance(req);
+    if (!gun) {
+      console.warn('❌ Gun instance not available for debug');
+      return res.json({
+        success: false,
+        error: "Gun instance not available",
+        debug: {
+          gunAvailable: false,
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
+
+    console.log('✅ Gun instance available for debug');
+    
+    // Test direct access to uploads
+    const uploadsNode = gun.get("shogun").get("uploads");
+    
+    const debugData = await new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        resolve({
+          error: "Timeout reading uploads",
+          uploadsData: null,
+          uploadsDataType: null,
+          uploadsDataKeys: null
+        });
+      }, 10000);
+
+      uploadsNode.once((uploadsData) => {
+        clearTimeout(timeoutId);
+        resolve({
+          error: null,
+          uploadsData: uploadsData,
+          uploadsDataType: typeof uploadsData,
+          uploadsDataKeys: uploadsData ? Object.keys(uploadsData) : null
+        });
+      });
+    });
+
+    console.log('🐛 Debug data:', debugData);
+    
+    res.json({
+      success: true,
+      debug: {
+        gunAvailable: true,
+        ...debugData,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error("Debug system hashes error:", error);
     res.status(500).json({
       success: false,
       error: "Errore interno del server",

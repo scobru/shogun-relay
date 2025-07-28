@@ -106,6 +106,7 @@
                                 <button onclick="testIpfsConnection()" class="btn btn-info flex-1 sm:flex-none">🔍 Test IPFS Connection</button>
                                 <button onclick="listPins()" class="btn btn-primary flex-1 sm:flex-none">List All Pins</button>
                                 <button onclick="garbageCollect()" class="btn btn-secondary flex-1 sm:flex-none">Garbage Collect</button>
+                                <button onclick="debugSystemHashes()" class="btn btn-neutral flex-1 sm:flex-none">🐛 Debug System Hashes</button>
                             </div>
                         </div>
 
@@ -624,6 +625,56 @@
             } catch (error) {
                 addBatchLog(`❌ Error fetching system hashes: ${error.message}`, true);
                 return [];
+            }
+        }
+
+        async function debugSystemHashes() {
+            showLoader();
+            setWorking(true);
+            try {
+                // Test the debug endpoint first
+                const debugResponse = await fetch('/api/v1/user-uploads/debug-system-hashes', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...ShogunAdmin.getAuthHeaders()
+                    }
+                });
+
+                if (!debugResponse.ok) {
+                    throw new Error(`HTTP error! status: ${debugResponse.status}`);
+                }
+
+                const debugResult = await debugResponse.json();
+                console.log('🐛 Debug result:', debugResult);
+
+                if (debugResult.success && debugResult.debug) {
+                    const debug = debugResult.debug;
+                    showMessage(`✅ Debug completed. Gun available: ${debug.gunAvailable}`, false);
+                    
+                    if (debug.error) {
+                        showMessage(`⚠️ Debug error: ${debug.error}`, true);
+                    } else {
+                        showMessage(`📋 Uploads data type: ${debug.uploadsDataType}, Keys: ${debug.uploadsDataKeys ? debug.uploadsDataKeys.length : 0}`, false);
+                    }
+                } else {
+                    showMessage('❌ Debug failed', true);
+                }
+
+                // Now test the actual system hashes
+                const hashes = await getSystemFileHashes();
+                if (hashes.length > 0) {
+                    showMessage(`✅ Successfully fetched ${hashes.length} system file hashes.`, false);
+                    console.log('🐛 System hashes:', hashes);
+                } else {
+                    showMessage('⚠️ No system files found or error fetching hashes.', true);
+                }
+            } catch (error) {
+                showMessage(`❌ Debug error: ${error.message}`, true);
+                console.error('🐛 Debug error:', error);
+            } finally {
+                setWorking(false);
+                hideLoader();
             }
         }
 

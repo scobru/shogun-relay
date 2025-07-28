@@ -787,11 +787,17 @@
         mbInput.addEventListener('input', updateSubscriptionDetails);
         checkStatusBtn.addEventListener('click', async () => {
             await syncMBUsage();
-            await checkSubscriptionStatusFromServer();
+            // Aggiungi un delay per permettere a GunDB di sincronizzare
+            setTimeout(async () => {
+                await checkSubscriptionStatusFromServer();
+            }, 1000); // 1 secondo di delay
         });
         refreshStatusBtn.addEventListener('click', async () => {
             await syncMBUsage();
-            await checkSubscriptionStatusFromServer();
+            // Aggiungi un delay per permettere a GunDB di sincronizzare
+            setTimeout(async () => {
+                await checkSubscriptionStatusFromServer();
+            }, 1000); // 1 secondo di delay
         });
         newSubscriptionBtn.addEventListener('click', () => {
             showStep(2);
@@ -1191,8 +1197,10 @@
                 showNotification(`Subscription successful! You now have ${mb} MB of storage for 30 days.`, 'success');
                 updateStep(3, 'step-completed');
 
-                // Update subscription status
-                await checkSubscriptionStatusFromServer();
+                // Update subscription status with delay
+                setTimeout(async () => {
+                    await checkSubscriptionStatusFromServer();
+                }, 1000); // 1 secondo di delay
 
             } catch (error) {
                 const errorResult = handleSubscriptionError(error);
@@ -1201,7 +1209,9 @@
                 if (errorResult.action === 'show_existing') {
                     // Se l'errore è già sottoscritto, mostra i dettagli della sottoscrizione esistente
                     showNotification('Found existing subscription! Showing details...', 'info');
-                    await checkSubscriptionStatusFromServer();
+                    setTimeout(async () => {
+                        await checkSubscriptionStatusFromServer();
+                    }, 1000); // 1 secondo di delay
                     showStep(3); // Vai al passo 3 per mostrare lo stato
                     updateStep(3, 'step-active');
                     updateStep(2, 'step-completed'); // Aggiorna lo stato del passo 2
@@ -1251,8 +1261,10 @@
 
                 showNotification(`${mbToAdd} MB added successfully!`, 'success');
 
-                // Aggiorna lo stato della sottoscrizione
-                await checkCurrentSubscriptionStatus();
+                // Aggiorna lo stato della sottoscrizione con delay
+                setTimeout(async () => {
+                    await checkCurrentSubscriptionStatus();
+                }, 1000); // 1 secondo di delay
 
                 // Pulisci l'input
                 addMbInput.value = '50';
@@ -1859,8 +1871,11 @@
                 if (result.success) {
                     showNotification(`✅ MB usage synced successfully! Used: ${result.mbUsed} MB (${result.fileCount} files)`, 'success');
 
-                    // Aggiorna immediatamente lo stato della sottoscrizione
-                    await checkSubscriptionStatusFromServer();
+                    // Aggiungi un delay per permettere a GunDB di sincronizzare
+                    setTimeout(async () => {
+                        // Aggiorna immediatamente lo stato della sottoscrizione
+                        await checkSubscriptionStatusFromServer();
+                    }, 1000); // 1 secondo di delay
                 } else {
                     showNotification(`❌ Failed to sync MB usage: ${result.error}`, 'error');
                 }
@@ -1908,7 +1923,10 @@
 
         function refreshCurrentStatusWithSync() {
             syncMBUsage().then(() => {
-                checkCurrentSubscriptionStatus();
+                // Aggiungi un delay per permettere a GunDB di sincronizzare
+                setTimeout(() => {
+                    checkCurrentSubscriptionStatus();
+                }, 1000); // 1 secondo di delay
             }).catch(error => {
                 console.error('Error in refreshCurrentStatusWithSync:', error);
             });
