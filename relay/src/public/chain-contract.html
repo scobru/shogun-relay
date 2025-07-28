@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="night">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chain Contract Interface - Shogun Relay</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles/wormhole.css">
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js" type="application/javascript"></script>
+    <script src="lib/admin-auth.js"></script>
+</head>
+
+<body class="antialiased">
+    <div class="container mx-auto p-4">
+        <div class="card">
+            <div class="p-8">
+                <div class="flex flex-col items-center mb-8">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-4 text-accent" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <h1 class="text-3xl font-semibold mb-2">Chain Contract Interface</h1>
+                    <p class="text-secondary">Interagisci con il contratto Chain.sol su Sepolia</p>
+                </div>
+
+                <!-- Connection Status -->
+                <div id="connectionStatus" class="alert alert-info mb-6">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>Connettendo al contratto...</span>
+                </div>
+
+                <!-- Contract Info -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="card bg-base-200">
+                        <div class="card-body">
+                            <h2 class="card-title text-accent">📋 Informazioni Contratto</h2>
+                            <div class="space-y-2 text-sm">
+                                <div><strong>Rete:</strong> <span id="networkInfo">Sepolia</span></div>
+                                <div><strong>Indirizzo:</strong> <span id="contractAddress" class="font-mono text-xs">Caricamento...</span></div>
+                                <div><strong>Owner:</strong> <span id="contractOwner" class="font-mono text-xs">Caricamento...</span></div>
+                                <div><strong>Stato:</strong> <span id="contractStatus">Connesso</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card bg-base-200">
+                        <div class="card-body">
+                            <h2 class="card-title text-accent">🔗 Connessione Wallet</h2>
+                            <div class="space-y-2 text-sm">
+                                <div><strong>Wallet:</strong> <span id="walletAddress" class="font-mono text-xs">Non connesso</span></div>
+                                <div><strong>Saldo:</strong> <span id="walletBalance">-</span></div>
+                                <div><strong>Permessi:</strong> <span id="walletPermissions">Nessuno</span></div>
+                            </div>
+                            <div class="card-actions justify-end mt-4">
+                                <button id="connectWalletBtn" class="btn btn-primary btn-sm" onclick="connectWallet()">
+                                    🔗 Connetti Wallet
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Interface -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Write Data Section -->
+                    <div class="card bg-base-200">
+                        <div class="card-body">
+                            <h2 class="card-title text-accent">✍️ Scrivi Dati</h2>
+                            <p class="text-sm text-base-content/70 mb-4">
+                                Inserisci i dati nel formato Gun e inviali al contratto Chain.sol
+                            </p>
+                            
+                            <div class="form-control space-y-4">
+                                <div>
+                                    <label class="label">
+                                        <span class="label-text">Soul (ID Nodo)</span>
+                                        <span class="label-text-alt">Hash keccak256</span>
+                                    </label>
+                                    <input type="text" id="soulInput" class="input input-bordered w-full" 
+                                           placeholder="es: keccak256('user123')" />
+                                    <div class="text-xs text-base-content/50 mt-1">
+                                        Lascia vuoto per generare automaticamente
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="label">
+                                        <span class="label-text">Chiave</span>
+                                        <span class="label-text-alt">Hash keccak256</span>
+                                    </label>
+                                    <input type="text" id="keyInput" class="input input-bordered w-full" 
+                                           placeholder="es: keccak256('profile')" />
+                                </div>
+
+                                <div>
+                                    <label class="label">
+                                        <span class="label-text">Valore (JSON)</span>
+                                    </label>
+                                    <textarea id="valueInput" class="textarea textarea-bordered w-full h-32" 
+                                              placeholder='{"name": "Mario", "age": 30, "city": "Roma"}'></textarea>
+                                </div>
+
+                                <div class="flex gap-2">
+                                    <button class="btn btn-primary flex-1" onclick="writeToContract()">
+                                        📝 Scrivi su Contratto
+                                    </button>
+                                    <button class="btn btn-outline" onclick="writeToGunOnly()">
+                                        💾 Solo GunDB
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Read Data Section -->
+                    <div class="card bg-base-200">
+                        <div class="card-body">
+                            <h2 class="card-title text-accent">📖 Leggi Dati</h2>
+                            <p class="text-sm text-base-content/70 mb-4">
+                                Leggi i dati dal contratto o da GunDB
+                            </p>
+                            
+                            <div class="form-control space-y-4">
+                                <div>
+                                    <label class="label">
+                                        <span class="label-text">Soul (ID Nodo)</span>
+                                    </label>
+                                    <input type="text" id="readSoulInput" class="input input-bordered w-full" 
+                                           placeholder="Inserisci soul per leggere" />
+                                </div>
+
+                                <div>
+                                    <label class="label">
+                                        <span class="label-text">Chiave (opzionale)</span>
+                                    </label>
+                                    <input type="text" id="readKeyInput" class="input input-bordered w-full" 
+                                           placeholder="Lascia vuoto per leggere tutto il nodo" />
+                                </div>
+
+                                <div class="flex gap-2">
+                                    <button class="btn btn-secondary flex-1" onclick="readFromContract()">
+                                        🔍 Dal Contratto
+                                    </button>
+                                    <button class="btn btn-outline flex-1" onclick="readFromGun()">
+                                        📊 Da GunDB
+                                    </button>
+                                </div>
+
+                                <div>
+                                    <label class="label">
+                                        <span class="label-text">Risultato</span>
+                                    </label>
+                                    <textarea id="readResult" class="textarea textarea-bordered w-full h-32" 
+                                              readonly placeholder="I risultati appariranno qui..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sync Section -->
+                <div class="card bg-base-200 mt-8">
+                    <div class="card-body">
+                        <h2 class="card-title text-accent">🔄 Sincronizzazione</h2>
+                        <p class="text-sm text-base-content/70 mb-4">
+                            Sincronizza i dati tra il contratto e GunDB
+                        </p>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <button class="btn btn-accent" onclick="syncContractToGun()">
+                                📥 Contratto → GunDB
+                            </button>
+                            <button class="btn btn-accent" onclick="syncGunToContract()">
+                                📤 GunDB → Contratto
+                            </button>
+                            <button class="btn btn-accent" onclick="startEventListening()">
+                                🎧 Ascolta Eventi
+                            </button>
+                        </div>
+
+                        <div class="mt-4">
+                            <label class="label">
+                                <span class="label-text">Log Sincronizzazione</span>
+                            </label>
+                            <textarea id="syncLog" class="textarea textarea-bordered w-full h-24" 
+                                      readonly placeholder="I log di sincronizzazione appariranno qui..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Event Log -->
+                <div class="card bg-base-200 mt-8">
+                    <div class="card-body">
+                        <h2 class="card-title text-accent">📋 Log Eventi</h2>
+                        <div class="flex justify-between items-center mb-4">
+                            <p class="text-sm text-base-content/70">
+                                Eventi NodeUpdated dal contratto
+                            </p>
+                            <button class="btn btn-sm btn-outline" onclick="clearEventLog()">
+                                🗑️ Pulisci
+                            </button>
+                        </div>
+                        <div id="eventLog" class="space-y-2 max-h-64 overflow-y-auto">
+                            <div class="text-sm text-base-content/50">Nessun evento ancora...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation -->
+                <div class="flex justify-center mt-8">
+                    <a href="/" class="btn btn-outline">
+                        ← Torna al Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="lib/chain-contract.js"></script>
+</body>
+
+</html> 

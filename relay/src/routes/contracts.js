@@ -62,6 +62,8 @@ router.get("/config", async (req, res) => {
       stealthKeyRegistry:
         chainDeployments["Stealth#StealthKeyRegistry"] || null,
       bridgeDex: chainDeployments["Bridge#BridgeDex"] || null,
+      chain: chainDeployments["Database#Chain"] || null,
+      ipcmFactory: chainDeployments["IPFS#IPCMFactory"] || null,
     };
 
     console.log(
@@ -127,6 +129,8 @@ router.get("/:contractName", async (req, res) => {
       "payment-forwarder": "Stealth#PayamentForwarder",
       "stealth-key-registry": "Stealth#StealthKeyRegistry",
       "bridge-dex": "Bridge#BridgeDex",
+      "chain": "Database#Chain",
+      "ipcm-factory": "IPFS#IPCMFactory",
     };
 
     const fullContractName = contractMapping[contractName];
@@ -198,6 +202,8 @@ router.get("/:contractName/abi", async (req, res) => {
       "payment-forwarder": "Stealth#PayamentForwarder",
       "stealth-key-registry": "Stealth#StealthKeyRegistry",
       "bridge-dex": "Bridge#BridgeDex",
+      "chain": "Database#Chain",
+      "ipcm-factory": "IPFS#IPCMFactory",
     };
 
     const fullContractName = contractMapping[contractName];
@@ -269,6 +275,8 @@ router.get("/:contractName/address", async (req, res) => {
       "payment-forwarder": "Stealth#PayamentForwarder",
       "stealth-key-registry": "Stealth#StealthKeyRegistry",
       "bridge-dex": "Bridge#BridgeDex",
+      "chain": "Database#Chain",
+      "ipcm-factory": "IPFS#IPCMFactory",
     };
 
     const fullContractName = contractMapping[contractName];

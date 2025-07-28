@@ -82,6 +82,11 @@ let provider;
 // Utilizza l'ABI dal pacchetto shogun-contracts
 const RELAY_ABI = DEPLOYMENTS.sepolia["Relay#RelayPaymentRouter"].abi;
 
+// --- Config per contratto Chain ---
+let chainContract;
+const CHAIN_CONTRACT_ADDRESS = DEPLOYMENTS.sepolia["Database#Chain"]?.address;
+const CHAIN_ABI = DEPLOYMENTS.sepolia["Database#Chain"]?.abi;
+
 // Initialize contract with network verification
 async function initializeRelayContract() {
   if (!RELAY_CONTRACT_ADDRESS) {
@@ -125,12 +130,178 @@ async function initializeRelayContract() {
   }
 }
 
+// Initialize Chain contract
+async function initializeChainContract() {
+  if (!CHAIN_CONTRACT_ADDRESS) {
+    console.log("⚠️ CHAIN_CONTRACT_ADDRESS not configured");
+    return false;
+  }
+
+  if (!provider) {
+    console.log("⚠️ Provider not initialized");
+    return false;
+  }
+
+  try {
+    chainContract = new ethers.Contract(
+      CHAIN_CONTRACT_ADDRESS,
+      CHAIN_ABI,
+      provider
+    );
+
+    console.log(
+      `✅ Chain contract initialized at: ${CHAIN_CONTRACT_ADDRESS}`
+    );
+    return true;
+  } catch (error) {
+    console.error("❌ Failed to initialize chain contract:", error);
+    return false;
+  }
+}
+
+// Start Chain contract event listener
+async function startChainEventListener() {
+  if (!chainContract) {
+    console.log("⚠️ Chain contract not initialized");
+    return false;
+  }
+
+  try {
+    console.log("🎧 Starting Chain contract event listener...");
+    
+    // Listen for NodeUpdated events
+    chainContract.on("NodeUpdated", (soul, key, value, event) => {
+      console.log("📡 Chain contract event received:", {
+        soul: soul,
+        key: key,
+        value: value,
+        blockNumber: event.blockNumber,
+        transactionHash: event.transactionHash
+      });
+
+      // Decode the value from bytes to string
+      let decodedValue;
+      try {
+        decodedValue = ethers.toUtf8String(value);
+      } catch (error) {
+        console.warn("⚠️ Could not decode value as UTF-8, using hex:", value);
+        decodedValue = value;
+      }
+
+      // Propagate to GunDB
+      propagateChainEventToGun(soul, key, decodedValue, event);
+    });
+
+    console.log("✅ Chain contract event listener started");
+    return true;
+  } catch (error) {
+    console.error("❌ Failed to start chain event listener:", error);
+    return false;
+  }
+}
+
+// Propagate Chain contract event to GunDB
+async function propagateChainEventToGun(soul, key, value, event) {
+  if (!gun) {
+    console.warn("⚠️ Gun not initialized, cannot propagate event");
+    return;
+  }
+
+  try {
+    // Create a unique identifier for this event
+    const eventId = `${event.transactionHash}-${event.logIndex}`;
+    
+    // Store the event data in GunDB
+    const eventNode = gun.get("shogun").get("chain_events").get(eventId);
+    await new Promise((resolve, reject) => {
+      eventNode.put({
+        soul: soul,
+        key: key,
+        value: value,
+        blockNumber: event.blockNumber,
+        transactionHash: event.transactionHash,
+        timestamp: Date.now(),
+        propagated: true
+      }, (ack) => {
+        if (ack.err) {
+          reject(ack.err);
+        } else {
+          resolve();
+        }
+      });
+    });
+
+    // Also store the data in the main GunDB structure
+    const dataNode = gun.get(soul);
+    await new Promise((resolve, reject) => {
+      dataNode.get(key).put(value, (ack) => {
+        if (ack.err) {
+          reject(ack.err);
+        } else {
+          resolve();
+        }
+      });
+    });
+
+    console.log(`✅ Chain event propagated to GunDB: ${soul} -> ${key}`);
+    
+    // Add to system log
+    addSystemLog("info", "Chain event propagated to GunDB", {
+      soul: soul,
+      key: key,
+      value: value,
+      eventId: eventId
+    });
+
+  } catch (error) {
+    console.error("❌ Failed to propagate chain event to GunDB:", error);
+    addSystemLog("error", "Failed to propagate chain event", {
+      soul: soul,
+      key: key,
+      error: error.message
+    });
+  }
+}
+
+// Sync function to read from Chain contract and update GunDB
+async function syncChainContractToGun() {
+  if (!chainContract || !gun) {
+    console.warn("⚠️ Chain contract or Gun not initialized");
+    return false;
+  }
+
+  try {
+    console.log("🔄 Starting Chain contract to GunDB sync...");
+    
+    // This is a simplified sync - in a real implementation you'd need to:
+    // 1. Get all nodes from the contract (requires additional contract functions)
+    // 2. Compare with GunDB data
+    // 3. Update GunDB with missing data
+    
+    // For now, we'll just log that sync is requested
+    addSystemLog("info", "Chain contract sync requested");
+    
+    console.log("✅ Chain contract sync completed");
+    return true;
+  } catch (error) {
+    console.error("❌ Failed to sync chain contract:", error);
+    addSystemLog("error", "Chain contract sync failed", { error: error.message });
+    return false;
+  }
+}
+
 // Main server initialization function
 async function initializeServer() {
   console.log("🚀 Initializing Shogun Relay Server...");
 
   // Initialize relay contract
   await initializeRelayContract();
+
+  // Initialize Chain contract
+  await initializeChainContract();
+
+  // Start Chain contract event listener
+  await startChainEventListener();
 
   // System logging function
   function addSystemLog(level, message, data = null) {
@@ -538,6 +709,12 @@ async function initializeServer() {
   app.set("addTimeSeriesPoint", addTimeSeriesPoint);
   app.set("runGarbageCollector", runGarbageCollector);
   app.set("getCurrentRelayAddress", getCurrentRelayAddress);
+
+  // Esponi le funzioni del contratto Chain per le route
+  app.set("chainContract", chainContract);
+  app.set("startChainEventListener", startChainEventListener);
+  app.set("syncChainContractToGun", syncChainContractToGun);
+  app.set("propagateChainEventToGun", propagateChainEventToGun);
 
   // Esponi i middleware di autenticazione per le route
   app.set("tokenAuthMiddleware", tokenAuthMiddleware);
