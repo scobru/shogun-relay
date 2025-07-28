@@ -2870,7 +2870,7 @@ setprototypeof@1.2.0:
   resolved "https://registry.yarnpkg.com/setprototypeof/-/setprototypeof-1.2.0.tgz#66c9a24a73f9fc28cbe66b09fed3d33dcaf1b424"
   integrity sha512-E5LDX7Wrp85Kil5bhZv46j8jOeboKq5JMmYM3gVGdGH8xFpPWXUMsNrlODCrkoxMEeNi/XZIwuRvY4XNwYMJpw==
 
-shogun-contracts@^1.1.0:
+shogun-contracts@^1.2.0:
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/shogun-contracts/-/shogun-contracts-1.2.0.tgz#dd866beaf24f8a125702ce19695f435ed88dfdab"
   integrity sha512-kmulqDT/DazLswjLzzrWSl8el+JHacdYCdj1W8XxoBPSgDYcULTx3JUZJS6CYQRzzM+CUWzezLB82PEiV2bFVQ==
@@ -2881,7 +2881,7 @@ shogun-contracts@^1.1.0:
     hardhat "^2.22.19"
     keccak256 "^1.0.6"
 
-shogun-core@^1.5.1:
+shogun-core@^1.6.0:
   version "1.6.0"
   resolved "https://registry.yarnpkg.com/shogun-core/-/shogun-core-1.6.0.tgz#200c0e7ffcc294630684e7b4801965085a7875d4"
   integrity sha512-XZw8ufYrVYQa4acRMEiz5Zj9yQvRtQgTEIvE21Yh310NQBAQU/pIhHoLhNjdyN7ry/ZN3Oomz4nia9snbDuJ4Q==
