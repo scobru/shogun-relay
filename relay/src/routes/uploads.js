@@ -16,22 +16,17 @@ async function getAllSystemHashes(req) {
   }
   
   console.log('🔍 Getting all system file hashes...');
-  console.log('🔍 Gun instance available:', !!gun);
   
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const timeoutId = setTimeout(() => {
       console.log('⏰ Timeout for system hashes retrieval');
-      resolve([]); // Return empty array instead of rejecting
-    }, 15000); // Reduced timeout to 15 seconds
+      resolve([]);
+    }, 10000); // Reduced timeout to 10 seconds
 
     const uploadsNode = gun.get("shogun").get("uploads");
-    console.log('🔍 Reading from path: shogun.uploads');
     
     uploadsNode.once((uploadsData) => {
       clearTimeout(timeoutId);
-      console.log('📋 Uploads data:', uploadsData);
-      console.log('📋 Uploads data type:', typeof uploadsData);
-      console.log('📋 Uploads data keys:', uploadsData ? Object.keys(uploadsData) : 'N/A');
       
       if (!uploadsData || typeof uploadsData !== "object") {
         console.log('📋 No uploads found, returning empty array');
@@ -43,7 +38,6 @@ async function getAllSystemHashes(req) {
       const userAddresses = Object.keys(uploadsData).filter(
         (key) => key !== "_" && key !== "#" && key !== ">" && key !== "<"
       );
-      console.log('📋 User addresses found:', userAddresses);
 
       if (userAddresses.length === 0) {
         console.log('📋 No users found, returning empty array');
@@ -56,27 +50,21 @@ async function getAllSystemHashes(req) {
       const totalUsers = userAddresses.length;
 
       userAddresses.forEach((userAddress) => {
-        console.log(`📋 Reading hashes for user: ${userAddress}`);
         const userUploadsNode = uploadsNode.get(userAddress);
         
         userUploadsNode.once((userData) => {
           completedUsers++;
-          console.log(`📋 User data for ${userAddress}:`, userData);
-          console.log(`📋 User data type for ${userAddress}:`, typeof userData);
-          console.log(`📋 User data keys for ${userAddress}:`, userData ? Object.keys(userData) : 'N/A');
 
           if (userData && typeof userData === "object") {
             // Ottieni tutti gli hash per questo utente
             const userHashes = Object.keys(userData).filter(
               (key) => key !== "_" && key !== "#" && key !== ">" && key !== "<"
             );
-            console.log(`📋 Hashes for user ${userAddress}:`, userHashes);
             allHashes = allHashes.concat(userHashes);
           }
 
           if (completedUsers === totalUsers) {
-            console.log(`📋 Final system hashes: ${allHashes.length} total hashes`);
-            console.log('📋 System hashes:', allHashes);
+            console.log(`📋 Found ${allHashes.length} system hashes`);
             resolve(allHashes);
           }
         });
