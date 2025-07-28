@@ -1,6 +1,7 @@
 import express from 'express';
 import { ethers } from 'ethers';
 import { DEPLOYMENTS } from "shogun-contracts/deployments.js";
+import { getOffChainMBUsage } from './uploads.js';
 
 const router = express.Router();
 
@@ -232,16 +233,7 @@ router.get("/user-subscription-details/:userAddress", async (req, res) => {
           let usagePercentage = 0;
           
           try {
-            // Importa la funzione getOffChainMBUsage
-            console.log(`📊 user-subscription-details: Importing getOffChainMBUsage for ${userAddress}`);
-            const { getOffChainMBUsage } = await import('../uploads.js');
-            console.log(`📊 user-subscription-details: getOffChainMBUsage imported successfully`);
-            
-            // Test diretto della funzione
-            console.log(`📊 user-subscription-details: Testing getOffChainMBUsage function...`);
-            console.log(`📊 user-subscription-details: Function type:`, typeof getOffChainMBUsage);
-            console.log(`📊 user-subscription-details: Function:`, getOffChainMBUsage);
-            
+            console.log(`📊 user-subscription-details: Calculating MB usage for ${userAddress}`);
             mbUsed = await getOffChainMBUsage(userAddress, req);
             console.log(`📊 user-subscription-details: getOffChainMBUsage returned: ${mbUsed}`);
             
@@ -255,79 +247,9 @@ router.get("/user-subscription-details/:userAddress", async (req, res) => {
             console.log(`📊 - Usage: ${usagePercentage.toFixed(2)}%`);
           } catch (mbError) {
             console.warn(`⚠️ Error calculating MB usage for ${userAddress}:`, mbError.message);
-            console.warn(`⚠️ MB Error stack:`, mbError.stack);
-            
-            // Fallback: prova a usare la funzione direttamente
-            try {
-              console.log(`📊 user-subscription-details: Trying fallback method...`);
-              const gun = req.app.get('gunInstance');
-              if (gun) {
-                console.log(`📊 user-subscription-details: Gun instance available, calculating manually...`);
-                
-                // Calcolo manuale dei MB
-                const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
-                const manualMB = await new Promise((resolve) => {
-                  const timeoutId = setTimeout(() => {
-                    console.log(`⏰ Manual MB calculation timeout for ${userAddress}`);
-                    resolve(0);
-                  }, 10000);
-
-                  uploadsNode.once((parentData) => {
-                    clearTimeout(timeoutId);
-                    if (!parentData || typeof parentData !== "object") {
-                      resolve(0);
-                      return;
-                    }
-
-                    const hashKeys = Object.keys(parentData).filter(
-                      (key) => key !== "_" && key !== "#" && key !== ">" && key !== "<"
-                    );
-
-                    if (hashKeys.length === 0) {
-                      resolve(0);
-                      return;
-                    }
-
-                    let totalMB = 0;
-                    let completedReads = 0;
-                    const totalReads = hashKeys.length;
-
-                    hashKeys.forEach((hash) => {
-                      uploadsNode.get(hash).once((uploadData) => {
-                        completedReads++;
-                        if (uploadData && uploadData.sizeMB) {
-                          totalMB += uploadData.sizeMB;
-                        }
-                        if (completedReads === totalReads) {
-                          console.log(`📊 Manual MB calculation: ${totalMB} MB from ${totalReads} files`);
-                          resolve(totalMB);
-                        }
-                      });
-                    });
-                  });
-                });
-                
-                mbUsed = manualMB;
-                mbRemaining = Math.max(0, Number(mbAllocated) - mbUsed);
-                usagePercentage = Number(mbAllocated) > 0 ? (mbUsed / Number(mbAllocated)) * 100 : 0;
-                
-                console.log(`📊 Manual MB calculation for ${userAddress}:`);
-                console.log(`📊 - MB Allocated: ${mbAllocated}`);
-                console.log(`📊 - MB Used (manual): ${mbUsed}`);
-                console.log(`📊 - MB Remaining: ${mbRemaining}`);
-                console.log(`📊 - Usage: ${usagePercentage.toFixed(2)}%`);
-              } else {
-                console.warn(`⚠️ Gun instance not available for manual calculation`);
-                mbUsed = 0;
-                mbRemaining = Number(mbAllocated);
-                usagePercentage = 0;
-              }
-            } catch (fallbackError) {
-              console.warn(`⚠️ Fallback calculation also failed:`, fallbackError.message);
-              mbUsed = 0;
-              mbRemaining = Number(mbAllocated);
-              usagePercentage = 0;
-            }
+            mbUsed = 0;
+            mbRemaining = Number(mbAllocated);
+            usagePercentage = 0;
           }
           
           activeSubscription = {
