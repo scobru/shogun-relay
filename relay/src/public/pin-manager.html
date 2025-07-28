@@ -623,60 +623,54 @@
                     addBatchLog(`⚠️ system-hashes endpoint failed: ${error.message}`);
                 }
                 
-                // Fallback: usa lo stesso approccio di user-upload.html
-                addBatchLog('🔄 Trying alternative method: fetching all user uploads...');
+                // Fallback: usa direttamente l'endpoint che funziona
+                addBatchLog('🔄 Trying direct approach: fetching known user files...');
                 
-                // Ottieni tutti i file degli utenti
-                const allUsersResponse = await fetch('/api/v1/user-uploads/all-users', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...ShogunAdmin.getAuthHeaders()
-                    }
-                });
-
-                if (!allUsersResponse.ok) {
-                    throw new Error(`HTTP error! status: ${allUsersResponse.status}`);
-                }
-
-                const allUsersResult = await allUsersResponse.json();
+                // Lista di wallet address noti (puoi aggiungerne altri)
+                const knownUsers = [
+                    '0xa6591dcdff5c7616110b4f84207184aef7835048' // Il tuo wallet
+                ];
                 
-                if (allUsersResult.success && allUsersResult.users) {
-                    const allHashes = [];
-                    
-                    // Per ogni utente, ottieni i suoi file
-                    for (const userAddress of allUsersResult.users) {
-                        try {
-                            const userFilesResponse = await fetch(`/api/v1/user-uploads/${encodeURIComponent(userAddress)}`, {
-                                method: 'GET',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    ...ShogunAdmin.getAuthHeaders()
-                                }
-                            });
-                            
-                            if (userFilesResponse.ok) {
-                                const userFilesResult = await userFilesResponse.json();
-                                
-                                if (userFilesResult.success && userFilesResult.uploads) {
-                                    userFilesResult.uploads.forEach(file => {
-                                        if (file.hash) {
-                                            allHashes.push(file.hash);
-                                        }
-                                    });
-                                }
+                const allHashes = [];
+                
+                // Per ogni utente noto, ottieni i suoi file
+                for (const userAddress of knownUsers) {
+                    try {
+                        addBatchLog(`📂 Fetching files for user: ${userAddress.substring(0, 10)}...`);
+                        
+                        const userFilesResponse = await fetch(`/api/v1/user-uploads/${encodeURIComponent(userAddress)}`, {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                ...ShogunAdmin.getAuthHeaders()
                             }
-                        } catch (userError) {
-                            addBatchLog(`⚠️ Error fetching files for user ${userAddress}: ${userError.message}`);
+                        });
+                        
+                        if (userFilesResponse.ok) {
+                            const userFilesResult = await userFilesResponse.json();
+                            
+                            if (userFilesResult.success && userFilesResult.uploads) {
+                                userFilesResult.uploads.forEach(file => {
+                                    if (file.hash) {
+                                        allHashes.push(file.hash);
+                                        addBatchLog(`📄 Found file: ${file.name} (${file.hash})`);
+                                    }
+                                });
+                                addBatchLog(`✅ Found ${userFilesResult.uploads.length} files for user ${userAddress.substring(0, 10)}...`);
+                            } else {
+                                addBatchLog(`⚠️ No files found for user ${userAddress.substring(0, 10)}...`);
+                            }
+                        } else {
+                            addBatchLog(`❌ Error fetching files for user ${userAddress.substring(0, 10)}...: ${userFilesResponse.status}`);
                         }
+                    } catch (userError) {
+                        addBatchLog(`❌ Error fetching files for user ${userAddress.substring(0, 10)}...: ${userError.message}`);
                     }
-                    
-                    addBatchLog(`✅ Found ${allHashes.length} system files via alternative method`);
-                    return allHashes;
-                } else {
-                    addBatchLog('⚠️ No users found or error in response');
-                    return [];
                 }
+                
+                addBatchLog(`✅ Found ${allHashes.length} system files via direct approach`);
+                return allHashes;
+                
             } catch (error) {
                 addBatchLog(`❌ Error fetching system hashes: ${error.message}`, true);
                 return [];
