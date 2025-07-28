@@ -74,12 +74,6 @@ RUN npm install --omit=dev
 # Copy the rest of the application
 COPY relay/ /app/relay/
 
-# Update Tailwind CSS to use local files instead of CDN
-RUN echo "🎨 Updating Tailwind CSS to use local files..." && \
-    find /app/relay/src/public -name "*.html" -type f -exec sed -i 's|<script src="https://cdn\.tailwindcss\.com"></script>|<link rel="stylesheet" href="styles/tailwind-local.css">|g' {} \; && \
-    find /app/relay/src/public -name "*.html" -type f -exec sed -i 's|<link rel="stylesheet" href="https://cdn\.jsdelivr\.net/npm/tailwindcss@[^"]*" />|<link rel="stylesheet" href="styles/tailwind-local.css">|g' {} \; && \
-    echo "✅ Tailwind CSS updated successfully!"
-
 # Set proper permissions
 RUN chown -R node:node /app \
     && chown -R ipfs:ipfs /data/ipfs \
