@@ -272,16 +272,114 @@ async function syncChainContractToGun() {
 
   try {
     console.log("🔄 Starting Chain contract to GunDB sync...");
+    addSystemLog("info", "Chain contract sync started");
     
-    // This is a simplified sync - in a real implementation you'd need to:
-    // 1. Get all nodes from the contract (requires additional contract functions)
-    // 2. Compare with GunDB data
-    // 3. Update GunDB with missing data
+    // Ottieni il blocco corrente
+    const currentBlock = await provider.getBlockNumber();
+    console.log(`📦 Current block: ${currentBlock}`);
     
-    // For now, we'll just log that sync is requested
-    addSystemLog("info", "Chain contract sync requested");
+    // Sincronizza gli ultimi 1000 blocchi (circa 4 ore su Sepolia)
+    const fromBlock = Math.max(0, currentBlock - 1000);
+    const toBlock = currentBlock;
     
-    console.log("✅ Chain contract sync completed");
+    console.log(`🔄 Syncing events from block ${fromBlock} to ${toBlock}`);
+    
+    // Ottieni tutti gli eventi NodeUpdated dal contratto
+    const events = await chainContract.queryFilter(
+      chainContract.filters.NodeUpdated(),
+      fromBlock,
+      toBlock
+    );
+    
+    console.log(`📡 Found ${events.length} NodeUpdated events`);
+    
+    let syncedCount = 0;
+    let errorCount = 0;
+    
+    // Processa ogni evento
+    for (const event of events) {
+      try {
+        const { soul, key, value } = event.args;
+        
+        // Decodifica il valore
+        let decodedValue;
+        try {
+          decodedValue = ethers.toUtf8String(value);
+        } catch (error) {
+          console.warn("⚠️ Could not decode value as UTF-8, using hex:", value);
+          decodedValue = value;
+        }
+        
+        // Crea un ID univoco per questo evento
+        const eventId = `${event.transactionHash}-${event.logIndex}`;
+        
+        // Verifica se l'evento è già stato sincronizzato
+        const existingEvent = await new Promise((resolve) => {
+          const eventNode = gun.get("shogun").get("chain_events").get(eventId);
+          eventNode.once((data) => {
+            resolve(data);
+          });
+        });
+        
+        if (existingEvent) {
+          console.log(`⏭️ Event already synced: ${eventId}`);
+          continue;
+        }
+        
+        // Salva l'evento in GunDB
+        const eventNode = gun.get("shogun").get("chain_events").get(eventId);
+        await new Promise((resolve, reject) => {
+          eventNode.put({
+            soul: soul,
+            key: key,
+            value: decodedValue,
+            blockNumber: event.blockNumber,
+            transactionHash: event.transactionHash,
+            timestamp: Date.now(),
+            synced: true,
+            syncMethod: "manual_sync"
+          }, (ack) => {
+            if (ack.err) {
+              reject(ack.err);
+            } else {
+              resolve();
+            }
+          });
+        });
+        
+        // Salva anche i dati nel nodo principale
+        const dataNode = gun.get(soul);
+        await new Promise((resolve, reject) => {
+          dataNode.get(key).put(decodedValue, (ack) => {
+            if (ack.err) {
+              reject(ack.err);
+            } else {
+              resolve();
+            }
+          });
+        });
+        
+        syncedCount++;
+        console.log(`✅ Synced event: ${eventId} (${syncedCount}/${events.length})`);
+        
+      } catch (eventError) {
+        errorCount++;
+        console.error(`❌ Error syncing event:`, eventError);
+      }
+    }
+    
+    const syncResult = {
+      totalEvents: events.length,
+      syncedEvents: syncedCount,
+      errorEvents: errorCount,
+      fromBlock: fromBlock,
+      toBlock: toBlock,
+      timestamp: Date.now()
+    };
+    
+    console.log(`✅ Chain contract sync completed:`, syncResult);
+    addSystemLog("info", "Chain contract sync completed", syncResult);
+    
     return true;
   } catch (error) {
     console.error("❌ Failed to sync chain contract:", error);
