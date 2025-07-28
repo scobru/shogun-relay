@@ -4,6 +4,17 @@ import { DEPLOYMENTS } from "shogun-contracts/deployments.js";
 
 const router = express.Router();
 
+// Funzione per convertire chainId in nome della chain
+function getChainName(chainId) {
+  const chainMap = {
+    "1": "mainnet",
+    "11155111": "sepolia",
+    "137": "polygon",
+    "80001": "mumbai"
+  };
+  return chainMap[chainId] || chainId;
+}
+
 // Inizializza il provider e il contratto per una chain specifica
 async function initializeContract(chainId = "11155111") {
   if (!process.env.ALCHEMY_API_KEY) {
@@ -28,14 +39,17 @@ async function initializeContract(chainId = "11155111") {
         return { success: false, error: `Unsupported chain ID: ${chainId}` };
     }
 
+    // Converti chainId in nome della chain
+    const chainName = getChainName(chainId);
+    
     // Verifica che la chain abbia i deployments
-    if (!DEPLOYMENTS[chainId]) {
-      return { success: false, error: `No deployments found for chain ID: ${chainId}` };
+    if (!DEPLOYMENTS[chainName]) {
+      return { success: false, error: `No deployments found for chain ID: ${chainId} (${chainName})` };
     }
 
-    const relayContractData = DEPLOYMENTS[chainId]["Relay#RelayPaymentRouter"];
+    const relayContractData = DEPLOYMENTS[chainName]["Relay#RelayPaymentRouter"];
     if (!relayContractData) {
-      return { success: false, error: `Relay contract not found on chain: ${chainId}` };
+      return { success: false, error: `Relay contract not found on chain: ${chainId} (${chainName})` };
     }
 
     const provider = new ethers.JsonRpcProvider(providerUrl);
@@ -215,16 +229,5 @@ router.get("/supported-chains", async (req, res) => {
     });
   }
 });
-
-// Funzione helper per ottenere il nome della chain
-function getChainName(chainId) {
-  const chainNames = {
-    "1": "Ethereum Mainnet",
-    "11155111": "Sepolia Testnet",
-    "137": "Polygon Mainnet",
-    "80001": "Polygon Mumbai Testnet"
-  };
-  return chainNames[chainId] || `Chain ${chainId}`;
-}
 
 export default router; 

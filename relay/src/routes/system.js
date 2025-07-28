@@ -2,6 +2,17 @@ import express from 'express';
 
 const router = express.Router();
 
+// Funzione per convertire chainId in nome della chain
+function getChainName(chainId) {
+  const chainMap = {
+    "1": "mainnet",
+    "11155111": "sepolia",
+    "137": "polygon",
+    "80001": "mumbai"
+  };
+  return chainMap[chainId] || chainId;
+}
+
 // Middleware per ottenere l'istanza Gun dal relay
 const getGunInstance = (req) => {
   return req.app.get('gunInstance');
@@ -142,12 +153,13 @@ router.get("/user-subscription/:userAddress", async (req, res) => {
     const web3ProviderUrl = `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`;
     const provider = new ethers.JsonRpcProvider(web3ProviderUrl);
     const chainId = process.env.CHAIN_ID || "11155111";
-    const chainDeployments = DEPLOYMENTS[chainId];
+    const chainName = getChainName(chainId);
+    const chainDeployments = DEPLOYMENTS[chainName];
 
     if (!chainDeployments) {
       return res.status(500).json({
         success: false,
-        error: "No deployments found for chain ID",
+        error: `No deployments found for chain ID: ${chainId} (${chainName})`,
       });
     }
 
@@ -207,12 +219,13 @@ router.get("/subscription-status/:identifier", async (req, res) => {
     const web3ProviderUrl = `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`;
     const provider = new ethers.JsonRpcProvider(web3ProviderUrl);
     const chainId = process.env.CHAIN_ID || "11155111";
-    const chainDeployments = DEPLOYMENTS[chainId];
+    const chainName = getChainName(chainId);
+    const chainDeployments = DEPLOYMENTS[chainName];
 
     if (!chainDeployments) {
       return res.status(500).json({
         success: false,
-        error: "No deployments found for chain ID",
+        error: `No deployments found for chain ID: ${chainId} (${chainName})`,
       });
     }
 
@@ -265,12 +278,13 @@ router.get("/user-subscription-details/:userAddress", async (req, res) => {
     const web3ProviderUrl = `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`;
     const provider = new ethers.JsonRpcProvider(web3ProviderUrl);
     const chainId = process.env.CHAIN_ID || "11155111";
-    const chainDeployments = DEPLOYMENTS[chainId];
+    const chainName = getChainName(chainId);
+    const chainDeployments = DEPLOYMENTS[chainName];
 
     if (!chainDeployments) {
       return res.status(500).json({
         success: false,
-        error: "No deployments found for chain ID",
+        error: `No deployments found for chain ID: ${chainId} (${chainName})`,
       });
     }
 
