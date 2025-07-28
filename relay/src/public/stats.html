@@ -500,7 +500,7 @@
         
         async function fetchStats() {
             try {
-                const response = await fetch('/api/stats');
+                const response = await fetch('/api/v1/system/stats');
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }

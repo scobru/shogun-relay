@@ -188,7 +188,7 @@
             const extra = extraInput ? extraInput.split(',').map(item => item.trim()) : null;
             const options = { includeP256, includeSecp256k1Bitcoin: includeBitcoin, includeSecp256k1Ethereum: includeEthereum };
             try {
-                const response = await fetch('/api/derive', {
+                const response = await fetch('/api/v1/system/derive', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ password, extra, options })

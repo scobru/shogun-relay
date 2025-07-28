@@ -100,7 +100,7 @@
                 notesArea.value = '';
                 return;
             }
-            const result = await apiCall('/api/notes');
+            const result = await apiCall('/api/v1/notes');
             if (result && result.notes) {
                 try {
                     const decryptedNotes = await SEA.decrypt(result.notes, secret);
@@ -130,7 +130,7 @@
             const notes = notesArea.value;
             const encryptedNotes = await SEA.encrypt(notes, secret);
             
-            const result = await apiCall('/api/notes', 'POST', { notes: encryptedNotes });
+            const result = await apiCall('/api/v1/notes', 'POST', { notes: encryptedNotes });
             if (result) {
                 showMessage('Notes encrypted and saved successfully!', false);
             }
@@ -140,7 +140,7 @@
             if (!confirm('Are you sure you want to delete all notes permanently? This cannot be undone.')) {
                 return;
             }
-            const result = await apiCall('/api/notes', 'DELETE');
+            const result = await apiCall('/api/v1/notes', 'DELETE');
             if (result && result.success) {
                 notesArea.value = '';
                 showMessage('Notes deleted successfully.', false);

@@ -439,7 +439,7 @@
                 subscriptionStatusEl.classList.remove('hidden');
 
                 // Usa il nuovo endpoint centralizzato
-                const url = `/api/user-subscription-details/${encodeURIComponent(walletAddr)}`;
+                const url = `/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(walletAddr)}`;
                 console.log('🔍 user-upload: Making API call to:', url);
 
                 const response = await fetch(url);
@@ -953,7 +953,7 @@
                     // Genera la stessa chiave deterministica
                     const encryptionKey = await generateDeterministicKey(signature, walletAddress);
 
-                    showStatus('�� Decrypting file...', 'info');
+                    showStatus('🔐 Decrypting file...', 'info');
 
                     // Scarica il file crittografato
                     const response = await fetch(`/ipfs-content/${hash}`);

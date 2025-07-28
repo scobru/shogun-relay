@@ -752,7 +752,7 @@
 
         console.log("Loading all data from server...");
 
-        fetch("/api/alldata", {
+        fetch("/api/v1/system/alldata", {
           headers: authHeaders,
         })
           .then((response) => {

@@ -238,7 +238,7 @@
         // Verifica la password admin con il server
         async function verifyAdminPassword(password) {
             try {
-                const response = await fetch('/api/relay-info', {
+                const response = await fetch('/api/v1/system/relay-info', {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${password}`,
@@ -361,7 +361,7 @@
             }
 
             try {
-                const response = await fetch('/api/relay-info');
+                const response = await fetch('/api/v1/system/relay-info');
                 const data = await response.json();
                 if (data.success && data.name) {
                     document.getElementById('relay-title').textContent = data.name;

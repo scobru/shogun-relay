@@ -1581,7 +1581,7 @@
                 const identifier = walletAddress;
                 console.log('🔍 Checking subscription status for identifier:', identifier, 'on chain:', chainId);
 
-                const response = await fetch(`/api/v1/subscriptions/subscription-status/${encodeURIComponent(identifier)}?chainId=${chainId}`);
+                const response = await fetch(`/api/v1/subscriptions/subscription-status/${encodeURIComponent(identifier)}`);
                 console.log('📡 Response status:', response.status);
 
                 const result = await response.json();
@@ -1803,7 +1803,7 @@
                 // Ottieni la firma del wallet per l'autenticazione
                 const authSignature = await getWalletSignature();
 
-                const response = await fetch(`/api/sync-mb-usage/${encodeURIComponent(walletAddress)}`, {
+                const response = await fetch(`/api/v1/user-uploads/sync-mb-usage/${encodeURIComponent(walletAddress)}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

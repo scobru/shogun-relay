@@ -490,7 +490,7 @@
 
             try {
                 log('Running garbage collection...', 'info');
-                const response = await fetch('/api/gc/trigger', {
+                const response = await fetch('/api/v1/system/gc/trigger', {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${password}` }
                 });

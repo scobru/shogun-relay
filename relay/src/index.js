@@ -547,6 +547,136 @@ async function initializeServer() {
   app.set("allowInternalOperations", () => allowInternalOperations);
   app.set("setAllowInternalOperations", (value) => { allowInternalOperations = value; });
 
+  // Funzione per calcolare l'utilizzo MB off-chain
+  async function getOffChainMBUsage(userAddress) {
+    try {
+      const mbUsageNode = gun.get("shogun").get("mb_usage").get(userAddress);
+      const offChainUsage = await new Promise((resolve) => {
+        const timeoutId = setTimeout(() => {
+          console.warn(
+            `⚠️ GunDB mb_usage read timeout for ${userAddress}, will recalculate from files`
+          );
+          resolve({ mbUsed: 0, lastUpdated: Date.now(), timeout: true });
+        }, 1500); // Timeout ridotto a 1.5 secondi
+
+        mbUsageNode.once((data) => {
+          clearTimeout(timeoutId);
+          resolve(data || { mbUsed: 0, lastUpdated: Date.now() });
+        });
+      });
+
+      // Se i dati off-chain non sono affidabili (timeout o 0), ricalcola dai file esistenti
+      if (offChainUsage.timeout || offChainUsage.mbUsed === 0) {
+        console.log(
+          `🔄 Recalculating MB usage from existing files for ${userAddress}`
+        );
+
+        try {
+          // Ottieni tutti i file dell'utente
+          const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
+          const userFiles = await new Promise((resolve) => {
+            const timeoutId = setTimeout(() => {
+              console.warn(
+                `⚠️ GunDB uploads read timeout for ${userAddress}, using fallback calculation`
+              );
+              resolve([]);
+            }, 2500); // Timeout ridotto a 2.5 secondi
+
+            uploadsNode.once((parentData) => {
+              clearTimeout(timeoutId);
+
+              if (!parentData || typeof parentData !== "object") {
+                resolve([]);
+                return;
+              }
+
+              const hashKeys = Object.keys(parentData).filter(
+                (key) => key !== "_"
+              );
+              let uploadsArray = [];
+              let completedReads = 0;
+              const totalReads = hashKeys.length;
+
+              if (totalReads === 0) {
+                resolve([]);
+                return;
+              }
+
+              // Timeout per ogni singola lettura di file
+              const fileReadTimeout = setTimeout(() => {
+                console.warn(`⚠️ File read timeout, using partial data`);
+                resolve(uploadsArray);
+              }, 3000);
+
+              hashKeys.forEach((hash) => {
+                uploadsNode.get(hash).once((uploadData) => {
+                  completedReads++;
+                  if (uploadData && uploadData.sizeMB) {
+                    uploadsArray.push(uploadData);
+                  }
+                  if (completedReads === totalReads) {
+                    clearTimeout(fileReadTimeout);
+                    resolve(uploadsArray);
+                  }
+                });
+              });
+            });
+          });
+
+          // Calcola il totale dei MB dai file
+          const calculatedMbUsed = userFiles.reduce(
+            (sum, file) => sum + (file.sizeMB || 0),
+            0
+          );
+          console.log(
+            `📊 Calculated MB usage from files: ${calculatedMbUsed} MB (${userFiles.length} files)`
+          );
+
+          // Usa il valore calcolato se è maggiore di 0
+          if (calculatedMbUsed > 0) {
+            // Aggiorna anche i dati off-chain per futuri utilizzi (in background)
+            const updatedUsage = {
+              mbUsed: calculatedMbUsed,
+              lastUpdated: Date.now(),
+              updatedBy: "recalculation-from-files",
+            };
+
+            mbUsageNode.put(updatedUsage, (ack) => {
+              if (ack.err) {
+                console.error("Error updating recalculated MB usage:", ack.err);
+              } else {
+                console.log(
+                  `✅ Updated off-chain MB usage with recalculated value: ${calculatedMbUsed} MB`
+                );
+              }
+            });
+
+            return {
+              mbUsed: calculatedMbUsed,
+              lastUpdated: Date.now(),
+              recalculated: true,
+            };
+          }
+        } catch (recalcError) {
+          console.error("Error recalculating MB usage:", recalcError);
+        }
+      }
+
+      return offChainUsage;
+    } catch (error) {
+      console.error("Error getting off-chain MB usage:", error);
+      return { mbUsed: 0, lastUpdated: Date.now(), error: error.message };
+    }
+  }
+
+  // Esponi la funzione getOffChainMBUsage
+  app.set("getOffChainMBUsage", getOffChainMBUsage);
+
+  // Esponi le configurazioni IPFS
+  app.set("IPFS_API_URL", IPFS_API_URL);
+  app.set("IPFS_API_TOKEN", IPFS_API_TOKEN);
+  app.set("IPFS_GATEWAY_URL", IPFS_GATEWAY_URL);
+
   // Esponi l'istanza Gun globalmente per le route
   global.gunInstance = gun;
 
