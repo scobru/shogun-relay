@@ -129,7 +129,53 @@ export default (app) => {
     })
   );
   
-  // Route per servire i file HTML specifici
+  // Route mancanti dall'index-old.js
+  app.get("/blog/:id", (req, res) => {
+    const publicPath = path.resolve(__dirname, '../public');
+    const indexPath = path.resolve(publicPath, "index.html");
+    const htmlData = fs.readFileSync(indexPath, "utf8");
+    let numberOfTries = 0;
+    const gun = req.app.get('gunInstance');
+    
+    const chain = gun
+      .get(`hal9000/post`)
+      .get(req.params.id)
+      .on((post) => {
+        numberOfTries++;
+        if (!post) {
+          if (numberOfTries > 1) {
+            chain.off();
+            return res.sendStatus(404);
+          }
+          return;
+        }
+        if (res.writableEnded) {
+          chain.off();
+          return;
+        }
+        const finalHtml = `
+            <!DOCTYPE html>
+            <html>
+               <head>
+                  <title>${post.title || "Blog Post"}</title>
+                  <meta name="description" content="${post.description || ""}" />
+               </head>
+               <body>
+                  ${post.content}
+               </body>
+            </html>
+         `;
+        return res.send(finalHtml);
+      });
+    setTimeout(() => {
+      if (!res.writableEnded) {
+        res.sendStatus(408);
+      }
+      chain.off();
+    }, 5000);
+  });
+
+  // Route per servire i file HTML specifici (DOPO le route API)
   app.get("/user-upload", (req, res) => {
     const publicPath = path.resolve(__dirname, '../public');
     res.sendFile(path.resolve(publicPath, "user-upload.html"));
@@ -198,52 +244,6 @@ export default (app) => {
   app.get("/charts", (req, res) => {
     const publicPath = path.resolve(__dirname, '../public');
     res.sendFile(path.resolve(publicPath, "charts.html"));
-  });
-
-  // Route mancanti dall'index-old.js
-  app.get("/blog/:id", (req, res) => {
-    const publicPath = path.resolve(__dirname, '../public');
-    const indexPath = path.resolve(publicPath, "index.html");
-    const htmlData = fs.readFileSync(indexPath, "utf8");
-    let numberOfTries = 0;
-    const gun = req.app.get('gunInstance');
-    
-    const chain = gun
-      .get(`hal9000/post`)
-      .get(req.params.id)
-      .on((post) => {
-        numberOfTries++;
-        if (!post) {
-          if (numberOfTries > 1) {
-            chain.off();
-            return res.sendStatus(404);
-          }
-          return;
-        }
-        if (res.writableEnded) {
-          chain.off();
-          return;
-        }
-        const finalHtml = `
-            <!DOCTYPE html>
-            <html>
-               <head>
-                  <title>${post.title || "Blog Post"}</title>
-                  <meta name="description" content="${post.description || ""}" />
-               </head>
-               <body>
-                  ${post.content}
-               </body>
-            </html>
-         `;
-        return res.send(finalHtml);
-      });
-    setTimeout(() => {
-      if (!res.writableEnded) {
-        res.sendStatus(408);
-      }
-      chain.off();
-    }, 5000);
   });
 
   app.get("/visualGraph", (req, res) => {

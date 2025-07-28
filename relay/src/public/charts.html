@@ -219,7 +219,7 @@
     var requestStart = +new Date;
     
     try {
-      var url = document.getElementById('url').value || (location.origin + '/stats.json');
+      var url = document.getElementById('url').value || (location.origin + '/api/v1/system/stats.json');
       var data = await (await fetch(url, {method: 'GET', mode: 'cors'})).json();
       
       var requestEnd = +new Date;

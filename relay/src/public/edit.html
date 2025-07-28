@@ -99,7 +99,7 @@
             }
             
             try {
-                const response = await fetch(`/node/${nodePath}`, { headers: authHeader });
+                const response = await fetch(`/api/v1/system/node/${nodePath}`, { headers: authHeader });
                 if (!response.ok) {
                     const errorText = await response.text();
                     throw new Error(`HTTP error ${response.status}: ${errorText}`);
@@ -126,7 +126,7 @@
             }
             
             try {
-                const response = await fetch(`/node/${nodePath}`, {
+                const response = await fetch(`/api/v1/system/node/${nodePath}`, {
                     method: 'POST',
                     headers: { ...authHeader, 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
@@ -156,7 +156,7 @@
             }
             
             try {
-                const response = await fetch(`/node/${nodePath}`, {
+                const response = await fetch(`/api/v1/system/node/${nodePath}`, {
                     method: 'DELETE',
                     headers: authHeader
                 });

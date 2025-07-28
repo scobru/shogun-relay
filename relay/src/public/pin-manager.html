@@ -259,7 +259,7 @@
                 return;
             }
 
-            const result = await apiCall('/pins/add', 'POST', { cid });
+            const result = await apiCall('/api/v1/ipfs/pins/add', 'POST', { cid });
             if (result) {
                 showMessage('Pin added successfully');
                 await listPins();
@@ -273,7 +273,7 @@
                 return;
             }
 
-            const result = await apiCall('/pins/rm', 'POST', { cid });
+            const result = await apiCall('/api/v1/ipfs/pins/rm', 'POST', { cid });
             if (result) {
                 showMessage('Pin removed successfully');
                 await listPins();
@@ -281,7 +281,7 @@
         }
 
         async function listPins() {
-            const result = await apiCall('/pins/ls', 'POST');
+            const result = await apiCall('/api/v1/ipfs/pins/ls', 'POST');
             if (result) {
                 pinListEl.innerHTML = '';
                 
@@ -416,7 +416,7 @@
                         rePinBtn.disabled = true;
                         rePinBtn.textContent = '⏳ Pinning...';
                         
-                        const result = await apiCall('/pins/add', 'POST', { cid });
+                        const result = await apiCall('/api/v1/ipfs/pins/add', 'POST', { cid });
 
                         if (result) {
                             rePinBtn.textContent = '✅ Pinned!';
@@ -443,7 +443,7 @@
                         unpinBtn.disabled = true;
                         unpinBtn.textContent = '⏳ Unpinning...';
                         
-                        const result = await apiCall('/pins/rm', 'POST', { cid });
+                        const result = await apiCall('/api/v1/ipfs/pins/rm', 'POST', { cid });
 
                         if (result) {
                             unpinBtn.textContent = '✅ Unpinned!';
@@ -471,13 +471,13 @@
                         removeBtn.textContent = '⏳ Unpinning...';
                         
                         try {
-                            const unpinResult = await apiCall('/pins/rm', 'POST', { cid }, { manageVisibility: false });
+                            const unpinResult = await apiCall('/api/v1/ipfs/pins/rm', 'POST', { cid }, { manageVisibility: false });
 
                             if (unpinResult) {
                                 showMessage(`Successfully unpinned ${cid}. Now running GC...`, false);
                                 removeBtn.textContent = '🧹 Collecting...';
 
-                                const gcResult = await apiCall('/repo/gc', 'POST', { manageVisibility: false });
+                                const gcResult = await apiCall('/api/v1/ipfs/repo/gc', 'POST', { manageVisibility: false });
 
                                 if (gcResult) {
                                     showMessage(`Successfully removed ${cid} and ran garbage collection.`, false);
@@ -517,7 +517,7 @@
         }
 
         async function garbageCollect() {
-            const result = await apiCall('/repo/gc', 'POST');
+            const result = await apiCall('/api/v1/ipfs/repo/gc', 'POST');
             if (result && result.data) {
                 // Handle the garbage collection response which might be a stream of objects
                 const message = Array.isArray(result.data) 
@@ -568,7 +568,7 @@
             try {
                 // First, get all pins
                 addBatchLog('Fetching current pin list...');
-                const listResult = await apiCall('/pins/ls', 'POST', {}, { manageVisibility: false });
+                const listResult = await apiCall('/api/v1/ipfs/pins/ls', 'POST', {}, { manageVisibility: false });
                 
                 if (!listResult || !listResult.data || !listResult.data.Keys) {
                     addBatchLog('Failed to fetch pin list', true);
@@ -602,7 +602,7 @@
                     addBatchLog(`Unpinning: ${cid}`);
 
                     try {
-                        const unpinResult = await apiCall('/pins/rm', 'POST', { cid }, { manageVisibility: false });
+                        const unpinResult = await apiCall('/api/v1/ipfs/pins/rm', 'POST', { cid }, { manageVisibility: false });
                         
                         if (unpinResult && unpinResult.success !== false) {
                             successCount++;
@@ -633,7 +633,7 @@
                         addBatchLog('Running garbage collection...');
                         updateBatchProgress(totalPins, totalPins, 'Running garbage collection...');
                         
-                        const gcResult = await apiCall('/repo/gc', 'POST', {}, { manageVisibility: false });
+                        const gcResult = await apiCall('/api/v1/ipfs/repo/gc', 'POST', {}, { manageVisibility: false });
                         if (gcResult) {
                             addBatchLog('✅ Garbage collection completed');
                             showMessage('Batch unpin and garbage collection completed successfully');

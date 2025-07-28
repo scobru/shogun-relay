@@ -103,7 +103,7 @@
 
             try {
                 // Use REST API instead of Gun directly
-                const response = await fetch(`/node/${path}`, { headers: authHeader });
+                const response = await fetch(`/api/v1/system/node/${path}`, { headers: authHeader });
                 if (!response.ok) {
                     const errorText = await response.text();
                     throw new Error(`HTTP error ${response.status}: ${errorText}`);
