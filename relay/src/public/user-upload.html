@@ -708,15 +708,17 @@
                     showStatus(`✅ File uploaded successfully! Hash: ${result.file.hash}${sizeInfo}${verificationInfo}${encryptionInfo}`, 'success');
                     fileInput.value = '';
 
-                    // Salva l'hash nel nodo systemhash
-                    try {
-                        console.log('💾 user-upload: Saving hash to systemhash node:', result.file.hash);
-                        await saveHashToSystemHash(result.file.hash, walletAddress);
-                        console.log('✅ user-upload: Hash saved to systemhash node successfully');
-                    } catch (systemHashError) {
-                        console.warn('⚠️ user-upload: Failed to save hash to systemhash node:', systemHashError);
-                        // Non blocchiamo l'upload se fallisce il salvataggio nel systemhash
-                    }
+                    // Salva l'hash nel nodo systemhash (opzionale, non bloccante)
+                    setTimeout(async () => {
+                        try {
+                            console.log('💾 user-upload: Saving hash to systemhash node:', result.file.hash);
+                            await saveHashToSystemHash(result.file.hash, walletAddress);
+                            console.log('✅ user-upload: Hash saved to systemhash node successfully');
+                        } catch (systemHashError) {
+                            console.warn('⚠️ user-upload: Failed to save hash to systemhash node:', systemHashError);
+                            // Non blocchiamo l'upload se fallisce il salvataggio nel systemhash
+                        }
+                    }, 100); // Piccolo delay per non bloccare l'upload
 
                     // Chiama loadUserFiles dopo l'upload riuscito
                     console.log(`📤 user-upload: Calling loadUserFiles after successful upload`);
@@ -807,7 +809,9 @@
                 console.log('💾 user-upload: saveHashToSystemHash called with:', { fileHash, userAddress });
                 
                 // Ottieni la firma del wallet per l'autenticazione
+                console.log('🔐 user-upload: Getting wallet signature for system hash save...');
                 const authSignature = await getWalletSignature();
+                console.log('🔐 user-upload: Got signature, making request to save-system-hash...');
 
                 const response = await fetch('/api/v1/user-uploads/save-system-hash', {
                     method: 'POST',
@@ -824,6 +828,7 @@
                     })
                 });
 
+                console.log('💾 user-upload: Save system hash response status:', response.status);
                 const result = await response.json();
                 console.log('💾 user-upload: Save system hash response:', result);
 
