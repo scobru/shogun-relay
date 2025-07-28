@@ -19,9 +19,10 @@ async function initialize() {
             return;
         }
         
-        // Inizializza Gun
-        gun = Gun(['http://localhost:8765/gun']);
-        console.log('✅ Gun inizializzato');
+        // Inizializza Gun usando l'indirizzo del browser corrente
+        const currentUrl = window.location.origin;
+        gun = Gun([`${currentUrl}/gun`]);
+        console.log('✅ Gun inizializzato su:', `${currentUrl}/gun`);
         
         // Ottieni configurazione contratto dal server
         await loadContractConfig();
