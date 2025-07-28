@@ -562,17 +562,23 @@ router.get("/content-json/:cid", async (req, res) => {
 
 // IPFS Pins endpoints
 router.post("/pins/add", (req, res, next) => {
-  // Middleware di autenticazione admin
-  const authHeader = req.headers["authorization"];
-  const bearerToken = authHeader && authHeader.split(" ")[1];
-  const customToken = req.headers["token"];
-  const token = bearerToken || customToken;
-
-  if (token === process.env.ADMIN_PASSWORD) {
-    next();
+  // Usa il middleware di autenticazione esistente
+  const tokenAuthMiddleware = req.app.get('tokenAuthMiddleware');
+  if (tokenAuthMiddleware) {
+    tokenAuthMiddleware(req, res, next);
   } else {
-    console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
-    return res.status(401).json({ success: false, error: "Unauthorized" });
+    // Fallback se il middleware non è disponibile
+    const authHeader = req.headers["authorization"];
+    const bearerToken = authHeader && authHeader.split(" ")[1];
+    const customToken = req.headers["token"];
+    const token = bearerToken || customToken;
+
+    if (token === process.env.ADMIN_PASSWORD) {
+      next();
+    } else {
+      console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
   }
 }, async (req, res) => {
   try {
@@ -641,17 +647,23 @@ router.post("/pins/add", (req, res, next) => {
 });
 
 router.post("/pins/rm", (req, res, next) => {
-  // Middleware di autenticazione admin
-  const authHeader = req.headers["authorization"];
-  const bearerToken = authHeader && authHeader.split(" ")[1];
-  const customToken = req.headers["token"];
-  const token = bearerToken || customToken;
-
-  if (token === process.env.ADMIN_PASSWORD) {
-    next();
+  // Usa il middleware di autenticazione esistente
+  const tokenAuthMiddleware = req.app.get('tokenAuthMiddleware');
+  if (tokenAuthMiddleware) {
+    tokenAuthMiddleware(req, res, next);
   } else {
-    console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
-    return res.status(401).json({ success: false, error: "Unauthorized" });
+    // Fallback se il middleware non è disponibile
+    const authHeader = req.headers["authorization"];
+    const bearerToken = authHeader && authHeader.split(" ")[1];
+    const customToken = req.headers["token"];
+    const token = bearerToken || customToken;
+
+    if (token === process.env.ADMIN_PASSWORD) {
+      next();
+    } else {
+      console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
   }
 }, async (req, res) => {
   try {
@@ -754,17 +766,23 @@ router.post("/pins/rm", (req, res, next) => {
 });
 
 router.post("/pins/ls", (req, res, next) => {
-  // Middleware di autenticazione admin
-  const authHeader = req.headers["authorization"];
-  const bearerToken = authHeader && authHeader.split(" ")[1];
-  const customToken = req.headers["token"];
-  const token = bearerToken || customToken;
-
-  if (token === process.env.ADMIN_PASSWORD) {
-    next();
+  // Usa il middleware di autenticazione esistente
+  const tokenAuthMiddleware = req.app.get('tokenAuthMiddleware');
+  if (tokenAuthMiddleware) {
+    tokenAuthMiddleware(req, res, next);
   } else {
-    console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
-    return res.status(401).json({ success: false, error: "Unauthorized" });
+    // Fallback se il middleware non è disponibile
+    const authHeader = req.headers["authorization"];
+    const bearerToken = authHeader && authHeader.split(" ")[1];
+    const customToken = req.headers["token"];
+    const token = bearerToken || customToken;
+
+    if (token === process.env.ADMIN_PASSWORD) {
+      next();
+    } else {
+      console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
   }
 }, async (req, res) => {
   try {
@@ -823,17 +841,23 @@ router.post("/pins/ls", (req, res, next) => {
 
 // IPFS Repo GC endpoint
 router.post("/repo/gc", (req, res, next) => {
-  // Middleware di autenticazione admin
-  const authHeader = req.headers["authorization"];
-  const bearerToken = authHeader && authHeader.split(" ")[1];
-  const customToken = req.headers["token"];
-  const token = bearerToken || customToken;
-
-  if (token === process.env.ADMIN_PASSWORD) {
-    next();
+  // Usa il middleware di autenticazione esistente
+  const tokenAuthMiddleware = req.app.get('tokenAuthMiddleware');
+  if (tokenAuthMiddleware) {
+    tokenAuthMiddleware(req, res, next);
   } else {
-    console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
-    return res.status(401).json({ success: false, error: "Unauthorized" });
+    // Fallback se il middleware non è disponibile
+    const authHeader = req.headers["authorization"];
+    const bearerToken = authHeader && authHeader.split(" ")[1];
+    const customToken = req.headers["token"];
+    const token = bearerToken || customToken;
+
+    if (token === process.env.ADMIN_PASSWORD) {
+      next();
+    } else {
+      console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
   }
 }, async (req, res) => {
   try {
@@ -910,17 +934,23 @@ router.post("/repo/gc", (req, res, next) => {
 
 // IPFS API connectivity test endpoint
 router.get("/test", (req, res, next) => {
-  // Middleware di autenticazione admin
-  const authHeader = req.headers["authorization"];
-  const bearerToken = authHeader && authHeader.split(" ")[1];
-  const customToken = req.headers["token"];
-  const token = bearerToken || customToken;
-
-  if (token === process.env.ADMIN_PASSWORD) {
-    next();
+  // Usa il middleware di autenticazione esistente
+  const tokenAuthMiddleware = req.app.get('tokenAuthMiddleware');
+  if (tokenAuthMiddleware) {
+    tokenAuthMiddleware(req, res, next);
   } else {
-    console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
-    return res.status(401).json({ success: false, error: "Unauthorized" });
+    // Fallback se il middleware non è disponibile
+    const authHeader = req.headers["authorization"];
+    const bearerToken = authHeader && authHeader.split(" ")[1];
+    const customToken = req.headers["token"];
+    const token = bearerToken || customToken;
+
+    if (token === process.env.ADMIN_PASSWORD) {
+      next();
+    } else {
+      console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
   }
 }, async (req, res) => {
   try {
@@ -992,17 +1022,23 @@ router.get("/test", (req, res, next) => {
 
 // IPFS Version endpoint for connectivity testing
 router.get("/version", (req, res, next) => {
-  // Middleware di autenticazione admin
-  const authHeader = req.headers["authorization"];
-  const bearerToken = authHeader && authHeader.split(" ")[1];
-  const customToken = req.headers["token"];
-  const token = bearerToken || customToken;
-
-  if (token === process.env.ADMIN_PASSWORD) {
-    next();
+  // Usa il middleware di autenticazione esistente
+  const tokenAuthMiddleware = req.app.get('tokenAuthMiddleware');
+  if (tokenAuthMiddleware) {
+    tokenAuthMiddleware(req, res, next);
   } else {
-    console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
-    return res.status(401).json({ success: false, error: "Unauthorized" });
+    // Fallback se il middleware non è disponibile
+    const authHeader = req.headers["authorization"];
+    const bearerToken = authHeader && authHeader.split(" ")[1];
+    const customToken = req.headers["token"];
+    const token = bearerToken || customToken;
+
+    if (token === process.env.ADMIN_PASSWORD) {
+      next();
+    } else {
+      console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
   }
 }, async (req, res) => {
   try {

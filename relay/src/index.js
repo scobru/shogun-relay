@@ -359,6 +359,8 @@ async function initializeServer() {
 
   // Middleware
   app.use(cors());
+  app.use(express.json()); // Aggiungi supporto per JSON body parsing
+  app.use(express.urlencoded({ extended: true })); // Aggiungi supporto per form data
   app.use(Gun.serve);
 
   // Route statiche (DEFINITE DOPO LE API)
