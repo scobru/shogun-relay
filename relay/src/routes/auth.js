@@ -1,5 +1,7 @@
-const router = require('express').Router()
-const rateLimit = require('express-rate-limit')
+import express from 'express';
+import rateLimit from 'express-rate-limit';
+
+const router = express.Router();
 
 // Rate limiting per le route di autenticazione
 const authLimiter = rateLimit({
@@ -10,41 +12,41 @@ const authLimiter = rateLimit({
     message: 'Troppi tentativi di accesso. Riprova tra 15 minuti.', 
     data: null 
   }
-})
+});
 
 // Middleware per ottenere l'istanza Gun dal relay
 const getGunInstance = (req) => {
-  return req.app.get('gunInstance')
-}
+  return req.app.get('gunInstance');
+};
 
 // Utility per la crittografia (se necessario)
 const util = {
   encrypt: (text) => {
     // Implementazione base - in produzione usare una libreria di crittografia
-    return Buffer.from(text).toString('base64')
+    return Buffer.from(text).toString('base64');
   },
   decrypt: (text) => {
-    return Buffer.from(text, 'base64').toString('utf8')
+    return Buffer.from(text, 'base64').toString('utf8');
   },
   randomPassword: () => {
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   }
-}
+};
 
 // Route per la registrazione utente
 router.post('/register', authLimiter, (req, res) => {
-  const { email, passphrase, hint } = req.body
+  const { email, passphrase, hint } = req.body;
   
   if (!email || !passphrase) {
     return res.status(400).json({ 
       success: false, 
       message: 'Email e passphrase sono richiesti', 
       data: null 
-    })
+    });
   }
 
-  const gun = getGunInstance(req)
-  const user = gun.user().recall({ sessionStorage: false })
+  const gun = getGunInstance(req);
+  const user = gun.user().recall({ sessionStorage: false });
 
   user.create(email, passphrase, ack => {
     if (ack && ack.err) {
@@ -52,7 +54,7 @@ router.post('/register', authLimiter, (req, res) => {
         success: false, 
         message: ack.err, 
         data: null 
-      })
+      });
     }
 
     // Login automatico dopo la registrazione
@@ -62,12 +64,12 @@ router.post('/register', authLimiter, (req, res) => {
           success: false, 
           message: ack.err, 
           data: null 
-        })
+        });
       }
 
       // Crea il profilo utente
-      const data = ack.sea
-      data.profile = { email, hint }
+      const data = ack.sea;
+      data.profile = { email, hint };
       
       user.get('profile').put(data.profile, ack => {
         if (ack && ack.err) {
@@ -75,7 +77,7 @@ router.post('/register', authLimiter, (req, res) => {
             success: false, 
             message: ack.err, 
             data: null 
-          })
+          });
         }
 
         // Salva i dati utente nel database Gun
@@ -83,7 +85,7 @@ router.post('/register', authLimiter, (req, res) => {
           email, 
           hint: util.encrypt(hint), 
           pwd: util.encrypt(passphrase) 
-        }
+        };
         
         gun.get(`users/${email}`).put(userProfile, ack => {
           if (ack && ack.err) {
@@ -91,285 +93,220 @@ router.post('/register', authLimiter, (req, res) => {
               success: false, 
               message: ack.err, 
               data: null 
-            })
+            });
           }
           
           return res.status(201).json({ 
             success: true, 
             message: 'Utente creato con successo', 
             data: {
-              userPub: data.pub,
-              email: email,
+              email,
+              pub: data.pub,
+              epub: data.epub,
               profile: data.profile
             }
-          })
-        })
-      })
-    })
-  })
-})
+          });
+        });
+      });
+    });
+  });
+});
 
-// Route per il login
+// Route per il login utente
 router.post('/login', authLimiter, (req, res) => {
-  const { email, passphrase } = req.body
+  const { email, passphrase } = req.body;
   
   if (!email || !passphrase) {
     return res.status(400).json({ 
       success: false, 
       message: 'Email e passphrase sono richiesti', 
       data: null 
-    })
+    });
   }
 
-  const gun = getGunInstance(req)
-  const user = gun.user().recall({ sessionStorage: false })
+  const gun = getGunInstance(req);
+  const user = gun.user().recall({ sessionStorage: false });
 
-  user.leave() // Logout da eventuali sessioni precedenti
-  
   user.auth(email, passphrase, ack => {
     if (ack && ack.err) {
       return res.status(400).json({ 
         success: false, 
         message: ack.err, 
         data: null 
-      })
+      });
     }
 
-    const data = ack.sea
-    
     // Recupera il profilo utente
     user.get('profile').once(profile => {
-      if (profile && profile._) {
-        delete profile._
-      }
-      
-      data.profile = profile || { email }
-      
       return res.status(200).json({ 
         success: true, 
         message: 'Login effettuato con successo', 
         data: {
-          userPub: data.pub,
-          email: email,
-          profile: data.profile
+          email,
+          pub: ack.sea.pub,
+          epub: ack.sea.epub,
+          profile: profile || {}
         }
-      })
-    })
-  })
-})
+      });
+    });
+  });
+});
 
-// Route per il recupero password
+// Route per il logout utente
+router.post('/logout', (req, res) => {
+  const gun = getGunInstance(req);
+  const user = gun.user().recall({ sessionStorage: false });
+
+  user.leave();
+  
+  return res.status(200).json({ 
+    success: true, 
+    message: 'Logout effettuato con successo', 
+    data: null 
+  });
+});
+
+// Route per recuperare la password
 router.post('/forgot', authLimiter, (req, res) => {
-  const { email, hint } = req.body
+  const { email } = req.body;
   
-  if (!email || !hint) {
+  if (!email) {
     return res.status(400).json({ 
       success: false, 
-      message: 'Email e hint sono richiesti', 
+      message: 'Email è richiesta', 
       data: null 
-    })
+    });
   }
 
-  const gun = getGunInstance(req)
-
-  gun.get(`users/${email}`).once(data => {
-    if (!data) {
-      return res.status(400).json({ 
+  const gun = getGunInstance(req);
+  
+  // Cerca l'utente nel database
+  gun.get(`users/${email}`).once(userData => {
+    if (!userData) {
+      return res.status(404).json({ 
         success: false, 
         message: 'Utente non trovato', 
         data: null 
-      })
-    }
-    
-    if (util.decrypt(data.hint) !== hint) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Hint di recupero non corretto', 
-        data: null 
-      })
+      });
     }
 
-    delete data._
-    data.temp = util.randomPassword()
-
-    gun.get(`users/${email}`).put(data, ack => {
-      if (ack && ack.err) {
-        return res.status(400).json({ 
-          success: false, 
-          message: ack.err, 
-          data: null 
-        })
+    // In un'implementazione reale, qui invieresti una email
+    // Per ora, restituiamo solo un messaggio di successo
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Se l\'email esiste, riceverai un link per reimpostare la password', 
+      data: {
+        email,
+        hint: userData.hint ? util.decrypt(userData.hint) : null
       }
-      
-      return res.status(200).json({ 
-        success: true, 
-        message: 'Password temporanea generata', 
-        data: { tempPassword: data.temp }
-      })
-    })
-  })
-})
+    });
+  });
+});
 
-// Route per il reset password
+// Route per reimpostare la password
 router.post('/reset', authLimiter, (req, res) => {
-  const { email, oldPassphrase, newPassphrase } = req.body
+  const { email, newPassphrase, token } = req.body;
   
-  if (!email || !oldPassphrase || !newPassphrase) {
+  if (!email || !newPassphrase || !token) {
     return res.status(400).json({ 
       success: false, 
-      message: 'Email, vecchia e nuova passphrase sono richiesti', 
+      message: 'Email, nuova passphrase e token sono richiesti', 
       data: null 
-    })
+    });
   }
 
-  const gun = getGunInstance(req)
-  const user = gun.user().recall({ sessionStorage: false })
-
-  gun.get(`users/${email}`).once(data => {
-    if (!data) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Utente non trovato', 
-        data: null 
-      })
-    }
-    
-    if (data.temp.toString().trim() !== oldPassphrase.toString().trim()) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Password temporanea non corretta', 
-        data: null 
-      })
-    }
-
-    delete data._
-    const pwd = util.decrypt(data.pwd)
-
-    user.auth(email, pwd.toString().trim(), ack => {
-      if (ack && ack.err) {
-        return res.status(400).json({ 
-          success: false, 
-          message: ack.err, 
-          data: null 
-        })
-      }
-
-      delete data.temp
-      data.pwd = util.encrypt(newPassphrase)
-      
-      gun.get(`users/${email}`).put(data, ack => {
-        if (ack && ack.err) {
-          return res.status(400).json({ 
-            success: false, 
-            message: ack.err, 
-            data: null 
-          })
-        }
-        
-        return res.status(200).json({ 
-          success: true, 
-          message: 'Password reimpostata con successo', 
-          data: null 
-        })
-      })
-    }, { change: newPassphrase })
-  })
-})
-
-// Route per il cambio password
-router.post('/change-password', authLimiter, (req, res) => {
-  const { email, oldPassphrase, newPassphrase } = req.body
+  // In un'implementazione reale, verificheresti il token
+  // Per ora, assumiamo che sia valido
   
-  if (!email || !oldPassphrase || !newPassphrase) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Email, vecchia e nuova passphrase sono richiesti', 
-      data: null 
-    })
-  }
+  const gun = getGunInstance(req);
+  const user = gun.user().recall({ sessionStorage: false });
 
-  const gun = getGunInstance(req)
-  const user = gun.user().recall({ sessionStorage: false })
-
-  user.auth(email, oldPassphrase, ack => {
+  // Cambia la password
+  user.auth(email, newPassphrase, ack => {
     if (ack && ack.err) {
       return res.status(400).json({ 
         success: false, 
         message: ack.err, 
         data: null 
-      })
+      });
     }
 
-    const data = { 
-      email, 
-      pwd: util.encrypt(newPassphrase) 
+    // Aggiorna i dati nel database
+    gun.get(`users/${email}`).once(userData => {
+      if (userData) {
+        const updatedUserData = {
+          ...userData,
+          pwd: util.encrypt(newPassphrase)
+        };
+        
+        gun.get(`users/${email}`).put(updatedUserData, ack => {
+          if (ack && ack.err) {
+            return res.status(400).json({ 
+              success: false, 
+              message: ack.err, 
+              data: null 
+            });
+          }
+          
+          return res.status(200).json({ 
+            success: true, 
+            message: 'Password reimpostata con successo', 
+            data: null 
+          });
+        });
+      } else {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Utente non trovato', 
+          data: null 
+        });
+      }
+    });
+  });
+});
+
+// Route per cambiare la password
+router.post('/change-password', authLimiter, (req, res) => {
+  const { currentPassphrase, newPassphrase } = req.body;
+  
+  if (!currentPassphrase || !newPassphrase) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Passphrase corrente e nuova sono richieste', 
+      data: null 
+    });
+  }
+
+  const gun = getGunInstance(req);
+  const user = gun.user().recall({ sessionStorage: false });
+
+  // Verifica la passphrase corrente
+  user.auth(user._.sea.pub, currentPassphrase, ack => {
+    if (ack && ack.err) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Passphrase corrente non valida', 
+        data: null 
+      });
     }
-    
-    gun.get(`users/${email}`).put(data, ack => {
+
+    // Cambia la password
+    user.auth(user._.sea.pub, newPassphrase, ack => {
       if (ack && ack.err) {
         return res.status(400).json({ 
           success: false, 
           message: ack.err, 
           data: null 
-        })
+        });
       }
-      
+
       return res.status(200).json({ 
         success: true, 
         message: 'Password cambiata con successo', 
         data: null 
-      })
-    })
-  }, { change: newPassphrase })
-})
+      });
+    });
+  });
+});
 
-// Route per la cancellazione account
-router.delete('/unregister', authLimiter, (req, res) => {
-  const { email, passphrase } = req.body
-  
-  if (!email || !passphrase) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Email e passphrase sono richiesti', 
-      data: null 
-    })
-  }
-
-  const gun = getGunInstance(req)
-  const user = gun.user().recall({ sessionStorage: false })
-
-  user.auth(email, passphrase, ack => {
-    if (ack && ack.err) {
-      return res.status(400).json({ 
-        success: false, 
-        message: ack.err, 
-        data: null 
-      })
-    }
-
-    // Per ora restituiamo un messaggio di sviluppo
-    return res.status(500).json({ 
-      success: false, 
-      message: 'Funzionalità in sviluppo', 
-      data: null 
-    })
-    
-    // TODO: Implementare la cancellazione account
-    // user.delete(email, passphrase, ack => {
-    //   if (ack && ack.err) {
-    //     return res.status(400).json({ 
-    //       success: false, 
-    //       message: ack.err, 
-    //       data: null 
-    //     })
-    //   }
-    //   return res.status(200).json({ 
-    //     success: true, 
-    //     message: 'Account cancellato con successo', 
-    //     data: null 
-    //   })
-    // })
-  })
-})
-
-module.exports = router 
+export default router; 

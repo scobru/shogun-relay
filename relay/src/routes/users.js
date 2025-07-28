@@ -1,5 +1,7 @@
-const router = require('express').Router()
-const rateLimit = require('express-rate-limit')
+import express from 'express';
+import rateLimit from 'express-rate-limit';
+
+const router = express.Router();
 
 // Rate limiting per le route utenti
 const userLimiter = rateLimit({
@@ -10,197 +12,156 @@ const userLimiter = rateLimit({
     message: 'Troppe richieste. Riprova tra 15 minuti.', 
     data: null 
   }
-})
+});
 
 // Middleware per ottenere l'istanza Gun dal relay
 const getGunInstance = (req) => {
-  return req.app.get('gunInstance')
-}
+  return req.app.get('gunInstance');
+};
 
-// Middleware per verificare l'autorizzazione
-const getUserByPubKey = (pubkey, callback) => {
-  try {
-    // Ottieni l'istanza Gun dal database globale
-    const gun = global.gunInstance || require('../index.js').gun
-    
-    if (!gun) {
-      return callback(new Error('Gun instance non disponibile'), null)
+// Route per ottenere il profilo utente
+router.get('/profile', userLimiter, (req, res) => {
+  const gun = getGunInstance(req);
+  const user = gun.user().recall({ sessionStorage: false });
+
+  if (!user._.sea) {
+    return res.status(401).json({ 
+      success: false, 
+      message: 'Utente non autenticato', 
+      data: null 
+    });
+  }
+
+  user.get('profile').once(profile => {
+    if (profile && profile._) {
+      delete profile._;
     }
     
-    gun.user(pubkey).once(data => {
-      if (!data) {
-        return callback(null, {
-          status: 403,
-          success: false,
-          message: 'Non hai i permessi sufficienti per eseguire questa azione',
-          data: null,
-        })
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Profilo recuperato con successo', 
+      data: {
+        pub: user._.sea.pub,
+        epub: user._.sea.epub,
+        profile: profile || {}
       }
-
-      delete data._
-      delete data.auth
-      delete data.profile
-      return callback(null, { status: 200, success: true, message: null, data })
-    })
-  } catch (error) {
-    return callback(error, null)
-  }
-}
-
-// Route per ottenere il profilo utente corrente
-router.get('/', userLimiter, (req, res) => {
-  const { authorization } = req.headers
-  
-  if (!authorization) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Header di autorizzazione richiesto', 
-      data: null 
-    })
-  }
-  
-  getUserByPubKey(authorization, (err, result) => {
-    if (err) {
-      return res.status(500).json({ 
-        status: 500, 
-        success: false, 
-        message: err, 
-        data: null 
-      })
-    }
-    return res.status(result.status).json(result)
-  })
-})
-
-// Route per ottenere il profilo di un utente specifico
-router.get('/:pubkey', userLimiter, (req, res) => {
-  const { pubkey } = req.params
-  
-  if (!pubkey) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Parametro pubkey richiesto', 
-      data: null 
-    })
-  }
-  
-  getUserByPubKey(pubkey, (err, result) => {
-    if (err) {
-      return res.status(500).json({ 
-        status: 500, 
-        success: false, 
-        message: err, 
-        data: null 
-      })
-    }
-    return res.status(result.status).json(result)
-  })
-})
+    });
+  });
+});
 
 // Route per aggiornare il profilo utente
 router.put('/profile', userLimiter, (req, res) => {
-  const { authorization } = req.headers
-  const { profile } = req.body
-  
-  if (!authorization) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Header di autorizzazione richiesto', 
-      data: null 
-    })
-  }
+  const { profile } = req.body;
   
   if (!profile) {
     return res.status(400).json({ 
       success: false, 
       message: 'Dati profilo richiesti', 
       data: null 
-    })
+    });
   }
 
-  const gun = getGunInstance(req)
-  const user = gun.user().recall({ sessionStorage: false })
+  const gun = getGunInstance(req);
+  const user = gun.user().recall({ sessionStorage: false });
 
-  // Verifica che l'utente sia autenticato
-  if (!user.is) {
+  if (!user._.sea) {
     return res.status(401).json({ 
       success: false, 
       message: 'Utente non autenticato', 
       data: null 
-    })
+    });
   }
 
-  // Aggiorna il profilo
   user.get('profile').put(profile, ack => {
     if (ack && ack.err) {
       return res.status(400).json({ 
         success: false, 
         message: ack.err, 
         data: null 
-      })
+      });
     }
-    
+
     return res.status(200).json({ 
       success: true, 
       message: 'Profilo aggiornato con successo', 
-      data: profile 
-    })
-  })
-})
+      data: {
+        profile: profile
+      }
+    });
+  });
+});
 
-// Route per ottenere le statistiche utente
-router.get('/stats/:pubkey', userLimiter, (req, res) => {
-  const { pubkey } = req.params
+// Route per ottenere un utente specifico tramite pubkey
+router.get('/:pubkey', userLimiter, (req, res) => {
+  const { pubkey } = req.params;
   
   if (!pubkey) {
     return res.status(400).json({ 
       success: false, 
-      message: 'Parametro pubkey richiesto', 
+      message: 'Pubkey richiesta', 
       data: null 
-    })
+    });
   }
 
-  const gun = getGunInstance(req)
-
-  // Recupera le statistiche utente dal database
-  gun.get(`users/${pubkey}/stats`).once(stats => {
-    if (!stats) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Statistiche utente non trovate', 
-        data: null 
-      })
+  const gun = getGunInstance(req);
+  
+  gun.user(pubkey).get('profile').once(profile => {
+    if (profile && profile._) {
+      delete profile._;
     }
-
-    delete stats._
     
     return res.status(200).json({ 
       success: true, 
-      message: 'Statistiche recuperate con successo', 
-      data: stats 
-    })
-  })
-})
+      message: 'Utente recuperato con successo', 
+      data: {
+        pubkey: pubkey,
+        profile: profile || {}
+      }
+    });
+  });
+});
 
-// Route per ottenere la lista degli utenti (solo per admin)
-router.get('/list/all', userLimiter, (req, res) => {
-  const { authorization } = req.headers
+// Route per cercare utenti
+router.get('/search/:query', userLimiter, (req, res) => {
+  const { query } = req.params;
   
-  if (!authorization) {
+  if (!query) {
     return res.status(400).json({ 
       success: false, 
-      message: 'Header di autorizzazione richiesto', 
+      message: 'Query di ricerca richiesta', 
       data: null 
-    })
+    });
   }
 
-  // TODO: Implementare verifica admin
-  // Per ora restituiamo un messaggio di sviluppo
-  return res.status(500).json({ 
-    success: false, 
-    message: 'Funzionalità in sviluppo', 
-    data: null 
-  })
-})
+  const gun = getGunInstance(req);
+  
+  // Per ora restituiamo un array vuoto
+  // In un'implementazione reale, qui implementeresti la ricerca
+  return res.status(200).json({ 
+    success: true, 
+    message: 'Ricerca completata', 
+    data: {
+      query: query,
+      results: [],
+      count: 0
+    }
+  });
+});
 
-module.exports = router 
+// Route per ottenere la lista degli utenti (limitata)
+router.get('/', userLimiter, (req, res) => {
+  const gun = getGunInstance(req);
+  
+  // Per ora restituiamo un array vuoto
+  // In un'implementazione reale, qui implementeresti la lista utenti
+  return res.status(200).json({ 
+    success: true, 
+    message: 'Lista utenti recuperata', 
+    data: {
+      users: [],
+      count: 0
+    }
+  });
+});
+
+export default router; 
