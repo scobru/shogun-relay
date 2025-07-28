@@ -468,6 +468,10 @@
                     `;
                 }
 
+                // Prima sincronizza i MB usage
+                await syncMBUsage();
+
+                // Poi controlla lo stato della sottoscrizione
                 const response = await fetch(`/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(walletAddress)}`);
                 
                 if (!response.ok) {
@@ -514,6 +518,14 @@
                                     <div class="bg-accent h-2 rounded-full" style="width: ${usagePercentage}%"></div>
                                 </div>
                                 <p class="text-xs text-base-content/60 mt-1">Storage usage: ${usagePercentage}%</p>
+                            </div>
+                            <div class="mt-3">
+                                <button onclick="syncMBUsage()" class="btn btn-sm btn-accent">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                    Sync MB Usage
+                                </button>
                             </div>
                         `;
 
@@ -583,6 +595,69 @@
                 }
 
                 showNotification(`Error checking subscription: ${error.message}`, 'error');
+            }
+        }
+
+        // Sync MB usage
+        async function syncMBUsage() {
+            if (!walletAddress) {
+                showNotification('Please connect your wallet first', 'error');
+                return;
+            }
+
+            try {
+                console.log('🔄 subscribe: Syncing MB usage for wallet:', walletAddress);
+                showNotification('🔄 Syncing MB usage...', 'info');
+
+                // Ottieni la firma del wallet per l'autenticazione
+                const authSignature = await getWalletSignature();
+
+                const response = await fetch(`/api/v1/user-uploads/sync-mb-usage/${encodeURIComponent(walletAddress)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-user-address': walletAddress,
+                        'x-wallet-signature': authSignature,
+                        'x-signature-message': 'I Love Shogun'
+                    }
+                });
+
+                const result = await response.json();
+                console.log('🔄 subscribe: Sync MB response:', result);
+
+                if (result.success) {
+                    showNotification(`✅ MB usage synced successfully! Used: ${result.mbUsed} MB (${result.fileCount} files)`, 'success');
+                    
+                    // Ricarica i dati della sottoscrizione dopo la sincronizzazione
+                    setTimeout(async () => {
+                        await checkSubscriptionStatus();
+                    }, 1000); // 1 secondo di delay per permettere a GunDB di sincronizzare
+                } else {
+                    showNotification(`❌ Failed to sync MB usage: ${result.error}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('💥 subscribe: Error syncing MB usage:', error);
+                showNotification(`❌ Error syncing MB usage: ${error.message}`, 'error');
+            }
+        }
+
+        // Funzione per ottenere la firma del wallet per autenticazione
+        async function getWalletSignature() {
+            try {
+                const message = "I Love Shogun";
+                console.log('🔐 subscribe: Requesting signature for authentication:', message);
+
+                const signature = await ethereum.request({
+                    method: 'personal_sign',
+                    params: [message, walletAddress]
+                });
+
+                console.log('🔐 subscribe: Authentication signature received:', signature.substring(0, 20) + '...');
+                return signature;
+            } catch (error) {
+                console.error('💥 subscribe: Error getting wallet signature:', error);
+                throw new Error('Failed to get wallet signature for authentication');
             }
         }
 
