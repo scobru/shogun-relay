@@ -91,63 +91,9 @@ async function getOffChainMBUsage(userAddress, req) {
   
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => {
-      console.log(`⏰ Timeout for MB usage calculation for: ${userAddress}, trying again...`);
-      // Retry una volta
-      setTimeout(() => {
-        console.log(`🔄 Retry attempt for MB usage calculation for: ${userAddress}`);
-        const retryTimeoutId = setTimeout(() => {
-          console.log(`⏰ Final timeout for MB usage calculation for: ${userAddress}`);
-          reject(new Error("MB usage calculation timeout after retry"));
-        }, 20000);
-
-        const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
-        uploadsNode.once((parentData) => {
-          clearTimeout(retryTimeoutId);
-          console.log(`📋 Retry - Uploads parent data for ${userAddress}:`, parentData);
-          
-          if (!parentData || typeof parentData !== "object") {
-            console.log(`📋 Retry - No uploads found for ${userAddress}, returning 0 MB`);
-            resolve(0);
-            return;
-          }
-
-          const hashKeys = Object.keys(parentData).filter(
-            (key) => key !== "_" && key !== "#" && key !== ">" && key !== "<"
-          );
-          console.log(`📋 Retry - Hash keys found:`, hashKeys);
-
-          if (hashKeys.length === 0) {
-            console.log(`📋 Retry - No files found for ${userAddress}, returning 0 MB`);
-            resolve(0);
-            return;
-          }
-
-          let totalMB = 0;
-          let completedReads = 0;
-          const totalReads = hashKeys.length;
-
-          hashKeys.forEach((hash) => {
-            console.log(`📋 Retry - Reading file data for hash: ${hash}`);
-            uploadsNode.get(hash).once((uploadData) => {
-              completedReads++;
-              console.log(`📋 Retry - File data for ${hash}:`, uploadData);
-
-              if (uploadData && uploadData.sizeMB) {
-                totalMB += uploadData.sizeMB;
-                console.log(`📊 Retry - Added ${uploadData.sizeMB} MB from ${hash}, total now: ${totalMB}`);
-              } else {
-                console.warn(`⚠️ Retry - Invalid file data for hash: ${hash}`, uploadData);
-              }
-
-              if (completedReads === totalReads) {
-                console.log(`📊 Retry - Final MB calculation for ${userAddress}: ${totalMB} MB from ${totalReads} files`);
-                resolve(totalMB);
-              }
-            });
-          });
-        });
-      }, 1000);
-    }, 25000); // Aumentato il timeout iniziale
+      console.log(`⏰ Timeout for MB usage calculation for: ${userAddress}`);
+      resolve(0); // Return 0 instead of rejecting
+    }, 10000); // Reduced timeout to 10 seconds
 
     // Calcola i MB dai file effettivamente caricati
     const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
