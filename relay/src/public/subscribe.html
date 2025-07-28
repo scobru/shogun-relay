@@ -479,12 +479,12 @@
                 // Prima sincronizza i MB usage
                 await subscribeSyncMBUsage();
 
-                console.log('⏳ subscribe: Waiting 3 seconds for GunDB sync...');
+                console.log('⏳ subscribe: Waiting 2 seconds for GunDB sync...');
                 // Aggiungi un delay per permettere a GunDB di sincronizzare
-                await new Promise(resolve => setTimeout(resolve, 3000));
+                await new Promise(resolve => setTimeout(resolve, 2000));
 
                 console.log('📡 subscribe: Fetching subscription details...');
-                // Poi controlla lo stato della sottoscrizione
+                // Usa lo stesso endpoint che funziona in user-upload.html
                 const response = await fetch(`/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(walletAddress)}`);
                 
                 if (!response.ok) {
@@ -499,10 +499,11 @@
                     console.log('📊 subscribe: Subscription details:', details);
 
                     if (details.isActive) {
-                        const mbAllocated = details.mbAllocated || 0;
-                        const mbUsed = details.mbUsed || 0;
-                        const mbRemaining = details.mbRemaining || 0;
-                        const usagePercentage = details.usagePercentage || 0;
+                        // Usa i dati dalla risposta dell'API
+                        const mbAllocated = parseFloat(details.mbAllocated) || 0;
+                        const mbUsed = parseFloat(details.mbUsed) || 0;
+                        const mbRemaining = parseFloat(details.mbRemaining) || 0;
+                        const usagePercentage = parseFloat(details.usagePercentage) || 0;
 
                         console.log('📊 subscribe: Calculated values:', {
                             mbAllocated,
@@ -523,22 +524,22 @@
                                 </div>
                                 <div>
                                     <p class="text-base-content/60">Total MB:</p>
-                                    <p class="font-semibold">${mbAllocated} MB</p>
+                                    <p class="font-semibold">${mbAllocated.toFixed(2)} MB</p>
                                 </div>
                                 <div>
                                     <p class="text-base-content/60">Used MB:</p>
-                                    <p class="font-semibold">${mbUsed} MB (${usagePercentage}%)</p>
+                                    <p class="font-semibold">${mbUsed.toFixed(2)} MB (${usagePercentage.toFixed(1)}%)</p>
                                 </div>
                                 <div class="col-span-2">
                                     <p class="text-base-content/60">Remaining MB:</p>
-                                    <p class="font-semibold text-accent">${mbRemaining} MB</p>
+                                    <p class="font-semibold text-accent">${mbRemaining.toFixed(2)} MB</p>
                                 </div>
                             </div>
                             <div class="mt-3">
                                 <div class="w-full bg-base-300 rounded-full h-2">
                                     <div class="bg-accent h-2 rounded-full" style="width: ${usagePercentage}%"></div>
                                 </div>
-                                <p class="text-xs text-base-content/60 mt-1">Storage usage: ${usagePercentage}%</p>
+                                <p class="text-xs text-base-content/60 mt-1">Storage usage: ${usagePercentage.toFixed(1)}%</p>
                             </div>
                             <div class="mt-3">
                                 <button onclick="checkSubscriptionStatus()" class="btn btn-sm btn-accent">
