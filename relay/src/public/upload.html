@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>IPFS File Uploader</title>
   <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="styles/tailwind-local.css">
   <link rel="stylesheet" href="styles/wormhole.css" />
   <!-- Include centralized admin authentication -->
   <script src="lib/admin-auth.js"></script>
@@ -264,12 +264,29 @@
 
           const { hash, ipfsUrl, gatewayUrl, publicGateway } = result.file;
           const isEncrypted = encryptCheck.checked;
-          const finalIpfsUrl = isEncrypted
-            ? `${ipfsUrl}?token=${encodeURIComponent(token)}`
-            : ipfsUrl;
+          
+          // Debug logging
+          console.log("🔍 Debug info:", result.debug);
+          console.log("🔍 Original ipfsUrl:", ipfsUrl);
+          console.log("🔍 Token:", token ? token.substring(0, 10) + "..." : "undefined");
+          console.log("🔍 Is encrypted:", isEncrypted);
+          
+          // Ensure ipfsUrl is valid
+          let finalIpfsUrl = ipfsUrl;
+          if (ipfsUrl && ipfsUrl !== "undefined" && !ipfsUrl.includes("undefined")) {
+            finalIpfsUrl = isEncrypted
+              ? `${ipfsUrl}?token=${encodeURIComponent(token)}`
+              : ipfsUrl;
+          } else {
+            // Fallback URL construction
+            const baseUrl = window.location.origin;
+            finalIpfsUrl = isEncrypted
+              ? `${baseUrl}/ipfs-content/${hash}?token=${encodeURIComponent(token)}`
+              : `${baseUrl}/ipfs-content/${hash}`;
+          }
 
           console.log(`🔗 Generated URL: ${finalIpfsUrl}`);
-          console.log(`🔑 Token used: ${token.substring(0, 10)}...`);
+          console.log(`🔑 Token used: ${token ? token.substring(0, 10) + "..." : "undefined"}`);
           console.log(`🔒 Is encrypted: ${isEncrypted}`);
 
           const successMessage = `

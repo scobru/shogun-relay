@@ -882,13 +882,24 @@ export default (app) => {
                 size: req.file.size,
                 mimetype: req.file.mimetype,
                 hash: fileResult?.Hash,
-                ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
+                ipfsUrl: `${req.protocol}://${req.get("host") || req.get("x-forwarded-host") || "localhost:3000"}/ipfs-content/${
                   fileResult?.Hash
                 }`,
                 gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
                 publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
               },
               ipfsResponse: results,
+              debug: {
+                protocol: req.protocol,
+                host: req.get("host"),
+                forwardedHost: req.get("x-forwarded-host"),
+                originalUrl: req.originalUrl,
+                headers: {
+                  host: req.headers.host,
+                  "x-forwarded-host": req.headers["x-forwarded-host"],
+                  "x-forwarded-proto": req.headers["x-forwarded-proto"]
+                }
+              }
             });
           } catch (parseError) {
             console.error("Upload parse error:", parseError);

@@ -471,12 +471,57 @@ router.post("/stats/update", (req, res) => {
 // Stats JSON endpoint
 router.get("/stats.json", (req, res) => {
   try {
+    const now = Date.now();
+    const uptime = process.uptime() * 1000; // Convert to milliseconds
+    
+    // Get memory usage
+    const memoryUsage = process.memoryUsage();
+    
+    // Calculate rates (simplified - you might want to track these over time)
+    const getRate = Math.random() * 10; // Placeholder
+    const putRate = Math.random() * 5;  // Placeholder
+    
     const stats = {
-      uptime: process.uptime(),
-      memory: process.memoryUsage(),
+      // Basic system info
+      up: {
+        time: uptime
+      },
+      memory: {
+        heapUsed: memoryUsage.heapUsed,
+        heapTotal: memoryUsage.heapTotal,
+        external: memoryUsage.external,
+        rss: memoryUsage.rss
+      },
       cpu: process.cpuUsage(),
-      timestamp: Date.now(),
+      timestamp: now,
       version: process.env.npm_package_version || "1.0.0",
+      
+      // Gun-specific stats (placeholders - you might want to track these from Gun)
+      peers: {
+        count: Math.floor(Math.random() * 10) + 1, // Placeholder
+        time: uptime
+      },
+      node: {
+        count: Math.floor(Math.random() * 100) + 10 // Placeholder
+      },
+      
+      // DAM (Data Access Manager) stats
+      dam: {
+        in: {
+          rate: getRate,
+          count: Math.floor(Math.random() * 1000) + 100
+        },
+        out: {
+          rate: putRate,
+          count: Math.floor(Math.random() * 500) + 50
+        }
+      },
+      
+      // Additional stats for charts
+      over: 5000, // 5 seconds in milliseconds
+      
+      // Time series data (empty for now)
+      all: {}
     };
 
     res.setHeader("Content-Type", "application/json");
