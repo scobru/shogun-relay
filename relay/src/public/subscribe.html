@@ -483,23 +483,22 @@
                 // Aggiungi un delay per permettere a GunDB di sincronizzare
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
-                // Debug: chiama l'endpoint di debug per vedere i dati reali
-                console.log('🐛 subscribe: Calling debug endpoint...');
+                // Debug: chiama l'endpoint che lista i file per calcolare i MB reali
+                console.log('📂 subscribe: Getting user files to calculate real MB usage...');
                 try {
-                    const authSignature = await subscribeGetWalletSignature();
-                    const debugResponse = await fetch(`/api/v1/user-uploads/debug-mb-usage/${encodeURIComponent(walletAddress)}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'x-user-address': walletAddress,
-                            'x-wallet-signature': authSignature,
-                            'x-signature-message': 'I Love Shogun'
-                        }
-                    });
-                    const debugResult = await debugResponse.json();
-                    console.log('🐛 subscribe: Debug result:', debugResult);
-                } catch (debugError) {
-                    console.log('🐛 subscribe: Debug failed:', debugError);
+                    const filesResponse = await fetch(`/api/v1/user-uploads/${encodeURIComponent(walletAddress)}`);
+                    const filesResult = await filesResponse.json();
+                    console.log('📂 subscribe: Files result:', filesResult);
+                    
+                    if (filesResult.success && filesResult.uploads) {
+                        let totalMB = 0;
+                        filesResult.uploads.forEach(file => {
+                            totalMB += parseFloat(file.sizeMB) || 0;
+                        });
+                        console.log('📊 subscribe: Calculated total MB from files:', totalMB, 'MB from', filesResult.uploads.length, 'files');
+                    }
+                } catch (filesError) {
+                    console.log('📂 subscribe: Files fetch failed:', filesError);
                 }
 
                 console.log('📡 subscribe: Fetching subscription details...');
