@@ -74,8 +74,8 @@ RUN npm install --omit=dev
 # Copy the rest of the application
 COPY relay/ /app/relay/
 
-# Copy utility scripts from parent directory
-COPY ../update-tailwind.sh /app/
+# Copy utility scripts
+COPY update-tailwind.sh /app/
 
 # Set proper permissions
 RUN chown -R node:node /app \
