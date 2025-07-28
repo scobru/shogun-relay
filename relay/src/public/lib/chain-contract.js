@@ -12,8 +12,16 @@ let CONTRACT_ABI = null;
 // Inizializzazione
 async function initialize() {
     try {
+        // Verifica che Gun sia caricato
+        if (typeof Gun === 'undefined') {
+            console.error('Gun non è caricato');
+            updateConnectionStatus('error', 'Gun non è caricato');
+            return;
+        }
+        
         // Inizializza Gun
         gun = Gun(['http://localhost:8765/gun']);
+        console.log('✅ Gun inizializzato');
         
         // Ottieni configurazione contratto dal server
         await loadContractConfig();
@@ -203,6 +211,11 @@ async function writeToGunOnly() {
 async function writeToGun(soul, key, value) {
     return new Promise((resolve, reject) => {
         try {
+            if (!gun) {
+                reject(new Error('Gun non inizializzato'));
+                return;
+            }
+            
             const node = gun.get(soul);
             node.get(key).put(value, (ack) => {
                 if (ack.err) {
@@ -272,6 +285,11 @@ async function readFromGun() {
         
         if (!soulInput) {
             alert('Inserisci soul per leggere');
+            return;
+        }
+        
+        if (!gun) {
+            alert('Gun non inizializzato');
             return;
         }
         
@@ -426,4 +444,7 @@ function clearEventLog() {
 }
 
 // Inizializza quando la pagina è caricata
-document.addEventListener('DOMContentLoaded', initialize); 
+document.addEventListener('DOMContentLoaded', () => {
+    // Aspetta che tutte le librerie siano caricate
+    setTimeout(initialize, 1000);
+}); 
