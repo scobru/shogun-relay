@@ -832,28 +832,191 @@ export default (app) => {
   });
 
   // IPFS upload legacy
-  app.post("/ipfs-upload", async (req, res) => {
+  app.post("/ipfs-upload", tokenAuthMiddleware, upload.single("file"), async (req, res) => {
     try {
-      const authHeader = req.headers["authorization"];
-      const bearerToken = authHeader && authHeader.split(" ")[1];
-      const customToken = req.headers["token"];
-      const token = bearerToken || customToken;
-
-      if (token !== process.env.ADMIN_PASSWORD) {
-        return res.status(401).json({ success: false, error: "Unauthorized" });
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          error: "No file provided",
+        });
       }
 
-      console.log("📤 IPFS Upload: Processing file upload");
-
-      // Implementazione mock per ora
-      res.json({
-        success: true,
-        hash: "QmMockHash123456789",
-        size: 1024,
-        message: "File uploaded successfully (mock)",
+      const formData = new FormData();
+      formData.append("file", req.file.buffer, {
+        filename: req.file.originalname,
+        contentType: req.file.mimetype,
       });
+
+      const requestOptions = {
+        hostname: "127.0.0.1",
+        port: 5001,
+        path: "/api/v0/add?wrap-with-directory=false",
+        method: "POST",
+        headers: {
+          ...formData.getHeaders(),
+        },
+      };
+
+      if (IPFS_API_TOKEN) {
+        requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+      }
+
+      const http = await import('http');
+      const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+        let data = "";
+        ipfsRes.on("data", (chunk) => (data += chunk));
+        ipfsRes.on("end", () => {
+          console.log("📤 IPFS Upload raw response:", data);
+
+          try {
+            const lines = data.trim().split("\n");
+            const results = lines.map((line) => JSON.parse(line));
+            const fileResult =
+              results.find((r) => r.Name === req.file.originalname) ||
+              results[0];
+
+            res.json({
+              success: true,
+              file: {
+                name: req.file.originalname,
+                size: req.file.size,
+                mimetype: req.file.mimetype,
+                hash: fileResult?.Hash,
+                ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
+                  fileResult?.Hash
+                }`,
+                gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
+                publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
+              },
+              ipfsResponse: results,
+            });
+          } catch (parseError) {
+            console.error("Upload parse error:", parseError);
+            res.status(500).json({
+              success: false,
+              error: "Failed to parse IPFS response",
+              rawResponse: data,
+              parseError: parseError.message,
+            });
+          }
+        });
+      });
+
+      ipfsReq.on("error", (err) => {
+        console.error("❌ IPFS Upload error:", err);
+        res.status(500).json({ success: false, error: err.message });
+      });
+
+      ipfsReq.setTimeout(30000, () => {
+        ipfsReq.destroy();
+        if (!res.headersSent) {
+          res.status(408).json({ success: false, error: "Upload timeout" });
+        }
+      });
+
+      formData.pipe(ipfsReq);
     } catch (error) {
       console.error("❌ IPFS Upload Error:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // IPFS upload user endpoint
+  app.post("/ipfs-upload-user", walletSignatureMiddleware, upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          error: "No file provided",
+        });
+      }
+
+      const userAddress = req.headers["x-user-address"];
+      if (!userAddress) {
+        return res.status(401).json({
+          success: false,
+          error: "Header 'x-user-address' required",
+        });
+      }
+
+      console.log(`📤 Upload request for user: ${userAddress}`);
+
+      const formData = new FormData();
+      formData.append("file", req.file.buffer, {
+        filename: req.file.originalname,
+        contentType: req.file.mimetype,
+      });
+
+      const requestOptions = {
+        hostname: "127.0.0.1",
+        port: 5001,
+        path: "/api/v0/add?wrap-with-directory=false",
+        method: "POST",
+        headers: {
+          ...formData.getHeaders(),
+        },
+      };
+
+      if (IPFS_API_TOKEN) {
+        requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+      }
+
+      const http = await import('http');
+      const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+        let data = "";
+        ipfsRes.on("data", (chunk) => (data += chunk));
+        ipfsRes.on("end", () => {
+          console.log("📤 IPFS Upload user raw response:", data);
+
+          try {
+            const lines = data.trim().split("\n");
+            const results = lines.map((line) => JSON.parse(line));
+            const fileResult =
+              results.find((r) => r.Name === req.file.originalname) ||
+              results[0];
+
+            res.json({
+              success: true,
+              file: {
+                name: req.file.originalname,
+                size: req.file.size,
+                mimetype: req.file.mimetype,
+                hash: fileResult?.Hash,
+                ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
+                  fileResult?.Hash
+                }`,
+                gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
+                publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
+              },
+              ipfsResponse: results,
+            });
+          } catch (parseError) {
+            console.error("Upload parse error:", parseError);
+            res.status(500).json({
+              success: false,
+              error: "Failed to parse IPFS response",
+              rawResponse: data,
+              parseError: parseError.message,
+            });
+          }
+        });
+      });
+
+      ipfsReq.on("error", (err) => {
+        console.error("❌ IPFS Upload user error:", err);
+        res.status(500).json({ success: false, error: err.message });
+      });
+
+      ipfsReq.setTimeout(30000, () => {
+        ipfsReq.destroy();
+        if (!res.headersSent) {
+          res.status(408).json({ success: false, error: "Upload timeout" });
+        }
+      });
+
+      formData.pipe(ipfsReq);
+    } catch (error) {
+      console.error("❌ IPFS Upload user Error:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -863,23 +1026,54 @@ export default (app) => {
     try {
       console.log("📊 IPFS Status: Checking IPFS node status");
 
-      const response = await fetch(`${IPFS_API_URL}/api/v0/version`);
+      const requestOptions = {
+        hostname: "127.0.0.1",
+        port: 5001,
+        path: "/api/v0/version",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      };
 
-      if (response.ok) {
-        const data = await response.json();
-        res.json({
-          success: true,
-          status: "connected",
-          version: data.Version,
-          apiUrl: IPFS_API_URL,
+      if (IPFS_API_TOKEN) {
+        requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+      }
+
+      const http = await import('http');
+      const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+        let data = "";
+        ipfsRes.on("data", (chunk) => (data += chunk));
+        ipfsRes.on("end", () => {
+          try {
+            const versionData = JSON.parse(data);
+            res.json({
+              success: true,
+              status: "connected",
+              version: versionData.Version,
+              apiUrl: IPFS_API_URL,
+            });
+          } catch (parseError) {
+            console.error("IPFS status parse error:", parseError);
+            res.json({
+              success: false,
+              status: "error",
+              error: "Failed to parse IPFS response",
+            });
+          }
         });
-      } else {
+      });
+
+      ipfsReq.on("error", (err) => {
+        console.error("❌ IPFS Status Error:", err);
         res.json({
           success: false,
           status: "disconnected",
           error: "IPFS node not responding",
         });
-      }
+      });
+
+      ipfsReq.end();
     } catch (error) {
       console.error("❌ IPFS Status Error:", error);
       res.json({

@@ -102,10 +102,16 @@ router.get("/subscription-status/:identifier", async (req, res) => {
     }
 
     // Ottieni i dettagli della sottoscrizione dal contratto
-    const subscription = await relayContract.getSubscription(userAddress);
+    const subscription = await relayContract.getSubscriptionDetails(userAddress);
     
-    // Ottieni l'uso MB dal contratto
-    const mbUsage = await relayContract.getMBUsage(userAddress);
+    // Ottieni l'uso MB dal contratto - usa getUserSubscriptions per ottenere i dettagli completi
+    const userSubscriptions = await relayContract.getUserSubscriptions(userAddress);
+
+    // Calcola i dettagli aggiuntivi
+    const now = Math.floor(Date.now() / 1000);
+    const isActive = subscription.isActive && subscription.endTime > now;
+    const timeRemaining = Math.max(0, subscription.endTime - now);
+    const mbRemaining = Math.max(0, subscription.mbAllocated - userSubscriptions.mbUsed);
 
     console.log(`📋 subscription-status/${identifier}: Returning subscription status for chain: ${chainId}`);
 
@@ -119,7 +125,9 @@ router.get("/subscription-status/:identifier", async (req, res) => {
         endTime: subscription.endTime.toString(),
         plan: subscription.plan.toString(),
         mbAllocated: subscription.mbAllocated.toString(),
-        mbUsed: mbUsage.toString(),
+        mbUsed: userSubscriptions.mbUsed.toString(),
+        mbRemaining: mbRemaining.toString(),
+        timeRemaining: timeRemaining.toString(),
       },
       timestamp: Date.now(),
     });

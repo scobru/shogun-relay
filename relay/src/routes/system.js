@@ -178,8 +178,8 @@ router.get("/user-subscription/:userAddress", async (req, res) => {
     );
 
     // Get user subscription data
-    const subscription = await contract.getUserSubscription(userAddress);
-    const subscriptionStatus = await contract.getSubscriptionStatus(userAddress);
+    const subscription = await contract.getSubscriptionDetails(userAddress);
+    const subscriptionStatus = await contract.isSubscriptionActive(userAddress);
 
     res.json({
       success: true,
@@ -244,7 +244,7 @@ router.get("/subscription-status/:identifier", async (req, res) => {
     );
 
     // Get subscription status
-    const status = await contract.getSubscriptionStatus(identifier);
+    const status = await contract.isSubscriptionActive(identifier);
 
     res.json({
       success: true,
