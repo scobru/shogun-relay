@@ -412,6 +412,55 @@ var DFS = (function(){
 
   var dfs = {};
 
+  dfs.back = function() {
+    console.log('DFS back called, stack length:', stack.length);
+    if (stack.length === 0) {
+      console.log('Stack empty, calling render');
+      dfs.render();
+    } else {
+      var soul = stack.pop();
+      console.log('Popping from stack:', soul);
+      // Se abbiamo ancora nodi da visitare, continua la ricerca
+      if (visitedCount < limit) {
+        window.gun.get(soul).once(dfs.node);
+      } else {
+        console.log('Reached limit, calling render');
+        dfs.render();
+      }
+    }
+  };
+
+  dfs.render = function() {
+    console.log('=== DFS RENDER CALLED ===');
+    console.log('Rendering graph with', nodes.size, 'nodes and', edges.size, 'edges');
+    console.log('Nodes map:', nodes);
+    console.log('Edges map:', edges);
+    
+    if (!window.graph) {
+      window.graph = { nodes: [], edges: [] };
+    }
+    
+    console.log('Before util.makeNodes - nodes map:', nodes);
+    window.graph.nodes = util.makeNodes(nodes);
+    console.log('After util.makeNodes - processed nodes:', window.graph.nodes);
+    
+    console.log('Before util.makeEdges - edges map:', edges);
+    window.graph.edges = util.makeEdges(edges);
+    console.log('After util.makeEdges - processed edges:', window.graph.edges);
+    
+    console.log('Final graph object:', window.graph);
+    console.log('Graph nodes length:', window.graph.nodes.length);
+    console.log('Graph edges length:', window.graph.edges.length);
+    
+    // Check if update function exists
+    if (typeof update === 'function') {
+      console.log('Calling update() function...');
+      update();
+    } else {
+      console.error('❌ update() function not found!');
+    }
+  };
+
   // Funzione per caricare tutti i nodi direttamente (come Graph Explorer)
   function loadAllNodesDirectly(soul) {
     console.log('🔄 Loading all nodes directly for soul:', soul);
@@ -677,44 +726,6 @@ var DFS = (function(){
     window.gun.get(targetSoul).once(dfs.node);
   };
 
-  dfs.back = function() {
-    console.log('DFS back called, stack length:', stack.length);
-    if (stack.length === 0) {
-      console.log('Stack empty, calling render');
-      dfs.render();
-    } else {
-      var soul = stack.pop();
-      console.log('Popping from stack:', soul);
-      // Se abbiamo ancora nodi da visitare, continua la ricerca
-      if (visitedCount < limit) {
-        window.gun.get(soul).once(dfs.node);
-      } else {
-        console.log('Reached limit, calling render');
-        dfs.render();
-      }
-    }
-  };
-
-  dfs.render = function() {
-    console.log('=== DFS RENDER CALLED ===');
-    console.log('Rendering graph with', nodes.size, 'nodes and', edges.size, 'edges');
-    console.log('Nodes map:', nodes);
-    console.log('Edges map:', edges);
-    
-    if (!window.graph) {
-      window.graph = { nodes: [], edges: [] };
-    }
-    
-    window.graph.nodes = util.makeNodes(nodes);
-    window.graph.edges = util.makeEdges(edges);
-    
-    console.log('Processed nodes:', window.graph.nodes);
-    console.log('Processed edges:', window.graph.edges);
-    
-    // Update the visualization
-    update();
-  };
-
   return dfs;
 })();
 
@@ -759,7 +770,12 @@ var bfs = (async function () {
     updateStatus(`🕸️ Loading all nodes for: ${key}`);
     
     // Usa il nuovo metodo di caricamento diretto
-    loadAllNodesDirectly(key);
+    if (typeof loadAllNodesDirectly === 'function') {
+      loadAllNodesDirectly(key);
+    } else {
+      console.error('❌ loadAllNodesDirectly function not available');
+      updateStatus('❌ Load All Nodes function not available', true);
+    }
   }
   
   window.loadAllNodesMode = loadAllNodesMode;
