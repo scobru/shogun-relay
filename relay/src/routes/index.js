@@ -1,6 +1,11 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Importa i moduli delle routes
 import contractsRouter from './contracts.js';
@@ -34,73 +39,73 @@ export default (app) => {
   
   // Route per servire i file HTML specifici
   app.get("/user-upload", (req, res) => {
-    const publicPath = require('path').resolve(__dirname, '../public');
-    res.sendFile(require('path').resolve(publicPath, "user-upload.html"));
+    const publicPath = path.resolve(__dirname, '../public');
+    res.sendFile(path.resolve(publicPath, "user-upload.html"));
   });
 
   app.get("/subscribe", (req, res) => {
-    const publicPath = require('path').resolve(__dirname, '../public');
-    res.sendFile(require('path').resolve(publicPath, "subscribe.html"));
+    const publicPath = path.resolve(__dirname, '../public');
+    res.sendFile(path.resolve(publicPath, "subscribe.html"));
   });
 
   app.get("/stats", (req, res) => {
-    const publicPath = require('path').resolve(__dirname, '../public');
-    res.sendFile(require('path').resolve(publicPath, "stats.html"));
+    const publicPath = path.resolve(__dirname, '../public');
+    res.sendFile(path.resolve(publicPath, "stats.html"));
   });
 
   app.get("/services-dashboard", (req, res) => {
-    const publicPath = require('path').resolve(__dirname, '../public');
-    res.sendFile(require('path').resolve(publicPath, "services-dashboard.html"));
+    const publicPath = path.resolve(__dirname, '../public');
+    res.sendFile(path.resolve(publicPath, "services-dashboard.html"));
   });
 
   app.get("/pin-manager", (req, res) => {
-    const publicPath = require('path').resolve(__dirname, '../public');
-    res.sendFile(require('path').resolve(publicPath, "pin-manager.html"));
+    const publicPath = path.resolve(__dirname, '../public');
+    res.sendFile(path.resolve(publicPath, "pin-manager.html"));
   });
 
   app.get("/notes", (req, res) => {
-    const publicPath = require('path').resolve(__dirname, '../public');
-    res.sendFile(require('path').resolve(publicPath, "notes.html"));
+    const publicPath = path.resolve(__dirname, '../public');
+    res.sendFile(path.resolve(publicPath, "notes.html"));
   });
 
   app.get("/upload", (req, res) => {
-    const publicPath = require('path').resolve(__dirname, '../public');
-    res.sendFile(require('path').resolve(publicPath, "upload.html"));
+    const publicPath = path.resolve(__dirname, '../public');
+    res.sendFile(path.resolve(publicPath, "upload.html"));
   });
 
   app.get("/create", (req, res) => {
-    const publicPath = require('path').resolve(__dirname, '../public');
-    res.sendFile(require('path').resolve(publicPath, "create.html"));
+    const publicPath = path.resolve(__dirname, '../public');
+    res.sendFile(path.resolve(publicPath, "create.html"));
   });
 
   app.get("/view", (req, res) => {
-    const publicPath = require('path').resolve(__dirname, '../public');
-    res.sendFile(require('path').resolve(publicPath, "view.html"));
+    const publicPath = path.resolve(__dirname, '../public');
+    res.sendFile(path.resolve(publicPath, "view.html"));
   });
 
   app.get("/edit", (req, res) => {
-    const publicPath = require('path').resolve(__dirname, '../public');
-    res.sendFile(require('path').resolve(publicPath, "edit.html"));
+    const publicPath = path.resolve(__dirname, '../public');
+    res.sendFile(path.resolve(publicPath, "edit.html"));
   });
 
   app.get("/derive", (req, res) => {
-    const publicPath = require('path').resolve(__dirname, '../public');
-    res.sendFile(require('path').resolve(publicPath, "derive.html"));
+    const publicPath = path.resolve(__dirname, '../public');
+    res.sendFile(path.resolve(publicPath, "derive.html"));
   });
 
   app.get("/graph", (req, res) => {
-    const publicPath = require('path').resolve(__dirname, '../public');
-    res.sendFile(require('path').resolve(publicPath, "graph.html"));
+    const publicPath = path.resolve(__dirname, '../public');
+    res.sendFile(path.resolve(publicPath, "graph.html"));
   });
 
   app.get("/chat", (req, res) => {
-    const publicPath = require('path').resolve(__dirname, '../public');
-    res.sendFile(require('path').resolve(publicPath, "chat.html"));
+    const publicPath = path.resolve(__dirname, '../public');
+    res.sendFile(path.resolve(publicPath, "chat.html"));
   });
 
   app.get("/charts", (req, res) => {
-    const publicPath = require('path').resolve(__dirname, '../public');
-    res.sendFile(require('path').resolve(publicPath, "charts.html"));
+    const publicPath = path.resolve(__dirname, '../public');
+    res.sendFile(path.resolve(publicPath, "charts.html"));
   });
   
   // Route di autenticazione
@@ -288,9 +293,9 @@ export default (app) => {
   });
 
   // Contract config legacy
-  app.get("/api/contract-config", (req, res) => {
+  app.get("/api/contract-config", async (req, res) => {
     try {
-      const { DEPLOYMENTS } = require("shogun-contracts/deployments.js");
+      const { DEPLOYMENTS } = await import("shogun-contracts/deployments.js");
       const chainId = process.env.CHAIN_ID || "11155111";
 
       if (!DEPLOYMENTS[chainId]) {
