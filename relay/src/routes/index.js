@@ -32,6 +32,77 @@ export default (app) => {
   // Applica rate limiting generale
   app.use(generalLimiter);
   
+  // Route per servire i file HTML specifici
+  app.get("/user-upload", (req, res) => {
+    const publicPath = require('path').resolve(__dirname, '../public');
+    res.sendFile(require('path').resolve(publicPath, "user-upload.html"));
+  });
+
+  app.get("/subscribe", (req, res) => {
+    const publicPath = require('path').resolve(__dirname, '../public');
+    res.sendFile(require('path').resolve(publicPath, "subscribe.html"));
+  });
+
+  app.get("/stats", (req, res) => {
+    const publicPath = require('path').resolve(__dirname, '../public');
+    res.sendFile(require('path').resolve(publicPath, "stats.html"));
+  });
+
+  app.get("/services-dashboard", (req, res) => {
+    const publicPath = require('path').resolve(__dirname, '../public');
+    res.sendFile(require('path').resolve(publicPath, "services-dashboard.html"));
+  });
+
+  app.get("/pin-manager", (req, res) => {
+    const publicPath = require('path').resolve(__dirname, '../public');
+    res.sendFile(require('path').resolve(publicPath, "pin-manager.html"));
+  });
+
+  app.get("/notes", (req, res) => {
+    const publicPath = require('path').resolve(__dirname, '../public');
+    res.sendFile(require('path').resolve(publicPath, "notes.html"));
+  });
+
+  app.get("/upload", (req, res) => {
+    const publicPath = require('path').resolve(__dirname, '../public');
+    res.sendFile(require('path').resolve(publicPath, "upload.html"));
+  });
+
+  app.get("/create", (req, res) => {
+    const publicPath = require('path').resolve(__dirname, '../public');
+    res.sendFile(require('path').resolve(publicPath, "create.html"));
+  });
+
+  app.get("/view", (req, res) => {
+    const publicPath = require('path').resolve(__dirname, '../public');
+    res.sendFile(require('path').resolve(publicPath, "view.html"));
+  });
+
+  app.get("/edit", (req, res) => {
+    const publicPath = require('path').resolve(__dirname, '../public');
+    res.sendFile(require('path').resolve(publicPath, "edit.html"));
+  });
+
+  app.get("/derive", (req, res) => {
+    const publicPath = require('path').resolve(__dirname, '../public');
+    res.sendFile(require('path').resolve(publicPath, "derive.html"));
+  });
+
+  app.get("/graph", (req, res) => {
+    const publicPath = require('path').resolve(__dirname, '../public');
+    res.sendFile(require('path').resolve(publicPath, "graph.html"));
+  });
+
+  app.get("/chat", (req, res) => {
+    const publicPath = require('path').resolve(__dirname, '../public');
+    res.sendFile(require('path').resolve(publicPath, "chat.html"));
+  });
+
+  app.get("/charts", (req, res) => {
+    const publicPath = require('path').resolve(__dirname, '../public');
+    res.sendFile(require('path').resolve(publicPath, "charts.html"));
+  });
+  
   // Route di autenticazione
   app.use(`${baseRoute}/auth`, authRouter);
   
