@@ -89,6 +89,7 @@ var simulation = d3.forceSimulation()
 
 function update() {
   console.log('Updating visualization with', window.graph?.nodes?.length || 0, 'nodes and', window.graph?.edges?.length || 0, 'edges');
+  console.log('Graph data:', window.graph);
   
   if (!window.graph || !window.graph.nodes || !window.graph.edges) {
     console.error('Graph data is not properly initialized');
@@ -97,6 +98,8 @@ function update() {
 
   // Clear previous elements
   container.selectAll('*').remove();
+  
+  console.log('Creating links for', window.graph.edges.length, 'edges');
   
   // Create links
   link = container.append("g")
@@ -108,6 +111,8 @@ function update() {
     .attr("stroke-opacity", 0.6)
     .attr("stroke-width", 1);
 
+  console.log('Creating nodes for', window.graph.nodes.length, 'nodes');
+  
   // Create nodes
   node = container.append("g")
     .attr("class", "nodes")
@@ -127,6 +132,8 @@ function update() {
   node.append("title")
     .text(function(d) { return d.id ? d.id.toUpperCase() : 'Unknown'; });
 
+  console.log('Creating labels for', window.graph.nodes.length, 'nodes');
+  
   // Create labels
   label = container.append("g")
     .attr("class", "labels")
@@ -142,6 +149,8 @@ function update() {
     .attr("font-size", "10px")
     .attr("fill", "#333");
 
+  console.log('Updating simulation with', window.graph.nodes.length, 'nodes and', window.graph.edges.length, 'edges');
+  
   // Update simulation
   simulation.nodes(window.graph.nodes)
     .on("tick", ticked);
@@ -150,6 +159,8 @@ function update() {
     .links(window.graph.edges);
 
   simulation.alpha(1).restart();
+  
+  console.log('Simulation restarted');
   
   // Cool down after some time
   setTimeout(coolIt, 2000);
@@ -525,6 +536,9 @@ var DFS = (function(){
     
     window.graph.nodes = util.makeNodes(nodes);
     window.graph.edges = util.makeEdges(edges);
+    
+    console.log('Processed nodes:', window.graph.nodes);
+    console.log('Processed edges:', window.graph.edges);
     
     // Update the visualization
     update();

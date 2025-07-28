@@ -366,6 +366,20 @@ async function initializeServer() {
   // Route statiche (DEFINITE DOPO LE API)
   app.use(express.static(publicPath));
 
+  // Route specifiche per il visual graph
+  app.get('/visualGraph', (req, res) => {
+    res.sendFile(path.resolve(publicPath, 'visualGraph/visualGraph.html'));
+  });
+
+  app.get('/visualGraph/*', (req, res) => {
+    const filePath = path.resolve(publicPath, req.path.substring(1));
+    if (fs.existsSync(filePath)) {
+      res.sendFile(filePath);
+    } else {
+      res.status(404).send('File not found');
+    }
+  });
+
   // IPFS File Upload Endpoint
   const upload = multer({ storage: multer.memoryStorage() });
   

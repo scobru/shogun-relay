@@ -603,14 +603,14 @@
                 addBatchLog('Fetching current pin list...');
                 const listResult = await apiCall('/api/v1/ipfs/pins/ls', 'POST', {}, { manageVisibility: false });
                 
-                if (!listResult || !listResult.data || !listResult.data.Keys) {
+                if (!listResult || !listResult.pins) {
                     addBatchLog('Failed to fetch pin list', true);
                     showMessage('Failed to fetch pin list', true);
                     batchProgress.style.display = 'none';
                     return;
                 }
 
-                const pins = Object.keys(listResult.data.Keys);
+                const pins = Object.keys(listResult.pins);
                 const totalPins = pins.length;
                 
                 if (totalPins === 0) {
@@ -686,6 +686,7 @@
                 addBatchLog(`❌ Fatal error: ${error.message}`, true);
                 showMessage(`Batch unpin failed: ${error.message}`, true);
             } finally {
+                batchProgress.style.display = 'none';
                 updateBatchProgress(0, 0, 'Ready');
             }
         }
