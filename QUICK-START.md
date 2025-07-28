@@ -157,6 +157,28 @@ curl https://your-subdomain.ngrok.io/api/contracts/relay-payment-router/address
 curl https://your-subdomain.ngrok.io/api/contracts/config
 ```
 
+### Test System Hash APIs
+
+```bash
+# Get all system file hashes (for pin manager)
+curl https://your-subdomain.ngrok.io/api/v1/user-uploads/system-hashes
+
+# Get system hashes map with details
+curl https://your-subdomain.ngrok.io/api/v1/user-uploads/system-hashes-map
+
+# Save a hash to system hashes (admin)
+curl -X POST https://your-subdomain.ngrok.io/api/v1/user-uploads/save-system-hash \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
+  -d '{"hash":"Qm...","userAddress":"admin-upload","timestamp":1234567890}'
+
+# Remove hash from system hashes (admin)
+curl -X DELETE https://your-subdomain.ngrok.io/api/v1/user-uploads/remove-system-hash/Qm... \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
+  -d '{"userAddress":"admin-remove"}'
+```
+
 ## 🎯 Visual Graph Interface
 
 The relay includes a powerful visual graph interface for exploring GunDB data structures in real-time.
@@ -267,6 +289,40 @@ curl https://your-subdomain.ngrok.io/api/v1/health
 5. **Manage pins**: Use `/pin-manager` for IPFS pin management
 6. **Test authentication**: Use the new `/api/v1/auth/*` endpoints
 7. **Manage users**: Explore user management APIs
+
+## 🗂️ IPFS Pin Manager
+
+Advanced pin management with automatic system file protection.
+
+### Features
+- **Individual Pin Operations**: Add, remove, and manage individual pins
+- **Batch Unpin All**: Bulk operation with progress tracking and system file preservation
+- **System File Protection**: Automatically preserves user uploads during bulk operations
+- **Garbage Collection**: Integrated IPFS cleanup with confirmation
+- **Modern UI**: Clean, responsive interface with consistent design
+- **Real-time Progress**: Detailed progress tracking with logs
+
+### System File Protection
+- **Automatic Detection**: System hashes are automatically managed when files are uploaded/removed
+- **Preservation Toggle**: Checkbox to protect user uploads during bulk operations
+- **Smart Filtering**: Only non-system files are unpinned when preservation is enabled
+- **Detailed Statistics**: Shows total pins, preserved files, and files to remove
+
+### Usage
+1. **Individual Pins**: Enter CID and use Add/Remove buttons
+2. **Batch Operations**: Use "Unpin All Files" with preservation toggle
+3. **System Files**: Checkbox protects user uploads by default
+4. **Progress Tracking**: Real-time progress with detailed logs
+5. **Garbage Collection**: Optional cleanup after unpinning
+
+### Access
+```bash
+# Direct access
+https://your-subdomain.ngrok.io/pin-manager
+
+# From main interface
+https://your-subdomain.ngrok.io → Click "Pin Manager"
+```
 
 ## 📚 More Information
 

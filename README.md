@@ -60,6 +60,9 @@ DELETE /api/v1/user-uploads/:userAddress/:hash   # Delete user file
 POST /api/v1/user-uploads/sync-mb-usage/:userAddress  # Sync MB usage
 POST /api/v1/user-uploads/repair-files/:userAddress   # Repair corrupted files
 GET  /api/v1/user-uploads/system-hashes          # Get all system file hashes
+GET  /api/v1/user-uploads/system-hashes-map      # Get system hashes with details
+POST /api/v1/user-uploads/save-system-hash       # Save hash to system hashes
+DELETE /api/v1/user-uploads/remove-system-hash/:hash  # Remove hash from system hashes
 ```
 
 ### Subscription Management
@@ -110,27 +113,52 @@ https://your-relay.ngrok.io → Click "Visual Graph"
 
 ## 🗂️ IPFS Pin Manager
 
-Advanced pin management with system file protection.
+Advanced pin management with automatic system file protection and modern UI.
 
 ### Features
-- **Individual Pin Operations**: Add, remove, and manage individual pins
-- **Batch Unpin All**: Bulk operation with progress tracking
-- **System File Preservation**: Protect user uploads during bulk operations
-- **Garbage Collection**: Integrated IPFS cleanup
-- **Connection Testing**: Verify IPFS API connectivity
+- **Individual Pin Operations**: Add, remove, and manage individual pins with clean interface
+- **Batch Unpin All**: Bulk operation with progress tracking and system file preservation
+- **System File Protection**: Automatically preserves user uploads during bulk operations
+- **Garbage Collection**: Integrated IPFS cleanup with confirmation
+- **Modern Design**: Clean, responsive interface with consistent color scheme
+- **Real-time Progress**: Detailed progress tracking with comprehensive logs
+- **Smart Filtering**: Intelligent system file detection and preservation
 
 ### System File Protection
 When "🛡️ Preserve system files" is enabled:
-- Automatically detects user upload hashes from GunDB
-- Excludes these hashes from bulk unpin operations
-- Provides detailed statistics (total, preserved, to remove)
-- Ensures user data integrity
+- **Automatic Detection**: System hashes are automatically managed when files are uploaded/removed
+- **Smart Preservation**: Only non-system files are unpinned during bulk operations
+- **Detailed Statistics**: Shows total pins, preserved files, and files to remove
+- **Real-time Updates**: System hashes are updated automatically during file operations
+- **Dual Authentication**: Supports both admin token and wallet signature authentication
+
+### Automatic System Hash Management
+- **Upload Integration**: Files are automatically added to system hashes when uploaded
+- **Removal Integration**: Hashes are automatically removed when files are deleted/unpinned
+- **Batch Operations**: System hashes are properly managed during bulk operations
+- **Error Resilience**: Upload operations continue even if system hash management fails
 
 ### Usage
 1. **Individual Pins**: Enter CID and use Add/Remove buttons
 2. **Batch Operations**: Use "Unpin All Files" with preservation toggle
 3. **System Files**: Checkbox protects user uploads by default
 4. **Progress Tracking**: Real-time progress with detailed logs
+5. **Garbage Collection**: Optional cleanup after unpinning with confirmation
+
+### API Integration
+```bash
+# Get system hashes for pin manager
+GET /api/v1/user-uploads/system-hashes
+
+# Get detailed system hashes map
+GET /api/v1/user-uploads/system-hashes-map
+
+# Save hash to system hashes (admin/user)
+POST /api/v1/user-uploads/save-system-hash
+
+# Remove hash from system hashes (admin/user)
+DELETE /api/v1/user-uploads/remove-system-hash/:hash
+```
 
 ## 📁 File Upload System
 
