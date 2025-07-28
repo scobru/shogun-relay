@@ -709,6 +709,8 @@
                     fileInput.value = '';
 
                     // Salva l'hash nel nodo systemhash (opzionale, non bloccante)
+                    // TEMPORANEO: commentato per debug
+                    /*
                     setTimeout(async () => {
                         try {
                             console.log('💾 user-upload: Saving hash to systemhash node:', result.file.hash);
@@ -719,6 +721,7 @@
                             // Non blocchiamo l'upload se fallisce il salvataggio nel systemhash
                         }
                     }, 100); // Piccolo delay per non bloccare l'upload
+                    */
 
                     // Chiama loadUserFiles dopo l'upload riuscito
                     console.log(`📤 user-upload: Calling loadUserFiles after successful upload`);
