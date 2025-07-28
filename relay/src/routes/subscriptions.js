@@ -247,6 +247,7 @@ router.get("/user-subscription-details/:userAddress", async (req, res) => {
             console.log(`📊 - Usage: ${usagePercentage.toFixed(2)}%`);
           } catch (mbError) {
             console.warn(`⚠️ Error calculating MB usage for ${userAddress}:`, mbError.message);
+            console.warn(`⚠️ MB Error stack:`, mbError.stack);
             mbUsed = 0;
             mbRemaining = Number(mbAllocated);
             usagePercentage = 0;
@@ -289,6 +290,13 @@ router.get("/user-subscription-details/:userAddress", async (req, res) => {
     }
 
     console.log(`📋 user-subscription-details/${userAddress}: Returning user subscription details for chain: ${chainId}`);
+    console.log(`📋 user-subscription-details/${userAddress}: Final response:`, {
+      success: true,
+      chainId: chainId,
+      userAddress: userAddress,
+      subscription: activeSubscription,
+      timestamp: Date.now(),
+    });
 
     res.json({
       success: true,
