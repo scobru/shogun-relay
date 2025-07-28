@@ -623,6 +623,38 @@
                     addBatchLog(`⚠️ system-hashes endpoint failed: ${error.message}`);
                 }
                 
+                // Prova il nuovo endpoint system-hashes-map
+                try {
+                    addBatchLog('🔄 Trying system-hashes-map endpoint...');
+                    
+                    const mapResponse = await fetch('/api/v1/user-uploads/system-hashes-map', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...ShogunAdmin.getAuthHeaders()
+                        }
+                    });
+
+                    if (mapResponse.ok) {
+                        const mapResult = await mapResponse.json();
+                        
+                        if (mapResult.success && mapResult.systemHashes) {
+                            const hashes = Object.keys(mapResult.systemHashes);
+                            addBatchLog(`✅ Found ${hashes.length} system files via system-hashes-map endpoint`);
+                            
+                            // Log dei dettagli degli hash trovati
+                            hashes.forEach(hash => {
+                                const hashData = mapResult.systemHashes[hash];
+                                addBatchLog(`📄 Found hash: ${hash} (user: ${hashData.userAddress})`);
+                            });
+                            
+                            return hashes;
+                        }
+                    }
+                } catch (mapError) {
+                    addBatchLog(`⚠️ system-hashes-map endpoint failed: ${mapError.message}`);
+                }
+                
                 // Fallback: usa direttamente l'endpoint che funziona
                 addBatchLog('🔄 Trying direct approach: fetching known user files...');
                 

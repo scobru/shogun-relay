@@ -441,5 +441,133 @@ router.get("/system-hashes", async (req, res) => {
   }
 });
 
+// Endpoint per ottenere gli hash dal nodo systemhash
+router.get("/system-hashes-map", async (req, res) => {
+  try {
+    console.log('🔍 System hashes map endpoint called');
+    
+    const gun = getGunInstance(req);
+    if (!gun) {
+      console.warn('Gun instance not available for system hashes map');
+      return res.status(500).json({
+        success: false,
+        error: "Gun instance not available"
+      });
+    }
+    
+    const systemHashesMap = await new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        console.log('⏰ Timeout for system hashes map retrieval');
+        resolve({});
+      }, 10000);
+
+      const systemHashesNode = gun.get("shogun").get("systemhash");
+      
+      systemHashesNode.once((systemHashesData) => {
+        clearTimeout(timeoutId);
+        
+        if (!systemHashesData || typeof systemHashesData !== "object") {
+          console.log('📋 No system hashes found, returning empty map');
+          resolve({});
+          return;
+        }
+
+        // Filtra le chiavi che non sono metadati Gun
+        const hashMap = {};
+        Object.keys(systemHashesData).forEach(key => {
+          if (key !== "_" && key !== "#" && key !== ">" && key !== "<") {
+            hashMap[key] = systemHashesData[key];
+          }
+        });
+
+        console.log(`📋 Found ${Object.keys(hashMap).length} system hashes in map`);
+        resolve(hashMap);
+      });
+    });
+    
+    res.json({
+      success: true,
+      systemHashes: systemHashesMap,
+      count: Object.keys(systemHashesMap).length,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error("System hashes map error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore interno del server",
+      details: error.message,
+    });
+  }
+});
+
+// Endpoint per salvare un hash nel nodo systemhash
+router.post("/save-system-hash", (req, res, next) => {
+  const walletSignatureMiddleware = req.app.get('walletSignatureMiddleware');
+  if (walletSignatureMiddleware) {
+    walletSignatureMiddleware(req, res, next);
+  } else {
+    next();
+  }
+}, async (req, res) => {
+  try {
+    const { hash, userAddress, timestamp } = req.body;
+
+    if (!hash || !userAddress) {
+      return res.status(400).json({
+        success: false,
+        error: "Hash e userAddress richiesti"
+      });
+    }
+
+    console.log(`💾 Saving hash to systemhash node: ${hash} for user: ${userAddress}`);
+
+    const gun = getGunInstance(req);
+    if (!gun) {
+      return res.status(500).json({
+        success: false,
+        error: "Gun instance not available"
+      });
+    }
+
+    // Salva l'hash nel nodo systemhash
+    await new Promise((resolve, reject) => {
+      const systemHashesNode = gun.get("shogun").get("systemhash");
+      
+      systemHashesNode.get(hash).put({
+        hash: hash,
+        userAddress: userAddress,
+        timestamp: timestamp || Date.now(),
+        savedAt: new Date().toISOString()
+      }, (ack) => {
+        if (ack && ack.err) {
+          console.error('❌ Error saving hash to systemhash node:', ack.err);
+          reject(new Error(ack.err));
+        } else {
+          console.log(`✅ Hash ${hash} saved to systemhash node successfully`);
+          resolve();
+        }
+      });
+    });
+
+    res.json({
+      success: true,
+      message: "Hash saved to systemhash node successfully",
+      hash: hash,
+      userAddress: userAddress,
+      timestamp: timestamp
+    });
+
+  } catch (error) {
+    console.error("Save system hash error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore interno del server",
+      details: error.message,
+    });
+  }
+});
+
 export { getOffChainMBUsage };
 export default router;

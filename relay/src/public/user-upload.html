@@ -708,6 +708,16 @@
                     showStatus(`✅ File uploaded successfully! Hash: ${result.file.hash}${sizeInfo}${verificationInfo}${encryptionInfo}`, 'success');
                     fileInput.value = '';
 
+                    // Salva l'hash nel nodo systemhash
+                    try {
+                        console.log('💾 user-upload: Saving hash to systemhash node:', result.file.hash);
+                        await saveHashToSystemHash(result.file.hash, walletAddress);
+                        console.log('✅ user-upload: Hash saved to systemhash node successfully');
+                    } catch (systemHashError) {
+                        console.warn('⚠️ user-upload: Failed to save hash to systemhash node:', systemHashError);
+                        // Non blocchiamo l'upload se fallisce il salvataggio nel systemhash
+                    }
+
                     // Chiama loadUserFiles dopo l'upload riuscito
                     console.log(`📤 user-upload: Calling loadUserFiles after successful upload`);
                     
@@ -788,6 +798,44 @@
             } catch (error) {
                 console.error('💥 user-upload: Error generating deterministic key:', error);
                 throw new Error('Failed to generate encryption key');
+            }
+        }
+
+        // Funzione per salvare l'hash nel nodo systemhash
+        async function saveHashToSystemHash(fileHash, userAddress) {
+            try {
+                console.log('💾 user-upload: saveHashToSystemHash called with:', { fileHash, userAddress });
+                
+                // Ottieni la firma del wallet per l'autenticazione
+                const authSignature = await getWalletSignature();
+
+                const response = await fetch('/api/v1/user-uploads/save-system-hash', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-user-address': userAddress,
+                        'x-wallet-signature': authSignature,
+                        'x-signature-message': 'I Love Shogun'
+                    },
+                    body: JSON.stringify({
+                        hash: fileHash,
+                        userAddress: userAddress,
+                        timestamp: Date.now()
+                    })
+                });
+
+                const result = await response.json();
+                console.log('💾 user-upload: Save system hash response:', result);
+
+                if (result.success) {
+                    console.log('✅ user-upload: Hash saved to systemhash node successfully');
+                    return true;
+                } else {
+                    throw new Error(result.error || 'Failed to save hash to systemhash node');
+                }
+            } catch (error) {
+                console.error('💥 user-upload: Error saving hash to systemhash node:', error);
+                throw error;
             }
         }
 
