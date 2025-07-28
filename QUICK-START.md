@@ -157,6 +157,54 @@ curl https://your-subdomain.ngrok.io/api/contracts/relay-payment-router/address
 curl https://your-subdomain.ngrok.io/api/contracts/config
 ```
 
+## 🎯 Visual Graph Interface
+
+The relay includes a powerful visual graph interface for exploring GunDB data structures in real-time.
+
+### Access the Visual Graph
+
+```bash
+# Direct access
+https://your-subdomain.ngrok.io/visualGraph
+
+# Or navigate from the main interface
+https://your-subdomain.ngrok.io → Click "Visual Graph"
+```
+
+### Visual Graph Features
+
+- **Interactive D3.js visualization** with zoom, pan, and node selection
+- **Depth-First Search (DFS) traversal** of GunDB nodes
+- **Real-time data exploration** with customizable node labels
+- **Data inspector** for viewing and editing node properties
+- **Authentication integration** with centralized admin token
+- **Responsive design** for desktop and mobile
+
+### Quick Start with Visual Graph
+
+1. **Set your admin password** in the Control Panel
+2. **Navigate to** `/visualGraph`
+3. **Configure the connection**:
+   - Relay Peer URL: `https://your-subdomain.ngrok.io` (auto-filled)
+   - Auth Token: Auto-loaded from Control Panel
+   - Start Key: `shogun` (or any GunDB key)
+   - Label Property: `name` (or any property to display as node labels)
+4. **Click "Start"** to begin the graph traversal
+5. **Explore the visualization** by zooming, panning, and clicking nodes
+
+### Visual Graph API
+
+```bash
+# Main interface
+GET https://your-subdomain.ngrok.io/visualGraph
+
+# Static assets (CSS, JS, images)
+GET https://your-subdomain.ngrok.io/visualGraph/*
+
+# GunDB WebSocket endpoint
+GET https://your-subdomain.ngrok.io/gun
+```
+
 ## 🏠 Option 2: Local Development (HTTP Only)
 
 For local testing without HTTPS:
@@ -215,9 +263,10 @@ curl https://your-subdomain.ngrok.io/api/v1/health
 1. **Connect your app**: Use `https://your-subdomain.ngrok.io/gun` as your Gun.js peer
 2. **Upload files**: Visit `/upload` to test IPFS storage
 3. **Monitor performance**: Check `/stats` for real-time metrics
-4. **Explore tools**: Try `/graph` for live data visualization
-5. **Test authentication**: Use the new `/api/v1/auth/*` endpoints
-6. **Manage users**: Explore user management APIs
+4. **Explore data**: Visit `/visualGraph` for interactive GunDB visualization
+5. **Manage pins**: Use `/pin-manager` for IPFS pin management
+6. **Test authentication**: Use the new `/api/v1/auth/*` endpoints
+7. **Manage users**: Explore user management APIs
 
 ## 📚 More Information
 

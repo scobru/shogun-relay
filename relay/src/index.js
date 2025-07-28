@@ -368,15 +368,24 @@ async function initializeServer() {
 
   // Route specifiche per il visual graph
   app.get('/visualGraph', (req, res) => {
-    res.sendFile(path.resolve(publicPath, 'visualGraph/visualGraph.html'));
+    console.log('📊 Visual Graph route accessed');
+    const filePath = path.resolve(publicPath, 'visualGraph/visualGraph.html');
+    console.log('📊 Serving visualGraph.html from:', filePath);
+    res.sendFile(filePath);
   });
 
   app.get('/visualGraph/*', (req, res) => {
-    const filePath = path.resolve(publicPath, req.path.substring(1));
+    const requestedPath = req.path.substring(1);
+    const filePath = path.resolve(publicPath, requestedPath);
+    console.log('📊 Visual Graph static file requested:', requestedPath);
+    console.log('📊 Resolved file path:', filePath);
+    
     if (fs.existsSync(filePath)) {
+      console.log('📊 File found, serving:', filePath);
       res.sendFile(filePath);
     } else {
-      res.status(404).send('File not found');
+      console.log('📊 File not found:', filePath);
+      res.status(404).send('File not found: ' + requestedPath);
     }
   });
 

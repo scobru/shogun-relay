@@ -55,6 +55,85 @@ const contract = new ethers.Contract(
 
 For detailed documentation, see [CONTRACT_APIS.md](relay/CONTRACT_APIS.md).
 
+## 🎯 Visual Graph
+
+The relay includes a powerful visual graph interface for exploring and visualizing GunDB data structures in real-time.
+
+### Visual Graph Features
+
+- **Real-time data visualization** using D3.js
+- **Interactive graph exploration** with zoom, pan, and node selection
+- **Depth-First Search (DFS) traversal** of GunDB nodes
+- **Customizable node labels** and graph properties
+- **Data inspector** for viewing and editing node properties
+- **Authentication integration** with centralized admin token
+- **Responsive design** that works on desktop and mobile
+
+### Accessing the Visual Graph
+
+```bash
+# Direct access to the visual graph interface
+https://your-subdomain.ngrok.io/visualGraph
+
+# Or navigate from the main interface
+https://your-subdomain.ngrok.io → Click "Visual Graph" in the navigation
+```
+
+### Visual Graph Configuration
+
+The visual graph supports various configuration options:
+
+- **Relay Peer URL**: The GunDB endpoint to connect to (default: `http://localhost:8765`)
+- **Auth Token**: Admin authentication token (auto-loaded from Control Panel)
+- **Start Key**: The GunDB key to begin the graph traversal from
+- **Label Property**: Property to use as node labels in the visualization
+
+### Visual Graph API Endpoints
+
+```bash
+# Main visual graph interface
+GET /visualGraph
+
+# Visual graph static assets
+GET /visualGraph/* (CSS, JS, images)
+
+# GunDB endpoint for graph data
+GET /gun (WebSocket endpoint)
+```
+
+### Usage Example
+
+```javascript
+// Connect to the visual graph with authentication
+const gun = new Gun({
+  peers: ['https://your-subdomain.ngrok.io/gun'],
+  localStorage: false
+});
+
+// Add authentication headers
+Gun.on('opt', function(ctx) {
+  if (ctx.once) return;
+  ctx.on('out', function(msg) {
+    msg.headers = {
+      token: 'your-admin-token',
+      Authorization: 'Bearer your-admin-token'
+    };
+    this.to.next(msg);
+  });
+});
+
+// Start DFS traversal from a specific key
+const dfs = new DFS(gun);
+dfs.search('shogun', 'name'); // Start from 'shogun' key, use 'name' as label
+```
+
+### Visual Graph Components
+
+- **Graph Viewer**: Interactive D3.js visualization with force-directed layout
+- **Data Inspector**: Panel for viewing and editing node properties
+- **Control Panel**: Configuration options for graph traversal
+- **Status Display**: Real-time connection and search status
+
 ## 🔐 User Authentication
 
 The relay includes a complete user authentication system based on GunDB:
@@ -222,6 +301,7 @@ shogun-relay/
 - `/api/v1/users/*`: User management APIs
 - `/upload`: IPFS file upload interface
 - `/pin-manager`: IPFS pin management
+- `/visualGraph`: Interactive GunDB data visualization
 - `/health`: System health check
 
 ## 📊 Logs and Monitoring
@@ -281,6 +361,16 @@ curl -X POST http://localhost:8765/api/v1/auth/register \
 1. Verify that all ports are properly exposed
 2. Check that Docker volumes are configured
 3. Verify directory permissions
+
+## 🌟 Next Steps
+
+1. **Connect your app**: Use `https://your-subdomain.ngrok.io/gun` as your Gun.js peer
+2. **Upload files**: Visit `/upload` to test IPFS storage
+3. **Monitor performance**: Check `/stats` for real-time metrics
+4. **Explore data**: Visit `/visualGraph` for interactive GunDB visualization
+5. **Manage pins**: Use `/pin-manager` for IPFS pin management
+6. **Test authentication**: Use the new `/api/v1/auth/*` endpoints
+7. **Manage users**: Explore user management APIs
 
 ## 📚 Additional Documentation
 

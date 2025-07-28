@@ -374,20 +374,38 @@ var DFS = (function(){
   };
 
   util.makeNodes = function(map) {
+    console.log('makeNodes called with map:', map);
+    console.log('Map size:', map.size);
+    console.log('Map entries:', Array.from(map.entries()));
+    
     var array = Array.from(map);
+    console.log('Array from map:', array);
+    
     var nodes = [];
     for (var i = 0; i < array.length; i++) {
+      console.log('Processing node entry:', array[i]);
       nodes.push(array[i][1]);
     }
+    
+    console.log('Final nodes array:', nodes);
     return nodes;
   };
 
   util.makeEdges = function(map) {
+    console.log('makeEdges called with map:', map);
+    console.log('Map size:', map.size);
+    console.log('Map entries:', Array.from(map.entries()));
+    
     var array = Array.from(map);
+    console.log('Array from map:', array);
+    
     var edges = [];
     for (var i = 0; i < array.length; i++) {
+      console.log('Processing edge entry:', array[i]);
       edges.push(array[i][1]);
     }
+    
+    console.log('Final edges array:', edges);
     return edges;
   };
 
@@ -528,7 +546,10 @@ var DFS = (function(){
   };
 
   dfs.render = function() {
+    console.log('=== DFS RENDER CALLED ===');
     console.log('Rendering graph with', nodes.size, 'nodes and', edges.size, 'edges');
+    console.log('Nodes map:', nodes);
+    console.log('Edges map:', edges);
     
     if (!window.graph) {
       window.graph = { nodes: [], edges: [] };
