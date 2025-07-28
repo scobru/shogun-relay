@@ -111,7 +111,18 @@
 
                         <div class="form-group">
                             <label class="block text-sm font-medium mb-2">Batch Operations:</label>
-                            <button onclick="batchUnpinAll()" class="btn btn-error">🗑️ Unpin All Files</button>
+                            <div class="flex flex-col gap-2">
+                                <div class="form-control">
+                                    <label class="label cursor-pointer justify-start gap-3">
+                                        <input type="checkbox" id="preserveSystemFiles" class="checkbox checkbox-accent" checked />
+                                        <span class="label-text">🛡️ Preserve system files (user uploads)</span>
+                                    </label>
+                                    <div class="label-text-alt text-base-content/60 ml-6">
+                                        When checked, files uploaded by users will not be unpinned
+                                    </div>
+                                </div>
+                                <button onclick="batchUnpinAll()" class="btn btn-error">🗑️ Unpin All Files</button>
+                            </div>
                             <div id="batchProgress" class="progress-container hidden">
                                 <div class="progress-bar">
                                     <div id="progressBar" class="progress-fill" style="width: 0%"></div>
@@ -584,8 +595,42 @@
             batchLog.scrollTop = batchLog.scrollHeight;
         }
 
+        // Funzione per ottenere tutti gli hash del sistema (file utente)
+        async function getSystemFileHashes() {
+            try {
+                addBatchLog('🔍 Fetching system file hashes...');
+                
+                const response = await fetch('/api/v1/user-uploads/system-hashes', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...ShogunAdmin.getAuthHeaders()
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.success && result.hashes) {
+                    addBatchLog(`✅ Found ${result.hashes.length} system files to preserve`);
+                    return result.hashes;
+                } else {
+                    addBatchLog('⚠️ No system files found or error in response');
+                    return [];
+                }
+            } catch (error) {
+                addBatchLog(`❌ Error fetching system hashes: ${error.message}`, true);
+                return [];
+            }
+        }
+
         async function batchUnpinAll() {
-            if (!confirm('⚠️ This will unpin ALL files from IPFS. This action cannot be undone. Are you sure?')) {
+            const preserveSystemFiles = document.getElementById('preserveSystemFiles').checked;
+            
+            if (!confirm(`⚠️ This will unpin ${preserveSystemFiles ? 'non-system ' : 'ALL '}files from IPFS. This action cannot be undone. Are you sure?`)) {
                 return;
             }
 
@@ -597,8 +642,15 @@
             batchProgress.style.display = 'block';
             
             addBatchLog('Starting batch unpin operation...');
+            addBatchLog(`🛡️ System file preservation: ${preserveSystemFiles ? 'ENABLED' : 'DISABLED'}`);
             
             try {
+                // Get system file hashes if preservation is enabled
+                let systemHashes = [];
+                if (preserveSystemFiles) {
+                    systemHashes = await getSystemFileHashes();
+                }
+                
                 // First, get all pins
                 addBatchLog('Fetching current pin list...');
                 const listResult = await apiCall('/api/v1/ipfs/pins/ls', 'POST', {}, { manageVisibility: false });
@@ -610,8 +662,8 @@
                     return;
                 }
 
-                const pins = Object.keys(listResult.pins);
-                const totalPins = pins.length;
+                const allPins = Object.keys(listResult.pins);
+                const totalPins = allPins.length;
                 
                 if (totalPins === 0) {
                     addBatchLog('No pins found to remove');
@@ -620,18 +672,40 @@
                     return;
                 }
 
-                addBatchLog(`Found ${totalPins} pins to remove`);
-                updateBatchProgress(0, totalPins, 'Unpinning files...');
+                // Filter pins based on system file preservation
+                let pinsToRemove = allPins;
+                if (preserveSystemFiles && systemHashes.length > 0) {
+                    pinsToRemove = allPins.filter(pin => !systemHashes.includes(pin));
+                    const preservedCount = allPins.length - pinsToRemove.length;
+                    addBatchLog(`📋 Total pins: ${totalPins}`);
+                    addBatchLog(`🛡️ Preserved system files: ${preservedCount}`);
+                    addBatchLog(`🗑️ Pins to remove: ${pinsToRemove.length}`);
+                    
+                    if (preservedCount > 0) {
+                        addBatchLog('🛡️ Preserved hashes: ' + systemHashes.slice(0, 5).join(', ') + (systemHashes.length > 5 ? '...' : ''));
+                    }
+                } else {
+                    addBatchLog(`📋 Total pins to remove: ${totalPins}`);
+                }
+
+                if (pinsToRemove.length === 0) {
+                    addBatchLog('No pins to remove (all are system files)');
+                    showMessage('No pins to remove - all files are system files');
+                    batchProgress.style.display = 'none';
+                    return;
+                }
+
+                updateBatchProgress(0, pinsToRemove.length, 'Unpinning files...');
 
                 let successCount = 0;
                 let errorCount = 0;
 
                 // Process each pin
-                for (let i = 0; i < pins.length; i++) {
-                    const cid = pins[i];
+                for (let i = 0; i < pinsToRemove.length; i++) {
+                    const cid = pinsToRemove[i];
                     const currentProgress = i + 1;
                     
-                    updateBatchProgress(currentProgress, totalPins, `Unpinning ${currentProgress}/${totalPins}: ${cid.substring(0, 12)}...`);
+                    updateBatchProgress(currentProgress, pinsToRemove.length, `Unpinning ${currentProgress}/${pinsToRemove.length}: ${cid.substring(0, 12)}...`);
                     addBatchLog(`Unpinning: ${cid}`);
 
                     try {
@@ -650,12 +724,12 @@
                     }
 
                     // Small delay to prevent overwhelming the API
-                    if (i < pins.length - 1) {
+                    if (i < pinsToRemove.length - 1) {
                         await new Promise(resolve => setTimeout(resolve, 100));
                     }
                 }
 
-                updateBatchProgress(totalPins, totalPins, 'Batch unpin completed');
+                updateBatchProgress(pinsToRemove.length, pinsToRemove.length, 'Batch unpin completed');
                 addBatchLog(`Batch operation completed: ${successCount} successful, ${errorCount} failed`);
                 
                 if (successCount > 0) {
@@ -664,7 +738,7 @@
                     // Ask if user wants to run garbage collection
                     if (confirm('Files have been unpinned. Would you like to run garbage collection to free up disk space?')) {
                         addBatchLog('Running garbage collection...');
-                        updateBatchProgress(totalPins, totalPins, 'Running garbage collection...');
+                        updateBatchProgress(pinsToRemove.length, pinsToRemove.length, 'Running garbage collection...');
                         
                         const gcResult = await apiCall('/api/v1/ipfs/repo/gc', 'POST', {}, { manageVisibility: false });
                         if (gcResult) {

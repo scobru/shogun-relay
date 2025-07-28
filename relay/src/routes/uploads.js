@@ -7,6 +7,78 @@ const getGunInstance = (req) => {
   return req.app.get('gunInstance');
 };
 
+// Funzione helper per ottenere tutti gli hash del sistema
+async function getAllSystemHashes(req) {
+  const gun = getGunInstance(req);
+  if (!gun) {
+    console.warn('Gun instance not available for system hashes');
+    return [];
+  }
+  
+  console.log('🔍 Getting all system file hashes...');
+  
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      console.log('⏰ Timeout for system hashes retrieval');
+      reject(new Error("System hashes retrieval timeout"));
+    }, 30000);
+
+    const uploadsNode = gun.get("shogun").get("uploads");
+    
+    uploadsNode.once((uploadsData) => {
+      clearTimeout(timeoutId);
+      console.log('📋 Uploads data:', uploadsData);
+      
+      if (!uploadsData || typeof uploadsData !== "object") {
+        console.log('📋 No uploads found, returning empty array');
+        resolve([]);
+        return;
+      }
+
+      // Ottieni tutti gli user address (escludendo i metadati Gun)
+      const userAddresses = Object.keys(uploadsData).filter(
+        (key) => key !== "_" && key !== "#" && key !== ">" && key !== "<"
+      );
+      console.log('📋 User addresses found:', userAddresses);
+
+      if (userAddresses.length === 0) {
+        console.log('📋 No users found, returning empty array');
+        resolve([]);
+        return;
+      }
+
+      let allHashes = [];
+      let completedUsers = 0;
+      const totalUsers = userAddresses.length;
+
+      userAddresses.forEach((userAddress) => {
+        console.log(`📋 Reading hashes for user: ${userAddress}`);
+        const userUploadsNode = uploadsNode.get(userAddress);
+        
+        userUploadsNode.once((userData) => {
+          completedUsers++;
+          console.log(`📋 User data for ${userAddress}:`, userData);
+
+          if (userData && typeof userData === "object") {
+            // Ottieni tutti gli hash per questo utente
+            const userHashes = Object.keys(userData).filter(
+              (key) => key !== "_" && key !== "#" && key !== ">" && key !== "<"
+            );
+            console.log(`📋 Hashes for user ${userAddress}:`, userHashes);
+            allHashes = allHashes.concat(userHashes);
+          }
+
+          if (completedUsers === totalUsers) {
+            console.log(`📋 Final system hashes: ${allHashes.length} total hashes`);
+            console.log('📋 System hashes:', allHashes);
+            resolve(allHashes);
+          }
+        });
+      });
+    });
+  });
+}
+
 // Funzione helper per ottenere l'utilizzo MB off-chain
 async function getOffChainMBUsage(userAddress, req) {
   const gun = getGunInstance(req);
@@ -763,6 +835,32 @@ router.post("/repair-files/:userAddress", async (req, res) => {
 
   } catch (error) {
     console.error("Repair files error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore interno del server",
+      details: error.message,
+    });
+  }
+});
+
+// Endpoint per ottenere tutti gli hash del sistema (per il pin manager)
+router.get("/system-hashes", async (req, res) => {
+  try {
+    console.log('🔍 System hashes endpoint called');
+    
+    const hashes = await getAllSystemHashes(req);
+    
+    console.log(`📋 Returning ${hashes.length} system hashes`);
+    
+    res.json({
+      success: true,
+      hashes: hashes,
+      count: hashes.length,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error("System hashes error:", error);
     res.status(500).json({
       success: false,
       error: "Errore interno del server",
