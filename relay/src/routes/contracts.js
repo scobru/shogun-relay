@@ -8,12 +8,14 @@ router.get("/config", async (req, res) => {
   try {
     console.log("📋 contracts/config: Requesting contract configuration");
 
-    const chainId = process.env.CHAIN_ID || "11155111"; // Sepolia di default
+    // Supporta chain ID come query parameter o usa quello di default
+    const chainId = req.query.chainId || process.env.CHAIN_ID || "11155111";
 
     if (!DEPLOYMENTS[chainId]) {
       return res.status(404).json({
         success: false,
         error: `No deployments found for chain ID: ${chainId}`,
+        availableChains: Object.keys(DEPLOYMENTS),
       });
     }
 
@@ -57,14 +59,15 @@ router.get("/config", async (req, res) => {
 router.get("/:contractName", async (req, res) => {
   try {
     const { contractName } = req.params;
-    console.log(`📋 contracts/${contractName}: Requesting contract details`);
-
-    const chainId = process.env.CHAIN_ID || "11155111";
+    const chainId = req.query.chainId || process.env.CHAIN_ID || "11155111";
+    
+    console.log(`📋 contracts/${contractName}: Requesting contract details for chain: ${chainId}`);
 
     if (!DEPLOYMENTS[chainId]) {
       return res.status(404).json({
         success: false,
         error: `No deployments found for chain ID: ${chainId}`,
+        availableChains: Object.keys(DEPLOYMENTS),
       });
     }
 
@@ -85,13 +88,15 @@ router.get("/:contractName", async (req, res) => {
     if (!fullContractName || !chainDeployments[fullContractName]) {
       return res.status(404).json({
         success: false,
-        error: `Contract not found: ${contractName}`,
+        error: `Contract not found: ${contractName} on chain: ${chainId}`,
+        availableContracts: Object.keys(contractMapping),
+        availableChains: Object.keys(DEPLOYMENTS),
       });
     }
 
     const contract = chainDeployments[fullContractName];
 
-    console.log(`📋 contracts/${contractName}: Returning contract details`);
+    console.log(`📋 contracts/${contractName}: Returning contract details for chain: ${chainId}`);
 
     res.json({
       success: true,
@@ -110,23 +115,25 @@ router.get("/:contractName", async (req, res) => {
   }
 });
 
-// Route per ottenere solo l'ABI di un contratto
+// Route per ottenere l'ABI di un contratto specifico
 router.get("/:contractName/abi", async (req, res) => {
   try {
     const { contractName } = req.params;
-    console.log(`📋 contracts/${contractName}/abi: Requesting contract ABI`);
-
-    const chainId = process.env.CHAIN_ID || "11155111";
+    const chainId = req.query.chainId || process.env.CHAIN_ID || "11155111";
+    
+    console.log(`📋 contracts/${contractName}/abi: Requesting contract ABI for chain: ${chainId}`);
 
     if (!DEPLOYMENTS[chainId]) {
       return res.status(404).json({
         success: false,
         error: `No deployments found for chain ID: ${chainId}`,
+        availableChains: Object.keys(DEPLOYMENTS),
       });
     }
 
     const chainDeployments = DEPLOYMENTS[chainId];
 
+    // Mappa dei nomi dei contratti
     const contractMapping = {
       "relay-payment-router": "Relay#RelayPaymentRouter",
       "stealth-pool": "Stealth#StealthPool",
@@ -141,13 +148,15 @@ router.get("/:contractName/abi", async (req, res) => {
     if (!fullContractName || !chainDeployments[fullContractName]) {
       return res.status(404).json({
         success: false,
-        error: `Contract not found: ${contractName}`,
+        error: `Contract not found: ${contractName} on chain: ${chainId}`,
+        availableContracts: Object.keys(contractMapping),
+        availableChains: Object.keys(DEPLOYMENTS),
       });
     }
 
     const contract = chainDeployments[fullContractName];
 
-    console.log(`📋 contracts/${contractName}/abi: Returning contract ABI`);
+    console.log(`📋 contracts/${contractName}/abi: Returning contract ABI for chain: ${chainId}`);
 
     res.json({
       success: true,
@@ -157,10 +166,7 @@ router.get("/:contractName/abi", async (req, res) => {
       timestamp: Date.now(),
     });
   } catch (error) {
-    console.error(
-      `❌ contracts/${req.params.contractName}/abi: Error:`,
-      error
-    );
+    console.error(`❌ contracts/${req.params.contractName}/abi: Error:`, error);
     res.status(500).json({
       success: false,
       error: "Failed to load contract ABI",
@@ -169,25 +175,25 @@ router.get("/:contractName/abi", async (req, res) => {
   }
 });
 
-// Route per ottenere solo l'indirizzo di un contratto
+// Route per ottenere l'indirizzo di un contratto specifico
 router.get("/:contractName/address", async (req, res) => {
   try {
     const { contractName } = req.params;
-    console.log(
-      `📋 contracts/${contractName}/address: Requesting contract address`
-    );
-
-    const chainId = process.env.CHAIN_ID || "11155111";
+    const chainId = req.query.chainId || process.env.CHAIN_ID || "11155111";
+    
+    console.log(`📋 contracts/${contractName}/address: Requesting contract address for chain: ${chainId}`);
 
     if (!DEPLOYMENTS[chainId]) {
       return res.status(404).json({
         success: false,
         error: `No deployments found for chain ID: ${chainId}`,
+        availableChains: Object.keys(DEPLOYMENTS),
       });
     }
 
     const chainDeployments = DEPLOYMENTS[chainId];
 
+    // Mappa dei nomi dei contratti
     const contractMapping = {
       "relay-payment-router": "Relay#RelayPaymentRouter",
       "stealth-pool": "Stealth#StealthPool",
@@ -202,15 +208,15 @@ router.get("/:contractName/address", async (req, res) => {
     if (!fullContractName || !chainDeployments[fullContractName]) {
       return res.status(404).json({
         success: false,
-        error: `Contract not found: ${contractName}`,
+        error: `Contract not found: ${contractName} on chain: ${chainId}`,
+        availableContracts: Object.keys(contractMapping),
+        availableChains: Object.keys(DEPLOYMENTS),
       });
     }
 
     const contract = chainDeployments[fullContractName];
 
-    console.log(
-      `📋 contracts/${contractName}/address: Returning contract address`
-    );
+    console.log(`📋 contracts/${contractName}/address: Returning contract address for chain: ${chainId}`);
 
     res.json({
       success: true,
@@ -220,10 +226,7 @@ router.get("/:contractName/address", async (req, res) => {
       timestamp: Date.now(),
     });
   } catch (error) {
-    console.error(
-      `❌ contracts/${req.params.contractName}/address: Error:`,
-      error
-    );
+    console.error(`❌ contracts/${req.params.contractName}/address: Error:`, error);
     res.status(500).json({
       success: false,
       error: "Failed to load contract address",
@@ -235,14 +238,15 @@ router.get("/:contractName/address", async (req, res) => {
 // Route per ottenere la lista di tutti i contratti disponibili
 router.get("/", async (req, res) => {
   try {
-    console.log("📋 contracts: Requesting available contracts list");
-
-    const chainId = process.env.CHAIN_ID || "11155111";
+    const chainId = req.query.chainId || process.env.CHAIN_ID || "11155111";
+    
+    console.log(`📋 contracts: Requesting available contracts list for chain: ${chainId}`);
 
     if (!DEPLOYMENTS[chainId]) {
       return res.status(404).json({
         success: false,
         error: `No deployments found for chain ID: ${chainId}`,
+        availableChains: Object.keys(DEPLOYMENTS),
       });
     }
 
@@ -260,13 +264,14 @@ router.get("/", async (req, res) => {
       }
     );
 
-    console.log("📋 contracts: Returning available contracts list");
+    console.log(`📋 contracts: Returning available contracts list for chain: ${chainId}`);
 
     res.json({
       success: true,
       chainId: chainId,
       contracts: availableContracts,
       count: availableContracts.length,
+      availableChains: Object.keys(DEPLOYMENTS),
       timestamp: Date.now(),
     });
   } catch (error) {
@@ -274,6 +279,35 @@ router.get("/", async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to load contracts list",
+      details: error.message,
+    });
+  }
+});
+
+// Route per ottenere la lista di tutte le chain disponibili
+router.get("/chains", async (req, res) => {
+  try {
+    console.log("📋 contracts/chains: Requesting available chains list");
+
+    const availableChains = Object.keys(DEPLOYMENTS).map(chainId => ({
+      chainId: chainId,
+      contractCount: Object.keys(DEPLOYMENTS[chainId]).length,
+      contracts: Object.keys(DEPLOYMENTS[chainId])
+    }));
+
+    console.log("📋 contracts/chains: Returning available chains list");
+
+    res.json({
+      success: true,
+      chains: availableChains,
+      count: availableChains.length,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error("❌ contracts/chains: Error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to load chains list",
       details: error.message,
     });
   }

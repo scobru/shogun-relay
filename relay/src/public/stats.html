@@ -305,7 +305,7 @@
                         <span class="label-text">Add New Peer</span>
                     </label>
                     <div class="flex gap-2">
-                        <input type="text" id="peerUrlInput" class="input input-bordered w-full" placeholder="e.g., wss://gun.shogun.to/gun">
+                        <input type="text" id="peerInput" class="input input-bordered w-full" placeholder="e.g., wss://gun.shogun.to/gun">
                         <button id="addPeerBtn" class="btn btn-primary">Add</button>
                     </div>
                 </div>
@@ -354,7 +354,7 @@
             }
 
             try {
-                const response = await fetch('/api/gc/trigger', {
+                const response = await fetch('/api/v1/system/gc/trigger', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -390,7 +390,7 @@
             }
 
             try {
-                const response = await fetch('/api/stats/update', {
+                const response = await fetch('/api/v1/system/stats/update', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -425,7 +425,7 @@
             }
 
             try {
-                const response = await fetch('/api/peers', {
+                const response = await fetch('/api/v1/system/peers', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const result = await response.json();
@@ -449,42 +449,43 @@
             }
         }
 
+        // Add peer function
         async function addPeer() {
             const token = getAuthToken();
             if (!token) {
-                peerStatusEl.innerHTML = '<span class="text-error">Authentication required</span>';
+                alert('Authentication required to add peers.');
                 return;
             }
 
-            const peerUrlInput = document.getElementById('peerUrlInput');
-            const peerUrl = peerUrlInput.value.trim();
+            const peerInput = document.getElementById('peerInput');
+            const peerAddress = peerInput.value.trim();
 
-            if (!peerUrl) {
-                peerStatusEl.innerHTML = '<span class="text-error">Peer URL cannot be empty</span>';
+            if (!peerAddress) {
+                alert('Please enter a peer address.');
                 return;
             }
 
             try {
-                const response = await fetch('/api/peers/add', {
+                const response = await fetch('/api/v1/system/peers/add', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ peerUrl })
+                    body: JSON.stringify({ peer: peerAddress })
                 });
 
                 const result = await response.json();
-                
+
                 if (result.success) {
-                    peerStatusEl.innerHTML = `<span class="text-success">✓ ${result.message}</span>`;
-                    peerUrlInput.value = '';
-                    setTimeout(fetchPeers, 1500); // Refresh list
+                    alert('Peer added successfully!');
+                    peerInput.value = '';
+                    fetchPeers(); // Refresh the list
                 } else {
-                    peerStatusEl.innerHTML = `<span class="text-error">✗ Error: ${result.error}</span>`;
+                    alert(`Failed to add peer: ${result.error}`);
                 }
             } catch (error) {
-                peerStatusEl.innerHTML = `<span class="text-error">✗ Error: ${error.message}</span>`;
+                alert(`Error adding peer: ${error.message}`);
             }
         }
 

@@ -462,10 +462,12 @@
         // Load contract configuration
         async function loadContractConfig() {
             try {
-                // Carica l'ABI e l'indirizzo dalle nuove API
+                // Carica l'ABI e l'indirizzo dalle nuove API con supporto per chain ID
+                const chainId = document.getElementById('chainSelect')?.value || '11155111';
+                
                 const [abiResponse, addressResponse] = await Promise.all([
-                    fetch('/api/contracts/relay-payment-router/abi'),
-                    fetch('/api/contracts/relay-payment-router/address')
+                    fetch(`/api/v1/contracts/relay-payment-router/abi?chainId=${chainId}`),
+                    fetch(`/api/v1/contracts/relay-payment-router/address?chainId=${chainId}`)
                 ]);
 
                 const abiData = await abiResponse.json();
@@ -476,6 +478,7 @@
                     RELAY_ABI = abiData.abi;
                     
                     console.log('Contract configuration loaded dynamically:', {
+                        chainId: chainId,
                         address: RELAY_CONTRACT_ADDRESS,
                         abiLength: RELAY_ABI.length
                     });
@@ -534,12 +537,11 @@
         // Funzione per testare l'endpoint direttamente
         async function testEndpoint() {
             try {
-                // Rimuovo tutte le funzioni e variabili JS relative a Gun key (gunKeyPair, gunPubKeyInput, validateKeyBtn, ecc.)
-                // Aggiorno la gestione degli step: solo Connect Wallet, Subscribe, Status
                 const identifier = walletAddress;
-                console.log('🧪 Testing endpoint directly for:', identifier);
+                const chainId = document.getElementById('chainSelect')?.value || '11155111';
+                console.log('🧪 Testing endpoint directly for:', identifier, 'on chain:', chainId);
 
-                const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
+                const response = await fetch(`/api/v1/subscriptions/subscription-status/${encodeURIComponent(identifier)}?chainId=${chainId}`);
                 console.log('📡 Test response status:', response.status);
                 console.log('📡 Test response headers:', response.headers);
 
@@ -556,6 +558,111 @@
             } catch (error) {
                 console.error('💥 Test endpoint error:', error);
                 showNotification(`Test Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Check subscription status
+        async function checkSubscriptionStatus(identifier) {
+            try {
+                const chainId = document.getElementById('chainSelect')?.value || '11155111';
+                console.log('🔍 Checking subscription status for:', identifier, 'on chain:', chainId);
+
+                const response = await fetch(`/api/v1/subscriptions/subscription-status/${encodeURIComponent(identifier)}?chainId=${chainId}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    return result.subscription;
+                } else {
+                    console.error('❌ Subscription status check failed:', result.error);
+                    return null;
+                }
+            } catch (error) {
+                console.error('💥 Subscription status check error:', error);
+                return null;
+            }
+        }
+
+        // Check subscription status (alternate function)
+        async function checkSubscriptionStatusAlt(identifier) {
+            try {
+                const chainId = document.getElementById('chainSelect')?.value || '11155111';
+                console.log('🔍 Checking subscription status (alt) for:', identifier, 'on chain:', chainId);
+
+                const response = await fetch(`/api/v1/subscriptions/subscription-status/${encodeURIComponent(identifier)}?chainId=${chainId}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    return result.subscription;
+                } else {
+                    console.error('❌ Subscription status check failed:', result.error);
+                    return null;
+                }
+            } catch (error) {
+                console.error('💥 Subscription status check error:', error);
+                return null;
+            }
+        }
+
+        // Get user subscription details
+        async function getUserSubscriptionDetails(walletAddress) {
+            try {
+                const chainId = document.getElementById('chainSelect')?.value || '11155111';
+                console.log('📋 Getting user subscription details for:', walletAddress, 'on chain:', chainId);
+
+                const response = await fetch(`/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(walletAddress)}?chainId=${chainId}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    return result.subscription;
+                } else {
+                    console.error('❌ Failed to get user subscription details:', result.error);
+                    return null;
+                }
+            } catch (error) {
+                console.error('💥 Error getting user subscription details:', error);
+                return null;
+            }
+        }
+
+        // Get user subscription details (alternate function)
+        async function getUserSubscriptionDetailsAlt(walletAddress) {
+            try {
+                const chainId = document.getElementById('chainSelect')?.value || '11155111';
+                console.log('📋 Getting user subscription details (alt) for:', walletAddress, 'on chain:', chainId);
+
+                const response = await fetch(`/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(walletAddress)}?chainId=${chainId}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    return result.subscription;
+                } else {
+                    console.error('❌ Failed to get user subscription details:', result.error);
+                    return null;
+                }
+            } catch (error) {
+                console.error('💥 Error getting user subscription details:', error);
+                return null;
+            }
+        }
+
+        // Check subscription status (third function)
+        async function checkSubscriptionStatusThird(identifier) {
+            try {
+                const chainId = document.getElementById('chainSelect')?.value || '11155111';
+                console.log('🔍 Checking subscription status (third) for:', identifier, 'on chain:', chainId);
+
+                const response = await fetch(`/api/v1/subscriptions/subscription-status/${encodeURIComponent(identifier)}?chainId=${chainId}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    return result.subscription;
+                } else {
+                    console.error('❌ Subscription status check failed:', result.error);
+                    return null;
+                }
+            } catch (error) {
+                console.error('💥 Subscription status check error:', error);
+                return null;
             }
         }
 
@@ -1189,9 +1296,10 @@
                 `;
 
                 // Usa il nuovo endpoint centralizzato
-                console.log('🔍 Making API call to:', `/api/user-subscription-details/${encodeURIComponent(walletAddress)}`);
+                const chainId = document.getElementById('chainSelect')?.value || '11155111';
+                console.log('🔍 Making API call to:', `/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(walletAddress)}?chainId=${chainId}`);
 
-                const response = await fetch(`/api/user-subscription-details/${encodeURIComponent(walletAddress)}`);
+                const response = await fetch(`/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(walletAddress)}?chainId=${chainId}`);
                 console.log('📡 Response status:', response.status);
 
                 const result = await response.json();
@@ -1417,10 +1525,10 @@
                     return;
                 }
 
-                // Usa il nuovo endpoint centralizzato
-                console.log('🔍 Checking subscription status for wallet:', walletAddress);
+                const chainId = document.getElementById('chainSelect')?.value || '11155111';
+                console.log('🔍 Checking subscription status for wallet:', walletAddress, 'on chain:', chainId);
 
-                const response = await fetch(`/api/user-subscription-details/${encodeURIComponent(walletAddress)}`);
+                const response = await fetch(`/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(walletAddress)}?chainId=${chainId}`);
                 console.log('📡 Response status:', response.status);
 
                 const result = await response.json();
@@ -1469,11 +1577,11 @@
                     return;
                 }
 
-                // Usa il nuovo endpoint ibrido che supporta sia pubKey che userAddress
+                const chainId = document.getElementById('chainSelect')?.value || '11155111';
                 const identifier = walletAddress;
-                console.log('🔍 Checking subscription status for identifier:', identifier);
+                console.log('🔍 Checking subscription status for identifier:', identifier, 'on chain:', chainId);
 
-                const response = await fetch(`/api/subscription-status/${encodeURIComponent(identifier)}`);
+                const response = await fetch(`/api/v1/subscriptions/subscription-status/${encodeURIComponent(identifier)}?chainId=${chainId}`);
                 console.log('📡 Response status:', response.status);
 
                 const result = await response.json();

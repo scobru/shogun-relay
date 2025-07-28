@@ -380,6 +380,12 @@ async function initializeServer() {
   app.set("addTimeSeriesPoint", addTimeSeriesPoint);
   app.set("runGarbageCollector", runGarbageCollector);
 
+  // Esponi i middleware di autenticazione per le route
+  app.set("tokenAuthMiddleware", tokenAuthMiddleware);
+  app.set("userAuthMiddleware", userAuthMiddleware);
+  app.set("walletSignatureMiddleware", walletSignatureMiddleware);
+  app.set("verifyWalletSignature", verifyWalletSignature);
+
   // Esponi l'istanza Gun globalmente per le route
   global.gunInstance = gun;
 

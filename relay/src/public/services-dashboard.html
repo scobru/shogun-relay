@@ -353,7 +353,7 @@
             }
 
             try {
-                const response = await fetch('/api/s3-stats', {
+                const response = await fetch('/api/v1/services/s3-stats', {
                     headers: { 'Authorization': `Bearer ${password}` }
                 });
 
@@ -412,7 +412,7 @@
 
             try {
                 log(`Restarting ${service} service...`, 'info');
-                const response = await fetch(`/api/services/${service}/restart`, {
+                const response = await fetch(`/api/v1/services/${service}/restart`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${password}`,

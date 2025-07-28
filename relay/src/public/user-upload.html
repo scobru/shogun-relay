@@ -753,16 +753,16 @@
             }
         }
 
-        // Load user files
+        // Carica i file dell'utente
         async function loadUserFiles() {
             if (!walletAddress) {
-                console.log('❌ user-upload: No wallet address for loadUserFiles');
+                showStatus('Please connect your wallet first', 'error');
                 return;
             }
 
             try {
                 console.log('📂 user-upload: Loading files for wallet:', walletAddress);
-                const response = await fetch(`/api/user-uploads/${encodeURIComponent(walletAddress)}`);
+                const response = await fetch(`/api/v1/user-uploads/${encodeURIComponent(walletAddress)}`);
 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -816,7 +816,7 @@
                 // Ottieni la firma del wallet per l'autenticazione
                 const authSignature = await getWalletSignature();
 
-                const response = await fetch(`/api/sync-mb-usage/${encodeURIComponent(walletAddress)}`, {
+                const response = await fetch(`/api/v1/user-uploads/sync-mb-usage/${encodeURIComponent(walletAddress)}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -858,20 +858,28 @@
                 console.log('🐛 user-upload: Debug MB usage triggered for wallet:', walletAddress);
                 showStatus('🐛 Debugging MB usage...', 'info');
 
-                const response = await fetch(`/api/debug/mb-usage/${encodeURIComponent(walletAddress)}`, {
-                    method: 'GET'
+                // Ottieni la firma del wallet per l'autenticazione
+                const authSignature = await getWalletSignature();
+
+                const response = await fetch(`/api/v1/debug/mb-usage/${encodeURIComponent(walletAddress)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-user-address': walletAddress,
+                        'x-wallet-signature': authSignature,
+                        'x-signature-message': 'I Love Shogun'
+                    }
                 });
 
                 const result = await response.json();
                 console.log('🐛 user-upload: Debug MB response:', result);
 
                 if (result.success) {
-                    const details = `Off-chain: ${result.offChainUsage.mbUsed} MB, Contract: ${result.contractData?.mbUsed || 0} MB, Calculated: ${result.calculated.mbRemaining} MB remaining`;
-                    showStatus(`✅ Debug MB usage: ${details}`, 'success');
-                    console.log('🐛 user-upload: Full debug data:', result);
+                    showStatus(`✅ MB usage debug completed! Details: ${JSON.stringify(result.details)}`, 'success');
                 } else {
-                    showStatus(`❌ Debug MB usage failed: ${result.error}`, 'error');
+                    showStatus(`❌ Failed to debug MB usage: ${result.error}`, 'error');
                 }
+
             } catch (error) {
                 console.error('💥 user-upload: Error debugging MB usage:', error);
                 showStatus(`❌ Error debugging MB usage: ${error.message}`, 'error');
@@ -945,7 +953,7 @@
                     // Genera la stessa chiave deterministica
                     const encryptionKey = await generateDeterministicKey(signature, walletAddress);
 
-                    showStatus('🔐 Decrypting file...', 'info');
+                    showStatus('�� Decrypting file...', 'info');
 
                     // Scarica il file crittografato
                     const response = await fetch(`/ipfs-content/${hash}`);
@@ -984,15 +992,25 @@
             }
         }
 
-        // Delete file
+        // Delete file function
         async function deleteFile(hash) {
-            if (!confirm('Are you sure you want to delete this file?')) return;
+            if (!walletAddress) {
+                showStatus('Please connect your wallet first', 'error');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to delete this file?`)) {
+                return;
+            }
 
             try {
+                console.log('🗑️ user-upload: Deleting file with hash:', hash);
+                showStatus('🗑️ Deleting file...', 'info');
+
                 // Ottieni la firma del wallet per l'autenticazione
                 const authSignature = await getWalletSignature();
 
-                const response = await fetch(`/api/user-uploads/${encodeURIComponent(walletAddress)}/${hash}`, {
+                const response = await fetch(`/api/v1/user-uploads/${encodeURIComponent(walletAddress)}/${hash}`, {
                     method: 'DELETE',
                     headers: {
                         'x-user-address': walletAddress,
@@ -1002,19 +1020,20 @@
                 });
 
                 const result = await response.json();
+                console.log('🗑️ user-upload: Delete file response:', result);
 
                 if (result.success) {
-                    showStatus('File deleted successfully', 'success');
-
-                    // Ricarica i file e aggiorna lo stato della sottoscrizione
+                    showStatus('✅ File deleted successfully!', 'success');
+                    
+                    // Ricarica i file per aggiornare la lista
                     await loadUserFiles();
-                    await checkSubscriptionStatus(walletAddress);
                 } else {
-                    showStatus(`Failed to delete file: ${result.error}`, 'error');
+                    showStatus(`❌ Failed to delete file: ${result.error}`, 'error');
                 }
 
             } catch (error) {
-                showStatus(`Error deleting file: ${error.message}`, 'error');
+                console.error('💥 user-upload: Error deleting file:', error);
+                showStatus(`❌ Error deleting file: ${error.message}`, 'error');
             }
         }
 
