@@ -411,67 +411,107 @@ var DFS = (function(){
 
   var dfs = {};
 
-  dfs.search = function(soul, lbl, lim) {
+  dfs.search = function(soul, label, limit, opt) {
     console.log('Starting DFS with soul:', soul);
+    console.log('DFS configuration:', { soul: soul, label: label, limit: limit, opt: opt });
     
-    if (!soul) {
-      console.error('No soul provided for DFS search');
-      return;
-    }
-
-    if (!window.gun) {
-      console.error('Gun instance not available for DFS search');
-      return;
-    }
-
-    // Reset state
-    opt = !!lbl;
-    label = lbl;
     start = soul;
+    visited.clear();
+    edges.clear();
+    nodes.clear();
     stack = [];
-    nodes = new Map();
-    edges = new Map();
-    stop = false;
     visitedCount = 0;
+    stop = false;
     
-    if (lim) limit = lim;
+    if (label) {
+      this.label = label;
+    }
+    if (limit) {
+      this.limit = limit;
+    }
+    if (opt) {
+      this.opt = opt;
+    }
     
-    console.log('DFS configuration:', { soul, label, limit, opt });
+    // Add timeout to ensure rendering happens
+    setTimeout(function() {
+      if (!stop && visitedCount > 0) {
+        console.log('DFS timeout reached, forcing render with', visitedCount, 'nodes');
+        dfs.render();
+      }
+    }, 10000); // 10 second timeout
     
     // Start the search
     window.gun.get(soul).once(dfs.node);
   };
 
-  dfs.node = function(node, key) {
+  dfs.node = function(node) {
     if (stop) return;
     
-    visitedCount++;
-    console.log('Visiting node:', key, 'Count:', visitedCount);
+    var soul = Gun.node.soul(node);
+    console.log('Visiting node:', soul, 'Count:', visitedCount);
     console.log('Node data:', node);
-    console.log('Node properties:', Object.keys(node || {}));
+    console.log('Node properties:', Object.keys(node));
     
-    if (!node) {
-      console.error('No data for key:', key);
+    if (!soul || visited.has(soul)) {
+      console.log('Node already visited or invalid soul:', soul);
       dfs.back();
       return;
     }
-
-    var soul = Gun.node.soul(node) || key;
     
-    if (soul === start) {
-      stack.push(soul);
+    visited.add(soul);
+    visitedCount++;
+    
+    // Add node
+    nodes.set(soul, { id: soul, label: soul });
+    
+    if (visitedCount >= limit) {
+      console.log('Reached node limit:', limit, 'calling render');
+      dfs.render();
+      return;
     }
 
-    u = node;
+    var properties = Object.keys(node);
+    console.log('Checking edges for soul:', soul);
+    console.log('Properties to check:', properties);
     
-    // Create node entry
-    var nodeData = { id: soul, label: key };
-    if (opt && node[label]) {
-      nodeData.label = node[label];
+    var nextRef = null;
+
+    // Find the next unvisited reference
+    for (var prop of properties) {
+      if (prop === "_" || node[prop] == null) {
+        console.log('Skipping property:', prop, 'value:', node[prop]);
+        continue;
+      }
+      
+      console.log('Checking property:', prop, 'value:', node[prop]);
+      
+      if (typeof node[prop] === 'object' && node[prop]['#']) {
+        var targetSoul = node[prop]['#'];
+        var edgeKey = soul + targetSoul;
+        
+        console.log('Found reference:', prop, '->', targetSoul);
+        
+        if (!edges.has(edgeKey)) {
+          nextRef = node[prop];
+          console.log('New edge found, will follow:', edgeKey);
+          break;
+        } else {
+          console.log('Edge already visited:', edgeKey);
+        }
+      }
     }
-    
-    nodes.set(soul, nodeData);
-    dfs.edge(u, edges);
+
+    if (nextRef) {
+      console.log('Following reference to:', nextRef['#']);
+      dfs.next(nextRef, soul, nextRef['#']);
+    } else {
+      console.log('No new references found, going back');
+      if (start === soul) {
+        stack.pop();
+      }
+      dfs.back();
+    }
   };
 
   dfs.edge = function(node, edges) {
@@ -561,7 +601,13 @@ var DFS = (function(){
     } else {
       var soul = stack.pop();
       console.log('Popping from stack:', soul);
-      window.gun.get(soul).once(dfs.node);
+      // Se abbiamo ancora nodi da visitare, continua la ricerca
+      if (visitedCount < limit) {
+        window.gun.get(soul).once(dfs.node);
+      } else {
+        console.log('Reached limit, calling render');
+        dfs.render();
+      }
     }
   };
 

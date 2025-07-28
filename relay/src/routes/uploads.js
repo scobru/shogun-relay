@@ -771,4 +771,5 @@ router.post("/repair-files/:userAddress", async (req, res) => {
   }
 });
 
+export { getOffChainMBUsage };
 export default router;

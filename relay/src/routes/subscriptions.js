@@ -215,14 +215,43 @@ router.get("/user-subscription-details/:userAddress", async (req, res) => {
           const now = Math.floor(Date.now() / 1000);
           const timeRemaining = Math.max(0, Number(endTime) - now);
           
+          // Calcola i MB utilizzati in tempo reale
+          let mbUsed = 0;
+          let mbRemaining = Number(mbAllocated);
+          let usagePercentage = 0;
+          
+          try {
+            // Importa la funzione getOffChainMBUsage
+            const { getOffChainMBUsage } = await import('../uploads.js');
+            mbUsed = await getOffChainMBUsage(userAddress, req);
+            mbRemaining = Math.max(0, Number(mbAllocated) - mbUsed);
+            usagePercentage = Number(mbAllocated) > 0 ? (mbUsed / Number(mbAllocated)) * 100 : 0;
+            
+            console.log(`📊 user-subscription-details: MB calculation for ${userAddress}:`);
+            console.log(`📊 - MB Allocated: ${mbAllocated}`);
+            console.log(`📊 - MB Used (off-chain): ${mbUsed}`);
+            console.log(`📊 - MB Remaining: ${mbRemaining}`);
+            console.log(`📊 - Usage: ${usagePercentage.toFixed(2)}%`);
+          } catch (mbError) {
+            console.warn(`⚠️ Error calculating MB usage for ${userAddress}:`, mbError.message);
+            // Se fallisce il calcolo MB, usa 0 come fallback
+            mbUsed = 0;
+            mbRemaining = Number(mbAllocated);
+            usagePercentage = 0;
+          }
+          
           activeSubscription = {
             isActive: true,
             startTime: startTime.toString(),
             endTime: endTime.toString(),
             amountPaid: amountPaid.toString(),
             mbAllocated: mbAllocated.toString(),
+            mbUsed: mbUsed,
+            mbRemaining: mbRemaining,
+            usagePercentage: Math.round(usagePercentage * 100) / 100,
             timeRemaining: timeRemaining.toString(),
-            relayAddress: relayAddress
+            relayAddress: relayAddress,
+            daysRemaining: Math.max(0, Math.ceil(timeRemaining / (24 * 60 * 60)))
           };
           
           foundRelay = relayAddress;
