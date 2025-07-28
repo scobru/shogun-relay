@@ -188,8 +188,13 @@ async function startChainEventListener() {
         decodedValue = value;
       }
 
-      // Propagate to GunDB - this will be handled by the function inside initializeServer
-      console.log("🔄 Event will be propagated to GunDB when server is ready");
+      // Converti bytes32 in stringhe leggibili per GunDB
+      // Per ora usiamo un approccio semplice: prendiamo i primi 16 caratteri dell'hash
+      const soulString = soul.substring(0, 16);
+      const keyString = key.substring(0, 16);
+
+      // Propagate to GunDB with readable strings
+      propagateChainEventToGun(soulString, keyString, decodedValue, event);
     });
 
     console.log("✅ Chain contract event listener started");
@@ -262,7 +267,7 @@ async function initializeServer() {
         });
       });
 
-      // Also store the data in the main GunDB structure
+      // Also store the data in the main GunDB structure using readable strings
       const dataNode = gun.get(soul);
       await new Promise((resolve, reject) => {
         dataNode.get(key).put(value, (ack) => {
@@ -341,6 +346,10 @@ async function initializeServer() {
             decodedValue = value;
           }
           
+          // Converti bytes32 in stringhe leggibili per GunDB
+          const soulString = soul.substring(0, 16);
+          const keyString = key.substring(0, 16);
+          
           // Crea un ID univoco per questo evento
           const eventId = `${event.transactionHash}-${event.logIndex}`;
           
@@ -361,8 +370,8 @@ async function initializeServer() {
           const eventNode = gun.get("shogun").get("chain_events").get(eventId);
           await new Promise((resolve, reject) => {
             eventNode.put({
-              soul: soul,
-              key: key,
+              soul: soulString,
+              key: keyString,
               value: decodedValue,
               blockNumber: event.blockNumber,
               transactionHash: event.transactionHash,
@@ -378,10 +387,10 @@ async function initializeServer() {
             });
           });
           
-          // Salva anche i dati nel nodo principale
-          const dataNode = gun.get(soul);
+          // Salva anche i dati nel nodo principale usando stringhe leggibili
+          const dataNode = gun.get(soulString);
           await new Promise((resolve, reject) => {
-            dataNode.get(key).put(decodedValue, (ack) => {
+            dataNode.get(keyString).put(decodedValue, (ack) => {
               if (ack.err) {
                 reject(ack.err);
               } else {
