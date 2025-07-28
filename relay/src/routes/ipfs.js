@@ -307,19 +307,41 @@ router.post("/upload",
               uploadData.sizeMB = fileSizeMB;
               uploadData.userAddress = req.userAddress;
 
+              console.log(`💾 Saving upload to GunDB:`, {
+                userAddress: req.userAddress,
+                fileHash: fileResult.Hash,
+                uploadData: uploadData
+              });
+
               // Save upload to Gun database
               const uploadsNode = gun.get("shogun").get("uploads").get(req.userAddress);
-              uploadsNode.get(fileResult.Hash).put(uploadData);
+              uploadsNode.get(fileResult.Hash).put(uploadData, (ack) => {
+                console.log(`💾 Upload save ack:`, ack);
+                if (ack && ack.err) {
+                  console.error(`❌ Error saving upload:`, ack.err);
+                } else {
+                  console.log(`✅ Upload saved successfully to GunDB`);
+                }
+              });
 
               // Update MB usage
-              const mbUsageNode = gun.get("shogun").get("mb_usage").get(req.userAddress);
+              const mbUsageNode = gun.get("shogun").get("mbUsage").get(req.userAddress);
               mbUsageNode.once((currentUsage) => {
+                console.log(`📊 Current MB usage:`, currentUsage);
                 const newUsage = {
                   mbUsed: (currentUsage?.mbUsed || 0) + fileSizeMB,
                   lastUpdated: Date.now(),
                   updatedBy: "file-upload",
                 };
-                mbUsageNode.put(newUsage);
+                console.log(`📊 New MB usage:`, newUsage);
+                mbUsageNode.put(newUsage, (mbAck) => {
+                  console.log(`📊 MB usage update ack:`, mbAck);
+                  if (mbAck && mbAck.err) {
+                    console.error(`❌ Error updating MB usage:`, mbAck.err);
+                  } else {
+                    console.log(`✅ MB usage updated successfully`);
+                  }
+                });
               });
 
               console.log(`📊 User upload saved: ${req.userAddress} - ${fileSizeMB} MB`);

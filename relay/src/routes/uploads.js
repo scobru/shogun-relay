@@ -15,18 +15,65 @@ async function getOffChainMBUsage(userAddress, req) {
     return 0;
   }
   
+  console.log(`🔍 Calculating offchain MB usage for: ${userAddress}`);
+  
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => {
-      reject(new Error("MB usage read timeout"));
-    }, 10000);
+      console.log(`⏰ Timeout for MB usage calculation for: ${userAddress}`);
+      reject(new Error("MB usage calculation timeout"));
+    }, 15000);
 
-    gun.get("shogun").get("mbUsage").get(userAddress).once((data) => {
+    // Calcola i MB dai file effettivamente caricati
+    const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
+    console.log(`🔍 Reading uploads from path: shogun.uploads.${userAddress}`);
+    
+    uploadsNode.once((parentData) => {
       clearTimeout(timeoutId);
-      if (!data) {
+      console.log(`📋 Uploads parent data for ${userAddress}:`, parentData);
+      
+      if (!parentData || typeof parentData !== "object") {
+        console.log(`📋 No uploads found for ${userAddress}, returning 0 MB`);
         resolve(0);
-      } else {
-        resolve(data.mbUsed || 0);
+        return;
       }
+
+      // Ottieni tutte le chiavi (escludendo i metadati Gun)
+      const hashKeys = Object.keys(parentData).filter(
+        (key) => key !== "_" && key !== "#" && key !== ">" && key !== "<"
+      );
+      console.log(`📋 Hash keys found:`, hashKeys);
+
+      if (hashKeys.length === 0) {
+        console.log(`📋 No files found for ${userAddress}, returning 0 MB`);
+        resolve(0);
+        return;
+      }
+
+      // Calcola la somma dei MB dai file
+      let totalMB = 0;
+      let completedReads = 0;
+      const totalReads = hashKeys.length;
+
+      hashKeys.forEach((hash) => {
+        console.log(`📋 Reading file data for hash: ${hash}`);
+        uploadsNode.get(hash).once((uploadData) => {
+          completedReads++;
+          console.log(`📋 File data for ${hash}:`, uploadData);
+
+          if (uploadData && uploadData.sizeMB) {
+            totalMB += uploadData.sizeMB;
+            console.log(`📊 Added ${uploadData.sizeMB} MB from ${hash}, total now: ${totalMB}`);
+          } else {
+            console.warn(`⚠️ Invalid file data for hash: ${hash}`, uploadData);
+          }
+
+          // Se abbiamo letto tutti i file, risolvi
+          if (completedReads === totalReads) {
+            console.log(`📊 Final MB calculation for ${userAddress}: ${totalMB} MB from ${totalReads} files`);
+            resolve(totalMB);
+          }
+        });
+      });
     });
   });
 }
@@ -125,6 +172,9 @@ router.get("/:identifier", async (req, res) => {
         let timeoutId;
         let dataReceived = false;
 
+        console.log(`🔍 Starting to read uploads for: ${identifier}`);
+        console.log(`🔍 Gun instance available:`, !!gun);
+
         // Timeout di 15 secondi (aumentato per dare più tempo)
         timeoutId = setTimeout(() => {
           if (!dataReceived) {
@@ -155,7 +205,7 @@ router.get("/:identifier", async (req, res) => {
 
           // Ottieni tutte le chiavi (escludendo i metadati Gun)
           const hashKeys = Object.keys(parentData).filter(
-            (key) => key !== "_"
+            (key) => key !== "_" && key !== "#" && key !== ">" && key !== "<"
           );
           console.log(`📋 Hash keys found:`, hashKeys);
 
@@ -421,7 +471,7 @@ router.post("/sync-mb-usage/:userAddress", async (req, res) => {
           return;
         }
         const hashKeys = Object.keys(parentData).filter(
-          (key) => key !== "_"
+          (key) => key !== "_" && key !== "#" && key !== ">" && key !== "<"
         );
         resolve(hashKeys.length);
       });
@@ -450,4 +500,4 @@ router.post("/sync-mb-usage/:userAddress", async (req, res) => {
   }
 });
 
-export default router; 
+export default router;
