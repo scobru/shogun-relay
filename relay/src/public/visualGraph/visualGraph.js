@@ -350,6 +350,7 @@ var DFS = (function(){
   var stack;
   var nodes;
   var edges;
+  var visited;
   var start;
   var u;
   var label;
@@ -416,9 +417,9 @@ var DFS = (function(){
     console.log('DFS configuration:', { soul: soul, label: label, limit: limit, opt: opt });
     
     start = soul;
-    visited.clear();
-    edges.clear();
-    nodes.clear();
+    visited = new Set();
+    edges = new Map();
+    nodes = new Map();
     stack = [];
     visitedCount = 0;
     stop = false;

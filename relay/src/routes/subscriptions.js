@@ -178,6 +178,8 @@ router.get("/user-subscription-details/:userAddress", async (req, res) => {
     const chainId = req.query.chainId || process.env.CHAIN_ID || "11155111";
     
     console.log(`📋 user-subscription-details/${userAddress}: Requesting user subscription details for chain: ${chainId}`);
+    console.log(`📋 user-subscription-details/${userAddress}: Request headers:`, req.headers);
+    console.log(`📋 user-subscription-details/${userAddress}: Request query:`, req.query);
 
     if (!ethers.isAddress(userAddress)) {
       return res.status(400).json({
@@ -204,14 +206,23 @@ router.get("/user-subscription-details/:userAddress", async (req, res) => {
     // Cerca una sottoscrizione attiva su qualsiasi relay
     for (const relayAddress of allRelays) {
       try {
+        console.log(`📋 user-subscription-details/${userAddress}: Checking relay: ${relayAddress}`);
         const subscriptionDetails = await relayContract.getSubscriptionDetails(
           userAddress,
           relayAddress
         );
 
         const [startTime, endTime, amountPaid, mbAllocated, isActive] = subscriptionDetails;
+        console.log(`📋 user-subscription-details/${userAddress}: Subscription details for relay ${relayAddress}:`, {
+          startTime: startTime.toString(),
+          endTime: endTime.toString(),
+          amountPaid: amountPaid.toString(),
+          mbAllocated: mbAllocated.toString(),
+          isActive: isActive
+        });
 
         if (isActive && Number(mbAllocated) > 0) {
+          console.log(`📋 user-subscription-details/${userAddress}: Found active subscription on relay ${relayAddress}`);
           const now = Math.floor(Date.now() / 1000);
           const timeRemaining = Math.max(0, Number(endTime) - now);
           
@@ -222,8 +233,13 @@ router.get("/user-subscription-details/:userAddress", async (req, res) => {
           
           try {
             // Importa la funzione getOffChainMBUsage
+            console.log(`📊 user-subscription-details: Importing getOffChainMBUsage for ${userAddress}`);
             const { getOffChainMBUsage } = await import('../uploads.js');
+            console.log(`📊 user-subscription-details: getOffChainMBUsage imported successfully`);
+            
             mbUsed = await getOffChainMBUsage(userAddress, req);
+            console.log(`📊 user-subscription-details: getOffChainMBUsage returned: ${mbUsed}`);
+            
             mbRemaining = Math.max(0, Number(mbAllocated) - mbUsed);
             usagePercentage = Number(mbAllocated) > 0 ? (mbUsed / Number(mbAllocated)) * 100 : 0;
             
@@ -234,6 +250,7 @@ router.get("/user-subscription-details/:userAddress", async (req, res) => {
             console.log(`📊 - Usage: ${usagePercentage.toFixed(2)}%`);
           } catch (mbError) {
             console.warn(`⚠️ Error calculating MB usage for ${userAddress}:`, mbError.message);
+            console.warn(`⚠️ MB Error stack:`, mbError.stack);
             // Se fallisce il calcolo MB, usa 0 come fallback
             mbUsed = 0;
             mbRemaining = Number(mbAllocated);
