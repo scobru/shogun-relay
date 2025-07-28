@@ -479,9 +479,9 @@
                 // Prima sincronizza i MB usage
                 await subscribeSyncMBUsage();
 
-                console.log('⏳ subscribe: Waiting 1 second for GunDB sync...');
+                console.log('⏳ subscribe: Waiting 3 seconds for GunDB sync...');
                 // Aggiungi un delay per permettere a GunDB di sincronizzare
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise(resolve => setTimeout(resolve, 3000));
 
                 console.log('📡 subscribe: Fetching subscription details...');
                 // Poi controlla lo stato della sottoscrizione
