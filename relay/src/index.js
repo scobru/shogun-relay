@@ -811,7 +811,16 @@ async function initializeServer() {
   // Esponi le funzioni del contratto Chain per le route
   app.set("chainContract", chainContract);
   app.set("startChainEventListener", startChainEventListener);
-  app.set("syncChainContractToGun", syncChainContractToGun);
+  
+  // Wrapper per syncChainContractToGun che accede alla funzione corretta
+  app.set("syncChainContractToGun", async () => {
+    if (!gun) {
+      console.error("❌ Gun not initialized");
+      return false;
+    }
+    return await syncChainContractToGun();
+  });
+  
   app.set("propagateChainEventToGun", propagateChainEventToGun);
 
   // Esponi i middleware di autenticazione per le route
