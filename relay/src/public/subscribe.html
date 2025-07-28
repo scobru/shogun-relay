@@ -486,7 +486,11 @@
                 // Debug: chiama l'endpoint che lista i file per calcolare i MB reali
                 console.log('📂 subscribe: Getting user files to calculate real MB usage...');
                 try {
-                    const filesResponse = await fetch(`/api/v1/user-uploads/${encodeURIComponent(walletAddress)}`);
+                    // Normalizza l'address in lowercase come fa user-upload.html
+                    const normalizedAddress = walletAddress.toLowerCase();
+                    console.log('📂 subscribe: Using normalized address:', normalizedAddress);
+                    
+                    const filesResponse = await fetch(`/api/v1/user-uploads/${encodeURIComponent(normalizedAddress)}`);
                     const filesResult = await filesResponse.json();
                     console.log('📂 subscribe: Files result:', filesResult);
                     
@@ -503,7 +507,8 @@
 
                 console.log('📡 subscribe: Fetching subscription details...');
                 // Usa lo stesso endpoint che funziona in user-upload.html
-                const response = await fetch(`/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(walletAddress)}`);
+                const normalizedAddress = walletAddress.toLowerCase();
+                const response = await fetch(`/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(normalizedAddress)}`);
                 
                 if (!response.ok) {
                     throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
@@ -659,7 +664,9 @@
                 // Ottieni la firma del wallet per l'autenticazione
                 const authSignature = await subscribeGetWalletSignature();
 
-                const response = await fetch(`/api/v1/user-uploads/sync-mb-usage/${encodeURIComponent(walletAddress)}`, {
+                console.log('📡 subscribe: Making request to sync MB usage...');
+                const normalizedAddress = walletAddress.toLowerCase();
+                const response = await fetch(`/api/v1/user-uploads/sync-mb-usage/${encodeURIComponent(normalizedAddress)}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
