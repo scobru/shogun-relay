@@ -601,7 +601,33 @@
             try {
                 addBatchLog('🔍 Fetching system file hashes...');
                 
-                const response = await fetch('/api/v1/user-uploads/system-hashes', {
+                // Prima prova l'endpoint originale
+                try {
+                    const response = await fetch('/api/v1/user-uploads/system-hashes', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...ShogunAdmin.getAuthHeaders()
+                        }
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        
+                        if (result.success && result.hashes) {
+                            addBatchLog(`✅ Found ${result.hashes.length} system files via system-hashes endpoint`);
+                            return result.hashes;
+                        }
+                    }
+                } catch (error) {
+                    addBatchLog(`⚠️ system-hashes endpoint failed: ${error.message}`);
+                }
+                
+                // Fallback: usa lo stesso approccio di user-upload.html
+                addBatchLog('🔄 Trying alternative method: fetching all user uploads...');
+                
+                // Ottieni tutti i file degli utenti
+                const allUsersResponse = await fetch('/api/v1/user-uploads/all-users', {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
@@ -609,17 +635,46 @@
                     }
                 });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                if (!allUsersResponse.ok) {
+                    throw new Error(`HTTP error! status: ${allUsersResponse.status}`);
                 }
 
-                const result = await response.json();
+                const allUsersResult = await allUsersResponse.json();
                 
-                if (result.success && result.hashes) {
-                    addBatchLog(`✅ Found ${result.hashes.length} system files to preserve`);
-                    return result.hashes;
+                if (allUsersResult.success && allUsersResult.users) {
+                    const allHashes = [];
+                    
+                    // Per ogni utente, ottieni i suoi file
+                    for (const userAddress of allUsersResult.users) {
+                        try {
+                            const userFilesResponse = await fetch(`/api/v1/user-uploads/${encodeURIComponent(userAddress)}`, {
+                                method: 'GET',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    ...ShogunAdmin.getAuthHeaders()
+                                }
+                            });
+                            
+                            if (userFilesResponse.ok) {
+                                const userFilesResult = await userFilesResponse.json();
+                                
+                                if (userFilesResult.success && userFilesResult.uploads) {
+                                    userFilesResult.uploads.forEach(file => {
+                                        if (file.hash) {
+                                            allHashes.push(file.hash);
+                                        }
+                                    });
+                                }
+                            }
+                        } catch (userError) {
+                            addBatchLog(`⚠️ Error fetching files for user ${userAddress}: ${userError.message}`);
+                        }
+                    }
+                    
+                    addBatchLog(`✅ Found ${allHashes.length} system files via alternative method`);
+                    return allHashes;
                 } else {
-                    addBatchLog('⚠️ No system files found or error in response');
+                    addBatchLog('⚠️ No users found or error in response');
                     return [];
                 }
             } catch (error) {
