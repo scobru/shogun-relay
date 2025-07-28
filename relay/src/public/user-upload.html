@@ -667,11 +667,11 @@
                 // Ottieni la firma del wallet per l'autenticazione
                 const authSignature = await getWalletSignature();
 
-                // Timeout per l'upload di 60 secondi
+                // Timeout per l'upload di 120 secondi (aumentato per file grandi)
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => {
                     controller.abort();
-                }, 60000);
+                }, 120000); // 120 secondi
 
                 const response = await fetch('/api/v1/ipfs/upload', {
                     method: 'POST',
@@ -735,7 +735,7 @@
                 console.error('💥 user-upload: Upload error:', error);
 
                 if (error.name === 'AbortError') {
-                    showStatus('❌ Upload timeout after 60 seconds', 'error');
+                    showStatus('❌ Upload timeout after 120 seconds', 'error');
                 } else {
                     showStatus(`❌ Upload error: ${error.message}`, 'error');
                 }
