@@ -347,4 +347,72 @@ router.get("/supported-chains", async (req, res) => {
   }
 });
 
+// Route di debug per testare getOffChainMBUsage direttamente
+router.get("/debug-mb/:userAddress", async (req, res) => {
+  try {
+    const { userAddress } = req.params;
+    
+    console.log(`🐛 Debug MB endpoint called for: ${userAddress}`);
+    
+    if (!ethers.isAddress(userAddress)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid user address",
+      });
+    }
+
+    // Test diretto di getOffChainMBUsage
+    console.log(`🐛 Testing getOffChainMBUsage for: ${userAddress}`);
+    const mbUsed = await getOffChainMBUsage(userAddress, req);
+    console.log(`🐛 getOffChainMBUsage result: ${mbUsed}`);
+
+    // Test diretto di GunDB
+    const gun = req.app.get('gunInstance');
+    if (!gun) {
+      return res.json({
+        success: false,
+        error: "Gun instance not available",
+        mbUsed: mbUsed
+      });
+    }
+
+    console.log(`🐛 Gun instance available, testing direct access`);
+    
+    // Test accesso diretto a GunDB
+    const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
+    const directTest = await new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        resolve({ error: "Timeout", data: null });
+      }, 10000);
+
+      uploadsNode.once((parentData) => {
+        clearTimeout(timeoutId);
+        resolve({
+          error: null,
+          data: parentData,
+          dataType: typeof parentData,
+          keys: parentData ? Object.keys(parentData) : null
+        });
+      });
+    });
+
+    console.log(`🐛 Direct GunDB test result:`, directTest);
+
+    res.json({
+      success: true,
+      userAddress: userAddress,
+      mbUsed: mbUsed,
+      gunTest: directTest,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error(`❌ Debug MB error:`, error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 export default router; 
