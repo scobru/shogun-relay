@@ -59,6 +59,10 @@ COPY docker/ /app/docker/
 RUN dos2unix /app/docker/init-ipfs.sh
 RUN dos2unix /app/docker/entrypoint.sh
 
+# Set executable permissions for scripts
+RUN chmod +x /app/docker/init-ipfs.sh
+RUN chmod +x /app/docker/entrypoint.sh
+
 # Create environment files with Docker-optimized settings
 RUN cp /app/docker/relay.env /app/relay/.env
 

@@ -110,6 +110,13 @@ else
     if [ -f "$IPFS_PATH/repo.lock" ]; then
         echo "⚠️ IPFS daemon is running, skipping configuration update"
         echo "✅ IPFS is ready for use"
+        
+        # Still create the API token file if it doesn't exist
+        if [ -n "$IPFS_API_TOKEN" ] && [ ! -f "/tmp/ipfs-api-token" ]; then
+            echo "🔑 Creating API token file for relay authentication..."
+            echo "$IPFS_API_TOKEN" > /tmp/ipfs-api-token
+            chmod 600 /tmp/ipfs-api-token
+        fi
     else
         # Update critical configuration only if no lock exists
         echo "🔄 Updating critical configuration..."
