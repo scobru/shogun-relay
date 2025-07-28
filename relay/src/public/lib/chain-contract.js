@@ -126,9 +126,36 @@ async function connectWallet() {
     }
 }
 
-// Genera hash keccak256
+// Genera hash keccak256 per il contratto
 function keccak256(input) {
     return ethers.utils.keccak256(ethers.utils.toUtf8Bytes(input));
+}
+
+// Genera hash usando l'algoritmo di Gun per GunDB
+function gunHash(input) {
+    if (typeof input !== 'string') {
+        input = input.toString();
+    }
+    
+    // Usa l'algoritmo di hashing di Gun (String.hash)
+    let hash = 0;
+    if (input.length === 0) return hash.toString();
+    
+    for (let i = 0; i < input.length; i++) {
+        const char = input.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+    }
+    
+    return Math.abs(hash).toString(36);
+}
+
+// Genera soul per GunDB
+function generateGunSoul(input) {
+    if (!input) {
+        input = Date.now().toString();
+    }
+    return gunHash(input);
 }
 
 // Scrivi su contratto (transazione utente)
@@ -170,8 +197,10 @@ async function writeToContract() {
         const receipt = await tx.wait();
         addToSyncLog(`✅ Transazione confermata: ${receipt.transactionHash}`);
         
-        // Scrivi anche su GunDB localmente
-        await writeToGun(soul, key, valueInput);
+        // Scrivi anche su GunDB localmente (usando soul/key compatibili con Gun)
+        const gunSoul = generateGunSoul(soulInput || Date.now().toString());
+        const gunKey = gunHash(keyInput);
+        await writeToGun(gunSoul, gunKey, valueInput);
         
         addToSyncLog(`✅ Dati scritti su contratto e GunDB. Soul: ${soul}, Key: ${keyInput}`);
         addToEventLog(`📝 Scrittura: Soul=${soul}, Key=${keyInput}, Value=${valueInput}`);
@@ -195,8 +224,8 @@ async function writeToGunOnly() {
             return;
         }
         
-        const soul = soulInput ? keccak256(soulInput) : keccak256(Date.now().toString());
-        const key = keccak256(keyInput);
+        const soul = soulInput ? generateGunSoul(soulInput) : generateGunSoul(Date.now().toString());
+        const key = gunHash(keyInput);
         
         await writeToGun(soul, key, valueInput);
         
@@ -294,11 +323,11 @@ async function readFromGun() {
             return;
         }
         
-        const soul = keccak256(soulInput);
+        const soul = generateGunSoul(soulInput);
         
         if (keyInput) {
             // Leggi campo specifico
-            const key = keccak256(keyInput);
+            const key = gunHash(keyInput);
             const node = gun.get(soul).get(key);
             
             node.once((data) => {
