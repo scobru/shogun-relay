@@ -237,7 +237,7 @@
                                     <h5 class="font-semibold">Status:</h5>
                                     <div class="flex gap-2">
                                         <button id="refreshCurrentStatusBtn" class="btn btn-xs btn-outline"
-                                            onclick="checkCurrentSubscriptionStatus()">
+                                            onclick="refreshCurrentStatusWithSync()">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none"
                                                 viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -785,8 +785,14 @@
         disconnectWalletBtn.addEventListener('click', disconnectWallet);
         subscribeBtn.addEventListener('click', subscribeToRelay);
         mbInput.addEventListener('input', updateSubscriptionDetails);
-        checkStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
-        refreshStatusBtn.addEventListener('click', checkSubscriptionStatusFromServer);
+        checkStatusBtn.addEventListener('click', async () => {
+            await syncMBUsage();
+            await checkSubscriptionStatusFromServer();
+        });
+        refreshStatusBtn.addEventListener('click', async () => {
+            await syncMBUsage();
+            await checkSubscriptionStatusFromServer();
+        });
         newSubscriptionBtn.addEventListener('click', () => {
             showStep(2);
             updateStep(2, 'step-active');
@@ -1866,6 +1872,14 @@
                 console.error('Error copying contract address:', error);
                 showNotification('Failed to copy contract address', 'error');
             }
+        }
+
+        function refreshCurrentStatusWithSync() {
+            syncMBUsage().then(() => {
+                checkCurrentSubscriptionStatus();
+            }).catch(error => {
+                console.error('Error in refreshCurrentStatusWithSync:', error);
+            });
         }
     </script>
 </body>
