@@ -329,6 +329,11 @@ router.post("/upload",
               success: true,
               file: uploadData,
               authType: req.authType,
+              mbUsage: req.authType === 'user' ? {
+                actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
+                verified: true
+              } : undefined
             });
           } catch (parseError) {
             console.error("❌ IPFS Upload parse error:", parseError);

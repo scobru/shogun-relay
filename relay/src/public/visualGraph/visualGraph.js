@@ -447,6 +447,8 @@ var DFS = (function(){
     
     visitedCount++;
     console.log('Visiting node:', key, 'Count:', visitedCount);
+    console.log('Node data:', node);
+    console.log('Node properties:', Object.keys(node || {}));
     
     if (!node) {
       console.error('No data for key:', key);
@@ -481,26 +483,41 @@ var DFS = (function(){
 
     var soul = Gun.node.soul(node);
     var properties = Object.keys(node);
+    console.log('Checking edges for soul:', soul);
+    console.log('Properties to check:', properties);
+    
     var nextRef = null;
 
     // Find the next unvisited reference
     for (var prop of properties) {
-      if (prop === "_" || node[prop] == null) continue;
+      if (prop === "_" || node[prop] == null) {
+        console.log('Skipping property:', prop, 'value:', node[prop]);
+        continue;
+      }
+      
+      console.log('Checking property:', prop, 'value:', node[prop]);
       
       if (typeof node[prop] === 'object' && node[prop]['#']) {
         var targetSoul = node[prop]['#'];
         var edgeKey = soul + targetSoul;
         
+        console.log('Found reference:', prop, '->', targetSoul);
+        
         if (!edges.has(edgeKey)) {
           nextRef = node[prop];
+          console.log('New edge found, will follow:', edgeKey);
           break;
+        } else {
+          console.log('Edge already visited:', edgeKey);
         }
       }
     }
 
     if (nextRef) {
+      console.log('Following reference to:', nextRef['#']);
       dfs.next(nextRef, soul, nextRef['#']);
     } else {
+      console.log('No new references found, going back');
       if (start === soul) {
         stack.pop();
       }
@@ -537,10 +554,13 @@ var DFS = (function(){
   };
 
   dfs.back = function() {
+    console.log('DFS back called, stack length:', stack.length);
     if (stack.length === 0) {
+      console.log('Stack empty, calling render');
       dfs.render();
     } else {
       var soul = stack.pop();
+      console.log('Popping from stack:', soul);
       window.gun.get(soul).once(dfs.node);
     }
   };
