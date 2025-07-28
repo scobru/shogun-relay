@@ -352,8 +352,30 @@ router.post("/upload",
                 });
               });
 
-              // Wait for both operations to complete
-              Promise.all([saveUploadPromise, updateMBPromise])
+              // Save hash to systemhash node with Promise
+              const saveSystemHashPromise = new Promise((resolve, reject) => {
+                const systemHashesNode = gun.get("shogun").get("systemhash");
+                systemHashesNode.get(fileResult.Hash).put({
+                  hash: fileResult.Hash,
+                  userAddress: req.userAddress,
+                  timestamp: Date.now(),
+                  fileName: req.file.originalname,
+                  fileSize: req.file.size,
+                  savedAt: new Date().toISOString()
+                }, (ack) => {
+                  console.log(`💾 System hash save ack:`, ack);
+                  if (ack && ack.err) {
+                    console.error(`❌ Error saving system hash:`, ack.err);
+                    reject(new Error(ack.err));
+                  } else {
+                    console.log(`✅ System hash saved successfully`);
+                    resolve();
+                  }
+                });
+              });
+
+              // Wait for all operations to complete
+              Promise.all([saveUploadPromise, updateMBPromise, saveSystemHashPromise])
                 .then(() => {
                   console.log(`📊 User upload saved: ${req.userAddress} - ${fileSizeMB} MB`);
                   

@@ -336,6 +336,24 @@ router.delete("/:identifier/:hash", (req, res, next) => {
     await deleteUploadAndUpdateMB(identifier, hash, fileSizeMB, req);
     const newMBUsed = await getOffChainMBUsage(identifier, req);
 
+    // Remove hash from systemhash node
+    try {
+      const systemHashesNode = gun.get("shogun").get("systemhash");
+      await new Promise((resolve, reject) => {
+        systemHashesNode.get(hash).put(null, (ack) => {
+          if (ack && ack.err) {
+            console.error('❌ Error removing hash from systemhash node:', ack.err);
+            reject(new Error(ack.err));
+          } else {
+            console.log(`✅ Hash ${hash} removed from systemhash node successfully`);
+            resolve();
+          }
+        });
+      });
+    } catch (error) {
+      console.warn(`⚠️ Failed to remove hash ${hash} from systemhash node:`, error);
+    }
+
     res.json({
       success: true,
       message: "Upload eliminato con successo",
@@ -561,6 +579,69 @@ router.post("/save-system-hash", (req, res, next) => {
 
   } catch (error) {
     console.error("Save system hash error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore interno del server",
+      details: error.message,
+    });
+  }
+});
+
+// Endpoint per rimuovere un hash dal nodo systemhash
+router.delete("/remove-system-hash/:hash", (req, res, next) => {
+  const walletSignatureMiddleware = req.app.get('walletSignatureMiddleware');
+  if (walletSignatureMiddleware) {
+    walletSignatureMiddleware(req, res, next);
+  } else {
+    next();
+  }
+}, async (req, res) => {
+  try {
+    const { hash } = req.params;
+    const { userAddress } = req.body;
+
+    if (!hash) {
+      return res.status(400).json({
+        success: false,
+        error: "Hash richiesto"
+      });
+    }
+
+    console.log(`🗑️ Removing hash from systemhash node: ${hash}`);
+
+    const gun = getGunInstance(req);
+    if (!gun) {
+      return res.status(500).json({
+        success: false,
+        error: "Gun instance not available"
+      });
+    }
+
+    // Rimuovi l'hash dal nodo systemhash
+    await new Promise((resolve, reject) => {
+      const systemHashesNode = gun.get("shogun").get("systemhash");
+      
+      systemHashesNode.get(hash).put(null, (ack) => {
+        if (ack && ack.err) {
+          console.error('❌ Error removing hash from systemhash node:', ack.err);
+          reject(new Error(ack.err));
+        } else {
+          console.log(`✅ Hash ${hash} removed from systemhash node successfully`);
+          resolve();
+        }
+      });
+    });
+
+    res.json({
+      success: true,
+      message: "Hash removed from systemhash node successfully",
+      hash: hash,
+      userAddress: userAddress,
+      timestamp: Date.now()
+    });
+
+  } catch (error) {
+    console.error("Remove system hash error:", error);
     res.status(500).json({
       success: false,
       error: "Errore interno del server",
