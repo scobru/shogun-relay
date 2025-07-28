@@ -8,8 +8,13 @@ const getGunInstance = (req) => {
 };
 
 // Funzione helper per ottenere l'utilizzo MB off-chain
-async function getOffChainMBUsage(userAddress) {
-  const gun = getGunInstance(req);
+async function getOffChainMBUsage(userAddress, req) {
+  const gun = req ? req.app.get('gunInstance') : null;
+  if (!gun) {
+    console.warn('Gun instance not available for MB usage calculation');
+    return 0;
+  }
+  
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => {
       reject(new Error("MB usage read timeout"));
@@ -261,13 +266,13 @@ router.delete("/:identifier/:hash", async (req, res) => {
     console.log(`📊 File size: ${fileData.size} bytes (${fileSizeMB} MB)`);
 
     // 3. Ottieni l'utilizzo MB corrente prima dell'eliminazione
-    const previousMBUsed = await getOffChainMBUsage(identifier);
+    const previousMBUsed = await getOffChainMBUsage(identifier, req);
 
     // 4. Elimina il file
     await deleteUploadAndUpdateMB(identifier, hash, fileSizeMB);
 
     // 5. Ottieni il nuovo utilizzo MB dopo l'eliminazione
-    const newMBUsed = await getOffChainMBUsage(identifier);
+    const newMBUsed = await getOffChainMBUsage(identifier, req);
 
     res.json({
       success: true,
@@ -392,7 +397,7 @@ router.post("/sync-mb-usage/:userAddress", async (req, res) => {
     console.log(`🔄 Syncing MB usage for user: ${userAddress}`);
 
     // Usa la funzione getOffChainMBUsage che ora calcola in tempo reale
-    const totalSizeMB = await getOffChainMBUsage(userAddress);
+    const totalSizeMB = await getOffChainMBUsage(userAddress, req);
 
     // Ottieni anche il numero di file per completezza
     const gun = getGunInstance(req);

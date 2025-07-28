@@ -220,14 +220,20 @@
                 messageEl.style.display = 'none';
                 console.log(`Making ${method} request to ${endpoint}`);
                 
-                const response = await fetch(endpoint, {
+                const requestOptions = {
                     method: method,
                     headers: {
                         'Content-Type': 'application/json',
                         ...authHeaders
-                    },
-                    body: JSON.stringify(body)
-                });
+                    }
+                };
+
+                // Solo aggiungi il body per richieste POST/PUT/PATCH
+                if (method !== 'GET' && method !== 'HEAD') {
+                    requestOptions.body = JSON.stringify(body);
+                }
+                
+                const response = await fetch(endpoint, requestOptions);
 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);

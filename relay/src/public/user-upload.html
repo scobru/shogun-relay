@@ -628,7 +628,7 @@
                     formData.append('encryptionKey', encryptionKey);
                 }
 
-                console.log('📤 user-upload: Sending request to /ipfs-upload-user');
+                console.log('📤 user-upload: Sending request to /api/v1/ipfs/upload');
 
                 // Ottieni la firma del wallet per l'autenticazione
                 const authSignature = await getWalletSignature();
@@ -639,7 +639,7 @@
                     controller.abort();
                 }, 60000);
 
-                const response = await fetch('/ipfs-upload-user', {
+                const response = await fetch('/api/v1/ipfs/upload', {
                     method: 'POST',
                     headers: {
                         'x-user-address': walletAddress,

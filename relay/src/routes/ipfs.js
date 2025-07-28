@@ -561,10 +561,26 @@ router.get("/content-json/:cid", async (req, res) => {
 });
 
 // IPFS Pins endpoints
-router.post("/pins/add", async (req, res) => {
+router.post("/pins/add", (req, res, next) => {
+  // Middleware di autenticazione admin
+  const authHeader = req.headers["authorization"];
+  const bearerToken = authHeader && authHeader.split(" ")[1];
+  const customToken = req.headers["token"];
+  const token = bearerToken || customToken;
+
+  if (token === process.env.ADMIN_PASSWORD) {
+    next();
+  } else {
+    console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+}, async (req, res) => {
   try {
+    console.log("🔍 IPFS Pin add request body:", req.body);
     const { cid } = req.body;
+    
     if (!cid) {
+      console.log("❌ IPFS Pin add error: CID is required");
       return res.status(400).json({
         success: false,
         error: "CID is required",
@@ -624,8 +640,22 @@ router.post("/pins/add", async (req, res) => {
   }
 });
 
-router.post("/pins/rm", async (req, res) => {
+router.post("/pins/rm", (req, res, next) => {
+  // Middleware di autenticazione admin
+  const authHeader = req.headers["authorization"];
+  const bearerToken = authHeader && authHeader.split(" ")[1];
+  const customToken = req.headers["token"];
+  const token = bearerToken || customToken;
+
+  if (token === process.env.ADMIN_PASSWORD) {
+    next();
+  } else {
+    console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+}, async (req, res) => {
   try {
+    console.log("🔍 IPFS Pin rm request body:", req.body);
     const { cid } = req.body;
     console.log(`🔍 IPFS Pin rm request for CID: ${cid}`);
     
@@ -718,12 +748,25 @@ router.post("/pins/rm", async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message,
-      details: "Unexpected error in pin removal",
+      details: "Unexpected error in pin removal"
     });
   }
 });
 
-router.post("/pins/ls", async (req, res) => {
+router.post("/pins/ls", (req, res, next) => {
+  // Middleware di autenticazione admin
+  const authHeader = req.headers["authorization"];
+  const bearerToken = authHeader && authHeader.split(" ")[1];
+  const customToken = req.headers["token"];
+  const token = bearerToken || customToken;
+
+  if (token === process.env.ADMIN_PASSWORD) {
+    next();
+  } else {
+    console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+}, async (req, res) => {
   try {
     const requestOptions = {
       hostname: "127.0.0.1",
@@ -779,7 +822,20 @@ router.post("/pins/ls", async (req, res) => {
 });
 
 // IPFS Repo GC endpoint
-router.post("/repo/gc", async (req, res) => {
+router.post("/repo/gc", (req, res, next) => {
+  // Middleware di autenticazione admin
+  const authHeader = req.headers["authorization"];
+  const bearerToken = authHeader && authHeader.split(" ")[1];
+  const customToken = req.headers["token"];
+  const token = bearerToken || customToken;
+
+  if (token === process.env.ADMIN_PASSWORD) {
+    next();
+  } else {
+    console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+}, async (req, res) => {
   try {
     const requestOptions = {
       hostname: "127.0.0.1",
@@ -853,7 +909,20 @@ router.post("/repo/gc", async (req, res) => {
 });
 
 // IPFS API connectivity test endpoint
-router.get("/test", async (req, res) => {
+router.get("/test", (req, res, next) => {
+  // Middleware di autenticazione admin
+  const authHeader = req.headers["authorization"];
+  const bearerToken = authHeader && authHeader.split(" ")[1];
+  const customToken = req.headers["token"];
+  const token = bearerToken || customToken;
+
+  if (token === process.env.ADMIN_PASSWORD) {
+    next();
+  } else {
+    console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+}, async (req, res) => {
   try {
     console.log("🔍 Testing IPFS API connectivity...");
     
@@ -922,7 +991,20 @@ router.get("/test", async (req, res) => {
 });
 
 // IPFS Version endpoint for connectivity testing
-router.get("/version", async (req, res) => {
+router.get("/version", (req, res, next) => {
+  // Middleware di autenticazione admin
+  const authHeader = req.headers["authorization"];
+  const bearerToken = authHeader && authHeader.split(" ")[1];
+  const customToken = req.headers["token"];
+  const token = bearerToken || customToken;
+
+  if (token === process.env.ADMIN_PASSWORD) {
+    next();
+  } else {
+    console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+}, async (req, res) => {
   try {
     console.log("🔍 Testing IPFS API connectivity via /version endpoint...");
     
