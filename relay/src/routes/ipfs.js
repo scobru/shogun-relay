@@ -353,7 +353,7 @@ router.post("/upload",
               });
 
               // Save hash to systemhash node with Promise
-              const saveSystemHashPromise = new Promise((resolve, reject) => {
+              const saveSystemHashPromise = new Promise((resolve) => {
                 const systemHashesNode = gun.get("shogun").get("systemhash");
                 systemHashesNode.get(fileResult.Hash).put({
                   hash: fileResult.Hash,
@@ -366,20 +366,32 @@ router.post("/upload",
                   console.log(`💾 System hash save ack:`, ack);
                   if (ack && ack.err) {
                     console.error(`❌ Error saving system hash:`, ack.err);
-                    reject(new Error(ack.err));
+                    // Don't reject, just resolve with error info
+                    resolve({ error: ack.err });
                   } else {
                     console.log(`✅ System hash saved successfully`);
-                    resolve();
+                    resolve({ success: true });
                   }
                 });
               });
 
-              // Wait for all operations to complete
-              Promise.all([saveUploadPromise, updateMBPromise, saveSystemHashPromise])
+              // Wait for critical operations to complete (upload and MB usage)
+              Promise.all([saveUploadPromise, updateMBPromise])
                 .then(() => {
                   console.log(`📊 User upload saved: ${req.userAddress} - ${fileSizeMB} MB`);
                   
-                  // Send response after GunDB operations complete
+                  // Try to save system hash but don't block the response
+                  saveSystemHashPromise.then((systemHashResult) => {
+                    if (systemHashResult.error) {
+                      console.warn(`⚠️ System hash save failed but upload completed:`, systemHashResult.error);
+                    } else {
+                      console.log(`✅ System hash saved successfully`);
+                    }
+                  }).catch((systemHashError) => {
+                    console.warn(`⚠️ System hash save failed but upload completed:`, systemHashError);
+                  });
+                  
+                  // Send response immediately after critical operations
                   res.json({
                     success: true,
                     file: uploadData,
@@ -392,7 +404,7 @@ router.post("/upload",
                   });
                 })
                 .catch((error) => {
-                  console.error(`❌ Error during GunDB save:`, error);
+                  console.error(`❌ Error during critical GunDB save:`, error);
                   // Send response anyway, the file is already on IPFS
                   res.json({
                     success: true,

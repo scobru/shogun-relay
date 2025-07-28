@@ -522,11 +522,36 @@ router.get("/system-hashes-map", async (req, res) => {
 
 // Endpoint per salvare un hash nel nodo systemhash
 router.post("/save-system-hash", (req, res, next) => {
-  const walletSignatureMiddleware = req.app.get('walletSignatureMiddleware');
-  if (walletSignatureMiddleware) {
-    walletSignatureMiddleware(req, res, next);
-  } else {
+  // Check both admin and user authentication
+  const authHeader = req.headers["authorization"];
+  const bearerToken = authHeader && authHeader.split(" ")[1];
+  const customToken = req.headers["token"];
+  const userAddress = req.headers["x-user-address"];
+  const signature = req.headers["x-wallet-signature"];
+  
+  const adminToken = bearerToken || customToken;
+  const isAdmin = adminToken === process.env.ADMIN_PASSWORD;
+  const isUser = userAddress && signature;
+  
+  if (isAdmin) {
+    req.authType = 'admin';
     next();
+  } else if (isUser) {
+    // Verify wallet signature for user uploads
+    const message = req.headers["x-signature-message"] || "I Love Shogun";
+    const verifyWalletSignature = req.app.get('verifyWalletSignature');
+    
+    if (verifyWalletSignature && verifyWalletSignature(message, signature, userAddress)) {
+      req.authType = 'user';
+      req.userAddress = userAddress;
+      next();
+    } else {
+      console.log("User auth failed - Address:", userAddress, "Signature:", signature?.substring(0, 20) + "...");
+      res.status(401).json({ success: false, error: "Invalid wallet signature" });
+    }
+  } else {
+    console.log("Auth failed - Admin token:", adminToken ? "provided" : "missing", "User:", userAddress ? "provided" : "missing");
+    res.status(401).json({ success: false, error: "Unauthorized - Admin token or valid wallet signature required" });
   }
 }, async (req, res) => {
   try {
@@ -589,11 +614,36 @@ router.post("/save-system-hash", (req, res, next) => {
 
 // Endpoint per rimuovere un hash dal nodo systemhash
 router.delete("/remove-system-hash/:hash", (req, res, next) => {
-  const walletSignatureMiddleware = req.app.get('walletSignatureMiddleware');
-  if (walletSignatureMiddleware) {
-    walletSignatureMiddleware(req, res, next);
-  } else {
+  // Check both admin and user authentication
+  const authHeader = req.headers["authorization"];
+  const bearerToken = authHeader && authHeader.split(" ")[1];
+  const customToken = req.headers["token"];
+  const userAddress = req.headers["x-user-address"];
+  const signature = req.headers["x-wallet-signature"];
+  
+  const adminToken = bearerToken || customToken;
+  const isAdmin = adminToken === process.env.ADMIN_PASSWORD;
+  const isUser = userAddress && signature;
+  
+  if (isAdmin) {
+    req.authType = 'admin';
     next();
+  } else if (isUser) {
+    // Verify wallet signature for user uploads
+    const message = req.headers["x-signature-message"] || "I Love Shogun";
+    const verifyWalletSignature = req.app.get('verifyWalletSignature');
+    
+    if (verifyWalletSignature && verifyWalletSignature(message, signature, userAddress)) {
+      req.authType = 'user';
+      req.userAddress = userAddress;
+      next();
+    } else {
+      console.log("User auth failed - Address:", userAddress, "Signature:", signature?.substring(0, 20) + "...");
+      res.status(401).json({ success: false, error: "Invalid wallet signature" });
+    }
+  } else {
+    console.log("Auth failed - Admin token:", adminToken ? "provided" : "missing", "User:", userAddress ? "provided" : "missing");
+    res.status(401).json({ success: false, error: "Unauthorized - Admin token or valid wallet signature required" });
   }
 }, async (req, res) => {
   try {

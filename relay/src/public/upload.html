@@ -313,9 +313,12 @@
               console.log('✅ File added to system hashes:', systemHashResult);
             } else {
               console.warn('⚠️ Failed to add file to system hashes:', systemHashResponse.status);
+              const errorText = await systemHashResponse.text();
+              console.warn('⚠️ Error details:', errorText);
             }
           } catch (error) {
             console.error('❌ Error adding file to system hashes:', error);
+            // Don't block the upload if system hash save fails
           }
 
           const successMessage = `
