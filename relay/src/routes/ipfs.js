@@ -313,38 +313,54 @@ router.post("/upload",
                 uploadData: uploadData
               });
 
-              // Save upload to Gun database
-              const uploadsNode = gun.get("shogun").get("uploads").get(req.userAddress);
-              uploadsNode.get(fileResult.Hash).put(uploadData, (ack) => {
-                console.log(`💾 Upload save ack:`, ack);
-                if (ack && ack.err) {
-                  console.error(`❌ Error saving upload:`, ack.err);
-                } else {
-                  console.log(`✅ Upload saved successfully to GunDB`);
-                }
-              });
-
-              // Update MB usage
-              const mbUsageNode = gun.get("shogun").get("mbUsage").get(req.userAddress);
-              mbUsageNode.once((currentUsage) => {
-                console.log(`📊 Current MB usage:`, currentUsage);
-                const newUsage = {
-                  mbUsed: (currentUsage?.mbUsed || 0) + fileSizeMB,
-                  lastUpdated: Date.now(),
-                  updatedBy: "file-upload",
-                };
-                console.log(`📊 New MB usage:`, newUsage);
-                mbUsageNode.put(newUsage, (mbAck) => {
-                  console.log(`📊 MB usage update ack:`, mbAck);
-                  if (mbAck && mbAck.err) {
-                    console.error(`❌ Error updating MB usage:`, mbAck.err);
+              // Save upload to Gun database with Promise
+              const saveUploadPromise = new Promise((resolve, reject) => {
+                const uploadsNode = gun.get("shogun").get("uploads").get(req.userAddress);
+                uploadsNode.get(fileResult.Hash).put(uploadData, (ack) => {
+                  console.log(`💾 Upload save ack:`, ack);
+                  if (ack && ack.err) {
+                    console.error(`❌ Error saving upload:`, ack.err);
+                    reject(new Error(ack.err));
                   } else {
-                    console.log(`✅ MB usage updated successfully`);
+                    console.log(`✅ Upload saved successfully to GunDB`);
+                    resolve();
                   }
                 });
               });
 
-              console.log(`📊 User upload saved: ${req.userAddress} - ${fileSizeMB} MB`);
+              // Update MB usage with Promise
+              const updateMBPromise = new Promise((resolve, reject) => {
+                const mbUsageNode = gun.get("shogun").get("mbUsage").get(req.userAddress);
+                mbUsageNode.once((currentUsage) => {
+                  console.log(`📊 Current MB usage:`, currentUsage);
+                  const newUsage = {
+                    mbUsed: (currentUsage?.mbUsed || 0) + fileSizeMB,
+                    lastUpdated: Date.now(),
+                    updatedBy: "file-upload",
+                  };
+                  console.log(`📊 New MB usage:`, newUsage);
+                  mbUsageNode.put(newUsage, (mbAck) => {
+                    console.log(`📊 MB usage update ack:`, mbAck);
+                    if (mbAck && mbAck.err) {
+                      console.error(`❌ Error updating MB usage:`, mbAck.err);
+                      reject(new Error(mbAck.err));
+                    } else {
+                      console.log(`✅ MB usage updated successfully`);
+                      resolve();
+                    }
+                  });
+                });
+              });
+
+              // Wait for both operations to complete
+              Promise.all([saveUploadPromise, updateMBPromise])
+                .then(() => {
+                  console.log(`📊 User upload saved: ${req.userAddress} - ${fileSizeMB} MB`);
+                })
+                .catch((error) => {
+                  console.error(`❌ Error during GunDB save:`, error);
+                  // Continue anyway, the file is already on IPFS
+                });
             }
 
             res.json({

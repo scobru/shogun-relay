@@ -325,15 +325,14 @@
         });
         refreshFilesBtn.addEventListener('click', async () => {
             console.log('🖱️ user-upload: Refresh button clicked');
-            try {
-                // Prima sincronizza i MB
-                await syncMBUsage();
-                // Poi carica i file
-                await loadUserFiles();
-            } catch (error) {
-                console.error('💥 user-upload: Error during refresh:', error);
-                showStatus('Error during refresh', 'error');
-            }
+            
+            // Prima sincronizza i MB
+            await syncMBUsage();
+            
+            // Poi ricarica i file con un delay per GunDB
+            setTimeout(() => {
+              loadUserFiles();
+            }, 1000); // 1 secondo di delay
         });
         connectWalletBtn.addEventListener('click', () => {
             console.log('🖱️ user-upload: Connect wallet button clicked');
@@ -709,10 +708,14 @@
                     showStatus(`✅ File uploaded successfully! Hash: ${result.file.hash}${sizeInfo}${verificationInfo}${encryptionInfo}`, 'success');
                     fileInput.value = '';
 
-                    console.log('📤 user-upload: Calling loadUserFiles after successful upload');
+                    // Chiama loadUserFiles dopo l'upload riuscito
+                    console.log(`📤 user-upload: Calling loadUserFiles after successful upload`);
+                    
+                    // Aggiungi un delay per permettere a GunDB di sincronizzare
+                    setTimeout(() => {
+                      loadUserFiles();
+                    }, 2000); // 2 secondi di delay
 
-                    // Aggiorna immediatamente i file e lo stato della sottoscrizione
-                    await loadUserFiles();
                     await checkSubscriptionStatus(walletAddress);
 
                 } else {
