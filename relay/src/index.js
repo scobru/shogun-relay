@@ -167,33 +167,189 @@ async function initializeServer() {
   // Garbage collection function
   function runGarbageCollector() {
     if (!GC_ENABLED) {
-      console.log("🗑️ Garbage collection disabled");
+      console.log("🗑️ Garbage Collector is disabled.");
+      return;
+    }
+    console.log("🗑️ Running Garbage Collector...");
+    addSystemLog("info", "Garbage collection started");
+    let cleanedCount = 0;
+
+    // Ensure gun is initialized before accessing its properties
+    if (!gun || !gun._ || !gun._.graph) {
+      console.warn("⚠️ Gun not initialized yet, skipping garbage collection");
       return;
     }
 
-    console.log("🗑️ Running garbage collection...");
-    addSystemLog("info", "Garbage collection started");
+    const graph = gun._.graph;
 
-    // Implementation would go here
-    // For now, just log that it's running
-    addSystemLog("info", "Garbage collection completed");
+    for (const soul in graph) {
+      if (Object.prototype.hasOwnProperty.call(graph, soul)) {
+        const isProtected = GC_EXCLUDED_NAMESPACES.some((ns) =>
+          soul.startsWith(ns)
+        );
+
+        if (!isProtected) {
+          gun.get(soul).put(null);
+          cleanedCount++;
+          console.log(`🗑️ Cleaned up unprotected node: ${soul}`);
+        }
+      }
+    }
+
+    if (cleanedCount > 0) {
+      console.log(
+        `🗑️ Garbage Collector finished. Cleaned ${cleanedCount} unprotected nodes.`
+      );
+      addSystemLog("info", `Garbage collection completed. Cleaned ${cleanedCount} nodes`);
+    } else {
+      console.log(
+        "🗑️ Garbage Collector finished. No unprotected nodes found to clean."
+      );
+      addSystemLog("info", "Garbage collection completed. No nodes to clean");
+    }
   }
+
+  // Store GC interval reference for cleanup
+  let gcInterval = null;
 
   // Initialize garbage collector
   function initializeGarbageCollector() {
     if (GC_ENABLED) {
       console.log("🗑️ Initializing garbage collector...");
-      setSelfAdjustingInterval(runGarbageCollector, GC_INTERVAL);
+      gcInterval = setInterval(runGarbageCollector, GC_INTERVAL);
+      console.log(
+        `✅ Garbage Collector scheduled to run every ${
+          GC_INTERVAL / 1000 / 60
+        } minutes.`
+      );
       addSystemLog("info", "Garbage collector initialized");
+      // Run once on startup after a delay
+      setTimeout(runGarbageCollector, 30 * 1000); // Run 30s after start
     } else {
       console.log("🗑️ Garbage collection disabled");
     }
   }
 
+  // Flag per permettere operazioni interne durante REST API
+  let allowInternalOperations = false;
+
+  // Funzione helper per trovare il relay corrente basandosi sull'URL
+  async function getCurrentRelayAddress() {
+    try {
+      if (!relayContract) {
+        console.error("Relay contract not initialized");
+        return null;
+      }
+
+      // Ottieni l'URL corrente del server
+      const serverURL = process.env.SERVER_URL || `http://${host}:${port}`;
+      const relayURL = serverURL + "/gun";
+      console.log("🔍 Looking for relay with URL:", relayURL);
+
+      // Prova prima a trovare il relay specifico per questo URL
+      try {
+        const specificRelayAddress = await relayContract.findRelayByURL(
+          relayURL
+        );
+        if (
+          specificRelayAddress &&
+          specificRelayAddress !== "0x0000000000000000000000000000000000000000"
+        ) {
+          console.log(
+            "✅ Found specific relay for this URL:",
+            specificRelayAddress
+          );
+          return specificRelayAddress;
+        }
+      } catch (error) {
+        console.log(
+          "⚠️ Could not find specific relay by URL, trying fallback..."
+        );
+      }
+
+      // Fallback: ottieni tutti i relay e usa il primo
+      console.log("🔄 Using fallback: getting all relays");
+      const allRelays = await relayContract.getAllRelays();
+      console.log("getAllRelays() result:", allRelays);
+
+      if (allRelays.length > 0) {
+        const fallbackRelayAddress = allRelays[0];
+        console.log("📋 Using first available relay:", fallbackRelayAddress);
+
+        // Ottieni i dettagli del relay per logging
+        try {
+          const relayDetails = await relayContract.getRelayDetails(
+            fallbackRelayAddress
+          );
+          console.log("📊 Relay details:", relayDetails);
+
+          // Log un avviso se non è il relay specifico
+          if (relayDetails.url !== relayURL) {
+            console.warn(
+              `⚠️ Using relay: ${relayDetails.url} (not the current relay)`
+            );
+          }
+        } catch (detailsError) {
+          console.log("Could not get relay details:", detailsError);
+        }
+
+        return fallbackRelayAddress;
+      } else {
+        console.warn("No relay registered in the contract");
+        return null;
+      }
+    } catch (error) {
+      console.error("Failed to get current relay address:", error);
+      return null;
+    }
+  }
+
   // Token validation function
   function hasValidToken(msg) {
-    const token = msg.headers?.token;
-    return token === process.env.ADMIN_PASSWORD;
+    if (process.env.RELAY_PROTECTED === "false") {
+      console.log("🔍 PUT allowed - protected disabled");
+      return true;
+    }
+
+    // Analizza le anime (souls) che sta cercando di modificare
+    const souls = Object.keys(msg.put || {});
+    const firstSoul = souls[0];
+
+    // Permetti operazioni temporanee durante REST API
+    if (allowInternalOperations) {
+      console.log(`🔍 PUT allowed - internal operation flag: ${firstSoul}`);
+      return true;
+    }
+
+    // Permetti operazioni interne di Gun senza autenticazione
+    const isInternalNamespace =
+      firstSoul &&
+      (firstSoul.startsWith("~") || // User namespace
+        firstSoul.startsWith("!") || // Root namespace
+        firstSoul === "shogun" || // Shogun internal operations
+        firstSoul.startsWith("shogun/relays") || // Relay health data
+        firstSoul.startsWith("shogun/uploads") || // User uploads (permette salvataggio upload user)
+        !firstSoul.includes("/") || // Single level keys (internal Gun operations)
+        firstSoul.match(
+          /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
+        )); // UUID souls
+
+    if (isInternalNamespace) {
+      console.log(`🔍 PUT allowed - internal namespace: ${firstSoul}`);
+      return true;
+    }
+
+    // Se ha headers, verifica il token
+    if (msg && msg.headers && msg.headers.token) {
+      const hasValidAuth = msg.headers.token === process.env.ADMIN_PASSWORD;
+      if (hasValidAuth) {
+        console.log(`🔍 PUT allowed - valid token: ${firstSoul}`);
+        return true;
+      }
+    }
+
+    console.log(`❌ PUT denied - no valid auth: ${firstSoul}`);
+    return false;
   }
 
   // Create Express app
@@ -379,12 +535,17 @@ async function initializeServer() {
   app.set("addSystemLog", addSystemLog);
   app.set("addTimeSeriesPoint", addTimeSeriesPoint);
   app.set("runGarbageCollector", runGarbageCollector);
+  app.set("getCurrentRelayAddress", getCurrentRelayAddress);
 
   // Esponi i middleware di autenticazione per le route
   app.set("tokenAuthMiddleware", tokenAuthMiddleware);
   app.set("userAuthMiddleware", userAuthMiddleware);
   app.set("walletSignatureMiddleware", walletSignatureMiddleware);
   app.set("verifyWalletSignature", verifyWalletSignature);
+
+  // Esponi la variabile per operazioni interne
+  app.set("allowInternalOperations", () => allowInternalOperations);
+  app.set("setAllowInternalOperations", (value) => { allowInternalOperations = value; });
 
   // Esponi l'istanza Gun globalmente per le route
   global.gunInstance = gun;
@@ -452,6 +613,12 @@ async function initializeServer() {
   async function shutdown() {
     console.log("🛑 Shutting down Shogun Relay...");
     addSystemLog("info", "Server shutdown initiated");
+
+    // Clean up garbage collector interval
+    if (gcInterval) {
+      clearInterval(gcInterval);
+      console.log("✅ Garbage collector interval cleared");
+    }
 
     // Close server
     if (server) {

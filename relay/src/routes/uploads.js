@@ -377,4 +377,65 @@ router.get("/debug/:identifier", async (req, res) => {
   }
 });
 
+// Endpoint per sincronizzare i MB utilizzati calcolandoli dai file effettivamente caricati
+router.post("/sync-mb-usage/:userAddress", async (req, res) => {
+  try {
+    const { userAddress } = req.params;
+
+    if (!userAddress) {
+      return res.status(400).json({
+        success: false,
+        error: "Indirizzo utente richiesto",
+      });
+    }
+
+    console.log(`🔄 Syncing MB usage for user: ${userAddress}`);
+
+    // Usa la funzione getOffChainMBUsage che ora calcola in tempo reale
+    const totalSizeMB = await getOffChainMBUsage(userAddress);
+
+    // Ottieni anche il numero di file per completezza
+    const gun = getGunInstance(req);
+    const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
+    const fileCount = await new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        resolve(0);
+      }, 5000);
+
+      uploadsNode.once((parentData) => {
+        clearTimeout(timeoutId);
+        if (!parentData || typeof parentData !== "object") {
+          resolve(0);
+          return;
+        }
+        const hashKeys = Object.keys(parentData).filter(
+          (key) => key !== "_"
+        );
+        resolve(hashKeys.length);
+      });
+    });
+
+    console.log(
+      `✅ MB usage synced: ${totalSizeMB} MB (${fileCount} files)`
+    );
+
+    res.json({
+      success: true,
+      message: "MB usage synchronized successfully",
+      userAddress,
+      mbUsed: totalSizeMB,
+      fileCount: fileCount,
+      lastUpdated: new Date().toISOString(),
+      storage: "real-time-calculation",
+    });
+  } catch (error) {
+    console.error("Sync MB usage error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore interno del server",
+      details: error.message,
+    });
+  }
+});
+
 export default router; 

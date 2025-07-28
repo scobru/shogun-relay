@@ -520,6 +520,14 @@ router.post("/node/*", async (req, res) => {
     const { data } = req.body;
     const gun = getGunInstance(req);
     
+    if (!path || path.trim() === "") {
+      return res
+        .status(400)
+        .json({ success: false, error: "Node path cannot be empty." });
+    }
+
+    console.log(`📝 Creating node at path: "${path}" with data:`, data);
+    
     const getGunNodeFromPath = (pathString) => {
       const pathParts = pathString.split("/").filter(Boolean);
       let node = gun;
@@ -532,27 +540,56 @@ router.post("/node/*", async (req, res) => {
     };
 
     const node = getGunNodeFromPath(path);
+
+    // Get the setAllowInternalOperations function
+    const setAllowInternalOperations = req.app.get('setAllowInternalOperations');
     
-    node.put(data, (ack) => {
-      if (ack && ack.err) {
-        res.status(500).json({
-          success: false,
-          error: ack.err,
-        });
-      } else {
-        res.json({
-          success: true,
-          path,
-          message: "Data saved successfully",
-          timestamp: Date.now(),
-        });
-      }
-    });
+    // Temporarily allow internal operations during this REST API call
+    setAllowInternalOperations(true);
+
+    try {
+      // Properly promisify the Gun put operation
+      const putResult = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error("Put operation timed out after 10 seconds"));
+        }, 10000);
+
+        try {
+          node.put(data, (ack) => {
+            clearTimeout(timeout);
+            if (ack.err) {
+              console.error(`❌ Gun put error for path "${path}":`, ack.err);
+              reject(new Error(ack.err));
+            } else {
+              console.log(`✅ Gun put success for path "${path}":`, ack);
+              resolve(ack);
+            }
+          });
+        } catch (syncError) {
+          clearTimeout(timeout);
+          console.error(
+            `❌ Synchronous error in put for path "${path}":`,
+            syncError
+          );
+          reject(syncError);
+        }
+      });
+    } finally {
+      // Reset flag
+      setAllowInternalOperations(false);
+    }
+
+    console.log(`✅ Node successfully created/updated at path: "${path}"`);
+    return res.json({ success: true, path, data });
   } catch (error) {
-    console.error("❌ Gun node POST error:", error);
-    res.status(500).json({
+    console.error(
+      `❌ Error in POST /node/* for path "${req.params[0]}":`,
+      error
+    );
+    return res.status(500).json({
       success: false,
       error: error.message,
+      path: req.params[0],
     });
   }
 });
@@ -562,6 +599,14 @@ router.delete("/node/*", async (req, res) => {
     const path = req.params[0];
     const gun = getGunInstance(req);
     
+    if (!path || path.trim() === "") {
+      return res
+        .status(400)
+        .json({ success: false, error: "Node path cannot be empty." });
+    }
+
+    console.log(`🗑️ Deleting node at path: "${path}"`);
+    
     const getGunNodeFromPath = (pathString) => {
       const pathParts = pathString.split("/").filter(Boolean);
       let node = gun;
@@ -574,27 +619,59 @@ router.delete("/node/*", async (req, res) => {
     };
 
     const node = getGunNodeFromPath(path);
-    
-    node.put(null, (ack) => {
-      if (ack && ack.err) {
-        res.status(500).json({
-          success: false,
-          error: ack.err,
-        });
-      } else {
-        res.json({
-          success: true,
-          path,
-          message: "Data deleted successfully",
-          timestamp: Date.now(),
-        });
-      }
-    });
+
+    // Get the setAllowInternalOperations function
+    const setAllowInternalOperations = req.app.get('setAllowInternalOperations');
+
+    // Temporarily allow internal operations during this REST API call
+    setAllowInternalOperations(true);
+
+    try {
+      // Properly promisify the Gun delete operation
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error("Delete operation timed out after 10 seconds"));
+        }, 10000);
+
+        try {
+          node.put(null, (ack) => {
+            clearTimeout(timeout);
+            if (ack.err) {
+              console.error(
+                `❌ Gun delete error for path "${path}":`,
+                ack.err
+              );
+              reject(new Error(ack.err));
+            } else {
+              console.log(`✅ Gun delete success for path "${path}":`, ack);
+              resolve(ack);
+            }
+          });
+        } catch (syncError) {
+          clearTimeout(timeout);
+          console.error(
+            `❌ Synchronous error in delete for path "${path}":`,
+            syncError
+          );
+          reject(syncError);
+        }
+      });
+    } finally {
+      // Reset flag
+      setAllowInternalOperations(false);
+    }
+
+    console.log(`✅ Node successfully deleted at path: "${path}"`);
+    return res.json({ success: true, path, message: "Node deleted successfully" });
   } catch (error) {
-    console.error("❌ Gun node DELETE error:", error);
-    res.status(500).json({
+    console.error(
+      `❌ Error in DELETE /node/* for path "${req.params[0]}":`,
+      error
+    );
+    return res.status(500).json({
       success: false,
       error: error.message,
+      path: req.params[0],
     });
   }
 });
