@@ -16,18 +16,33 @@ router.post("/sync-to-gun", async (req, res) => {
     console.log("🔄 Starting Chain contract to GunDB sync...");
 
     const result = await syncChainContractToGun();
+    
+    console.log("📊 Sync result:", result);
 
-    res.json({
-      success: result,
-      message: result ? "Sincronizzazione completata" : "Sincronizzazione fallita"
-    });
+    if (result === true) {
+      res.json({
+        success: true,
+        message: "Sincronizzazione completata con successo"
+      });
+    } else if (result === false) {
+      res.json({
+        success: false,
+        error: "Sincronizzazione fallita - controlla i log del server"
+      });
+    } else {
+      res.json({
+        success: false,
+        error: "Risultato sincronizzazione non valido",
+        details: `Risultato: ${result}`
+      });
+    }
 
   } catch (error) {
     console.error("❌ Chain sync error:", error);
     res.status(500).json({
       success: false,
       error: "Errore sincronizzazione",
-      details: error.message
+      details: error.message || "Errore sconosciuto"
     });
   }
 });

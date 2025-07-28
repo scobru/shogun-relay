@@ -814,11 +814,26 @@ async function initializeServer() {
   
   // Wrapper per syncChainContractToGun che accede alla funzione corretta
   app.set("syncChainContractToGun", async () => {
-    if (!gun) {
-      console.error("❌ Gun not initialized");
+    try {
+      if (!gun) {
+        console.error("❌ Gun not initialized");
+        return false;
+      }
+      
+      if (!chainContract) {
+        console.error("❌ Chain contract not initialized");
+        return false;
+      }
+      
+      console.log("🔧 Calling syncChainContractToGun function...");
+      const result = await syncChainContractToGun();
+      console.log("🔧 syncChainContractToGun returned:", result);
+      return result;
+      
+    } catch (error) {
+      console.error("❌ Error in syncChainContractToGun wrapper:", error);
       return false;
     }
-    return await syncChainContractToGun();
   });
   
   app.set("propagateChainEventToGun", propagateChainEventToGun);
