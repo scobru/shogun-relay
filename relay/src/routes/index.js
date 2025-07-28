@@ -19,6 +19,7 @@ import authRouter from './auth.js';
 import usersRouter from './users.js';
 import subscriptionsRouter from './subscriptions.js';
 import servicesRouter from './services.js';
+import visualGraphRouter from './visualGraph.js';
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -244,11 +245,6 @@ export default (app) => {
   app.get("/charts", (req, res) => {
     const publicPath = path.resolve(__dirname, '../public');
     res.sendFile(path.resolve(publicPath, "charts.html"));
-  });
-
-  app.get("/visualGraph", (req, res) => {
-    const publicPath = path.resolve(__dirname, '../public');
-    res.sendFile(path.resolve(publicPath, "visualGraph/visualGraph.html"));
   });
 
   app.get("/drive", (req, res) => {
@@ -499,6 +495,9 @@ export default (app) => {
   // Route per i servizi
   app.use(`${baseRoute}/services`, servicesRouter);
   
+  // Route per il grafico visivo
+  app.use(`${baseRoute}/visualGraph`, visualGraphRouter);
+  
   // Route di test per verificare se le route sono registrate correttamente
   app.get(`${baseRoute}/test`, (req, res) => {
     res.json({
@@ -519,6 +518,9 @@ export default (app) => {
   app.use('/api/subscriptions', subscriptionsRouter);
   app.use('/api/services', servicesRouter);
   app.use('/api/auth', authRouter);
+  
+  // Route principale per il visual graph
+  app.use('/visualGraph', visualGraphRouter);
   
   // IPFS API Proxy - for API calls to the IPFS node
   // Example: /api/v0/add, /api/v0/cat, etc.
