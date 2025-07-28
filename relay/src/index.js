@@ -188,8 +188,8 @@ async function startChainEventListener() {
         decodedValue = value;
       }
 
-      // Propagate to GunDB
-      propagateChainEventToGun(soul, key, decodedValue, event);
+      // Propagate to GunDB - this will be handled by the function inside initializeServer
+      console.log("🔄 Event will be propagated to GunDB when server is ready");
     });
 
     console.log("✅ Chain contract event listener started");
@@ -197,69 +197,6 @@ async function startChainEventListener() {
   } catch (error) {
     console.error("❌ Failed to start chain event listener:", error);
     return false;
-  }
-}
-
-// Propagate Chain contract event to GunDB
-async function propagateChainEventToGun(soul, key, value, event) {
-  if (!gun) {
-    console.warn("⚠️ Gun not initialized, cannot propagate event");
-    return;
-  }
-
-  try {
-    // Create a unique identifier for this event
-    const eventId = `${event.transactionHash}-${event.logIndex}`;
-    
-    // Store the event data in GunDB
-    const eventNode = gun.get("shogun").get("chain_events").get(eventId);
-    await new Promise((resolve, reject) => {
-      eventNode.put({
-        soul: soul,
-        key: key,
-        value: value,
-        blockNumber: event.blockNumber,
-        transactionHash: event.transactionHash,
-        timestamp: Date.now(),
-        propagated: true
-      }, (ack) => {
-        if (ack.err) {
-          reject(ack.err);
-        } else {
-          resolve();
-        }
-      });
-    });
-
-    // Also store the data in the main GunDB structure
-    const dataNode = gun.get(soul);
-    await new Promise((resolve, reject) => {
-      dataNode.get(key).put(value, (ack) => {
-        if (ack.err) {
-          reject(ack.err);
-        } else {
-          resolve();
-        }
-      });
-    });
-
-    console.log(`✅ Chain event propagated to GunDB: ${soul} -> ${key}`);
-    
-    // Add to system log
-    addSystemLog("info", "Chain event propagated to GunDB", {
-      soul: soul,
-      key: key,
-      value: value,
-      eventId: eventId
-    });
-
-  } catch (error) {
-    console.error("❌ Failed to propagate chain event to GunDB:", error);
-    addSystemLog("error", "Failed to propagate chain event", {
-      soul: soul,
-      key: key,
-      error: error.message
-    });
   }
 }
 
@@ -275,6 +212,87 @@ async function initializeServer() {
 
   // Start Chain contract event listener
   await startChainEventListener();
+
+  // System logging function
+  function addSystemLog(level, message, data = null) {
+    const timestamp = new Date().toISOString();
+    const logEntry = {
+      timestamp,
+      level,
+      message,
+      data,
+    };
+
+    console.log(`[${timestamp}] ${level.toUpperCase()}: ${message}`);
+    
+    // Store in Gun database for persistence
+    if (gun) {
+      gun.get("shogun").get("logs").get(timestamp).put(logEntry);
+    }
+  }
+
+  // Propagate Chain contract event to GunDB
+  async function propagateChainEventToGun(soul, key, value, event) {
+    if (!gun) {
+      console.warn("⚠️ Gun not initialized, cannot propagate event");
+      return;
+    }
+
+    try {
+      // Create a unique identifier for this event
+      const eventId = `${event.transactionHash}-${event.logIndex}`;
+      
+      // Store the event data in GunDB
+      const eventNode = gun.get("shogun").get("chain_events").get(eventId);
+      await new Promise((resolve, reject) => {
+        eventNode.put({
+          soul: soul,
+          key: key,
+          value: value,
+          blockNumber: event.blockNumber,
+          transactionHash: event.transactionHash,
+          timestamp: Date.now(),
+          propagated: true
+        }, (ack) => {
+          if (ack.err) {
+            reject(ack.err);
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      // Also store the data in the main GunDB structure
+      const dataNode = gun.get(soul);
+      await new Promise((resolve, reject) => {
+        dataNode.get(key).put(value, (ack) => {
+          if (ack.err) {
+            reject(ack.err);
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      console.log(`✅ Chain event propagated to GunDB: ${soul} -> ${key}`);
+      
+      // Add to system log
+      addSystemLog("info", "Chain event propagated to GunDB", {
+        soul: soul,
+        key: key,
+        value: value,
+        eventId: eventId
+      });
+
+    } catch (error) {
+      console.error("❌ Failed to propagate chain event to GunDB:", error);
+      addSystemLog("error", "Failed to propagate chain event", {
+        soul: soul,
+        key: key,
+        error: error.message
+      });
+    }
+  }
 
   // Sync function to read from Chain contract and update GunDB
   async function syncChainContractToGun() {
@@ -398,24 +416,6 @@ async function initializeServer() {
       console.error("❌ Failed to sync chain contract:", error);
       addSystemLog("error", "Chain contract sync failed", { error: error.message });
       return false;
-    }
-  }
-
-  // System logging function
-  function addSystemLog(level, message, data = null) {
-    const timestamp = new Date().toISOString();
-    const logEntry = {
-      timestamp,
-      level,
-      message,
-      data,
-    };
-
-    console.log(`[${timestamp}] ${level.toUpperCase()}: ${message}`);
-    
-    // Store in Gun database for persistence
-    if (gun) {
-      gun.get("shogun").get("logs").get(timestamp).put(logEntry);
     }
   }
 

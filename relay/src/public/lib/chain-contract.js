@@ -21,7 +21,7 @@ async function initialize() {
         
         // Inizializza Gun usando l'indirizzo del browser corrente
         const currentUrl = window.location.origin;
-        gun = Gun("https://ruling-mastodon-improved.ngrok-free.app/gun");
+        gun = Gun([`${currentUrl}/gun`]);
         console.log('✅ Gun inizializzato su:', `${currentUrl}/gun`);
         
         // Ottieni configurazione contratto dal server
