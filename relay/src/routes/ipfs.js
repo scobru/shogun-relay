@@ -356,23 +356,34 @@ router.post("/upload",
               Promise.all([saveUploadPromise, updateMBPromise])
                 .then(() => {
                   console.log(`📊 User upload saved: ${req.userAddress} - ${fileSizeMB} MB`);
+                  
+                  // Send response after GunDB operations complete
+                  res.json({
+                    success: true,
+                    file: uploadData,
+                    authType: req.authType,
+                    mbUsage: req.authType === 'user' ? {
+                      actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                      sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
+                      verified: true
+                    } : undefined
+                  });
                 })
                 .catch((error) => {
                   console.error(`❌ Error during GunDB save:`, error);
-                  // Continue anyway, the file is already on IPFS
+                  // Send response anyway, the file is already on IPFS
+                  res.json({
+                    success: true,
+                    file: uploadData,
+                    authType: req.authType,
+                    mbUsage: req.authType === 'user' ? {
+                      actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                      sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
+                      verified: false,
+                      error: error.message
+                    } : undefined
+                  });
                 });
-
-              // Send response immediately, don't wait for GunDB operations
-              res.json({
-                success: true,
-                file: uploadData,
-                authType: req.authType,
-                mbUsage: req.authType === 'user' ? {
-                  actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
-                  sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
-                  verified: true
-                } : undefined
-              });
             } else {
               // For admin uploads, send response immediately
               res.json({
