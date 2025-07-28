@@ -303,19 +303,48 @@ router.get("/user-subscription-details/:userAddress", async (req, res) => {
     );
 
     // Get detailed subscription information
-    const subscription = await contract.getUserSubscription(userAddress);
-    const status = await contract.getSubscriptionStatus(userAddress);
+    // Ottieni tutti i relay per trovare una sottoscrizione attiva
+    const allRelays = await contract.getAllRelays();
+    let activeSubscription = null;
+    let foundRelay = null;
+
+    // Cerca una sottoscrizione attiva su qualsiasi relay
+    for (const relayAddress of allRelays) {
+      try {
+        const subscriptionDetails = await contract.getSubscriptionDetails(
+          userAddress,
+          relayAddress
+        );
+
+        const [startTime, endTime, amountPaid, mbAllocated, isActive] = subscriptionDetails;
+
+        if (isActive && Number(mbAllocated) > 0) {
+          activeSubscription = {
+            isActive: true,
+            startTime: startTime.toString(),
+            endTime: endTime.toString(),
+            amountPaid: amountPaid.toString(),
+            mbAllocated: mbAllocated.toString(),
+            relayAddress: relayAddress
+          };
+          
+          foundRelay = relayAddress;
+          break;
+        }
+      } catch (error) {
+        // Continua con il prossimo relay se questo fallisce
+        console.log(`⚠️ Error checking relay ${relayAddress}:`, error.message);
+      }
+    }
+
     const balance = await provider.getBalance(userAddress);
 
     res.json({
       success: true,
       userAddress,
-      subscription: {
-        isActive: subscription.isActive,
-        startTime: subscription.startTime.toString(),
-        endTime: subscription.endTime.toString(),
-        plan: subscription.plan.toString(),
-        status: status,
+      subscription: activeSubscription || {
+        isActive: false,
+        reason: "No active subscription found"
       },
       balance: {
         wei: balance.toString(),

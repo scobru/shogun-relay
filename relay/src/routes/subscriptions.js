@@ -101,17 +101,56 @@ router.get("/subscription-status/:identifier", async (req, res) => {
       });
     }
 
-    // Ottieni i dettagli della sottoscrizione dal contratto
-    const subscription = await relayContract.getSubscriptionDetails(userAddress);
-    
-    // Ottieni l'uso MB dal contratto - usa getUserSubscriptions per ottenere i dettagli completi
-    const userSubscriptions = await relayContract.getUserSubscriptions(userAddress);
+    // Ottieni tutti i relay per trovare una sottoscrizione attiva
+    const allRelays = await relayContract.getAllRelays();
+    let activeSubscription = null;
+    let foundRelay = null;
 
-    // Calcola i dettagli aggiuntivi
-    const now = Math.floor(Date.now() / 1000);
-    const isActive = subscription.isActive && subscription.endTime > now;
-    const timeRemaining = Math.max(0, subscription.endTime - now);
-    const mbRemaining = Math.max(0, subscription.mbAllocated - userSubscriptions.mbUsed);
+    // Cerca una sottoscrizione attiva su qualsiasi relay
+    for (const relayAddress of allRelays) {
+      try {
+        const subscriptionDetails = await relayContract.getSubscriptionDetails(
+          userAddress,
+          relayAddress
+        );
+
+        const [startTime, endTime, amountPaid, mbAllocated, isActive] = subscriptionDetails;
+
+        if (isActive && Number(mbAllocated) > 0) {
+          const now = Math.floor(Date.now() / 1000);
+          const timeRemaining = Math.max(0, Number(endTime) - now);
+          
+          activeSubscription = {
+            isActive: true,
+            startTime: startTime.toString(),
+            endTime: endTime.toString(),
+            amountPaid: amountPaid.toString(),
+            mbAllocated: mbAllocated.toString(),
+            timeRemaining: timeRemaining.toString(),
+            relayAddress: relayAddress
+          };
+          
+          foundRelay = relayAddress;
+          break;
+        }
+      } catch (error) {
+        // Continua con il prossimo relay se questo fallisce
+        console.log(`⚠️ Error checking relay ${relayAddress}:`, error.message);
+      }
+    }
+
+    if (!activeSubscription) {
+      return res.json({
+        success: true,
+        chainId: chainId,
+        userAddress: userAddress,
+        subscription: {
+          isActive: false,
+          reason: "No active subscription found"
+        },
+        timestamp: Date.now(),
+      });
+    }
 
     console.log(`📋 subscription-status/${identifier}: Returning subscription status for chain: ${chainId}`);
 
@@ -119,16 +158,7 @@ router.get("/subscription-status/:identifier", async (req, res) => {
       success: true,
       chainId: chainId,
       userAddress: userAddress,
-      subscription: {
-        isActive: subscription.isActive,
-        startTime: subscription.startTime.toString(),
-        endTime: subscription.endTime.toString(),
-        plan: subscription.plan.toString(),
-        mbAllocated: subscription.mbAllocated.toString(),
-        mbUsed: userSubscriptions.mbUsed.toString(),
-        mbRemaining: mbRemaining.toString(),
-        timeRemaining: timeRemaining.toString(),
-      },
+      subscription: activeSubscription,
       timestamp: Date.now(),
     });
   } catch (error) {
@@ -166,17 +196,56 @@ router.get("/user-subscription-details/:userAddress", async (req, res) => {
 
     const { relayContract } = contractInit;
 
-    // Ottieni i dettagli della sottoscrizione dal contratto
-    const subscription = await relayContract.getSubscription(userAddress);
-    
-    // Ottieni l'uso MB dal contratto
-    const mbUsage = await relayContract.getMBUsage(userAddress);
+    // Ottieni tutti i relay per trovare una sottoscrizione attiva
+    const allRelays = await relayContract.getAllRelays();
+    let activeSubscription = null;
+    let foundRelay = null;
 
-    // Calcola i dettagli aggiuntivi
-    const now = Math.floor(Date.now() / 1000);
-    const isActive = subscription.isActive && subscription.endTime > now;
-    const timeRemaining = Math.max(0, subscription.endTime - now);
-    const mbRemaining = Math.max(0, subscription.mbAllocated - mbUsage);
+    // Cerca una sottoscrizione attiva su qualsiasi relay
+    for (const relayAddress of allRelays) {
+      try {
+        const subscriptionDetails = await relayContract.getSubscriptionDetails(
+          userAddress,
+          relayAddress
+        );
+
+        const [startTime, endTime, amountPaid, mbAllocated, isActive] = subscriptionDetails;
+
+        if (isActive && Number(mbAllocated) > 0) {
+          const now = Math.floor(Date.now() / 1000);
+          const timeRemaining = Math.max(0, Number(endTime) - now);
+          
+          activeSubscription = {
+            isActive: true,
+            startTime: startTime.toString(),
+            endTime: endTime.toString(),
+            amountPaid: amountPaid.toString(),
+            mbAllocated: mbAllocated.toString(),
+            timeRemaining: timeRemaining.toString(),
+            relayAddress: relayAddress
+          };
+          
+          foundRelay = relayAddress;
+          break;
+        }
+      } catch (error) {
+        // Continua con il prossimo relay se questo fallisce
+        console.log(`⚠️ Error checking relay ${relayAddress}:`, error.message);
+      }
+    }
+
+    if (!activeSubscription) {
+      return res.json({
+        success: true,
+        chainId: chainId,
+        userAddress: userAddress,
+        subscription: {
+          isActive: false,
+          reason: "No active subscription found"
+        },
+        timestamp: Date.now(),
+      });
+    }
 
     console.log(`📋 user-subscription-details/${userAddress}: Returning user subscription details for chain: ${chainId}`);
 
@@ -184,16 +253,7 @@ router.get("/user-subscription-details/:userAddress", async (req, res) => {
       success: true,
       chainId: chainId,
       userAddress: userAddress,
-      subscription: {
-        isActive: isActive,
-        startTime: subscription.startTime.toString(),
-        endTime: subscription.endTime.toString(),
-        plan: subscription.plan.toString(),
-        mbAllocated: subscription.mbAllocated.toString(),
-        mbUsed: mbUsage.toString(),
-        mbRemaining: mbRemaining.toString(),
-        timeRemaining: timeRemaining.toString(),
-      },
+      subscription: activeSubscription,
       timestamp: Date.now(),
     });
   } catch (error) {
