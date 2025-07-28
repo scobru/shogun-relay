@@ -483,6 +483,25 @@
                 // Aggiungi un delay per permettere a GunDB di sincronizzare
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
+                // Debug: chiama l'endpoint di debug per vedere i dati reali
+                console.log('🐛 subscribe: Calling debug endpoint...');
+                try {
+                    const authSignature = await subscribeGetWalletSignature();
+                    const debugResponse = await fetch(`/api/v1/user-uploads/debug-mb-usage/${encodeURIComponent(walletAddress)}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-user-address': walletAddress,
+                            'x-wallet-signature': authSignature,
+                            'x-signature-message': 'I Love Shogun'
+                        }
+                    });
+                    const debugResult = await debugResponse.json();
+                    console.log('🐛 subscribe: Debug result:', debugResult);
+                } catch (debugError) {
+                    console.log('🐛 subscribe: Debug failed:', debugError);
+                }
+
                 console.log('📡 subscribe: Fetching subscription details...');
                 // Usa lo stesso endpoint che funziona in user-upload.html
                 const response = await fetch(`/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(walletAddress)}`);
