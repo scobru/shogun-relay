@@ -1,46 +1,47 @@
-import express from 'express';
-import rateLimit from 'express-rate-limit';
-import { createProxyMiddleware } from 'http-proxy-middleware';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
+import express from "express";
+import rateLimit from "express-rate-limit";
+import { createProxyMiddleware } from "http-proxy-middleware";
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Importa i moduli delle routes
-import contractsRouter from './contracts.js';
-import uploadsRouter from './uploads.js';
-import ipfsRouter from './ipfs.js';
-import systemRouter from './system.js';
-import notesRouter from './notes.js';
-import debugRouter from './debug.js';
-import authRouter from './auth.js';
-import usersRouter from './users.js';
-import subscriptionsRouter from './subscriptions.js';
-import servicesRouter from './services.js';
-import visualGraphRouter from './visualGraph.js';
+import contractsRouter from "./contracts.js";
+import uploadsRouter from "./uploads.js";
+import ipfsRouter from "./ipfs.js";
+import systemRouter from "./system.js";
+import notesRouter from "./notes.js";
+import debugRouter from "./debug.js";
+import authRouter from "./auth.js";
+import usersRouter from "./users.js";
+import subscriptionsRouter from "./subscriptions.js";
+import servicesRouter from "./services.js";
+import visualGraphRouter from "./visualGraph.js";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minuti
   max: 1000, // massimo 1000 richieste per IP
-  message: { 
-    success: false, 
-    message: 'Troppe richieste. Riprova tra 15 minuti.', 
-    data: null 
-  }
+  message: {
+    success: false,
+    message: "Troppe richieste. Riprova tra 15 minuti.",
+    data: null,
+  },
 });
 
 export default (app) => {
   // Configurazione generale delle route
-  const baseRoute = '/api/v1';
-  
+  const baseRoute = "/api/v1";
+
   // Applica rate limiting generale
   app.use(generalLimiter);
-  
+
   // --- IPFS Desktop Proxy Configuration ---
-  const IPFS_GATEWAY_URL = process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
+  const IPFS_GATEWAY_URL =
+    process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
   const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN || process.env.IPFS_API_KEY;
   const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
 
@@ -129,15 +130,15 @@ export default (app) => {
       },
     })
   );
-  
+
   // Route mancanti dall'index-old.js
   app.get("/blog/:id", (req, res) => {
-    const publicPath = path.resolve(__dirname, '../public');
+    const publicPath = path.resolve(__dirname, "../public");
     const indexPath = path.resolve(publicPath, "index.html");
     const htmlData = fs.readFileSync(indexPath, "utf8");
     let numberOfTries = 0;
-    const gun = req.app.get('gunInstance');
-    
+    const gun = req.app.get("gunInstance");
+
     const chain = gun
       .get(`hal9000/post`)
       .get(req.params.id)
@@ -159,7 +160,9 @@ export default (app) => {
             <html>
                <head>
                   <title>${post.title || "Blog Post"}</title>
-                  <meta name="description" content="${post.description || ""}" />
+                  <meta name="description" content="${
+                    post.description || ""
+                  }" />
                </head>
                <body>
                   ${post.content}
@@ -178,77 +181,77 @@ export default (app) => {
 
   // Route per servire i file HTML specifici (DOPO le route API)
   app.get("/user-upload", (req, res) => {
-    const publicPath = path.resolve(__dirname, '../public');
+    const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "user-upload.html"));
   });
 
   app.get("/subscribe", (req, res) => {
-    const publicPath = path.resolve(__dirname, '../public');
+    const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "subscribe.html"));
   });
 
   app.get("/stats", (req, res) => {
-    const publicPath = path.resolve(__dirname, '../public');
+    const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "stats.html"));
   });
 
   app.get("/services-dashboard", (req, res) => {
-    const publicPath = path.resolve(__dirname, '../public');
+    const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "services-dashboard.html"));
   });
 
   app.get("/pin-manager", (req, res) => {
-    const publicPath = path.resolve(__dirname, '../public');
+    const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "pin-manager.html"));
   });
 
   app.get("/notes", (req, res) => {
-    const publicPath = path.resolve(__dirname, '../public');
+    const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "notes.html"));
   });
 
   app.get("/upload", (req, res) => {
-    const publicPath = path.resolve(__dirname, '../public');
+    const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "upload.html"));
   });
 
   app.get("/create", (req, res) => {
-    const publicPath = path.resolve(__dirname, '../public');
+    const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "create.html"));
   });
 
   app.get("/view", (req, res) => {
-    const publicPath = path.resolve(__dirname, '../public');
+    const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "view.html"));
   });
 
   app.get("/edit", (req, res) => {
-    const publicPath = path.resolve(__dirname, '../public');
+    const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "edit.html"));
   });
 
   app.get("/derive", (req, res) => {
-    const publicPath = path.resolve(__dirname, '../public');
+    const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "derive.html"));
   });
 
   app.get("/graph", (req, res) => {
-    const publicPath = path.resolve(__dirname, '../public');
+    const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "graph.html"));
   });
 
   app.get("/chat", (req, res) => {
-    const publicPath = path.resolve(__dirname, '../public');
+    const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "chat.html"));
   });
 
   app.get("/charts", (req, res) => {
-    const publicPath = path.resolve(__dirname, '../public');
+    const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "charts.html"));
   });
 
   app.get("/drive", (req, res) => {
-    const publicPath = path.resolve(__dirname, '../public');
+    const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "drive.html"));
   });
 
@@ -256,7 +259,8 @@ export default (app) => {
   app.get("/ipfs-content/:cid", async (req, res) => {
     const { cid } = req.params;
     const { token } = req.query;
-    const IPFS_GATEWAY_URL = process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
+    const IPFS_GATEWAY_URL =
+      process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
 
     console.log(
       `🔍 IPFS Content Request - CID: ${cid}, Token: ${
@@ -280,7 +284,7 @@ export default (app) => {
         method: "GET",
       };
 
-      const http = await import('http');
+      const http = await import("http");
       const ipfsReq = http.get(requestOptions, (ipfsRes) => {
         // If no token, just stream the response
         if (!token) {
@@ -301,7 +305,7 @@ export default (app) => {
         ipfsRes.on("data", (chunk) => (body += chunk));
         ipfsRes.on("end", async () => {
           try {
-            const SEA = await import('gun/sea.js');
+            const SEA = await import("gun/sea.js");
             const decrypted = await SEA.default.decrypt(body, token);
 
             if (decrypted) {
@@ -309,7 +313,9 @@ export default (app) => {
 
               // Controlla se i dati decrittati sono un data URL
               if (decrypted.startsWith("data:")) {
-                console.log(`📁 Detected data URL, extracting content type and data`);
+                console.log(
+                  `📁 Detected data URL, extracting content type and data`
+                );
 
                 // Estrai il content type e i dati dal data URL
                 const matches = decrypted.match(/^data:([^;]+);base64,(.+)$/);
@@ -328,7 +334,8 @@ export default (app) => {
                   // Fallback: restituisci come JSON
                   res.json({
                     success: true,
-                    message: "Decryption successful but could not parse data URL",
+                    message:
+                      "Decryption successful but could not parse data URL",
                     decryptedData: decrypted,
                     originalLength: body.length,
                   });
@@ -375,7 +382,8 @@ export default (app) => {
   app.get("/ipfs-content-json/:cid", async (req, res) => {
     const { cid } = req.params;
     const { token } = req.query;
-    const IPFS_GATEWAY_URL = process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
+    const IPFS_GATEWAY_URL =
+      process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
 
     if (!cid) {
       return res.status(400).json({
@@ -392,7 +400,7 @@ export default (app) => {
         method: "GET",
       };
 
-      const http = await import('http');
+      const http = await import("http");
       const ipfsReq = http.get(requestOptions, (ipfsRes) => {
         if (!token) {
           let body = "";
@@ -418,7 +426,7 @@ export default (app) => {
         ipfsRes.on("data", (chunk) => (body += chunk));
         ipfsRes.on("end", async () => {
           try {
-            const SEA = await import('gun/sea.js');
+            const SEA = await import("gun/sea.js");
             const decrypted = await SEA.default.decrypt(body, token);
 
             if (decrypted) {
@@ -464,64 +472,64 @@ export default (app) => {
       });
     }
   });
-  
+
   // Route di autenticazione
   app.use(`${baseRoute}/auth`, authRouter);
-  
+
   // Route per la gestione utenti
   app.use(`${baseRoute}/users`, usersRouter);
-  
+
   // Route per i contratti smart contract
   app.use(`${baseRoute}/contracts`, contractsRouter);
-  
+
   // Route per gli upload degli utenti
   app.use(`${baseRoute}/user-uploads`, uploadsRouter);
-  
+
   // Route per IPFS
   app.use(`${baseRoute}/ipfs`, ipfsRouter);
-  
+
   // Route di sistema e debug
   app.use(`${baseRoute}/system`, systemRouter);
-  
+
   // Route per le note
   app.use(`${baseRoute}/notes`, notesRouter);
-  
+
   // Route di debug
   app.use(`${baseRoute}/debug`, debugRouter);
-  
+
   // Route per le sottoscrizioni
   app.use(`${baseRoute}/subscriptions`, subscriptionsRouter);
-  
+
   // Route per i servizi
   app.use(`${baseRoute}/services`, servicesRouter);
-  
+
   // Route per il grafico visivo
   app.use(`${baseRoute}/visualGraph`, visualGraphRouter);
-  
+
   // Route di test per verificare se le route sono registrate correttamente
   app.get(`${baseRoute}/test`, (req, res) => {
     res.json({
       success: true,
-      message: 'API routes are working',
+      message: "API routes are working",
       timestamp: Date.now(),
-      baseRoute: baseRoute
+      baseRoute: baseRoute,
     });
   });
-  
+
   // Route legacy per compatibilità (solo quelle essenziali)
-  app.use('/api/contracts', contractsRouter);
-  app.use('/api/user-uploads', uploadsRouter);
-  app.use('/api/ipfs', ipfsRouter);
-  app.use('/api/system', systemRouter);
-  app.use('/api/notes', notesRouter);
-  app.use('/api/debug', debugRouter);
-  app.use('/api/subscriptions', subscriptionsRouter);
-  app.use('/api/services', servicesRouter);
-  app.use('/api/auth', authRouter);
-  
+  app.use("/api/contracts", contractsRouter);
+  app.use("/api/user-uploads", uploadsRouter);
+  app.use("/api/ipfs", ipfsRouter);
+  app.use("/api/system", systemRouter);
+  app.use("/api/notes", notesRouter);
+  app.use("/api/debug", debugRouter);
+  app.use("/api/subscriptions", subscriptionsRouter);
+  app.use("/api/services", servicesRouter);
+  app.use("/api/auth", authRouter);
+
   // Route principale per il visual graph
-  app.use('/visualGraph', visualGraphRouter);
-  
+  app.use("/visualGraph", visualGraphRouter);
+
   // IPFS API Proxy - for API calls to the IPFS node
   // Example: /api/v0/add, /api/v0/cat, etc.
   // SECURED: This generic proxy requires the admin token for any access.
@@ -606,7 +614,7 @@ export default (app) => {
   app.post("/api/authorize-gun-key", async (req, res) => {
     try {
       const { pubKey, userAddress, expiresAt } = req.body;
-      const gun = req.app.get('gunInstance');
+      const gun = req.app.get("gunInstance");
 
       if (!pubKey) {
         return res.status(400).json({
@@ -619,24 +627,29 @@ export default (app) => {
       if (userAddress) {
         try {
           const { ethers } = await import("ethers");
-          const { DEPLOYMENTS } = await import("shogun-contracts/deployments.js");
-          
+          const { DEPLOYMENTS } = await import(
+            "shogun-contracts/deployments.js"
+          );
+
           const chainId = process.env.CHAIN_ID || "11155111";
           const web3ProviderUrl = `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`;
-          
+
           if (process.env.ALCHEMY_API_KEY) {
             const provider = new ethers.JsonRpcProvider(web3ProviderUrl);
             const chainDeployments = DEPLOYMENTS[chainId];
-            const relayContract = chainDeployments?.["Relay#RelayPaymentRouter"];
-            
+            const relayContract =
+              chainDeployments?.["Relay#RelayPaymentRouter"];
+
             if (relayContract) {
               const contract = new ethers.Contract(
                 relayContract.address,
                 relayContract.abi,
                 provider
               );
-              
-              const isSubscribed = await contract.checkUserSubscription(userAddress);
+
+              const isSubscribed = await contract.checkUserSubscription(
+                userAddress
+              );
               if (!isSubscribed) {
                 return res.status(403).json({
                   success: false,
@@ -696,7 +709,7 @@ export default (app) => {
   app.delete("/api/authorize-gun-key/:pubKey", async (req, res) => {
     try {
       const { pubKey } = req.params;
-      const gun = req.app.get('gunInstance');
+      const gun = req.app.get("gunInstance");
 
       if (!pubKey) {
         return res.status(400).json({
@@ -729,7 +742,7 @@ export default (app) => {
   app.get("/api/authorize-gun-key/:pubKey", async (req, res) => {
     try {
       const { pubKey } = req.params;
-      const gun = req.app.get('gunInstance');
+      const gun = req.app.get("gunInstance");
 
       if (!pubKey) {
         return res.status(400).json({
@@ -774,7 +787,7 @@ export default (app) => {
       });
     }
   });
-  
+
   // --- ROUTE LEGACY ESSENZIALI DAL FILE ORIGINALE ---
 
   // IPFS API proxy legacy
@@ -834,205 +847,217 @@ export default (app) => {
   });
 
   // IPFS upload legacy
-  app.post("/ipfs-upload", tokenAuthMiddleware, upload.single("file"), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          error: "No file provided",
+  app.post(
+    "/ipfs-upload",
+    tokenAuthMiddleware,
+    upload.single("file"),
+    async (req, res) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({
+            success: false,
+            error: "No file provided",
+          });
+        }
+
+        const formData = new FormData();
+        formData.append("file", req.file.buffer, {
+          filename: req.file.originalname,
+          contentType: req.file.mimetype,
         });
-      }
 
-      const formData = new FormData();
-      formData.append("file", req.file.buffer, {
-        filename: req.file.originalname,
-        contentType: req.file.mimetype,
-      });
+        const requestOptions = {
+          hostname: "127.0.0.1",
+          port: 5001,
+          path: "/api/v0/add?wrap-with-directory=false",
+          method: "POST",
+          headers: {
+            ...formData.getHeaders(),
+          },
+        };
 
-      const requestOptions = {
-        hostname: "127.0.0.1",
-        port: 5001,
-        path: "/api/v0/add?wrap-with-directory=false",
-        method: "POST",
-        headers: {
-          ...formData.getHeaders(),
-        },
-      };
+        if (IPFS_API_TOKEN) {
+          requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+        }
 
-      if (IPFS_API_TOKEN) {
-        requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
-      }
+        const http = await import("http");
+        const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+          let data = "";
+          ipfsRes.on("data", (chunk) => (data += chunk));
+          ipfsRes.on("end", () => {
+            console.log("📤 IPFS Upload raw response:", data);
 
-      const http = await import('http');
-      const ipfsReq = http.request(requestOptions, (ipfsRes) => {
-        let data = "";
-        ipfsRes.on("data", (chunk) => (data += chunk));
-        ipfsRes.on("end", () => {
-          console.log("📤 IPFS Upload raw response:", data);
+            try {
+              const lines = data.trim().split("\n");
+              const results = lines.map((line) => JSON.parse(line));
+              const fileResult =
+                results.find((r) => r.Name === req.file.originalname) ||
+                results[0];
 
-          try {
-            const lines = data.trim().split("\n");
-            const results = lines.map((line) => JSON.parse(line));
-            const fileResult =
-              results.find((r) => r.Name === req.file.originalname) ||
-              results[0];
+              res.json({
+                success: true,
+                file: {
+                  name: req.file.originalname,
+                  size: req.file.size,
+                  mimetype: req.file.mimetype,
+                  hash: fileResult?.Hash,
+                  ipfsUrl: `${req.protocol}://${
+                    req.get("host") ||
+                    req.get("x-forwarded-host") ||
+                    "localhost:3000"
+                  }/ipfs-content/${fileResult?.Hash}`,
+                  gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
+                  publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
+                },
+                ipfsResponse: results,
+                debug: {
+                  protocol: req.protocol,
+                  host: req.get("host"),
+                  forwardedHost: req.get("x-forwarded-host"),
+                  originalUrl: req.originalUrl,
+                  headers: {
+                    host: req.headers.host,
+                    "x-forwarded-host": req.headers["x-forwarded-host"],
+                    "x-forwarded-proto": req.headers["x-forwarded-proto"],
+                  },
+                },
+              });
+            } catch (parseError) {
+              console.error("Upload parse error:", parseError);
+              res.status(500).json({
+                success: false,
+                error: "Failed to parse IPFS response",
+                rawResponse: data,
+                parseError: parseError.message,
+              });
+            }
+          });
+        });
 
-            res.json({
-              success: true,
-              file: {
-                name: req.file.originalname,
-                size: req.file.size,
-                mimetype: req.file.mimetype,
-                hash: fileResult?.Hash,
-                ipfsUrl: `${req.protocol}://${req.get("host") || req.get("x-forwarded-host") || "localhost:3000"}/ipfs-content/${
-                  fileResult?.Hash
-                }`,
-                gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
-                publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
-              },
-              ipfsResponse: results,
-              debug: {
-                protocol: req.protocol,
-                host: req.get("host"),
-                forwardedHost: req.get("x-forwarded-host"),
-                originalUrl: req.originalUrl,
-                headers: {
-                  host: req.headers.host,
-                  "x-forwarded-host": req.headers["x-forwarded-host"],
-                  "x-forwarded-proto": req.headers["x-forwarded-proto"]
-                }
-              }
-            });
-          } catch (parseError) {
-            console.error("Upload parse error:", parseError);
-            res.status(500).json({
-              success: false,
-              error: "Failed to parse IPFS response",
-              rawResponse: data,
-              parseError: parseError.message,
-            });
+        ipfsReq.on("error", (err) => {
+          console.error("❌ IPFS Upload error:", err);
+          res.status(500).json({ success: false, error: err.message });
+        });
+
+        ipfsReq.setTimeout(30000, () => {
+          ipfsReq.destroy();
+          if (!res.headersSent) {
+            res.status(408).json({ success: false, error: "Upload timeout" });
           }
         });
-      });
 
-      ipfsReq.on("error", (err) => {
-        console.error("❌ IPFS Upload error:", err);
-        res.status(500).json({ success: false, error: err.message });
-      });
-
-      ipfsReq.setTimeout(30000, () => {
-        ipfsReq.destroy();
-        if (!res.headersSent) {
-          res.status(408).json({ success: false, error: "Upload timeout" });
-        }
-      });
-
-      formData.pipe(ipfsReq);
-    } catch (error) {
-      console.error("❌ IPFS Upload Error:", error);
-      res.status(500).json({ success: false, error: error.message });
+        formData.pipe(ipfsReq);
+      } catch (error) {
+        console.error("❌ IPFS Upload Error:", error);
+        res.status(500).json({ success: false, error: error.message });
+      }
     }
-  });
+  );
 
   // IPFS upload user endpoint
-  app.post("/ipfs-upload-user", walletSignatureMiddleware, upload.single("file"), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          error: "No file provided",
+  app.post(
+    "/ipfs-upload-user",
+    walletSignatureMiddleware,
+    upload.single("file"),
+    async (req, res) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({
+            success: false,
+            error: "No file provided",
+          });
+        }
+
+        const userAddress = req.headers["x-user-address"];
+        if (!userAddress) {
+          return res.status(401).json({
+            success: false,
+            error: "Header 'x-user-address' required",
+          });
+        }
+
+        console.log(`📤 Upload request for user: ${userAddress}`);
+
+        const formData = new FormData();
+        formData.append("file", req.file.buffer, {
+          filename: req.file.originalname,
+          contentType: req.file.mimetype,
         });
-      }
 
-      const userAddress = req.headers["x-user-address"];
-      if (!userAddress) {
-        return res.status(401).json({
-          success: false,
-          error: "Header 'x-user-address' required",
+        const requestOptions = {
+          hostname: "127.0.0.1",
+          port: 5001,
+          path: "/api/v0/add?wrap-with-directory=false",
+          method: "POST",
+          headers: {
+            ...formData.getHeaders(),
+          },
+        };
+
+        if (IPFS_API_TOKEN) {
+          requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+        }
+
+        const http = await import("http");
+        const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+          let data = "";
+          ipfsRes.on("data", (chunk) => (data += chunk));
+          ipfsRes.on("end", () => {
+            console.log("📤 IPFS Upload user raw response:", data);
+
+            try {
+              const lines = data.trim().split("\n");
+              const results = lines.map((line) => JSON.parse(line));
+              const fileResult =
+                results.find((r) => r.Name === req.file.originalname) ||
+                results[0];
+
+              res.json({
+                success: true,
+                file: {
+                  name: req.file.originalname,
+                  size: req.file.size,
+                  mimetype: req.file.mimetype,
+                  hash: fileResult?.Hash,
+                  ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
+                    fileResult?.Hash
+                  }`,
+                  gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
+                  publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
+                },
+                ipfsResponse: results,
+              });
+            } catch (parseError) {
+              console.error("Upload parse error:", parseError);
+              res.status(500).json({
+                success: false,
+                error: "Failed to parse IPFS response",
+                rawResponse: data,
+                parseError: parseError.message,
+              });
+            }
+          });
         });
-      }
 
-      console.log(`📤 Upload request for user: ${userAddress}`);
+        ipfsReq.on("error", (err) => {
+          console.error("❌ IPFS Upload user error:", err);
+          res.status(500).json({ success: false, error: err.message });
+        });
 
-      const formData = new FormData();
-      formData.append("file", req.file.buffer, {
-        filename: req.file.originalname,
-        contentType: req.file.mimetype,
-      });
-
-      const requestOptions = {
-        hostname: "127.0.0.1",
-        port: 5001,
-        path: "/api/v0/add?wrap-with-directory=false",
-        method: "POST",
-        headers: {
-          ...formData.getHeaders(),
-        },
-      };
-
-      if (IPFS_API_TOKEN) {
-        requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
-      }
-
-      const http = await import('http');
-      const ipfsReq = http.request(requestOptions, (ipfsRes) => {
-        let data = "";
-        ipfsRes.on("data", (chunk) => (data += chunk));
-        ipfsRes.on("end", () => {
-          console.log("📤 IPFS Upload user raw response:", data);
-
-          try {
-            const lines = data.trim().split("\n");
-            const results = lines.map((line) => JSON.parse(line));
-            const fileResult =
-              results.find((r) => r.Name === req.file.originalname) ||
-              results[0];
-
-            res.json({
-              success: true,
-              file: {
-                name: req.file.originalname,
-                size: req.file.size,
-                mimetype: req.file.mimetype,
-                hash: fileResult?.Hash,
-                ipfsUrl: `${req.protocol}://${req.get("host")}/ipfs-content/${
-                  fileResult?.Hash
-                }`,
-                gatewayUrl: `${IPFS_GATEWAY_URL}/ipfs/${fileResult?.Hash}`,
-                publicGateway: `https://ipfs.io/ipfs/${fileResult?.Hash}`,
-              },
-              ipfsResponse: results,
-            });
-          } catch (parseError) {
-            console.error("Upload parse error:", parseError);
-            res.status(500).json({
-              success: false,
-              error: "Failed to parse IPFS response",
-              rawResponse: data,
-              parseError: parseError.message,
-            });
+        ipfsReq.setTimeout(30000, () => {
+          ipfsReq.destroy();
+          if (!res.headersSent) {
+            res.status(408).json({ success: false, error: "Upload timeout" });
           }
         });
-      });
 
-      ipfsReq.on("error", (err) => {
-        console.error("❌ IPFS Upload user error:", err);
-        res.status(500).json({ success: false, error: err.message });
-      });
-
-      ipfsReq.setTimeout(30000, () => {
-        ipfsReq.destroy();
-        if (!res.headersSent) {
-          res.status(408).json({ success: false, error: "Upload timeout" });
-        }
-      });
-
-      formData.pipe(ipfsReq);
-    } catch (error) {
-      console.error("❌ IPFS Upload user Error:", error);
-      res.status(500).json({ success: false, error: error.message });
+        formData.pipe(ipfsReq);
+      } catch (error) {
+        console.error("❌ IPFS Upload user Error:", error);
+        res.status(500).json({ success: false, error: error.message });
+      }
     }
-  });
+  );
 
   // IPFS status legacy
   app.get("/ipfs-status", async (req, res) => {
@@ -1053,7 +1078,7 @@ export default (app) => {
         requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
       }
 
-      const http = await import('http');
+      const http = await import("http");
       const ipfsReq = http.request(requestOptions, (ipfsRes) => {
         let data = "";
         ipfsRes.on("data", (chunk) => (data += chunk));
@@ -1204,7 +1229,7 @@ export default (app) => {
       // Test basic contract interaction
       try {
         await contract.getFunction("owner")();
-        
+
         res.json({
           success: true,
           status: "connected",
@@ -1244,25 +1269,25 @@ export default (app) => {
   });
 
   // --- FINE ROUTE LEGACY ---
-  
+
   // Route di health check
   app.get(`${baseRoute}/health`, (req, res) => {
     res.json({
       success: true,
-      message: 'Shogun Relay API is running',
+      message: "Shogun Relay API is running",
       data: {
         timestamp: new Date().toISOString(),
-        version: process.env.npm_package_version || '1.0.0',
-        uptime: process.uptime()
-      }
+        version: process.env.npm_package_version || "1.0.0",
+        uptime: process.uptime(),
+      },
     });
   });
-  
+
   // Route di default per API non trovate
   app.use(`${baseRoute}/*`, (req, res) => {
     res.status(404).json({
       success: false,
-      message: 'API endpoint non trovato',
+      message: "API endpoint non trovato",
       data: {
         path: req.path,
         method: req.method,
@@ -1289,9 +1314,9 @@ export default (app) => {
           `${baseRoute}/subscriptions/user-subscription-details/:userAddress`,
           `${baseRoute}/services/s3-stats`,
           `${baseRoute}/services/:service/restart`,
-          `${baseRoute}/health`
-        ]
-      }
+          `${baseRoute}/health`,
+        ],
+      },
     });
   });
 
@@ -1316,11 +1341,13 @@ export default (app) => {
         });
       }
 
-      const gun = req.app.get('gunInstance');
-      const getOffChainMBUsage = req.app.get('getOffChainMBUsage');
+      const gun = req.app.get("gunInstance");
+      const getOffChainMBUsage = req.app.get("getOffChainMBUsage");
 
       // Ottieni l'utilizzo MB corrente prima del reset
-      const previousMBUsed = getOffChainMBUsage ? await getOffChainMBUsage(identifier) : 0;
+      const previousMBUsed = getOffChainMBUsage
+        ? await getOffChainMBUsage(identifier)
+        : 0;
 
       // Reset dell'utilizzo MB
       const mbUsageNode = gun.get("shogun").get("mb_usage").get(identifier);
@@ -1370,7 +1397,7 @@ export default (app) => {
 
   // Fallback to index.html per tutte le altre route
   app.get("/*", (req, res) => {
-    const publicPath = path.resolve(__dirname, '../public');
+    const publicPath = path.resolve(__dirname, "../public");
     const indexPath = path.resolve(publicPath, "index.html");
     if (fs.existsSync(indexPath)) {
       res.sendFile(indexPath);
@@ -1378,4 +1405,4 @@ export default (app) => {
       res.status(404).send("Index file not found");
     }
   });
-}; 
+};

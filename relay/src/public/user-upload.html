@@ -454,17 +454,38 @@
 
                 // Usa il nuovo endpoint centralizzato
                 const url = `/api/v1/subscriptions/user-subscription-details/${encodeURIComponent(walletAddr)}`;
-                console.log('🔍 user-upload: Making API call to:', url);
-
+                console.log(`🔍 user-upload: Making API call to: ${url}`);
+                
+                // Log dettagliato della richiesta
+                console.log(`🔍 user-upload: Request details:`, {
+                  url: url,
+                  method: 'GET',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  }
+                });
+                
                 const response = await fetch(url);
-                console.log('📡 user-upload: Response status:', response.status);
-
+                console.log(`📡 user-upload: Response status: ${response.status}`);
+                console.log(`📡 user-upload: Response headers:`, Object.fromEntries(response.headers.entries()));
+                
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
                 }
 
                 const result = await response.json();
-                console.log('📋 user-upload: Response data:', result);
+                console.log(`📋 user-upload: Response data:`, result);
+                
+                // Log dettagliato della risposta
+                console.log(`📋 user-upload: Subscription response details:`, {
+                  success: result.success,
+                  chainId: result.chainId,
+                  userAddress: result.userAddress,
+                  subscription: result.subscription,
+                  mbUsed: result.subscription?.mbUsed,
+                  mbRemaining: result.subscription?.mbRemaining,
+                  usagePercentage: result.subscription?.usagePercentage
+                });
 
                 if (result.success) {
                     const details = result.subscription;
