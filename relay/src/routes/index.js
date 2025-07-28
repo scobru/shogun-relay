@@ -499,6 +499,16 @@ export default (app) => {
   // Route per i servizi
   app.use(`${baseRoute}/services`, servicesRouter);
   
+  // Route di test per verificare se le route sono registrate correttamente
+  app.get(`${baseRoute}/test`, (req, res) => {
+    res.json({
+      success: true,
+      message: 'API routes are working',
+      timestamp: Date.now(),
+      baseRoute: baseRoute
+    });
+  });
+  
   // Route legacy per compatibilità (solo quelle essenziali)
   app.use('/api/contracts', contractsRouter);
   app.use('/api/user-uploads', uploadsRouter);

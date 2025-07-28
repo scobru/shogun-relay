@@ -1,7 +1,26 @@
 import express from 'express';
-import { DEPLOYMENTS } from "shogun-contracts/deployments.js";
 
 const router = express.Router();
+
+// Test import di shogun-contracts
+let DEPLOYMENTS = {};
+try {
+  const contractsModule = await import("shogun-contracts/deployments.js");
+  DEPLOYMENTS = contractsModule.DEPLOYMENTS;
+  console.log("✅ shogun-contracts importato correttamente");
+  console.log("📋 Chain IDs disponibili:", Object.keys(DEPLOYMENTS));
+} catch (error) {
+  console.error("❌ Errore import shogun-contracts:", error);
+  // Fallback con dati mock per test
+  DEPLOYMENTS = {
+    "11155111": {
+      "Relay#RelayPaymentRouter": {
+        address: "0x1234567890123456789012345678901234567890",
+        abi: []
+      }
+    }
+  };
+}
 
 // Route per ottenere la configurazione completa dei contratti
 router.get("/config", async (req, res) => {
