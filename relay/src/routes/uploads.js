@@ -9,7 +9,7 @@ const getGunInstance = (req) => {
 
 // Funzione helper per ottenere l'utilizzo MB off-chain
 async function getOffChainMBUsage(userAddress, req) {
-  const gun = req ? req.app.get('gunInstance') : null;
+  const gun = getGunInstance(req);
   if (!gun) {
     console.warn('Gun instance not available for MB usage calculation');
     return 0;
@@ -32,7 +32,7 @@ async function getOffChainMBUsage(userAddress, req) {
 }
 
 // Funzione helper per salvare upload e aggiornare MB
-async function saveUploadAndUpdateMB(userAddress, fileHash, uploadData, fileSizeMB) {
+async function saveUploadAndUpdateMB(userAddress, fileHash, uploadData, fileSizeMB, req) {
   const gun = getGunInstance(req);
   return new Promise((resolve, reject) => {
     try {
@@ -68,7 +68,7 @@ async function saveUploadAndUpdateMB(userAddress, fileHash, uploadData, fileSize
 }
 
 // Funzione helper per eliminare upload e aggiornare MB
-async function deleteUploadAndUpdateMB(userAddress, fileHash, fileSizeMB) {
+async function deleteUploadAndUpdateMB(userAddress, fileHash, fileSizeMB, req) {
   const gun = getGunInstance(req);
   return new Promise((resolve, reject) => {
     try {
@@ -227,7 +227,14 @@ router.get("/:identifier", async (req, res) => {
 });
 
 // Endpoint per eliminare un upload specifico
-router.delete("/:identifier/:hash", async (req, res) => {
+router.delete("/:identifier/:hash", (req, res, next) => {
+  const walletSignatureMiddleware = req.app.get('walletSignatureMiddleware');
+  if (walletSignatureMiddleware) {
+    walletSignatureMiddleware(req, res, next);
+  } else {
+    next();
+  }
+}, async (req, res) => {
   try {
     const { identifier, hash } = req.params;
     if (!identifier || !hash) {
@@ -269,7 +276,7 @@ router.delete("/:identifier/:hash", async (req, res) => {
     const previousMBUsed = await getOffChainMBUsage(identifier, req);
 
     // 4. Elimina il file
-    await deleteUploadAndUpdateMB(identifier, hash, fileSizeMB);
+    await deleteUploadAndUpdateMB(identifier, hash, fileSizeMB, req);
 
     // 5. Ottieni il nuovo utilizzo MB dopo l'eliminazione
     const newMBUsed = await getOffChainMBUsage(identifier, req);

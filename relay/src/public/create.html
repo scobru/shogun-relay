@@ -252,7 +252,7 @@
                 const response = await fetch(`/api/v1/system/node/${nodePath}`, {
                     method: 'POST',
                     headers: { ...authHeader, 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify({ data: data })
                 });
                 
                 if (!response.ok) {

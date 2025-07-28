@@ -663,6 +663,17 @@ router.post("/node/*", async (req, res) => {
         .json({ success: false, error: "Node path cannot be empty." });
     }
 
+    if (data === undefined) {
+      return res
+        .status(400)
+        .json({ 
+          success: false, 
+          error: "Invalid data: undefined at test.",
+          path: path,
+          receivedBody: req.body
+        });
+    }
+
     console.log(`📝 Creating node at path: "${path}" with data:`, data);
     
     const getGunNodeFromPath = (pathString) => {

@@ -317,9 +317,17 @@
             console.log('🖱️ user-upload: Upload button clicked');
             uploadFile();
         });
-        refreshFilesBtn.addEventListener('click', () => {
+        refreshFilesBtn.addEventListener('click', async () => {
             console.log('🖱️ user-upload: Refresh button clicked');
-            loadUserFiles();
+            try {
+                // Prima sincronizza i MB
+                await syncMBUsage();
+                // Poi carica i file
+                await loadUserFiles();
+            } catch (error) {
+                console.error('💥 user-upload: Error during refresh:', error);
+                showStatus('Error during refresh', 'error');
+            }
         });
         connectWalletBtn.addEventListener('click', () => {
             console.log('🖱️ user-upload: Connect wallet button clicked');
