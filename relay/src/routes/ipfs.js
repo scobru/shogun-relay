@@ -356,23 +356,36 @@ router.post("/upload",
               Promise.all([saveUploadPromise, updateMBPromise])
                 .then(() => {
                   console.log(`📊 User upload saved: ${req.userAddress} - ${fileSizeMB} MB`);
+                  
+                  // Send response only after GunDB operations are complete
+                  res.json({
+                    success: true,
+                    file: uploadData,
+                    authType: req.authType,
+                    mbUsage: req.authType === 'user' ? {
+                      actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                      sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
+                      verified: true
+                    } : undefined
+                  });
                 })
                 .catch((error) => {
                   console.error(`❌ Error during GunDB save:`, error);
-                  // Continue anyway, the file is already on IPFS
+                  // Send error response
+                  res.status(500).json({
+                    success: false,
+                    error: "Failed to save upload data",
+                    details: error.message
+                  });
                 });
+            } else {
+              // For admin uploads, send response immediately
+              res.json({
+                success: true,
+                file: uploadData,
+                authType: req.authType
+              });
             }
-
-            res.json({
-              success: true,
-              file: uploadData,
-              authType: req.authType,
-              mbUsage: req.authType === 'user' ? {
-                actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
-                sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
-                verified: true
-              } : undefined
-            });
           } catch (parseError) {
             console.error("❌ IPFS Upload parse error:", parseError);
             res.status(500).json({
