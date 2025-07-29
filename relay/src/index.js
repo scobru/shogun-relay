@@ -1025,4 +1025,321 @@ async function initializeServer() {
           const userFiles = await new Promise((resolve) => {
             const timeoutId = setTimeout(() => {
               console.warn(
-                `
+                `⚠️ GunDB uploads read timeout for ${userAddress}, using fallback calculation`
+              );
+              resolve([]);
+            }, 2500); // Timeout ridotto a 2.5 secondi
+
+            uploadsNode.once((parentData) => {
+              clearTimeout(timeoutId);
+
+              if (!parentData || typeof parentData !== "object") {
+                resolve([]);
+                return;
+              }
+
+              const hashKeys = Object.keys(parentData).filter(
+                (key) => key !== "_"
+              );
+              let uploadsArray = [];
+              let completedReads = 0;
+              const totalReads = hashKeys.length;
+
+              if (totalReads === 0) {
+                resolve([]);
+                return;
+              }
+
+              // Timeout per ogni singola lettura di file
+              const fileReadTimeout = setTimeout(() => {
+                console.warn(`⚠️ File read timeout, using partial data`);
+                resolve(uploadsArray);
+              }, 3000);
+
+              hashKeys.forEach((hash) => {
+                uploadsNode.get(hash).once((uploadData) => {
+                  completedReads++;
+                  if (uploadData && uploadData.sizeMB) {
+                    uploadsArray.push(uploadData);
+                  }
+                  if (completedReads === totalReads) {
+                    clearTimeout(fileReadTimeout);
+                    resolve(uploadsArray);
+                  }
+                });
+              });
+            });
+          });
+
+          // Calcola il totale dei MB dai file
+          const calculatedMbUsed = userFiles.reduce(
+            (sum, file) => sum + (file.sizeMB || 0),
+            0
+          );
+          console.log(
+            `📊 Calculated MB usage from files: ${calculatedMbUsed} MB (${userFiles.length} files)`
+          );
+
+          // Usa il valore calcolato se è maggiore di 0
+          if (calculatedMbUsed > 0) {
+            // Aggiorna anche i dati off-chain per futuri utilizzi (in background)
+            const updatedUsage = {
+              mbUsed: calculatedMbUsed,
+              lastUpdated: Date.now(),
+              updatedBy: "recalculation-from-files",
+            };
+
+            mbUsageNode.put(updatedUsage, (ack) => {
+              if (ack.err) {
+                console.error("Error updating recalculated MB usage:", ack.err);
+              } else {
+                console.log(
+                  `✅ Updated off-chain MB usage with recalculated value: ${calculatedMbUsed} MB`
+                );
+              }
+            });
+
+            return {
+              mbUsed: calculatedMbUsed,
+              lastUpdated: Date.now(),
+              recalculated: true,
+            };
+          }
+        } catch (recalcError) {
+          console.error("Error recalculating MB usage:", recalcError);
+        }
+      }
+
+      return offChainUsage;
+    } catch (error) {
+      console.error("Error getting off-chain MB usage:", error);
+      return { mbUsed: 0, lastUpdated: Date.now(), error: error.message };
+    }
+  }
+
+  // Esponi la funzione getOffChainMBUsage
+  app.set("getOffChainMBUsage", getOffChainMBUsage);
+
+  // Esponi le configurazioni IPFS
+  app.set("IPFS_API_URL", IPFS_API_URL);
+  app.set("IPFS_API_TOKEN", IPFS_API_TOKEN);
+  app.set("IPFS_GATEWAY_URL", IPFS_GATEWAY_URL);
+
+  // Esponi l'istanza Gun globalmente per le route
+  global.gunInstance = gun;
+
+  // Route legacy per compatibilità (definite prima delle route modulari)
+  
+  // Health check endpoint
+  app.get("/health", (req, res) => {
+    res.json({
+      success: true,
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      activeConnections: activeWires || 0,
+      totalConnections: totalConnections || 0,
+      memoryUsage: process.memoryUsage(),
+    });
+  });
+
+  // IPFS status endpoint
+  app.get("/ipfs-status", async (req, res) => {
+    try {
+      console.log("📊 IPFS Status: Checking IPFS node status");
+
+      const requestOptions = {
+        hostname: "127.0.0.1",
+        port: 5001,
+        path: "/api/v0/version",
+        method: "POST",
+        headers: {
+          "Content-Length": "0",
+        },
+      };
+
+      if (IPFS_API_TOKEN) {
+        requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+      }
+
+      const http = await import('http');
+      const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+        let data = "";
+        ipfsRes.on("data", (chunk) => (data += chunk));
+        ipfsRes.on("end", () => {
+          try {
+            const versionData = JSON.parse(data);
+            res.json({
+              success: true,
+              status: "connected",
+              version: versionData.Version,
+              apiUrl: IPFS_API_URL,
+            });
+          } catch (parseError) {
+            console.error("IPFS status parse error:", parseError);
+            res.json({
+              success: false,
+              status: "error",
+              error: "Failed to parse IPFS response",
+            });
+          }
+        });
+      });
+
+      ipfsReq.on("error", (err) => {
+        console.error("❌ IPFS Status Error:", err);
+        res.json({
+          success: false,
+          status: "disconnected",
+          error: "IPFS node not responding",
+        });
+      });
+
+      ipfsReq.end();
+    } catch (error) {
+      console.error("❌ IPFS Status Error:", error);
+      res.json({
+        success: false,
+        status: "error",
+        error: error.message,
+      });
+    }
+  });
+
+  // IPFS upload endpoint (admin) - DEPRECATED: use /api/v1/ipfs/upload instead
+  app.post("/ipfs-upload", tokenAuthMiddleware, upload.single("file"), async (req, res) => {
+    res.status(410).json({
+      success: false,
+      error: "This endpoint is deprecated. Use /api/v1/ipfs/upload instead.",
+      message: "Please update your client to use the new API endpoint."
+    });
+  });
+
+  // IPFS upload endpoint (user) - DEPRECATED: use /api/v1/ipfs/upload instead
+  app.post("/ipfs-upload-user", walletSignatureMiddleware, upload.single("file"), async (req, res) => {
+    res.status(410).json({
+      success: false,
+      error: "This endpoint is deprecated. Use /api/v1/ipfs/upload instead.",
+      message: "Please update your client to use the new API endpoint."
+    });
+  });
+
+  // Importa e configura le route modulari
+  try {
+    const routes = await import("./routes/index.js");
+    routes.default(app);
+    console.log("✅ Route modulari configurate con successo");
+  } catch (error) {
+    console.error(
+      "❌ Errore nel caricamento delle route modulari:",
+      error
+    );
+  }
+
+  // Initialize garbage collector now that gun is ready
+  initializeGarbageCollector();
+
+  // Set up relay stats database
+  const db = gun.get(namespace).get("relays").get(host);
+
+  let totalConnections = 0;
+  let activeWires = 0;
+
+  gun.on("hi", () => {
+    totalConnections += 1;
+    activeWires += 1;
+    db?.get("totalConnections").put(totalConnections);
+    db?.get("activeWires").put(activeWires);
+    console.log(`Connection opened (active: ${activeWires})`);
+  });
+
+  gun.on("bye", () => {
+    activeWires -= 1;
+    db?.get("activeWires").put(activeWires);
+    console.log(`Connection closed (active: ${activeWires})`);
+  });
+
+  gun.on("out", { get: { "#": { "*": "" } } });
+
+  // Set up pulse interval for health monitoring
+  setSelfAdjustingInterval(() => {
+    const pulse = {
+      timestamp: Date.now(),
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      connections: {
+        total: totalConnections,
+        active: activeWires,
+      },
+      relay: {
+        host,
+        port,
+        namespace,
+      },
+    };
+
+    db?.get("pulse").put(pulse);
+    addTimeSeriesPoint("connections.active", activeWires);
+    addTimeSeriesPoint("memory.heapUsed", process.memoryUsage().heapUsed);
+  }, 30000); // 30 seconds
+
+  // Shutdown function
+  async function shutdown() {
+    console.log("🛑 Shutting down Shogun Relay...");
+    addSystemLog("info", "Server shutdown initiated");
+
+    // Clean up garbage collector interval
+    if (gcInterval) {
+      clearInterval(gcInterval);
+      console.log("✅ Garbage collector interval cleared");
+    }
+
+    // Close server
+    if (server) {
+      server.close(() => {
+        console.log("✅ Server closed");
+        process.exit(0);
+      });
+    } else {
+      process.exit(0);
+    }
+  }
+
+  // Handle shutdown signals
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+
+  // Show QR code if enabled
+  if (showQr) {
+    const url = `http://${host}:${port}`;
+    console.log(`📱 QR Code for: ${url}`);
+    try {
+      const qrCode = qr.image(url, { type: 'terminal', small: true });
+      console.log(qrCode);
+    } catch (qrError) {
+      console.log(`📱 QR Code generation failed: ${qrError.message}`);
+      console.log(`📱 URL: ${url}`);
+    }
+  }
+
+  console.log(`🚀 Shogun Relay Server running on http://${host}:${port}`);
+  addSystemLog("info", "Server started successfully", {
+    host,
+    port,
+    namespace,
+    peers: peers.length,
+  });
+
+  return {
+    server,
+    gun,
+    db,
+    addSystemLog,
+    addTimeSeriesPoint,
+    runGarbageCollector,
+    shutdown,
+  };
+}
+
+// Avvia il server
+initializeServer().catch(console.error);
