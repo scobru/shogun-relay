@@ -381,20 +381,25 @@ async function initializeServer() {
                     keyType: typeof event.args.key
                   });
                   
-                  // In Ethers.js v6, gli argomenti degli eventi sono oggetti Result
-                  // Dobbiamo accedere alla proprietà corretta per ottenere i bytes
+                  // Gestisci sia eventi indexed che non-indexed
                   let soulBytes, keyBytes;
                   
-                  // Controlla se sono oggetti Result di Ethers.js
-                  if (event.args.soul && typeof event.args.soul === 'object') {
-                    // Prova diverse proprietà possibili
+                  // Controlla se sono oggetti Indexed (vecchio contratto)
+                  if (event.args.soul && typeof event.args.soul === 'object' && event.args.soul._isIndexed) {
+                    console.log("🔍 Detected indexed soul, using hash");
+                    soulBytes = event.args.soul.hash;
+                  } else if (event.args.soul && typeof event.args.soul === 'object') {
+                    // Oggetto Result di Ethers.js (nuovo contratto)
                     soulBytes = event.args.soul.bytes || event.args.soul.data || event.args.soul;
                   } else {
                     soulBytes = event.args.soul;
                   }
                   
-                  if (event.args.key && typeof event.args.key === 'object') {
-                    // Prova diverse proprietà possibili
+                  if (event.args.key && typeof event.args.key === 'object' && event.args.key._isIndexed) {
+                    console.log("🔍 Detected indexed key, using hash");
+                    keyBytes = event.args.key.hash;
+                  } else if (event.args.key && typeof event.args.key === 'object') {
+                    // Oggetto Result di Ethers.js (nuovo contratto)
                     keyBytes = event.args.key.bytes || event.args.key.data || event.args.key;
                   } else {
                     keyBytes = event.args.key;
@@ -407,12 +412,24 @@ async function initializeServer() {
                     keyBytesType: typeof keyBytes
                   });
                   
-                  // Ora che soul e key non sono più indexed, dovrebbero essere bytes in chiaro
-                  // Prova a decodificarli direttamente come UTF-8
-                  soulString = ethers.toUtf8String(soulBytes);
-                  keyString = ethers.toUtf8String(keyBytes);
+                  // Se sono hash keccak256 (eventi indexed), non possiamo decodificarli
+                  if (typeof soulBytes === 'string' && soulBytes.startsWith('0x') && soulBytes.length === 66) {
+                    console.log("⚠️ Soul is keccak256 hash, cannot decode to original string");
+                    soulString = `hash_${soulBytes.substring(2, 10)}`;
+                  } else {
+                    // Prova a decodificare come UTF-8
+                    soulString = ethers.toUtf8String(soulBytes);
+                  }
                   
-                  console.log(`✅ Decoded from bytes: soul="${soulString}", key="${keyString}"`);
+                  if (typeof keyBytes === 'string' && keyBytes.startsWith('0x') && keyBytes.length === 66) {
+                    console.log("⚠️ Key is keccak256 hash, cannot decode to original string");
+                    keyString = `hash_${keyBytes.substring(2, 10)}`;
+                  } else {
+                    // Prova a decodificare come UTF-8
+                    keyString = ethers.toUtf8String(keyBytes);
+                  }
+                  
+                  console.log(`✅ Final decoded: soul="${soulString}", key="${keyString}"`);
                 } catch (error) {
                   console.warn("⚠️ Could not decode soul/key as UTF-8, using fallback");
                   console.log("Decode error:", error.message);
