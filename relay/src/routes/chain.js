@@ -1,4 +1,5 @@
 import express from 'express';
+import { ethers } from 'ethers';
 
 const router = express.Router();
 
@@ -107,6 +108,158 @@ router.get("/status", async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Errore ottenimento stato contratto",
+      details: error.message
+    });
+  }
+});
+
+// Route per leggere i dati grezzi dal contratto
+router.get("/contract-read/:soul/:key", async (req, res) => {
+  try {
+    const { soul, key } = req.params;
+    const chainContract = req.app.get("chainContract");
+    
+    if (!chainContract) {
+      return res.status(500).json({
+        success: false,
+        error: "Contratto Chain non inizializzato"
+      });
+    }
+
+    console.log(`🔍 Reading from contract: soul=${soul}, key=${key}`);
+
+    // Converti in bytes come fa il contratto
+    const soulBytes = ethers.toUtf8Bytes(soul);
+    const keyBytes = ethers.toUtf8Bytes(key);
+
+    try {
+      // Leggi dal contratto
+      const value = await chainContract.getNode(soulBytes, keyBytes);
+      
+      console.log("🔍 Raw contract response:", {
+        value: value,
+        valueType: typeof value,
+        valueLength: value ? value.length : 0
+      });
+
+      // Prova a decodificare il valore
+      let decodedValue;
+      try {
+        decodedValue = ethers.toUtf8String(value);
+        console.log("✅ Value decoded successfully:", decodedValue);
+      } catch (decodeError) {
+        console.warn("⚠️ Could not decode value:", decodeError.message);
+        decodedValue = value;
+      }
+
+      res.json({
+        success: true,
+        request: { soul, key },
+        contractResponse: {
+          rawValue: value,
+          decodedValue: decodedValue,
+          valueHex: value ? ethers.hexlify(value) : null
+        },
+        encoding: {
+          soulBytes: Array.from(soulBytes),
+          keyBytes: Array.from(keyBytes),
+          soulHex: ethers.hexlify(soulBytes),
+          keyHex: ethers.hexlify(keyBytes)
+        }
+      });
+
+    } catch (contractError) {
+      console.error("❌ Contract read error:", contractError);
+      res.json({
+        success: false,
+        error: "Errore lettura dal contratto",
+        details: contractError.message,
+        request: { soul, key },
+        encoding: {
+          soulBytes: Array.from(soulBytes),
+          keyBytes: Array.from(keyBytes),
+          soulHex: ethers.hexlify(soulBytes),
+          keyHex: ethers.hexlify(keyBytes)
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error("❌ Contract read error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore lettura contratto",
+      details: error.message
+    });
+  }
+});
+
+// Route per testare la decodifica dei dati dal contratto
+router.get("/decode-test/:soul/:key", async (req, res) => {
+  try {
+    const { soul, key } = req.params;
+    const chainContract = req.app.get("chainContract");
+    
+    if (!chainContract) {
+      return res.status(500).json({
+        success: false,
+        error: "Contratto Chain non inizializzato"
+      });
+    }
+
+    console.log(`🔍 Testing decode for soul: ${soul}, key: ${key}`);
+
+    // Converti le stringhe in bytes (simula quello che fa il contratto)
+    const soulBytes = ethers.toUtf8Bytes(soul);
+    const keyBytes = ethers.toUtf8Bytes(key);
+    
+    console.log("🔍 Encoded bytes:", {
+      soulBytes: soulBytes,
+      keyBytes: keyBytes,
+      soulHex: ethers.hexlify(soulBytes),
+      keyHex: ethers.hexlify(keyBytes)
+    });
+
+    // Prova a decodificare
+    try {
+      const decodedSoul = ethers.toUtf8String(soulBytes);
+      const decodedKey = ethers.toUtf8String(keyBytes);
+      
+      res.json({
+        success: true,
+        original: { soul, key },
+        encoded: {
+          soulBytes: Array.from(soulBytes),
+          keyBytes: Array.from(keyBytes),
+          soulHex: ethers.hexlify(soulBytes),
+          keyHex: ethers.hexlify(keyBytes)
+        },
+        decoded: {
+          soul: decodedSoul,
+          key: decodedKey
+        },
+        note: "Questo test mostra come i dati vengono codificati/decodificati"
+      });
+    } catch (decodeError) {
+      res.json({
+        success: false,
+        error: "Decode failed",
+        details: decodeError.message,
+        original: { soul, key },
+        encoded: {
+          soulBytes: Array.from(soulBytes),
+          keyBytes: Array.from(keyBytes),
+          soulHex: ethers.hexlify(soulBytes),
+          keyHex: ethers.hexlify(keyBytes)
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error("❌ Decode test error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore test decodifica",
       details: error.message
     });
   }

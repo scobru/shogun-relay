@@ -378,17 +378,31 @@ async function initializeServer() {
                   const soulValue = event.args.soul && typeof event.args.soul === 'object' && event.args.soul.hash ? event.args.soul.hash : event.args.soul;
                   const keyValue = event.args.key && typeof event.args.key === 'object' && event.args.key.hash ? event.args.key.hash : event.args.key;
                   
+                  console.log("🔍 Raw values before decoding:", {
+                    soulValue: soulValue,
+                    keyValue: keyValue,
+                    soulType: typeof soulValue,
+                    keyType: typeof keyValue
+                  });
+                  
                   // Prova a decodificare come UTF-8
                   soulString = ethers.toUtf8String(soulValue);
                   keyString = ethers.toUtf8String(keyValue);
-                  console.log(`🔄 Decoded: soul="${soulString}", key="${keyString}"`);
+                  console.log(`✅ UTF-8 decoded: soul="${soulString}", key="${keyString}"`);
                 } catch (error) {
                   console.warn("⚠️ Could not decode soul/key as UTF-8, using hex");
+                  console.log("Decode error:", error.message);
+                  
                   // Se la decodifica fallisce, usa i valori hex
                   const soulValue = event.args.soul && typeof event.args.soul === 'object' && event.args.soul.hash ? event.args.soul.hash : event.args.soul;
                   const keyValue = event.args.key && typeof event.args.key === 'object' && event.args.key.hash ? event.args.key.hash : event.args.key;
                   soulString = soulValue;
                   keyString = keyValue;
+                  
+                  console.log("🔍 Using hex values:", {
+                    soulString: soulString,
+                    keyString: keyString
+                  });
                 }
 
                 // Verifica che soulString e keyString siano stringhe valide
