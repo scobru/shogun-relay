@@ -1,161 +1,200 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="night">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IPCM Contract Interface - Shogun Relay</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js" type="application/javascript"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+    <link rel="stylesheet" href="styles/wormhole.css">
+    <script src="lib/admin-auth.js"></script>
+    
+    <!-- Load Gun first -->
+    <script src="https://cdn.jsdelivr.net/npm/gun@0.2020.1240/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun@0.2020.1240/sea.js"></script>
+    
+    <!-- Load Ethers from reliable CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <div class="container mx-auto px-4 py-8">
-        <!-- Header -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h1 class="text-3xl font-bold text-gray-800 mb-2">IPCM Contract Interface</h1>
-            <p class="text-gray-600">Interact with IPCM (IPFS CID Mapping) contracts</p>
-        </div>
 
-        <!-- Application Info -->
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <h3 class="text-lg font-semibold text-blue-800 mb-2">📋 Application Info</h3>
-            <p class="text-blue-700 text-sm">
-                IPCM (IPFS CID Mapping) allows you to create and manage smart contracts that store IPFS CID mappings. 
-                Each contract can store a single string value (typically an IPFS CID) and is owned by a specific address.
-                Use the IPCMFactory to create new IPCM instances and manage your mappings.
-            </p>
-        </div>
-
-        <!-- Connection Status -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 class="text-xl font-semibold text-gray-800 mb-4">🔗 Connection Status</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-gray-50 p-4 rounded-lg">
-                    <h3 class="font-medium text-gray-700">Wallet</h3>
-                    <p id="wallet-status" class="text-sm text-gray-600">Not connected</p>
+<body class="antialiased">
+    <div class="container mx-auto p-4">
+        <div class="card">
+            <div class="p-8">
+                <div class="flex flex-col items-center mb-8">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-4 text-accent" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <h1 class="text-3xl font-semibold mb-2">IPCM Contract Interface</h1>
+                    <p class="text-secondary">Interact with IPCM (IPFS CID Mapping) contracts</p>
                 </div>
-                <div class="bg-gray-50 p-4 rounded-lg">
-                    <h3 class="font-medium text-gray-700">Network</h3>
-                    <p id="network-status" class="text-sm text-gray-600">Unknown</p>
+
+                <!-- Connection Status -->
+                <div id="connectionStatus" class="alert alert-info mb-6">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>Connecting to contracts...</span>
                 </div>
-                <div class="bg-gray-50 p-4 rounded-lg">
-                    <h3 class="font-medium text-gray-700">Contracts</h3>
-                    <p id="contract-status" class="text-sm text-gray-600">Not loaded</p>
+
+                <!-- Contract Info -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="card bg-base-200">
+                        <div class="card-body">
+                            <h2 class="card-title text-accent">📋 Contract Information</h2>
+                            <div class="space-y-2 text-sm">
+                                <div><strong>Network:</strong> <span id="networkInfo">Sepolia</span></div>
+                                <div><strong>Factory Address:</strong> <span id="factoryAddress" class="font-mono text-xs">Loading...</span></div>
+                                <div><strong>Status:</strong> <span id="contractStatus">Connected</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card bg-base-200">
+                        <div class="card-body">
+                            <h2 class="card-title text-accent">🔗 Wallet Connection</h2>
+                            <div class="space-y-2 text-sm">
+                                <div><strong>Wallet:</strong> <span id="walletAddress" class="font-mono text-xs">Not connected</span></div>
+                                <div><strong>Balance:</strong> <span id="walletBalance">-</span></div>
+                                <div><strong>Permissions:</strong> <span id="walletPermissions">None</span></div>
+                            </div>
+                            <div class="card-actions justify-end mt-4">
+                                <button id="connectWalletBtn" class="btn btn-primary btn-sm" onclick="connectWallet()">
+                                    🔗 Connect Wallet
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Interface -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- IPCMFactory Operations -->
+                    <div class="card bg-base-200">
+                        <div class="card-body">
+                            <h2 class="card-title text-accent">🏭 IPCMFactory Operations</h2>
+                            <p class="text-sm text-base-content/70 mb-4">
+                                Create and manage IPCM instances
+                            </p>
+                            
+                            <div class="form-control space-y-4">
+                                <div>
+                                    <label class="label">
+                                        <span class="label-text">Owner Address (optional)</span>
+                                        <span class="label-text-alt">Leave empty for current wallet</span>
+                                    </label>
+                                    <input type="text" id="newOwnerInput" class="input input-bordered w-full" 
+                                           placeholder="0x..." />
+                                </div>
+
+                                <div class="flex gap-2">
+                                    <button class="btn btn-primary flex-1" onclick="createIPCM()">
+                                        🏭 Create IPCM
+                                    </button>
+                                    <button class="btn btn-outline" onclick="getAllInstances()">
+                                        📋 All Instances
+                                    </button>
+                                </div>
+
+                                <div>
+                                    <button class="btn btn-secondary w-full" onclick="getUserInstances()">
+                                        👤 My Instances
+                                    </button>
+                                </div>
+
+                                <div id="factoryResults" class="alert alert-info">
+                                    <span>Factory operations will appear here...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- IPCM Instance Operations -->
+                    <div class="card bg-base-200">
+                        <div class="card-body">
+                            <h2 class="card-title text-accent">📝 IPCM Instance Operations</h2>
+                            <p class="text-sm text-base-content/70 mb-4">
+                                Interact with specific IPCM instances
+                            </p>
+                            
+                            <div class="form-control space-y-4">
+                                <div>
+                                    <label class="label">
+                                        <span class="label-text">Instance Address</span>
+                                    </label>
+                                    <input type="text" id="instanceAddressInput" class="input input-bordered w-full" 
+                                           placeholder="0x..." />
+                                </div>
+
+                                <div>
+                                    <label class="label">
+                                        <span class="label-text">New CID Mapping</span>
+                                    </label>
+                                    <input type="text" id="newMappingInput" class="input input-bordered w-full" 
+                                           placeholder="Qm..." />
+                                </div>
+
+                                <div class="flex gap-2">
+                                    <button class="btn btn-primary flex-1" onclick="loadInstance()">
+                                        🔍 Load Instance
+                                    </button>
+                                    <button class="btn btn-secondary flex-1" onclick="updateMapping()">
+                                        ✏️ Update Mapping
+                                    </button>
+                                </div>
+
+                                <div>
+                                    <button class="btn btn-outline w-full" onclick="getMapping()">
+                                        📖 Get Current Mapping
+                                    </button>
+                                </div>
+
+                                <div id="instanceResults" class="alert alert-info">
+                                    <span>Instance operations will appear here...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Additional Operations -->
+                <div class="card bg-base-200 mt-8">
+                    <div class="card-body">
+                        <h2 class="card-title text-accent">🗂️ Additional Operations</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <button class="btn btn-info" onclick="getUserData()">
+                                📁 My Contracts & Files
+                            </button>
+                            <button class="btn btn-warning" onclick="checkFileStatus()">
+                                🔍 Check File Status
+                            </button>
+                            <button class="btn btn-success" onclick="getSystemStats()">
+                                📊 System Stats
+                            </button>
+                        </div>
+                        
+                        <div id="additionalResults" class="mt-4">
+                            <div class="alert alert-info">
+                                <span>Additional operations will appear here...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation -->
+                <div class="flex justify-center mt-8">
+                    <a href="/" class="btn btn-outline">
+                        ← Back to Dashboard
+                    </a>
                 </div>
             </div>
-            <div class="mt-4">
-                <button id="connect-wallet" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
-                    Connect Wallet
-                </button>
-            </div>
-        </div>
-
-        <!-- IPCMFactory Operations -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 class="text-xl font-semibold text-gray-800 mb-4">🏭 IPCMFactory Operations</h2>
-            
-            <!-- Create IPCM -->
-            <div class="mb-6 p-4 border border-gray-200 rounded-lg">
-                <h3 class="font-medium text-gray-700 mb-2">Create New IPCM Instance</h3>
-                <div class="flex gap-2">
-                    <input type="text" id="new-owner" placeholder="Owner address (optional)" 
-                           class="flex-1 px-3 py-2 border border-gray-300 rounded-lg">
-                    <button id="create-ipcm" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
-                        Create IPCM
-                    </button>
-                </div>
-                <div id="create-result" class="mt-2 text-sm"></div>
-            </div>
-
-            <!-- List All Instances -->
-            <div class="mb-6 p-4 border border-gray-200 rounded-lg">
-                <h3 class="font-medium text-gray-700 mb-2">All IPCM Instances</h3>
-                <button id="get-all-instances" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg mb-2">
-                    Get All Instances
-                </button>
-                <div id="all-instances" class="mt-2 text-sm"></div>
-            </div>
-
-            <!-- Get User Instances -->
-            <div class="p-4 border border-gray-200 rounded-lg">
-                <h3 class="font-medium text-gray-700 mb-2">My IPCM Instances</h3>
-                <button id="get-user-instances" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg mb-2">
-                    Get My Instances
-                </button>
-                <div id="user-instances" class="mt-2 text-sm"></div>
-            </div>
-        </div>
-
-        <!-- IPCM Instance Operations -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 class="text-xl font-semibold text-gray-800 mb-4">📝 IPCM Instance Operations</h2>
-            
-            <!-- Instance Address Input -->
-            <div class="mb-6 p-4 border border-gray-200 rounded-lg">
-                <h3 class="font-medium text-gray-700 mb-2">Select IPCM Instance</h3>
-                <div class="flex gap-2">
-                    <input type="text" id="instance-address" placeholder="IPCM contract address" 
-                           class="flex-1 px-3 py-2 border border-gray-300 rounded-lg">
-                    <button id="load-instance" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
-                        Load Instance
-                    </button>
-                </div>
-                <div id="instance-info" class="mt-2 text-sm"></div>
-            </div>
-
-            <!-- Update Mapping -->
-            <div class="mb-6 p-4 border border-gray-200 rounded-lg">
-                <h3 class="font-medium text-gray-700 mb-2">Update CID Mapping</h3>
-                <div class="flex gap-2">
-                    <input type="text" id="new-mapping" placeholder="New IPFS CID mapping" 
-                           class="flex-1 px-3 py-2 border border-gray-300 rounded-lg">
-                    <button id="update-mapping" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg">
-                        Update Mapping
-                    </button>
-                </div>
-                <div id="update-result" class="mt-2 text-sm"></div>
-            </div>
-
-            <!-- Get Mapping -->
-            <div class="p-4 border border-gray-200 rounded-lg">
-                <h3 class="font-medium text-gray-700 mb-2">Current Mapping</h3>
-                <button id="get-mapping" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg mb-2">
-                    Get Current Mapping
-                </button>
-                <div id="current-mapping" class="mt-2 text-sm"></div>
-            </div>
-        </div>
-
-        <!-- Mapping Operations -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 class="text-xl font-semibold text-gray-800 mb-4">🗂️ Mapping Operations</h2>
-            
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <button id="my-contracts-files" class="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg">
-                    My Contracts & Files
-                </button>
-                <button id="check-file-status" class="bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-lg">
-                    Check File Status
-                </button>
-                <button id="system-stats" class="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-lg">
-                    System Stats
-                </button>
-            </div>
-            
-            <div id="mapping-results" class="mt-4 p-4 bg-gray-50 rounded-lg">
-                <p class="text-gray-600 text-sm">Click a button above to see results...</p>
-            </div>
-        </div>
-
-        <!-- Back to Dashboard -->
-        <div class="text-center">
-            <a href="/" class="inline-block bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg">
-                ← Back to Dashboard
-            </a>
         </div>
     </div>
 
-    <script src="/lib/ipcm-contract.js"></script>
+    <script src="lib/ipcm-contract.js"></script>
 </body>
+
 </html> 

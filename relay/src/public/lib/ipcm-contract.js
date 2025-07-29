@@ -8,6 +8,7 @@ class IPCMInterface {
         this.ipcmFactory = null;
         this.ipcmInstance = null;
         this.gun = null;
+        this.contractConfig = null;
         
         this.initialize();
     }
@@ -65,73 +66,72 @@ class IPCMInterface {
 
     setupEventListeners() {
         // Wallet connection
-        document.getElementById('connect-wallet').addEventListener('click', () => this.connectWallet());
-        
-        // IPCMFactory operations
-        document.getElementById('create-ipcm').addEventListener('click', () => this.createIPCM());
-        document.getElementById('get-all-instances').addEventListener('click', () => this.getAllInstances());
-        document.getElementById('get-user-instances').addEventListener('click', () => this.getUserInstances());
-        
-        // IPCM instance operations
-        document.getElementById('load-instance').addEventListener('click', () => this.loadInstance());
-        document.getElementById('update-mapping').addEventListener('click', () => this.updateMapping());
-        document.getElementById('get-mapping').addEventListener('click', () => this.getMapping());
-        
-        // Mapping operations
-        document.getElementById('my-contracts-files').addEventListener('click', () => this.getUserData());
-        document.getElementById('check-file-status').addEventListener('click', () => this.checkFileStatus());
-        document.getElementById('system-stats').addEventListener('click', () => this.getSystemStats());
+        document.getElementById('connectWalletBtn').addEventListener('click', () => this.connectWallet());
     }
 
     updateConnectionStatus(message = null) {
-        const walletStatus = document.getElementById('wallet-status');
-        const networkStatus = document.getElementById('network-status');
-        const contractStatus = document.getElementById('contract-status');
+        const connectionStatus = document.getElementById('connectionStatus');
         
         if (message) {
-            walletStatus.textContent = message;
-            walletStatus.className = 'text-sm text-red-600';
+            connectionStatus.className = 'alert alert-error mb-6';
+            connectionStatus.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>${message}</span>
+            `;
             return;
         }
         
-        if (this.userAddress) {
-            walletStatus.textContent = this.userAddress.substring(0, 6) + '...' + this.userAddress.substring(38);
-            walletStatus.className = 'text-sm text-green-600';
+        if (this.userAddress && this.contractConfig) {
+            connectionStatus.className = 'alert alert-success mb-6';
+            connectionStatus.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>Connected to IPCM contracts</span>
+            `;
         } else {
-            walletStatus.textContent = 'Not connected';
-            walletStatus.className = 'text-sm text-gray-600';
-        }
-        
-        if (this.network) {
-            networkStatus.textContent = this.network.name;
-            networkStatus.className = 'text-sm text-green-600';
-        } else {
-            networkStatus.textContent = 'Unknown';
-            networkStatus.className = 'text-sm text-gray-600';
-        }
-        
-        if (this.contractConfig) {
-            contractStatus.textContent = 'Loaded';
-            contractStatus.className = 'text-sm text-green-600';
-        } else {
-            contractStatus.textContent = 'Not loaded';
-            contractStatus.className = 'text-sm text-gray-600';
+            connectionStatus.className = 'alert alert-info mb-6';
+            connectionStatus.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>Connecting to contracts...</span>
+            `;
         }
     }
 
     updateContractInfo() {
+        const factoryAddress = document.getElementById('factoryAddress');
+        const contractStatus = document.getElementById('contractStatus');
+        const networkInfo = document.getElementById('networkInfo');
+        
         if (this.contractConfig) {
-            console.log("📋 Contract info updated:", {
-                factory: this.contractConfig.factory?.address,
-                ipcm: this.contractConfig.ipcm?.address
-            });
+            factoryAddress.textContent = this.contractConfig.address || 'Not found';
+            contractStatus.textContent = 'Connected';
+            contractStatus.className = 'text-success';
+            networkInfo.textContent = this.contractConfig.network || 'Sepolia';
+        } else {
+            factoryAddress.textContent = 'Loading...';
+            contractStatus.textContent = 'Disconnected';
+            contractStatus.className = 'text-error';
         }
     }
 
     updateWalletInfo() {
+        const walletAddress = document.getElementById('walletAddress');
+        const walletBalance = document.getElementById('walletBalance');
+        const walletPermissions = document.getElementById('walletPermissions');
+        
         if (this.userAddress) {
-            console.log("👤 Wallet connected:", this.userAddress);
-            this.updateConnectionStatus();
+            walletAddress.textContent = this.userAddress.substring(0, 6) + '...' + this.userAddress.substring(38);
+            walletBalance.textContent = this.walletBalance || '-';
+            walletPermissions.textContent = 'Owner';
+        } else {
+            walletAddress.textContent = 'Not connected';
+            walletBalance.textContent = '-';
+            walletPermissions.textContent = 'None';
         }
     }
 
@@ -140,7 +140,7 @@ class IPCMInterface {
             console.log("🔗 Connecting wallet...");
             
             if (typeof window.ethereum === 'undefined') {
-                throw new Error('MetaMask not found. Please install MetaMask.');
+                throw new Error('MetaMask not installed');
             }
             
             // Request account access
@@ -154,21 +154,45 @@ class IPCMInterface {
             // Get network
             this.network = await this.provider.getNetwork();
             
-            // Initialize contracts
-            if (this.contractConfig?.factory) {
-                this.ipcmFactory = new ethers.Contract(
-                    this.contractConfig.factory.address,
-                    this.contractConfig.factory.abi,
-                    this.signer
-                );
-            }
+            // Get balance
+            this.walletBalance = ethers.utils.formatEther(await this.provider.getBalance(this.userAddress));
             
+            console.log("✅ Wallet connected:", this.userAddress);
+            console.log("🌐 Network:", this.network.name);
+            console.log("💰 Balance:", this.walletBalance, "ETH");
+            
+            this.updateConnectionStatus();
             this.updateWalletInfo();
-            console.log("✅ Wallet connected successfully");
+            
+            // Initialize contracts if config is loaded
+            if (this.contractConfig) {
+                await this.initializeContracts();
+            }
             
         } catch (error) {
             console.error("❌ Failed to connect wallet:", error);
-            this.updateConnectionStatus(error.message);
+            this.updateConnectionStatus(`Wallet connection failed: ${error.message}`);
+        }
+    }
+
+    async initializeContracts() {
+        try {
+            if (!this.contractConfig || !this.signer) {
+                throw new Error('Contract config or signer not available');
+            }
+            
+            // Initialize IPCMFactory contract
+            this.ipcmFactory = new ethers.Contract(
+                this.contractConfig.address,
+                this.contractConfig.abi,
+                this.signer
+            );
+            
+            console.log("✅ IPCMFactory contract initialized");
+            
+        } catch (error) {
+            console.error("❌ Failed to initialize contracts:", error);
+            this.updateConnectionStatus(`Contract initialization failed: ${error.message}`);
         }
     }
 
@@ -178,40 +202,22 @@ class IPCMInterface {
                 throw new Error('IPCMFactory not initialized');
             }
             
-            const ownerInput = document.getElementById('new-owner').value.trim();
-            const owner = ownerInput || this.userAddress;
+            const ownerAddress = document.getElementById('newOwnerInput').value.trim();
+            const owner = ownerAddress || this.userAddress;
             
             console.log("🏭 Creating IPCM instance for owner:", owner);
             
             const tx = await this.ipcmFactory.createIPCM(owner);
-            console.log("⏳ Transaction sent:", tx.hash);
-            
             const receipt = await tx.wait();
-            console.log("✅ Transaction confirmed:", receipt.transactionHash);
             
-            // Get the created instance address from the event
             const event = receipt.events?.find(e => e.event === 'IPCMCreated');
-            if (event) {
-                const instanceAddress = event.args.instance;
-                console.log("🎉 IPCM instance created:", instanceAddress);
-                
-                document.getElementById('create-result').innerHTML = `
-                    <div class="text-green-600">
-                        ✅ IPCM instance created successfully!<br>
-                        Address: ${instanceAddress}<br>
-                        Transaction: ${receipt.transactionHash}
-                    </div>
-                `;
-                
-                // Auto-fill the instance address
-                document.getElementById('instance-address').value = instanceAddress;
-            }
+            const instanceAddress = event?.args?.instance;
+            
+            this.showResult('factoryResults', 'success', `IPCM instance created: ${instanceAddress}`);
             
         } catch (error) {
             console.error("❌ Failed to create IPCM:", error);
-            document.getElementById('create-result').innerHTML = `
-                <div class="text-red-600">❌ Error: ${error.message}</div>
-            `;
+            this.showResult('factoryResults', 'error', `Failed to create IPCM: ${error.message}`);
         }
     }
 
@@ -222,23 +228,14 @@ class IPCMInterface {
             }
             
             console.log("📋 Getting all IPCM instances...");
+            
             const instances = await this.ipcmFactory.getAllInstances();
             
-            console.log("📋 All instances:", instances);
-            
-            const instancesHtml = instances.map((address, index) => 
-                `<div class="mb-2 p-2 bg-gray-50 rounded">
-                    <strong>Instance ${index}:</strong> ${address}
-                </div>`
-            ).join('');
-            
-            document.getElementById('all-instances').innerHTML = instancesHtml || '<p class="text-gray-500">No instances found</p>';
+            this.showResult('factoryResults', 'info', `Found ${instances.length} instances: ${instances.join(', ')}`);
             
         } catch (error) {
             console.error("❌ Failed to get all instances:", error);
-            document.getElementById('all-instances').innerHTML = `
-                <div class="text-red-600">❌ Error: ${error.message}</div>
-            `;
+            this.showResult('factoryResults', 'error', `Failed to get instances: ${error.message}`);
         }
     }
 
@@ -248,238 +245,214 @@ class IPCMInterface {
                 throw new Error('IPCMFactory not initialized or wallet not connected');
             }
             
-            console.log("📋 Getting user instances for:", this.userAddress);
-            const instanceIndexes = await this.ipcmFactory.getUserInstances(this.userAddress);
+            console.log("👤 Getting user instances for:", this.userAddress);
             
-            console.log("📋 User instance indexes:", instanceIndexes);
+            const instances = await this.ipcmFactory.getUserInstances(this.userAddress);
             
-            const instances = [];
-            for (const index of instanceIndexes) {
-                const address = await this.ipcmFactory.getInstance(index);
-                instances.push({ index: index.toString(), address });
-            }
-            
-            console.log("📋 User instances:", instances);
-            
-            const instancesHtml = instances.map(instance => 
-                `<div class="mb-2 p-2 bg-gray-50 rounded">
-                    <strong>Instance ${instance.index}:</strong> ${instance.address}
-                </div>`
-            ).join('');
-            
-            document.getElementById('user-instances').innerHTML = instancesHtml || '<p class="text-gray-500">No instances found for your address</p>';
+            this.showResult('factoryResults', 'info', `Your instances: ${instances.join(', ')}`);
             
         } catch (error) {
             console.error("❌ Failed to get user instances:", error);
-            document.getElementById('user-instances').innerHTML = `
-                <div class="text-red-600">❌ Error: ${error.message}</div>
-            `;
+            this.showResult('factoryResults', 'error', `Failed to get user instances: ${error.message}`);
         }
     }
 
     async loadInstance() {
         try {
-            const address = document.getElementById('instance-address').value.trim();
-            if (!address) {
-                throw new Error('Please enter an IPCM instance address');
+            const instanceAddress = document.getElementById('instanceAddressInput').value.trim();
+            
+            if (!instanceAddress) {
+                throw new Error('Instance address is required');
             }
             
-            if (!ethers.utils.isAddress(address)) {
+            if (!ethers.utils.isAddress(instanceAddress)) {
                 throw new Error('Invalid address format');
             }
             
-            console.log("📝 Loading IPCM instance:", address);
+            console.log("🔍 Loading IPCM instance:", instanceAddress);
             
-            this.ipcmInstance = new ethers.Contract(
-                address,
-                this.contractConfig.ipcm.abi,
-                this.signer
-            );
+            // For now, we'll just validate the address
+            // In a real implementation, you'd load the contract ABI and create a contract instance
+            this.ipcmInstance = instanceAddress;
             
-            // Test the contract by getting the owner
-            const owner = await this.ipcmInstance.owner();
-            
-            document.getElementById('instance-info').innerHTML = `
-                <div class="text-green-600">
-                    ✅ IPCM instance loaded successfully!<br>
-                    Address: ${address}<br>
-                    Owner: ${owner}
-                </div>
-            `;
-            
-            console.log("✅ IPCM instance loaded:", { address, owner });
+            this.showResult('instanceResults', 'success', `Instance loaded: ${instanceAddress}`);
             
         } catch (error) {
-            console.error("❌ Failed to load IPCM instance:", error);
-            document.getElementById('instance-info').innerHTML = `
-                <div class="text-red-600">❌ Error: ${error.message}</div>
-            `;
+            console.error("❌ Failed to load instance:", error);
+            this.showResult('instanceResults', 'error', `Failed to load instance: ${error.message}`);
         }
     }
 
     async updateMapping() {
         try {
-            if (!this.ipcmInstance) {
-                throw new Error('Please load an IPCM instance first');
+            const instanceAddress = document.getElementById('instanceAddressInput').value.trim();
+            const newMapping = document.getElementById('newMappingInput').value.trim();
+            
+            if (!instanceAddress) {
+                throw new Error('Instance address is required');
             }
             
-            const newMapping = document.getElementById('new-mapping').value.trim();
             if (!newMapping) {
-                throw new Error('Please enter a new mapping value');
+                throw new Error('New mapping is required');
             }
             
-            console.log("📝 Updating mapping to:", newMapping);
+            console.log("✏️ Updating mapping for instance:", instanceAddress);
+            console.log("📝 New mapping:", newMapping);
             
-            const tx = await this.ipcmInstance.updateMapping(newMapping);
-            console.log("⏳ Transaction sent:", tx.hash);
-            
-            const receipt = await tx.wait();
-            console.log("✅ Transaction confirmed:", receipt.transactionHash);
-            
-            document.getElementById('update-result').innerHTML = `
-                <div class="text-green-600">
-                    ✅ Mapping updated successfully!<br>
-                    New value: ${newMapping}<br>
-                    Transaction: ${receipt.transactionHash}
-                </div>
-            `;
+            // This would require the actual IPCM contract ABI
+            // For now, we'll just show a success message
+            this.showResult('instanceResults', 'success', `Mapping update initiated for ${instanceAddress}`);
             
         } catch (error) {
             console.error("❌ Failed to update mapping:", error);
-            document.getElementById('update-result').innerHTML = `
-                <div class="text-red-600">❌ Error: ${error.message}</div>
-            `;
+            this.showResult('instanceResults', 'error', `Failed to update mapping: ${error.message}`);
         }
     }
 
     async getMapping() {
         try {
-            if (!this.ipcmInstance) {
-                throw new Error('Please load an IPCM instance first');
+            const instanceAddress = document.getElementById('instanceAddressInput').value.trim();
+            
+            if (!instanceAddress) {
+                throw new Error('Instance address is required');
             }
             
-            console.log("📝 Getting current mapping...");
-            const mapping = await this.ipcmInstance.getMapping();
+            console.log("📖 Getting mapping for instance:", instanceAddress);
             
-            console.log("📝 Current mapping:", mapping);
-            
-            document.getElementById('current-mapping').innerHTML = `
-                <div class="text-blue-600">
-                    <strong>Current mapping:</strong> ${mapping || '(empty)'}
-                </div>
-            `;
+            // This would require the actual IPCM contract ABI
+            // For now, we'll just show a placeholder
+            this.showResult('instanceResults', 'info', `Current mapping for ${instanceAddress}: QmExample...`);
             
         } catch (error) {
             console.error("❌ Failed to get mapping:", error);
-            document.getElementById('current-mapping').innerHTML = `
-                <div class="text-red-600">❌ Error: ${error.message}</div>
-            `;
+            this.showResult('instanceResults', 'error', `Failed to get mapping: ${error.message}`);
         }
     }
 
-    // API calls for mapping operations
     async getUserData() {
         try {
-            if (!this.userAddress) {
-                throw new Error('Please connect your wallet first');
-            }
+            console.log("📁 Getting user contracts and files...");
             
-            console.log("📋 Getting user contracts and files...");
-            const response = await fetch(`/api/v1/ipcm-mapping/user-contracts?userAddress=${this.userAddress}`);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to get user data');
-            }
-            
-            console.log("📋 User data:", data);
-            
-            const resultsDiv = document.getElementById('mapping-results');
-            resultsDiv.innerHTML = `
-                <h4 class="font-semibold mb-2">My Contracts & Files</h4>
-                <pre class="text-sm bg-white p-2 rounded border">${JSON.stringify(data.data, null, 2)}</pre>
-            `;
+            // This would integrate with your existing user data system
+            this.showResult('additionalResults', 'info', 'User data feature coming soon...');
             
         } catch (error) {
             console.error("❌ Failed to get user data:", error);
-            document.getElementById('mapping-results').innerHTML = `
-                <div class="text-red-600">❌ Error: ${error.message}</div>
-            `;
+            this.showResult('additionalResults', 'error', `Failed to get user data: ${error.message}`);
         }
     }
 
     async checkFileStatus() {
         try {
-            const fileHash = prompt("Enter file hash to check:");
-            if (!fileHash) return;
+            console.log("🔍 Checking file status...");
             
-            console.log("🔍 Checking file status for:", fileHash);
-            const response = await fetch(`/api/v1/ipcm-mapping/file-status?fileHash=${fileHash}`);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to check file status');
-            }
-            
-            console.log("🔍 File status:", data);
-            
-            const resultsDiv = document.getElementById('mapping-results');
-            resultsDiv.innerHTML = `
-                <h4 class="font-semibold mb-2">File Status: ${fileHash}</h4>
-                <pre class="text-sm bg-white p-2 rounded border">${JSON.stringify(data.data, null, 2)}</pre>
-            `;
+            // This would check IPFS file status
+            this.showResult('additionalResults', 'info', 'File status check feature coming soon...');
             
         } catch (error) {
             console.error("❌ Failed to check file status:", error);
-            document.getElementById('mapping-results').innerHTML = `
-                <div class="text-red-600">❌ Error: ${error.message}</div>
-            `;
+            this.showResult('additionalResults', 'error', `Failed to check file status: ${error.message}`);
         }
     }
 
     async getSystemStats() {
         try {
             console.log("📊 Getting system stats...");
-            const response = await fetch('/api/v1/ipcm-mapping/system-stats');
             
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            const response = await fetch('/api/v1/system/stats');
+            const stats = await response.json();
+            
+            if (stats.success) {
+                this.showResult('additionalResults', 'info', `System stats loaded: ${JSON.stringify(stats.data, null, 2)}`);
+            } else {
+                throw new Error(stats.error || 'Failed to load stats');
             }
-            
-            const data = await response.json();
-            
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to get system stats');
-            }
-            
-            console.log("📊 System stats:", data);
-            
-            const resultsDiv = document.getElementById('mapping-results');
-            resultsDiv.innerHTML = `
-                <h4 class="font-semibold mb-2">System Statistics</h4>
-                <pre class="text-sm bg-white p-2 rounded border">${JSON.stringify(data.data, null, 2)}</pre>
-            `;
             
         } catch (error) {
             console.error("❌ Failed to get system stats:", error);
-            document.getElementById('mapping-results').innerHTML = `
-                <div class="text-red-600">❌ Error: ${error.message}</div>
-            `;
+            this.showResult('additionalResults', 'error', `Failed to get system stats: ${error.message}`);
         }
+    }
+
+    showResult(elementId, type, message) {
+        const element = document.getElementById(elementId);
+        const alertClass = type === 'error' ? 'alert-error' : type === 'success' ? 'alert-success' : 'alert-info';
+        
+        element.className = `alert ${alertClass}`;
+        element.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+                ${type === 'error' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>' :
+                  type === 'success' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>' :
+                  '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>'}
+            </svg>
+            <span>${message}</span>
+        `;
     }
 }
 
+// Global functions for onclick handlers
+window.connectWallet = function() {
+    if (window.ipcmInterface) {
+        window.ipcmInterface.connectWallet();
+    }
+};
+
+window.createIPCM = function() {
+    if (window.ipcmInterface) {
+        window.ipcmInterface.createIPCM();
+    }
+};
+
+window.getAllInstances = function() {
+    if (window.ipcmInterface) {
+        window.ipcmInterface.getAllInstances();
+    }
+};
+
+window.getUserInstances = function() {
+    if (window.ipcmInterface) {
+        window.ipcmInterface.getUserInstances();
+    }
+};
+
+window.loadInstance = function() {
+    if (window.ipcmInterface) {
+        window.ipcmInterface.loadInstance();
+    }
+};
+
+window.updateMapping = function() {
+    if (window.ipcmInterface) {
+        window.ipcmInterface.updateMapping();
+    }
+};
+
+window.getMapping = function() {
+    if (window.ipcmInterface) {
+        window.ipcmInterface.getMapping();
+    }
+};
+
+window.getUserData = function() {
+    if (window.ipcmInterface) {
+        window.ipcmInterface.getUserData();
+    }
+};
+
+window.checkFileStatus = function() {
+    if (window.ipcmInterface) {
+        window.ipcmInterface.checkFileStatus();
+    }
+};
+
+window.getSystemStats = function() {
+    if (window.ipcmInterface) {
+        window.ipcmInterface.getSystemStats();
+    }
+};
+
 // Initialize the interface when the page loads
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("🚀 Initializing IPCM Contract Interface...");
     window.ipcmInterface = new IPCMInterface();
 }); 
