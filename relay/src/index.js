@@ -381,9 +381,24 @@ async function initializeServer() {
                     keyType: typeof event.args.key
                   });
                   
-                  // Estrai i bytes dagli oggetti Result di Ethers.js
-                  const soulBytes = event.args.soul;
-                  const keyBytes = event.args.key;
+                  // In Ethers.js v6, gli argomenti degli eventi sono oggetti Result
+                  // Dobbiamo accedere alla proprietà corretta per ottenere i bytes
+                  let soulBytes, keyBytes;
+                  
+                  // Controlla se sono oggetti Result di Ethers.js
+                  if (event.args.soul && typeof event.args.soul === 'object') {
+                    // Prova diverse proprietà possibili
+                    soulBytes = event.args.soul.bytes || event.args.soul.data || event.args.soul;
+                  } else {
+                    soulBytes = event.args.soul;
+                  }
+                  
+                  if (event.args.key && typeof event.args.key === 'object') {
+                    // Prova diverse proprietà possibili
+                    keyBytes = event.args.key.bytes || event.args.key.data || event.args.key;
+                  } else {
+                    keyBytes = event.args.key;
+                  }
                   
                   console.log("🔍 Extracted bytes:", {
                     soulBytes: soulBytes,
