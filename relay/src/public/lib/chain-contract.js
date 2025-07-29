@@ -495,6 +495,37 @@ async function verifyGunDBData(soul, key, expectedValue) {
     }
 }
 
+// Riavvia il listener
+async function restartListener() {
+    try {
+        console.log('🔄 Riavvio listener...');
+        
+        const response = await fetch('/api/v1/chain/restart-listener', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            console.log('✅ Listener riavviato con successo');
+            console.log('📋 Status:', data.status);
+            
+            // Verifica lo stato dopo il riavvio
+            setTimeout(() => {
+                testListenerStatus();
+            }, 1000);
+        } else {
+            console.error('❌ Errore riavvio listener:', data.error);
+        }
+        
+    } catch (error) {
+        console.error('❌ Errore riavvio listener:', error);
+    }
+}
+
 // Inizializza quando la pagina è caricata
 document.addEventListener('DOMContentLoaded', () => {
     // Aspetta che tutte le librerie siano caricate

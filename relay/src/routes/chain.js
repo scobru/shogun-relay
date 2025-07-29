@@ -393,4 +393,61 @@ router.post("/test-propagation", async (req, res) => {
   }
 });
 
+// Route per riavviare il listener
+router.post("/restart-listener", async (req, res) => {
+  try {
+    const chainContract = req.app.get("chainContract");
+    const startChainEventListener = req.app.get("startChainEventListener");
+    
+    if (!chainContract) {
+      return res.status(500).json({
+        success: false,
+        error: "Contratto Chain non inizializzato"
+      });
+    }
+
+    console.log("🔄 Restarting Chain contract event listener...");
+
+    // Rimuovi tutti i listener esistenti
+    try {
+      chainContract.removeAllListeners("NodeUpdated");
+      console.log("🗑️ Removed existing listeners");
+    } catch (error) {
+      console.warn("⚠️ Could not remove existing listeners:", error.message);
+    }
+
+    // Riavvia il listener
+    const result = await startChainEventListener();
+    
+    if (result) {
+      // Verifica che il listener sia attivo
+      const listenerCount = chainContract.listenerCount("NodeUpdated");
+      const hasEventListeners = listenerCount > 0;
+      
+      res.json({
+        success: true,
+        message: "Listener riavviato con successo",
+        status: {
+          listenerCount: listenerCount,
+          hasEventListeners: hasEventListeners,
+          timestamp: Date.now()
+        }
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: "Errore riavvio listener"
+      });
+    }
+
+  } catch (error) {
+    console.error("❌ Restart listener error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore riavvio listener",
+      details: error.message
+    });
+  }
+});
+
 export default router; 
