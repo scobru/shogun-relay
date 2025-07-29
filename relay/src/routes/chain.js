@@ -112,6 +112,83 @@ router.get("/status", async (req, res) => {
   }
 });
 
+// Route per leggere i dati da GunDB
+router.get("/read/:soul/:key?", async (req, res) => {
+  try {
+    const { soul, key } = req.params;
+    const gun = req.app.get("gunInstance");
+    
+    if (!gun) {
+      return res.status(500).json({
+        success: false,
+        error: "Gun non inizializzato"
+      });
+    }
+
+    if (!soul) {
+      return res.status(400).json({
+        success: false,
+        error: "Soul è richiesto"
+      });
+    }
+
+    console.log(`🔍 Reading from GunDB: soul="${soul}", key="${key || 'all'}"`);
+
+    // Se non è specificata una chiave, leggi tutto il nodo
+    if (!key) {
+      const node = gun.get(soul);
+      const data = await new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          console.warn("⚠️ Timeout reading from GunDB");
+          reject(new Error("Timeout"));
+        }, 3000);
+
+        node.once((data) => {
+          clearTimeout(timeoutId);
+          resolve(data);
+        });
+      });
+
+      res.json({
+        success: true,
+        soul: soul,
+        data: data,
+        timestamp: Date.now()
+      });
+    } else {
+      // Leggi una chiave specifica
+      const node = gun.get(soul).get(key);
+      const data = await new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          console.warn("⚠️ Timeout reading from GunDB");
+          reject(new Error("Timeout"));
+        }, 3000);
+
+        node.once((data) => {
+          clearTimeout(timeoutId);
+          resolve(data);
+        });
+      });
+
+      res.json({
+        success: true,
+        soul: soul,
+        key: key,
+        value: data,
+        timestamp: Date.now()
+      });
+    }
+
+  } catch (error) {
+    console.error("❌ Chain read error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore lettura da GunDB",
+      details: error.message
+    });
+  }
+});
+
 // Route per ottenere gli eventi recenti dal GunDB
 router.get("/events", async (req, res) => {
   try {
@@ -125,6 +202,8 @@ router.get("/events", async (req, res) => {
 
     const limit = parseInt(req.query.limit) || 50;
     
+    console.log(`🔍 Reading chain events from GunDB, limit: ${limit}`);
+    
     // Ottieni gli eventi recenti dal GunDB
     const eventsNode = gun.get("shogun").get("chain_events");
     
@@ -135,7 +214,8 @@ router.get("/events", async (req, res) => {
       success: true,
       message: "Eventi disponibili nel GunDB",
       limit: limit,
-      note: "Implementazione completa richiede lettura asincrona dal GunDB"
+      note: "Implementazione completa richiede lettura asincrona dal GunDB",
+      endpoint: "/api/v1/chain/read/shogun/chain_events per leggere gli eventi"
     });
 
   } catch (error) {

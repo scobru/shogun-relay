@@ -198,7 +198,7 @@ async function initializeServer() {
 
     try {
       // Crea un identificatore univoco per questo evento
-      const eventId = `${event.transactionHash}-${event.logIndex}`;
+      const eventId = `${event.transactionHash}-${event.logIndex || 0}`;
       console.log("📋 Event ID:", eventId);
       
       // Memorizza i dati dell'evento in GunDB
@@ -226,18 +226,44 @@ async function initializeServer() {
 
       // Memorizza anche i dati nella struttura principale di GunDB usando dati leggibili
       console.log("💾 Storing data in main GunDB structure...");
-      const dataNode = gun.get(soul);
-      await new Promise((resolve, reject) => {
-        dataNode.get(key).put(value, (ack) => {
-          if (ack.err) {
-            console.error("❌ Error storing data in main structure:", ack.err);
-            reject(ack.err);
-          } else {
-            console.log("✅ Data stored in main structure successfully");
-            resolve();
-          }
+      
+      // Verifica che soul e key siano stringhe valide
+      if (typeof soul !== 'string' || typeof key !== 'string') {
+        console.warn("⚠️ Soul or key is not a string, skipping main structure storage");
+        console.log("Soul type:", typeof soul, "Key type:", typeof key);
+        return;
+      }
+
+      // Usa un approccio più sicuro per scrivere i dati
+      try {
+        const dataNode = gun.get(soul);
+        if (!dataNode) {
+          console.warn("⚠️ Could not get data node for soul:", soul);
+          return;
+        }
+
+        await new Promise((resolve, reject) => {
+          const timeoutId = setTimeout(() => {
+            console.warn("⚠️ Timeout writing to main GunDB structure");
+            reject(new Error("Timeout"));
+          }, 5000);
+
+          dataNode.get(key).put(value, (ack) => {
+            clearTimeout(timeoutId);
+            if (ack.err) {
+              console.error("❌ Error storing data in main structure:", ack.err);
+              reject(ack.err);
+            } else {
+              console.log("✅ Data stored in main structure successfully");
+              resolve();
+            }
+          });
         });
-      });
+      } catch (mainStructureError) {
+        console.error("❌ Error writing to main GunDB structure:", mainStructureError);
+        // Non fallire completamente se la scrittura nella struttura principale fallisce
+        // L'evento è già stato salvato nella sezione chain_events
+      }
 
       console.log(`✅ Chain event propagated to GunDB: ${soul} -> ${key}`);
       
