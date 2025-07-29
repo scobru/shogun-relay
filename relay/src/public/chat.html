@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Public Relay Chat</title>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="styles/wormhole.css">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
     <style>
         .message-timestamp {
@@ -27,27 +27,27 @@
         }
     </style>
 </head>
-<body class="antialiased">
-    <div class="container mx-auto px-4 py-2 sm:py-4">
-        <div class="flex items-center mb-4">
-            <a href="/" class="nav-link">&larr; Back to Control Panel</a>
+<body class="antialiased bg-[#1A1A1A]">
+    <div class="container mx-auto px-6 py-4 sm:py-6">
+        <div class="flex items-center mb-6">
+            <a href="/" class="text-[#42A5F5] hover:text-[#64B5F6] transition-colors text-lg">&larr; Back to Control Panel</a>
         </div>
         
-        <div class="card bg-base-200 shadow-xl">
-            <div class="p-4 sm:p-6 md:p-8 flex flex-col items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 sm:h-12 sm:w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div class="card bg-[#282828] border-[#404040] rounded-2xl shadow-xl">
+            <div class="p-6 sm:p-8 md:p-10 flex flex-col items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 sm:h-14 sm:w-14 mb-6 text-[#FF69B4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
                 
-                <h1 class="text-xl sm:text-2xl font-semibold mb-6 sm:mb-8 text-center">Public Relay Chat</h1>
+                <h1 class="text-2xl sm:text-3xl font-semibold mb-8 sm:mb-10 text-center text-[#FFFFFF]">Public Relay Chat</h1>
                 
-                <div id="messages" class="w-full h-72 sm:h-96 overflow-y-auto bg-opacity-10 bg-white rounded-xl p-3 sm:p-4 mb-4"></div>
+                <div id="messages" class="w-full h-80 sm:h-96 md:h-[28rem] overflow-y-auto bg-[#404040] rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8"></div>
                 
-                <form id="chatForm" class="w-full space-y-3">
-                    <input type="text" id="usernameInput" class="input input-bordered w-full" placeholder="Your Nickname">
-                    <div class="flex flex-col sm:flex-row gap-2">
-                        <input type="text" id="messageInput" class="input input-bordered w-full" placeholder="Type your message...">
-                        <button type="submit" class="btn btn-primary w-full sm:w-auto">Send</button>
+                <form id="chatForm" class="w-full space-y-4 sm:space-y-6">
+                    <input type="text" id="usernameInput" class="input w-full bg-[#404040] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-6 py-4 text-lg focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none" placeholder="Your Nickname">
+                    <div class="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                        <input type="text" id="messageInput" class="input w-full bg-[#404040] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-6 py-4 text-lg focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none" placeholder="Type your message...">
+                        <button type="submit" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] w-full sm:w-auto rounded-xl px-8 py-4 text-lg font-medium">Send</button>
                     </div>
                 </form>
             </div>
@@ -104,15 +104,15 @@
             if (document.getElementById(messageId)) return; // Avoid duplicates
 
             const messageEl = document.createElement('div');
-            messageEl.className = 'bg-opacity-10 bg-white rounded-xl p-3 sm:p-4 mb-3';
+            messageEl.className = 'bg-[#282828] rounded-2xl p-4 sm:p-5 mb-4 border border-[#606060]';
             messageEl.id = messageId;
             
             messageEl.innerHTML = `
-                <div class="flex justify-between items-center mb-2 message-header">
-                    <strong class="text-accent">${message.nickname || 'Anonymous'}</strong>
-                    <span class="text-secondary message-timestamp">${new Date(message.createdAt).toLocaleString()}</span>
+                <div class="flex justify-between items-center mb-3 message-header">
+                    <strong class="text-[#FF69B4] text-lg">${message.nickname || 'Anonymous'}</strong>
+                    <span class="text-[#A0A0A0] message-timestamp">${new Date(message.createdAt).toLocaleString()}</span>
                 </div>
-                <div class="text-color-text break-words">${message.content || ''}</div>
+                <div class="text-[#E0E0E0] break-words text-base leading-relaxed">${message.content || ''}</div>
             `;
             
             messagesEl.appendChild(messageEl);

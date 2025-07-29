@@ -5,39 +5,55 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Relay Subscription - Smart Contract</title>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="styles/wormhole.css" />
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.15.0/ethers.umd.min.js"
         type="application/javascript"></script>
     <style>
         body {
             line-height: 1.6;
-            background-color: rgb(25, 25, 25);
+            background-color: #1A1A1A;
         }
 
         .status-card {
-            @apply bg-base-300/50 rounded-xl p-6 border border-base-content/20;
+            background-color: #404040;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            border: 1px solid #606060;
         }
 
         .step-indicator {
-            @apply flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            font-size: 0.875rem;
+            font-weight: 600;
         }
 
         .step-active {
-            @apply bg-accent text-accent-content;
+            background-color: #FF69B4;
+            color: #FFFFFF;
         }
 
         .step-completed {
-            @apply bg-success text-success-content;
+            background-color: #4CAF50;
+            color: #FFFFFF;
         }
 
         .step-pending {
-            @apply bg-base-content/20 text-base-content/60;
+            background-color: #A0A0A0;
+            color: #FFFFFF;
         }
 
         .wallet-info {
-            @apply bg-base-200/50 rounded-lg p-4 border border-base-content/10;
+            background-color: #282828;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            border: 1px solid #606060;
         }
 
         .notification-container {
@@ -49,24 +65,36 @@
         }
 
         .notification {
-            @apply p-4 rounded-lg shadow-lg mb-3 transform transition-all duration-300;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            margin-bottom: 0.75rem;
+            transform: transition-all duration-300;
             animation: slideIn 0.3s ease-out;
         }
 
         .notification.success {
-            @apply bg-success text-success-content;
+            background-color: rgba(76, 175, 80, 0.2);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            color: #4CAF50;
         }
 
         .notification.error {
-            @apply bg-error text-error-content;
+            background-color: rgba(244, 67, 54, 0.2);
+            border: 1px solid rgba(244, 67, 54, 0.3);
+            color: #F44336;
         }
 
         .notification.warning {
-            @apply bg-warning text-warning-content;
+            background-color: rgba(255, 165, 0, 0.2);
+            border: 1px solid rgba(255, 165, 0, 0.3);
+            color: #FFA500;
         }
 
         .notification.info {
-            @apply bg-info text-info-content;
+            background-color: rgba(66, 165, 245, 0.2);
+            border: 1px solid rgba(66, 165, 245, 0.3);
+            color: #42A5F5;
         }
 
         @keyframes slideIn {
@@ -82,46 +110,46 @@
     </style>
 </head>
 
-<body class="antialiased">
+<body class="antialiased bg-[#1A1A1A]">
     <!-- Sistema di notifiche -->
     <div id="notificationContainer" class="notification-container"></div>
 
-    <div class="container mx-auto p-4">
-        <div class="flex items-center mb-4">
-            <a href="/" class="nav-link">&larr; Back to Control Panel</a>
+    <div class="container mx-auto p-6">
+        <div class="flex items-center mb-6">
+            <a href="/" class="text-[#42A5F5] hover:text-[#64B5F6] transition-colors text-lg">&larr; Back to Control Panel</a>
         </div>
         
-        <div class="card">
-            <div class="p-8">
+        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
+            <div class="p-8 sm:p-10">
                 <div class="flex flex-col items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-4 text-accent" fill="none"
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-6 text-[#FF69B4]" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                             d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
 
-                    <h1 class="text-3xl font-semibold mb-2">Relay Subscription</h1>
-                    <p class="text-base-content/70 mb-8">Subscribe to the relay using smart contract</p>
+                    <h1 class="text-3xl font-semibold mb-3 text-[#FFFFFF]">Relay Subscription</h1>
+                    <p class="text-[#A0A0A0] text-lg mb-8">Subscribe to the relay using smart contract</p>
 
                     <!-- Contract Information -->
-                    <div class="w-full max-w-2xl mb-8 p-6 bg-base-300/50 rounded-xl border border-base-content/20">
+                    <div class="w-full max-w-2xl mb-8 p-6 bg-[#404040] rounded-xl border border-[#606060]">
                         <div class="flex items-center gap-3 mb-4">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-accent" fill="none"
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#FF69B4]" fill="none"
                                 viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <h3 class="text-lg font-semibold text-accent">Smart Contract Information</h3>
+                            <h3 class="text-lg font-semibold text-[#FF69B4]">Smart Contract Information</h3>
                         </div>
-                        <div class="space-y-3 text-sm">
+                        <div class="space-y-3 text-base">
                             <div class="flex items-center gap-2">
-                                <span class="text-base-content/60">Network:</span>
-                                <span class="badge badge-accent">Sepolia Testnet</span>
+                                <span class="text-[#A0A0A0]">Network:</span>
+                                <span class="badge bg-[#FF69B4] text-[#FFFFFF] border-0">Sepolia Testnet</span>
                             </div>
                             <div class="flex items-center gap-2">
-                                <span class="text-base-content/60">Contract Address:</span>
-                                <span id="contractAddress" class="font-mono text-accent">Loading...</span>
-                                <button id="copyContractBtn" class="btn btn-xs btn-outline"
+                                <span class="text-[#A0A0A0]">Contract Address:</span>
+                                <span id="contractAddress" class="font-mono text-[#42A5F5]">Loading...</span>
+                                <button id="copyContractBtn" class="btn btn-xs bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-lg"
                                     onclick="copyContractAddress()">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none"
                                         viewBox="0 0 24 24" stroke="currentColor">
@@ -132,10 +160,10 @@
                                 </button>
                             </div>
                             <div class="flex items-center gap-2">
-                                <span class="text-base-content/60">Chain ID:</span>
-                                <span class="font-mono">0xaa36a7 (11155111)</span>
+                                <span class="text-[#A0A0A0]">Chain ID:</span>
+                                <span class="font-mono text-[#E0E0E0]">0xaa36a7 (11155111)</span>
                             </div>
-                            <div class="alert alert-info text-xs">
+                            <div class="alert bg-[#42A5F5]/20 border-[#42A5F5]/30 text-[#42A5F5] rounded-xl p-4">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
                                     stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -150,24 +178,24 @@
                     <div class="flex items-center gap-4 mb-8">
                         <div class="flex items-center gap-2">
                             <div id="step1" class="step-indicator step-active">1</div>
-                            <span class="text-sm">Connect Wallet</span>
+                            <span class="text-sm text-[#E0E0E0]">Connect Wallet</span>
                         </div>
-                        <div class="w-8 h-px bg-base-content/30"></div>
+                        <div class="w-8 h-px bg-[#606060]"></div>
                         <div class="flex items-center gap-2">
                             <div id="step2" class="step-indicator step-pending">2</div>
-                            <span class="text-sm">Subscribe</span>
+                            <span class="text-sm text-[#A0A0A0]">Subscribe</span>
                         </div>
-                        <div class="w-8 h-px bg-base-content/30"></div>
+                        <div class="w-8 h-px bg-[#606060]"></div>
                         <div class="flex items-center gap-2">
                             <div id="step3" class="step-indicator step-pending">3</div>
-                            <span class="text-sm">Status</span>
+                            <span class="text-sm text-[#A0A0A0]">Status</span>
                         </div>
                     </div>
 
                     <!-- Step 1: Wallet Connection -->
                     <div id="step1Content" class="w-full max-w-2xl space-y-6">
                         <div class="status-card">
-                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-[#FF69B4]">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
                                     stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -175,10 +203,10 @@
                                 </svg>
                                 Connect Your Wallet
                             </h3>
-                            <p class="text-base-content/70 mb-4">
+                            <p class="text-[#A0A0A0] mb-6">
                                 Connect your MetaMask wallet to proceed with the subscription.
                             </p>
-                            <button id="connectWalletBtn" class="btn btn-accent">
+                            <button id="connectWalletBtn" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
                                     viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -189,10 +217,10 @@
                         </div>
 
                         <div id="walletInfo" class="wallet-info hidden">
-                            <h4 class="font-semibold mb-2">Connected Wallet:</h4>
-                            <div class="flex items-center gap-2">
-                                <span id="walletAddress" class="font-mono text-sm"></span>
-                                <button id="disconnectWalletBtn" class="btn btn-sm btn-outline">Disconnect</button>
+                            <h4 class="font-semibold mb-3 text-[#FFFFFF]">Connected Wallet:</h4>
+                            <div class="flex items-center gap-3">
+                                <span id="walletAddress" class="font-mono text-base text-[#E0E0E0]"></span>
+                                <button id="disconnectWalletBtn" class="btn btn-sm bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-lg">Disconnect</button>
                             </div>
                         </div>
                     </div>
@@ -201,7 +229,7 @@
                     <div id="step2Content" class="w-full max-w-2xl space-y-6 hidden">
                         <!-- Current Subscription Status -->
                         <div class="status-card">
-                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-[#FF69B4]">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
                                     stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -209,9 +237,9 @@
                                 </svg>
                                 Subscription Status
                             </h3>
-                            <div class="bg-base-200/50 rounded-lg p-4">
-                                <div class="flex items-center justify-between mb-2">
-                                    <h4 class="font-semibold flex items-center gap-2">
+                            <div class="bg-[#282828] rounded-xl p-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <h4 class="font-semibold flex items-center gap-2 text-[#FFFFFF]">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
                                             viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -220,7 +248,7 @@
                                         </svg>
                                         Subscription Status
                                     </h4>
-                                    <button id="refreshSubscriptionBtn" class="btn btn-xs btn-outline"
+                                    <button id="refreshSubscriptionBtn" class="btn btn-xs bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-lg"
                                         onclick="checkSubscriptionStatus()">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none"
                                             viewBox="0 0 24 24" stroke="currentColor">
@@ -231,15 +259,15 @@
                                         Refresh
                                     </button>
                                 </div>
-                                <div id="subscriptionDetails" class="text-sm space-y-1">
-                                    <p class="text-base-content/60">Loading...</p>
+                                <div id="subscriptionDetails" class="text-base space-y-2">
+                                    <p class="text-[#A0A0A0]">Loading...</p>
                                 </div>
                             </div>
                         </div>
 
                         <!-- New Subscription Form -->
                         <div class="status-card">
-                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-[#FF69B4]">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
                                     stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -247,45 +275,45 @@
                                 </svg>
                                 New Subscription
                             </h3>
-                            <p class="text-base-content/70 mb-4">
+                            <p class="text-[#A0A0A0] mb-6">
                                 Sottoscrivi lo storage usando il tuo wallet Ethereum. Scegli la quantità di MB
                                 desiderata.
                             </p>
 
-                            <div class="form-control mb-4">
+                            <div class="form-control mb-6">
                                 <label class="label">
-                                    <span class="label-text">Storage (MB):</span>
+                                    <span class="label-text text-[#FFFFFF] text-base">Storage (MB):</span>
                                 </label>
-                                <input id="mbInput" type="number" class="input input-bordered"
+                                <input id="mbInput" type="number" class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none"
                                     placeholder="Enter MB needed (e.g., 100)" min="1" value="100">
                                 <div class="label">
-                                    <span class="label-text-alt">1 GB = 1000 MB</span>
+                                    <span class="label-text-alt text-[#A0A0A0]">1 GB = 1000 MB</span>
                                 </div>
                             </div>
 
-                            <div class="bg-base-200/50 rounded-lg p-4 mb-4">
-                                <h5 class="font-semibold mb-2">Subscription Details:</h5>
-                                <div class="space-y-1 text-sm">
+                            <div class="bg-[#282828] rounded-xl p-4 mb-6">
+                                <h5 class="font-semibold mb-3 text-[#FFFFFF]">Subscription Details:</h5>
+                                <div class="space-y-2 text-base">
                                     <div class="flex justify-between">
-                                        <span>Storage:</span>
-                                        <span id="storageDisplay">100 MB</span>
+                                        <span class="text-[#A0A0A0]">Storage:</span>
+                                        <span id="storageDisplay" class="text-[#FFFFFF]">100 MB</span>
                                     </div>
                                     <div class="flex justify-between">
-                                        <span>Price per GB:</span>
-                                        <span id="pricePerGB">Loading...</span>
+                                        <span class="text-[#A0A0A0]">Price per GB:</span>
+                                        <span id="pricePerGB" class="text-[#FFFFFF]">Loading...</span>
                                     </div>
                                     <div class="flex justify-between font-semibold">
-                                        <span>Total cost:</span>
-                                        <span id="totalCost">Loading...</span>
+                                        <span class="text-[#FFFFFF]">Total cost:</span>
+                                        <span id="totalCost" class="text-[#FF69B4]">Loading...</span>
                                     </div>
-                                    <div class="flex justify-between text-xs text-base-content/60">
+                                    <div class="flex justify-between text-sm text-[#A0A0A0]">
                                         <span>Duration:</span>
                                         <span>30 days</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <button id="subscribeBtn" class="btn btn-accent w-full">
+                            <button id="subscribeBtn" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
                                     viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -299,7 +327,7 @@
                     <!-- Step 3: Subscription Status Check -->
                     <div id="step3Content" class="w-full max-w-2xl space-y-6 hidden">
                         <div class="status-card">
-                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-[#FF69B4]">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
                                     stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -307,14 +335,14 @@
                                 </svg>
                                 Subscription Status
                             </h3>
-                            <p class="text-base-content/70 mb-4">
+                            <p class="text-[#A0A0A0] mb-6">
                                 Check the status of your current subscription and manage your relay access.
                             </p>
 
-                            <div class="bg-base-200/50 rounded-lg p-4 mb-4">
-                                <div class="flex items-center justify-between mb-2">
-                                    <h5 class="font-semibold">Current Status:</h5>
-                                    <button id="refreshStatusBtn" class="btn btn-sm btn-outline">
+                            <div class="bg-[#282828] rounded-xl p-4 mb-6">
+                                <div class="flex items-center justify-between mb-3">
+                                    <h5 class="font-semibold text-[#FFFFFF]">Current Status:</h5>
+                                    <button id="refreshStatusBtn" class="btn btn-sm bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-lg">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
                                             viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -323,16 +351,16 @@
                                         Refresh
                                     </button>
                                 </div>
-                                <div id="step3SubscriptionDetails" class="space-y-2">
-                                    <div class="text-center py-4">
-                                        <div class="loading loading-spinner loading-md"></div>
-                                        <p class="text-sm text-base-content/60 mt-2">Loading subscription status...</p>
+                                <div id="step3SubscriptionDetails" class="space-y-3">
+                                    <div class="text-center py-6">
+                                        <div class="loading loading-spinner loading-md text-[#FF69B4]"></div>
+                                        <p class="text-base text-[#A0A0A0] mt-3">Loading subscription status...</p>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="flex gap-2">
-                                <button id="checkStatusBtn" class="btn btn-accent flex-1">
+                            <div class="flex gap-3">
+                                <button id="checkStatusBtn" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] flex-1 rounded-xl px-6 py-3 font-medium">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
                                         viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -340,7 +368,7 @@
                                     </svg>
                                     Check Status
                                 </button>
-                                <button id="newSubscriptionBtn" class="btn btn-outline flex-1">
+                                <button id="newSubscriptionBtn" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] flex-1 rounded-xl px-6 py-3 font-medium">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
                                         viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

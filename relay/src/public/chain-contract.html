@@ -5,9 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chain Contract Interface - Shogun Relay</title>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="styles/wormhole.css">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="lib/admin-auth.js"></script>
     
     <!-- Load Gun first -->
@@ -18,56 +18,56 @@
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 </head>
 
-<body class="antialiased">
-    <div class="container mx-auto p-4">
-        <div class="flex items-center mb-4">
-            <a href="/" class="nav-link">&larr; Back to Control Panel</a>
+<body class="antialiased bg-[#1A1A1A]">
+    <div class="container mx-auto p-6">
+        <div class="flex items-center mb-6">
+            <a href="/" class="text-[#42A5F5] hover:text-[#64B5F6] transition-colors text-lg">&larr; Back to Control Panel</a>
         </div>
         
-        <div class="card">
-            <div class="p-8">
-                <div class="flex flex-col items-center mb-8">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-4 text-accent" fill="none"
+        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
+            <div class="p-10">
+                <div class="flex flex-col items-center mb-12">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-20 w-20 mb-6 text-[#FF69B4]" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                             d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    <h1 class="text-3xl font-semibold mb-2">Chain Contract Interface</h1>
-                    <p class="text-secondary">Interact with Chain.sol contract on Sepolia</p>
+                    <h1 class="text-4xl font-semibold mb-4 text-[#FFFFFF]">Chain Contract Interface</h1>
+                    <p class="text-[#8B94FF] text-lg">Interact with Chain.sol contract on Sepolia</p>
                 </div>
 
                 <!-- Connection Status -->
-                <div id="connectionStatus" class="alert alert-info mb-6">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+                <div id="connectionStatus" class="alert bg-[#404040] border-[#606060] text-[#E0E0E0] mb-8 rounded-xl p-6">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6 text-[#42A5F5]">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
-                    <span>Connecting to contract...</span>
+                    <span class="text-lg">Connecting to contract...</span>
                 </div>
 
                 <!-- Contract Info -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    <div class="card bg-base-200">
-                        <div class="card-body">
-                            <h2 class="card-title text-accent">📋 Contract Information</h2>
-                            <div class="space-y-2 text-sm">
-                                <div><strong>Network:</strong> <span id="networkInfo">Sepolia</span></div>
-                                <div><strong>Address:</strong> <span id="contractAddress" class="font-mono text-xs">Loading...</span></div>
-                                <div><strong>Owner:</strong> <span id="contractOwner" class="font-mono text-xs">Loading...</span></div>
-                                <div><strong>Status:</strong> <span id="contractStatus">Connected</span></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+                    <div class="card bg-[#404040] border-[#606060] rounded-2xl">
+                        <div class="card-body p-8">
+                            <h2 class="card-title text-[#FF69B4] text-xl mb-6">📋 Contract Information</h2>
+                            <div class="space-y-4 text-base text-[#E0E0E0]">
+                                <div class="flex justify-between items-center py-2"><strong class="text-[#FFFFFF]">Network:</strong> <span id="networkInfo" class="text-right">Sepolia</span></div>
+                                <div class="flex justify-between items-center py-2"><strong class="text-[#FFFFFF]">Address:</strong> <span id="contractAddress" class="font-mono text-xs text-[#A0A0A0] text-right">Loading...</span></div>
+                                <div class="flex justify-between items-center py-2"><strong class="text-[#FFFFFF]">Owner:</strong> <span id="contractOwner" class="font-mono text-xs text-[#A0A0A0] text-right">Loading...</span></div>
+                                <div class="flex justify-between items-center py-2"><strong class="text-[#FFFFFF]">Status:</strong> <span id="contractStatus" class="text-right">Connected</span></div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="card bg-base-200">
-                        <div class="card-body">
-                            <h2 class="card-title text-accent">🔗 Wallet Connection</h2>
-                            <div class="space-y-2 text-sm">
-                                <div><strong>Wallet:</strong> <span id="walletAddress" class="font-mono text-xs">Not connected</span></div>
-                                <div><strong>Balance:</strong> <span id="walletBalance">-</span></div>
-                                <div><strong>Permissions:</strong> <span id="walletPermissions">None</span></div>
+                    <div class="card bg-[#404040] border-[#606060] rounded-2xl">
+                        <div class="card-body p-8">
+                            <h2 class="card-title text-[#FF69B4] text-xl mb-6">🔗 Wallet Connection</h2>
+                            <div class="space-y-4 text-base text-[#E0E0E0] mb-8">
+                                <div class="flex justify-between items-center py-2"><strong class="text-[#FFFFFF]">Wallet:</strong> <span id="walletAddress" class="font-mono text-xs text-[#A0A0A0] text-right">Not connected</span></div>
+                                <div class="flex justify-between items-center py-2"><strong class="text-[#FFFFFF]">Balance:</strong> <span id="walletBalance" class="text-right">-</span></div>
+                                <div class="flex justify-between items-center py-2"><strong class="text-[#FFFFFF]">Permissions:</strong> <span id="walletPermissions" class="text-right">None</span></div>
                             </div>
-                            <div class="card-actions justify-end mt-4">
-                                <button id="connectWalletBtn" class="btn btn-primary btn-sm" onclick="connectWallet()">
+                            <div class="card-actions justify-end">
+                                <button id="connectWalletBtn" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-8 py-4 text-lg font-medium" onclick="connectWallet()">
                                     🔗 Connect Wallet
                                 </button>
                             </div>
@@ -76,50 +76,53 @@
                 </div>
 
                 <!-- Main Interface -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
                     <!-- Write Data Section -->
-                    <div class="card bg-base-200">
-                        <div class="card-body">
-                            <h2 class="card-title text-accent">✍️ Write Data</h2>
-                            <p class="text-sm text-base-content/70 mb-4">
+                    <div class="card bg-[#404040] border-[#606060] rounded-2xl">
+                        <div class="card-body p-8">
+                            <h2 class="card-title text-[#FF69B4] text-xl mb-4">✍️ Write Data</h2>
+                            <p class="text-base text-[#E0E0E0] mb-8 leading-relaxed">
                                 Enter data in Gun format and send it to the Chain.sol contract
                             </p>
                             
-                            <div class="form-control space-y-4">
+                            <div class="form-control space-y-6">
                                 <div>
-                                    <label class="label">
-                                        <span class="label-text">Soul (Node ID)</span>
-                                        <span class="label-text-alt">keccak256 hash</span>
+                                    <label class="label pb-2">
+                                        <span class="label-text text-[#FFFFFF] text-lg font-medium">Soul (Node ID)</span>
+                                        <span class="label-text-alt text-[#A0A0A0]">keccak256 hash</span>
                                     </label>
-                                    <input type="text" id="soulInput" class="input input-bordered w-full" 
-                                           placeholder="e.g. keccak256('user123')" />
-                                    <div class="text-xs text-base-content/50 mt-1">
+                                    <input type="text" id="soulInput" 
+                                        class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-6 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:ring-opacity-50" 
+                                        placeholder="e.g. keccak256('user123')" />
+                                    <div class="text-sm text-[#A0A0A0] mt-3 ml-2">
                                         Leave empty to generate automatically
                                     </div>
                                 </div>
 
                                 <div>
-                                    <label class="label">
-                                        <span class="label-text">Key</span>
-                                        <span class="label-text-alt">keccak256 hash</span>
+                                    <label class="label pb-2">
+                                        <span class="label-text text-[#FFFFFF] text-lg font-medium">Key</span>
+                                        <span class="label-text-alt text-[#A0A0A0]">keccak256 hash</span>
                                     </label>
-                                    <input type="text" id="keyInput" class="input input-bordered w-full" 
-                                           placeholder="e.g. keccak256('profile')" />
+                                    <input type="text" id="keyInput" 
+                                        class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-6 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:ring-opacity-50" 
+                                        placeholder="e.g. keccak256('profile')" />
                                 </div>
 
                                 <div>
-                                    <label class="label">
-                                        <span class="label-text">Value (JSON)</span>
+                                    <label class="label pb-2">
+                                        <span class="label-text text-[#FFFFFF] text-lg font-medium">Value (JSON)</span>
                                     </label>
-                                    <textarea id="valueInput" class="textarea textarea-bordered w-full h-32" 
-                                              placeholder='{"name": "John", "age": 30, "city": "Rome"}'></textarea>
+                                    <textarea id="valueInput" 
+                                        class="textarea w-full h-40 bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-6 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:ring-opacity-50 resize-none" 
+                                        placeholder='{"name": "John", "age": 30, "city": "Rome"}'></textarea>
                                 </div>
 
-                                <div class="flex gap-2">
-                                    <button class="btn btn-primary flex-1" onclick="writeToContract()">
+                                <div class="flex gap-4 pt-4">
+                                    <button class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] flex-1 rounded-xl px-8 py-4 text-lg font-medium" onclick="writeToContract()">
                                         📝 Write to Contract
                                     </button>
-                                    <button class="btn btn-outline" onclick="writeToGunOnly()">
+                                    <button class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-8 py-4 text-lg font-medium" onclick="writeToGunOnly()">
                                         💾 GunDB Only
                                     </button>
                                 </div>
@@ -128,45 +131,48 @@
                     </div>
 
                     <!-- Read Data Section -->
-                    <div class="card bg-base-200">
-                        <div class="card-body">
-                            <h2 class="card-title text-accent">📖 Read Data</h2>
-                            <p class="text-sm text-base-content/70 mb-4">
+                    <div class="card bg-[#404040] border-[#606060] rounded-2xl">
+                        <div class="card-body p-8">
+                            <h2 class="card-title text-[#FF69B4] text-xl mb-4">📖 Read Data</h2>
+                            <p class="text-base text-[#E0E0E0] mb-8 leading-relaxed">
                                 Read data from contract or GunDB
                             </p>
                             
-                            <div class="form-control space-y-4">
+                            <div class="form-control space-y-6">
                                 <div>
-                                    <label class="label">
-                                        <span class="label-text">Soul (Node ID)</span>
+                                    <label class="label pb-2">
+                                        <span class="label-text text-[#FFFFFF] text-lg font-medium">Soul (Node ID)</span>
                                     </label>
-                                    <input type="text" id="readSoulInput" class="input input-bordered w-full" 
-                                           placeholder="Enter soul to read" />
+                                    <input type="text" id="readSoulInput" 
+                                        class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-6 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:ring-opacity-50" 
+                                        placeholder="Enter soul to read" />
                                 </div>
 
                                 <div>
-                                    <label class="label">
-                                        <span class="label-text">Key (optional)</span>
+                                    <label class="label pb-2">
+                                        <span class="label-text text-[#FFFFFF] text-lg font-medium">Key (optional)</span>
                                     </label>
-                                    <input type="text" id="readKeyInput" class="input input-bordered w-full" 
-                                           placeholder="Leave empty to read entire node" />
+                                    <input type="text" id="readKeyInput" 
+                                        class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-6 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:ring-opacity-50" 
+                                        placeholder="Leave empty to read entire node" />
                                 </div>
 
-                                <div class="flex gap-2">
-                                    <button class="btn btn-secondary flex-1" onclick="readFromContract()">
+                                <div class="flex gap-4 pt-4">
+                                    <button class="btn bg-[#42A5F5] hover:bg-[#64B5F6] border-0 text-[#FFFFFF] flex-1 rounded-xl px-8 py-4 text-lg font-medium" onclick="readFromContract()">
                                         🔍 From Contract
                                     </button>
-                                    <button class="btn btn-outline flex-1" onclick="readFromGun()">
+                                    <button class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] flex-1 rounded-xl px-8 py-4 text-lg font-medium" onclick="readFromGun()">
                                         📊 From GunDB
                                     </button>
                                 </div>
 
-                                <div>
-                                    <label class="label">
-                                        <span class="label-text">Result</span>
+                                <div class="pt-6">
+                                    <label class="label pb-2">
+                                        <span class="label-text text-[#FFFFFF] text-lg font-medium">Result</span>
                                     </label>
-                                    <textarea id="readResult" class="textarea textarea-bordered w-full h-32" 
-                                              readonly placeholder="Results will appear here..."></textarea>
+                                    <textarea id="readResult" 
+                                        class="textarea w-full h-40 bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-6 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:ring-opacity-50 resize-none" 
+                                        readonly placeholder="Results will appear here..."></textarea>
                                 </div>
                             </div>
                         </div>
@@ -174,8 +180,8 @@
                 </div>
 
                 <!-- Navigation -->
-                <div class="flex justify-center mt-8">
-                    <a href="/" class="btn btn-outline">
+                <div class="flex justify-center mt-12">
+                    <a href="/" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-8 py-4 text-lg font-medium">
                         ← Back to Dashboard
                     </a>
                 </div>

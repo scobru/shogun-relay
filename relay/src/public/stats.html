@@ -4,201 +4,215 @@
     <meta charset="UTF-8">
     <title>Gun Relay Stats</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
-    <link rel="stylesheet" href="styles/tailwind-local.css">
-    <link rel="stylesheet" href="styles/wormhole.css">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style>
         body { 
             line-height: 1.6;
-            background-color: rgb(25,25,25);
+            background-color: #1A1A1A;
         }
         
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 1rem;
+            padding: 1.5rem;
         }
 
         h1 { 
-            border-bottom: 1px solid #555; 
-            padding-bottom: 0.75rem;
-            margin-bottom: 1.5rem;
-            color: #eee;
+            border-bottom: 1px solid #606060; 
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+            color: #FFFFFF;
+            font-size: 2.5rem;
+            font-weight: bold;
         }
 
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
+            gap: 2rem;
+            margin-bottom: 3rem;
         }
 
         .stat-card {
-            background-color: #2a2a2a;
-            border: 1px solid #444;
-            border-radius: 0.5rem;
-            padding: 1.5rem;
+            background-color: #404040;
+            border: 1px solid #606060;
+            border-radius: 1rem;
+            padding: 2rem;
             text-align: center;
             transition: transform 0.2s ease;
         }
 
         .stat-card:hover {
             transform: translateY(-2px);
-            border-color: #8af;
+            border-color: #FF69B4;
+            box-shadow: 0 8px 32px rgba(255, 105, 180, 0.2);
         }
 
         .stat-title {
-            color: #8af;
-            font-size: 1.1rem;
-            margin-bottom: 0.5rem;
+            color: #FF69B4;
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
         }
 
         .stat-value {
-            font-size: 2rem;
+            font-size: 2.5rem;
             font-weight: bold;
-            margin: 0.5rem 0;
-            color: #eee;
+            margin: 1rem 0;
+            color: #FFFFFF;
         }
 
         .stat-unit {
-            color: #888;
-            font-size: 0.9rem;
+            color: #A0A0A0;
+            font-size: 1rem;
         }
 
         .error { 
-            background-color: #533; 
-            color: #f88; 
-            border-left: 3px solid #c00; 
-            padding: 1rem;
-            margin-top: 1rem; 
+            background-color: rgba(244, 67, 54, 0.2); 
+            color: #F44336; 
+            border-left: 3px solid #F44336; 
+            padding: 1.5rem;
+            margin-top: 1.5rem; 
             display: none;
-            border-radius: 0.25rem;
+            border-radius: 0.75rem;
         }
 
         #lastUpdated { 
-            margin-top: 2rem; 
-            color: #888; 
-            font-size: 0.9rem;
+            margin-top: 3rem; 
+            color: #A0A0A0; 
+            font-size: 1rem;
             text-align: center;
         }
 
         .back-link {
             display: inline-flex;
             align-items: center;
-            color: #8af;
+            color: #42A5F5;
             text-decoration: none;
-            padding: 0.5rem 1rem;
-            border-radius: 0.25rem;
-            margin-bottom: 1rem;
-            transition: background-color 0.2s ease;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            margin-bottom: 1.5rem;
+            transition: all 0.2s ease;
+            font-size: 1.1rem;
         }
 
         .back-link:hover {
-            background-color: rgba(136, 170, 255, 0.1);
+            background-color: rgba(66, 165, 245, 0.1);
+            color: #64B5F6;
         }
 
         .back-link svg {
-            margin-right: 0.5rem;
+            margin-right: 0.75rem;
         }
 
         .view-charts-link {
             display: block;
             text-align: center;
-            margin-top: 2rem;
-            color: #8af;
+            margin-top: 3rem;
+            color: #42A5F5;
             text-decoration: none;
-            padding: 1rem;
-            border: 1px solid #444;
-            border-radius: 0.5rem;
+            padding: 1.5rem;
+            border: 1px solid #606060;
+            border-radius: 1rem;
             transition: all 0.2s ease;
+            font-size: 1.1rem;
         }
 
         .view-charts-link:hover {
-            background-color: rgba(136, 170, 255, 0.1);
-            border-color: #8af;
+            background-color: rgba(66, 165, 245, 0.1);
+            border-color: #42A5F5;
+            color: #64B5F6;
         }
 
         /* Admin Controls Styles */
         .admin-controls {
-            background-color: #2a2a2a;
-            border: 1px solid #444;
-            margin-top: 2rem;
-            padding: 1.5rem;
-            border-radius: 0.5rem;
+            background-color: #404040;
+            border: 1px solid #606060;
+            margin-top: 3rem;
+            padding: 2rem;
+            border-radius: 1rem;
             transition: all 0.2s ease;
         }
 
         .admin-controls:hover {
-            border-color: #8af;
+            border-color: #FF69B4;
         }
 
         .admin-controls h2 {
-            color: #8af;
-            font-size: 1.25rem;
-            margin-bottom: 1rem;
+            color: #FF69B4;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            font-weight: 600;
         }
 
         .admin-controls h3 {
-            color: #eee;
-            font-size: 1.1rem;
-            margin-bottom: 0.5rem;
+            color: #FFFFFF;
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            font-weight: 500;
         }
 
         .admin-controls .btn {
-            background-color: #444;
-            color: #fff;
-            border: 1px solid #666;
-            padding: 0.5rem 1rem;
-            border-radius: 0.25rem;
+            background-color: #FF69B4;
+            color: #FFFFFF;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
             cursor: pointer;
             transition: all 0.2s ease;
+            font-weight: 500;
         }
 
         .admin-controls .btn:hover {
-            background-color: #555;
-            border-color: #8af;
+            background-color: #FF1493;
+            transform: translateY(-1px);
         }
 
         .admin-controls .input {
-            background-color: #333;
-            border: 1px solid #555;
-            color: #fff;
-            padding: 0.5rem;
-            border-radius: 0.25rem;
+            background-color: #282828;
+            border: 1px solid #606060;
+            color: #FFFFFF;
+            padding: 0.75rem;
+            border-radius: 0.75rem;
             width: 100%;
+            font-size: 1rem;
         }
 
         .admin-controls .input:focus {
-            border-color: #8af;
+            border-color: #FF69B4;
             outline: none;
+            box-shadow: 0 0 0 2px rgba(255, 105, 180, 0.2);
         }
 
         .admin-controls .text-success {
-            color: #4ade80;
+            color: #4CAF50;
         }
 
         .admin-controls .text-error {
-            color: #f87171;
+            color: #F44336;
         }
 
         .admin-controls .form-control {
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
         }
 
         .admin-controls .label-text {
-            color: #ccc;
-            font-size: 0.9rem;
-            margin-bottom: 0.25rem;
+            color: #E0E0E0;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
         }
 
         @media (max-width: 768px) {
             .stats-grid {
                 grid-template-columns: 1fr 1fr;
-                gap: 1rem;
+                gap: 1.5rem;
             }
 
             .stat-value {
-                font-size: 1.75rem;
+                font-size: 2rem;
             }
         }
 
@@ -208,19 +222,19 @@
             }
 
             body {
-                padding: 0.5rem;
+                padding: 1rem;
             }
             
             .container {
-                padding: 0.5rem;
+                padding: 1rem;
             }
         }
     </style>
 </head>
-<body class="antialiased">
+<body class="antialiased bg-[#1A1A1A]">
     <div class="container">
         <a href="/" class="back-link">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
             </svg>
             Back to Control Panel
@@ -252,64 +266,64 @@
         </div>
 
         <!-- New Admin Controls Section -->
-        <div class="admin-controls bg-base-200 rounded-lg p-6 mt-8">
-            <h2 class="text-xl font-bold mb-4 text-primary">Admin Controls</h2>
+        <div class="admin-controls">
+            <h2 class="text-xl font-bold mb-6 text-[#FF69B4]">Admin Controls</h2>
             
             <!-- Garbage Collector Control -->
-            <div class="mb-6">
-                <h3 class="text-lg mb-2">Garbage Collector</h3>
-                <button id="triggerGC" class="btn btn-primary">
+            <div class="mb-8">
+                <h3 class="text-lg mb-4 text-[#FFFFFF]">Garbage Collector</h3>
+                <button id="triggerGC" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium">
                     🗑️ Trigger Garbage Collection
                 </button>
-                <div id="gcStatus" class="mt-2 text-sm"></div>
+                <div id="gcStatus" class="mt-3 text-base"></div>
             </div>
 
             <!-- Stats Modification -->
-            <div class="mb-6">
-                <h3 class="text-lg mb-2">Modify Stats</h3>
-                <div class="flex flex-col gap-4">
+            <div class="mb-8">
+                <h3 class="text-lg mb-4 text-[#FFFFFF]">Modify Stats</h3>
+                <div class="flex flex-col gap-6">
                     <div class="form-control">
                         <label class="label">
-                            <span class="label-text">GET Requests</span>
+                            <span class="label-text text-[#E0E0E0] text-base">GET Requests</span>
                         </label>
-                        <div class="flex gap-2">
-                            <input type="number" id="getRequestsInput" class="input input-bordered w-full" placeholder="Enter value">
-                            <button onclick="updateStat('getRequests')" class="btn btn-primary">Update</button>
+                        <div class="flex gap-3">
+                            <input type="number" id="getRequestsInput" class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none" placeholder="Enter value">
+                            <button onclick="updateStat('getRequests')" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium">Update</button>
                         </div>
                     </div>
                     <div class="form-control">
                         <label class="label">
-                            <span class="label-text">PUT Requests</span>
+                            <span class="label-text text-[#E0E0E0] text-base">PUT Requests</span>
                         </label>
-                        <div class="flex gap-2">
-                            <input type="number" id="putRequestsInput" class="input input-bordered w-full" placeholder="Enter value">
-                            <button onclick="updateStat('putRequests')" class="btn btn-primary">Update</button>
+                        <div class="flex gap-3">
+                            <input type="number" id="putRequestsInput" class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none" placeholder="Enter value">
+                            <button onclick="updateStat('putRequests')" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium">Update</button>
                         </div>
                     </div>
                 </div>
-                <div id="updateStatus" class="mt-2 text-sm"></div>
+                <div id="updateStatus" class="mt-3 text-base"></div>
             </div>
 
             <!-- Peer Management -->
-            <div class="mt-6">
-                <h3 class="text-lg mb-2">Peer Management</h3>
-                <div class="mb-4">
-                    <h4 class="text-md font-semibold mb-2">Connected Peers:</h4>
-                    <ul id="peerList" class="list-disc list-inside bg-base-100 p-3 rounded-md text-sm min-h-[4rem]">
+            <div class="mt-8">
+                <h3 class="text-lg mb-4 text-[#FFFFFF]">Peer Management</h3>
+                <div class="mb-6">
+                    <h4 class="text-lg font-semibold mb-3 text-[#E0E0E0]">Connected Peers:</h4>
+                    <ul id="peerList" class="list-disc list-inside bg-[#282828] p-4 rounded-xl text-base min-h-[5rem] text-[#E0E0E0]">
                         <!-- Peers will be listed here -->
                         <li>Loading...</li>
                     </ul>
                 </div>
                 <div class="form-control">
                     <label class="label">
-                        <span class="label-text">Add New Peer</span>
+                        <span class="label-text text-[#E0E0E0] text-base">Add New Peer</span>
                     </label>
-                    <div class="flex gap-2">
-                        <input type="text" id="peerInput" class="input input-bordered w-full" placeholder="e.g., wss://gun.shogun.to/gun">
-                        <button id="addPeerBtn" class="btn btn-primary">Add</button>
+                    <div class="flex gap-3">
+                        <input type="text" id="peerInput" class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none" placeholder="e.g., wss://gun.shogun.to/gun">
+                        <button id="addPeerBtn" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium">Add</button>
                     </div>
                 </div>
-                <div id="peerStatus" class="mt-2 text-sm"></div>
+                <div id="peerStatus" class="mt-3 text-base"></div>
             </div>
         </div>
 

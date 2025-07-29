@@ -4,40 +4,116 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Notes</title>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="styles/wormhole.css">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Include centralized admin authentication -->
     <script src="lib/admin-auth.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+    <style>
+        .textarea-custom {
+            width: 100%;
+            background-color: #404040;
+            color: #FFFFFF;
+            border: 1px solid #606060;
+            padding: 1rem 1.5rem;
+            border-radius: 0.75rem;
+            font-family: inherit;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+            resize: vertical;
+            min-height: 24rem;
+        }
+        
+        .textarea-custom:focus {
+            outline: none;
+            border-color: #FF69B4;
+            box-shadow: 0 0 0 2px rgba(255, 105, 180, 0.2);
+        }
+        
+        .btn-custom {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #FF69B4;
+            color: #FFFFFF;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+        
+        @media (min-width: 640px) {
+            .btn-custom {
+                width: auto;
+            }
+        }
+        
+        .btn-custom:hover {
+            background-color: #FF1493;
+            transform: translateY(-1px);
+        }
+        
+        .btn-custom.delete {
+            background-color: #F44336;
+        }
+        
+        .btn-custom.delete:hover {
+            background-color: #D32F2F;
+        }
+        
+        .message {
+            padding: 1rem 1.5rem;
+            border-radius: 0.75rem;
+            margin-top: 1rem;
+            font-weight: 500;
+        }
+        
+        .message.success {
+            background-color: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+        
+        .message.error {
+            background-color: rgba(244, 67, 54, 0.2);
+            color: #F44336;
+            border: 1px solid rgba(244, 67, 54, 0.3);
+        }
+    </style>
 </head>
-<body class="antialiased">
-    <div class="container mx-auto p-4">
-        <div class="flex items-center mb-4">
-            <a href="/" class="nav-link">&larr; Back to Control Panel</a>
+<body class="antialiased bg-[#1A1A1A]">
+    <div class="container mx-auto p-6">
+        <div class="flex items-center mb-6">
+            <a href="/" class="text-[#42A5F5] hover:text-[#64B5F6] transition-colors text-lg">&larr; Back to Control Panel</a>
         </div>
 
-        <div class="card">
-            <div class="p-8">
+        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
+            <div class="p-8 sm:p-10">
                 <div class="flex flex-col items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-6 text-[#FF69B4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
 
-                    <h1 class="text-2xl font-semibold mb-8">Admin Notes</h1>
+                    <h1 class="text-3xl font-semibold mb-8 text-[#FFFFFF]">Admin Notes</h1>
 
-                    <div class="w-full space-y-6">
+                    <div class="w-full space-y-8">
                         <div class="form-group">
-                            <label class="block text-sm font-medium mb-2">Your Private, Encrypted Notes:</label>
-                            <textarea id="notesArea" class="textarea textarea-bordered w-full h-96" placeholder="Enter your admin token to load encrypted notes..."></textarea>
-                            <div class="flex gap-2 mt-4">
-                                <button onclick="saveNotes()" class="btn btn-primary">Save Encrypted Notes</button>
-                                <button onclick="deleteNotes()" class="btn btn-error">Delete Notes</button>
+                            <label class="block text-lg font-medium mb-3 text-[#FFFFFF]">Your Private, Encrypted Notes:</label>
+                            <textarea id="notesArea" class="textarea-custom" placeholder="Enter your admin token to load encrypted notes..."></textarea>
+                            <div class="flex flex-col sm:flex-row gap-4 mt-6">
+                                <button onclick="saveNotes()" class="btn-custom">Save Encrypted Notes</button>
+                                <button onclick="deleteNotes()" class="btn-custom delete">Delete Notes</button>
                             </div>
                         </div>
 
-                        <div id="message" class="alert hidden"></div>
+                        <div id="message" class="message hidden"></div>
                     </div>
                 </div>
             </div>
@@ -53,9 +129,16 @@
 
         function showMessage(text, isError = false) {
             messageEl.textContent = text;
-            messageEl.className = isError ? 'error' : 'success';
+            messageEl.className = isError ? 'message error' : 'message success';
             messageEl.style.display = 'block';
-            setTimeout(() => { messageEl.style.display = 'none'; }, 3000);
+            
+            // Scroll to message
+            messageEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Auto-hide messages after 5 seconds
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 5000);
         }
         
         async function apiCall(endpoint, method = 'GET', body) {

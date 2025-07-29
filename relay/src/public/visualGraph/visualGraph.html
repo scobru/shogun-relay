@@ -4,46 +4,143 @@
     <meta charset="utf-8" />
     <meta http-equiv="Access-Control-Allow-Origin" content="*" />
     <title>Graph Visualizer</title>
-    <link
-      href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css"
-      rel="stylesheet"
-      type="text/css"
-    />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="../styles/wormhole.css" />
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <link href="../styles/wormhole.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="vGmain.css" />
     <!-- Include centralized admin authentication -->
     <script src="../lib/admin-auth.js"></script>
+    <style>
+        body {
+            line-height: 1.6;
+            background-color: #1A1A1A;
+            color: #E0E0E0;
+        }
+
+        .navbar {
+            background-color: #404040;
+            border: 1px solid #606060;
+            border-radius: 1rem;
+            padding: 1rem 1.5rem;
+        }
+
+        .card {
+            background-color: #404040;
+            border: 1px solid #606060;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        .input {
+            background-color: #282828;
+            color: #FFFFFF;
+            border: 1px solid #606060;
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .input:focus {
+            outline: none;
+            border-color: #FF69B4;
+            box-shadow: 0 0 0 3px rgba(255, 105, 180, 0.1);
+        }
+
+        .input::placeholder {
+            color: #A0A0A0;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+            border: none;
+        }
+
+        .btn-primary {
+            background-color: #FF69B4;
+            color: #FFFFFF;
+        }
+
+        .btn-primary:hover {
+            background-color: #FF1493;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(255, 105, 180, 0.3);
+        }
+
+        .btn-accent {
+            background-color: #42A5F5;
+            color: #FFFFFF;
+        }
+
+        .btn-accent:hover {
+            background-color: #64B5F6;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(66, 165, 245, 0.3);
+        }
+
+        .btn-sm {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+
+        .label-text {
+            color: #FFFFFF;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .card-title {
+            color: #FF69B4;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .cont {
+            background-color: #282828;
+            border: 1px solid #606060;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            color: #E0E0E0;
+        }
+    </style>
   </head>
-  <body class="min-h-screen bg-base-200 text-base-content">
-    <div class="container mx-auto p-4">
-        <div class="flex items-center mb-4">
-            <a href="/" class="nav-link">&larr; Back to Control Panel</a>
+  <body class="min-h-screen bg-[#1A1A1A] text-[#E0E0E0]">
+    <div class="container mx-auto p-6">
+        <div class="flex items-center mb-6">
+            <a href="/" class="text-[#42A5F5] hover:text-[#64B5F6] transition-colors text-lg">&larr; Back to Control Panel</a>
         </div>
         
-        <div class="navbar bg-base-300">
+        <div class="navbar mb-6">
       <div class="flex-1">
         <img
           src="visualGraphIcon.svg"
           width="25"
           height="25"
           alt=""
-          class="mr-2"
+          class="mr-3"
         />
-        <h2 class="text-xl font-semibold">Visualization</h2>
+        <h2 class="text-xl font-semibold text-[#FF69B4]">Visualization</h2>
       </div>
       <div class="flex-none">
-        <span id="peerList" class="text-sm opacity-70"></span>
+        <span id="peerList" class="text-base text-[#A0A0A0]"></span>
       </div>
     </div>
 
     <div
-      class="container mx-auto p-4 flex flex-col gap-4 min-h-[calc(100vh-4rem)]"
+      class="container mx-auto flex flex-col gap-6 min-h-[calc(100vh-8rem)]"
     >
       <!-- Input Controls -->
-      <div class="card bg-base-300 shadow-xl">
-        <div class="card-body p-4">
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="card">
+        <div class="card-body">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div class="form-control">
               <label class="label" for="relayPeer">
                 <span class="label-text">Relay Peer URL:</span>
@@ -51,7 +148,7 @@
               <input
                 id="relayPeer"
                 type="text"
-                class="input input-bordered w-full"
+                class="input w-full"
                 placeholder="https://ruling-mastodon-improved.ngrok-free.app"
                 value="https://ruling-mastodon-improved.ngrok-free.app"
               />
@@ -64,7 +161,7 @@
               <input
                 id="authToken"
                 type="password"
-                class="input input-bordered w-full"
+                class="input w-full"
                 placeholder="Enter auth token (auto-loaded if saved)"
               />
             </div>
@@ -73,46 +170,46 @@
               <label class="label" for="key">
                 <span class="label-text">Key to Start from:</span>
               </label>
-              <input id="key" class="input input-bordered w-full" />
+              <input id="key" class="input w-full" />
             </div>
 
             <div class="form-control">
               <label class="label" for="label">
                 <span class="label-text">Property to be used as Label:</span>
               </label>
-              <input id="label" class="input input-bordered w-full custom" />
+              <input id="label" class="input w-full custom" />
             </div>
           </div>
 
-          <div class="flex items-center gap-4 mt-4">
+          <div class="flex items-center gap-6 mt-6">
             <button id="startButton" class="btn btn-primary flex-1">
               Start
             </button>
-            <div id="status" class="text-sm opacity-70 flex-1"></div>
+            <div id="status" class="text-base text-[#A0A0A0] flex-1"></div>
           </div>
         </div>
       </div>
 
       <!-- Graph Viewer -->
-      <div class="card bg-base-300 shadow-xl flex-1">
+      <div class="card flex-1">
         <div class="card-body p-0">
           <svg class="w-full h-full min-h-[400px]"></svg>
         </div>
       </div>
 
       <!-- Data Inspector -->
-      <div class="card bg-base-300 shadow-xl">
-        <div class="card-body p-4">
-          <div class="flex justify-between items-center">
+      <div class="card">
+        <div class="card-body">
+          <div class="flex justify-between items-center mb-4">
             <h3 class="card-title">Data Inspector</h3>
-            <div class="flex gap-2">
+            <div class="flex gap-3">
               <button id="loadAllNodesBtn" class="btn btn-sm btn-accent" onclick="loadAllNodesMode()">
                 🕸️ Load All Nodes
               </button>
               <button id="save" class="btn btn-accent">Save Changes</button>
             </div>
           </div>
-          <div id="detail" class="cont overflow-auto max-h-[200px] mt-2"></div>
+          <div id="detail" class="cont overflow-auto max-h-[200px] mt-3"></div>
         </div>
       </div>
     </div>
@@ -147,7 +244,7 @@
         const statusEl = document.getElementById("status");
         if (statusEl) {
           statusEl.textContent = message;
-          statusEl.style.color = isError ? "#ff0000" : "#666";
+          statusEl.style.color = isError ? "#F44336" : "#A0A0A0";
         }
         console.log(isError ? "ERROR:" : "INFO:", message);
       }

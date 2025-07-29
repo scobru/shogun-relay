@@ -5,38 +5,73 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Upload - Smart Contract</title>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="styles/wormhole.css" />
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style>
         body {
             line-height: 1.6;
-            background-color: rgb(25, 25, 25);
+            background-color: #1A1A1A;
         }
 
         .drag-drop-area {
-            @apply border-2 border-dashed border-base-content/20 rounded-xl p-8 text-center mt-6 mb-6 transition-all duration-300 cursor-pointer bg-base-300/30;
+            border: 2px dashed #606060;
+            border-radius: 1rem;
+            padding: 2rem;
+            text-align: center;
+            margin-top: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background-color: rgba(64, 64, 64, 0.3);
         }
 
         .drag-drop-area.drag-over {
-            @apply border-accent bg-accent/10;
+            border-color: #FF69B4;
+            background-color: rgba(255, 105, 180, 0.1);
         }
 
         .upload-card {
-            @apply bg-base-300/50 rounded-xl p-6 border border-base-content/20;
+            background-color: #404040;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            border: 1px solid #606060;
         }
 
         .file-item {
-            @apply bg-base-200/50 rounded-lg p-4 border border-base-content/10 hover:bg-base-200/70 transition-colors;
+            background-color: #282828;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            border: 1px solid #606060;
+            transition: all 0.3s ease;
+        }
+
+        .file-item:hover {
+            background-color: #404040;
         }
 
         .pubkey-display {
-            @apply font-mono text-sm bg-base-300 p-3 rounded border break-all;
+            font-family: monospace;
+            font-size: 0.875rem;
+            background-color: #404040;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            border: 1px solid #606060;
+            word-break: break-all;
+            color: #E0E0E0;
         }
 
         /* Stili migliorati per i badge - design elegante e minimalista */
         .encrypted-badge {
-            @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.375rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             color: white;
             box-shadow: 0 1px 3px rgba(16, 185, 129, 0.2);
@@ -56,7 +91,15 @@
         }
 
         .plain-badge {
-            @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.375rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
             background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
             color: white;
             box-shadow: 0 1px 3px rgba(107, 114, 128, 0.2);
@@ -74,27 +117,27 @@
     <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
 </head>
 
-<body class="antialiased">
-    <div class="container mx-auto p-4">
+<body class="antialiased bg-[#1A1A1A]">
+    <div class="container mx-auto p-6">
         <div class="flex items-center mb-6">
-            <a href="/" class="nav-link">&larr; Back to Control Panel</a>
+            <a href="/" class="text-[#42A5F5] hover:text-[#64B5F6] transition-colors text-lg">&larr; Back to Control Panel</a>
         </div>
 
-        <div class="card">
-            <div class="p-8">
+        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
+            <div class="p-8 sm:p-10">
                 <div class="flex flex-col items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-4 text-accent" fill="none"
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-6 text-[#FF69B4]" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                             d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
 
-                    <h1 class="text-3xl font-semibold mb-2">User Upload</h1>
-                    <p class="text-base-content/70 mb-8">Upload files using your Ethereum wallet</p>
+                    <h1 class="text-3xl font-semibold mb-3 text-[#FFFFFF]">User Upload</h1>
+                    <p class="text-[#A0A0A0] text-lg mb-8">Upload files using your Ethereum wallet</p>
 
                     <!-- Subscription Status Link -->
                     <div class="mb-6">
-                        <a href="/subscribe" class="btn btn-outline btn-sm">
+                        <a href="/subscribe" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-6 py-3 font-medium">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -105,10 +148,10 @@
                     </div>
 
                     <!-- Setup Section -->
-                    <div class="w-full max-w-4xl space-y-6">
+                    <div class="w-full max-w-4xl space-y-8">
                         <!-- Wallet Setup -->
                         <div class="upload-card">
-                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-[#FF69B4]">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
                                     stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -116,15 +159,15 @@
                                 </svg>
                                 Wallet Setup
                             </h3>
-                            <p class="text-base-content/70 mb-4">
+                            <p class="text-[#A0A0A0] text-base mb-6">
                                 Connetti il tuo wallet Ethereum. Tutti i file caricati saranno associati al tuo address.
                             </p>
-                            <div class="form-control mb-4">
+                            <div class="form-control mb-6">
                                 <label class="label">
-                                    <span class="label-text">Wallet Connection:</span>
+                                    <span class="label-text text-[#FFFFFF] text-base">Wallet Connection:</span>
                                 </label>
-                                <div class="flex items-center gap-2">
-                                    <button id="connectWalletBtn" class="btn btn-accent">
+                                <div class="flex items-center gap-3">
+                                    <button id="connectWalletBtn" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none"
                                             viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -132,12 +175,12 @@
                                         </svg>
                                         Connect MetaMask
                                     </button>
-                                    <span id="walletStatus" class="text-sm text-base-content/60">Not connected</span>
+                                    <span id="walletStatus" class="text-base text-[#A0A0A0]">Not connected</span>
                                 </div>
-                                <div id="walletInfo" class="mt-2 hidden">
-                                    <div class="bg-base-200/50 rounded-lg p-3">
-                                        <p class="text-sm text-base-content/70 mb-1">Connected Wallet:</p>
-                                        <div class="font-mono text-sm" id="walletAddress"></div>
+                                <div id="walletInfo" class="mt-3 hidden">
+                                    <div class="bg-[#282828] rounded-xl p-4">
+                                        <p class="text-base text-[#A0A0A0] mb-2">Connected Wallet:</p>
+                                        <div class="font-mono text-base text-[#E0E0E0]" id="walletAddress"></div>
                                     </div>
                                 </div>
                             </div>
@@ -145,7 +188,7 @@
 
                         <!-- Upload Section -->
                         <div id="uploadSection" class="upload-card hidden">
-                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-[#FF69B4]">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
                                     stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -154,17 +197,17 @@
                                 Upload Files
                             </h3>
 
-                            <div class="mb-4 space-y-2">
+                            <div class="mb-6 space-y-3">
                                 <div>
-                                    <p class="text-sm text-base-content/70 mb-1">Wallet Address:</p>
+                                    <p class="text-base text-[#A0A0A0] mb-2">Wallet Address:</p>
                                     <div class="pubkey-display" id="currentWalletAddress"></div>
                                 </div>
 
                                 <!-- Subscription Status -->
-                                <div id="subscriptionStatus" class="mt-4">
-                                    <div class="bg-base-200/50 rounded-lg p-4">
-                                        <div class="flex items-center justify-between mb-2">
-                                            <h4 class="font-semibold flex items-center gap-2">
+                                <div id="subscriptionStatus" class="mt-6">
+                                    <div class="bg-[#282828] rounded-xl p-4">
+                                        <div class="flex items-center justify-between mb-3">
+                                            <h4 class="font-semibold flex items-center gap-2 text-[#FFFFFF]">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
                                                     viewBox="0 0 24 24" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -173,7 +216,7 @@
                                                 </svg>
                                                 Subscription Status
                                             </h4>
-                                            <button id="refreshSubscriptionBtn" class="btn btn-xs btn-outline"
+                                            <button id="refreshSubscriptionBtn" class="btn btn-xs bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-lg"
                                                 onclick="checkSubscriptionStatus(walletAddress)">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none"
                                                     viewBox="0 0 24 24" stroke="currentColor">
@@ -184,8 +227,8 @@
                                                 Refresh
                                             </button>
                                         </div>
-                                        <div id="subscriptionDetails" class="text-sm space-y-1">
-                                            <p class="text-base-content/60">Loading...</p>
+                                        <div id="subscriptionDetails" class="text-base space-y-2">
+                                            <p class="text-[#A0A0A0]">Loading...</p>
                                         </div>
                                     </div>
                                 </div>
@@ -198,16 +241,16 @@
                                         d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z"
                                         clip-rule="evenodd" />
                                 </svg>
-                                <p>Drag & drop files here or click to select</p>
+                                <p class="text-[#E0E0E0] text-lg">Drag & drop files here or click to select</p>
                                 <input type="file" id="fileInput" class="hidden" />
                             </div>
 
-                            <div class="form-control mb-4">
+                            <div class="form-control mb-6">
                                 <label class="label cursor-pointer justify-start gap-3">
-                                    <input type="checkbox" id="encryptCheck" class="checkbox checkbox-accent" />
-                                    <span class="label-text">🔒 Encrypt file with wallet signature</span>
+                                    <input type="checkbox" id="encryptCheck" class="checkbox checkbox-primary" />
+                                    <span class="label-text text-[#E0E0E0] text-base">🔒 Encrypt file with wallet signature</span>
                                 </label>
-                                <div class="label-text-alt text-base-content/60 mt-1">
+                                <div class="label-text-alt text-[#A0A0A0] mt-2">
                                     Files will be encrypted with a deterministic key derived from your wallet signature
                                 </div>
                             </div>
@@ -216,8 +259,8 @@
                                 <div class="progress-bar" id="progressBar">0%</div>
                             </div>
 
-                            <button id="uploadBtn" class="btn btn-accent mt-4">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20"
+                            <button id="uploadBtn" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] mt-6 rounded-xl px-8 py-4 font-medium">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" viewBox="0 0 20 20"
                                     fill="currentColor">
                                     <path fill-rule="evenodd"
                                         d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z"
@@ -229,7 +272,7 @@
 
                         <!-- Files List -->
                         <div id="filesSection" class="upload-card hidden">
-                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-[#FF69B4]">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
                                     stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -238,13 +281,13 @@
                                 Your Files
                             </h3>
 
-                            <div class="flex items-center justify-between mb-4">
-                                <div class="text-sm text-base-content/70">
+                            <div class="flex items-center justify-between mb-6">
+                                <div class="text-base text-[#A0A0A0]">
                                     <span id="fileCount">0</span> files,
                                     <span id="totalSize">0 MB</span> total
                                 </div>
-                                <div class="flex items-center gap-2">
-                                    <button id="refreshFilesBtn" class="btn btn-sm btn-outline">
+                                <div class="flex items-center gap-3">
+                                    <button id="refreshFilesBtn" class="btn btn-sm bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-lg">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
                                             viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -252,7 +295,7 @@
                                         </svg>
                                         Refresh
                                     </button>
-                                    <button id="syncMBBtn" class="btn btn-sm btn-accent" onclick="syncMBUsage()">
+                                    <button id="syncMBBtn" class="btn btn-sm bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-lg" onclick="syncMBUsage()">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
                                             viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -260,14 +303,14 @@
                                         </svg>
                                         Sync MB
                                     </button>
-                                    <button id="debugMBBtn" class="btn btn-sm btn-neutral" onclick="debugMBUsage()">
+                                    <button id="debugMBBtn" class="btn btn-sm bg-[#42A5F5] hover:bg-[#64B5F6] border-0 text-[#FFFFFF] rounded-lg" onclick="debugMBUsage()">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
                                             viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                                         </svg>
                                         Debug MB
                                     </button>
-                                    <button id="repairFilesBtn" class="btn btn-sm btn-warning" onclick="repairFiles()">
+                                    <button id="repairFilesBtn" class="btn btn-sm bg-[#FFA500] hover:bg-[#FF8C00] border-0 text-[#FFFFFF] rounded-lg" onclick="repairFiles()">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -277,14 +320,14 @@
                                 </div>
                             </div>
 
-                            <div id="filesList" class="space-y-3">
+                            <div id="filesList" class="space-y-4">
                                 <!-- Files will be loaded here -->
                             </div>
                         </div>
                     </div>
 
                     <!-- Status Messages -->
-                    <div id="statusMessage" class="w-full max-w-4xl mt-6"></div>
+                    <div id="statusMessage" class="w-full max-w-4xl mt-8"></div>
                 </div>
             </div>
         </div>
@@ -446,7 +489,7 @@
                 subscriptionDetailsEl.innerHTML = `
                     <div class="text-center py-4">
                         <div class="loading loading-spinner loading-sm"></div>
-                        <p class="text-sm text-base-content/60 mt-2">Checking subscription status...</p>
+                        <p class="text-sm text-[#A0A0A0] mt-2">Checking subscription status...</p>
                     </div>
                 `;
                 subscriptionStatusEl.classList.remove('hidden');
@@ -500,31 +543,31 @@
                         subscriptionDetailsEl.innerHTML = `
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
-                                    <p class="text-base-content/60">Status:</p>
-                                    <p class="text-success font-semibold">✅ Active</p>
+                                    <p class="text-[#A0A0A0]">Status:</p>
+                                    <p class="text-success font-semibold text-[#10B981]">✅ Active</p>
                                 </div>
                                 <div>
-                                    <p class="text-base-content/60">Days Remaining:</p>
-                                    <p class="font-semibold">${details.daysRemaining}</p>
+                                    <p class="text-[#A0A0A0]">Days Remaining:</p>
+                                    <p class="font-semibold text-[#FF69B4]">${details.daysRemaining}</p>
                                 </div>
                                 <div>
-                                    <p class="text-base-content/60">Total MB:</p>
-                                    <p class="font-semibold">${mbAllocated} MB</p>
+                                    <p class="text-[#A0A0A0]">Total MB:</p>
+                                    <p class="font-semibold text-[#FF69B4]">${mbAllocated} MB</p>
                                 </div>
                                 <div>
-                                    <p class="text-base-content/60">Used MB:</p>
-                                    <p class="font-semibold">${mbUsed} MB (${usagePercentage}%)</p>
+                                    <p class="text-[#A0A0A0]">Used MB:</p>
+                                    <p class="font-semibold text-[#FF69B4]">${mbUsed} MB (${usagePercentage}%)</p>
                                 </div>
                                 <div class="col-span-2">
-                                    <p class="text-base-content/60">Remaining MB:</p>
-                                    <p class="font-semibold text-accent">${mbRemaining} MB</p>
+                                    <p class="text-[#A0A0A0]">Remaining MB:</p>
+                                    <p class="font-semibold text-[#FF69B4]">${mbRemaining} MB</p>
                                 </div>
                             </div>
                             <div class="mt-3">
-                                <div class="w-full bg-base-300 rounded-full h-2">
-                                    <div class="bg-accent h-2 rounded-full" style="width: ${usagePercentage}%"></div>
+                                <div class="w-full bg-[#404040] rounded-full h-2">
+                                    <div class="bg-[#FF69B4] h-2 rounded-full" style="width: ${usagePercentage}%"></div>
                                 </div>
-                                <p class="text-xs text-base-content/60 mt-1">Storage usage: ${usagePercentage}%</p>
+                                <p class="text-xs text-[#A0A0A0] mt-1">Storage usage: ${usagePercentage}%</p>
                             </div>
                         `;
 
@@ -533,9 +576,9 @@
                         console.log('❌ user-upload: Subscription is NOT active. Reason:', details.reason);
                         subscriptionDetailsEl.innerHTML = `
                             <div class="text-center">
-                                <p class="text-warning font-semibold mb-2">⚠️ No active subscription</p>
-                                <p class="text-base-content/60 mb-3">You need an active subscription to upload files</p>
-                                <a href="/subscribe" class="btn btn-sm btn-accent">
+                                <p class="text-warning font-semibold mb-2 text-[#FFD700]">⚠️ No active subscription</p>
+                                <p class="text-[#A0A0A0] mb-3">You need an active subscription to upload files</p>
+                                <a href="/subscribe" class="btn bg-transparent border-[#FF69B4] text-[#FF69B4] hover:bg-[#FF1493] rounded-lg px-6 py-3 font-medium">
                                     Subscribe Now
                                 </a>
                             </div>
@@ -545,8 +588,8 @@
                     console.log('❌ user-upload: API call failed:', result.error);
                     subscriptionDetailsEl.innerHTML = `
                         <div class="text-center">
-                            <p class="text-error font-semibold">❌ Error checking subscription</p>
-                            <p class="text-base-content/60">${result.error}</p>
+                            <p class="text-error font-semibold text-[#FF4444]">❌ Error checking subscription</p>
+                            <p class="text-[#A0A0A0]">${result.error}</p>
                         </div>
                     `;
                 }
@@ -556,9 +599,9 @@
                 if (subscriptionDetailsEl) {
                     subscriptionDetailsEl.innerHTML = `
                         <div class="text-center">
-                            <p class="text-error font-semibold">❌ Connection error</p>
-                            <p class="text-base-content/60">${error.message}</p>
-                            <button onclick="checkSubscriptionStatus('${walletAddr}')" class="btn btn-sm btn-outline mt-2">
+                            <p class="text-error font-semibold text-[#FF4444]">❌ Connection error</p>
+                            <p class="text-[#A0A0A0]">${error.message}</p>
+                            <button onclick="checkSubscriptionStatus('${walletAddr}')" class="btn btn-sm bg-transparent border-[#FF69B4] text-[#FF69B4] hover:bg-[#FF1493] rounded-lg mt-2">
                                 Retry
                             </button>
                         </div>
@@ -1108,7 +1151,7 @@
 
             if (!files || files.length === 0) {
                 console.log('📭 user-upload: No files to display');
-                filesList.innerHTML = '<p class="text-base-content/60 text-center py-8">No files uploaded yet</p>';
+                filesList.innerHTML = '<p class="text-[#A0A0A0] text-center py-8">No files uploaded yet</p>';
                 return;
             }
 
@@ -1130,22 +1173,22 @@
                         <div class="flex items-center justify-between">
                             <div class="flex-1">
                                 <div class="flex items-center gap-2 mb-1">
-                                    <h4 class="font-semibold">${displayName}</h4>
+                                    <h4 class="font-semibold text-[#FFFFFF]">${displayName}</h4>
                                     ${isEncrypted ? '<span class="encrypted-badge"><svg xmlns="http://www.w3.org/2000/svg" class="lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></svg> Encrypted</span>' : '<span class="plain-badge">📄 Plain</span>'}
                                 </div>
-                                <p class="text-sm text-base-content/60">
+                                <p class="text-base text-[#A0A0A0]">
                                     ${file.sizeMB} MB • ${new Date(file.uploadedAt).toLocaleString()}
                                 </p>
-                                <p class="text-xs font-mono text-accent mt-1">${file.hash}</p>
+                                <p class="text-xs font-mono text-[#FF69B4] mt-1">${file.hash}</p>
                             </div>
                             <div class="flex items-center gap-2">
-                                <button onclick="viewFile('${file.hash}', '${displayName}', ${isEncrypted})" class="btn btn-sm btn-outline">
+                                <button onclick="viewFile('${file.hash}', '${displayName}', ${isEncrypted})" class="btn btn-sm bg-transparent border-[#FF69B4] text-[#FF69B4] hover:bg-[#FF1493] rounded-lg">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                                     </svg>
                                     ${isEncrypted ? 'Decrypt & View' : 'View'}
                                 </button>
-                                <button onclick="deleteFile('${file.hash}')" class="btn btn-sm btn-error">
+                                <button onclick="deleteFile('${file.hash}')" class="btn btn-sm bg-transparent border-[#FF4444] text-[#FF4444] hover:bg-[#FF1493] rounded-lg">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
@@ -1314,14 +1357,14 @@
         // Utility functions
         function showStatus(message, type = 'info') {
             const colors = {
-                success: 'text-success',
-                error: 'text-error',
-                info: 'text-info',
-                warning: 'text-warning'
+                success: 'text-[#10B981]',
+                error: 'text-[#FF4444]',
+                info: 'text-[#42A5F5]',
+                warning: 'text-[#FFD700]'
             };
 
             statusMessage.innerHTML = `
-                <div class="alert ${colors[type]} bg-${type}/10 border border-${type}/20">
+                <div class="alert ${colors[type]} bg-[#282828] border border-[#404040]">
                     <span>${message}</span>
                 </div>
             `;

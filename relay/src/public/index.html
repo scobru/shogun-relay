@@ -5,91 +5,101 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gun Relay Control Panel</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
-    <link rel="stylesheet" href="styles/wormhole.css">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="lib/admin-auth.js"></script>
 </head>
 
-<body class="antialiased">
-    <div class="container mx-auto p-4 bg-[#151515]">
-        <div class="card">
+<body class="antialiased bg-[#1A1A1A]">
+    <div class="container mx-auto p-4">
+        <div class="card bg-[#1A1A1A] border-0 rounded-2xl">
             <div class="p-8">
                 <div class="flex flex-col items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-4 text-accent" fill="none"
+                    <!-- Top Arrow Icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-4 text-[#FF69B4]" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                             d="M5 12h14M12 5l7 7-7 7" />
                     </svg>
 
-                    <h1 id="relay-title" class="text-3xl font-medium mb-8">Shogun Relay Control Panel</h1>
-                    <p class="text-secondary mb-8">Select a tool to continue<span class="animate-pulse">_</span></p>
+                    <h1 id="relay-title" class="text-3xl font-medium mb-8 text-[#FFFFFF]">Shogun Relay Control Panel</h1>
+                    <p class="text-[#8B94FF] mb-8">Select a tool to continue<span class="animate-pulse">_</span></p>
 
                     <!-- Admin Password Section -->
                     <div id="adminPasswordSection"
-                        class="w-full max-w-md mb-8 p-6 bg-base-300/50 rounded-xl border border-base-content/20">
+                        class="w-full max-w-md mb-8 p-6 bg-[#282828] rounded-2xl border border-[#404040] shadow-lg">
                         <div class="flex items-center gap-3 mb-4">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-accent" fill="none"
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#FF69B4]" fill="none"
                                 viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                             </svg>
-                            <h3 class="text-lg font-medium text-accent">Centralized Admin Authentication</h3>
+                            <h3 class="text-lg font-medium text-[#FF69B4]">Centralized Admin Authentication</h3>
                         </div>
-                        <p class="text-sm text-base-content/70 mb-3">
-                            🔒 Inserisci la password admin per accedere a tutte le applicazioni. Se la password non è
-                            corretta, saranno visibili solo le applicazioni pubbliche.
-                        </p>
-                        <div class="space-y-3">
+                        <div class="flex items-start gap-2 mb-4">
+                            <span class="text-[#FFA500] text-sm mt-0.5">🔒</span>
+                            <p class="text-sm text-[#E0E0E0] leading-relaxed">
+                                Inserisci la password admin per accedere a tutte le applicazioni. Se la password non è
+                                corretta, saranno visibili solo le applicazioni pubbliche.
+                            </p>
+                        </div>
+                        <div class="space-y-4">
                             <div class="form-control">
-                                <input type="password" id="adminPassword" class="input input-bordered w-full"
+                                <input type="password" id="adminPassword" 
+                                    class="input w-full bg-[#404040] border-0 text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:ring-opacity-50"
                                     placeholder="Enter Admin Password" />
                             </div>
-                            <div class="flex gap-2">
-                                <button class="btn btn-accent flex-1" onclick="saveAdminPassword()">
-                                    💾 Save Password
+                            <div class="flex gap-3">
+                                <button class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] flex-1 rounded-xl px-4 py-3 font-medium transition-all duration-200 shadow-sm hover:shadow-md" onclick="saveAdminPassword()">
+                                    <span class="mr-2">💾</span>
+                                    Save Password
                                 </button>
-                                <button class="btn btn-outline flex-1" onclick="clearAdminPassword()">
-                                    🗑️ Clear
+                                <button class="btn bg-transparent border-0 text-[#E0E0E0] hover:text-[#FFFFFF] hover:bg-[#404040] flex-1 rounded-xl px-4 py-3 font-medium transition-all duration-200" onclick="clearAdminPassword()">
+                                    <span class="mr-2">🗑️</span>
+                                    Clear
                                 </button>
                             </div>
-                            <div id="passwordStatus" class="text-sm text-center opacity-70"></div>
+                            <div id="passwordStatus" class="flex items-center gap-2 text-sm text-center text-[#E0E0E0] opacity-90 min-h-[20px]">
+                                <span class="text-[#FFA500]">🔒</span>
+                                <span>Accesso Limitato - Solo applicazioni pubbliche visibili</span>
+                            </div>
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
                         <!-- Monitoring & Analytics -->
-                        <div class="card bg-[#2d2d2d]">
+                        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
                             <div class="p-6">
-                                <h2 class="text-xl font-medium mb-4 text-accent">Monitoring & Analytics</h2>
-                                <div class="space-y-3 ">
-                                    <a href="/stats.html" class="btn-custom flex items-center gap-3 relative font-light text-md">
-                                        <span>⚡</span> 
-                                        <span >Live Stats & Performance</span>
-                                        <span class="absolute right-3">🔒</span>
+                                <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Monitoring & Analytics</h2>
+                                <div class="space-y-3">
+                                    <a href="/stats.html" class="btn-custom flex items-center gap-3 relative font-light text-md text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl">
+                                        <span class="text-[#FFD700]">⚡</span> 
+                                        <span>Live Stats & Performance</span>
+                                        <span class="absolute right-3 text-[#FFA500]">🔒</span>
                                     </a>
-                                    <a href="/services-dashboard" class="btn-custom flex items-center gap-3 relative">
-                                        <span>🔧</span>
+                                    <a href="/services-dashboard" class="btn-custom flex items-center gap-3 relative text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl">
+                                        <span class="text-[#A0A0A0]">🔧</span>
                                         <span>Services Dashboard</span>
-                                        <span class="absolute right-3">🔒</span>
+                                        <span class="absolute right-3 text-[#FFA500]">🔒</span>
                                     </a>
-                                    <a href="/stats" class="btn-custom flex items-center gap-3 relative">
-                                        <span>📈</span>
+                                    <a href="/stats" class="btn-custom flex items-center gap-3 relative text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl">
+                                        <span class="text-[#64B5F6]">📈</span>
                                         <span>Live Stats</span>
-                                        <span class="absolute right-3">🔒</span>
+                                        <span class="absolute right-3 text-[#FFA500]">🔒</span>
                                     </a>
-                                    <a href="/charts" class="btn-custom flex items-center gap-3 relative">
-                                        <span>📊</span>
+                                    <a href="/charts" class="btn-custom flex items-center gap-3 relative text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl">
+                                        <span class="text-[#64B5F6]">📊</span>
                                         <span>Advanced Charts</span>
-                                        <span class="absolute right-3">🔒</span>
+                                        <span class="absolute right-3 text-[#FFA500]">🔒</span>
                                     </a>
-                                    <a href="/graph" class="btn-custom flex items-center gap-3">
-                                        <span>🌐</span>
+                                    <a href="/graph" class="btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl">
+                                        <span class="text-[#42A5F5]">🌐</span>
                                         <span>Live Graph Explorer</span>
                                     </a>
-                                    <a href="/visualGraph" class="btn-custom flex items-center gap-3">
-                                        <span>🕸️</span>
+                                    <a href="/visualGraph" class="btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl">
+                                        <span class="text-[#A0A0A0]">🕸️</span>
                                         <span>Visual Graph Data</span>
                                     </a>
                                 </div>
@@ -97,26 +107,26 @@
                         </div>
 
                         <!-- Storage & Files -->
-                        <div class="card bg-opacity-10 bg-white ">
+                        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
                             <div class="p-6">
-                                <h2 class="text-xl font-medium mb-4 text-accent">Storage & Files</h2>
+                                <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Storage & Files</h2>
                                 <div class="space-y-3">
-                                    <a href="/user-upload" class="btn-custom flex items-center gap-3">
-                                        <span>📤</span>
+                                    <a href="/user-upload" class="btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl">
+                                        <span class="text-[#42A5F5]">📤</span>
                                         <span>User Upload</span>
                                     </a>
-                                    <a href="/upload" class="btn-custom flex items-center gap-3">
-                                        <span>📤</span>
+                                    <a href="/upload" class="btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl">
+                                        <span class="text-[#42A5F5]">📤</span>
                                         <span>Upload to IPFS</span>
-                                        <span class="absolute right-3">🔒</span>
+                                        <span class="absolute right-3 text-[#FFA500]">🔒</span>
                                     </a>
-                                    <a href="/pin-manager" class="btn-custom flex items-center gap-3">
-                                        <span>📌</span>
+                                    <a href="/pin-manager" class="btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl">
+                                        <span class="text-[#FF0000]">📌</span>
                                         <span>IPFS Pin Manager</span>
-                                        <span class="absolute right-3">🔒</span>
+                                        <span class="absolute right-3 text-[#FFA500]">🔒</span>
                                     </a>
-                                    <a href="/ipfs-status" class="btn-custom flex items-center gap-3">
-                                        <span>📊</span>
+                                    <a href="/ipfs-status" class="btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl">
+                                        <span class="text-[#4CAF50]">📊</span>
                                         <span>IPFS Node Status</span>
                                     </a>
                                 </div>
@@ -124,44 +134,44 @@
                         </div>
 
                         <!-- Data Management -->
-                        <div class="card bg-opacity-10 bg-white">
+                        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
                             <div class="p-6">
-                                <h2 class="text-xl font-medium mb-4 text-accent">Data Management</h2>
+                                <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Data Management</h2>
                                 <div class="space-y-3">
-                                    <a href="/create" class="btn-custom flex items-center gap-3 relative">
-                                        <span>➕</span>
+                                    <a href="/create" class="btn-custom flex items-center gap-3 relative text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl">
+                                        <span class="text-[#42A5F5]">➕</span>
                                         <span>Create Data Node</span>
-                                        <span class="absolute right-3">🔒</span>
+                                        <span class="absolute right-3 text-[#FFA500]">🔒</span>
                                     </a>
-                                    <a href="/view" class="btn-custom flex items-center gap-3 relative">
-                                        <span>🔍</span>
+                                    <a href="/view" class="btn-custom flex items-center gap-3 relative text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl">
+                                        <span class="text-[#42A5F5]">🔍</span>
                                         <span>View/Query Data</span>
-                                        <span class="absolute right-3">🔒</span>
+                                        <span class="absolute right-3 text-[#FFA500]">🔒</span>
                                     </a>
-                                    <a href="/chain-contract" class="btn-custom flex items-center gap-3">
-                                        <span>⛓️</span>
+                                    <a href="/chain-contract" class="btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl">
+                                        <span class="text-[#A0A0A0]">⛓️</span>
                                         <span>Chain Contract Interface</span>
                                     </a>
-                                    <a href="/ipcm-contract" class="btn-custom flex items-center gap-3">
-                                        <span>🗂️</span>
+                                    <a href="/ipcm-contract" class="btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl">
+                                        <span class="text-[#FFEB3B]">🗂️</span>
                                         <span>IPCM Contract Interface</span>
                                     </a>
-                                    <a href="/notes" class="btn-custom flex items-center gap-3">
-                                        <span>📝</span>
+                                    <a href="/notes" class="btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl">
+                                        <span class="text-[#F44336]">📝</span>
                                         <span>Admin Notes</span>
-                                        <span class="absolute right-3">🔒</span>
+                                        <span class="absolute right-3 text-[#FFA500]">🔒</span>
                                     </a>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Communication -->
-                        <div class="card bg-opacity-10 bg-white">
+                        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
                             <div class="p-6">
-                                <h2 class="text-xl font-medium mb-4 text-accent">Communication</h2>
+                                <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Communication</h2>
                                 <div class="space-y-3">
-                                    <a href="/chat" class="btn-custom flex items-center gap-3">
-                                        <span>💬</span>
+                                    <a href="/chat" class="btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl">
+                                        <span class="text-[#A0A0A0]">💬</span>
                                         <span>Public Chat</span>
                                     </a>
                                 </div>
@@ -169,20 +179,20 @@
                         </div>
 
                         <!-- Security & Tools -->
-                        <div class="card bg-opacity-10 bg-white">
+                        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
                             <div class="p-6">
-                                <h2 class="text-xl font-medium mb-4 text-accent">Security & Tools</h2>
+                                <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Security & Tools</h2>
                                 <div class="space-y-3">
-                                    <a href="/subscribe" class="btn-custom flex items-center gap-3">
-                                        <span>🔗</span>
+                                    <a href="/subscribe" class="btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl">
+                                        <span class="text-[#42A5F5]">🔗</span>
                                         <span>Relay Subscription</span>
                                     </a>
-                                    <a href="/derive" class="btn-custom flex items-center gap-3">
-                                        <span>🔑</span>
+                                    <a href="/derive" class="btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl">
+                                        <span class="text-[#42A5F5]">🔑</span>
                                         <span>Derive Keys</span>
                                     </a>
-                                    <a href="#" onclick="checkIPFSVersion()" class="btn-custom flex items-center gap-3">
-                                        <span>🔧</span>
+                                    <a href="#" onclick="checkIPFSVersion()" class="btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl">
+                                        <span class="text-[#A0A0A0]">🔧</span>
                                         <span>IPFS API Version</span>
                                     </a>
                                 </div>
@@ -195,17 +205,17 @@
     </div>
 
     <!-- Footer -->
-    <footer class="mt-12 py-8 border-t border-border-color bg-base-200/50">
+    <footer class="mt-12 py-8 border-t border-[#404040] bg-[#202040] rounded-t-2xl">
         <div class="container mx-auto text-center">
-            <p class="text-gray-400 mb-4">
-                <a href="https://github.com/scobru/shogun-relay" class="text-blue-500 hover:text-blue-400">repo</a>
+            <p class="text-[#E0E0E0] mb-4">
+                <a href="https://github.com/scobru/shogun-relay" class="text-[#42A5F5] hover:text-[#64B5F6]">repo</a>
 
                 build with ❤️ by
-                <a href="https://github.com/scobru" class="text-blue-500 hover:text-blue-400">scobru</a>
+                <a href="https://github.com/scobru" class="text-[#42A5F5] hover:text-[#64B5F6]">scobru</a>
             </p>
-            <p class="text-gray-400 mb-4">
+            <p class="text-[#E0E0E0] mb-4">
                 part of
-                <a href="https://shogun-info.vercel.app" class="text-blue-500 hover:text-blue-400">shogun project</a>
+                <a href="https://shogun-info.vercel.app" class="text-[#42A5F5] hover:text-[#64B5F6]">shogun project</a>
             </p>
         </div>
     </footer>
@@ -276,8 +286,8 @@
             // Aggiorna il messaggio di stato
             const statusEl = document.getElementById('passwordStatus');
             if (statusEl) {
-                statusEl.innerHTML = '🔓 <strong>Accesso Admin Completo</strong> - Tutte le applicazioni disponibili';
-                statusEl.className = 'text-sm text-center text-success font-medium';
+                statusEl.innerHTML = '<span class="text-[#4CAF50]">🔓</span><span><strong>Accesso Admin Completo</strong> - Tutte le applicazioni disponibili</span>';
+                statusEl.className = 'flex items-center gap-2 text-sm text-center text-[#E0E0E0] opacity-90 min-h-[20px]';
             }
         }
 
@@ -294,24 +304,36 @@
             // Aggiorna il messaggio di stato
             const statusEl = document.getElementById('passwordStatus');
             if (statusEl) {
-                statusEl.innerHTML = '🔒 <strong>Accesso Limitato</strong> - Solo applicazioni pubbliche visibili';
-                statusEl.className = 'text-sm text-center text-warning font-medium';
+                statusEl.innerHTML = '<span class="text-[#FFA500]">🔒</span><span><strong>Accesso Limitato</strong> - Solo applicazioni pubbliche visibili</span>';
+                statusEl.className = 'flex items-center gap-2 text-sm text-center text-[#E0E0E0] opacity-90 min-h-[20px]';
             }
         }
 
         function clearAdminPassword() {
             ShogunAdmin.clearPassword();
-            updatePasswordStatus('🗑️ Password cleared - Solo applicazioni pubbliche', 'text-info');
+            updatePasswordStatus('🔒 <strong>Accesso Limitato</strong> - Solo applicazioni pubbliche visibili', 'text-[#E0E0E0]');
             showPublicApplicationsOnly();
         }
 
         function updatePasswordStatus(message, className = '') {
             const statusEl = document.getElementById('passwordStatus');
-            statusEl.textContent = message;
-            statusEl.className = `text-sm text-center opacity-70 ${className}`;
+            if (message.includes('corretta')) {
+                statusEl.innerHTML = '<span class="text-[#4CAF50]">🔓</span><span>' + message + '</span>';
+            } else if (message.includes('non corretta') || message.includes('Limitato')) {
+                statusEl.innerHTML = '<span class="text-[#FFA500]">🔒</span><span>' + message + '</span>';
+            } else if (message.includes('cleared')) {
+                statusEl.innerHTML = '<span class="text-[#FFA500]">🔒</span><span>Accesso Limitato - Solo applicazioni pubbliche visibili</span>';
+            } else {
+                statusEl.innerHTML = '<span class="text-[#FFA500]">🔒</span><span>' + message + '</span>';
+            }
+            statusEl.className = `flex items-center gap-2 text-sm text-center opacity-90 min-h-[20px] ${className}`;
             setTimeout(() => {
-                statusEl.textContent = '';
-                statusEl.className = 'text-sm text-center opacity-70';
+                if (message.includes('corretta')) {
+                    statusEl.innerHTML = '<span class="text-[#4CAF50]">🔓</span><span><strong>Accesso Admin Completo</strong> - Tutte le applicazioni disponibili</span>';
+                } else {
+                    statusEl.innerHTML = '<span class="text-[#FFA500]">🔒</span><span><strong>Accesso Limitato</strong> - Solo applicazioni pubbliche visibili</span>';
+                }
+                statusEl.className = 'flex items-center gap-2 text-sm text-center text-[#E0E0E0] opacity-90 min-h-[20px]';
             }, 5000);
         }
 

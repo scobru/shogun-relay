@@ -3,23 +3,22 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Gun Relay Advanced Stats</title>
-<link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
-<script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="styles/wormhole.css">
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+<link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 <style>
 	body {
-		background-color: rgb(25,25,25);
-		color: rgb(80,135,25) !important;
-		text-shadow: 1px 1px 20px rgb(80,150,25);
+		background-color: #1A1A1A;
+		color: #E0E0E0 !important;
 		margin: 0;
 		padding: 1em;
 		line-height: 1.6;
 	}
 
 	h1 {
-		border-bottom: 1px solid #555;
+		border-bottom: 1px solid #404040;
 		padding-bottom: 10px;
-		color: rgb(80,135,25);
+		color: #FF69B4;
 		font-size: 1.5rem;
 	}
 
@@ -39,12 +38,13 @@
 	}
 
 	a {
-		color: #8af;
+		color: #42A5F5;
 		text-decoration: none;
 	}
 
 	a:hover {
-		background-color: #333;
+		background-color: #404040;
+		color: #64B5F6;
 	}
 
 	.center {
@@ -63,10 +63,10 @@
 	}
 
 	.shout {
-		color: rgb(250,50,50);
+		color: #FF69B4;
 		font-weight: bold;
 		font-size: 1.2em;
-		text-shadow: 1px 1px 10px rgb(250,50,50);
+		text-shadow: 1px 1px 10px rgba(255, 105, 180, 0.3);
 		margin-right: 0.25rem;
 	}
 
@@ -74,19 +74,20 @@
 		position: absolute;
 		left: 0.5em;
 		top: 1.75em;
-		color: rgb(80,135,25);
+		color: #FF69B4;
 		font-size: 0.9em;
 	}
 
 	.input {
 		height: 30px;
 		padding: 10px;
-		background-color: rgb(50,50,50);
-		color: rgb(250,50,50);
-		border: 1px solid #555;
+		background-color: #404040;
+		color: #FFFFFF;
+		border: 1px solid #606060;
 		margin: 10px 0;
 		width: 100%;
 		max-width: 600px;
+		border-radius: 0.5rem;
 	}
 
 	.tall { 
@@ -121,11 +122,11 @@
 
 	.chart {
 		position: relative;
-		border: 1px solid #555;
-		background-color: rgb(40,40,40);
+		border: 1px solid #404040;
+		background-color: #282828;
 		padding: 15px;
 		margin: 0;
-		border-radius: 0.5rem;
+		border-radius: 1rem;
 		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 	}
 
@@ -140,16 +141,17 @@
 	}
 
 	.topbar {
-		background-color: rgb(40,40,40);
+		background-color: #282828;
 		padding: 15px;
-		border: 1px solid #555;
+		border: 1px solid #404040;
 		margin-bottom: 20px;
+		border-radius: 1rem;
 	}
 
 	.status {
 		margin-top: 10px;
 		font-size: 12px;
-		color: #666;
+		color: #A0A0A0;
 	}
 
 	.stats {
@@ -161,23 +163,23 @@
 	.input-custom {
 		width: 100%;
 		padding: 0.5rem;
-		background-color: rgb(50,50,50);
-		color: rgb(250,50,50);
-		border: 1px solid #555;
-		border-radius: 0.25rem;
+		background-color: #404040;
+		color: #FFFFFF;
+		border: 1px solid #606060;
+		border-radius: 0.5rem;
 	}
 </style>
 </head>
 <body class="antialiased">
 <div class="container mx-auto p-2 sm:p-4">
 	<div class="flex items-center mb-4">
-		<a href="/" class="nav-link">&larr; Back to Control Panel</a>
+		<a href="/" class="text-[#42A5F5] hover:text-[#64B5F6] transition-colors">&larr; Back to Control Panel</a>
 	</div>
 
-	<div class="card">
+	<div class="card bg-[#282828] border-[#404040] rounded-2xl">
 		<div class="p-4 sm:p-6 md:p-8">
 			<div class="flex flex-col items-center">
-				<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 sm:h-12 sm:w-12 mb-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 sm:h-12 sm:w-12 mb-4 text-[#FF69B4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
 				</svg>
 				
@@ -193,9 +195,9 @@
 				</div>
 
 				<div class="stats">
-					<label for="url">Stats Source URL:</label>
+					<label for="url" class="text-[#FFFFFF]">Stats Source URL:</label>
 					<input id="url" class="input-custom" placeholder="Enter custom stats source URL (optional)" value="">
-					<div class="text-secondary text-sm mt-2" id="status">Connecting to local stats...</div>
+					<div class="text-[#A0A0A0] text-sm mt-2" id="status">Connecting to local stats...</div>
 				</div>
 
 				<div id="charts" class="charts">
@@ -288,7 +290,7 @@
       responsive: true,
       minValue: 0,
       grid: {
-        strokeStyle: 'rgba(80,135,25,0.3)',
+        strokeStyle: 'rgba(255,105,180,0.3)',
         fillStyle: 'transparent',
         lineWidth: 1,
         millisPerLine: 30000,
@@ -296,7 +298,7 @@
       },
       labels: {
         fontSize: 12,
-        fillStyle: 'rgb(80,135,25)',
+        fillStyle: '#FF69B4',
         precision: 2
       },
       interpolation: 'linear',

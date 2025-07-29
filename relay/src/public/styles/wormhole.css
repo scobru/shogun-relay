@@ -2,11 +2,32 @@
 
 body {
     font-family: 'Poppins', sans-serif;
+    
 }
 
-
+/* Shogun Relay Color Variables */
 :root {
-    --primary-color: #2d2d2d;
-    --secondary-color: #151515;
+  /* Background Colors */
+  --shogun-bg-main: #1A1A1A;
+  --shogun-bg-panel: #282828;
+  --shogun-bg-input: #404040;
+  --shogun-bg-footer: #202040;
+  
+  /* Border Colors */
+  --shogun-border-panel: #404040;
+  --shogun-border-input: #606060;
+  
+  /* Text Colors */
+  --shogun-text-main: #FFFFFF;
+  --shogun-text-secondary: #E0E0E0;
+  --shogun-text-placeholder: #A0A0A0;
+  --shogun-text-accent: #FF69B4;
 }
+
+
+
+
+
+
+
 

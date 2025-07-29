@@ -5,9 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IPCM Contract Interface - Shogun Relay</title>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="styles/wormhole.css">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="lib/admin-auth.js"></script>
     
     <!-- Load Gun first -->
@@ -18,26 +18,26 @@
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 </head>
 
-<body class="antialiased">
-    <div class="container mx-auto p-4">
-        <div class="flex items-center mb-4">
-            <a href="/" class="nav-link">&larr; Back to Control Panel</a>
+<body class="antialiased bg-[#1A1A1A]">
+    <div class="container mx-auto p-6">
+        <div class="flex items-center mb-6">
+            <a href="/" class="text-[#42A5F5] hover:text-[#64B5F6] transition-colors text-lg">&larr; Back to Control Panel</a>
         </div>
         
-        <div class="card">
-            <div class="p-8">
+        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
+            <div class="p-8 sm:p-10">
                 <div class="flex flex-col items-center mb-8">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-4 text-accent" fill="none"
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-6 text-[#FF69B4]" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                             d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
-                    <h1 class="text-3xl font-semibold mb-2">IPCM Contract Interface</h1>
-                    <p class="text-secondary">Interact with IPCM (IPFS CID Mapping) contracts</p>
+                    <h1 class="text-3xl font-semibold mb-2 text-[#FFFFFF]">IPCM Contract Interface</h1>
+                    <p class="text-[#A0A0A0] text-lg">Interact with IPCM (IPFS CID Mapping) contracts</p>
                 </div>
 
                 <!-- Connection Status -->
-                <div id="connectionStatus" class="alert alert-info mb-6">
+                <div id="connectionStatus" class="alert alert-info mb-8 bg-[#42A5F5]/20 border-[#42A5F5]/30 text-[#42A5F5] rounded-xl p-4">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
@@ -45,28 +45,28 @@
                 </div>
 
                 <!-- Contract Info -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    <div class="card bg-base-200">
-                        <div class="card-body">
-                            <h2 class="card-title text-accent">📋 Contract Information</h2>
-                            <div class="space-y-2 text-sm">
-                                <div><strong>Network:</strong> <span id="networkInfo">Sepolia</span></div>
-                                <div><strong>Factory Address:</strong> <span id="factoryAddress" class="font-mono text-xs">Loading...</span></div>
-                                <div><strong>Status:</strong> <span id="contractStatus">Connected</span></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                    <div class="card bg-[#404040] border-[#606060] rounded-xl">
+                        <div class="card-body p-6">
+                            <h2 class="card-title text-[#FF69B4] text-xl mb-4">📋 Contract Information</h2>
+                            <div class="space-y-3 text-base">
+                                <div><strong class="text-[#FFFFFF]">Network:</strong> <span id="networkInfo" class="text-[#E0E0E0]">Sepolia</span></div>
+                                <div><strong class="text-[#FFFFFF]">Factory Address:</strong> <span id="factoryAddress" class="font-mono text-sm text-[#A0A0A0]">Loading...</span></div>
+                                <div><strong class="text-[#FFFFFF]">Status:</strong> <span id="contractStatus" class="text-[#E0E0E0]">Connected</span></div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="card bg-base-200">
-                        <div class="card-body">
-                            <h2 class="card-title text-accent">🔗 Wallet Connection</h2>
-                            <div class="space-y-2 text-sm">
-                                <div><strong>Wallet:</strong> <span id="walletAddress" class="font-mono text-xs">Not connected</span></div>
-                                <div><strong>Balance:</strong> <span id="walletBalance">-</span></div>
-                                <div><strong>Permissions:</strong> <span id="walletPermissions">None</span></div>
+                    <div class="card bg-[#404040] border-[#606060] rounded-xl">
+                        <div class="card-body p-6">
+                            <h2 class="card-title text-[#FF69B4] text-xl mb-4">🔗 Wallet Connection</h2>
+                            <div class="space-y-3 text-base">
+                                <div><strong class="text-[#FFFFFF]">Wallet:</strong> <span id="walletAddress" class="font-mono text-sm text-[#A0A0A0]">Not connected</span></div>
+                                <div><strong class="text-[#FFFFFF]">Balance:</strong> <span id="walletBalance" class="text-[#E0E0E0]">-</span></div>
+                                <div><strong class="text-[#FFFFFF]">Permissions:</strong> <span id="walletPermissions" class="text-[#E0E0E0]">None</span></div>
                             </div>
-                            <div class="card-actions justify-end mt-4">
-                                <button id="connectWalletBtn" class="btn btn-primary btn-sm" onclick="connectWallet()">
+                            <div class="card-actions justify-end mt-6">
+                                <button id="connectWalletBtn" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium" onclick="connectWallet()">
                                     🔗 Connect Wallet
                                 </button>
                             </div>
@@ -77,45 +77,45 @@
                 <!-- Main Interface -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <!-- IPCMFactory Operations -->
-                    <div class="card bg-base-200">
-                        <div class="card-body">
-                            <h2 class="card-title text-accent">🏭 IPCMFactory Operations</h2>
-                            <p class="text-sm text-base-content/70 mb-4">
+                    <div class="card bg-[#404040] border-[#606060] rounded-xl">
+                        <div class="card-body p-6">
+                            <h2 class="card-title text-[#FF69B4] text-xl mb-4">🏭 IPCMFactory Operations</h2>
+                            <p class="text-sm text-[#A0A0A0] mb-6">
                                 Create and manage IPCM instances
                             </p>
                             
-                            <div class="form-control space-y-4">
+                            <div class="form-control space-y-6">
                                 <div>
                                     <label class="label">
-                                        <span class="label-text">Owner Address (optional)</span>
-                                        <span class="label-text-alt">Leave empty for current wallet</span>
+                                        <span class="label-text text-[#FFFFFF] text-base">Owner Address (optional)</span>
+                                        <span class="label-text-alt text-[#A0A0A0]">Leave empty for current wallet</span>
                                     </label>
-                                    <input type="text" id="newOwnerInput" class="input input-bordered w-full" 
+                                    <input type="text" id="newOwnerInput" class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none" 
                                            placeholder="0x..." />
                                 </div>
 
-                                <div class="flex gap-2">
-                                    <button class="btn btn-primary flex-1" onclick="createIPCM()">
+                                <div class="flex gap-3">
+                                    <button class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] flex-1 rounded-xl px-6 py-3 font-medium" onclick="createIPCM()">
                                         🏭 Create IPCM
                                     </button>
-                                    <button class="btn btn-outline" onclick="getAllInstances()">
+                                    <button class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-6 py-3 font-medium" onclick="getAllInstances()">
                                         📋 All Instances
                                     </button>
                                 </div>
 
                                 <div>
-                                    <button class="btn btn-secondary w-full" onclick="getUserInstances()">
+                                    <button class="btn bg-[#42A5F5] hover:bg-[#64B5F6] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium" onclick="getUserInstances()">
                                         👤 My Instances
                                     </button>
                                 </div>
 
                                 <div>
-                                    <button class="btn btn-accent w-full" onclick="checkContractExists()">
+                                    <button class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium" onclick="checkContractExists()">
                                         🔍 Check Contract
                                     </button>
                                 </div>
 
-                                <div id="factoryResults" class="alert alert-info">
+                                <div id="factoryResults" class="alert alert-info bg-[#42A5F5]/20 border-[#42A5F5]/30 text-[#42A5F5] rounded-xl p-4">
                                     <span>Factory operations will appear here...</span>
                                 </div>
                             </div>
@@ -123,80 +123,57 @@
                     </div>
 
                     <!-- IPCM Instance Operations -->
-                    <div class="card bg-base-200">
-                        <div class="card-body">
-                            <h2 class="card-title text-accent">📝 IPCM Instance Operations</h2>
-                            <p class="text-sm text-base-content/70 mb-4">
+                    <div class="card bg-[#404040] border-[#606060] rounded-xl">
+                        <div class="card-body p-6">
+                            <h2 class="card-title text-[#FF69B4] text-xl mb-4">📝 IPCM Instance Operations</h2>
+                            <p class="text-sm text-[#A0A0A0] mb-6">
                                 Interact with specific IPCM instances
                             </p>
                             
-                            <div class="form-control space-y-4">
+                            <div class="form-control space-y-6">
                                 <div>
                                     <label class="label">
-                                        <span class="label-text">Instance Address</span>
+                                        <span class="label-text text-[#FFFFFF] text-base">Instance Address</span>
                                     </label>
-                                    <input type="text" id="instanceAddressInput" class="input input-bordered w-full" 
+                                    <input type="text" id="instanceAddressInput" class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none" 
                                            placeholder="0x..." />
                                 </div>
 
                                 <div>
                                     <label class="label">
-                                        <span class="label-text">New CID Mapping</span>
+                                        <span class="label-text text-[#FFFFFF] text-base">New CID Mapping</span>
                                     </label>
-                                    <input type="text" id="newMappingInput" class="input input-bordered w-full" 
+                                    <input type="text" id="newMappingInput" class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none" 
                                            placeholder="Qm..." />
                                 </div>
 
-                                <div class="flex gap-2">
-                                    <button class="btn btn-primary flex-1" onclick="loadInstance()">
+                                <div class="flex gap-3">
+                                    <button class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] flex-1 rounded-xl px-6 py-3 font-medium" onclick="loadInstance()">
                                         🔍 Load Instance
                                     </button>
-                                    <button class="btn btn-secondary flex-1" onclick="updateMapping()">
+                                    <button class="btn bg-[#42A5F5] hover:bg-[#64B5F6] border-0 text-[#FFFFFF] flex-1 rounded-xl px-6 py-3 font-medium" onclick="updateMapping()">
                                         ✏️ Update Mapping
                                     </button>
                                 </div>
 
                                 <div>
-                                    <button class="btn btn-outline w-full" onclick="getMapping()">
+                                    <button class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] w-full rounded-xl px-6 py-3 font-medium" onclick="getMapping()">
                                         📖 Get Current Mapping
                                     </button>
                                 </div>
 
-                                <div id="instanceResults" class="alert alert-info">
+                                <div id="instanceResults" class="alert alert-info bg-[#42A5F5]/20 border-[#42A5F5]/30 text-[#42A5F5] rounded-xl p-4">
                                     <span>Instance operations will appear here...</span>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-
-                <!-- Additional Operations -->
-                <div class="card bg-base-200 mt-8">
-                    <div class="card-body">
-                        <h2 class="card-title text-accent">🗂️ Additional Operations</h2>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <button class="btn btn-info" onclick="getUserData()">
-                                📁 My Contracts & Files
-                            </button>
-                            <button class="btn btn-warning" onclick="checkFileStatus()">
-                                🔍 Check File Status
-                            </button>
-                            <button class="btn btn-success" onclick="getSystemStats()">
-                                📊 System Stats
-                            </button>
-                        </div>
-                        
-                        <div id="additionalResults" class="mt-4">
-                            <div class="alert alert-info">
-                                <span>Additional operations will appear here...</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+              
 
                 <!-- Navigation -->
                 <div class="flex justify-center mt-8">
-                    <a href="/" class="btn btn-outline">
+                    <a href="/" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-8 py-3 font-medium">
                         ← Back to Dashboard
                     </a>
                 </div>
