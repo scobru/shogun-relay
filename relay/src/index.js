@@ -381,10 +381,21 @@ async function initializeServer() {
                     keyType: typeof event.args.key
                   });
                   
+                  // Estrai i bytes dagli oggetti Result di Ethers.js
+                  const soulBytes = event.args.soul;
+                  const keyBytes = event.args.key;
+                  
+                  console.log("🔍 Extracted bytes:", {
+                    soulBytes: soulBytes,
+                    keyBytes: keyBytes,
+                    soulBytesType: typeof soulBytes,
+                    keyBytesType: typeof keyBytes
+                  });
+                  
                   // Ora che soul e key non sono più indexed, dovrebbero essere bytes in chiaro
                   // Prova a decodificarli direttamente come UTF-8
-                  soulString = ethers.toUtf8String(event.args.soul);
-                  keyString = ethers.toUtf8String(event.args.key);
+                  soulString = ethers.toUtf8String(soulBytes);
+                  keyString = ethers.toUtf8String(keyBytes);
                   
                   console.log(`✅ Decoded from bytes: soul="${soulString}", key="${keyString}"`);
                 } catch (error) {
