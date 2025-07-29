@@ -56,10 +56,8 @@ class IPCMInterface {
             
             this.contractConfig = config.data;
             console.log("✅ Contract configuration loaded:", this.contractConfig);
-            console.log("📋 Factory config:", this.contractConfig.data?.factory);
-            console.log("📋 Factory address:", this.contractConfig.data?.factory?.address);
-            console.log("📋 Factory ABI length:", this.contractConfig.data?.factory?.abi?.length);
-            console.log("🔍 Full config structure:", JSON.stringify(this.contractConfig, null, 2));
+            console.log("📋 Factory address:", this.contractConfig.factory?.address);
+            console.log("📋 Factory ABI length:", this.contractConfig.factory?.abi?.length);
             this.updateContractInfo();
             
         } catch (error) {
@@ -87,7 +85,7 @@ class IPCMInterface {
             return;
         }
         
-        if (this.userAddress && this.contractConfig && this.contractConfig.data?.factory && this.ipcmFactory) {
+        if (this.userAddress && this.contractConfig && this.contractConfig.factory && this.ipcmFactory) {
             connectionStatus.className = 'alert alert-success mb-6';
             connectionStatus.innerHTML = `
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
@@ -111,8 +109,8 @@ class IPCMInterface {
         const contractStatus = document.getElementById('contractStatus');
         const networkInfo = document.getElementById('networkInfo');
         
-        if (this.contractConfig && this.contractConfig.data?.factory) {
-            factoryAddress.textContent = this.contractConfig.data.factory.address || 'Not found';
+        if (this.contractConfig && this.contractConfig.factory) {
+            factoryAddress.textContent = this.contractConfig.factory.address || 'Not found';
             contractStatus.textContent = 'Connected';
             contractStatus.className = 'text-success';
             networkInfo.textContent = 'Sepolia';
@@ -169,7 +167,7 @@ class IPCMInterface {
             this.updateWalletInfo();
             
             // Initialize contracts if config is loaded
-            if (this.contractConfig && this.contractConfig.data?.factory) {
+            if (this.contractConfig && this.contractConfig.factory) {
                 await this.initializeContracts();
             }
             
@@ -186,7 +184,7 @@ class IPCMInterface {
             }
             
             // La configurazione è in this.contractConfig.data.factory
-            const factoryConfig = this.contractConfig.data?.factory;
+            const factoryConfig = this.contractConfig.factory;
             if (!factoryConfig || !factoryConfig.address || !factoryConfig.abi) {
                 throw new Error('Factory contract configuration not found or incomplete');
             }
