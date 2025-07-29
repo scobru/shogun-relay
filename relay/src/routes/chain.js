@@ -148,4 +148,99 @@ router.get("/events", async (req, res) => {
   }
 });
 
+// Route per testare lo stato del contratto e delle funzioni
+router.get("/test", async (req, res) => {
+  try {
+    const chainContract = req.app.get("chainContract");
+    const syncChainContractToGun = req.app.get("syncChainContractToGun");
+    
+    const testResults = {
+      contractInitialized: !!chainContract,
+      syncFunctionAvailable: !!syncChainContractToGun,
+      timestamp: Date.now()
+    };
+    
+    if (chainContract) {
+      try {
+        const address = chainContract.target;
+        const owner = await chainContract.owner();
+        testResults.contractDetails = {
+          address: address,
+          owner: owner,
+          hasQueryFilter: !!chainContract.queryFilter,
+          hasFilters: !!chainContract.filters,
+          hasNodeUpdatedFilter: !!(chainContract.filters && chainContract.filters.NodeUpdated)
+        };
+      } catch (error) {
+        testResults.contractError = error.message;
+      }
+    }
+    
+    res.json({
+      success: true,
+      testResults: testResults
+    });
+
+  } catch (error) {
+    console.error("❌ Chain test error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore test",
+      details: error.message
+    });
+  }
+});
+
+// Route per testare la sincronizzazione con dati specifici
+router.post("/test-sync", async (req, res) => {
+  try {
+    const { soul, key, value } = req.body;
+    
+    if (!soul || !key || value === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: "Soul, key e value sono richiesti"
+      });
+    }
+
+    const gun = req.app.get("gunInstance");
+    if (!gun) {
+      return res.status(500).json({
+        success: false,
+        error: "Gun non inizializzato"
+      });
+    }
+
+    console.log("🧪 Test sync with data:", { soul, key, value });
+
+    // Scrivi i dati su GunDB
+    const dataNode = gun.get(soul);
+    await new Promise((resolve, reject) => {
+      dataNode.get(key).put(value, (ack) => {
+        if (ack.err) {
+          reject(ack.err);
+        } else {
+          resolve();
+        }
+      });
+    });
+
+    console.log("✅ Test data written to GunDB");
+
+    res.json({
+      success: true,
+      message: "Test data written to GunDB",
+      data: { soul, key, value }
+    });
+
+  } catch (error) {
+    console.error("❌ Test sync error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore test sync",
+      details: error.message
+    });
+  }
+});
+
 export default router; 

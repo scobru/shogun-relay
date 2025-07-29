@@ -400,6 +400,13 @@ async function syncContractToGun() {
     try {
         addToSyncLog('🔄 Iniziando sincronizzazione Contratto → GunDB...');
         
+        // Test preliminare delle API
+        addToSyncLog('🔍 Testando endpoint chain...');
+        const testResponse = await fetch('/api/v1/chain/status');
+        const testData = await testResponse.json();
+        addToSyncLog(`📊 Status API: ${testData.success ? 'OK' : 'FAIL'} - ${testData.error || 'Nessun errore'}`);
+        
+        addToSyncLog('📡 Invio richiesta sincronizzazione...');
         const response = await fetch('/api/v1/chain/sync-to-gun', {
             method: 'POST',
             headers: {
@@ -407,7 +414,10 @@ async function syncContractToGun() {
             }
         });
         
+        addToSyncLog(`📥 Risposta ricevuta: ${response.status} ${response.statusText}`);
+        
         const result = await response.json();
+        addToSyncLog(`📋 Risultato: ${JSON.stringify(result, null, 2)}`);
         
         if (result.success) {
             addToSyncLog('✅ Sincronizzazione completata con successo');
@@ -424,6 +434,7 @@ async function syncContractToGun() {
     } catch (error) {
         console.error('Errore sincronizzazione:', error);
         addToSyncLog('❌ Errore sincronizzazione: ' + error.message);
+        addToSyncLog('🔍 Stack: ' + error.stack);
     }
 }
 
@@ -556,6 +567,81 @@ async function checkServerStatus() {
     } catch (error) {
         console.error('Errore verifica stato server:', error);
         addToSyncLog('❌ Errore verifica stato server: ' + error.message);
+    }
+}
+
+// Testa lo stato del contratto e delle funzioni di sincronizzazione
+async function testChainFunctions() {
+    try {
+        addToSyncLog('🔍 Testando funzioni Chain...');
+        
+        const response = await fetch('/api/v1/chain/test');
+        const data = await response.json();
+        
+        if (data.success) {
+            const results = data.testResults;
+            addToSyncLog('✅ Test funzioni completato');
+            addToSyncLog(`📋 Contratto inizializzato: ${results.contractInitialized ? 'Sì' : 'No'}`);
+            addToSyncLog(`📋 Funzione sync disponibile: ${results.syncFunctionAvailable ? 'Sì' : 'No'}`);
+            
+            if (results.contractDetails) {
+                addToSyncLog(`📋 Indirizzo contratto: ${results.contractDetails.address}`);
+                addToSyncLog(`📋 Owner: ${results.contractDetails.owner}`);
+                addToSyncLog(`📋 Ha queryFilter: ${results.contractDetails.hasQueryFilter ? 'Sì' : 'No'}`);
+                addToSyncLog(`📋 Ha filters: ${results.contractDetails.hasFilters ? 'Sì' : 'No'}`);
+                addToSyncLog(`📋 Ha NodeUpdated filter: ${results.contractDetails.hasNodeUpdatedFilter ? 'Sì' : 'No'}`);
+            }
+            
+            if (results.contractError) {
+                addToSyncLog(`❌ Errore contratto: ${results.contractError}`);
+            }
+        } else {
+            addToSyncLog(`❌ Test fallito: ${data.error}`);
+        }
+        
+    } catch (error) {
+        console.error('Errore test funzioni:', error);
+        addToSyncLog('❌ Errore test funzioni: ' + error.message);
+    }
+}
+
+// Testa la scrittura diretta su GunDB tramite API
+async function testGunDBWrite() {
+    try {
+        const soulInput = document.getElementById('soulInput').value || 'test/node';
+        const keyInput = document.getElementById('keyInput').value || 'test';
+        const valueInput = document.getElementById('valueInput').value || 'Mario';
+        
+        addToSyncLog('🧪 Test scrittura GunDB tramite API...');
+        addToSyncLog(`📝 Dati: ${soulInput} -> ${keyInput} = ${valueInput}`);
+        
+        const response = await fetch('/api/v1/chain/test-sync', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                soul: soulInput,
+                key: keyInput,
+                value: valueInput
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            addToSyncLog('✅ Scrittura GunDB tramite API riuscita');
+            addToSyncLog(`📋 ${result.message}`);
+        } else {
+            addToSyncLog(`❌ Scrittura GunDB fallita: ${result.error}`);
+            if (result.details) {
+                addToSyncLog(`🔍 Dettagli: ${result.details}`);
+            }
+        }
+        
+    } catch (error) {
+        console.error('Errore test scrittura GunDB:', error);
+        addToSyncLog('❌ Errore test scrittura GunDB: ' + error.message);
     }
 }
 
