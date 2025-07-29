@@ -322,7 +322,23 @@ export default (app) => {
 
   app.get("/ipcm-contract", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "ipcm-contract.html"));
+    const filePath = path.resolve(publicPath, "ipcm-contract.html");
+    
+    console.log(`🔍 IPCM Contract route requested`);
+    console.log(`📁 Public path: ${publicPath}`);
+    console.log(`📄 File path: ${filePath}`);
+    console.log(`📄 File exists: ${fs.existsSync(filePath)}`);
+    
+    if (!fs.existsSync(filePath)) {
+      console.error(`❌ File not found: ${filePath}`);
+      return res.status(404).json({
+        success: false,
+        error: "IPCM contract HTML file not found",
+        path: filePath
+      });
+    }
+    
+    res.sendFile(filePath);
   });
 
   app.get("/drive", (req, res) => {

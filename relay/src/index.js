@@ -911,9 +911,6 @@ async function initializeServer() {
   app.use(express.urlencoded({ extended: true })); // Aggiungi supporto per i dati del form
   app.use(Gun.serve);
 
-  // Route statiche (DEFINITE DOPO LE API)
-  app.use(express.static(publicPath));
-
   // IPFS File Upload Endpoint
   const upload = multer({ storage: multer.memoryStorage() });
   
@@ -1373,6 +1370,9 @@ async function initializeServer() {
       error
     );
   }
+
+  // Route statiche (DEFINITE DOPO LE API)
+  app.use(express.static(publicPath));
 
   // Initialize garbage collector now that gun is ready
   initializeGarbageCollector();

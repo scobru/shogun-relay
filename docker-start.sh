@@ -48,6 +48,7 @@ if docker-compose ps | grep -q "Up"; then
     echo "   📊 Logs:            docker-compose logs -f"
     echo "   ⏲️ Relay Logs:      docker exec shogun-relay-stack tail -f /var/log/supervisor/relay.log" 
     echo "   ⏲️ IPFS  Logs:      docker exec shogun-relay-stack tail -f /var/log/supervisor/ipfs.log"
+    echo "   ⏲️ IPFS-INIT  Logs:      docker exec shogun-relay-stack tail -f /var/log/supervisor/ipfs-init.log"
     echo "   📈 Stats:           docker stats shogun-relay-stack"
     echo "   🔧 Debug:           docker-compose exec shogun-relay bash"
     echo "   🛑 Stop:            docker-compose down"
