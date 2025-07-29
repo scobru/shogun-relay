@@ -243,4 +243,61 @@ router.post("/test-sync", async (req, res) => {
   }
 });
 
+// Route per sincronizzare con parametri personalizzabili
+router.post("/sync-custom", async (req, res) => {
+  try {
+    const { fromBlock, toBlock, forceSync } = req.body;
+    
+    const syncChainContractToGun = req.app.get("syncChainContractToGun");
+    if (!syncChainContractToGun) {
+      return res.status(500).json({
+        success: false,
+        error: "Funzione sync non disponibile"
+      });
+    }
+
+    console.log("🔄 Starting custom Chain contract to GunDB sync...", { fromBlock, toBlock, forceSync });
+
+    // Se non specificati, usa i valori di default
+    const syncParams = {
+      fromBlock: fromBlock || null,
+      toBlock: toBlock || null,
+      forceSync: forceSync || false
+    };
+
+    const result = await syncChainContractToGun(syncParams);
+    
+    console.log("📊 Custom sync result:", result);
+
+    if (result === true) {
+      res.json({
+        success: true,
+        message: "Sincronizzazione personalizzata completata con successo",
+        params: syncParams
+      });
+    } else if (result === false) {
+      res.json({
+        success: false,
+        error: "Sincronizzazione personalizzata fallita - controlla i log del server",
+        params: syncParams
+      });
+    } else {
+      res.json({
+        success: false,
+        error: "Risultato sincronizzazione non valido",
+        details: `Risultato: ${result}`,
+        params: syncParams
+      });
+    }
+
+  } catch (error) {
+    console.error("❌ Custom chain sync error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore sincronizzazione personalizzata",
+      details: error.message || "Errore sconosciuto"
+    });
+  }
+});
+
 export default router; 

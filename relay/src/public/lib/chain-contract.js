@@ -2,8 +2,6 @@
 // Gestisce l'interazione con il contratto Chain.sol su Sepolia
 
 let provider, signer, contract, gun;
-let isListening = false;
-let eventListener = null;
 
 // Configurazione
 let CONTRACT_ADDRESS = null;
@@ -193,22 +191,21 @@ async function writeToContract() {
         
         // Scrivi su contratto (transazione utente)
         const tx = await contract.put(stringToBytes(soul), stringToBytes(key), value);
-        addToSyncLog(`⏳ Transazione inviata: ${tx.hash}`);
+        console.log(`⏳ Transazione inviata: ${tx.hash}`);
         
         // Aspetta conferma
         const receipt = await tx.wait();
-        addToSyncLog(`✅ Transazione confermata: ${receipt.transactionHash}`);
+        console.log(`✅ Transazione confermata: ${receipt.transactionHash}`);
         
         // Scrivi anche su GunDB localmente (usando i dati originali leggibili)
         await writeToGun(soul, key, valueInput);
         
-        addToSyncLog(`✅ Dati scritti su contratto e GunDB. Soul: ${soul}, Key: ${key}`);
-        addToEventLog(`📝 Scrittura: Soul=${soul}, Key=${key}, Value=${valueInput}`);
+        console.log(`✅ Dati scritti su contratto e GunDB. Soul: ${soul}, Key: ${key}`);
+        alert(`✅ Dati scritti con successo!\nSoul: ${soul}\nKey: ${key}\nValue: ${valueInput}`);
         
     } catch (error) {
         console.error('Errore scrittura contratto:', error);
         alert('Errore scrittura: ' + error.message);
-        addToSyncLog(`❌ Errore scrittura: ${error.message}`);
     }
 }
 
@@ -229,7 +226,8 @@ async function writeToGunOnly() {
         
         await writeToGun(soul, key, valueInput);
         
-        addToSyncLog(`✅ Dati scritti solo su GunDB. Soul: ${soul}, Key: ${key}`);
+        console.log(`✅ Dati scritti solo su GunDB. Soul: ${soul}, Key: ${key}`);
+        alert(`✅ Dati scritti su GunDB!\nSoul: ${soul}\nKey: ${key}\nValue: ${valueInput}`);
         
     } catch (error) {
         console.error('Errore scrittura GunDB:', error);
@@ -395,261 +393,10 @@ async function readFromGun() {
     }
 }
 
-// Sincronizza da contratto a GunDB (chiama API del relay)
-async function syncContractToGun() {
-    try {
-        addToSyncLog('🔄 Iniziando sincronizzazione Contratto → GunDB...');
-        
-        // Test preliminare delle API
-        addToSyncLog('🔍 Testando endpoint chain...');
-        const testResponse = await fetch('/api/v1/chain/status');
-        const testData = await testResponse.json();
-        addToSyncLog(`📊 Status API: ${testData.success ? 'OK' : 'FAIL'} - ${testData.error || 'Nessun errore'}`);
-        
-        addToSyncLog('📡 Invio richiesta sincronizzazione...');
-        const response = await fetch('/api/v1/chain/sync-to-gun', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        addToSyncLog(`📥 Risposta ricevuta: ${response.status} ${response.statusText}`);
-        
-        const result = await response.json();
-        addToSyncLog(`📋 Risultato: ${JSON.stringify(result, null, 2)}`);
-        
-        if (result.success) {
-            addToSyncLog('✅ Sincronizzazione completata con successo');
-            if (result.message) {
-                addToSyncLog(`📝 ${result.message}`);
-            }
-        } else {
-            addToSyncLog(`❌ Sincronizzazione fallita: ${result.error}`);
-            if (result.details) {
-                addToSyncLog(`🔍 Dettagli: ${result.details}`);
-            }
-        }
-        
-    } catch (error) {
-        console.error('Errore sincronizzazione:', error);
-        addToSyncLog('❌ Errore sincronizzazione: ' + error.message);
-        addToSyncLog('🔍 Stack: ' + error.stack);
-    }
-}
-
-// Sincronizza manualmente un evento specifico (per test)
-async function syncSpecificEvent() {
-    try {
-        const soulInput = document.getElementById('soulInput').value || 'test/node';
-        const keyInput = document.getElementById('keyInput').value || 'test';
-        
-        addToSyncLog(`🔄 Sincronizzazione manuale evento: ${soulInput} -> ${keyInput}`);
-        
-        // Prima scrivi su GunDB per assicurarci che i dati ci siano
-        await writeToGun(soulInput, keyInput, 'Mario');
-        addToSyncLog('✅ Dati scritti su GunDB per test');
-        
-        // Poi prova la sincronizzazione
-        await syncContractToGun();
-        
-    } catch (error) {
-        console.error('Errore sincronizzazione manuale:', error);
-        addToSyncLog('❌ Errore sincronizzazione manuale: ' + error.message);
-    }
-}
-
-// Sincronizza da GunDB a contratto (chiama API del relay)
-async function syncGunToContract() {
-    try {
-        addToSyncLog('🔄 Iniziando sincronizzazione GunDB → Contratto...');
-        
-        // Per ora implementiamo una sincronizzazione di esempio
-        addToSyncLog('⚠️ Funzionalità di sincronizzazione completa non ancora implementata');
-        
-    } catch (error) {
-        console.error('Errore sincronizzazione:', error);
-        addToSyncLog('❌ Errore sincronizzazione: ' + error.message);
-    }
-}
-
-// Inizia ascolto eventi (chiama API del relay)
-async function startEventListening() {
-    if (isListening) {
-        addToSyncLog('⚠️ Ascolto eventi già attivo');
-        return;
-    }
-    
-    try {
-        addToSyncLog('🎧 Avviando ascolto eventi NodeUpdated...');
-        
-        const response = await fetch('/api/v1/chain/start-events', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            isListening = true;
-            addToSyncLog('✅ Ascolto eventi attivo');
-        } else {
-            addToSyncLog(`❌ Errore avvio ascolto: ${result.error}`);
-        }
-        
-    } catch (error) {
-        console.error('Errore avvio ascolto eventi:', error);
-        addToSyncLog('❌ Errore avvio ascolto: ' + error.message);
-    }
-}
-
-// Aggiungi al log sincronizzazione
-function addToSyncLog(message) {
-    const syncLog = document.getElementById('syncLog');
-    const timestamp = new Date().toLocaleTimeString();
-    syncLog.value += `[${timestamp}] ${message}\n`;
-    syncLog.scrollTop = syncLog.scrollHeight;
-}
-
-// Aggiungi al log eventi
-function addToEventLog(message) {
-    const eventLog = document.getElementById('eventLog');
-    const timestamp = new Date().toLocaleTimeString();
-    
-    const eventDiv = document.createElement('div');
-    eventDiv.className = 'text-sm p-2 bg-base-300 rounded';
-    eventDiv.innerHTML = `<span class="text-accent">[${timestamp}]</span> ${message}`;
-    
-    eventLog.insertBefore(eventDiv, eventLog.firstChild);
-    
-    // Mantieni solo gli ultimi 50 eventi
-    while (eventLog.children.length > 50) {
-        eventLog.removeChild(eventLog.lastChild);
-    }
-}
-
-// Pulisci log eventi
-function clearEventLog() {
-    document.getElementById('eventLog').innerHTML = '<div class="text-sm text-base-content/50">Nessun evento ancora...</div>';
-}
-
-// Verifica stato server e API
-async function checkServerStatus() {
-    try {
-        addToSyncLog('🔍 Verificando stato server...');
-        
-        // Test endpoint di base
-        const healthResponse = await fetch('/api/v1/health');
-        const healthData = await healthResponse.json();
-        
-        if (healthData.success) {
-            addToSyncLog('✅ Server API funzionante');
-        } else {
-            addToSyncLog('❌ Server API non funzionante');
-        }
-        
-        // Test endpoint chain
-        const chainResponse = await fetch('/api/v1/chain/status');
-        const chainData = await chainResponse.json();
-        
-        if (chainData.success) {
-            addToSyncLog('✅ Chain API funzionante');
-            addToSyncLog(`📋 Contratto: ${chainData.address || 'N/A'}`);
-        } else {
-            addToSyncLog('❌ Chain API non funzionante');
-            if (chainData.error) {
-                addToSyncLog(`🔍 Errore: ${chainData.error}`);
-            }
-        }
-        
-    } catch (error) {
-        console.error('Errore verifica stato server:', error);
-        addToSyncLog('❌ Errore verifica stato server: ' + error.message);
-    }
-}
-
-// Testa lo stato del contratto e delle funzioni di sincronizzazione
-async function testChainFunctions() {
-    try {
-        addToSyncLog('🔍 Testando funzioni Chain...');
-        
-        const response = await fetch('/api/v1/chain/test');
-        const data = await response.json();
-        
-        if (data.success) {
-            const results = data.testResults;
-            addToSyncLog('✅ Test funzioni completato');
-            addToSyncLog(`📋 Contratto inizializzato: ${results.contractInitialized ? 'Sì' : 'No'}`);
-            addToSyncLog(`📋 Funzione sync disponibile: ${results.syncFunctionAvailable ? 'Sì' : 'No'}`);
-            
-            if (results.contractDetails) {
-                addToSyncLog(`📋 Indirizzo contratto: ${results.contractDetails.address}`);
-                addToSyncLog(`📋 Owner: ${results.contractDetails.owner}`);
-                addToSyncLog(`📋 Ha queryFilter: ${results.contractDetails.hasQueryFilter ? 'Sì' : 'No'}`);
-                addToSyncLog(`📋 Ha filters: ${results.contractDetails.hasFilters ? 'Sì' : 'No'}`);
-                addToSyncLog(`📋 Ha NodeUpdated filter: ${results.contractDetails.hasNodeUpdatedFilter ? 'Sì' : 'No'}`);
-            }
-            
-            if (results.contractError) {
-                addToSyncLog(`❌ Errore contratto: ${results.contractError}`);
-            }
-        } else {
-            addToSyncLog(`❌ Test fallito: ${data.error}`);
-        }
-        
-    } catch (error) {
-        console.error('Errore test funzioni:', error);
-        addToSyncLog('❌ Errore test funzioni: ' + error.message);
-    }
-}
-
-// Testa la scrittura diretta su GunDB tramite API
-async function testGunDBWrite() {
-    try {
-        const soulInput = document.getElementById('soulInput').value || 'test/node';
-        const keyInput = document.getElementById('keyInput').value || 'test';
-        const valueInput = document.getElementById('valueInput').value || 'Mario';
-        
-        addToSyncLog('🧪 Test scrittura GunDB tramite API...');
-        addToSyncLog(`📝 Dati: ${soulInput} -> ${keyInput} = ${valueInput}`);
-        
-        const response = await fetch('/api/v1/chain/test-sync', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                soul: soulInput,
-                key: keyInput,
-                value: valueInput
-            })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            addToSyncLog('✅ Scrittura GunDB tramite API riuscita');
-            addToSyncLog(`📋 ${result.message}`);
-        } else {
-            addToSyncLog(`❌ Scrittura GunDB fallita: ${result.error}`);
-            if (result.details) {
-                addToSyncLog(`🔍 Dettagli: ${result.details}`);
-            }
-        }
-        
-    } catch (error) {
-        console.error('Errore test scrittura GunDB:', error);
-        addToSyncLog('❌ Errore test scrittura GunDB: ' + error.message);
-    }
-}
-
 // Inizializza quando la pagina è caricata
 document.addEventListener('DOMContentLoaded', () => {
     // Aspetta che tutte le librerie siano caricate
     setTimeout(async () => {
         await initialize();
-        await checkServerStatus();
     }, 1000);
 }); 

@@ -174,69 +174,6 @@
                     </div>
                 </div>
 
-                <!-- Sync Section -->
-                <div class="card bg-base-200 mt-8">
-                    <div class="card-body">
-                        <h2 class="card-title text-accent">🔄 Sincronizzazione</h2>
-                        <p class="text-sm text-base-content/70 mb-4">
-                            Sincronizza i dati tra il contratto e GunDB
-                        </p>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <button class="btn btn-accent" onclick="syncContractToGun()">
-                                📥 Contratto → GunDB
-                            </button>
-                            <button class="btn btn-accent" onclick="syncGunToContract()">
-                                📤 GunDB → Contratto
-                            </button>
-                            <button class="btn btn-accent" onclick="startEventListening()">
-                                🎧 Ascolta Eventi
-                            </button>
-                        </div>
-                        
-                        <div class="mt-4">
-                            <button class="btn btn-sm btn-outline" onclick="syncSpecificEvent()">
-                                🔧 Test Sincronizzazione Manuale
-                            </button>
-                            <button class="btn btn-sm btn-outline" onclick="checkServerStatus()">
-                                🔍 Verifica Stato Server
-                            </button>
-                            <button class="btn btn-sm btn-outline" onclick="testChainFunctions()">
-                                ⚙️ Test Funzioni Chain
-                            </button>
-                            <button class="btn btn-sm btn-outline" onclick="testGunDBWrite()">
-                                💾 Test Scrittura GunDB API
-                            </button>
-                        </div>
-
-                        <div class="mt-4">
-                            <label class="label">
-                                <span class="label-text">Log Sincronizzazione</span>
-                            </label>
-                            <textarea id="syncLog" class="textarea textarea-bordered w-full h-24" 
-                                      readonly placeholder="I log di sincronizzazione appariranno qui..."></textarea>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Event Log -->
-                <div class="card bg-base-200 mt-8">
-                    <div class="card-body">
-                        <h2 class="card-title text-accent">📋 Log Eventi</h2>
-                        <div class="flex justify-between items-center mb-4">
-                            <p class="text-sm text-base-content/70">
-                                Eventi NodeUpdated dal contratto
-                            </p>
-                            <button class="btn btn-sm btn-outline" onclick="clearEventLog()">
-                                🗑️ Pulisci
-                            </button>
-                        </div>
-                        <div id="eventLog" class="space-y-2 max-h-64 overflow-y-auto">
-                            <div class="text-sm text-base-content/50">Nessun evento ancora...</div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Navigation -->
                 <div class="flex justify-center mt-8">
                     <a href="/" class="btn btn-outline">

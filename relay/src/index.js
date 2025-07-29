@@ -307,15 +307,15 @@ async function initializeServer() {
   }
 
   // Sync function to read from Chain contract and update GunDB
-  async function syncChainContractToGun() {
+  async function syncChainContractToGun(params = {}) {
     if (!chainContract || !gun) {
       console.warn("⚠️ Chain contract or Gun not initialized");
       return false;
     }
 
     try {
-      console.log("🔄 Starting Chain contract to GunDB sync...");
-      addSystemLog("info", "Chain contract sync started");
+      console.log("🔄 Starting Chain contract to GunDB sync...", params);
+      addSystemLog("info", "Chain contract sync started", params);
       
       // Verifica che il provider sia disponibile
       if (!provider) {
@@ -328,11 +328,12 @@ async function initializeServer() {
       const currentBlock = await provider.getBlockNumber();
       console.log(`📦 Current block: ${currentBlock}`);
       
-      // Sincronizza gli ultimi 1000 blocchi (circa 4 ore su Sepolia)
-      const fromBlock = Math.max(0, currentBlock - 1000);
-      const toBlock = currentBlock;
+      // Usa i parametri personalizzati o i valori di default
+      const fromBlock = params.fromBlock !== null ? params.fromBlock : Math.max(0, currentBlock - 1000);
+      const toBlock = params.toBlock !== null ? params.toBlock : currentBlock;
+      const forceSync = params.forceSync || false;
       
-      console.log(`🔄 Syncing events from block ${fromBlock} to ${toBlock}`);
+      console.log(`🔄 Syncing events from block ${fromBlock} to ${toBlock} (forceSync: ${forceSync})`);
       
       // Verifica che il contratto abbia il metodo queryFilter
       if (!chainContract.queryFilter || !chainContract.filters) {
@@ -360,6 +361,31 @@ async function initializeServer() {
       if (!events || events.length === 0) {
         console.log("ℹ️ No events found in the specified block range");
         addSystemLog("info", "No events found in block range", { fromBlock, toBlock });
+        
+        // Se forceSync è true, prova a cercare in un range più ampio
+        if (forceSync) {
+          try {
+            console.log("🔍 Force sync: trying wider block range...");
+            const widerFromBlock = Math.max(0, currentBlock - 10000); // Ultimi 10k blocchi
+            const widerEvents = await chainContract.queryFilter(
+              chainContract.filters.NodeUpdated(),
+              widerFromBlock,
+              toBlock
+            );
+            console.log(`📡 Found ${widerEvents.length} events in wider range (${widerFromBlock}-${toBlock})`);
+            
+            if (widerEvents.length > 0) {
+              console.log("ℹ️ Events exist but not in the specified range");
+              addSystemLog("info", "Events found in wider range", { 
+                widerRange: `${widerFromBlock}-${toBlock}`,
+                eventCount: widerEvents.length 
+              });
+            }
+          } catch (widerError) {
+            console.log("⚠️ Could not query wider range:", widerError.message);
+          }
+        }
+        
         return true; // Restituisci true perché non è un errore
       }
       
@@ -402,17 +428,19 @@ async function initializeServer() {
           // Crea un ID univoco per questo evento
           const eventId = `${event.transactionHash}-${event.logIndex}`;
           
-          // Verifica se l'evento è già stato sincronizzato
-          const existingEvent = await new Promise((resolve) => {
-            const eventNode = gun.get("shogun").get("chain_events").get(eventId);
-            eventNode.once((data) => {
-              resolve(data);
+          // Se forceSync è false, verifica se l'evento è già stato sincronizzato
+          if (!forceSync) {
+            const existingEvent = await new Promise((resolve) => {
+              const eventNode = gun.get("shogun").get("chain_events").get(eventId);
+              eventNode.once((data) => {
+                resolve(data);
+              });
             });
-          });
-          
-          if (existingEvent) {
-            console.log(`⏭️ Event already synced: ${eventId}`);
-            continue;
+            
+            if (existingEvent) {
+              console.log(`⏭️ Event already synced: ${eventId}`);
+              continue;
+            }
           }
           
           // Salva l'evento in GunDB
@@ -426,7 +454,7 @@ async function initializeServer() {
               transactionHash: event.transactionHash,
               timestamp: Date.now(),
               synced: true,
-              syncMethod: "manual_sync"
+              syncMethod: forceSync ? "force_sync" : "manual_sync"
             }, (ack) => {
               if (ack.err) {
                 reject(ack.err);
@@ -463,6 +491,7 @@ async function initializeServer() {
         errorEvents: errorCount,
         fromBlock: fromBlock,
         toBlock: toBlock,
+        forceSync: forceSync,
         timestamp: Date.now()
       };
       
@@ -871,7 +900,7 @@ async function initializeServer() {
   app.set("startChainEventListener", startChainEventListener);
   
   // Wrapper per syncChainContractToGun che accede alla funzione corretta
-  app.set("syncChainContractToGun", async () => {
+  app.set("syncChainContractToGun", async (params) => {
     try {
       if (!gun) {
         console.error("❌ Gun not initialized");
@@ -884,7 +913,7 @@ async function initializeServer() {
       }
       
       console.log("🔧 Calling syncChainContractToGun function...");
-      const result = await syncChainContractToGun();
+      const result = await syncChainContractToGun(params);
       console.log("🔧 syncChainContractToGun returned:", result);
       return result;
       
