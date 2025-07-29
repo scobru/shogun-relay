@@ -168,21 +168,25 @@ async function startChainEventListener() {
 
   try {
     console.log("🎧 Starting Chain contract event listener...");
+    console.log("📋 Contract address:", chainContract.target);
+    console.log("📋 Contract filters:", chainContract.filters ? "Available" : "Not available");
     
     // Listen for NodeUpdated events
     chainContract.on("NodeUpdated", async (soul, key, value, event) => {
-      console.log("📡 Chain contract event received:", {
+      console.log("🎉 EVENTO RICEVUTO! Chain contract event received:", {
         soul: soul,
         key: key,
         value: value,
         blockNumber: event.blockNumber,
-        transactionHash: event.transactionHash
+        transactionHash: event.transactionHash,
+        logIndex: event.logIndex
       });
 
       // Decode the value from bytes to string
       let decodedValue;
       try {
         decodedValue = ethers.toUtf8String(value);
+        console.log("✅ Value decoded successfully:", decodedValue);
       } catch (error) {
         console.warn("⚠️ Could not decode value as UTF-8, using hex:", value);
         decodedValue = value;
@@ -201,8 +205,37 @@ async function startChainEventListener() {
       }
 
       // Propagate to GunDB with original readable data
-      propagateChainEventToGun(soulString, keyString, decodedValue, event);
+      console.log("🔄 Calling propagateChainEventToGun...");
+      await propagateChainEventToGun(soulString, keyString, decodedValue, event);
     });
+
+    // Test if the listener is working by checking for past events
+    console.log("🔍 Testing event listener with past events...");
+    try {
+      const currentBlock = await provider.getBlockNumber();
+      const fromBlock = Math.max(0, currentBlock - 100); // Ultimi 100 blocchi
+      const pastEvents = await chainContract.queryFilter(
+        chainContract.filters.NodeUpdated(),
+        fromBlock,
+        currentBlock
+      );
+      console.log(`📡 Found ${pastEvents.length} past events in last 100 blocks`);
+      
+      if (pastEvents.length > 0) {
+        console.log("📋 Recent events found, testing propagation...");
+        const latestEvent = pastEvents[pastEvents.length - 1];
+        const { soul, key, value } = latestEvent.args;
+        
+        let decodedValue = ethers.toUtf8String(value);
+        let soulString = ethers.toUtf8String(soul);
+        let keyString = ethers.toUtf8String(key);
+        
+        console.log(`🔄 Testing with latest event: soul="${soulString}", key="${keyString}"`);
+        await propagateChainEventToGun(soulString, keyString, decodedValue, latestEvent);
+      }
+    } catch (testError) {
+      console.warn("⚠️ Could not test with past events:", testError.message);
+    }
 
     console.log("✅ Chain contract event listener started");
     return true;
@@ -245,6 +278,8 @@ async function initializeServer() {
 
   // Propagate Chain contract event to GunDB
   async function propagateChainEventToGun(soul, key, value, event) {
+    console.log("🔄 propagateChainEventToGun called with:", { soul, key, value });
+    
     if (!gun) {
       console.warn("⚠️ Gun not initialized, cannot propagate event");
       return;
@@ -253,8 +288,10 @@ async function initializeServer() {
     try {
       // Create a unique identifier for this event
       const eventId = `${event.transactionHash}-${event.logIndex}`;
+      console.log("📋 Event ID:", eventId);
       
       // Store the event data in GunDB
+      console.log("💾 Storing event data in GunDB...");
       const eventNode = gun.get("shogun").get("chain_events").get(eventId);
       await new Promise((resolve, reject) => {
         eventNode.put({
@@ -267,20 +304,25 @@ async function initializeServer() {
           propagated: true
         }, (ack) => {
           if (ack.err) {
+            console.error("❌ Error storing event data:", ack.err);
             reject(ack.err);
           } else {
+            console.log("✅ Event data stored successfully");
             resolve();
           }
         });
       });
 
       // Also store the data in the main GunDB structure using readable strings
+      console.log("💾 Storing data in main GunDB structure...");
       const dataNode = gun.get(soul);
       await new Promise((resolve, reject) => {
         dataNode.get(key).put(value, (ack) => {
           if (ack.err) {
+            console.error("❌ Error storing data in main structure:", ack.err);
             reject(ack.err);
           } else {
+            console.log("✅ Data stored in main structure successfully");
             resolve();
           }
         });
@@ -898,6 +940,7 @@ async function initializeServer() {
   // Esponi le funzioni del contratto Chain per le route
   app.set("chainContract", chainContract);
   app.set("startChainEventListener", startChainEventListener);
+  app.set("propagateChainEventToGun", propagateChainEventToGun);
   
   // Wrapper per syncChainContractToGun che accede alla funzione corretta
   app.set("syncChainContractToGun", async (params) => {

@@ -300,4 +300,97 @@ router.post("/sync-custom", async (req, res) => {
   }
 });
 
+// Route per verificare lo stato del listener e testare la propagazione
+router.get("/listener-status", async (req, res) => {
+  try {
+    const chainContract = req.app.get("chainContract");
+    const gun = req.app.get("gunInstance");
+    
+    const status = {
+      contractInitialized: !!chainContract,
+      gunInitialized: !!gun,
+      timestamp: Date.now()
+    };
+    
+    if (chainContract) {
+      try {
+        status.contractAddress = chainContract.target;
+        status.hasEventListeners = chainContract.listenerCount("NodeUpdated") > 0;
+        status.listenerCount = chainContract.listenerCount("NodeUpdated");
+      } catch (error) {
+        status.contractError = error.message;
+      }
+    }
+    
+    res.json({
+      success: true,
+      status: status
+    });
+
+  } catch (error) {
+    console.error("❌ Listener status error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore verifica listener",
+      details: error.message
+    });
+  }
+});
+
+// Route per forzare la propagazione di un evento di test
+router.post("/test-propagation", async (req, res) => {
+  try {
+    const { soul, key, value } = req.body;
+    
+    if (!soul || !key || value === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: "Soul, key e value sono richiesti"
+      });
+    }
+
+    const gun = req.app.get("gunInstance");
+    if (!gun) {
+      return res.status(500).json({
+        success: false,
+        error: "Gun non inizializzato"
+      });
+    }
+
+    console.log("🧪 Test propagation with data:", { soul, key, value });
+
+    // Simula un evento di test
+    const testEvent = {
+      transactionHash: "0x" + "0".repeat(64),
+      logIndex: 0,
+      blockNumber: 0
+    };
+
+    // Chiama la funzione di propagazione
+    const propagateChainEventToGun = req.app.get("propagateChainEventToGun");
+    if (propagateChainEventToGun) {
+      await propagateChainEventToGun(soul, key, value, testEvent);
+      
+      res.json({
+        success: true,
+        message: "Test propagation completed",
+        data: { soul, key, value }
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: "Propagation function not available"
+      });
+    }
+
+  } catch (error) {
+    console.error("❌ Test propagation error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore test propagation",
+      details: error.message
+    });
+  }
+});
+
 export default router; 

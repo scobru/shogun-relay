@@ -393,10 +393,117 @@ async function readFromGun() {
     }
 }
 
+// Testa lo stato del listener
+async function testListenerStatus() {
+    try {
+        console.log('🔍 Testando stato listener...');
+        
+        const response = await fetch('/api/v1/chain/listener-status');
+        const data = await response.json();
+        
+        if (data.success) {
+            const status = data.status;
+            console.log('📊 Stato listener:', status);
+            
+            if (status.contractInitialized) {
+                console.log('✅ Contratto inizializzato');
+                console.log('📋 Indirizzo:', status.contractAddress);
+                console.log('🎧 Listener attivi:', status.listenerCount);
+                console.log('📡 Ha event listeners:', status.hasEventListeners);
+            } else {
+                console.log('❌ Contratto non inizializzato');
+            }
+            
+            if (status.gunInitialized) {
+                console.log('✅ Gun inizializzato');
+            } else {
+                console.log('❌ Gun non inizializzato');
+            }
+        } else {
+            console.error('❌ Errore test listener:', data.error);
+        }
+        
+    } catch (error) {
+        console.error('❌ Errore test listener:', error);
+    }
+}
+
+// Testa la propagazione di un evento
+async function testEventPropagation() {
+    try {
+        const soulInput = document.getElementById('soulInput').value || 'test/node';
+        const keyInput = document.getElementById('keyInput').value || 'test';
+        const valueInput = document.getElementById('valueInput').value || 'Mario';
+        
+        console.log('🧪 Testando propagazione evento...');
+        console.log('📝 Dati:', { soul: soulInput, key: keyInput, value: valueInput });
+        
+        const response = await fetch('/api/v1/chain/test-propagation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                soul: soulInput,
+                key: keyInput,
+                value: valueInput
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            console.log('✅ Propagazione test completata');
+            console.log('📋 Risultato:', data.message);
+            
+            // Verifica che i dati siano stati scritti su GunDB
+            setTimeout(() => {
+                verifyGunDBData(soulInput, keyInput, valueInput);
+            }, 1000);
+        } else {
+            console.error('❌ Errore propagazione test:', data.error);
+        }
+        
+    } catch (error) {
+        console.error('❌ Errore test propagazione:', error);
+    }
+}
+
+// Verifica che i dati siano stati scritti su GunDB
+async function verifyGunDBData(soul, key, expectedValue) {
+    try {
+        console.log('🔍 Verificando dati su GunDB...');
+        
+        if (!gun) {
+            console.error('❌ Gun non inizializzato');
+            return;
+        }
+        
+        const node = gun.get(soul).get(key);
+        node.once((data) => {
+            if (data === expectedValue) {
+                console.log('✅ Dati trovati su GunDB:', data);
+            } else {
+                console.log('❌ Dati non trovati o diversi su GunDB');
+                console.log('📋 Atteso:', expectedValue);
+                console.log('📋 Trovato:', data);
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Errore verifica GunDB:', error);
+    }
+}
+
 // Inizializza quando la pagina è caricata
 document.addEventListener('DOMContentLoaded', () => {
     // Aspetta che tutte le librerie siano caricate
     setTimeout(async () => {
         await initialize();
+        
+        // Testa lo stato del listener dopo l'inizializzazione
+        setTimeout(() => {
+            testListenerStatus();
+        }, 2000);
     }, 1000);
 }); 
