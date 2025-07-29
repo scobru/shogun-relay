@@ -83,7 +83,7 @@ class IPCMInterface {
             return;
         }
         
-        if (this.userAddress && this.contractConfig) {
+        if (this.userAddress && this.contractConfig && this.contractConfig.data?.factory) {
             connectionStatus.className = 'alert alert-success mb-6';
             connectionStatus.innerHTML = `
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
@@ -107,8 +107,8 @@ class IPCMInterface {
         const contractStatus = document.getElementById('contractStatus');
         const networkInfo = document.getElementById('networkInfo');
         
-        if (this.contractConfig && this.contractConfig.factory) {
-            factoryAddress.textContent = this.contractConfig.factory.address || 'Not found';
+        if (this.contractConfig && this.contractConfig.data?.factory) {
+            factoryAddress.textContent = this.contractConfig.data.factory.address || 'Not found';
             contractStatus.textContent = 'Connected';
             contractStatus.className = 'text-success';
             networkInfo.textContent = 'Sepolia';
@@ -165,7 +165,7 @@ class IPCMInterface {
             this.updateWalletInfo();
             
             // Initialize contracts if config is loaded
-            if (this.contractConfig) {
+            if (this.contractConfig && this.contractConfig.data?.factory) {
                 await this.initializeContracts();
             }
             
@@ -181,10 +181,16 @@ class IPCMInterface {
                 throw new Error('Contract config or signer not available');
             }
             
+            // La configurazione è in this.contractConfig.data.factory
+            const factoryConfig = this.contractConfig.data?.factory;
+            if (!factoryConfig || !factoryConfig.address || !factoryConfig.abi) {
+                throw new Error('Factory contract configuration not found or incomplete');
+            }
+            
             // Initialize IPCMFactory contract
             this.ipcmFactory = new ethers.Contract(
-                this.contractConfig.address,
-                this.contractConfig.abi,
+                factoryConfig.address,
+                factoryConfig.abi,
                 this.signer
             );
             
