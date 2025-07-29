@@ -234,9 +234,6 @@ async function startChainEventListener() {
       await propagateChainEventToGun(soulString, keyString, decodedValue, event);
     });
 
-    // Gestisci errori di filtro
-    chainContract.on("error", handleFilterError);
-    
     // Verifica che il listener sia registrato
     const listenerCount = chainContract.listenerCount("NodeUpdated");
     console.log("📊 Listener count after registration:", listenerCount);
@@ -320,6 +317,24 @@ async function initializeServer() {
         if (listenerCount === 0) {
           console.warn("⚠️ Listener count is 0, restarting...");
           await startChainEventListener();
+        } else {
+          // Test se il listener funziona ancora facendo una query
+          try {
+            const currentBlock = await provider.getBlockNumber();
+            const fromBlock = Math.max(0, currentBlock - 10); // Ultimi 10 blocchi
+            await chainContract.queryFilter(
+              chainContract.filters.NodeUpdated(),
+              fromBlock,
+              currentBlock
+            );
+            console.log("✅ Listener health check passed");
+          } catch (queryError) {
+            console.warn("⚠️ Listener health check failed:", queryError.message);
+            if (queryError.message.includes("filter not found")) {
+              console.warn("🔄 Filter not found, restarting listener...");
+              await startChainEventListener();
+            }
+          }
         }
       } catch (error) {
         console.error("❌ Error during listener health check:", error);
