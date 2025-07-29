@@ -3,51 +3,6 @@ import { ethers } from 'ethers';
 
 const router = express.Router();
 
-// Route per sincronizzare dal contratto a GunDB
-router.post("/sync-to-gun", async (req, res) => {
-  try {
-    const syncChainContractToGun = req.app.get("syncChainContractToGun");
-    if (!syncChainContractToGun) {
-      return res.status(500).json({
-        success: false,
-        error: "Funzione sync non disponibile"
-      });
-    }
-
-    console.log("🔄 Starting Chain contract to GunDB sync...");
-
-    const result = await syncChainContractToGun();
-    
-    console.log("📊 Sync result:", result);
-
-    if (result === true) {
-      res.json({
-        success: true,
-        message: "Sincronizzazione completata con successo"
-      });
-    } else if (result === false) {
-      res.json({
-        success: false,
-        error: "Sincronizzazione fallita - controlla i log del server"
-      });
-    } else {
-      res.json({
-        success: false,
-        error: "Risultato sincronizzazione non valido",
-        details: `Risultato: ${result}`
-      });
-    }
-
-  } catch (error) {
-    console.error("❌ Chain sync error:", error);
-    res.status(500).json({
-      success: false,
-      error: "Errore sincronizzazione",
-      details: error.message || "Errore sconosciuto"
-    });
-  }
-});
-
 // Route per avviare l'ascolto eventi
 router.post("/start-events", async (req, res) => {
   try {
