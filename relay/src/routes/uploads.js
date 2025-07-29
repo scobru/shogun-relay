@@ -85,7 +85,7 @@ async function getOffChainMBUsage(userAddress, req) {
     const timeoutId = setTimeout(() => {
       console.log(`⏰ Timeout for MB usage calculation for: ${userAddress}`);
       resolve(0);
-    }, 10000);
+    }, 3000); // Timeout ridotto da 10 secondi a 3 secondi
 
     const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
     
@@ -112,6 +112,12 @@ async function getOffChainMBUsage(userAddress, req) {
       let completedReads = 0;
       const totalReads = hashKeys.length;
 
+      // Timeout aggiuntivo per le letture individuali dei file
+      const fileReadTimeout = setTimeout(() => {
+        console.log(`⏰ File read timeout for ${userAddress}, using partial calculation`);
+        resolve(totalMB);
+      }, 2500);
+
       hashKeys.forEach((hash) => {
         uploadsNode.get(hash).once((uploadData) => {
           completedReads++;
@@ -121,6 +127,7 @@ async function getOffChainMBUsage(userAddress, req) {
           }
 
           if (completedReads === totalReads) {
+            clearTimeout(fileReadTimeout);
             console.log(`📊 Final MB calculation for ${userAddress}: ${totalMB} MB from ${totalReads} files`);
             resolve(totalMB);
           }
@@ -397,7 +404,7 @@ router.post("/sync-mb-usage/:userAddress", async (req, res) => {
     const fileCount = await new Promise((resolve) => {
       const timeoutId = setTimeout(() => {
         resolve(0);
-      }, 5000);
+      }, 2000); // Timeout ridotto da 5 secondi a 2 secondi
 
       uploadsNode.once((parentData) => {
         clearTimeout(timeoutId);
