@@ -320,6 +320,11 @@ export default (app) => {
     res.sendFile(path.resolve(publicPath, "chain-contract.html"));
   });
 
+  app.get("/ipcm-contract", (req, res) => {
+    const publicPath = path.resolve(__dirname, "../public");
+    res.sendFile(path.resolve(publicPath, "ipcm-contract.html"));
+  });
+
   app.get("/drive", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "drive.html"));

@@ -91,6 +91,112 @@ router.get("/config", async (req, res) => {
   }
 });
 
+// Route specifica per IPCM
+router.get("/ipcm", async (req, res) => {
+  try {
+    console.log("📋 contracts/ipcm: Requesting IPCM contract configuration");
+
+    let chainId = req.query.chainId || process.env.CHAIN_ID || "11155111";
+    
+    const chainIdMapping = {
+      "11155111": "sepolia",
+      "sepolia": "sepolia"
+    };
+    
+    const chainKey = chainIdMapping[chainId] || chainId;
+
+    if (!DEPLOYMENTS[chainKey]) {
+      return res.status(404).json({
+        success: false,
+        error: `No deployments found for chain ID: ${chainId}`,
+        availableChains: Object.keys(DEPLOYMENTS),
+        chainKey: chainKey,
+        originalChainId: chainId
+      });
+    }
+
+    const chainDeployments = DEPLOYMENTS[chainKey];
+
+    // Estrai solo i contratti IPCM
+    const factory = chainDeployments["IPFS#IPCMFactory"] || null;
+    const ipcm = chainDeployments["IPFS#IPCM"] || null;
+
+    if (!factory) {
+      return res.status(404).json({
+        success: false,
+        error: "IPCMFactory contract not found in deployments",
+        chainId: chainId,
+        chainKey: chainKey
+      });
+    }
+
+    console.log("📋 contracts/ipcm: Returning IPCM configuration for chain:", chainId);
+
+    res.json({
+      success: true,
+      chainId: chainId,
+      chainKey: chainKey,
+      data: {
+        factory: factory,
+        ipcm: ipcm
+      },
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error("❌ contracts/ipcm: Error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to load IPCM configuration",
+      details: error.message,
+    });
+  }
+});
+
+// Route per ottenere tutti i contratti disponibili
+router.get("/all", async (req, res) => {
+  try {
+    console.log("📋 contracts/all: Requesting all contracts configuration");
+
+    let chainId = req.query.chainId || process.env.CHAIN_ID || "11155111";
+    
+    const chainIdMapping = {
+      "11155111": "sepolia",
+      "sepolia": "sepolia"
+    };
+    
+    const chainKey = chainIdMapping[chainId] || chainId;
+
+    if (!DEPLOYMENTS[chainKey]) {
+      return res.status(404).json({
+        success: false,
+        error: `No deployments found for chain ID: ${chainId}`,
+        availableChains: Object.keys(DEPLOYMENTS),
+        chainKey: chainKey,
+        originalChainId: chainId
+      });
+    }
+
+    const chainDeployments = DEPLOYMENTS[chainKey];
+
+    console.log("📋 contracts/all: Returning all contracts for chain:", chainId);
+
+    res.json({
+      success: true,
+      chainId: chainId,
+      chainKey: chainKey,
+      data: chainDeployments,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error("❌ contracts/all: Error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to load all contracts",
+      details: error.message,
+    });
+  }
+});
+
 // Route per ottenere un contratto specifico
 router.get("/:contractName", async (req, res) => {
   try {
