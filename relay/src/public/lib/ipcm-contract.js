@@ -107,11 +107,11 @@ class IPCMInterface {
         const contractStatus = document.getElementById('contractStatus');
         const networkInfo = document.getElementById('networkInfo');
         
-        if (this.contractConfig) {
-            factoryAddress.textContent = this.contractConfig.address || 'Not found';
+        if (this.contractConfig && this.contractConfig.factory) {
+            factoryAddress.textContent = this.contractConfig.factory.address || 'Not found';
             contractStatus.textContent = 'Connected';
             contractStatus.className = 'text-success';
-            networkInfo.textContent = this.contractConfig.network || 'Sepolia';
+            networkInfo.textContent = 'Sepolia';
         } else {
             factoryAddress.textContent = 'Loading...';
             contractStatus.textContent = 'Disconnected';
