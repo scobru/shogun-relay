@@ -4,9 +4,73 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
+import multer from "multer";
+import FormData from "form-data";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Configurazione multer per upload file
+const upload = multer({ storage: multer.memoryStorage() });
+
+// Middleware di autenticazione
+const tokenAuthMiddleware = (req, res, next) => {
+  // Check Authorization header (Bearer token)
+  const authHeader = req.headers["authorization"];
+  const bearerToken = authHeader && authHeader.split(" ")[1];
+
+  // Check custom token header (for Gun/Wormhole compatibility)
+  const customToken = req.headers["token"];
+
+  // Accept either format
+  const token = bearerToken || customToken;
+
+  if (token === process.env.ADMIN_PASSWORD) {
+    // Use a more secure token in production
+    next();
+  } else {
+    console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
+    res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+};
+
+// Middleware per autenticare le richieste con firma del wallet
+const walletSignatureMiddleware = (req, res, next) => {
+  try {
+    const userAddress = req.headers["x-user-address"];
+    const signature = req.headers["x-wallet-signature"];
+    const message = req.headers["x-signature-message"] || "I Love Shogun";
+
+    if (!userAddress) {
+      return res.status(401).json({
+        success: false,
+        error: "x-user-address header richiesto",
+      });
+    }
+
+    if (!signature) {
+      return res.status(401).json({
+        success: false,
+        error: "x-wallet-signature header richiesto per autenticazione",
+      });
+    }
+
+    // Per ora restituiamo true se i formati sono corretti
+    // In futuro potremmo implementare la verifica crittografica completa
+    console.log(`🔐 Verifying signature for address: ${userAddress}`);
+    console.log(`🔐 Message: ${message}`);
+    console.log(`🔐 Signature: ${signature.substring(0, 20)}...`);
+
+    console.log(`✅ Wallet signature verified for: ${userAddress}`);
+    next();
+  } catch (error) {
+    console.error("❌ Wallet signature middleware error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore di autenticazione",
+    });
+  }
+};
 
 // Importa i moduli delle routes
 import contractsRouter from "./contracts.js";

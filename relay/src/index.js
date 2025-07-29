@@ -798,24 +798,9 @@ async function initializeServer() {
   // Route statiche (DEFINITE DOPO LE API)
   app.use(express.static(publicPath));
 
-  // Endpoint di upload IPFS (admin) - DEPRECATO: usa /api/v1/ipfs/upload invece
-  app.post("/ipfs-upload", tokenAuthMiddleware, upload.single("file"), async (req, res) => {
-    res.status(410).json({
-      success: false,
-      error: "This endpoint is deprecated. Use /api/v1/ipfs/upload instead.",
-      message: "Please update your client to use the new API endpoint."
-    });
-  });
-
-  // Endpoint di upload IPFS (user) - DEPRECATO: usa /api/v1/ipfs/upload invece
-  app.post("/ipfs-upload-user", walletSignatureMiddleware, upload.single("file"), async (req, res) => {
-    res.status(410).json({
-      success: false,
-      error: "This endpoint is deprecated. Use /api/v1/ipfs/upload instead.",
-      message: "Please update your client to use the new API endpoint."
-    });
-  });
-
+  // IPFS File Upload Endpoint
+  const upload = multer({ storage: multer.memoryStorage() });
+  
   // Middleware di autenticazione
   const tokenAuthMiddleware = (req, res, next) => {
     // Check Authorization header (Bearer token)
@@ -923,6 +908,24 @@ async function initializeServer() {
       });
     }
   };
+
+  // IPFS upload endpoint (admin) - DEPRECATED: use /api/v1/ipfs/upload instead
+  app.post("/ipfs-upload", tokenAuthMiddleware, upload.single("file"), async (req, res) => {
+    res.status(410).json({
+      success: false,
+      error: "This endpoint is deprecated. Use /api/v1/ipfs/upload instead.",
+      message: "Please update your client to use the new API endpoint."
+    });
+  });
+
+  // IPFS upload endpoint (user) - DEPRECATED: use /api/v1/ipfs/upload instead
+  app.post("/ipfs-upload-user", walletSignatureMiddleware, upload.single("file"), async (req, res) => {
+    res.status(410).json({
+      success: false,
+      error: "This endpoint is deprecated. Use /api/v1/ipfs/upload instead.",
+      message: "Please update your client to use the new API endpoint."
+    });
+  });
 
   // --- Start Server Function ---
   async function startServer() {
