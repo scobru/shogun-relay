@@ -9,6 +9,27 @@ let eventListener = null;
 let CONTRACT_ADDRESS = null;
 let CONTRACT_ABI = null;
 
+// Testa la connessione al contratto
+async function testContractConnection() {
+    try {
+        if (!contract) {
+            updateConnectionStatus('error', 'Contratto non inizializzato');
+            return false;
+        }
+        
+        // Testa una chiamata semplice al contratto
+        const owner = await contract.owner();
+        console.log('✅ Test connessione contratto riuscito, owner:', owner);
+        updateConnectionStatus('success', 'Connesso al contratto');
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Test connessione contratto fallito:', error);
+        updateConnectionStatus('error', 'Errore connessione contratto: ' + error.message);
+        return false;
+    }
+}
+
 // Inizializzazione
 async function initialize() {
     try {
@@ -36,9 +57,13 @@ async function initialize() {
             // Inizializza contratto
             if (CONTRACT_ADDRESS && CONTRACT_ABI) {
                 contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-                updateConnectionStatus('success', 'Connesso al contratto');
-                updateContractInfo();
-                updateWalletInfo();
+                
+                // Testa la connessione
+                const connectionOk = await testContractConnection();
+                if (connectionOk) {
+                    updateContractInfo();
+                    updateWalletInfo();
+                }
             } else {
                 updateConnectionStatus('error', 'Configurazione contratto non disponibile');
             }
@@ -254,31 +279,55 @@ async function readFromContract() {
         const soul = soulInput;
         
         // Verifica se il nodo esiste
-        const exists = await contract.nodeExists(stringToBytes(soul));
-        if (!exists) {
-            document.getElementById('readResult').value = 'Nodo non trovato nel contratto';
-            return;
+        try {
+            const exists = await contract.nodeExists(stringToBytes(soul));
+            if (!exists) {
+                document.getElementById('readResult').value = 'Nodo non trovato nel contratto';
+                return;
+            }
+        } catch (error) {
+            console.warn('Errore verifica esistenza nodo:', error);
+            // Continua comunque, potrebbe essere un problema con il metodo nodeExists
         }
         
         if (keyInput) {
             // Leggi campo specifico
             const key = keyInput;
-            const value = await contract.get(stringToBytes(soul), stringToBytes(key));
-            const decodedValue = bytesToString(value);
-            
-            document.getElementById('readResult').value = JSON.stringify({
-                soul: soulInput,
-                key: keyInput,
-                value: decodedValue
-            }, null, 2);
+            try {
+                const value = await contract.get(stringToBytes(soul), stringToBytes(key));
+                const decodedValue = bytesToString(value);
+                
+                document.getElementById('readResult').value = JSON.stringify({
+                    soul: soulInput,
+                    key: keyInput,
+                    value: decodedValue
+                }, null, 2);
+            } catch (error) {
+                console.error('Errore lettura campo specifico:', error);
+                document.getElementById('readResult').value = JSON.stringify({
+                    error: 'Errore lettura campo',
+                    details: error.message,
+                    soul: soulInput,
+                    key: keyInput
+                }, null, 2);
+            }
         } else {
             // Per ora leggiamo solo un campo di esempio
-            document.getElementById('readResult').value = 'Funzionalità di lettura completa non ancora implementata';
+            // In futuro potremmo implementare una lettura completa del nodo
+            document.getElementById('readResult').value = JSON.stringify({
+                message: 'Funzionalità di lettura completa non ancora implementata',
+                note: 'Per leggere un campo specifico, inserisci anche la chiave',
+                soul: soulInput
+            }, null, 2);
         }
         
     } catch (error) {
         console.error('Errore lettura contratto:', error);
-        document.getElementById('readResult').value = 'Errore: ' + error.message;
+        document.getElementById('readResult').value = JSON.stringify({
+            error: 'Errore lettura contratto',
+            details: error.message,
+            soul: soulInput || 'non specificato'
+        }, null, 2);
     }
 }
 
@@ -361,14 +410,41 @@ async function syncContractToGun() {
         const result = await response.json();
         
         if (result.success) {
-            addToSyncLog('✅ Sincronizzazione completata');
+            addToSyncLog('✅ Sincronizzazione completata con successo');
+            if (result.message) {
+                addToSyncLog(`📝 ${result.message}`);
+            }
         } else {
             addToSyncLog(`❌ Sincronizzazione fallita: ${result.error}`);
+            if (result.details) {
+                addToSyncLog(`🔍 Dettagli: ${result.details}`);
+            }
         }
         
     } catch (error) {
         console.error('Errore sincronizzazione:', error);
         addToSyncLog('❌ Errore sincronizzazione: ' + error.message);
+    }
+}
+
+// Sincronizza manualmente un evento specifico (per test)
+async function syncSpecificEvent() {
+    try {
+        const soulInput = document.getElementById('soulInput').value || 'test/node';
+        const keyInput = document.getElementById('keyInput').value || 'test';
+        
+        addToSyncLog(`🔄 Sincronizzazione manuale evento: ${soulInput} -> ${keyInput}`);
+        
+        // Prima scrivi su GunDB per assicurarci che i dati ci siano
+        await writeToGun(soulInput, keyInput, 'Mario');
+        addToSyncLog('✅ Dati scritti su GunDB per test');
+        
+        // Poi prova la sincronizzazione
+        await syncContractToGun();
+        
+    } catch (error) {
+        console.error('Errore sincronizzazione manuale:', error);
+        addToSyncLog('❌ Errore sincronizzazione manuale: ' + error.message);
     }
 }
 
@@ -448,8 +524,46 @@ function clearEventLog() {
     document.getElementById('eventLog').innerHTML = '<div class="text-sm text-base-content/50">Nessun evento ancora...</div>';
 }
 
+// Verifica stato server e API
+async function checkServerStatus() {
+    try {
+        addToSyncLog('🔍 Verificando stato server...');
+        
+        // Test endpoint di base
+        const healthResponse = await fetch('/api/v1/health');
+        const healthData = await healthResponse.json();
+        
+        if (healthData.success) {
+            addToSyncLog('✅ Server API funzionante');
+        } else {
+            addToSyncLog('❌ Server API non funzionante');
+        }
+        
+        // Test endpoint chain
+        const chainResponse = await fetch('/api/v1/chain/status');
+        const chainData = await chainResponse.json();
+        
+        if (chainData.success) {
+            addToSyncLog('✅ Chain API funzionante');
+            addToSyncLog(`📋 Contratto: ${chainData.address || 'N/A'}`);
+        } else {
+            addToSyncLog('❌ Chain API non funzionante');
+            if (chainData.error) {
+                addToSyncLog(`🔍 Errore: ${chainData.error}`);
+            }
+        }
+        
+    } catch (error) {
+        console.error('Errore verifica stato server:', error);
+        addToSyncLog('❌ Errore verifica stato server: ' + error.message);
+    }
+}
+
 // Inizializza quando la pagina è caricata
 document.addEventListener('DOMContentLoaded', () => {
     // Aspetta che tutte le librerie siano caricate
-    setTimeout(initialize, 1000);
+    setTimeout(async () => {
+        await initialize();
+        await checkServerStatus();
+    }, 1000);
 }); 

@@ -317,6 +317,13 @@ async function initializeServer() {
       console.log("🔄 Starting Chain contract to GunDB sync...");
       addSystemLog("info", "Chain contract sync started");
       
+      // Verifica che il provider sia disponibile
+      if (!provider) {
+        console.error("❌ Provider not initialized");
+        addSystemLog("error", "Provider not initialized");
+        return false;
+      }
+      
       // Ottieni il blocco corrente
       const currentBlock = await provider.getBlockNumber();
       console.log(`📦 Current block: ${currentBlock}`);
@@ -327,14 +334,34 @@ async function initializeServer() {
       
       console.log(`🔄 Syncing events from block ${fromBlock} to ${toBlock}`);
       
-      // Ottieni tutti gli eventi NodeUpdated dal contratto
-      const events = await chainContract.queryFilter(
-        chainContract.filters.NodeUpdated(),
-        fromBlock,
-        toBlock
-      );
+      // Verifica che il contratto abbia il metodo queryFilter
+      if (!chainContract.queryFilter || !chainContract.filters) {
+        console.error("❌ Contract does not have queryFilter method or filters");
+        addSystemLog("error", "Contract missing queryFilter method");
+        return false;
+      }
       
-      console.log(`📡 Found ${events.length} NodeUpdated events`);
+      // Ottieni tutti gli eventi NodeUpdated dal contratto
+      let events;
+      try {
+        events = await chainContract.queryFilter(
+          chainContract.filters.NodeUpdated(),
+          fromBlock,
+          toBlock
+        );
+        console.log(`📡 Found ${events.length} NodeUpdated events`);
+      } catch (filterError) {
+        console.error("❌ Error querying events:", filterError);
+        addSystemLog("error", "Error querying events", { error: filterError.message });
+        return false;
+      }
+      
+      // Se non ci sono eventi, restituisci successo ma con messaggio informativo
+      if (!events || events.length === 0) {
+        console.log("ℹ️ No events found in the specified block range");
+        addSystemLog("info", "No events found in block range", { fromBlock, toBlock });
+        return true; // Restituisci true perché non è un errore
+      }
       
       let syncedCount = 0;
       let errorCount = 0;
@@ -343,6 +370,13 @@ async function initializeServer() {
       for (const event of events) {
         try {
           const { soul, key, value } = event.args;
+          
+          // Verifica che gli argomenti esistano
+          if (!soul || !key || value === undefined) {
+            console.warn("⚠️ Event missing required arguments:", { soul, key, value });
+            errorCount++;
+            continue;
+          }
           
           // Decodifica il valore
           let decodedValue;

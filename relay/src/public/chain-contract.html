@@ -51,6 +51,11 @@
                                 <div><strong>Owner:</strong> <span id="contractOwner" class="font-mono text-xs">Caricamento...</span></div>
                                 <div><strong>Stato:</strong> <span id="contractStatus">Connesso</span></div>
                             </div>
+                            <div class="card-actions justify-end mt-4">
+                                <button class="btn btn-sm btn-outline" onclick="testContractConnection()">
+                                    🔍 Test Connessione
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -186,6 +191,15 @@
                             </button>
                             <button class="btn btn-accent" onclick="startEventListening()">
                                 🎧 Ascolta Eventi
+                            </button>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <button class="btn btn-sm btn-outline" onclick="syncSpecificEvent()">
+                                🔧 Test Sincronizzazione Manuale
+                            </button>
+                            <button class="btn btn-sm btn-outline" onclick="checkServerStatus()">
+                                🔍 Verifica Stato Server
                             </button>
                         </div>
 
