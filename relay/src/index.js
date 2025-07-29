@@ -346,6 +346,21 @@ async function initializeServer() {
                   logIndex: event.logIndex
                 });
 
+                // Log dettagliato della struttura degli oggetti
+                console.log("🔍 Soul structure:", {
+                  type: typeof event.args.soul,
+                  isObject: typeof event.args.soul === 'object',
+                  hasHash: event.args.soul && typeof event.args.soul === 'object' && 'hash' in event.args.soul,
+                  hash: event.args.soul && typeof event.args.soul === 'object' ? event.args.soul.hash : 'N/A'
+                });
+
+                console.log("🔍 Key structure:", {
+                  type: typeof event.args.key,
+                  isObject: typeof event.args.key === 'object',
+                  hasHash: event.args.key && typeof event.args.key === 'object' && 'hash' in event.args.key,
+                  hash: event.args.key && typeof event.args.key === 'object' ? event.args.key.hash : 'N/A'
+                });
+
                 // Decode the value from bytes to string
                 let decodedValue;
                 try {
@@ -359,13 +374,35 @@ async function initializeServer() {
                 // Decode soul and key from bytes to string
                 let soulString, keyString;
                 try {
-                  soulString = ethers.toUtf8String(event.args.soul);
-                  keyString = ethers.toUtf8String(event.args.key);
+                  // Se sono oggetti Indexed, estrai il valore
+                  const soulValue = event.args.soul && typeof event.args.soul === 'object' && event.args.soul.hash ? event.args.soul.hash : event.args.soul;
+                  const keyValue = event.args.key && typeof event.args.key === 'object' && event.args.key.hash ? event.args.key.hash : event.args.key;
+                  
+                  // Prova a decodificare come UTF-8
+                  soulString = ethers.toUtf8String(soulValue);
+                  keyString = ethers.toUtf8String(keyValue);
                   console.log(`🔄 Decoded: soul="${soulString}", key="${keyString}"`);
                 } catch (error) {
                   console.warn("⚠️ Could not decode soul/key as UTF-8, using hex");
-                  soulString = event.args.soul;
-                  keyString = event.args.key;
+                  // Se la decodifica fallisce, usa i valori hex
+                  const soulValue = event.args.soul && typeof event.args.soul === 'object' && event.args.soul.hash ? event.args.soul.hash : event.args.soul;
+                  const keyValue = event.args.key && typeof event.args.key === 'object' && event.args.key.hash ? event.args.key.hash : event.args.key;
+                  soulString = soulValue;
+                  keyString = keyValue;
+                }
+
+                // Verifica che soulString e keyString siano stringhe valide
+                if (typeof soulString !== 'string' || typeof keyString !== 'string') {
+                  console.warn("⚠️ Soul or key is still not a string after decoding, converting to string");
+                  soulString = String(soulString || '');
+                  keyString = String(keyString || '');
+                }
+
+                // Verifica che i valori non siano vuoti
+                if (!soulString || !keyString) {
+                  console.warn("⚠️ Soul or key is empty after decoding, skipping event");
+                  console.log("Soul:", soulString, "Key:", keyString);
+                  continue;
                 }
 
                 // Propaga a GunDB con i dati originali leggibili
