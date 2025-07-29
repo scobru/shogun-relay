@@ -771,6 +771,8 @@ async function initializeServer() {
         firstSoul.startsWith("shogun/timeseries") || // Dati di serie temporale
         firstSoul.startsWith("shogun/logs") || // Log del sistema
         firstSoul.startsWith("shogun/chain_events") || // Eventi del contratto Chain
+        firstSoul.startsWith("shogun/mbUsage") || // Utilizzo MB off-chain
+        firstSoul.startsWith("shogun/mb_usage") || // Utilizzo MB off-chain (alternativo)
         !firstSoul.includes("/") || // Chiavi a livello singolo (operazioni interne di Gun)
         firstSoul.match(
           /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
