@@ -604,17 +604,15 @@
                         if (result) {
                             // Remove from system hashes if unpinned
                             try {
-                                await fetch(`/api/v1/user-uploads/remove-system-hash/${cid}`, {
-                                    method: 'DELETE',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        ...ShogunAdmin.getAuthHeaders()
-                                    },
-                                    body: JSON.stringify({
-                                        userAddress: 'admin-unpin'
-                                    })
-                                });
-                                console.log(`✅ Hash ${cid} removed from system hashes after unpin`);
+                                const removeHashResult = await apiCall(`/api/v1/user-uploads/remove-system-hash/${cid}`, 'DELETE', {
+                                    userAddress: 'admin-unpin'
+                                }, { manageVisibility: false });
+                                
+                                if (removeHashResult && removeHashResult.success) {
+                                    console.log(`✅ Hash ${cid} removed from system hashes after unpin`);
+                                } else {
+                                    console.warn(`⚠️ Failed to remove hash ${cid} from system hashes:`, removeHashResult?.error || 'Unknown error');
+                                }
                             } catch (error) {
                                 console.warn(`⚠️ Failed to remove hash ${cid} from system hashes:`, error);
                             }
@@ -649,17 +647,15 @@
                             if (unpinResult) {
                                 // Remove from system hashes after unpin
                                 try {
-                                    await fetch(`/api/v1/user-uploads/remove-system-hash/${cid}`, {
-                                        method: 'DELETE',
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                            ...ShogunAdmin.getAuthHeaders()
-                                        },
-                                        body: JSON.stringify({
-                                            userAddress: 'admin-remove'
-                                        })
-                                    });
-                                    console.log(`✅ Hash ${cid} removed from system hashes after remove`);
+                                    const removeHashResult = await apiCall(`/api/v1/user-uploads/remove-system-hash/${cid}`, 'DELETE', {
+                                        userAddress: 'admin-remove'
+                                    }, { manageVisibility: false });
+                                    
+                                    if (removeHashResult && removeHashResult.success) {
+                                        console.log(`✅ Hash ${cid} removed from system hashes after remove`);
+                                    } else {
+                                        console.warn(`⚠️ Failed to remove hash ${cid} from system hashes:`, removeHashResult?.error || 'Unknown error');
+                                    }
                                 } catch (error) {
                                     console.warn(`⚠️ Failed to remove hash ${cid} from system hashes:`, error);
                                 }
@@ -766,21 +762,11 @@
                 
                 // Prima prova l'endpoint originale
                 try {
-                    const response = await fetch('/api/v1/user-uploads/system-hashes', {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            ...ShogunAdmin.getAuthHeaders()
-                        }
-                    });
-
-                    if (response.ok) {
-                        const result = await response.json();
-                        
-                        if (result.success && result.hashes) {
-                            addBatchLog(`✅ Found ${result.hashes.length} system files via system-hashes endpoint`);
-                            return result.hashes;
-                        }
+                    const result = await apiCall('/api/v1/user-uploads/system-hashes', 'GET', null, { manageVisibility: false });
+                    
+                    if (result && result.success && result.hashes) {
+                        addBatchLog(`✅ Found ${result.hashes.length} system files via system-hashes endpoint`);
+                        return result.hashes;
                     }
                 } catch (error) {
                     addBatchLog(`⚠️ system-hashes endpoint failed: ${error.message}`);
@@ -790,29 +776,19 @@
                 try {
                     addBatchLog('🔄 Trying system-hashes-map endpoint...');
                     
-                    const mapResponse = await fetch('/api/v1/user-uploads/system-hashes-map', {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            ...ShogunAdmin.getAuthHeaders()
-                        }
-                    });
-
-                    if (mapResponse.ok) {
-                        const mapResult = await mapResponse.json();
+                    const mapResult = await apiCall('/api/v1/user-uploads/system-hashes-map', 'GET', null, { manageVisibility: false });
+                    
+                    if (mapResult && mapResult.success && mapResult.systemHashes) {
+                        const hashes = Object.keys(mapResult.systemHashes);
+                        addBatchLog(`✅ Found ${hashes.length} system files via system-hashes-map endpoint`);
                         
-                        if (mapResult.success && mapResult.systemHashes) {
-                            const hashes = Object.keys(mapResult.systemHashes);
-                            addBatchLog(`✅ Found ${hashes.length} system files via system-hashes-map endpoint`);
-                            
-                            // Log dei dettagli degli hash trovati
-                            hashes.forEach(hash => {
-                                const hashData = mapResult.systemHashes[hash];
-                                addBatchLog(`📄 Found hash: ${hash} (user: ${hashData.userAddress})`);
-                            });
-                            
-                            return hashes;
-                        }
+                        // Log dei dettagli degli hash trovati
+                        hashes.forEach(hash => {
+                            const hashData = mapResult.systemHashes[hash];
+                            addBatchLog(`📄 Found hash: ${hash} (user: ${hashData.userAddress})`);
+                        });
+                        
+                        return hashes;
                     }
                 } catch (mapError) {
                     addBatchLog(`⚠️ system-hashes-map endpoint failed: ${mapError.message}`);
@@ -833,30 +809,18 @@
                     try {
                         addBatchLog(`📂 Fetching files for user: ${userAddress.substring(0, 10)}...`);
                         
-                        const userFilesResponse = await fetch(`/api/v1/user-uploads/${encodeURIComponent(userAddress)}`, {
-                            method: 'GET',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                ...ShogunAdmin.getAuthHeaders()
-                            }
-                        });
+                        const userFilesResult = await apiCall(`/api/v1/user-uploads/${encodeURIComponent(userAddress)}`, 'GET', null, { manageVisibility: false });
                         
-                        if (userFilesResponse.ok) {
-                            const userFilesResult = await userFilesResponse.json();
-                            
-                            if (userFilesResult.success && userFilesResult.uploads) {
-                                userFilesResult.uploads.forEach(file => {
-                                    if (file.hash) {
-                                        allHashes.push(file.hash);
-                                        addBatchLog(`📄 Found file: ${file.name} (${file.hash})`);
-                                    }
-                                });
-                                addBatchLog(`✅ Found ${userFilesResult.uploads.length} files for user ${userAddress.substring(0, 10)}...`);
-                            } else {
-                                addBatchLog(`⚠️ No files found for user ${userAddress.substring(0, 10)}...`);
-                            }
+                        if (userFilesResult && userFilesResult.success && userFilesResult.uploads) {
+                            userFilesResult.uploads.forEach(file => {
+                                if (file.hash) {
+                                    allHashes.push(file.hash);
+                                    addBatchLog(`📄 Found file: ${file.name} (${file.hash})`);
+                                }
+                            });
+                            addBatchLog(`✅ Found ${userFilesResult.uploads.length} files for user ${userAddress.substring(0, 10)}...`);
                         } else {
-                            addBatchLog(`❌ Error fetching files for user ${userAddress.substring(0, 10)}...: ${userFilesResponse.status}`);
+                            addBatchLog(`⚠️ No files found for user ${userAddress.substring(0, 10)}...`);
                         }
                     } catch (userError) {
                         addBatchLog(`❌ Error fetching files for user ${userAddress.substring(0, 10)}...: ${userError.message}`);
@@ -877,22 +841,9 @@
             setWorking(true);
             try {
                 // Test the debug endpoint first
-                const debugResponse = await fetch('/api/v1/user-uploads/debug-system-hashes', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...ShogunAdmin.getAuthHeaders()
-                    }
-                });
+                const debugResult = await apiCall('/api/v1/user-uploads/debug-system-hashes', 'GET', null, { manageVisibility: false });
 
-                if (!debugResponse.ok) {
-                    throw new Error(`HTTP error! status: ${debugResponse.status}`);
-                }
-
-                const debugResult = await debugResponse.json();
-                console.log('🐛 Debug result:', debugResult);
-
-                if (debugResult.success && debugResult.debug) {
+                if (debugResult && debugResult.success && debugResult.debug) {
                     const debug = debugResult.debug;
                     showMessage(`✅ Debug completed. Gun available: ${debug.gunAvailable}`, false);
                     
@@ -1009,17 +960,15 @@
                         if (unpinResult && unpinResult.success !== false) {
                             // Remove from system hashes after unpin
                             try {
-                                await fetch(`/api/v1/user-uploads/remove-system-hash/${cid}`, {
-                                    method: 'DELETE',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        ...ShogunAdmin.getAuthHeaders()
-                                    },
-                                    body: JSON.stringify({
-                                        userAddress: 'admin-batch-unpin'
-                                    })
-                                });
-                                console.log(`✅ Hash ${cid} removed from system hashes after batch unpin`);
+                                const removeHashResult = await apiCall(`/api/v1/user-uploads/remove-system-hash/${cid}`, 'DELETE', {
+                                    userAddress: 'admin-batch-unpin'
+                                }, { manageVisibility: false });
+                                
+                                if (removeHashResult && removeHashResult.success) {
+                                    console.log(`✅ Hash ${cid} removed from system hashes after batch unpin`);
+                                } else {
+                                    console.warn(`⚠️ Failed to remove hash ${cid} from system hashes:`, removeHashResult?.error || 'Unknown error');
+                                }
                             } catch (error) {
                                 console.warn(`⚠️ Failed to remove hash ${cid} from system hashes:`, error);
                             }
