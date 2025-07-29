@@ -341,6 +341,52 @@ export default (app) => {
     res.sendFile(filePath);
   });
 
+  // Route per servire i file JavaScript dalla directory lib
+  app.get("/lib/:filename", (req, res) => {
+    const publicPath = path.resolve(__dirname, "../public");
+    const filePath = path.resolve(publicPath, "lib", req.params.filename);
+    
+    console.log(`🔍 Lib file requested: ${req.params.filename}`);
+    console.log(`📄 File path: ${filePath}`);
+    console.log(`📄 File exists: ${fs.existsSync(filePath)}`);
+    
+    if (!fs.existsSync(filePath)) {
+      console.error(`❌ Lib file not found: ${filePath}`);
+      return res.status(404).json({
+        success: false,
+        error: "JavaScript file not found",
+        path: filePath
+      });
+    }
+    
+    // Set correct content type for JavaScript files
+    res.setHeader('Content-Type', 'application/javascript');
+    res.sendFile(filePath);
+  });
+
+  // Route per servire i file CSS dalla directory styles
+  app.get("/styles/:filename", (req, res) => {
+    const publicPath = path.resolve(__dirname, "../public");
+    const filePath = path.resolve(publicPath, "styles", req.params.filename);
+    
+    console.log(`🔍 Styles file requested: ${req.params.filename}`);
+    console.log(`📄 File path: ${filePath}`);
+    console.log(`📄 File exists: ${fs.existsSync(filePath)}`);
+    
+    if (!fs.existsSync(filePath)) {
+      console.error(`❌ Styles file not found: ${filePath}`);
+      return res.status(404).json({
+        success: false,
+        error: "CSS file not found",
+        path: filePath
+      });
+    }
+    
+    // Set correct content type for CSS files
+    res.setHeader('Content-Type', 'text/css');
+    res.sendFile(filePath);
+  });
+
   app.get("/drive", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "drive.html"));
