@@ -285,11 +285,35 @@ class IPCMInterface {
             
             console.log("🔍 Loading IPCM instance:", instanceAddress);
             
-            // For now, we'll just validate the address
-            // In a real implementation, you'd load the contract ABI and create a contract instance
+            // Check if instance contract has code
+            const code = await this.provider.getCode(instanceAddress);
+            console.log("📄 Instance code length:", code.length);
+            console.log("📄 Instance has code:", code !== '0x');
+            
+            if (code === '0x') {
+                throw new Error('IPCM instance has no code - not deployed or wrong address');
+            }
+            
+            // Get the IPCM contract configuration
+            const ipcmConfig = this.contractConfig.ipcm;
+            if (!ipcmConfig || !ipcmConfig.address || !ipcmConfig.abi) {
+                throw new Error('IPCM contract configuration not found');
+            }
+            
+            // Create IPCM contract instance for verification
+            const ipcmContract = new ethers.Contract(
+                instanceAddress,
+                ipcmConfig.abi,
+                this.provider
+            );
+            
+            // Try to get the owner to verify it's a valid IPCM instance
+            const owner = await ipcmContract.owner();
+            console.log("👑 Instance owner:", owner);
+            
             this.ipcmInstance = instanceAddress;
             
-            this.showResult('instanceResults', 'success', `Instance loaded: ${instanceAddress}`);
+            this.showResult('instanceResults', 'success', `Instance loaded: ${instanceAddress} (Owner: ${owner})`);
             
         } catch (error) {
             console.error("❌ Failed to load instance:", error);
@@ -310,12 +334,53 @@ class IPCMInterface {
                 throw new Error('New mapping is required');
             }
             
+            if (!ethers.utils.isAddress(instanceAddress)) {
+                throw new Error('Invalid instance address format');
+            }
+            
             console.log("✏️ Updating mapping for instance:", instanceAddress);
             console.log("📝 New mapping:", newMapping);
             
-            // This would require the actual IPCM contract ABI
-            // For now, we'll just show a success message
-            this.showResult('instanceResults', 'success', `Mapping update initiated for ${instanceAddress}`);
+            // Get the IPCM contract configuration
+            const ipcmConfig = this.contractConfig.ipcm;
+            if (!ipcmConfig || !ipcmConfig.address || !ipcmConfig.abi) {
+                throw new Error('IPCM contract configuration not found');
+            }
+            
+            // Create IPCM contract instance
+            const ipcmContract = new ethers.Contract(
+                instanceAddress,
+                ipcmConfig.abi,
+                this.provider
+            );
+            
+            // Check if user is the owner of this instance
+            const owner = await ipcmContract.owner();
+            console.log("👑 Instance owner:", owner);
+            console.log("👤 Current user:", this.userAddress);
+            
+            if (owner.toLowerCase() !== this.userAddress.toLowerCase()) {
+                throw new Error(`You are not the owner of this instance. Owner: ${owner}`);
+            }
+            
+            // Create IPCM contract instance with signer for transaction
+            const ipcmContractWithSigner = new ethers.Contract(
+                instanceAddress,
+                ipcmConfig.abi,
+                this.signer
+            );
+            
+            console.log("🔗 IPCM contract instance created for:", instanceAddress);
+            
+            // Call updateMapping function
+            const tx = await ipcmContractWithSigner.updateMapping(newMapping);
+            console.log("📤 Transaction sent:", tx.hash);
+            
+            // Wait for transaction confirmation
+            const receipt = await tx.wait();
+            console.log("✅ Transaction confirmed:", receipt.transactionHash);
+            
+            this.showResult('instanceResults', 'success', `Mapping updated successfully! TX: ${receipt.transactionHash}`);
             
         } catch (error) {
             console.error("❌ Failed to update mapping:", error);
@@ -331,11 +396,32 @@ class IPCMInterface {
                 throw new Error('Instance address is required');
             }
             
+            if (!ethers.utils.isAddress(instanceAddress)) {
+                throw new Error('Invalid instance address format');
+            }
+            
             console.log("📖 Getting mapping for instance:", instanceAddress);
             
-            // This would require the actual IPCM contract ABI
-            // For now, we'll just show a placeholder
-            this.showResult('instanceResults', 'info', `Current mapping for ${instanceAddress}: QmExample...`);
+            // Get the IPCM contract configuration
+            const ipcmConfig = this.contractConfig.ipcm;
+            if (!ipcmConfig || !ipcmConfig.address || !ipcmConfig.abi) {
+                throw new Error('IPCM contract configuration not found');
+            }
+            
+            // Create IPCM contract instance (read-only, no signer needed)
+            const ipcmContract = new ethers.Contract(
+                instanceAddress,
+                ipcmConfig.abi,
+                this.provider
+            );
+            
+            console.log("🔗 IPCM contract instance created for reading:", instanceAddress);
+            
+            // Call getMapping function
+            const mapping = await ipcmContract.getMapping();
+            console.log("📖 Current mapping:", mapping);
+            
+            this.showResult('instanceResults', 'success', `Current mapping: ${mapping}`);
             
         } catch (error) {
             console.error("❌ Failed to get mapping:", error);
