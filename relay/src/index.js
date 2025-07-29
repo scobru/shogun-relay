@@ -179,6 +179,23 @@ async function startChainEventListener() {
       console.warn("⚠️ Could not remove existing listeners:", error.message);
     }
     
+    // Funzione per gestire gli errori di filtro
+    const handleFilterError = async (error) => {
+      console.warn("⚠️ Filter error detected, attempting to restart listener...");
+      console.warn("📋 Error details:", error.message);
+      
+      // Aspetta un po' prima di riprovare
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      // Riavvia il listener
+      try {
+        await startChainEventListener();
+        console.log("✅ Listener restarted successfully after filter error");
+      } catch (restartError) {
+        console.error("❌ Failed to restart listener after filter error:", restartError);
+      }
+    };
+    
     // Listen for NodeUpdated events
     chainContract.on("NodeUpdated", async (soul, key, value, event) => {
       console.log("🎉 EVENTO RICEVUTO! Chain contract event received:", {
@@ -217,6 +234,9 @@ async function startChainEventListener() {
       await propagateChainEventToGun(soulString, keyString, decodedValue, event);
     });
 
+    // Gestisci errori di filtro
+    chainContract.on("error", handleFilterError);
+    
     // Verifica che il listener sia registrato
     const listenerCount = chainContract.listenerCount("NodeUpdated");
     console.log("📊 Listener count after registration:", listenerCount);
@@ -252,6 +272,10 @@ async function startChainEventListener() {
       }
     } catch (testError) {
       console.warn("⚠️ Could not test with past events:", testError.message);
+      // Se il test fallisce, potrebbe essere un problema di filtro
+      if (testError.message.includes("filter not found")) {
+        await handleFilterError(testError);
+      }
     }
 
     console.log("✅ Chain contract event listener started");
@@ -274,6 +298,36 @@ async function initializeServer() {
 
   // Start Chain contract event listener
   await startChainEventListener();
+
+  // Sistema di polling per verificare lo stato del listener
+  let listenerHealthCheckInterval;
+  
+  const startListenerHealthCheck = () => {
+    if (listenerHealthCheckInterval) {
+      clearInterval(listenerHealthCheckInterval);
+    }
+    
+    listenerHealthCheckInterval = setInterval(async () => {
+      try {
+        if (!chainContract) {
+          console.warn("⚠️ Chain contract not available during health check");
+          return;
+        }
+        
+        const listenerCount = chainContract.listenerCount("NodeUpdated");
+        console.log("🏥 Listener health check - count:", listenerCount);
+        
+        if (listenerCount === 0) {
+          console.warn("⚠️ Listener count is 0, restarting...");
+          await startChainEventListener();
+        }
+      } catch (error) {
+        console.error("❌ Error during listener health check:", error);
+      }
+    }, 30000); // Controlla ogni 30 secondi
+  };
+  
+  startListenerHealthCheck();
 
   // System logging function
   function addSystemLog(level, message, data = null) {
@@ -1292,6 +1346,12 @@ async function initializeServer() {
     if (gcInterval) {
       clearInterval(gcInterval);
       console.log("✅ Garbage collector interval cleared");
+    }
+    
+    // Clean up listener health check interval
+    if (listenerHealthCheckInterval) {
+      clearInterval(listenerHealthCheckInterval);
+      console.log("✅ Listener health check interval cleared");
     }
 
     // Close server
