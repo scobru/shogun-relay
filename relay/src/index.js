@@ -238,7 +238,11 @@ async function startChainEventListener() {
     const listenerCount = chainContract.listenerCount("NodeUpdated");
     console.log("📊 Listener count after registration:", listenerCount);
     
-    if (listenerCount === 0) {
+    // Se listenerCount è una Promise, aspettiamo il risultato
+    const actualListenerCount = listenerCount instanceof Promise ? await listenerCount : listenerCount;
+    console.log("📊 Actual listener count:", actualListenerCount);
+    
+    if (actualListenerCount === 0) {
       console.error("❌ Listener not registered properly");
       return false;
     }
@@ -314,7 +318,11 @@ async function initializeServer() {
         const listenerCount = chainContract.listenerCount("NodeUpdated");
         console.log("🏥 Listener health check - count:", listenerCount);
         
-        if (listenerCount === 0) {
+        // Se listenerCount è una Promise, aspettiamo il risultato
+        const actualListenerCount = listenerCount instanceof Promise ? await listenerCount : listenerCount;
+        console.log("🏥 Actual listener count:", actualListenerCount);
+        
+        if (actualListenerCount === 0) {
           console.warn("⚠️ Listener count is 0, restarting...");
           await startChainEventListener();
         } else {
@@ -813,6 +821,9 @@ async function initializeServer() {
         firstSoul === "shogun" || // Shogun internal operations
         firstSoul.startsWith("shogun/relays") || // Relay health data
         firstSoul.startsWith("shogun/uploads") || // User uploads (permette salvataggio upload user)
+        firstSoul.startsWith("shogun/timeseries") || // Timeseries data
+        firstSoul.startsWith("shogun/logs") || // System logs
+        firstSoul.startsWith("shogun/chain_events") || // Chain events
         !firstSoul.includes("/") || // Single level keys (internal Gun operations)
         firstSoul.match(
           /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
