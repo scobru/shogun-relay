@@ -37,7 +37,8 @@ const namespace = "shogun";
 // --- IPFS Configuration ---
 const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
 const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN;
-const IPFS_GATEWAY_URL = process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
+const IPFS_GATEWAY_URL =
+  process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
 
 // --- Garbage Collection Configuration ---
 const GC_ENABLED = process.env.GC_ENABLED === "true";
@@ -58,7 +59,6 @@ const __dirname = path.dirname(__filename);
 
 // Configuration
 let host = process.env.RELAY_HOST || ip.address();
-let store = process.env.RELAY_STORE !== "false";
 // Ensure port is always a valid integer, fallback to 8765 if NaN
 let port = parseInt(process.env.RELAY_PORT || process.env.PORT || 8765);
 if (isNaN(port) || port <= 0 || port >= 65536) {
@@ -120,9 +120,7 @@ async function initializeRelayContract() {
       provider
     );
 
-    console.log(
-      `✅ Relay contract initialized at: ${RELAY_CONTRACT_ADDRESS}`
-    );
+    console.log(`✅ Relay contract initialized at: ${RELAY_CONTRACT_ADDRESS}`);
     return true;
   } catch (error) {
     console.error("❌ Failed to initialize relay contract:", error);
@@ -149,9 +147,7 @@ async function initializeChainContract() {
       provider
     );
 
-    console.log(
-      `✅ Chain contract initialized at: ${CHAIN_CONTRACT_ADDRESS}`
-    );
+    console.log(`✅ Chain contract initialized at: ${CHAIN_CONTRACT_ADDRESS}`);
     return true;
   } catch (error) {
     console.error("❌ Failed to initialize chain contract:", error);
@@ -180,7 +176,7 @@ async function initializeServer() {
     };
 
     console.log(`[${timestamp}] ${level.toUpperCase()}: ${message}`);
-    
+
     // Store in Gun database for persistence
     if (gun) {
       gun.get("shogun").get("logs").get(timestamp).put(logEntry);
@@ -189,8 +185,12 @@ async function initializeServer() {
 
   // Propaga Chain contract event a GunDB
   async function propagateChainEventToGun(soul, key, value, event) {
-    console.log("🔄 propagateChainEventToGun called with:", { soul, key, value });
-    
+    console.log("🔄 propagateChainEventToGun called with:", {
+      soul,
+      key,
+      value,
+    });
+
     if (!gun) {
       console.warn("⚠️ Gun not initialized, cannot propagate event");
       return;
@@ -200,36 +200,41 @@ async function initializeServer() {
       // Crea un identificatore univoco per questo evento
       const eventId = `${event.transactionHash}-${event.logIndex || 0}`;
       console.log("📋 Event ID:", eventId);
-      
+
       // Memorizza i dati dell'evento in GunDB
       console.log("💾 Storing event data in GunDB...");
       const eventNode = gun.get("shogun").get("chain_events").get(eventId);
       await new Promise((resolve, reject) => {
-        eventNode.put({
-          soul: soul,
-          key: key,
-          value: value,
-          blockNumber: event.blockNumber,
-          transactionHash: event.transactionHash,
-          timestamp: Date.now(),
-          propagated: true
-        }, (ack) => {
-          if (ack.err) {
-            console.error("❌ Error storing event data:", ack.err);
-            reject(ack.err);
-          } else {
-            console.log("✅ Event data stored successfully");
-            resolve();
+        eventNode.put(
+          {
+            soul: soul,
+            key: key,
+            value: value,
+            blockNumber: event.blockNumber,
+            transactionHash: event.transactionHash,
+            timestamp: Date.now(),
+            propagated: true,
+          },
+          (ack) => {
+            if (ack.err) {
+              console.error("❌ Error storing event data:", ack.err);
+              reject(ack.err);
+            } else {
+              console.log("✅ Event data stored successfully");
+              resolve();
+            }
           }
-        });
+        );
       });
 
       // Memorizza anche i dati nella struttura principale di GunDB usando dati leggibili
       console.log("💾 Storing data in main GunDB structure...");
-      
+
       // Verifica che soul e key siano stringhe valide
-      if (typeof soul !== 'string' || typeof key !== 'string') {
-        console.warn("⚠️ Soul or key is not a string, skipping main structure storage");
+      if (typeof soul !== "string" || typeof key !== "string") {
+        console.warn(
+          "⚠️ Soul or key is not a string, skipping main structure storage"
+        );
         console.log("Soul type:", typeof soul, "Key type:", typeof key);
         return;
       }
@@ -251,7 +256,10 @@ async function initializeServer() {
           dataNode.get(key).put(value, (ack) => {
             clearTimeout(timeoutId);
             if (ack.err) {
-              console.error("❌ Error storing data in main structure:", ack.err);
+              console.error(
+                "❌ Error storing data in main structure:",
+                ack.err
+              );
               reject(ack.err);
             } else {
               console.log("✅ Data stored in main structure successfully");
@@ -260,27 +268,29 @@ async function initializeServer() {
           });
         });
       } catch (mainStructureError) {
-        console.error("❌ Error writing to main GunDB structure:", mainStructureError);
+        console.error(
+          "❌ Error writing to main GunDB structure:",
+          mainStructureError
+        );
         // Non fallire completamente se la scrittura nella struttura principale fallisce
         // L'evento è già stato salvato nella sezione chain_events
       }
 
       console.log(`✅ Chain event propagated to GunDB: ${soul} -> ${key}`);
-      
+
       // Aggiungi al log del sistema
       addSystemLog("info", "Chain event propagated to GunDB", {
         soul: soul,
         key: key,
         value: value,
-        eventId: eventId
+        eventId: eventId,
       });
-
     } catch (error) {
       console.error("❌ Failed to propagate chain event to GunDB:", error);
       addSystemLog("error", "Failed to propagate chain event", {
         soul: soul,
         key: key,
-        error: error.message
+        error: error.message,
       });
     }
   }
@@ -295,8 +305,11 @@ async function initializeServer() {
     try {
       console.log("🎧 Starting Chain contract event listener...");
       console.log("📋 Contract address:", chainContract.target);
-      console.log("📋 Contract filters:", chainContract.filters ? "Available" : "Not available");
-      
+      console.log(
+        "📋 Contract filters:",
+        chainContract.filters ? "Available" : "Not available"
+      );
+
       // Rimuovi listener esistenti per evitare duplicati
       try {
         chainContract.removeAllListeners("NodeUpdated");
@@ -304,61 +317,82 @@ async function initializeServer() {
       } catch (error) {
         console.warn("⚠️ Could not remove existing listeners:", error.message);
       }
-      
+
       // Variabili per il polling
       let lastProcessedBlock = 0;
       let isPolling = false;
-      
+
       // Funzione di polling per controllare nuovi eventi
       const pollForEvents = async () => {
         if (isPolling) return; // Evita polling simultaneo
         isPolling = true;
-        
+
         try {
           const currentBlock = await provider.getBlockNumber();
-          
+
           if (lastProcessedBlock === 0) {
             // Prima volta: inizia dal blocco corrente
             lastProcessedBlock = currentBlock - 1;
-            console.log(`🎯 Starting event polling from block ${lastProcessedBlock}`);
+            console.log(
+              `🎯 Starting event polling from block ${lastProcessedBlock}`
+            );
           }
-          
+
           if (currentBlock > lastProcessedBlock) {
-            console.log(`🔍 Polling for events from block ${lastProcessedBlock + 1} to ${currentBlock}`);
-            
+            console.log(
+              `🔍 Polling for events from block ${
+                lastProcessedBlock + 1
+              } to ${currentBlock}`
+            );
+
             try {
               const events = await chainContract.queryFilter(
                 chainContract.filters.NodeUpdated(),
                 lastProcessedBlock + 1,
                 currentBlock
               );
-              
+
               console.log(`📡 Found ${events.length} new events`);
-              
+
               // Processa ogni evento
               for (const event of events) {
-                console.log("🎉 EVENTO RICEVUTO! Chain contract event received:", {
-                  soul: event.args.soul,
-                  key: event.args.key,
-                  value: event.args.value,
-                  blockNumber: event.blockNumber,
-                  transactionHash: event.transactionHash,
-                  logIndex: event.logIndex
-                });
+                console.log(
+                  "🎉 EVENTO RICEVUTO! Chain contract event received:",
+                  {
+                    soul: event.args.soul,
+                    key: event.args.key,
+                    value: event.args.value,
+                    blockNumber: event.blockNumber,
+                    transactionHash: event.transactionHash,
+                    logIndex: event.logIndex,
+                  }
+                );
 
                 // Log dettagliato della struttura degli oggetti
                 console.log("🔍 Soul structure:", {
                   type: typeof event.args.soul,
-                  isObject: typeof event.args.soul === 'object',
-                  hasHash: event.args.soul && typeof event.args.soul === 'object' && 'hash' in event.args.soul,
-                  hash: event.args.soul && typeof event.args.soul === 'object' ? event.args.soul.hash : 'N/A'
+                  isObject: typeof event.args.soul === "object",
+                  hasHash:
+                    event.args.soul &&
+                    typeof event.args.soul === "object" &&
+                    "hash" in event.args.soul,
+                  hash:
+                    event.args.soul && typeof event.args.soul === "object"
+                      ? event.args.soul.hash
+                      : "N/A",
                 });
 
                 console.log("🔍 Key structure:", {
                   type: typeof event.args.key,
-                  isObject: typeof event.args.key === 'object',
-                  hasHash: event.args.key && typeof event.args.key === 'object' && 'hash' in event.args.key,
-                  hash: event.args.key && typeof event.args.key === 'object' ? event.args.key.hash : 'N/A'
+                  isObject: typeof event.args.key === "object",
+                  hasHash:
+                    event.args.key &&
+                    typeof event.args.key === "object" &&
+                    "hash" in event.args.key,
+                  hash:
+                    event.args.key && typeof event.args.key === "object"
+                      ? event.args.key.hash
+                      : "N/A",
                 });
 
                 // Decode the value from bytes to string
@@ -367,7 +401,10 @@ async function initializeServer() {
                   decodedValue = ethers.toUtf8String(event.args.value);
                   console.log("✅ Value decoded successfully:", decodedValue);
                 } catch (error) {
-                  console.warn("⚠️ Could not decode value as UTF-8, using hex:", event.args.value);
+                  console.warn(
+                    "⚠️ Could not decode value as UTF-8, using hex:",
+                    event.args.value
+                  );
                   decodedValue = event.args.value;
                 }
 
@@ -378,112 +415,158 @@ async function initializeServer() {
                     soul: event.args.soul,
                     key: event.args.key,
                     soulType: typeof event.args.soul,
-                    keyType: typeof event.args.key
+                    keyType: typeof event.args.key,
                   });
-                  
+
                   // Gestisci sia eventi indexed che non-indexed
                   let soulBytes, keyBytes;
-                  
+
                   // Controlla se sono oggetti Indexed (vecchio contratto)
-                  if (event.args.soul && typeof event.args.soul === 'object' && event.args.soul._isIndexed) {
+                  if (
+                    event.args.soul &&
+                    typeof event.args.soul === "object" &&
+                    event.args.soul._isIndexed
+                  ) {
                     console.log("🔍 Detected indexed soul, using hash");
                     soulBytes = event.args.soul.hash;
-                  } else if (event.args.soul && typeof event.args.soul === 'object') {
+                  } else if (
+                    event.args.soul &&
+                    typeof event.args.soul === "object"
+                  ) {
                     // Oggetto Result di Ethers.js (nuovo contratto)
-                    soulBytes = event.args.soul.bytes || event.args.soul.data || event.args.soul;
+                    soulBytes =
+                      event.args.soul.bytes ||
+                      event.args.soul.data ||
+                      event.args.soul;
                   } else {
                     soulBytes = event.args.soul;
                   }
-                  
-                  if (event.args.key && typeof event.args.key === 'object' && event.args.key._isIndexed) {
+
+                  if (
+                    event.args.key &&
+                    typeof event.args.key === "object" &&
+                    event.args.key._isIndexed
+                  ) {
                     console.log("🔍 Detected indexed key, using hash");
                     keyBytes = event.args.key.hash;
-                  } else if (event.args.key && typeof event.args.key === 'object') {
+                  } else if (
+                    event.args.key &&
+                    typeof event.args.key === "object"
+                  ) {
                     // Oggetto Result di Ethers.js (nuovo contratto)
-                    keyBytes = event.args.key.bytes || event.args.key.data || event.args.key;
+                    keyBytes =
+                      event.args.key.bytes ||
+                      event.args.key.data ||
+                      event.args.key;
                   } else {
                     keyBytes = event.args.key;
                   }
-                  
+
                   console.log("🔍 Extracted bytes:", {
                     soulBytes: soulBytes,
                     keyBytes: keyBytes,
                     soulBytesType: typeof soulBytes,
-                    keyBytesType: typeof keyBytes
+                    keyBytesType: typeof keyBytes,
                   });
-                  
+
                   // Se sono hash keccak256 (eventi indexed), non possiamo decodificarli
-                  if (typeof soulBytes === 'string' && soulBytes.startsWith('0x') && soulBytes.length === 66) {
-                    console.log("⚠️ Soul is keccak256 hash, cannot decode to original string");
+                  if (
+                    typeof soulBytes === "string" &&
+                    soulBytes.startsWith("0x") &&
+                    soulBytes.length === 66
+                  ) {
+                    console.log(
+                      "⚠️ Soul is keccak256 hash, cannot decode to original string"
+                    );
                     soulString = `hash_${soulBytes.substring(2, 10)}`;
                   } else {
                     // Prova a decodificare come UTF-8
                     soulString = ethers.toUtf8String(soulBytes);
                   }
-                  
-                  if (typeof keyBytes === 'string' && keyBytes.startsWith('0x') && keyBytes.length === 66) {
-                    console.log("⚠️ Key is keccak256 hash, cannot decode to original string");
+
+                  if (
+                    typeof keyBytes === "string" &&
+                    keyBytes.startsWith("0x") &&
+                    keyBytes.length === 66
+                  ) {
+                    console.log(
+                      "⚠️ Key is keccak256 hash, cannot decode to original string"
+                    );
                     keyString = `hash_${keyBytes.substring(2, 10)}`;
                   } else {
                     // Prova a decodificare come UTF-8
                     keyString = ethers.toUtf8String(keyBytes);
                   }
-                  
-                  console.log(`✅ Final decoded: soul="${soulString}", key="${keyString}"`);
+
+                  console.log(
+                    `✅ Final decoded: soul="${soulString}", key="${keyString}"`
+                  );
                 } catch (error) {
-                  console.warn("⚠️ Could not decode soul/key as UTF-8, using fallback");
+                  console.warn(
+                    "⚠️ Could not decode soul/key as UTF-8, using fallback"
+                  );
                   console.log("Decode error:", error.message);
-                  
+
                   // Se la decodifica fallisce, usa i valori originali
-                  soulString = String(event.args.soul || '');
-                  keyString = String(event.args.key || '');
-                  
+                  soulString = String(event.args.soul || "");
+                  keyString = String(event.args.key || "");
+
                   console.log("🔍 Using fallback values:", {
                     soulString: soulString,
-                    keyString: keyString
+                    keyString: keyString,
                   });
                 }
 
                 // Verifica che soulString e keyString siano stringhe valide
-                if (typeof soulString !== 'string' || typeof keyString !== 'string') {
-                  console.warn("⚠️ Soul or key is still not a string after decoding, converting to string");
-                  soulString = String(soulString || '');
-                  keyString = String(keyString || '');
+                if (
+                  typeof soulString !== "string" ||
+                  typeof keyString !== "string"
+                ) {
+                  console.warn(
+                    "⚠️ Soul or key is still not a string after decoding, converting to string"
+                  );
+                  soulString = String(soulString || "");
+                  keyString = String(keyString || "");
                 }
 
                 // Verifica che i valori non siano vuoti
                 if (!soulString || !keyString) {
-                  console.warn("⚠️ Soul or key is empty after decoding, skipping event");
+                  console.warn(
+                    "⚠️ Soul or key is empty after decoding, skipping event"
+                  );
                   console.log("Soul:", soulString, "Key:", keyString);
                   continue;
                 }
 
                 // Propaga a GunDB con i dati originali leggibili
                 console.log("🔄 Calling propagateChainEventToGun...");
-                await propagateChainEventToGun(soulString, keyString, decodedValue, event);
+                await propagateChainEventToGun(
+                  soulString,
+                  keyString,
+                  decodedValue,
+                  event
+                );
               }
-              
+
               lastProcessedBlock = currentBlock;
-              
             } catch (filterError) {
               console.warn("⚠️ Error querying events:", filterError.message);
               // Non aggiornare lastProcessedBlock in caso di errore
             }
           }
-          
         } catch (error) {
           console.error("❌ Error in polling:", error);
         } finally {
           isPolling = false;
         }
       };
-      
+
       // Avvia il polling ogni 5 secondi
       const pollingInterval = setInterval(pollForEvents, 5000);
-      
+
       // Esegui il primo polling immediatamente
       await pollForEvents();
-      
+
       console.log("✅ Chain contract event listener started (polling mode)");
       return true;
     } catch (error) {
@@ -505,32 +588,39 @@ async function initializeServer() {
     try {
       console.log("🔄 Starting Chain contract to GunDB sync...", params);
       addSystemLog("info", "Chain contract sync started", params);
-      
+
       // Verifica che il provider sia disponibile
       if (!provider) {
         console.error("❌ Provider not initialized");
         addSystemLog("error", "Provider not initialized");
         return false;
       }
-      
+
       // Ottieni il blocco corrente
       const currentBlock = await provider.getBlockNumber();
       console.log(`📦 Current block: ${currentBlock}`);
-      
+
       // Usa i parametri personalizzati o i valori di default
-      const fromBlock = params.fromBlock !== null ? params.fromBlock : Math.max(0, currentBlock - 1000);
+      const fromBlock =
+        params.fromBlock !== null
+          ? params.fromBlock
+          : Math.max(0, currentBlock - 1000);
       const toBlock = params.toBlock !== null ? params.toBlock : currentBlock;
       const forceSync = params.forceSync || false;
-      
-      console.log(`🔄 Syncing events from block ${fromBlock} to ${toBlock} (forceSync: ${forceSync})`);
-      
+
+      console.log(
+        `🔄 Syncing events from block ${fromBlock} to ${toBlock} (forceSync: ${forceSync})`
+      );
+
       // Verifica che il contratto abbia il metodo queryFilter
       if (!chainContract.queryFilter || !chainContract.filters) {
-        console.error("❌ Contract does not have queryFilter method or filters");
+        console.error(
+          "❌ Contract does not have queryFilter method or filters"
+        );
         addSystemLog("error", "Contract missing queryFilter method");
         return false;
       }
-      
+
       // Ottieni tutti gli eventi NodeUpdated dal contratto
       let events;
       try {
@@ -542,15 +632,20 @@ async function initializeServer() {
         console.log(`📡 Found ${events.length} NodeUpdated events`);
       } catch (filterError) {
         console.error("❌ Error querying events:", filterError);
-        addSystemLog("error", "Error querying events", { error: filterError.message });
+        addSystemLog("error", "Error querying events", {
+          error: filterError.message,
+        });
         return false;
       }
-      
+
       // Se non ci sono eventi, restituisci successo ma con messaggio informativo
       if (!events || events.length === 0) {
         console.log("ℹ️ No events found in the specified block range");
-        addSystemLog("info", "No events found in block range", { fromBlock, toBlock });
-        
+        addSystemLog("info", "No events found in block range", {
+          fromBlock,
+          toBlock,
+        });
+
         // Se forceSync è true, prova a cercare in un range più ampio
         if (forceSync) {
           try {
@@ -561,98 +656,117 @@ async function initializeServer() {
               widerFromBlock,
               toBlock
             );
-            console.log(`📡 Found ${widerEvents.length} events in wider range (${widerFromBlock}-${toBlock})`);
-            
+            console.log(
+              `📡 Found ${widerEvents.length} events in wider range (${widerFromBlock}-${toBlock})`
+            );
+
             if (widerEvents.length > 0) {
               console.log("ℹ️ Events exist but not in the specified range");
-              addSystemLog("info", "Events found in wider range", { 
+              addSystemLog("info", "Events found in wider range", {
                 widerRange: `${widerFromBlock}-${toBlock}`,
-                eventCount: widerEvents.length 
+                eventCount: widerEvents.length,
               });
             }
           } catch (widerError) {
             console.log("⚠️ Could not query wider range:", widerError.message);
           }
         }
-        
+
         return true; // Restituisci true perché non è un errore
       }
-      
+
       let syncedCount = 0;
       let errorCount = 0;
-      
+
       // Processa ogni evento
       for (const event of events) {
         try {
           const { soul, key, value } = event.args;
-          
+
           // Verifica che gli argomenti esistano
           if (!soul || !key || value === undefined) {
-            console.warn("⚠️ Event missing required arguments:", { soul, key, value });
+            console.warn("⚠️ Event missing required arguments:", {
+              soul,
+              key,
+              value,
+            });
             errorCount++;
             continue;
           }
-          
+
           // Decodifica il valore
           let decodedValue;
           try {
             decodedValue = ethers.toUtf8String(value);
           } catch (error) {
-            console.warn("⚠️ Could not decode value as UTF-8, using hex:", value);
+            console.warn(
+              "⚠️ Could not decode value as UTF-8, using hex:",
+              value
+            );
             decodedValue = value;
           }
-          
+
           // Decode soul and key from bytes to string
           let soulString, keyString;
           try {
             soulString = ethers.toUtf8String(soul);
             keyString = ethers.toUtf8String(key);
-            console.log(`🔄 Decoded for sync: soul="${soulString}", key="${keyString}"`);
+            console.log(
+              `🔄 Decoded for sync: soul="${soulString}", key="${keyString}"`
+            );
           } catch (error) {
-            console.warn("⚠️ Could not decode soul/key as UTF-8 for sync, using hex");
+            console.warn(
+              "⚠️ Could not decode soul/key as UTF-8 for sync, using hex"
+            );
             soulString = soul;
             keyString = key;
           }
-          
+
           // Crea un ID univoco per questo evento
           const eventId = `${event.transactionHash}-${event.logIndex}`;
-          
+
           // Se forceSync è false, verifica se l'evento è già stato sincronizzato
           if (!forceSync) {
             const existingEvent = await new Promise((resolve) => {
-              const eventNode = gun.get("shogun").get("chain_events").get(eventId);
+              const eventNode = gun
+                .get("shogun")
+                .get("chain_events")
+                .get(eventId);
               eventNode.once((data) => {
                 resolve(data);
               });
             });
-            
+
             if (existingEvent) {
               console.log(`⏭️ Event already synced: ${eventId}`);
               continue;
             }
           }
-          
+
           // Salva l'evento in GunDB
           const eventNode = gun.get("shogun").get("chain_events").get(eventId);
           await new Promise((resolve, reject) => {
-            eventNode.put({
-              soul: soulString,
-              key: keyString,
-              value: decodedValue,
-              blockNumber: event.blockNumber,
-              transactionHash: event.transactionHash,
-              timestamp: Date.now(),
-              synced: true,
-              syncMethod: forceSync ? "force_sync" : "manual_sync"
-            }, (ack) => {
-              if (ack.err) {
-                reject(ack.err);
-              } else {
-                resolve();
+            eventNode.put(
+              {
+                soul: soulString,
+                key: keyString,
+                value: decodedValue,
+                blockNumber: event.blockNumber,
+                transactionHash: event.transactionHash,
+                timestamp: Date.now(),
+                synced: true,
+                syncMethod: forceSync ? "force_sync" : "manual_sync",
+              },
+              (ack) => {
+                if (ack.err) {
+                  reject(ack.err);
+                } else {
+                  resolve();
+                }
               }
-            });
+            );
           });
-          
+
           // Salva anche i dati nel nodo principale usando dati originali leggibili
           const dataNode = gun.get(soulString);
           await new Promise((resolve, reject) => {
@@ -664,16 +778,17 @@ async function initializeServer() {
               }
             });
           });
-          
+
           syncedCount++;
-          console.log(`✅ Synced event: ${eventId} (${syncedCount}/${events.length})`);
-          
+          console.log(
+            `✅ Synced event: ${eventId} (${syncedCount}/${events.length})`
+          );
         } catch (eventError) {
           errorCount++;
           console.error(`❌ Error syncing event:`, eventError);
         }
       }
-      
+
       const syncResult = {
         totalEvents: events.length,
         syncedEvents: syncedCount,
@@ -681,16 +796,18 @@ async function initializeServer() {
         fromBlock: fromBlock,
         toBlock: toBlock,
         forceSync: forceSync,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
-      
+
       console.log(`✅ Chain contract sync completed:`, syncResult);
       addSystemLog("info", "Chain contract sync completed", syncResult);
-      
+
       return true;
     } catch (error) {
       console.error("❌ Failed to sync chain contract:", error);
-      addSystemLog("error", "Chain contract sync failed", { error: error.message });
+      addSystemLog("error", "Chain contract sync failed", {
+        error: error.message,
+      });
       return false;
     }
   }
@@ -705,7 +822,12 @@ async function initializeServer() {
     };
 
     if (gun) {
-      gun.get("shogun").get("timeseries").get(key).get(timestamp).put(dataPoint);
+      gun
+        .get("shogun")
+        .get("timeseries")
+        .get(key)
+        .get(timestamp)
+        .put(dataPoint);
     }
   }
 
@@ -721,7 +843,9 @@ async function initializeServer() {
 
     // Assicurati che gun sia inizializzato prima di accedere alle sue proprietà
     if (!gun || !gun._ || !gun._.graph) {
-      console.warn("⚠️ Gun non ancora inizializzato, saltando la raccolta spazzatura");
+      console.warn(
+        "⚠️ Gun non ancora inizializzato, saltando la raccolta spazzatura"
+      );
       return;
     }
 
@@ -745,7 +869,10 @@ async function initializeServer() {
       console.log(
         `🗑️ Garbage Collector finished. Cleaned ${cleanedCount} nodes.`
       );
-      addSystemLog("info", `Garbage collection completed. Cleaned ${cleanedCount} nodes`);
+      addSystemLog(
+        "info",
+        `Garbage collection completed. Cleaned ${cleanedCount} nodes`
+      );
     } else {
       console.log(
         "🗑️ Garbage Collector finished. No unprotected nodes found to clean."
@@ -913,7 +1040,7 @@ async function initializeServer() {
 
   // IPFS File Upload Endpoint
   const upload = multer({ storage: multer.memoryStorage() });
-  
+
   // Middleware di autenticazione
   const tokenAuthMiddleware = (req, res, next) => {
     // Check Authorization header (Bearer token)
@@ -1023,22 +1150,32 @@ async function initializeServer() {
   };
 
   // IPFS upload endpoint (admin) - DEPRECATED: use /api/v1/ipfs/upload instead
-  app.post("/ipfs-upload", tokenAuthMiddleware, upload.single("file"), async (req, res) => {
-    res.status(410).json({
-      success: false,
-      error: "This endpoint is deprecated. Use /api/v1/ipfs/upload instead.",
-      message: "Please update your client to use the new API endpoint."
-    });
-  });
+  app.post(
+    "/ipfs-upload",
+    tokenAuthMiddleware,
+    upload.single("file"),
+    async (req, res) => {
+      res.status(410).json({
+        success: false,
+        error: "This endpoint is deprecated. Use /api/v1/ipfs/upload instead.",
+        message: "Please update your client to use the new API endpoint.",
+      });
+    }
+  );
 
   // IPFS upload endpoint (user) - DEPRECATED: use /api/v1/ipfs/upload instead
-  app.post("/ipfs-upload-user", walletSignatureMiddleware, upload.single("file"), async (req, res) => {
-    res.status(410).json({
-      success: false,
-      error: "This endpoint is deprecated. Use /api/v1/ipfs/upload instead.",
-      message: "Please update your client to use the new API endpoint."
-    });
-  });
+  app.post(
+    "/ipfs-upload-user",
+    walletSignatureMiddleware,
+    upload.single("file"),
+    async (req, res) => {
+      res.status(410).json({
+        success: false,
+        error: "This endpoint is deprecated. Use /api/v1/ipfs/upload instead.",
+        message: "Please update your client to use the new API endpoint.",
+      });
+    }
+  );
 
   // --- Start Server Function ---
   async function startServer() {
@@ -1106,12 +1243,12 @@ async function initializeServer() {
   app.set("chainContract", chainContract);
   app.set("startChainEventListener", startChainEventListener);
   app.set("propagateChainEventToGun", propagateChainEventToGun);
-  
+
   // Esponi la mappatura per le route
   // app.set("originalNamesMap", originalNamesMap); // Removed as per edit hint
   // app.set("addHashMapping", addHashMapping); // Removed as per edit hint
   // app.set("calculateKeccak256Hash", calculateKeccak256Hash); // Removed as per edit hint
-  
+
   // Wrapper per syncChainContractToGun che accede alla funzione corretta
   app.set("syncChainContractToGun", async (params) => {
     try {
@@ -1119,23 +1256,22 @@ async function initializeServer() {
         console.error("❌ Gun not initialized");
         return false;
       }
-      
+
       if (!chainContract) {
         console.error("❌ Chain contract not initialized");
         return false;
       }
-      
+
       console.log("🔧 Calling syncChainContractToGun function...");
       const result = await syncChainContractToGun(params);
       console.log("🔧 syncChainContractToGun returned:", result);
       return result;
-      
     } catch (error) {
       console.error("❌ Error in syncChainContractToGun wrapper:", error);
       return false;
     }
   });
-  
+
   app.set("propagateChainEventToGun", propagateChainEventToGun);
 
   // Esponi i middleware di autenticazione per le route
@@ -1146,7 +1282,9 @@ async function initializeServer() {
 
   // Esponi la variabile per operazioni interne
   app.set("allowInternalOperations", () => allowInternalOperations);
-  app.set("setAllowInternalOperations", (value) => { allowInternalOperations = value; });
+  app.set("setAllowInternalOperations", (value) => {
+    allowInternalOperations = value;
+  });
 
   // Funzione per calcolare l'utilizzo MB off-chain
   async function getOffChainMBUsage(userAddress) {
@@ -1282,7 +1420,7 @@ async function initializeServer() {
   global.gunInstance = gun;
 
   // Route legacy per compatibilità (definite prima delle route modulari)
-  
+
   // Health check endpoint
   app.get("/health", (req, res) => {
     res.json({
@@ -1315,7 +1453,7 @@ async function initializeServer() {
         requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
       }
 
-      const http = await import('http');
+      const http = await import("http");
       const ipfsReq = http.request(requestOptions, (ipfsRes) => {
         let data = "";
         ipfsRes.on("data", (chunk) => (data += chunk));
@@ -1365,10 +1503,7 @@ async function initializeServer() {
     routes.default(app);
     console.log("✅ Route modulari configurate con successo");
   } catch (error) {
-    console.error(
-      "❌ Errore nel caricamento delle route modulari:",
-      error
-    );
+    console.error("❌ Errore nel caricamento delle route modulari:", error);
   }
 
   // Route statiche (DEFINITE DOPO LE API)
@@ -1431,7 +1566,7 @@ async function initializeServer() {
       clearInterval(gcInterval);
       console.log("✅ Garbage collector interval cleared");
     }
-    
+
     // Clean up listener health check interval
     // if (listenerHealthCheckInterval) { // This line is removed as per the edit hint
     //   clearInterval(listenerHealthCheckInterval);
@@ -1458,7 +1593,7 @@ async function initializeServer() {
     const url = `http://${host}:${port}`;
     console.log(`📱 QR Code for: ${url}`);
     try {
-      const qrCode = qr.image(url, { type: 'terminal', small: true });
+      const qrCode = qr.image(url, { type: "terminal", small: true });
       console.log(qrCode);
     } catch (qrError) {
       console.log(`📱 QR Code generation failed: ${qrError.message}`);

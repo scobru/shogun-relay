@@ -22,6 +22,9 @@ class IPCMInterface {
         // Load contract configuration
         await this.loadContractConfig();
         
+        // Check if wallet is already connected
+        await this.checkExistingWalletConnection();
+        
         // Set up event listeners
         this.setupEventListeners();
         
@@ -56,11 +59,38 @@ class IPCMInterface {
             
             this.contractConfig = config.data;
             console.log("✅ Contract configuration loaded:", this.contractConfig);
+            console.log("📋 Factory config:", this.contractConfig.data?.factory);
+            console.log("📋 Factory address:", this.contractConfig.data?.factory?.address);
+            console.log("📋 Factory ABI length:", this.contractConfig.data?.factory?.abi?.length);
             this.updateContractInfo();
             
         } catch (error) {
             console.error("❌ Failed to load contract config:", error);
             this.updateConnectionStatus('Contract config failed to load');
+        }
+    }
+
+    async checkExistingWalletConnection() {
+        if (typeof window.ethereum !== 'undefined') {
+            try {
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                if (accounts.length > 0) {
+                    this.userAddress = accounts[0];
+                    this.provider = new ethers.providers.Web3Provider(window.ethereum);
+                    this.signer = this.provider.getSigner();
+                    this.network = await this.provider.getNetwork();
+                    this.walletBalance = ethers.utils.formatEther(await this.provider.getBalance(this.userAddress));
+                    console.log("✅ Wallet already connected:", this.userAddress);
+                    this.updateConnectionStatus();
+                    this.updateWalletInfo();
+                    if (this.contractConfig && this.contractConfig.data?.factory) {
+                        await this.initializeContracts();
+                    }
+                }
+            } catch (error) {
+                console.error("❌ Failed to check existing wallet connection:", error);
+                this.updateConnectionStatus('Failed to check existing wallet connection');
+            }
         }
     }
 
@@ -83,13 +113,21 @@ class IPCMInterface {
             return;
         }
         
-        if (this.userAddress && this.contractConfig && this.contractConfig.data?.factory) {
+        if (this.userAddress && this.contractConfig && this.contractConfig.data?.factory && this.ipcmFactory) {
             connectionStatus.className = 'alert alert-success mb-6';
             connectionStatus.innerHTML = `
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
-                <span>Connected to IPCM contracts</span>
+                <span>Connected to IPCM contracts (Full access)</span>
+            `;
+        } else if (this.contractConfig && this.contractConfig.data?.factory && this.ipcmFactory) {
+            connectionStatus.className = 'alert alert-warning mb-6';
+            connectionStatus.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                </svg>
+                <span>Connected to IPCM contracts (Read-only mode)</span>
             `;
         } else {
             connectionStatus.className = 'alert alert-info mb-6';
@@ -198,6 +236,40 @@ class IPCMInterface {
             
         } catch (error) {
             console.error("❌ Failed to initialize contracts:", error);
+            this.updateConnectionStatus(`Contract initialization failed: ${error.message}`);
+        }
+    }
+
+    async initializeContractsWithoutWallet() {
+        try {
+            if (!this.contractConfig) {
+                throw new Error('Contract config not available');
+            }
+            
+            const factoryConfig = this.contractConfig.data?.factory;
+            if (!factoryConfig || !factoryConfig.address || !factoryConfig.abi) {
+                throw new Error('Factory contract configuration not found or incomplete');
+            }
+            
+            console.log("🔧 Initializing contracts without wallet (read-only mode)");
+            console.log("📋 Factory address:", factoryConfig.address);
+            console.log("📋 Factory ABI functions:", factoryConfig.abi.filter(item => item.type === 'function').map(f => f.name));
+            
+            // Create a read-only provider
+            const provider = new ethers.providers.JsonRpcProvider('https://eth-sepolia.g.alchemy.com/v2/' + (process.env.ALCHEMY_API_KEY || 'demo'));
+            
+            // Initialize IPCMFactory contract in read-only mode
+            this.ipcmFactory = new ethers.Contract(
+                factoryConfig.address,
+                factoryConfig.abi,
+                provider
+            );
+            
+            console.log("✅ IPCMFactory contract initialized (read-only mode)");
+            this.updateConnectionStatus();
+            
+        } catch (error) {
+            console.error("❌ Failed to initialize contracts without wallet:", error);
             this.updateConnectionStatus(`Contract initialization failed: ${error.message}`);
         }
     }
@@ -400,6 +472,12 @@ class IPCMInterface {
 window.connectWallet = function() {
     if (window.ipcmInterface) {
         window.ipcmInterface.connectWallet();
+    }
+};
+
+window.initializeContractsWithoutWallet = function() {
+    if (window.ipcmInterface) {
+        window.ipcmInterface.initializeContractsWithoutWallet();
     }
 };
 
