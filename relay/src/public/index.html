@@ -22,7 +22,7 @@
                             d="M5 12h14M12 5l7 7-7 7" />
                     </svg>
 
-                    <h1 id="relay-title" class="text-3xl font-semibold mb-8">Shogun Relay Control Panel</h1>
+                    <h1 id="relay-title" class="text-3xl font-medium mb-8">Shogun Relay Control Panel</h1>
                     <p class="text-secondary mb-8">Select a tool to continue<span class="animate-pulse">_</span></p>
 
                     <!-- Admin Password Section -->
@@ -34,7 +34,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                             </svg>
-                            <h3 class="text-lg font-semibold text-accent">Centralized Admin Authentication</h3>
+                            <h3 class="text-lg font-medium text-accent">Centralized Admin Authentication</h3>
                         </div>
                         <p class="text-sm text-base-content/70 mb-3">
                             🔒 Inserisci la password admin per accedere a tutte le applicazioni. Se la password non è
@@ -61,7 +61,7 @@
                         <!-- Monitoring & Analytics -->
                         <div class="card bg-opacity-10 bg-white">
                             <div class="p-6">
-                                <h2 class="text-xl font-semibold mb-4 text-accent">📊 Monitoring & Analytics</h2>
+                                <h2 class="text-xl font-medium mb-4 text-accent">📊 Monitoring & Analytics</h2>
                                 <div class="space-y-3">
                                     <a href="/stats.html" class="btn-custom flex items-center gap-3 relative">
                                         <span>⚡</span>
@@ -98,7 +98,7 @@
                         <!-- Storage & Files -->
                         <div class="card bg-opacity-10 bg-white">
                             <div class="p-6">
-                                <h2 class="text-xl font-semibold mb-4 text-accent">💾 Storage & Files</h2>
+                                <h2 class="text-xl font-medium mb-4 text-accent">💾 Storage & Files</h2>
                                 <div class="space-y-3">
                                     <a href="/user-upload" class="btn-custom flex items-center gap-3">
                                         <span>📤</span>
@@ -125,7 +125,7 @@
                         <!-- Data Management -->
                         <div class="card bg-opacity-10 bg-white">
                             <div class="p-6">
-                                <h2 class="text-xl font-semibold mb-4 text-accent">🗃️ Data Management</h2>
+                                <h2 class="text-xl font-medium mb-4 text-accent">🗃️ Data Management</h2>
                                 <div class="space-y-3">
                                     <a href="/create" class="btn-custom flex items-center gap-3 relative">
                                         <span>➕</span>
@@ -157,7 +157,7 @@
                         <!-- Communication -->
                         <div class="card bg-opacity-10 bg-white">
                             <div class="p-6">
-                                <h2 class="text-xl font-semibold mb-4 text-accent">�� Communication</h2>
+                                <h2 class="text-xl font-medium mb-4 text-accent">�� Communication</h2>
                                 <div class="space-y-3">
                                     <a href="/chat" class="btn-custom flex items-center gap-3">
                                         <span>💬</span>
@@ -170,7 +170,7 @@
                         <!-- Security & Tools -->
                         <div class="card bg-opacity-10 bg-white">
                             <div class="p-6">
-                                <h2 class="text-xl font-semibold mb-4 text-accent">🔐 Security & Tools</h2>
+                                <h2 class="text-xl font-medium mb-4 text-accent">🔐 Security & Tools</h2>
                                 <div class="space-y-3">
                                     <a href="/subscribe" class="btn-custom flex items-center gap-3">
                                         <span>🔗</span>
@@ -204,7 +204,7 @@
             </p>
             <p class="text-gray-400 mb-4">
                 part of
-                <a href="https://shogun-info.vercel.app" class="text-blue-500 hover:text-blue-400">shogun project</a>
+                <a href="https://shogun-info.vercel.app" class="text-blue-500 hover:text-blue-400">shogun ecosystem</a>
             </p>
         </div>
     </footer>
@@ -276,7 +276,7 @@
             const statusEl = document.getElementById('passwordStatus');
             if (statusEl) {
                 statusEl.innerHTML = '🔓 <strong>Accesso Admin Completo</strong> - Tutte le applicazioni disponibili';
-                statusEl.className = 'text-sm text-center text-success font-semibold';
+                statusEl.className = 'text-sm text-center text-success font-medium';
             }
         }
 
@@ -294,7 +294,7 @@
             const statusEl = document.getElementById('passwordStatus');
             if (statusEl) {
                 statusEl.innerHTML = '🔒 <strong>Accesso Limitato</strong> - Solo applicazioni pubbliche visibili';
-                statusEl.className = 'text-sm text-center text-warning font-semibold';
+                statusEl.className = 'text-sm text-center text-warning font-medium';
             }
         }
 
