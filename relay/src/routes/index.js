@@ -631,6 +631,9 @@ export default (app) => {
   // Route per le note
   app.use(`${baseRoute}/notes`, notesRouter);
 
+  // Route per le note admin criptate (v1)
+  app.use(`${baseRoute}/notes`, notesRouter);
+
   // Route di debug
   app.use(`${baseRoute}/debug`, debugRouter);
 
@@ -667,6 +670,9 @@ export default (app) => {
   app.use("/api/services", servicesRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/chain", chainRouter);
+
+  // Route legacy per le note admin criptate (v1)
+  app.use("/api/v1/notes", notesRouter);
 
   // Route principale per il visual graph
   app.use("/visualGraph", visualGraphRouter);

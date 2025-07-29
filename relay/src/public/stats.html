@@ -232,107 +232,116 @@
     </style>
 </head>
 <body class="antialiased bg-[#1A1A1A]">
-    <div class="container">
-        <a href="/" class="back-link">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
-            </svg>
-            Back to Control Panel
-        </a>
+    <div class="container mx-auto p-6">
+        <div class="flex items-center mb-6">
+            <a href="/" class="text-[#42A5F5] hover:text-[#64B5F6] transition-colors text-lg">&larr; Back to Control Panel</a>
+        </div>
         
-        <h1>Gun Relay Live Stats</h1>
+        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
+            <div class="p-8 sm:p-10">
+                <div class="flex flex-col items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-6 text-[#FF69B4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
 
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-title">Connected Peers</div>
-                <div class="stat-value" id="peersCount">-</div>
-                <div class="stat-unit">peers</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-title">Memory Usage</div>
-                <div class="stat-value" id="memoryUsage">-</div>
-                <div class="stat-unit">MB</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-title">Request Rate</div>
-                <div class="stat-value" id="requestRate">-</div>
-                <div class="stat-unit">req/s</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-title">Uptime</div>
-                <div class="stat-value" id="uptime">-</div>
-                <div class="stat-unit">hours</div>
+                    <h1 class="text-3xl font-semibold mb-8 text-[#FFFFFF]">Gun Relay Live Stats</h1>
+
+                    <div class="w-full space-y-8">
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-title">Connected Peers</div>
+                                <div class="stat-value" id="peersCount">-</div>
+                                <div class="stat-unit">peers</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-title">Memory Usage</div>
+                                <div class="stat-value" id="memoryUsage">-</div>
+                                <div class="stat-unit">MB</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-title">Request Rate</div>
+                                <div class="stat-value" id="requestRate">-</div>
+                                <div class="stat-unit">req/s</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-title">Uptime</div>
+                                <div class="stat-value" id="uptime">-</div>
+                                <div class="stat-unit">hours</div>
+                            </div>
+                        </div>
+
+                        <!-- Admin Controls Section -->
+                        <div class="admin-controls">
+                            <h2 class="text-xl font-bold mb-6 text-[#FF69B4]">Admin Controls</h2>
+                            
+                            <!-- Garbage Collector Control -->
+                            <div class="mb-8">
+                                <h3 class="text-lg mb-4 text-[#FFFFFF]">Garbage Collector</h3>
+                                <button id="triggerGC" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium">
+                                    🗑️ Trigger Garbage Collection
+                                </button>
+                                <div id="gcStatus" class="mt-3 text-base"></div>
+                            </div>
+
+                            <!-- Stats Modification -->
+                            <div class="mb-8">
+                                <h3 class="text-lg mb-4 text-[#FFFFFF]">Modify Stats</h3>
+                                <div class="flex flex-col gap-6">
+                                    <div class="form-control">
+                                        <label class="label">
+                                            <span class="label-text text-[#E0E0E0] text-base">GET Requests</span>
+                                        </label>
+                                        <div class="flex gap-3">
+                                            <input type="number" id="getRequestsInput" class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none" placeholder="Enter value">
+                                            <button onclick="updateStat('getRequests')" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium">Update</button>
+                                        </div>
+                                    </div>
+                                    <div class="form-control">
+                                        <label class="label">
+                                            <span class="label-text text-[#E0E0E0] text-base">PUT Requests</span>
+                                        </label>
+                                        <div class="flex gap-3">
+                                            <input type="number" id="putRequestsInput" class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none" placeholder="Enter value">
+                                            <button onclick="updateStat('putRequests')" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium">Update</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="updateStatus" class="mt-3 text-base"></div>
+                            </div>
+
+                            <!-- Peer Management -->
+                            <div class="mt-8">
+                                <h3 class="text-lg mb-4 text-[#FFFFFF]">Peer Management</h3>
+                                <div class="mb-6">
+                                    <h4 class="text-lg font-semibold mb-3 text-[#E0E0E0]">Connected Peers:</h4>
+                                    <ul id="peerList" class="list-disc list-inside bg-[#282828] p-4 rounded-xl text-base min-h-[5rem] text-[#E0E0E0]">
+                                        <!-- Peers will be listed here -->
+                                        <li>Loading...</li>
+                                    </ul>
+                                </div>
+                                <div class="form-control">
+                                    <label class="label">
+                                        <span class="label-text text-[#E0E0E0] text-base">Add New Peer</span>
+                                    </label>
+                                    <div class="flex gap-3">
+                                        <input type="text" id="peerInput" class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none" placeholder="e.g., wss://gun.shogun.to/gun">
+                                        <button id="addPeerBtn" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium">Add</button>
+                                    </div>
+                                </div>
+                                <div id="peerStatus" class="mt-3 text-base"></div>
+                            </div>
+                        </div>
+
+                        <a href="/charts.html" class="view-charts-link">
+                            📊 View Detailed Charts & Metrics
+                        </a>
+
+                        <div id="error" class="error"></div>
+                        <p id="lastUpdated"></p>
+                    </div>
+                </div>
             </div>
         </div>
-
-        <!-- New Admin Controls Section -->
-        <div class="admin-controls">
-            <h2 class="text-xl font-bold mb-6 text-[#FF69B4]">Admin Controls</h2>
-            
-            <!-- Garbage Collector Control -->
-            <div class="mb-8">
-                <h3 class="text-lg mb-4 text-[#FFFFFF]">Garbage Collector</h3>
-                <button id="triggerGC" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium">
-                    🗑️ Trigger Garbage Collection
-                </button>
-                <div id="gcStatus" class="mt-3 text-base"></div>
-            </div>
-
-            <!-- Stats Modification -->
-            <div class="mb-8">
-                <h3 class="text-lg mb-4 text-[#FFFFFF]">Modify Stats</h3>
-                <div class="flex flex-col gap-6">
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text text-[#E0E0E0] text-base">GET Requests</span>
-                        </label>
-                        <div class="flex gap-3">
-                            <input type="number" id="getRequestsInput" class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none" placeholder="Enter value">
-                            <button onclick="updateStat('getRequests')" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium">Update</button>
-                        </div>
-                    </div>
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text text-[#E0E0E0] text-base">PUT Requests</span>
-                        </label>
-                        <div class="flex gap-3">
-                            <input type="number" id="putRequestsInput" class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none" placeholder="Enter value">
-                            <button onclick="updateStat('putRequests')" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium">Update</button>
-                        </div>
-                    </div>
-                </div>
-                <div id="updateStatus" class="mt-3 text-base"></div>
-            </div>
-
-            <!-- Peer Management -->
-            <div class="mt-8">
-                <h3 class="text-lg mb-4 text-[#FFFFFF]">Peer Management</h3>
-                <div class="mb-6">
-                    <h4 class="text-lg font-semibold mb-3 text-[#E0E0E0]">Connected Peers:</h4>
-                    <ul id="peerList" class="list-disc list-inside bg-[#282828] p-4 rounded-xl text-base min-h-[5rem] text-[#E0E0E0]">
-                        <!-- Peers will be listed here -->
-                        <li>Loading...</li>
-                    </ul>
-                </div>
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text text-[#E0E0E0] text-base">Add New Peer</span>
-                    </label>
-                    <div class="flex gap-3">
-                        <input type="text" id="peerInput" class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none" placeholder="e.g., wss://gun.shogun.to/gun">
-                        <button id="addPeerBtn" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium">Add</button>
-                    </div>
-                </div>
-                <div id="peerStatus" class="mt-3 text-base"></div>
-            </div>
-        </div>
-
-        <a href="/charts.html" class="view-charts-link">
-            📊 View Detailed Charts & Metrics
-        </a>
-
-        <div id="error" class="error"></div>
-        <p id="lastUpdated"></p>
     </div>
 
     <script>

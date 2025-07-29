@@ -183,6 +183,7 @@
                 notesArea.value = '';
                 return;
             }
+            
             const result = await apiCall('/api/v1/notes');
             if (result && result.notes) {
                 try {

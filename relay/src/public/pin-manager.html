@@ -28,38 +28,49 @@
             font-size: 0.875rem;
             border-radius: 0.75rem;
             transition: all 0.2s ease;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
         }
         .pin-action {
-            background-color: rgba(76, 175, 80, 0.2);
-            border: 1px solid rgba(76, 175, 80, 0.3);
-            color: #4CAF50;
+            background-color: #4CAF50;
+            color: #FFFFFF;
+            box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
         }
         .pin-action:hover {
-            background-color: rgba(76, 175, 80, 0.3);
+            background-color: #45A049;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(76, 175, 80, 0.4);
         }
         .unpin-action {
-            background-color: rgba(255, 165, 0, 0.2);
-            border: 1px solid rgba(255, 165, 0, 0.3);
-            color: #FFA500;
+            background-color: #FFA500;
+            color: #FFFFFF;
+            box-shadow: 0 2px 4px rgba(255, 165, 0, 0.3);
         }
         .unpin-action:hover {
-            background-color: rgba(255, 165, 0, 0.3);
+            background-color: #FF8C00;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(255, 165, 0, 0.4);
         }
         .remove-action {
-            background-color: rgba(244, 67, 54, 0.2);
-            border: 1px solid rgba(244, 67, 54, 0.3);
-            color: #F44336;
+            background-color: #F44336;
+            color: #FFFFFF;
+            box-shadow: 0 2px 4px rgba(244, 67, 54, 0.3);
         }
         .remove-action:hover {
-            background-color: rgba(244, 67, 54, 0.3);
+            background-color: #D32F2F;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(244, 67, 54, 0.4);
         }
         .copy-action {
-            background-color: #404040;
-            border: 1px solid #606060;
-            color: #E0E0E0;
+            background-color: #42A5F5;
+            color: #FFFFFF;
+            box-shadow: 0 2px 4px rgba(66, 165, 245, 0.3);
         }
         .copy-action:hover {
-            background-color: #505050;
+            background-color: #64B5F6;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(66, 165, 245, 0.4);
         }
         .progress-container {
             background-color: #404040;
@@ -142,6 +153,37 @@
             <p class="text-[#A0A0A0] text-lg">Manage IPFS pins and system files</p>
         </div>
 
+        <!-- Results and Logs - SPOSTATO IN ALTO -->
+        <div class="mb-8">
+            <div class="card bg-[#404040] border-[#606060] rounded-xl">
+                <div class="card-body p-6">
+                    <h3 class="card-title text-lg font-semibold mb-6 text-[#FF69B4]">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Results & Logs
+                    </h3>
+                    
+                    <div id="message" class="alert hidden mb-6 bg-[#42A5F5]/20 border-[#42A5F5]/30 text-[#42A5F5] rounded-xl p-4"></div>
+                    <div id="pinList" class="mb-6"></div>
+                    
+                    <!-- Progress Bar -->
+                    <div id="batchProgress" class="hidden mb-6">
+                        <div class="w-full bg-[#282828] rounded-full h-2 mb-3">
+                            <div id="progressBar" class="bg-[#FF69B4] h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                        <div class="flex justify-between text-sm text-[#A0A0A0]">
+                            <span id="progressText">Processing...</span>
+                            <span><span id="progressCurrent">0</span> / <span id="progressTotal">0</span></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Batch Log -->
+                    <div id="batchLog" class="bg-[#282828] rounded-xl p-4 max-h-96 overflow-y-auto font-mono text-sm text-[#E0E0E0]"></div>
+                </div>
+            </div>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
         <!-- Pin Management -->
@@ -162,13 +204,13 @@
                 </div>
                 
                 <div class="flex gap-3 mb-6">
-                    <button onclick="addPin()" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] flex-1 rounded-xl px-6 py-3 font-medium">
+                    <button onclick="addPin()" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] flex-1 rounded-xl px-6 py-3 font-medium shadow-lg hover:shadow-xl transition-all duration-200">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                         </svg>
                         Add Pin
                     </button>
-                    <button onclick="removePin()" class="btn bg-[#42A5F5] hover:bg-[#64B5F6] border-0 text-[#FFFFFF] flex-1 rounded-xl px-6 py-3 font-medium">
+                    <button onclick="removePin()" class="btn bg-[#42A5F5] hover:bg-[#64B5F6] border-0 text-[#FFFFFF] flex-1 rounded-xl px-6 py-3 font-medium shadow-lg hover:shadow-xl transition-all duration-200">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
                         </svg>
@@ -177,21 +219,21 @@
                 </div>
                 
                 <div class="space-y-3">
-                    <button onclick="listPins()" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] w-full rounded-xl px-6 py-3 font-medium">
+                    <button onclick="listPins()" class="btn bg-[#4CAF50] hover:bg-[#45A049] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium shadow-lg hover:shadow-xl transition-all duration-200">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                         </svg>
                         List All Pins
                     </button>
                     
-                    <button onclick="garbageCollect()" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] w-full rounded-xl px-6 py-3 font-medium">
+                    <button onclick="garbageCollect()" class="btn bg-[#FFA500] hover:bg-[#FF8C00] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium shadow-lg hover:shadow-xl transition-all duration-200">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                         Garbage Collect
                     </button>
                     
-                    <button onclick="debugSystemHashes()" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] w-full rounded-xl px-6 py-3 font-medium">
+                    <button onclick="debugSystemHashes()" class="btn bg-[#9C27B0] hover:bg-[#7B1FA2] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium shadow-lg hover:shadow-xl transition-all duration-200">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                         </svg>
@@ -221,43 +263,12 @@
                     </div>
                 </div>
                 
-                <button onclick="unpinAllFiles()" class="btn bg-[#F44336] hover:bg-[#D32F2F] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium">
+                <button onclick="unpinAllFiles()" class="btn bg-[#F44336] hover:bg-[#D32F2F] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium shadow-lg hover:shadow-xl transition-all duration-200">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                     Unpin All Files
                 </button>
-            </div>
-        </div>
-
-        <!-- Results and Logs -->
-        <div class="mt-8">
-            <div class="card bg-[#404040] border-[#606060] rounded-xl">
-                <div class="card-body p-6">
-                    <h3 class="card-title text-lg font-semibold mb-6 text-[#FF69B4]">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        Results & Logs
-                    </h3>
-                    
-                    <div id="message" class="alert hidden mb-6 bg-[#42A5F5]/20 border-[#42A5F5]/30 text-[#42A5F5] rounded-xl p-4"></div>
-                    <div id="pinList" class="mb-6"></div>
-                    
-                    <!-- Progress Bar -->
-                    <div id="batchProgress" class="hidden mb-6">
-                        <div class="w-full bg-[#282828] rounded-full h-2 mb-3">
-                            <div id="progressBar" class="bg-[#FF69B4] h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
-                        </div>
-                        <div class="flex justify-between text-sm text-[#A0A0A0]">
-                            <span id="progressText">Processing...</span>
-                            <span><span id="progressCurrent">0</span> / <span id="progressTotal">0</span></span>
-                        </div>
-                    </div>
-                    
-                    <!-- Batch Log -->
-                    <div id="batchLog" class="bg-[#282828] rounded-xl p-4 max-h-96 overflow-y-auto font-mono text-sm text-[#E0E0E0]"></div>
-                </div>
             </div>
         </div>
     </div>
