@@ -3,3 +3,10 @@
 body {
     font-family: 'Poppins', sans-serif;
 }
+
+
+:root {
+    --primary-color: #2d2d2d;
+    --secondary-color: #151515;
+}
+
