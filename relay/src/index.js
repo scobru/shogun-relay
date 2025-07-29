@@ -187,6 +187,21 @@ async function initializeServer() {
     }
   }
 
+  // Funzione per convertire hash keccak256 in stringhe leggibili
+  function hashToReadableString(hash) {
+    if (!hash || typeof hash !== 'string') {
+      return hash;
+    }
+    
+    // Se è un hash keccak256 (64 caratteri hex + 0x)
+    if (hash.startsWith('0x') && hash.length === 66) {
+      // Per ora, usa i primi 8 caratteri come identificatore leggibile
+      return `hash_${hash.substring(2, 10)}`;
+    }
+    
+    return hash;
+  }
+
   // Propaga Chain contract event a GunDB
   async function propagateChainEventToGun(soul, key, value, event) {
     console.log("🔄 propagateChainEventToGun called with:", { soul, key, value });
@@ -385,21 +400,36 @@ async function initializeServer() {
                     keyType: typeof keyValue
                   });
                   
-                  // Prova a decodificare come UTF-8
-                  soulString = ethers.toUtf8String(soulValue);
-                  keyString = ethers.toUtf8String(keyValue);
-                  console.log(`✅ UTF-8 decoded: soul="${soulString}", key="${keyString}"`);
+                  // Controlla se sono hash keccak256
+                  if (typeof soulValue === 'string' && soulValue.startsWith('0x') && soulValue.length === 66) {
+                    console.log("🔍 Detected keccak256 hash for soul, converting to readable string");
+                    soulString = hashToReadableString(soulValue);
+                  } else {
+                    // Prova a decodificare come UTF-8
+                    soulString = ethers.toUtf8String(soulValue);
+                  }
+                  
+                  if (typeof keyValue === 'string' && keyValue.startsWith('0x') && keyValue.length === 66) {
+                    console.log("🔍 Detected keccak256 hash for key, converting to readable string");
+                    keyString = hashToReadableString(keyValue);
+                  } else {
+                    // Prova a decodificare come UTF-8
+                    keyString = ethers.toUtf8String(keyValue);
+                  }
+                  
+                  console.log(`✅ Final decoded: soul="${soulString}", key="${keyString}"`);
                 } catch (error) {
-                  console.warn("⚠️ Could not decode soul/key as UTF-8, using hex");
+                  console.warn("⚠️ Could not decode soul/key, using fallback");
                   console.log("Decode error:", error.message);
                   
-                  // Se la decodifica fallisce, usa i valori hex
+                  // Se la decodifica fallisce, usa i valori originali o hash
                   const soulValue = event.args.soul && typeof event.args.soul === 'object' && event.args.soul.hash ? event.args.soul.hash : event.args.soul;
                   const keyValue = event.args.key && typeof event.args.key === 'object' && event.args.key.hash ? event.args.key.hash : event.args.key;
-                  soulString = soulValue;
-                  keyString = keyValue;
                   
-                  console.log("🔍 Using hex values:", {
+                  soulString = hashToReadableString(soulValue);
+                  keyString = hashToReadableString(keyValue);
+                  
+                  console.log("🔍 Using fallback values:", {
                     soulString: soulString,
                     keyString: keyString
                   });

@@ -113,6 +113,46 @@ router.get("/status", async (req, res) => {
   }
 });
 
+// Route per testare la conversione degli hash
+router.get("/hash-test/:hash", async (req, res) => {
+  try {
+    const { hash } = req.params;
+    
+    // Funzione per convertire hash keccak256 in stringhe leggibili
+    function hashToReadableString(hash) {
+      if (!hash || typeof hash !== 'string') {
+        return hash;
+      }
+      
+      // Se è un hash keccak256 (64 caratteri hex + 0x)
+      if (hash.startsWith('0x') && hash.length === 66) {
+        // Per ora, usa i primi 8 caratteri come identificatore leggibile
+        return `hash_${hash.substring(2, 10)}`;
+      }
+      
+      return hash;
+    }
+
+    const readableString = hashToReadableString(hash);
+    
+    res.json({
+      success: true,
+      originalHash: hash,
+      readableString: readableString,
+      isKeccak256: hash.startsWith('0x') && hash.length === 66,
+      note: "Converte hash keccak256 in stringhe leggibili per GunDB"
+    });
+
+  } catch (error) {
+    console.error("❌ Hash test error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore test hash",
+      details: error.message
+    });
+  }
+});
+
 // Route per leggere i dati grezzi dal contratto
 router.get("/contract-read/:soul/:key", async (req, res) => {
   try {
