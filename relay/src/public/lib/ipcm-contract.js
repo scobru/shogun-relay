@@ -59,6 +59,7 @@ class IPCMInterface {
             console.log("📋 Factory config:", this.contractConfig.data?.factory);
             console.log("📋 Factory address:", this.contractConfig.data?.factory?.address);
             console.log("📋 Factory ABI length:", this.contractConfig.data?.factory?.abi?.length);
+            console.log("🔍 Full config structure:", JSON.stringify(this.contractConfig, null, 2));
             this.updateContractInfo();
             
         } catch (error) {
