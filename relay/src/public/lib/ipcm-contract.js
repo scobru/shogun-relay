@@ -260,10 +260,21 @@ class IPCMInterface {
             console.log("👤 Getting user instances for:", this.userAddress);
             console.log("🔍 User address checksum:", ethers.utils.getAddress(this.userAddress));
             
-            const instances = await this.ipcmFactory.getUserInstances(this.userAddress);
-            console.log("👤 Raw user instances result:", instances);
+            const instanceIndices = await this.ipcmFactory.getUserInstances(this.userAddress);
+            console.log("👤 Raw user instances result:", instanceIndices);
             
-            this.showResult('factoryResults', 'info', `Your instances: ${instances.join(', ')}`);
+            // Convert indices to addresses
+            const instanceAddresses = [];
+            for (let i = 0; i < instanceIndices.length; i++) {
+                const index = instanceIndices[i];
+                console.log(`🔍 Getting instance at index ${index.toString()}`);
+                const address = await this.ipcmFactory.getInstance(index);
+                console.log(`📍 Instance address at index ${index.toString()}: ${address}`);
+                instanceAddresses.push(address);
+            }
+            
+            console.log("👤 Final user instance addresses:", instanceAddresses);
+            this.showResult('factoryResults', 'info', `Your instances: ${instanceAddresses.join(', ')}`);
             
         } catch (error) {
             console.error("❌ Failed to get user instances:", error);
