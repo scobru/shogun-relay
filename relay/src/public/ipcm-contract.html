@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPCM Contract Interface - Shogun Relay</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js" type="application/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">IPCM Contract Interface</h1>
+            <p class="text-gray-600">Interact with IPCM (IPFS CID Mapping) contracts</p>
+        </div>
+
+        <!-- Application Info -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <h3 class="text-lg font-semibold text-blue-800 mb-2">📋 Application Info</h3>
+            <p class="text-blue-700 text-sm">
+                IPCM (IPFS CID Mapping) allows you to create and manage smart contracts that store IPFS CID mappings. 
+                Each contract can store a single string value (typically an IPFS CID) and is owned by a specific address.
+                Use the IPCMFactory to create new IPCM instances and manage your mappings.
+            </p>
+        </div>
+
+        <!-- Connection Status -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">🔗 Connection Status</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <h3 class="font-medium text-gray-700">Wallet</h3>
+                    <p id="wallet-status" class="text-sm text-gray-600">Not connected</p>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <h3 class="font-medium text-gray-700">Network</h3>
+                    <p id="network-status" class="text-sm text-gray-600">Unknown</p>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <h3 class="font-medium text-gray-700">Contracts</h3>
+                    <p id="contract-status" class="text-sm text-gray-600">Not loaded</p>
+                </div>
+            </div>
+            <div class="mt-4">
+                <button id="connect-wallet" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                    Connect Wallet
+                </button>
+            </div>
+        </div>
+
+        <!-- IPCMFactory Operations -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">🏭 IPCMFactory Operations</h2>
+            
+            <!-- Create IPCM -->
+            <div class="mb-6 p-4 border border-gray-200 rounded-lg">
+                <h3 class="font-medium text-gray-700 mb-2">Create New IPCM Instance</h3>
+                <div class="flex gap-2">
+                    <input type="text" id="new-owner" placeholder="Owner address (optional)" 
+                           class="flex-1 px-3 py-2 border border-gray-300 rounded-lg">
+                    <button id="create-ipcm" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
+                        Create IPCM
+                    </button>
+                </div>
+                <div id="create-result" class="mt-2 text-sm"></div>
+            </div>
+
+            <!-- List All Instances -->
+            <div class="mb-6 p-4 border border-gray-200 rounded-lg">
+                <h3 class="font-medium text-gray-700 mb-2">All IPCM Instances</h3>
+                <button id="get-all-instances" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg mb-2">
+                    Get All Instances
+                </button>
+                <div id="all-instances" class="mt-2 text-sm"></div>
+            </div>
+
+            <!-- Get User Instances -->
+            <div class="p-4 border border-gray-200 rounded-lg">
+                <h3 class="font-medium text-gray-700 mb-2">My IPCM Instances</h3>
+                <button id="get-user-instances" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg mb-2">
+                    Get My Instances
+                </button>
+                <div id="user-instances" class="mt-2 text-sm"></div>
+            </div>
+        </div>
+
+        <!-- IPCM Instance Operations -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">📝 IPCM Instance Operations</h2>
+            
+            <!-- Instance Address Input -->
+            <div class="mb-6 p-4 border border-gray-200 rounded-lg">
+                <h3 class="font-medium text-gray-700 mb-2">Select IPCM Instance</h3>
+                <div class="flex gap-2">
+                    <input type="text" id="instance-address" placeholder="IPCM contract address" 
+                           class="flex-1 px-3 py-2 border border-gray-300 rounded-lg">
+                    <button id="load-instance" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                        Load Instance
+                    </button>
+                </div>
+                <div id="instance-info" class="mt-2 text-sm"></div>
+            </div>
+
+            <!-- Update Mapping -->
+            <div class="mb-6 p-4 border border-gray-200 rounded-lg">
+                <h3 class="font-medium text-gray-700 mb-2">Update CID Mapping</h3>
+                <div class="flex gap-2">
+                    <input type="text" id="new-mapping" placeholder="New IPFS CID mapping" 
+                           class="flex-1 px-3 py-2 border border-gray-300 rounded-lg">
+                    <button id="update-mapping" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg">
+                        Update Mapping
+                    </button>
+                </div>
+                <div id="update-result" class="mt-2 text-sm"></div>
+            </div>
+
+            <!-- Get Mapping -->
+            <div class="p-4 border border-gray-200 rounded-lg">
+                <h3 class="font-medium text-gray-700 mb-2">Current Mapping</h3>
+                <button id="get-mapping" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg mb-2">
+                    Get Current Mapping
+                </button>
+                <div id="current-mapping" class="mt-2 text-sm"></div>
+            </div>
+        </div>
+
+        <!-- Mapping Operations -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">🗂️ Mapping Operations</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button id="my-contracts-files" class="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg">
+                    My Contracts & Files
+                </button>
+                <button id="check-file-status" class="bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-lg">
+                    Check File Status
+                </button>
+                <button id="system-stats" class="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-lg">
+                    System Stats
+                </button>
+            </div>
+            
+            <div id="mapping-results" class="mt-4 p-4 bg-gray-50 rounded-lg">
+                <p class="text-gray-600 text-sm">Click a button above to see results...</p>
+            </div>
+        </div>
+
+        <!-- Back to Dashboard -->
+        <div class="text-center">
+            <a href="/" class="inline-block bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg">
+                ← Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <script src="/lib/ipcm-contract.js"></script>
+</body>
+</html> 

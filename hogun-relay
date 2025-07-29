@@ -1,0 +1,344 @@
+[1mdiff --git a/relay/src/public/ipcm-contract.html b/relay/src/public/ipcm-contract.html[m
+[1mnew file mode 100644[m
+[1mindex 0000000..66dfce4[m
+[1m--- /dev/null[m
+[1m+++ b/relay/src/public/ipcm-contract.html[m
+[36m@@ -0,0 +1,161 @@[m
+[32m+[m[32m<!DOCTYPE html>[m
+[32m+[m[32m<html lang="en">[m
+[32m+[m[32m<head>[m
+[32m+[m[32m    <meta charset="UTF-8">[m
+[32m+[m[32m    <meta name="viewport" content="width=device-width, initial-scale=1.0">[m
+[32m+[m[32m    <title>IPCM Contract Interface - Shogun Relay</title>[m
+[32m+[m[32m    <script src="https://cdn.tailwindcss.com"></script>[m
+[32m+[m[32m    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js" type="application/javascript"></script>[m
+[32m+[m[32m    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>[m
+[32m+[m[32m    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>[m
+[32m+[m[32m</head>[m
+[32m+[m[32m<body class="bg-gray-100 min-h-screen">[m
+[32m+[m[32m    <div class="container mx-auto px-4 py-8">[m
+[32m+[m[32m        <!-- Header -->[m
+[32m+[m[32m        <div class="bg-white rounded-lg shadow-md p-6 mb-6">[m
+[32m+[m[32m            <h1 class="text-3xl font-bold text-gray-800 mb-2">IPCM Contract Interface</h1>[m
+[32m+[m[32m            <p class="text-gray-600">Interact with IPCM (IPFS CID Mapping) contracts</p>[m
+[32m+[m[32m        </div>[m
+[32m+[m
+[32m+[m[32m        <!-- Application Info -->[m
+[32m+[m[32m        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">[m
+[32m+[m[32m            <h3 class="text-lg font-semibold text-blue-800 mb-2">📋 Application Info</h3>[m
+[32m+[m[32m            <p class="text-blue-700 text-sm">[m
+[32m+[m[32m                IPCM (IPFS CID Mapping) allows you to create and manage smart contracts that store IPFS CID mappings.[m[41m [m
+[32m+[m[32m                Each contract can store a single string value (typically an IPFS CID) and is owned by a specific address.[m
+[32m+[m[32m                Use the IPCMFactory to create new IPCM instances and manage your mappings.[m
+[32m+[m[32m            </p>[m
+[32m+[m[32m        </div>[m
+[32m+[m
+[32m+[m[32m        <!-- Connection Status -->[m
+[32m+[m[32m        <div class="bg-white rounded-lg shadow-md p-6 mb-6">[m
+[32m+[m[32m            <h2 class="text-xl font-semibold text-gray-800 mb-4">🔗 Connection Status</h2>[m
+[32m+[m[32m            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">[m
+[32m+[m[32m                <div class="bg-gray-50 p-4 rounded-lg">[m
+[32m+[m[32m                    <h3 class="font-medium text-gray-700">Wallet</h3>[m
+[32m+[m[32m                    <p id="wallet-status" class="text-sm text-gray-600">Not connected</p>[m
+[32m+[m[32m                </div>[m
+[32m+[m[32m                <div class="bg-gray-50 p-4 rounded-lg">[m
+[32m+[m[32m                    <h3 class="font-medium text-gray-700">Network</h3>[m
+[32m+[m[32m                    <p id="network-status" class="text-sm text-gray-600">Unknown</p>[m
+[32m+[m[32m                </div>[m
+[32m+[m[32m                <div class="bg-gray-50 p-4 rounded-lg">[m
+[32m+[m[32m                    <h3 class="font-medium text-gray-700">Contracts</h3>[m
+[32m+[m[32m                    <p id="contract-status" class="text-sm text-gray-600">Not loaded</p>[m
+[32m+[m[32m                </div>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m            <div class="mt-4">[m
+[32m+[m[32m                <button id="connect-wallet" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">[m
+[32m+[m[32m                    Connect Wallet[m
+[32m+[m[32m                </button>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m        </div>[m
+[32m+[m
+[32m+[m[32m        <!-- IPCMFactory Operations -->[m
+[32m+[m[32m        <div class="bg-white rounded-lg shadow-md p-6 mb-6">[m
+[32m+[m[32m            <h2 class="text-xl font-semibold text-gray-800 mb-4">🏭 IPCMFactory Operations</h2>[m
+[32m+[m[41m            [m
+[32m+[m[32m            <!-- Create IPCM -->[m
+[32m+[m[32m            <div class="mb-6 p-4 border border-gray-200 rounded-lg">[m
+[32m+[m[32m                <h3 class="font-medium text-gray-700 mb-2">Create New IPCM Instance</h3>[m
+[32m+[m[32m                <div class="flex gap-2">[m
+[32m+[m[32m                    <input type="text" id="new-owner" placeholder="Owner address (optional)"[m[41m [m
+[32m+[m[32m                           class="flex-1 px-3 py-2 border border-gray-300 rounded-lg">[m
+[32m+[m[32m                    <button id="create-ipcm" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">[m
+[32m+[m[32m                        Create IPCM[m
+[32m+[m[32m                    </button>[m
+[32m+[m[32m                </div>[m
+[32m+[m[32m                <div id="create-result" class="mt-2 text-sm"></div>[m
+[32m+[m[32m            </div>[m
+[32m+[m
+[32m+[m[32m            <!-- List All Instances -->[m
+[32m+[m[32m            <div class="mb-6 p-4 border border-gray-200 rounded-lg">[m
+[32m+[m[32m                <h3 class="font-medium text-gray-700 mb-2">All IPCM Instances</h3>[m
+[32m+[m[32m                <button id="get-all-instances" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg mb-2">[m
+[32m+[m[32m                    Get All Instances[m
+[32m+[m[32m                </button>[m
+[32m+[m[32m                <div id="all-instances" class="mt-2 text-sm"></div>[m
+[32m+[m[32m            </div>[m
+[32m+[m
+[32m+[m[32m            <!-- Get User Instances -->[m
+[32m+[m[32m            <div class="p-4 border border-gray-200 rounded-lg">[m
+[32m+[m[32m                <h3 class="font-medium text-gray-700 mb-2">My IPCM Instances</h3>[m
+[32m+[m[32m                <button id="get-user-instances" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg mb-2">[m
+[32m+[m[32m                    Get My Instances[m
+[32m+[m[32m                </button>[m
+[32m+[m[32m                <div id="user-instances" class="mt-2 text-sm"></div>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m        </div>[m
+[32m+[m
+[32m+[m[32m        <!-- IPCM Instance Operations -->[m
+[32m+[m[32m        <div class="bg-white rounded-lg shadow-md p-6 mb-6">[m
+[32m+[m[32m            <h2 class="text-xl font-semibold text-gray-800 mb-4">📝 IPCM Instance Operations</h2>[m
+[32m+[m[41m            [m
+[32m+[m[32m            <!-- Instance Address Input -->[m
+[32m+[m[32m            <div class="mb-6 p-4 border border-gray-200 rounded-lg">[m
+[32m+[m[32m                <h3 class="font-medium text-gray-700 mb-2">Select IPCM Instance</h3>[m
+[32m+[m[32m                <div class="flex gap-2">[m
+[32m+[m[32m                    <input type="text" id="instance-address" placeholder="IPCM contract address"[m[41m [m
+[32m+[m[32m                           class="flex-1 px-3 py-2 border border-gray-300 rounded-lg">[m
+[32m+[m[32m                    <button id="load-instance" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">[m
+[32m+[m[32m                        Load Instance[m
+[32m+[m[32m                    </button>[m
+[32m+[m[32m                </div>[m
+[32m+[m[32m                <div id="instance-info" class="mt-2 text-sm"></div>[m
+[32m+[m[32m            </div>[m
+[32m+[m
+[32m+[m[32m            <!-- Update Mapping -->[m
+[32m+[m[32m            <div class="mb-6 p-4 border border-gray-200 rounded-lg">[m
+[32m+[m[32m                <h3 class="font-medium text-gray-700 mb-2">Update CID Mapping</h3>[m
+[32m+[m[32m                <div class="flex gap-2">[m
+[32m+[m[32m                    <input type="text" id="new-mapping" placeholder="New IPFS CID mapping"[m[41m [m
+[32m+[m[32m                           class="flex-1 px-3 py-2 border border-gray-300 rounded-lg">[m
+[32m+[m[32m                    <button id="update-mapping" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg">[m
+[32m+[m[32m                        Update Mapping[m
+[32m+[m[32m                    </button>[m
+[32m+[m[32m                </div>[m
+[32m+[m[32m                <div id="update-result" class="mt-2 text-sm"></div>[m
+[32m+[m[32m            </div>[m
+[32m+[m
+[32m+[m[32m            <!-- Get Mapping -->[m
+[32m+[m[32m            <div class="p-4 border border-gray-200 rounded-lg">[m
+[32m+[m[32m                <h3 class="font-medium text-gray-700 mb-2">Current Mapping</h3>[m
+[32m+[m[32m                <button id="get-mapping" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg mb-2">[m
+[32m+[m[32m                    Get Current Mapping[m
+[32m+[m[32m                </button>[m
+[32m+[m[32m                <div id="current-mapping" class="mt-2 text-sm"></div>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m        </div>[m
+[32m+[m
+[32m+[m[32m        <!-- Mapping Operations -->[m
+[32m+[m[32m        <div class="bg-white rounded-lg shadow-md p-6 mb-6">[m
+[32m+[m[32m            <h2 class="text-xl font-semibold text-gray-800 mb-4">🗂️ Mapping Operations</h2>[m
+[32m+[m[41m            [m
+[32m+[m[32m            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">[m
+[32m+[m[32m                <button id="my-contracts-files" class="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg">[m
+[32m+[m[32m                    My Contracts & Files[m
+[32m+[m[32m                </button>[m
+[32m+[m[32m                <button id="check-file-status" class="bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-lg">[m
+[32m+[m[32m                    Check File Status[m
+[32m+[m[32m                </button>[m
+[32m+[m[32m                <button id="system-stats" class="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-lg">[m
+[32m+[m[32m                    System Stats[m
+[32m+[m[32m                </button>[m
+[32m+[m[32m            </div>[m
+[32m+[m[41m            [m
+[32m+[m[32m            <div id="mapping-results" class="mt-4 p-4 bg-gray-50 rounded-lg">[m
+[32m+[m[32m                <p class="text-gray-600 text-sm">Click a button above to see results...</p>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m        </div>[m
+[32m+[m
+[32m+[m[32m        <!-- Back to Dashboard -->[m
+[32m+[m[32m        <div class="text-center">[m
+[32m+[m[32m            <a href="/" class="inline-block bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg">[m
+[32m+[m[32m                ← Back to Dashboard[m
+[32m+[m[32m            </a>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m    </div>[m
+[32m+[m
+[32m+[m[32m    <script src="/lib/ipcm-contract.js"></script>[m
+[32m+[m[32m</body>[m
+[32m+[m[32m</html>[m[41m [m
+\ No newline at end of file[m
+[1mdiff --git a/relay/src/public/lib/ipcm-contract.js b/relay/src/public/lib/ipcm-contract.js[m
+[1mnew file mode 100644[m
+[1mindex 0000000..8607a42[m
+[1m--- /dev/null[m
+[1m+++ b/relay/src/public/lib/ipcm-contract.js[m
+[36m@@ -0,0 +1,485 @@[m
+[32m+[m[32m// IPCM Contract Interface JavaScript[m
+[32m+[m[32mclass IPCMInterface {[m
+[32m+[m[32m    constructor() {[m
+[32m+[m[32m        this.provider = null;[m
+[32m+[m[32m        this.signer = null;[m
+[32m+[m[32m        this.userAddress = null;[m
+[32m+[m[32m        this.network = null;[m
+[32m+[m[32m        this.ipcmFactory = null;[m
+[32m+[m[32m        this.ipcmInstance = null;[m
+[32m+[m[32m        this.gun = null;[m
+[32m+[m[41m        [m
+[32m+[m[32m        this.initialize();[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    async initialize() {[m
+[32m+[m[32m        console.log("🚀 Initializing IPCM Interface...");[m
+[32m+[m[41m        [m
+[32m+[m[32m        // Initialize Gun[m
+[32m+[m[32m        this.initializeGun();[m
+[32m+[m[41m        [m
+[32m+[m[32m        // Load contract configuration[m
+[32m+[m[32m        await this.loadContractConfig();[m
+[32m+[m[41m        [m
+[32m+[m[32m        // Set up event listeners[m
+[32m+[m[32m        this.setupEventListeners();[m
+[32m+[m[41m        [m
+[32m+[m[32m        // Update UI[m
+[32m+[m[32m        this.updateConnectionStatus();[m
+[32m+[m[32m        this.updateContractInfo();[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    initializeGun() {[m
+[32m+[m[32m        try {[m
+[32m+[m[32m            this.gun = Gun(['https://ruling-mastodon-improved.ngrok-free.app/gun']);[m
+[32m+[m[32m            console.log("✅ Gun initialized on:", this.gun._.opt.peers[0]);[m
+[32m+[m[32m        } catch (error) {[m
+[32m+[m[32m            console.error("❌ Failed to initialize Gun:", error);[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    async loadContractConfig() {[m
+[32m+[m[32m        try {[m
+[32m+[m[32m            console.log("📋 Loading contract configuration...");[m
+[32m+[m[32m            const response = await fetch('/api/v1/contracts/ipcm');[m
+[32m+[m[41m            [m
+[32m+[m[32m            if (!response.ok) {[m
+[32m+[m[32m                throw new Error(`HTTP error! status: ${response.status}`);[m
+[32m+[m[32m            }[m
+[32m+[m[41m            [m
+[32m+[m[32m            const config = await response.json();[m
+[32m+[m[41m            [m
+[32m+[m[32m            if (!config.success) {[m
+[32m+[m[32m                throw new Error(config.error || 'Failed to load contract config');[m
+[32m+[m[32m            }[m
+[32m+[m[41m            [m
+[32m+[m[32m            this.contractConfig = config.data;[m
+[32m+[m[32m            console.log("✅ Contract configuration loaded:", this.contractConfig);[m
+[32m+[m[32m            this.updateContractInfo();[m
+[32m+[m[41m            [m
+[32m+[m[32m        } catch (error) {[m
+[32m+[m[32m            console.error("❌ Failed to load contract config:", error);[m
+[32m+[m[32m            this.updateConnectionStatus('Contract config failed to load');[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    setupEventListeners() {[m
+[32m+[m[32m        // Wallet connection[m
+[32m+[m[32m        document.getElementById('connect-wallet').addEventListener('click', () => this.connectWallet());[m
+[32m+[m[41m        [m
+[32m+[m[32m        // IPCMFactory operations[m
+[32m+[m[32m        document.getElementById('create-ipcm').addEventListener('click', () => this.createIPCM());[m
+[32m+[m[32m        document.getElementById('get-all-instances').addEventListener('click', () => this.getAllInstances());[m
+[32m+[m[32m        document.getElementById('get-user-instances').addEventListener('click', () => this.getUserInstances());[m
+[32m+[m[41m        [m
+[32m+[m[32m        // IPCM instance operations[m
+[32m+[m[32m        document.getElementById('load-instance').addEventListener('click', () => this.loadInstance());[m
+[32m+[m[32m        document.getElementById('update-mapping').addEventListener('click', () => this.updateMapping());[m
+[32m+[m[32m        document.getElementById('get-mapping').addEventListener('click', () => this.getMapping());[m
+[32m+[m[41m        [m
+[32m+[m[32m        // Mapping operations[m
+[32m+[m[32m        document.getElementById('my-contracts-files').addEventListener('click', () => this.getUserData());[m
+[32m+[m[32m        document.getElementById('check-file-status').addEventListener('click', () => this.checkFileStatus());[m
+[32m+[m[32m        document.getElementById('system-stats').addEventListener('click', () => this.getSystemStats());[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    updateConnectionStatus(message = null) {[m
+[32m+[m[32m        const walletStatus = document.getElementById('wallet-status');[m
+[32m+[m[32m        const networkStatus = document.getElementById('network-status');[m
+[32m+[m[32m        const contractStatus = document.getElementById('contract-status');[m
+[32m+[m[41m        [m
+[32m+[m[32m        if (message) {[m
+[32m+[m[32m            walletStatus.textContent = message;[m
+[32m+[m[32m            walletStatus.className = 'text-sm text-red-600';[m
+[32m+[m[32m            return;[m
+[32m+[m[32m        }[m
+[32m+[m[41m        [m
+[32m+[m[32m        if (this.userAddress) {[m
+[32m+[m[32m            walletStatus.textContent = this.userAddress.substring(0, 6) + '...' + this.userAddress.substring(38);[m
+[32m+[m[32m            walletStatus.className = 'text-sm text-green-600';[m
+[32m+[m[32m        } else {[m
+[32m+[m[32m            walletStatus.textContent = 'Not connected';[m
+[32m+[m[32m            walletStatus.className = 'text-sm text-gray-600';[m
+[32m+[m[32m        }[m
+[32m+[m[41m        [m
+[32m+[m[32m        if (this.network) {[m
+[32m+[m[32m            networkStatus.textContent = this.network.name;[m
+[32m+[m[32m            networkStatus.className = 'text-sm text-green-600';[m
+[32m+[m[32m        } else {[m
+[32m+[m[32m            networkStatus.textContent = 'Unknown';[m
+[32m+[m[32m            networkStatus.className = 'text-sm text-gray-600';[m
+[32m+[m[32m        }[m
+[32m+[m[41m        [m
+[32m+[m[32m        if (this.contractConfig) {[m
+[32m+[m[32m            contractStatus.textContent = 'Loaded';[m
+[32m+[m[32m            contractStatus.className = 'text-sm text-green-600';[m
+[32m+[m[32m        } else {[m
+[32m+[m[32m            contractStatus.textContent = 'Not loaded';[m
+[32m+[m[32m            contractStatus.className = 'text-sm text-gray-600';[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    updateContractInfo() {[m
+[32m+[m[32m        if (this.contractConfig) {[m
+[32m+[m[32m            console.log("📋 Contract info updated:", {[m
+[32m+[m[32m                factory: this.contractConfig.factory?.address,[m
+[32m+[m[32m                ipcm: this.contractConfig.ipcm?.address[m
+[32m+[m[32m            });[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    updateWalletInfo() {[m
+[32m+[m[32m        if (this.userAddress) {[m
+[32m+[m[32m            console.log("👤 Wallet connected:", this.userAddress);[m
+[32m+[m[32m            this.updateConnectionStatus();[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    async connectWallet() {[m
+[32m+[m[32m        try {[m
+[32m+[m[32m            console.log("🔗 Connecting wallet...");[m
+[32m+[m[41m            [m
+[32m+[m[32m            if (typeof window.ethereum === 'undefined') {[m
+[32m+[m[32m                throw new Error('MetaMask not found. Please install MetaMask.');[m
+[32m+[m[32m            }[m
+[32m+[m[41m            [m
+[32m+[m[32m            // Request account access[m
+[32m+[m[32m            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });[m
+[32m+[m[32m            this.userAddress = accounts[0];[m
+[32m+[m[41m            [m
+[32m+[m[32m            // Get provider and signer[m
+[32m+[m[32m            this.provider = new ethers.providers.Web3Provider(window.ethereum);[m
+[32m+[m[32m            this.signer = this.provider.getSigner();[m
+[32m+[m[41m            [m
+[32m+[m[32m            // Get network[m
+[32m+[m[32m            this.network = await this.provider.getNetwork();[m
+[32m+[m[41m            [m
+[32m+[m[32m            // Initialize contracts[m
+[32m+[m[32m            if (this.contractConfig?.factory) {[m
+[32m+[m[32m                this.ipcmFactory = new ethers.Contract([m
+[32m+[m[32m                    this.contractConfig.factory.address,[m
+[32m+[m[32m                    this.contractConfig.factory.abi,[m
+[32m+[m[32m                    this.signer[m
+[32m+[m[32m                );[m
+[32m+[m[32m            }[m
+[32m+[m[41m            [m
+[32m+[m[32m            this.updateWalletInfo();[m
+[32m+[m[32m            console.log("✅ Wallet connected successfully");[m
+[32m+[m[41m            [m
+[32m+[m[32m        } catch (error) {[m
+[32m+[m[32m            console.error("❌ Failed to co
