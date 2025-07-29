@@ -237,8 +237,11 @@ class IPCMInterface {
             }
             
             console.log("📋 Getting all IPCM instances...");
+            console.log("🏭 Factory address:", this.ipcmFactory.address);
+            console.log("🔍 Factory contract:", this.ipcmFactory);
             
             const instances = await this.ipcmFactory.getAllInstances();
+            console.log("📋 Raw instances result:", instances);
             
             this.showResult('factoryResults', 'info', `Found ${instances.length} instances: ${instances.join(', ')}`);
             
@@ -255,8 +258,10 @@ class IPCMInterface {
             }
             
             console.log("👤 Getting user instances for:", this.userAddress);
+            console.log("🔍 User address checksum:", ethers.utils.getAddress(this.userAddress));
             
             const instances = await this.ipcmFactory.getUserInstances(this.userAddress);
+            console.log("👤 Raw user instances result:", instances);
             
             this.showResult('factoryResults', 'info', `Your instances: ${instances.join(', ')}`);
             
@@ -383,6 +388,31 @@ class IPCMInterface {
         }
     }
 
+    async checkContractExists() {
+        try {
+            if (!this.ipcmFactory) {
+                throw new Error('IPCMFactory not initialized');
+            }
+            
+            console.log("🔍 Checking if factory contract exists...");
+            
+            // Check if contract has code
+            const code = await this.provider.getCode(this.ipcmFactory.address);
+            console.log("📄 Contract code length:", code.length);
+            console.log("📄 Contract has code:", code !== '0x');
+            
+            if (code === '0x') {
+                this.showResult('factoryResults', 'error', 'Factory contract has no code - not deployed or wrong address');
+            } else {
+                this.showResult('factoryResults', 'success', `Factory contract exists with ${code.length} bytes of code`);
+            }
+            
+        } catch (error) {
+            console.error("❌ Failed to check contract:", error);
+            this.showResult('factoryResults', 'error', `Failed to check contract: ${error.message}`);
+        }
+    }
+
     showResult(elementId, type, message) {
         const element = document.getElementById(elementId);
         const alertClass = type === 'error' ? 'alert-error' : type === 'success' ? 'alert-success' : 'alert-info';
@@ -421,6 +451,12 @@ window.getAllInstances = function() {
 window.getUserInstances = function() {
     if (window.ipcmInterface) {
         window.ipcmInterface.getUserInstances();
+    }
+};
+
+window.checkContractExists = function() {
+    if (window.ipcmInterface) {
+        window.ipcmInterface.checkContractExists();
     }
 };
 
