@@ -1,6 +1,6 @@
 # Shogun Relay - Quick Start Guide 🚀
 
-Get your Shogun Relay running with HTTPS in under 10 minutes!
+Get your **GunDB relay server** with integrated IPFS storage running with HTTPS in under 10 minutes!
 
 ## 📋 Prerequisites
 
@@ -47,10 +47,10 @@ ngrok http 8765
 
 ### Step 4: Access Your Relay
 
-🎉 **You're ready!** Your Shogun Relay is now accessible via HTTPS:
+🎉 **You're ready!** Your Shogun GunDB Relay is now accessible via HTTPS:
 
 - **Relay Interface**: `https://your-subdomain.ngrok.io`
-- **Gun.js Endpoint**: `https://your-subdomain.ngrok.io/gun`
+- **GunDB Endpoint**: `https://your-subdomain.ngrok.io/gun` (Primary)
 - **API Endpoints**: `https://your-subdomain.ngrok.io/api/*`
 - **Health Check**: `https://your-subdomain.ngrok.io/health`
 
@@ -157,6 +157,32 @@ curl https://your-subdomain.ngrok.io/api/contracts/relay-payment-router/address
 curl https://your-subdomain.ngrok.io/api/contracts/config
 ```
 
+### Test IPCM Contract APIs
+
+```bash
+# Get IPCM contract configuration
+curl https://your-subdomain.ngrok.io/api/v1/contracts/ipcm
+
+# Get IPCM factory ABI
+curl https://your-subdomain.ngrok.io/api/v1/contracts/ipcm/abi
+
+# Get IPCM factory address
+curl https://your-subdomain.ngrok.io/api/v1/contracts/ipcm/address
+```
+
+### Test Chain Contract APIs
+
+```bash
+# Get Chain contract configuration
+curl https://your-subdomain.ngrok.io/api/v1/contracts/chain
+
+# Get Chain contract ABI
+curl https://your-subdomain.ngrok.io/api/v1/contracts/chain/abi
+
+# Get Chain contract address
+curl https://your-subdomain.ngrok.io/api/v1/contracts/chain/address
+```
+
 ### Test System Hash APIs
 
 ```bash
@@ -227,6 +253,118 @@ GET https://your-subdomain.ngrok.io/visualGraph/*
 GET https://your-subdomain.ngrok.io/gun
 ```
 
+## 🌐 GunDB Relay Core
+
+The relay provides a complete GunDB relay server with real-time synchronization and decentralized data storage.
+
+### GunDB Features
+- **WebSocket Support**: Real-time bidirectional communication
+- **Graph Database**: Hierarchical data structure with soul/key/value pairs
+- **WebRTC Integration**: Peer-to-peer connections for enhanced decentralization
+- **Local Storage**: Persistent data storage with radisk
+- **Garbage Collection**: Automatic cleanup of unused data
+- **Authentication**: Token-based access control for protected operations
+
+### Connect to GunDB
+```bash
+# WebSocket connection (primary)
+wss://your-subdomain.ngrok.io/gun
+
+# HTTP connection (fallback)
+https://your-subdomain.ngrok.io/gun
+
+# Client library
+https://your-subdomain.ngrok.io/gun.js
+```
+
+### GunDB Client Example
+```javascript
+// Connect to the relay
+const gun = Gun(['https://your-subdomain.ngrok.io/gun']);
+
+// Store data
+gun.get('users').get('john').put({
+  name: 'John Doe',
+  email: 'john@example.com'
+});
+
+// Retrieve data
+gun.get('users').get('john').on((data) => {
+  console.log('User data:', data);
+});
+```
+
+### GunDB Authentication
+```bash
+# For protected operations, include token in headers
+const gun = Gun({
+  peers: ['https://your-subdomain.ngrok.io/gun'],
+  headers: {
+    token: 'your-admin-token'
+  }
+});
+```
+
+## ⛓️ Contract Interfaces
+
+The relay includes two powerful contract interfaces for blockchain integration:
+
+### IPCM Contract Interface (`/ipcm-contract`)
+**IPFS CID Mapping Contract** - Manage IPFS content identifiers on-chain
+
+#### Features
+- **IPCM Factory Operations**: Create and manage IPCM instances
+- **Instance Management**: Load, update, and query IPCM instances
+- **CID Mapping**: Update IPFS CID mappings for decentralized content
+- **Owner Management**: Transfer ownership of IPCM instances
+- **Batch Operations**: Get all instances or user-specific instances
+
+#### Smart Contract Integration
+- **Sepolia Testnet**: Deployed on Ethereum Sepolia testnet
+- **Factory Pattern**: IPCMFactory contract for instance creation
+- **Owner-based Access**: Only instance owners can update mappings
+- **Ethereum Wallet**: MetaMask integration for transactions
+
+#### Quick Start with IPCM Contract
+1. **Connect Wallet**: MetaMask with Sepolia network
+2. **Create IPCM**: Deploy new IPCM instance for CID mapping
+3. **Load Instance**: Connect to existing IPCM instance
+4. **Update Mapping**: Change IPFS CID mapping
+5. **Query Data**: Get current mapping and instance details
+
+### Chain Contract Interface (`/chain-contract`)
+**GunDB Chain Integration** - Write and read data to/from blockchain
+
+#### Features
+- **GunDB Integration**: Direct blockchain storage for GunDB data
+- **Data Writing**: Store GunDB nodes on-chain with soul/key/value
+- **Data Reading**: Retrieve blockchain-stored GunDB data
+- **Hash Generation**: Automatic keccak256 hashing for soul and keys
+- **Dual Storage**: Write to both GunDB and blockchain
+
+#### Smart Contract Integration
+- **Chain.sol Contract**: Custom smart contract for GunDB data
+- **Sepolia Testnet**: Deployed on Ethereum Sepolia testnet
+- **Gas Optimization**: Efficient storage patterns
+- **Data Verification**: On-chain data integrity checks
+
+#### Quick Start with Chain Contract
+1. **Connect Wallet**: MetaMask with Sepolia network
+2. **Write Data**: Store GunDB data on blockchain
+3. **Read Data**: Retrieve blockchain-stored data
+4. **Dual Mode**: Write to GunDB only or both systems
+5. **Data Inspection**: View and verify stored data
+
+### Contract Interface Access
+```bash
+# Direct access
+https://your-subdomain.ngrok.io/ipcm-contract
+https://your-subdomain.ngrok.io/chain-contract
+
+# From main interface
+https://your-subdomain.ngrok.io → Click "IPCM Contract Interface" or "Chain Contract Interface"
+```
+
 ## 🏠 Option 2: Local Development (HTTP Only)
 
 For local testing without HTTPS:
@@ -282,13 +420,15 @@ curl https://your-subdomain.ngrok.io/api/v1/health
 
 ## 🌟 Next Steps
 
-1. **Connect your app**: Use `https://your-subdomain.ngrok.io/gun` as your Gun.js peer
-2. **Upload files**: Visit `/upload` to test IPFS storage
+1. **Connect your app**: Use `https://your-subdomain.ngrok.io/gun` as your **GunDB peer**
+2. **Upload files**: Visit `/upload` to test IPFS storage (integrated)
 3. **Monitor performance**: Check `/stats` for real-time metrics
 4. **Explore data**: Visit `/visualGraph` for interactive GunDB visualization
-5. **Manage pins**: Use `/pin-manager` for IPFS pin management
+5. **Manage pins**: Use `/pin-manager` for IPFS pin management (integrated)
 6. **Test authentication**: Use the new `/api/v1/auth/*` endpoints
 7. **Manage users**: Explore user management APIs
+8. **Deploy contracts**: Use `/ipcm-contract` for IPFS CID mapping
+9. **Chain integration**: Use `/chain-contract` for GunDB blockchain storage
 
 ## 🗂️ IPFS Pin Manager
 
