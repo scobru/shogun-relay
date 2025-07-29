@@ -187,63 +187,6 @@ async function initializeServer() {
     }
   }
 
-  // Mappatura per mantenere i nomi originali
-  const originalNamesMap = new Map();
-
-  // Funzione per calcolare l'hash keccak256 di una stringa
-  function calculateKeccak256Hash(input) {
-    if (!input || typeof input !== 'string') {
-      return null;
-    }
-    try {
-      const bytes = ethers.toUtf8Bytes(input);
-      return ethers.keccak256(bytes);
-    } catch (error) {
-      console.error("❌ Error calculating keccak256 hash:", error);
-      return null;
-    }
-  }
-
-  // Funzione per aggiungere una mappatura hash -> nome originale
-  function addHashMapping(originalName, hash) {
-    if (originalName && hash) {
-      originalNamesMap.set(hash, originalName);
-      console.log(`📋 Added hash mapping: ${hash} -> ${originalName}`);
-    }
-  }
-
-  // Funzione per convertire hash keccak256 in stringhe leggibili
-  function hashToReadableString(hash) {
-    if (!hash || typeof hash !== 'string') {
-      return hash;
-    }
-    
-    // Se è un hash keccak256 (64 caratteri hex + 0x)
-    if (hash.startsWith('0x') && hash.length === 66) {
-      // Per ora, usa i primi 8 caratteri come identificatore leggibile
-      return `hash_${hash.substring(2, 10)}`;
-    }
-    
-    return hash;
-  }
-
-  // Funzione per ottenere il nome originale se disponibile
-  function getOriginalName(hash, fallbackName) {
-    if (!hash || typeof hash !== 'string') {
-      return fallbackName;
-    }
-    
-    // Se è un hash keccak256, cerca nella mappatura
-    if (hash.startsWith('0x') && hash.length === 66) {
-      const originalName = originalNamesMap.get(hash);
-      if (originalName) {
-        return originalName;
-      }
-    }
-    
-    return fallbackName;
-  }
-
   // Propaga Chain contract event a GunDB
   async function propagateChainEventToGun(soul, key, value, event) {
     console.log("🔄 propagateChainEventToGun called with:", { soul, key, value });
@@ -431,60 +374,26 @@ async function initializeServer() {
                 // Decode soul and key from bytes to string
                 let soulString, keyString;
                 try {
-                  // Se sono oggetti Indexed, estrai il valore
-                  const soulValue = event.args.soul && typeof event.args.soul === 'object' && event.args.soul.hash ? event.args.soul.hash : event.args.soul;
-                  const keyValue = event.args.key && typeof event.args.key === 'object' && event.args.key.hash ? event.args.key.hash : event.args.key;
-                  
-                  console.log("🔍 Raw values before decoding:", {
-                    soulValue: soulValue,
-                    keyValue: keyValue,
-                    soulType: typeof soulValue,
-                    keyType: typeof keyValue
+                  console.log("🔍 Raw event args:", {
+                    soul: event.args.soul,
+                    key: event.args.key,
+                    soulType: typeof event.args.soul,
+                    keyType: typeof event.args.key
                   });
                   
-                  // Per i parametri indexed, i bytes vengono hashati automaticamente da Solidity
-                  // Dobbiamo cercare nella mappatura per trovare i nomi originali
-                  if (typeof soulValue === 'string' && soulValue.startsWith('0x') && soulValue.length === 66) {
-                    // È un hash keccak256, cerca nella mappatura
-                    const originalSoul = originalNamesMap.get(soulValue);
-                    if (originalSoul) {
-                      console.log("✅ Found original soul in mapping:", originalSoul);
-                      soulString = originalSoul;
-                    } else {
-                      console.log("⚠️ Soul hash not found in mapping, using readable hash");
-                      soulString = hashToReadableString(soulValue);
-                    }
-                  } else {
-                    // Prova a decodificare come UTF-8 (caso non indexed)
-                    soulString = ethers.toUtf8String(soulValue);
-                  }
+                  // Ora che soul e key non sono più indexed, dovrebbero essere bytes in chiaro
+                  // Prova a decodificarli direttamente come UTF-8
+                  soulString = ethers.toUtf8String(event.args.soul);
+                  keyString = ethers.toUtf8String(event.args.key);
                   
-                  if (typeof keyValue === 'string' && keyValue.startsWith('0x') && keyValue.length === 66) {
-                    // È un hash keccak256, cerca nella mappatura
-                    const originalKey = originalNamesMap.get(keyValue);
-                    if (originalKey) {
-                      console.log("✅ Found original key in mapping:", originalKey);
-                      keyString = originalKey;
-                    } else {
-                      console.log("⚠️ Key hash not found in mapping, using readable hash");
-                      keyString = hashToReadableString(keyValue);
-                    }
-                  } else {
-                    // Prova a decodificare come UTF-8 (caso non indexed)
-                    keyString = ethers.toUtf8String(keyValue);
-                  }
-                  
-                  console.log(`✅ Final decoded: soul="${soulString}", key="${keyString}"`);
+                  console.log(`✅ Decoded from bytes: soul="${soulString}", key="${keyString}"`);
                 } catch (error) {
-                  console.warn("⚠️ Could not decode soul/key, using fallback");
+                  console.warn("⚠️ Could not decode soul/key as UTF-8, using fallback");
                   console.log("Decode error:", error.message);
                   
-                  // Se la decodifica fallisce, usa i valori originali o hash
-                  const soulValue = event.args.soul && typeof event.args.soul === 'object' && event.args.soul.hash ? event.args.soul.hash : event.args.soul;
-                  const keyValue = event.args.key && typeof event.args.key === 'object' && event.args.key.hash ? event.args.key.hash : event.args.key;
-                  
-                  soulString = hashToReadableString(soulValue);
-                  keyString = hashToReadableString(keyValue);
+                  // Se la decodifica fallisce, usa i valori originali
+                  soulString = String(event.args.soul || '');
+                  keyString = String(event.args.key || '');
                   
                   console.log("🔍 Using fallback values:", {
                     soulString: soulString,
@@ -1159,9 +1068,9 @@ async function initializeServer() {
   app.set("propagateChainEventToGun", propagateChainEventToGun);
   
   // Esponi la mappatura per le route
-  app.set("originalNamesMap", originalNamesMap);
-  app.set("addHashMapping", addHashMapping);
-  app.set("calculateKeccak256Hash", calculateKeccak256Hash);
+  // app.set("originalNamesMap", originalNamesMap); // Removed as per edit hint
+  // app.set("addHashMapping", addHashMapping); // Removed as per edit hint
+  // app.set("calculateKeccak256Hash", calculateKeccak256Hash); // Removed as per edit hint
   
   // Wrapper per syncChainContractToGun che accede alla funzione corretta
   app.set("syncChainContractToGun", async (params) => {
