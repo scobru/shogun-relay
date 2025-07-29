@@ -10,11 +10,11 @@
     <link rel="stylesheet" href="styles/wormhole.css">
     <script src="lib/admin-auth.js"></script>
     
-    <!-- Carica Gun prima di tutto -->
+    <!-- Load Gun first -->
     <script src="https://cdn.jsdelivr.net/npm/gun@0.2020.1240/gun.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gun@0.2020.1240/sea.js"></script>
     
-    <!-- Carica Ethers da CDN più affidabile -->
+    <!-- Load Ethers from reliable CDN -->
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 </head>
 
@@ -29,7 +29,7 @@
                             d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                     <h1 class="text-3xl font-semibold mb-2">Chain Contract Interface</h1>
-                    <p class="text-secondary">Interagisci con il contratto Chain.sol su Sepolia</p>
+                    <p class="text-secondary">Interact with Chain.sol contract on Sepolia</p>
                 </div>
 
                 <!-- Connection Status -->
@@ -37,48 +37,34 @@
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
-                    <span>Connettendo al contratto...</span>
+                    <span>Connecting to contract...</span>
                 </div>
 
                 <!-- Contract Info -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                     <div class="card bg-base-200">
                         <div class="card-body">
-                            <h2 class="card-title text-accent">📋 Informazioni Contratto</h2>
+                            <h2 class="card-title text-accent">📋 Contract Information</h2>
                             <div class="space-y-2 text-sm">
-                                <div><strong>Rete:</strong> <span id="networkInfo">Sepolia</span></div>
-                                <div><strong>Indirizzo:</strong> <span id="contractAddress" class="font-mono text-xs">Caricamento...</span></div>
-                                <div><strong>Owner:</strong> <span id="contractOwner" class="font-mono text-xs">Caricamento...</span></div>
-                                <div><strong>Stato:</strong> <span id="contractStatus">Connesso</span></div>
-                            </div>
-                            <div class="card-actions justify-end mt-4">
-                                <button class="btn btn-sm btn-outline" onclick="testContractConnection()">
-                                    🔍 Test Connessione
-                                </button>
-                                <button class="btn btn-sm btn-outline" onclick="testListenerStatus()">
-                                    🎧 Test Listener
-                                </button>
-                                <button class="btn btn-sm btn-outline" onclick="testEventPropagation()">
-                                    📡 Test Propagazione
-                                </button>
-                                <button class="btn btn-sm btn-outline" onclick="restartListener()">
-                                    🔄 Riavvia Listener
-                                </button>
+                                <div><strong>Network:</strong> <span id="networkInfo">Sepolia</span></div>
+                                <div><strong>Address:</strong> <span id="contractAddress" class="font-mono text-xs">Loading...</span></div>
+                                <div><strong>Owner:</strong> <span id="contractOwner" class="font-mono text-xs">Loading...</span></div>
+                                <div><strong>Status:</strong> <span id="contractStatus">Connected</span></div>
                             </div>
                         </div>
                     </div>
 
                     <div class="card bg-base-200">
                         <div class="card-body">
-                            <h2 class="card-title text-accent">🔗 Connessione Wallet</h2>
+                            <h2 class="card-title text-accent">🔗 Wallet Connection</h2>
                             <div class="space-y-2 text-sm">
-                                <div><strong>Wallet:</strong> <span id="walletAddress" class="font-mono text-xs">Non connesso</span></div>
-                                <div><strong>Saldo:</strong> <span id="walletBalance">-</span></div>
-                                <div><strong>Permessi:</strong> <span id="walletPermissions">Nessuno</span></div>
+                                <div><strong>Wallet:</strong> <span id="walletAddress" class="font-mono text-xs">Not connected</span></div>
+                                <div><strong>Balance:</strong> <span id="walletBalance">-</span></div>
+                                <div><strong>Permissions:</strong> <span id="walletPermissions">None</span></div>
                             </div>
                             <div class="card-actions justify-end mt-4">
                                 <button id="connectWalletBtn" class="btn btn-primary btn-sm" onclick="connectWallet()">
-                                    🔗 Connetti Wallet
+                                    🔗 Connect Wallet
                                 </button>
                             </div>
                         </div>
@@ -90,47 +76,47 @@
                     <!-- Write Data Section -->
                     <div class="card bg-base-200">
                         <div class="card-body">
-                            <h2 class="card-title text-accent">✍️ Scrivi Dati</h2>
+                            <h2 class="card-title text-accent">✍️ Write Data</h2>
                             <p class="text-sm text-base-content/70 mb-4">
-                                Inserisci i dati nel formato Gun e inviali al contratto Chain.sol
+                                Enter data in Gun format and send it to the Chain.sol contract
                             </p>
                             
                             <div class="form-control space-y-4">
                                 <div>
                                     <label class="label">
-                                        <span class="label-text">Soul (ID Nodo)</span>
-                                        <span class="label-text-alt">Hash keccak256</span>
+                                        <span class="label-text">Soul (Node ID)</span>
+                                        <span class="label-text-alt">keccak256 hash</span>
                                     </label>
                                     <input type="text" id="soulInput" class="input input-bordered w-full" 
-                                           placeholder="es: keccak256('user123')" />
+                                           placeholder="e.g. keccak256('user123')" />
                                     <div class="text-xs text-base-content/50 mt-1">
-                                        Lascia vuoto per generare automaticamente
+                                        Leave empty to generate automatically
                                     </div>
                                 </div>
 
                                 <div>
                                     <label class="label">
-                                        <span class="label-text">Chiave</span>
-                                        <span class="label-text-alt">Hash keccak256</span>
+                                        <span class="label-text">Key</span>
+                                        <span class="label-text-alt">keccak256 hash</span>
                                     </label>
                                     <input type="text" id="keyInput" class="input input-bordered w-full" 
-                                           placeholder="es: keccak256('profile')" />
+                                           placeholder="e.g. keccak256('profile')" />
                                 </div>
 
                                 <div>
                                     <label class="label">
-                                        <span class="label-text">Valore (JSON)</span>
+                                        <span class="label-text">Value (JSON)</span>
                                     </label>
                                     <textarea id="valueInput" class="textarea textarea-bordered w-full h-32" 
-                                              placeholder='{"name": "Mario", "age": 30, "city": "Roma"}'></textarea>
+                                              placeholder='{"name": "John", "age": 30, "city": "Rome"}'></textarea>
                                 </div>
 
                                 <div class="flex gap-2">
                                     <button class="btn btn-primary flex-1" onclick="writeToContract()">
-                                        📝 Scrivi su Contratto
+                                        📝 Write to Contract
                                     </button>
                                     <button class="btn btn-outline" onclick="writeToGunOnly()">
-                                        💾 Solo GunDB
+                                        💾 GunDB Only
                                     </button>
                                 </div>
                             </div>
@@ -140,43 +126,43 @@
                     <!-- Read Data Section -->
                     <div class="card bg-base-200">
                         <div class="card-body">
-                            <h2 class="card-title text-accent">📖 Leggi Dati</h2>
+                            <h2 class="card-title text-accent">📖 Read Data</h2>
                             <p class="text-sm text-base-content/70 mb-4">
-                                Leggi i dati dal contratto o da GunDB
+                                Read data from contract or GunDB
                             </p>
                             
                             <div class="form-control space-y-4">
                                 <div>
                                     <label class="label">
-                                        <span class="label-text">Soul (ID Nodo)</span>
+                                        <span class="label-text">Soul (Node ID)</span>
                                     </label>
                                     <input type="text" id="readSoulInput" class="input input-bordered w-full" 
-                                           placeholder="Inserisci soul per leggere" />
+                                           placeholder="Enter soul to read" />
                                 </div>
 
                                 <div>
                                     <label class="label">
-                                        <span class="label-text">Chiave (opzionale)</span>
+                                        <span class="label-text">Key (optional)</span>
                                     </label>
                                     <input type="text" id="readKeyInput" class="input input-bordered w-full" 
-                                           placeholder="Lascia vuoto per leggere tutto il nodo" />
+                                           placeholder="Leave empty to read entire node" />
                                 </div>
 
                                 <div class="flex gap-2">
                                     <button class="btn btn-secondary flex-1" onclick="readFromContract()">
-                                        🔍 Dal Contratto
+                                        🔍 From Contract
                                     </button>
                                     <button class="btn btn-outline flex-1" onclick="readFromGun()">
-                                        📊 Da GunDB
+                                        📊 From GunDB
                                     </button>
                                 </div>
 
                                 <div>
                                     <label class="label">
-                                        <span class="label-text">Risultato</span>
+                                        <span class="label-text">Result</span>
                                     </label>
                                     <textarea id="readResult" class="textarea textarea-bordered w-full h-32" 
-                                              readonly placeholder="I risultati appariranno qui..."></textarea>
+                                              readonly placeholder="Results will appear here..."></textarea>
                                 </div>
                             </div>
                         </div>
@@ -186,7 +172,7 @@
                 <!-- Navigation -->
                 <div class="flex justify-center mt-8">
                     <a href="/" class="btn btn-outline">
-                        ← Torna al Dashboard
+                        ← Back to Dashboard
                     </a>
                 </div>
             </div>

@@ -179,107 +179,96 @@ async function startChainEventListener() {
       console.warn("⚠️ Could not remove existing listeners:", error.message);
     }
     
-    // Funzione per gestire gli errori di filtro
-    const handleFilterError = async (error) => {
-      console.warn("⚠️ Filter error detected, attempting to restart listener...");
-      console.warn("📋 Error details:", error.message);
+    // Variabili per il polling
+    let lastProcessedBlock = 0;
+    let isPolling = false;
+    
+    // Funzione di polling per controllare nuovi eventi
+    const pollForEvents = async () => {
+      if (isPolling) return; // Evita polling simultaneo
+      isPolling = true;
       
-      // Aspetta un po' prima di riprovare
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      
-      // Riavvia il listener
       try {
-        await startChainEventListener();
-        console.log("✅ Listener restarted successfully after filter error");
-      } catch (restartError) {
-        console.error("❌ Failed to restart listener after filter error:", restartError);
+        const currentBlock = await provider.getBlockNumber();
+        
+        if (lastProcessedBlock === 0) {
+          // Prima volta: inizia dal blocco corrente
+          lastProcessedBlock = currentBlock - 1;
+          console.log(`🎯 Starting event polling from block ${lastProcessedBlock}`);
+        }
+        
+        if (currentBlock > lastProcessedBlock) {
+          console.log(`🔍 Polling for events from block ${lastProcessedBlock + 1} to ${currentBlock}`);
+          
+          try {
+            const events = await chainContract.queryFilter(
+              chainContract.filters.NodeUpdated(),
+              lastProcessedBlock + 1,
+              currentBlock
+            );
+            
+            console.log(`📡 Found ${events.length} new events`);
+            
+            // Processa ogni evento
+            for (const event of events) {
+              console.log("🎉 EVENTO RICEVUTO! Chain contract event received:", {
+                soul: event.args.soul,
+                key: event.args.key,
+                value: event.args.value,
+                blockNumber: event.blockNumber,
+                transactionHash: event.transactionHash,
+                logIndex: event.logIndex
+              });
+
+              // Decode the value from bytes to string
+              let decodedValue;
+              try {
+                decodedValue = ethers.toUtf8String(event.args.value);
+                console.log("✅ Value decoded successfully:", decodedValue);
+              } catch (error) {
+                console.warn("⚠️ Could not decode value as UTF-8, using hex:", event.args.value);
+                decodedValue = event.args.value;
+              }
+
+              // Decode soul and key from bytes to string
+              let soulString, keyString;
+              try {
+                soulString = ethers.toUtf8String(event.args.soul);
+                keyString = ethers.toUtf8String(event.args.key);
+                console.log(`🔄 Decoded: soul="${soulString}", key="${keyString}"`);
+              } catch (error) {
+                console.warn("⚠️ Could not decode soul/key as UTF-8, using hex");
+                soulString = event.args.soul;
+                keyString = event.args.key;
+              }
+
+              // Propaga a GunDB con i dati originali leggibili
+              console.log("🔄 Calling propagateChainEventToGun...");
+              await propagateChainEventToGun(soulString, keyString, decodedValue, event);
+            }
+            
+            lastProcessedBlock = currentBlock;
+            
+          } catch (filterError) {
+            console.warn("⚠️ Error querying events:", filterError.message);
+            // Non aggiornare lastProcessedBlock in caso di errore
+          }
+        }
+        
+      } catch (error) {
+        console.error("❌ Error in polling:", error);
+      } finally {
+        isPolling = false;
       }
     };
     
-    // Listen for NodeUpdated events
-    chainContract.on("NodeUpdated", async (soul, key, value, event) => {
-      console.log("🎉 EVENTO RICEVUTO! Chain contract event received:", {
-        soul: soul,
-        key: key,
-        value: value,
-        blockNumber: event.blockNumber,
-        transactionHash: event.transactionHash,
-        logIndex: event.logIndex
-      });
-
-      // Decode the value from bytes to string
-      let decodedValue;
-      try {
-        decodedValue = ethers.toUtf8String(value);
-        console.log("✅ Value decoded successfully:", decodedValue);
-      } catch (error) {
-        console.warn("⚠️ Could not decode value as UTF-8, using hex:", value);
-        decodedValue = value;
-      }
-
-      // Decode soul and key from bytes to string
-      let soulString, keyString;
-      try {
-        soulString = ethers.toUtf8String(soul);
-        keyString = ethers.toUtf8String(key);
-        console.log(`🔄 Decoded: soul="${soulString}", key="${keyString}"`);
-      } catch (error) {
-        console.warn("⚠️ Could not decode soul/key as UTF-8, using hex");
-        soulString = soul;
-        keyString = key;
-      }
-
-      // Propagate to GunDB with original readable data
-      console.log("🔄 Calling propagateChainEventToGun...");
-      await propagateChainEventToGun(soulString, keyString, decodedValue, event);
-    });
-
-    // Verifica che il listener sia registrato
-    const listenerCount = chainContract.listenerCount("NodeUpdated");
-    console.log("📊 Listener count after registration:", listenerCount);
+    // Avvia il polling ogni 5 secondi
+    const pollingInterval = setInterval(pollForEvents, 5000);
     
-    // Se listenerCount è una Promise, aspettiamo il risultato
-    const actualListenerCount = listenerCount instanceof Promise ? await listenerCount : listenerCount;
-    console.log("📊 Actual listener count:", actualListenerCount);
+    // Esegui il primo polling immediatamente
+    await pollForEvents();
     
-    if (actualListenerCount === 0) {
-      console.error("❌ Listener not registered properly");
-      return false;
-    }
-
-    // Test if the listener is working by checking for past events
-    console.log("🔍 Testing event listener with past events...");
-    try {
-      const currentBlock = await provider.getBlockNumber();
-      const fromBlock = Math.max(0, currentBlock - 100); // Ultimi 100 blocchi
-      const pastEvents = await chainContract.queryFilter(
-        chainContract.filters.NodeUpdated(),
-        fromBlock,
-        currentBlock
-      );
-      console.log(`📡 Found ${pastEvents.length} past events in last 100 blocks`);
-      
-      if (pastEvents.length > 0) {
-        console.log("📋 Recent events found, testing propagation...");
-        const latestEvent = pastEvents[pastEvents.length - 1];
-        const { soul, key, value } = latestEvent.args;
-        
-        let decodedValue = ethers.toUtf8String(value);
-        let soulString = ethers.toUtf8String(soul);
-        let keyString = ethers.toUtf8String(key);
-        
-        console.log(`🔄 Testing with latest event: soul="${soulString}", key="${keyString}"`);
-        await propagateChainEventToGun(soulString, keyString, decodedValue, latestEvent);
-      }
-    } catch (testError) {
-      console.warn("⚠️ Could not test with past events:", testError.message);
-      // Se il test fallisce, potrebbe essere un problema di filtro
-      if (testError.message.includes("filter not found")) {
-        await handleFilterError(testError);
-      }
-    }
-
-    console.log("✅ Chain contract event listener started");
+    console.log("✅ Chain contract event listener started (polling mode)");
     return true;
   } catch (error) {
     console.error("❌ Failed to start chain event listener:", error);
@@ -300,58 +289,6 @@ async function initializeServer() {
   // Start Chain contract event listener
   await startChainEventListener();
 
-  // Sistema di polling per verificare lo stato del listener
-  let listenerHealthCheckInterval;
-  
-  const startListenerHealthCheck = () => {
-    if (listenerHealthCheckInterval) {
-      clearInterval(listenerHealthCheckInterval);
-    }
-    
-    listenerHealthCheckInterval = setInterval(async () => {
-      try {
-        if (!chainContract) {
-          console.warn("⚠️ Chain contract not available during health check");
-          return;
-        }
-        
-        const listenerCount = chainContract.listenerCount("NodeUpdated");
-        console.log("🏥 Listener health check - count:", listenerCount);
-        
-        // Se listenerCount è una Promise, aspettiamo il risultato
-        const actualListenerCount = listenerCount instanceof Promise ? await listenerCount : listenerCount;
-        console.log("🏥 Actual listener count:", actualListenerCount);
-        
-        if (actualListenerCount === 0) {
-          console.warn("⚠️ Listener count is 0, restarting...");
-          await startChainEventListener();
-        } else {
-          // Test se il listener funziona ancora facendo una query
-          try {
-            const currentBlock = await provider.getBlockNumber();
-            const fromBlock = Math.max(0, currentBlock - 10); // Ultimi 10 blocchi
-            await chainContract.queryFilter(
-              chainContract.filters.NodeUpdated(),
-              fromBlock,
-              currentBlock
-            );
-            console.log("✅ Listener health check passed");
-          } catch (queryError) {
-            console.warn("⚠️ Listener health check failed:", queryError.message);
-            if (queryError.message.includes("filter not found")) {
-              console.warn("🔄 Filter not found, restarting listener...");
-              await startChainEventListener();
-            }
-          }
-        }
-      } catch (error) {
-        console.error("❌ Error during listener health check:", error);
-      }
-    }, 30000); // Controlla ogni 30 secondi
-  };
-  
-  startListenerHealthCheck();
-
   // System logging function
   function addSystemLog(level, message, data = null) {
     const timestamp = new Date().toISOString();
@@ -370,7 +307,7 @@ async function initializeServer() {
     }
   }
 
-  // Propagate Chain contract event to GunDB
+  // Propaga Chain contract event a GunDB
   async function propagateChainEventToGun(soul, key, value, event) {
     console.log("🔄 propagateChainEventToGun called with:", { soul, key, value });
     
@@ -380,11 +317,11 @@ async function initializeServer() {
     }
 
     try {
-      // Create a unique identifier for this event
+      // Crea un identificatore univoco per questo evento
       const eventId = `${event.transactionHash}-${event.logIndex}`;
       console.log("📋 Event ID:", eventId);
       
-      // Store the event data in GunDB
+      // Memorizza i dati dell'evento in GunDB
       console.log("💾 Storing event data in GunDB...");
       const eventNode = gun.get("shogun").get("chain_events").get(eventId);
       await new Promise((resolve, reject) => {
@@ -407,7 +344,7 @@ async function initializeServer() {
         });
       });
 
-      // Also store the data in the main GunDB structure using readable strings
+      // Memorizza anche i dati nella struttura principale di GunDB usando dati leggibili
       console.log("💾 Storing data in main GunDB structure...");
       const dataNode = gun.get(soul);
       await new Promise((resolve, reject) => {
@@ -424,7 +361,7 @@ async function initializeServer() {
 
       console.log(`✅ Chain event propagated to GunDB: ${soul} -> ${key}`);
       
-      // Add to system log
+      // Aggiungi al log del sistema
       addSystemLog("info", "Chain event propagated to GunDB", {
         soul: soul,
         key: key,
@@ -442,7 +379,7 @@ async function initializeServer() {
     }
   }
 
-  // Sync function to read from Chain contract and update GunDB
+  // Funzione di sincronizzazione per leggere dal contratto Chain e aggiornare GunDB
   async function syncChainContractToGun(params = {}) {
     if (!chainContract || !gun) {
       console.warn("⚠️ Chain contract or Gun not initialized");
@@ -642,7 +579,7 @@ async function initializeServer() {
     }
   }
 
-  // Time series data function
+  // Funzione per i dati di serie temporale
   function addTimeSeriesPoint(key, value) {
     const timestamp = Date.now();
     const dataPoint = {
@@ -656,7 +593,7 @@ async function initializeServer() {
     }
   }
 
-  // Garbage collection function
+  // Funzione di raccolta spazzatura
   function runGarbageCollector() {
     if (!GC_ENABLED) {
       console.log("🗑️ Garbage Collector is disabled.");
@@ -666,9 +603,9 @@ async function initializeServer() {
     addSystemLog("info", "Garbage collection started");
     let cleanedCount = 0;
 
-    // Ensure gun is initialized before accessing its properties
+    // Assicurati che gun sia inizializzato prima di accedere alle sue proprietà
     if (!gun || !gun._ || !gun._.graph) {
-      console.warn("⚠️ Gun not initialized yet, skipping garbage collection");
+      console.warn("⚠️ Gun non ancora inizializzato, saltando la raccolta spazzatura");
       return;
     }
 
@@ -683,14 +620,14 @@ async function initializeServer() {
         if (!isProtected) {
           gun.get(soul).put(null);
           cleanedCount++;
-          console.log(`🗑️ Cleaned up unprotected node: ${soul}`);
+          console.log(`🗑️ Pulito nodo non protetto: ${soul}`);
         }
       }
     }
 
     if (cleanedCount > 0) {
       console.log(
-        `🗑️ Garbage Collector finished. Cleaned ${cleanedCount} unprotected nodes.`
+        `🗑️ Garbage Collector finished. Cleaned ${cleanedCount} nodes.`
       );
       addSystemLog("info", `Garbage collection completed. Cleaned ${cleanedCount} nodes`);
     } else {
@@ -701,10 +638,10 @@ async function initializeServer() {
     }
   }
 
-  // Store GC interval reference for cleanup
+  // Memorizza il riferimento all'intervallo di GC per il cleanup
   let gcInterval = null;
 
-  // Initialize garbage collector
+  // Inizializza il garbage collector
   function initializeGarbageCollector() {
     if (GC_ENABLED) {
       console.log("🗑️ Initializing garbage collector...");
@@ -715,14 +652,14 @@ async function initializeServer() {
         } minutes.`
       );
       addSystemLog("info", "Garbage collector initialized");
-      // Run once on startup after a delay
-      setTimeout(runGarbageCollector, 30 * 1000); // Run 30s after start
+      // Esegui una volta all'avvio per un ritardo
+      setTimeout(runGarbageCollector, 30 * 1000); // Esegui 30s dopo l'avvio
     } else {
       console.log("🗑️ Garbage collection disabled");
     }
   }
 
-  // Flag per permettere operazioni interne durante REST API
+  // Flag per consentire operazioni interne durante REST API
   let allowInternalOperations = false;
 
   // Funzione helper per trovare il relay corrente basandosi sull'URL
@@ -768,7 +705,7 @@ async function initializeServer() {
         const fallbackRelayAddress = allRelays[0];
         console.log("📋 Using first available relay:", fallbackRelayAddress);
 
-        // Ottieni i dettagli del relay per logging
+        // Ottieni i dettagli del relay per il logging
         try {
           const relayDetails = await relayContract.getRelayDetails(
             fallbackRelayAddress
@@ -796,7 +733,7 @@ async function initializeServer() {
     }
   }
 
-  // Token validation function
+  // Funzione di validazione del token
   function hasValidToken(msg) {
     if (process.env.RELAY_PROTECTED === "false") {
       console.log("🔍 PUT allowed - protected disabled");
@@ -816,15 +753,15 @@ async function initializeServer() {
     // Permetti operazioni interne di Gun senza autenticazione
     const isInternalNamespace =
       firstSoul &&
-      (firstSoul.startsWith("~") || // User namespace
-        firstSoul.startsWith("!") || // Root namespace
-        firstSoul === "shogun" || // Shogun internal operations
-        firstSoul.startsWith("shogun/relays") || // Relay health data
-        firstSoul.startsWith("shogun/uploads") || // User uploads (permette salvataggio upload user)
-        firstSoul.startsWith("shogun/timeseries") || // Timeseries data
-        firstSoul.startsWith("shogun/logs") || // System logs
-        firstSoul.startsWith("shogun/chain_events") || // Chain events
-        !firstSoul.includes("/") || // Single level keys (internal Gun operations)
+      (firstSoul.startsWith("~") || // Namespace utente
+        firstSoul.startsWith("!") || // Namespace radice
+        firstSoul === "shogun" || // Operazioni interne di Shogun
+        firstSoul.startsWith("shogun/relays") || // Dati di salute del relay
+        firstSoul.startsWith("shogun/uploads") || // Upload utente (permette salvataggio upload utente)
+        firstSoul.startsWith("shogun/timeseries") || // Dati di serie temporale
+        firstSoul.startsWith("shogun/logs") || // Log del sistema
+        firstSoul.startsWith("shogun/chain_events") || // Eventi del contratto Chain
+        !firstSoul.includes("/") || // Chiavi a livello singolo (operazioni interne di Gun)
         firstSoul.match(
           /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
         )); // UUID souls
@@ -847,23 +784,38 @@ async function initializeServer() {
     return false;
   }
 
-  // Create Express app
+  // Crea l'app Express
   const app = express();
   const publicPath = path.resolve(__dirname, path_public);
   const indexPath = path.resolve(publicPath, "index.html");
 
   // Middleware
   app.use(cors());
-  app.use(express.json()); // Aggiungi supporto per JSON body parsing
-  app.use(express.urlencoded({ extended: true })); // Aggiungi supporto per form data
+  app.use(express.json()); // Aggiungi supporto per il parsing del body JSON
+  app.use(express.urlencoded({ extended: true })); // Aggiungi supporto per i dati del form
   app.use(Gun.serve);
 
   // Route statiche (DEFINITE DOPO LE API)
   app.use(express.static(publicPath));
 
-  // IPFS File Upload Endpoint
-  const upload = multer({ storage: multer.memoryStorage() });
-  
+  // Endpoint di upload IPFS (admin) - DEPRECATO: usa /api/v1/ipfs/upload invece
+  app.post("/ipfs-upload", tokenAuthMiddleware, upload.single("file"), async (req, res) => {
+    res.status(410).json({
+      success: false,
+      error: "This endpoint is deprecated. Use /api/v1/ipfs/upload instead.",
+      message: "Please update your client to use the new API endpoint."
+    });
+  });
+
+  // Endpoint di upload IPFS (user) - DEPRECATO: usa /api/v1/ipfs/upload invece
+  app.post("/ipfs-upload-user", walletSignatureMiddleware, upload.single("file"), async (req, res) => {
+    res.status(410).json({
+      success: false,
+      error: "This endpoint is deprecated. Use /api/v1/ipfs/upload instead.",
+      message: "Please update your client to use the new API endpoint."
+    });
+  });
+
   // Middleware di autenticazione
   const tokenAuthMiddleware = (req, res, next) => {
     // Check Authorization header (Bearer token)
@@ -1286,24 +1238,6 @@ async function initializeServer() {
     }
   });
 
-  // IPFS upload endpoint (admin) - DEPRECATED: use /api/v1/ipfs/upload instead
-  app.post("/ipfs-upload", tokenAuthMiddleware, upload.single("file"), async (req, res) => {
-    res.status(410).json({
-      success: false,
-      error: "This endpoint is deprecated. Use /api/v1/ipfs/upload instead.",
-      message: "Please update your client to use the new API endpoint."
-    });
-  });
-
-  // IPFS upload endpoint (user) - DEPRECATED: use /api/v1/ipfs/upload instead
-  app.post("/ipfs-upload-user", walletSignatureMiddleware, upload.single("file"), async (req, res) => {
-    res.status(410).json({
-      success: false,
-      error: "This endpoint is deprecated. Use /api/v1/ipfs/upload instead.",
-      message: "Please update your client to use the new API endpoint."
-    });
-  });
-
   // Importa e configura le route modulari
   try {
     const routes = await import("./routes/index.js");
@@ -1375,10 +1309,10 @@ async function initializeServer() {
     }
     
     // Clean up listener health check interval
-    if (listenerHealthCheckInterval) {
-      clearInterval(listenerHealthCheckInterval);
-      console.log("✅ Listener health check interval cleared");
-    }
+    // if (listenerHealthCheckInterval) { // This line is removed as per the edit hint
+    //   clearInterval(listenerHealthCheckInterval);
+    //   console.log("✅ Listener health check interval cleared");
+    // }
 
     // Close server
     if (server) {
