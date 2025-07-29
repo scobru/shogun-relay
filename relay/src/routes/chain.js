@@ -723,4 +723,83 @@ router.post("/restart-listener", async (req, res) => {
   }
 });
 
+// Route per visualizzare le mappature hash -> nome originale
+router.get("/mappings", async (req, res) => {
+  try {
+    const originalNamesMap = req.app.get("originalNamesMap");
+    
+    if (!originalNamesMap) {
+      return res.status(500).json({
+        success: false,
+        error: "Mappatura non disponibile"
+      });
+    }
+    
+    // Converti la Map in un oggetto per la risposta JSON
+    const mappings = {};
+    originalNamesMap.forEach((originalName, hash) => {
+      mappings[hash] = originalName;
+    });
+    
+    res.json({
+      success: true,
+      mappings: mappings,
+      count: originalNamesMap.size,
+      note: "Mappature hash keccak256 -> nome originale"
+    });
+    
+  } catch (error) {
+    console.error("❌ Error getting mappings:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Route per registrare mappature hash -> nome originale
+router.post("/register-mapping", async (req, res) => {
+  try {
+    const { soul, key } = req.body;
+    
+    if (!soul || !key) {
+      return res.status(400).json({
+        success: false,
+        error: "Soul e key sono richiesti"
+      });
+    }
+    
+    // Calcola gli hash keccak256
+    const soulBytes = ethers.toUtf8Bytes(soul);
+    const keyBytes = ethers.toUtf8Bytes(key);
+    const soulHash = ethers.keccak256(soulBytes);
+    const keyHash = ethers.keccak256(keyBytes);
+    
+    // Ottieni la mappatura dal server
+    const originalNamesMap = req.app.get("originalNamesMap");
+    if (originalNamesMap) {
+      originalNamesMap.set(soulHash, soul);
+      originalNamesMap.set(keyHash, key);
+      
+      console.log(`📋 Registered mappings: ${soulHash} -> ${soul}, ${keyHash} -> ${key}`);
+    }
+    
+    res.json({
+      success: true,
+      mappings: {
+        soul: { original: soul, hash: soulHash },
+        key: { original: key, hash: keyHash }
+      },
+      note: "Mappature registrate per il prossimo evento"
+    });
+    
+  } catch (error) {
+    console.error("❌ Error registering mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 export default router; 

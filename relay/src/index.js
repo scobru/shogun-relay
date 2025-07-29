@@ -187,6 +187,31 @@ async function initializeServer() {
     }
   }
 
+  // Mappatura per mantenere i nomi originali
+  const originalNamesMap = new Map();
+
+  // Funzione per calcolare l'hash keccak256 di una stringa
+  function calculateKeccak256Hash(input) {
+    if (!input || typeof input !== 'string') {
+      return null;
+    }
+    try {
+      const bytes = ethers.toUtf8Bytes(input);
+      return ethers.keccak256(bytes);
+    } catch (error) {
+      console.error("❌ Error calculating keccak256 hash:", error);
+      return null;
+    }
+  }
+
+  // Funzione per aggiungere una mappatura hash -> nome originale
+  function addHashMapping(originalName, hash) {
+    if (originalName && hash) {
+      originalNamesMap.set(hash, originalName);
+      console.log(`📋 Added hash mapping: ${hash} -> ${originalName}`);
+    }
+  }
+
   // Funzione per convertire hash keccak256 in stringhe leggibili
   function hashToReadableString(hash) {
     if (!hash || typeof hash !== 'string') {
@@ -200,6 +225,23 @@ async function initializeServer() {
     }
     
     return hash;
+  }
+
+  // Funzione per ottenere il nome originale se disponibile
+  function getOriginalName(hash, fallbackName) {
+    if (!hash || typeof hash !== 'string') {
+      return fallbackName;
+    }
+    
+    // Se è un hash keccak256, cerca nella mappatura
+    if (hash.startsWith('0x') && hash.length === 66) {
+      const originalName = originalNamesMap.get(hash);
+      if (originalName) {
+        return originalName;
+      }
+    }
+    
+    return fallbackName;
   }
 
   // Propaga Chain contract event a GunDB
@@ -400,20 +442,35 @@ async function initializeServer() {
                     keyType: typeof keyValue
                   });
                   
-                  // Controlla se sono hash keccak256
+                  // Per i parametri indexed, i bytes vengono hashati automaticamente da Solidity
+                  // Dobbiamo cercare nella mappatura per trovare i nomi originali
                   if (typeof soulValue === 'string' && soulValue.startsWith('0x') && soulValue.length === 66) {
-                    console.log("🔍 Detected keccak256 hash for soul, converting to readable string");
-                    soulString = hashToReadableString(soulValue);
+                    // È un hash keccak256, cerca nella mappatura
+                    const originalSoul = originalNamesMap.get(soulValue);
+                    if (originalSoul) {
+                      console.log("✅ Found original soul in mapping:", originalSoul);
+                      soulString = originalSoul;
+                    } else {
+                      console.log("⚠️ Soul hash not found in mapping, using readable hash");
+                      soulString = hashToReadableString(soulValue);
+                    }
                   } else {
-                    // Prova a decodificare come UTF-8
+                    // Prova a decodificare come UTF-8 (caso non indexed)
                     soulString = ethers.toUtf8String(soulValue);
                   }
                   
                   if (typeof keyValue === 'string' && keyValue.startsWith('0x') && keyValue.length === 66) {
-                    console.log("🔍 Detected keccak256 hash for key, converting to readable string");
-                    keyString = hashToReadableString(keyValue);
+                    // È un hash keccak256, cerca nella mappatura
+                    const originalKey = originalNamesMap.get(keyValue);
+                    if (originalKey) {
+                      console.log("✅ Found original key in mapping:", originalKey);
+                      keyString = originalKey;
+                    } else {
+                      console.log("⚠️ Key hash not found in mapping, using readable hash");
+                      keyString = hashToReadableString(keyValue);
+                    }
                   } else {
-                    // Prova a decodificare come UTF-8
+                    // Prova a decodificare come UTF-8 (caso non indexed)
                     keyString = ethers.toUtf8String(keyValue);
                   }
                   
@@ -1100,6 +1157,11 @@ async function initializeServer() {
   app.set("chainContract", chainContract);
   app.set("startChainEventListener", startChainEventListener);
   app.set("propagateChainEventToGun", propagateChainEventToGun);
+  
+  // Esponi la mappatura per le route
+  app.set("originalNamesMap", originalNamesMap);
+  app.set("addHashMapping", addHashMapping);
+  app.set("calculateKeccak256Hash", calculateKeccak256Hash);
   
   // Wrapper per syncChainContractToGun che accede alla funzione corretta
   app.set("syncChainContractToGun", async (params) => {

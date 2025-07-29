@@ -189,6 +189,28 @@ async function writeToContract() {
         const key = keyInput;
         const value = stringToBytes(valueInput);
         
+        // Registra le mappature hash -> nome originale PRIMA di scrivere sul contratto
+        console.log('📋 Registering hash mappings before contract write...');
+        try {
+            const mappingResponse = await fetch('/api/v1/chain/register-mapping', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ soul, key })
+            });
+            
+            const mappingData = await mappingResponse.json();
+            if (mappingData.success) {
+                console.log('✅ Hash mappings registered:', mappingData.mappings);
+            } else {
+                console.warn('⚠️ Failed to register mappings:', mappingData.error);
+            }
+        } catch (mappingError) {
+            console.warn('⚠️ Error registering mappings:', mappingError);
+            // Continua comunque con la scrittura del contratto
+        }
+        
         // Write to contract (user transaction)
         const tx = await contract.put(stringToBytes(soul), stringToBytes(key), value);
         console.log(`⏳ Transaction sent: ${tx.hash}`);
