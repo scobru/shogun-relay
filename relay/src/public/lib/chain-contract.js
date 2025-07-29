@@ -198,7 +198,7 @@ async function writeToContract() {
         console.log(`✅ Transazione confermata: ${receipt.transactionHash}`);
         
         // Scrivi anche su GunDB localmente (usando i dati originali leggibili)
-        await writeToGun(soul, key, valueInput);
+        // await writeToGun(soul, key, valueInput);
         
         console.log(`✅ Dati scritti su contratto e GunDB. Soul: ${soul}, Key: ${key}`);
         alert(`✅ Dati scritti con successo!\nSoul: ${soul}\nKey: ${key}\nValue: ${valueInput}`);
