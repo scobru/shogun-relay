@@ -159,123 +159,6 @@ async function initializeChainContract() {
   }
 }
 
-// Start Chain contract event listener
-async function startChainEventListener() {
-  if (!chainContract) {
-    console.log("⚠️ Chain contract not initialized");
-    return false;
-  }
-
-  try {
-    console.log("🎧 Starting Chain contract event listener...");
-    console.log("📋 Contract address:", chainContract.target);
-    console.log("📋 Contract filters:", chainContract.filters ? "Available" : "Not available");
-    
-    // Rimuovi listener esistenti per evitare duplicati
-    try {
-      chainContract.removeAllListeners("NodeUpdated");
-      console.log("🗑️ Removed existing listeners");
-    } catch (error) {
-      console.warn("⚠️ Could not remove existing listeners:", error.message);
-    }
-    
-    // Variabili per il polling
-    let lastProcessedBlock = 0;
-    let isPolling = false;
-    
-    // Funzione di polling per controllare nuovi eventi
-    const pollForEvents = async () => {
-      if (isPolling) return; // Evita polling simultaneo
-      isPolling = true;
-      
-      try {
-        const currentBlock = await provider.getBlockNumber();
-        
-        if (lastProcessedBlock === 0) {
-          // Prima volta: inizia dal blocco corrente
-          lastProcessedBlock = currentBlock - 1;
-          console.log(`🎯 Starting event polling from block ${lastProcessedBlock}`);
-        }
-        
-        if (currentBlock > lastProcessedBlock) {
-          console.log(`🔍 Polling for events from block ${lastProcessedBlock + 1} to ${currentBlock}`);
-          
-          try {
-            const events = await chainContract.queryFilter(
-              chainContract.filters.NodeUpdated(),
-              lastProcessedBlock + 1,
-              currentBlock
-            );
-            
-            console.log(`📡 Found ${events.length} new events`);
-            
-            // Processa ogni evento
-            for (const event of events) {
-              console.log("🎉 EVENTO RICEVUTO! Chain contract event received:", {
-                soul: event.args.soul,
-                key: event.args.key,
-                value: event.args.value,
-                blockNumber: event.blockNumber,
-                transactionHash: event.transactionHash,
-                logIndex: event.logIndex
-              });
-
-              // Decode the value from bytes to string
-              let decodedValue;
-              try {
-                decodedValue = ethers.toUtf8String(event.args.value);
-                console.log("✅ Value decoded successfully:", decodedValue);
-              } catch (error) {
-                console.warn("⚠️ Could not decode value as UTF-8, using hex:", event.args.value);
-                decodedValue = event.args.value;
-              }
-
-              // Decode soul and key from bytes to string
-              let soulString, keyString;
-              try {
-                soulString = ethers.toUtf8String(event.args.soul);
-                keyString = ethers.toUtf8String(event.args.key);
-                console.log(`🔄 Decoded: soul="${soulString}", key="${keyString}"`);
-              } catch (error) {
-                console.warn("⚠️ Could not decode soul/key as UTF-8, using hex");
-                soulString = event.args.soul;
-                keyString = event.args.key;
-              }
-
-              // Propaga a GunDB con i dati originali leggibili
-              console.log("🔄 Calling propagateChainEventToGun...");
-              await propagateChainEventToGun(soulString, keyString, decodedValue, event);
-            }
-            
-            lastProcessedBlock = currentBlock;
-            
-          } catch (filterError) {
-            console.warn("⚠️ Error querying events:", filterError.message);
-            // Non aggiornare lastProcessedBlock in caso di errore
-          }
-        }
-        
-      } catch (error) {
-        console.error("❌ Error in polling:", error);
-      } finally {
-        isPolling = false;
-      }
-    };
-    
-    // Avvia il polling ogni 5 secondi
-    const pollingInterval = setInterval(pollForEvents, 5000);
-    
-    // Esegui il primo polling immediatamente
-    await pollForEvents();
-    
-    console.log("✅ Chain contract event listener started (polling mode)");
-    return true;
-  } catch (error) {
-    console.error("❌ Failed to start chain event listener:", error);
-    return false;
-  }
-}
-
 // Main server initialization function
 async function initializeServer() {
   console.log("🚀 Initializing Shogun Relay Server...");
@@ -285,9 +168,6 @@ async function initializeServer() {
 
   // Initialize Chain contract
   await initializeChainContract();
-
-  // Start Chain contract event listener
-  await startChainEventListener();
 
   // System logging function
   function addSystemLog(level, message, data = null) {
@@ -378,6 +258,126 @@ async function initializeServer() {
       });
     }
   }
+
+  // Start Chain contract event listener
+  async function startChainEventListener() {
+    if (!chainContract) {
+      console.log("⚠️ Chain contract not initialized");
+      return false;
+    }
+
+    try {
+      console.log("🎧 Starting Chain contract event listener...");
+      console.log("📋 Contract address:", chainContract.target);
+      console.log("📋 Contract filters:", chainContract.filters ? "Available" : "Not available");
+      
+      // Rimuovi listener esistenti per evitare duplicati
+      try {
+        chainContract.removeAllListeners("NodeUpdated");
+        console.log("🗑️ Removed existing listeners");
+      } catch (error) {
+        console.warn("⚠️ Could not remove existing listeners:", error.message);
+      }
+      
+      // Variabili per il polling
+      let lastProcessedBlock = 0;
+      let isPolling = false;
+      
+      // Funzione di polling per controllare nuovi eventi
+      const pollForEvents = async () => {
+        if (isPolling) return; // Evita polling simultaneo
+        isPolling = true;
+        
+        try {
+          const currentBlock = await provider.getBlockNumber();
+          
+          if (lastProcessedBlock === 0) {
+            // Prima volta: inizia dal blocco corrente
+            lastProcessedBlock = currentBlock - 1;
+            console.log(`🎯 Starting event polling from block ${lastProcessedBlock}`);
+          }
+          
+          if (currentBlock > lastProcessedBlock) {
+            console.log(`🔍 Polling for events from block ${lastProcessedBlock + 1} to ${currentBlock}`);
+            
+            try {
+              const events = await chainContract.queryFilter(
+                chainContract.filters.NodeUpdated(),
+                lastProcessedBlock + 1,
+                currentBlock
+              );
+              
+              console.log(`📡 Found ${events.length} new events`);
+              
+              // Processa ogni evento
+              for (const event of events) {
+                console.log("🎉 EVENTO RICEVUTO! Chain contract event received:", {
+                  soul: event.args.soul,
+                  key: event.args.key,
+                  value: event.args.value,
+                  blockNumber: event.blockNumber,
+                  transactionHash: event.transactionHash,
+                  logIndex: event.logIndex
+                });
+
+                // Decode the value from bytes to string
+                let decodedValue;
+                try {
+                  decodedValue = ethers.toUtf8String(event.args.value);
+                  console.log("✅ Value decoded successfully:", decodedValue);
+                } catch (error) {
+                  console.warn("⚠️ Could not decode value as UTF-8, using hex:", event.args.value);
+                  decodedValue = event.args.value;
+                }
+
+                // Decode soul and key from bytes to string
+                let soulString, keyString;
+                try {
+                  soulString = ethers.toUtf8String(event.args.soul);
+                  keyString = ethers.toUtf8String(event.args.key);
+                  console.log(`🔄 Decoded: soul="${soulString}", key="${keyString}"`);
+                } catch (error) {
+                  console.warn("⚠️ Could not decode soul/key as UTF-8, using hex");
+                  soulString = event.args.soul;
+                  keyString = event.args.key;
+                }
+
+                // Propaga a GunDB con i dati originali leggibili
+                console.log("🔄 Calling propagateChainEventToGun...");
+                await propagateChainEventToGun(soulString, keyString, decodedValue, event);
+              }
+              
+              lastProcessedBlock = currentBlock;
+              
+            } catch (filterError) {
+              console.warn("⚠️ Error querying events:", filterError.message);
+              // Non aggiornare lastProcessedBlock in caso di errore
+            }
+          }
+          
+        } catch (error) {
+          console.error("❌ Error in polling:", error);
+        } finally {
+          isPolling = false;
+        }
+      };
+      
+      // Avvia il polling ogni 5 secondi
+      const pollingInterval = setInterval(pollForEvents, 5000);
+      
+      // Esegui il primo polling immediatamente
+      await pollForEvents();
+      
+      console.log("✅ Chain contract event listener started (polling mode)");
+      return true;
+    } catch (error) {
+      console.error("❌ Failed to start chain event listener:", error);
+      return false;
+    }
+  }
+
+  // Start Chain contract event listener
+  await startChainEventListener();
 
   // Funzione di sincronizzazione per leggere dal contratto Chain e aggiornare GunDB
   async function syncChainContractToGun(params = {}) {
