@@ -23,7 +23,7 @@ const authLimiter = rateLimit({
 // Inizializza Shogun Core con la configurazione del relay
 let shogunInstance = null;
 
-function initializeShogunCore() {
+function initializeShogunCore(req) {
   if (shogunInstance) return shogunInstance;
 
   const peers = process.env.RELAY_PEERS ? process.env.RELAY_PEERS.split(',') : [
@@ -32,7 +32,7 @@ function initializeShogunCore() {
     "https://peer.wallie.io/gun",
   ];
 
-  const gun = getGunInstance(req);
+  const gun = req ? getGunInstance(req) : null;
   
   shogunInstance = new ShogunCore({
     gunInstance: gun,
@@ -60,7 +60,7 @@ function initializeShogunCore() {
 // Middleware per ottenere l'istanza Shogun Core
 const getShogunInstance = (req) => {
   if (!shogunInstance) {
-    shogunInstance = initializeShogunCore();
+    shogunInstance = initializeShogunCore(req);
   }
   return shogunInstance;
 };
