@@ -358,11 +358,11 @@
 
         // Get the token from localStorage or prompt the user
         function getAuthToken() {
-            let token = localStorage.getItem('adminToken');
+            let token = localStorage.getItem('shogun-relay-admin-password');
             if (!token) {
                 token = prompt('Please enter your admin token:');
                 if (token) {
-                    localStorage.setItem('adminToken', token);
+                    localStorage.setItem('shogun-relay-admin-password', token);
                 }
             }
             return token;
