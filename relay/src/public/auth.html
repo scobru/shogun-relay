@@ -628,17 +628,33 @@
                 console.log('⚡ Nostr public key:', pubKey);
                 document.getElementById('nostrAddress').value = pubKey;
                 
-                // Genera firma deterministica basata sulla chiave pubblica
+                // Richiedi firma reale dall'estensione Nostr
                 const message = "I Love Shogun!";
-                console.log('⚡ Generating deterministic signature for message:', message);
+                console.log('⚡ Requesting real Nostr signature for message:', message);
                 
-                // Crea una firma deterministica basata sulla chiave pubblica e il messaggio
-                const deterministicSignature = generateDeterministicNostrSignature(pubKey, message);
+                // Crea un evento Nostr con timestamp fisso per renderlo deterministico
+                const eventData = {
+                    kind: 1,
+                    created_at: 0, // IMPORTANT: Use a fixed timestamp to make signatures verifiable
+                    tags: [],
+                    content: message,
+                    pubkey: pubKey,
+                };
                 
-                console.log('⚡ Deterministic signature generated:', deterministicSignature.substring(0, 20) + '...');
-                document.getElementById('nostrSignature').value = deterministicSignature;
+                // Crea l'evento con l'ID calcolato
+                const nostrEvent = {
+                    ...eventData,
+                    id: "", // L'estensione calcolerà l'ID
+                    sig: "", // L'estensione riempirà la firma
+                };
                 
-                showStatus('Nostr connesso e firma deterministica generata! Ora puoi fare login o registrazione.', 'success');
+                const event = await window.nostr.signEvent(nostrEvent);
+                const signature = event.sig;
+                
+                console.log('⚡ Real Nostr signature received:', signature.substring(0, 20) + '...');
+                document.getElementById('nostrSignature').value = signature;
+                
+                showStatus('Nostr connesso e firma reale ottenuta! Ora puoi fare login o registrazione.', 'success');
                 
             } catch (error) {
                 console.error('❌ Nostr connection error:', error);
@@ -651,48 +667,6 @@
                     showStatus('Errore nella connessione a Nostr: ' + error.message, 'error');
                 }
             }
-        }
-
-        // Funzione per generare una firma Nostr deterministica
-        function generateDeterministicNostrSignature(pubKey, message) {
-            // Crea una stringa base deterministica
-            const baseString = `${pubKey}_${message}_shogun_deterministic`;
-            
-            // Genera un hash deterministico usando una funzione semplice
-            let hash = "";
-            let runningValue = 0;
-            
-            for (let i = 0; i < baseString.length; i++) {
-                const charCode = baseString.charCodeAt(i);
-                runningValue = (runningValue * 31 + charCode) & 0xffffffff;
-                
-                if (i % 4 === 3) {
-                    hash += runningValue.toString(16).padStart(8, "0");
-                }
-            }
-            
-            // Assicurati di avere esattamente 128 caratteri (64 bytes in hex)
-            while (hash.length < 128) {
-                runningValue = (runningValue * 31 + hash.length) & 0xffffffff;
-                hash += runningValue.toString(16).padStart(8, "0");
-            }
-            
-            // Assicurati che il risultato sia esattamente 128 caratteri e contenga solo caratteri hex validi
-            let deterministicSignature = hash.substring(0, 128);
-            
-            // Double-check che sia una stringa hex valida
-            deterministicSignature = deterministicSignature
-                .toLowerCase()
-                .replace(/[^0-9a-f]/g, "0");
-            
-            // Assicurati che sia esattamente 128 caratteri
-            if (deterministicSignature.length < 128) {
-                deterministicSignature = deterministicSignature.padEnd(128, "0");
-            } else if (deterministicSignature.length > 128) {
-                deterministicSignature = deterministicSignature.substring(0, 128);
-            }
-            
-            return deterministicSignature;
         }
 
         // OAuth Authentication
