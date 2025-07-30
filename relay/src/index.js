@@ -12,7 +12,7 @@ import qr from "qr";
 import setSelfAdjustingInterval from "self-adjusting-interval";
 import "./utils/bullet-catcher.js";
 import { ethers } from "ethers";
-import {ShogunCore} from "shogun-core";
+import { ShogunCore } from "shogun-core";
 
 dotenv.config();
 
@@ -574,7 +574,6 @@ async function initializeServer() {
   // Start Chain contract event listener
   await startChainEventListener();
 
- 
   // Funzione per i dati di serie temporale
   function addTimeSeriesPoint(key, value) {
     const timestamp = Date.now();
@@ -802,9 +801,9 @@ async function initializeServer() {
   app.use(cors());
   app.use(express.json()); // Aggiungi supporto per il parsing del body JSON
   app.use(express.urlencoded({ extended: true })); // Aggiungi supporto per i dati del form
-  
+
   // Fix per rate limiting con proxy
-  app.set('trust proxy', 1);
+  app.set("trust proxy", 1);
 
   // Route specifica per /admin (DEFINITA PRIMA DEL MIDDLEWARE DI AUTENTICAZIONE)
   app.get('/admin', (req, res) => {
@@ -826,14 +825,40 @@ async function initializeServer() {
     }
   });
 
+  // Route specifica per /oauth-callback (DEFINITA PRIMA DEL MIDDLEWARE DI AUTENTICAZIONE)
+  app.get('/oauth-callback', (req, res) => {
+    const callbackPath = path.resolve(publicPath, "oauth-callback.html");
+    if (fs.existsSync(callbackPath)) {
+      // Aggiungi header per prevenire il caching
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      res.sendFile(callbackPath);
+    } else {
+      res.status(404).json({ 
+        success: false, 
+        error: "OAuth callback page not found",
+        message: "OAuth callback page not available"
+      });
+    }
+  });
+
   // Middleware di protezione per le route statiche che richiedono autenticazione admin
   const protectedStaticRoutes = [
-    '/services-dashboard', '/stats', '/charts', '/upload', '/pin-manager', '/create', '/notes'
+    "/services-dashboard",
+    "/stats",
+    "/charts",
+    "/upload",
+    "/pin-manager",
+    "/create",
+    "/notes",
   ];
 
   app.use((req, res, next) => {
     const path = req.path;
-    
+
     // Controlla se la route richiede autenticazione admin
     if (protectedStaticRoutes.includes(path)) {
       // Verifica autenticazione admin
@@ -846,11 +871,14 @@ async function initializeServer() {
       if (token === process.env.ADMIN_PASSWORD) {
         next();
       } else {
-        console.log(`❌ Accesso negato a ${path} - Token mancante o non valido`);
-        return res.status(401).json({ 
-          success: false, 
+        console.log(
+          `❌ Accesso negato a ${path} - Token mancante o non valido`
+        );
+        return res.status(401).json({
+          success: false,
           error: "Unauthorized - Admin authentication required",
-          message: "Questa pagina richiede autenticazione admin. Inserisci la password admin nella pagina principale."
+          message:
+            "Questa pagina richiede autenticazione admin. Inserisci la password admin nella pagina principale.",
         });
       }
     } else {
@@ -1061,20 +1089,27 @@ async function initializeServer() {
   try {
     console.log("🔐 Initializing Shogun Core for authentication...");
     console.log("🔐 ShogunCore constructor available:", typeof ShogunCore);
-    console.log("🔐 ShogunCore import check:", ShogunCore ? "SUCCESS" : "FAILED");
-    
-    if (typeof ShogunCore !== 'function') {
-      throw new Error(`ShogunCore is not a constructor. Type: ${typeof ShogunCore}`);
+    console.log(
+      "🔐 ShogunCore import check:",
+      ShogunCore ? "SUCCESS" : "FAILED"
+    );
+
+    if (typeof ShogunCore !== "function") {
+      throw new Error(
+        `ShogunCore is not a constructor. Type: ${typeof ShogunCore}`
+      );
     }
-    
-    const peers = process.env.RELAY_PEERS ? process.env.RELAY_PEERS.split(',') : [
-      "wss://ruling-mastodon-improved.ngrok-free.app/gun",
-      "https://gun-manhattan.herokuapp.com/gun",
-      "https://peer.wallie.io/gun",
-    ];
-    
+
+    const peers = process.env.RELAY_PEERS
+      ? process.env.RELAY_PEERS.split(",")
+      : [
+          "wss://ruling-mastodon-improved.ngrok-free.app/gun",
+          "https://gun-manhattan.herokuapp.com/gun",
+          "https://peer.wallie.io/gun",
+        ];
+
     console.log("🔐 Peers for Shogun Core:", peers);
-    
+
     // Debug: mostra la configurazione
     const shogunConfig = {
       gunInstance: gun,
@@ -1084,23 +1119,45 @@ async function initializeServer() {
       scope: "shogun",
       web3: { enabled: true },
       webauthn: {
-        enabled: false
+        enabled: false,
       },
       nostr: { enabled: true },
+      oauth: {
+        enabled: true,
+        usePKCE: true, // PKCE obbligatorio per sicurezza
+        allowUnsafeClientSecret: true, // Abilitato per Google OAuth
+        stateTimeout: 10 * 60 * 1000, // 10 minuti timeout
+        providers: {
+          google: {
+            enabled: true,
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+            redirectUri: process.env.GOOGLE_REDIRECT_URI || `http://${host}:${port}/oauth-callback`,
+            scope: ["openid", "email", "profile"],
+            authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+            tokenUrl: "https://oauth2.googleapis.com/token",
+            userInfoUrl: "https://www.googleapis.com/oauth2/v2/userinfo",
+            usePKCE: true, // PKCE obbligatorio per sicurezza
+          },
+        },
+      },
       timeouts: {
         login: 30000,
         signup: 30000,
         operation: 60000,
       },
     };
-    
-    console.log("🔐 Shogun Core configuration:", JSON.stringify(shogunConfig, null, 2));
-    
+
+    console.log(
+      "🔐 Shogun Core configuration:",
+      JSON.stringify(shogunConfig, null, 2)
+    );
+
     // Usa l'import già fatto all'inizio del file
     shogunCore = new ShogunCore(shogunConfig);
 
     console.log("🔐 Shogun Core instance created, initializing...");
-    
+
     try {
       await shogunCore.initialize();
       console.log("🔐 Shogun Core initialization completed");
@@ -1108,14 +1165,14 @@ async function initializeServer() {
       console.error("❌ Error during Shogun Core initialization:", initError);
       console.error("❌ Init error stack:", initError.stack);
     }
-    
+
     // Debug: controlla i plugin dopo l'inizializzazione
     console.log("🔐 Checking plugins after initialization:");
     console.log("🔐 - web3:", !!shogunCore.getPlugin("web3"));
     console.log("🔐 - webauthn:", !!shogunCore.getPlugin("webauthn"));
     console.log("🔐 - nostr:", !!shogunCore.getPlugin("nostr"));
     console.log("🔐 - oauth:", !!shogunCore.getPlugin("oauth"));
-    
+
     // Debug: controlla tutti i plugin registrati
     console.log("🔐 All registered plugins after initialization:");
     if (shogunCore.plugins) {
@@ -1125,7 +1182,7 @@ async function initializeServer() {
     } else {
       console.log("🔐 No plugins map found");
     }
-    
+
     app.set("shogunCore", shogunCore);
     console.log("✅ Shogun Core initialized successfully");
   } catch (error) {
@@ -1247,9 +1304,7 @@ async function initializeServer() {
             return;
           }
 
-          const hashKeys = Object.keys(parentData).filter(
-            (key) => key !== "_"
-          );
+          const hashKeys = Object.keys(parentData).filter((key) => key !== "_");
           let uploadsArray = [];
           let completedReads = 0;
           const totalReads = hashKeys.length;
@@ -1300,7 +1355,10 @@ async function initializeServer() {
 
         mbUsageNode.put(updatedUsage, (ack) => {
           if (ack.err) {
-            console.error("Error updating background recalculated MB usage:", ack.err);
+            console.error(
+              "Error updating background recalculated MB usage:",
+              ack.err
+            );
           } else {
             console.log(
               `✅ Background updated off-chain MB usage with recalculated value: ${calculatedMbUsed} MB`
@@ -1412,7 +1470,7 @@ async function initializeServer() {
   }
 
   // Route statiche (DEFINITE DOPO LE API)
-  
+
   app.use(express.static(publicPath));
 
   // Initialize garbage collector now that gun is ready

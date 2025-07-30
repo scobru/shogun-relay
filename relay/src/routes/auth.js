@@ -920,4 +920,200 @@ router.get("/authorize-gun-key/:pubKey", async (req, res) => {
   }
 });
 
+// OAuth Routes
+// Route per avviare il flusso OAuth
+router.get('/oauth/:provider/authorize', async (req, res) => {
+  try {
+    const { provider } = req.params;
+    const shogun = getShogunInstance(req);
+    
+    if (!shogun) {
+      console.error("❌ Shogun Core not available for OAuth");
+      return res.status(503).json({ 
+        success: false, 
+        message: 'Sistema di autenticazione non disponibile', 
+        data: null 
+      });
+    }
+
+    const oauthPlugin = shogun.getPlugin("oauth");
+    if (!oauthPlugin) {
+      console.error("❌ OAuth plugin not found");
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Plugin OAuth non trovato', 
+        data: null 
+      });
+    }
+
+    console.log(`🔐 Initiating OAuth flow for provider: ${provider}`);
+
+    // Avvia il flusso OAuth
+    const result = await oauthPlugin.initiateOAuth(provider);
+    
+    if (!result.success) {
+      console.error("❌ OAuth initiation failed:", result.error);
+      return res.status(400).json({ 
+        success: false, 
+        message: result.error || 'Avvio OAuth fallito', 
+        data: null 
+      });
+    }
+
+    console.log(`🔐 OAuth URL generated for ${provider}:`, result.authUrl);
+
+    // Reindirizza all'URL di autorizzazione OAuth
+    res.redirect(result.authUrl);
+
+  } catch (error) {
+    console.error('Errore durante l\'avvio OAuth:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Errore interno del server', 
+      data: null 
+    });
+  }
+});
+
+// Route per gestire il callback OAuth
+router.post('/oauth/callback', async (req, res) => {
+  try {
+    const { provider, code, state } = req.body;
+    const shogun = getShogunInstance(req);
+    
+    if (!shogun) {
+      console.error("❌ Shogun Core not available for OAuth callback");
+      return res.status(503).json({ 
+        success: false, 
+        message: 'Sistema di autenticazione non disponibile', 
+        data: null 
+      });
+    }
+
+    if (!code || !state) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Codice e state sono richiesti', 
+        data: null 
+      });
+    }
+
+    const oauthPlugin = shogun.getPlugin("oauth");
+    if (!oauthPlugin) {
+      console.error("❌ OAuth plugin not found");
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Plugin OAuth non trovato', 
+        data: null 
+      });
+    }
+
+    console.log(`🔐 Processing OAuth callback for provider: ${provider}`);
+
+    // Completa il flusso OAuth
+    const result = await oauthPlugin.completeOAuth(provider, code, state);
+    
+    if (!result.success) {
+      console.error("❌ OAuth completion failed:", result.error);
+      return res.status(400).json({ 
+        success: false, 
+        message: result.error || 'Completamento OAuth fallito', 
+        data: null 
+      });
+    }
+
+    console.log(`🔐 OAuth authentication successful for ${provider}`);
+
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Autenticazione OAuth completata con successo', 
+      data: {
+        provider,
+        user: result.user,
+        profile: { type: 'oauth', provider }
+      }
+    });
+
+  } catch (error) {
+    console.error('Errore durante il callback OAuth:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Errore interno del server', 
+      data: null 
+    });
+  }
+});
+
+// Route per login OAuth (alternativa)
+router.post('/oauth/:provider/login', async (req, res) => {
+  try {
+    const { provider } = req.params;
+    const shogun = getShogunInstance(req);
+    
+    if (!shogun) {
+      console.error("❌ Shogun Core not available for OAuth login");
+      return res.status(503).json({ 
+        success: false, 
+        message: 'Sistema di autenticazione non disponibile', 
+        data: null 
+      });
+    }
+
+    const oauthPlugin = shogun.getPlugin("oauth");
+    if (!oauthPlugin) {
+      console.error("❌ OAuth plugin not found");
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Plugin OAuth non trovato', 
+        data: null 
+      });
+    }
+
+    console.log(`🔐 Initiating OAuth login for provider: ${provider}`);
+
+    // Avvia il login OAuth
+    const result = await oauthPlugin.login(provider);
+    
+    if (!result.success) {
+      console.error("❌ OAuth login initiation failed:", result.error);
+      return res.status(400).json({ 
+        success: false, 
+        message: result.error || 'Avvio login OAuth fallito', 
+        data: null 
+      });
+    }
+
+    if (result.redirectUrl) {
+      // Restituisce l'URL di redirect
+      return res.status(200).json({ 
+        success: true, 
+        message: 'Reindirizzamento OAuth richiesto', 
+        data: {
+          redirectUrl: result.redirectUrl,
+          provider
+        }
+      });
+    } else {
+      // Login completato direttamente
+      return res.status(200).json({ 
+        success: true, 
+        message: 'Login OAuth completato con successo', 
+        data: {
+          provider,
+          user: result.user,
+          profile: { type: 'oauth', provider }
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('Errore durante il login OAuth:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Errore interno del server', 
+      data: null 
+    });
+  }
+});
+
 export default router; 

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shogun Relay - OAuth Callback</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #404040;
+            border-top: 3px solid #FF69B4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="antialiased bg-[#1A1A1A]">
+    <div class="container mx-auto px-4 py-8">
+        <div class="max-w-2xl mx-auto">
+            <div class="card bg-[#1A1A1A] border-0 rounded-2xl">
+                <div class="p-8">
+                    <div class="flex flex-col items-center">
+                        <!-- Header con icona e titolo -->
+                        <div class="flex items-center gap-4 mb-8">
+                            <span class="text-[#FF69B4] text-4xl">🔐</span>
+                            <h1 class="text-3xl font-medium text-[#FFFFFF]">OAuth Callback</h1>
+                        </div>
+                        
+                        <!-- Status Display -->
+                        <div id="status" class="mb-6 p-4 rounded-lg hidden w-full max-w-md">
+                            <div id="statusContent"></div>
+                        </div>
+
+                        <!-- Loading State -->
+                        <div id="loadingState" class="text-center">
+                            <div class="loading mb-4"></div>
+                            <p class="text-[#E0E0E0] text-lg">Elaborazione autenticazione...</p>
+                            <p class="text-[#A0A0A0] text-sm mt-2">Non chiudere questa finestra</p>
+                        </div>
+
+                        <!-- Success State -->
+                        <div id="successState" class="text-center hidden">
+                            <div class="text-[#4CAF50] text-6xl mb-4">✅</div>
+                            <h2 class="text-2xl font-medium text-[#FFFFFF] mb-2">Autenticazione Completata!</h2>
+                            <p class="text-[#E0E0E0] mb-6">Il tuo account è stato autenticato con successo.</p>
+                            <button onclick="closeWindow()" class="bg-[#FF69B4] hover:bg-[#FF1493] text-[#FFFFFF] py-2 px-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:ring-offset-2 transition-colors">
+                                Chiudi Finestra
+                            </button>
+                        </div>
+
+                        <!-- Error State -->
+                        <div id="errorState" class="text-center hidden">
+                            <div class="text-[#F44336] text-6xl mb-4">❌</div>
+                            <h2 class="text-2xl font-medium text-[#FFFFFF] mb-2">Errore di Autenticazione</h2>
+                            <p id="errorMessage" class="text-[#E0E0E0] mb-6">Si è verificato un errore durante l'autenticazione.</p>
+                            <div class="space-y-2">
+                                <button onclick="retryAuth()" class="bg-[#FF69B4] hover:bg-[#FF1493] text-[#FFFFFF] py-2 px-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:ring-offset-2 transition-colors mr-2">
+                                    Riprova
+                                </button>
+                                <button onclick="closeWindow()" class="bg-[#666666] hover:bg-[#555555] text-[#FFFFFF] py-2 px-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#666666] focus:ring-offset-2 transition-colors">
+                                    Chiudi
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/v1/auth';
+        let processing = false;
+
+        // Utility functions
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            const content = document.getElementById('statusContent');
+            
+            const colors = {
+                'error': 'bg-red-100 text-red-700 border-red-300',
+                'success': 'bg-green-100 text-green-700 border-green-300',
+                'info': 'bg-blue-100 text-blue-700 border-blue-300'
+            };
+            
+            status.className = `mb-6 p-4 rounded-lg border ${colors[type] || colors.info}`;
+            content.textContent = message;
+            status.classList.remove('hidden');
+            
+            setTimeout(() => {
+                status.classList.add('hidden');
+            }, 5000);
+        }
+
+        function showLoading() {
+            document.getElementById('loadingState').classList.remove('hidden');
+            document.getElementById('successState').classList.add('hidden');
+            document.getElementById('errorState').classList.add('hidden');
+        }
+
+        function showSuccess() {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('successState').classList.remove('hidden');
+            document.getElementById('errorState').classList.add('hidden');
+        }
+
+        function showError(message) {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('successState').classList.add('hidden');
+            document.getElementById('errorState').classList.remove('hidden');
+            document.getElementById('errorMessage').textContent = message;
+        }
+
+        async function handleOAuthCallback() {
+            if (processing) {
+                console.warn("OAuth callback is already being processed, skipping.");
+                return;
+            }
+            processing = true;
+
+            try {
+                // Ottieni i parametri dall'URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const code = urlParams.get("code");
+                const state = urlParams.get("state");
+                const error = urlParams.get("error");
+                const errorDescription = urlParams.get("error_description");
+                const provider = urlParams.get("provider") || "google";
+
+                console.log("🔐 OAuth callback parameters:", {
+                    code: code ? "present" : "missing",
+                    state: state ? "present" : "missing",
+                    error,
+                    errorDescription,
+                    provider
+                });
+
+                // Controlla errori OAuth
+                if (error) {
+                    throw new Error(
+                        `OAuth error: ${error}${errorDescription ? ` - ${errorDescription}` : ""}`
+                    );
+                }
+
+                // Validazione di sicurezza
+                if (!code) {
+                    throw new Error("Codice di autorizzazione non trovato nell'URL.");
+                }
+
+                if (!state) {
+                    throw new Error(
+                        "Parametro state non trovato nell'URL - possibile attacco CSRF."
+                    );
+                }
+
+                console.log(`🔐 Handling OAuth callback for ${provider}`);
+
+                // Chiama l'endpoint di callback OAuth
+                const response = await fetch(`${API_BASE}/oauth/callback`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        provider,
+                        code,
+                        state
+                    })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.message || 'Errore durante l\'autenticazione OAuth');
+                }
+
+                if (result.success) {
+                    console.log("🔐 OAuth authentication successful:", result);
+                    
+                    // Emetti evento di successo
+                    window.dispatchEvent(new CustomEvent('oauth:success', {
+                        detail: { provider, user: result.data }
+                    }));
+
+                    showSuccess();
+                    showStatus('Autenticazione OAuth completata con successo!', 'success');
+                    
+                    // Chiudi automaticamente dopo 3 secondi
+                    setTimeout(() => {
+                        closeWindow();
+                    }, 3000);
+                } else {
+                    throw new Error(result.message || "Autenticazione fallita");
+                }
+
+            } catch (error) {
+                console.error("❌ Error handling OAuth callback:", error);
+
+                // Gestisci errori specifici
+                let errorMessage = error.message;
+                
+                if (error.message?.includes("invalid_grant")) {
+                    errorMessage = "La tua sessione è scaduta. Riprova ad accedere.";
+                } else if (error.message?.includes("state parameter expired")) {
+                    errorMessage = "Sessione di autenticazione scaduta. Riprova ad accedere.";
+                } else if (error.message?.includes("CSRF")) {
+                    errorMessage = "Validazione di sicurezza fallita. Riprova ad accedere.";
+                } else if (error.message?.includes("network")) {
+                    errorMessage = "Errore di connessione. Verifica la tua connessione internet.";
+                }
+
+                showError(errorMessage);
+                showStatus(errorMessage, 'error');
+            } finally {
+                processing = false;
+            }
+        }
+
+        function retryAuth() {
+            // Torna alla pagina di autenticazione
+            window.location.href = '/auth';
+        }
+
+        function closeWindow() {
+            // Chiudi la finestra popup
+            if (window.opener) {
+                // Se è una finestra popup, chiudila
+                window.close();
+            } else {
+                // Se non è una finestra popup, reindirizza alla pagina principale
+                window.location.href = '/auth';
+            }
+        }
+
+        // Inizializza quando la pagina è caricata
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("🔐 OAuth callback page loaded");
+            handleOAuthCallback();
+        });
+
+        // Gestisci errori di caricamento
+        window.addEventListener('error', (event) => {
+            console.error("❌ Page error:", event.error);
+            showError("Errore durante il caricamento della pagina.");
+        });
+    </script>
+</body>
+</html> 
