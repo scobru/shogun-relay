@@ -1068,7 +1068,7 @@ router.post('/oauth/callback', async (req, res) => {
     // Prepara i dati completi dell'utente per il frontend
     const userData = {
       authenticated: true,
-      alias: result.user?.name || result.user?.email || `OAuth User (${provider})`,
+      alias: result.user?.username || result.user?.name || result.user?.email || `OAuth User (${provider})`,
       email: result.user?.email,
       pub: shogun.user?._?.sea?.pub,
       epub: shogun.user?._?.sea?.epub,
