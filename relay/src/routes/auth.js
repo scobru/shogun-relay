@@ -1,8 +1,52 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { ethers } from 'ethers';
+import { verifyEvent, getEventHash } from 'nostr-tools';
 
 const router = express.Router();
+
+// Funzione per verificare le firme Nostr
+function verifyNostrSignature(message, signature, address) {
+  try {
+    console.log("🔐 Verifying Nostr signature directly");
+    
+    // Ricostruisce l'evento esatto che è stato firmato
+    const eventData = {
+      kind: 1,
+      created_at: 0, // IMPORTANTE: Usa lo stesso timestamp fisso usato per la firma
+      tags: [],
+      content: message,
+      pubkey: address,
+    };
+    
+    const event = {
+      ...eventData,
+      id: getEventHash(eventData),
+      sig: signature,
+    };
+
+    const isValid = verifyEvent(event);
+    console.log("🔐 Nostr signature verification result:", isValid);
+    return isValid;
+  } catch (error) {
+    console.error("❌ Error verifying Nostr signature:", error);
+    return false;
+  }
+}
+
+// Funzione per generare credenziali Nostr
+async function generateNostrCredentials(address, signature, message) {
+  try {
+    // Usa una funzione di derivazione semplice per creare username e password
+    const username = `nostr_${address.substring(0, 10)}`;
+    const password = ethers.sha256(ethers.toUtf8Bytes(`${address}_${signature}_${message}`));
+    
+    return { username, password };
+  } catch (error) {
+    console.error("❌ Error generating Nostr credentials:", error);
+    throw error;
+  }
+}
 
 // Rate limiting per le route di autenticazione
 const authLimiter = rateLimit({
@@ -418,23 +462,12 @@ router.post('/nostr/login', authLimiter, async (req, res) => {
 
     console.log("⚡ Processing Nostr login for address:", address.substring(0, 10) + "...");
 
-    // Usa il plugin Nostr di Shogun Core per verifica e generazione credenziali
-    const nostrPlugin = shogun.getPlugin("nostr");
-    if (!nostrPlugin) {
-      console.error("❌ Nostr plugin not found");
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Plugin Nostr non trovato', 
-        data: null 
-      });
-    }
-
     const messageToVerify = message || "I Love Shogun!";
     console.log("⚡ Verifying Nostr signature for message:", messageToVerify);
 
     try {
-      // Verifica la firma usando il plugin
-      const isValid = await nostrPlugin.verifySignature(messageToVerify, signature, address);
+      // Verifica la firma usando la funzione locale
+      const isValid = verifyNostrSignature(messageToVerify, signature, address);
       
       if (!isValid) {
         console.error("❌ Nostr signature verification failed");
@@ -447,10 +480,21 @@ router.post('/nostr/login', authLimiter, async (req, res) => {
 
       console.log("⚡ Nostr signature verified successfully");
 
-      // Usa il plugin per generare le credenziali
-      const credentials = await nostrPlugin.generateCredentials(address, signature, messageToVerify);
+      // Genera le credenziali usando la funzione locale
+      const credentials = await generateNostrCredentials(address, signature, messageToVerify);
       
+      if (!credentials || !credentials.username || !credentials.password) {
+        console.error("❌ Failed to generate Nostr credentials");
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Errore nella generazione delle credenziali', 
+          data: null 
+        });
+      }
+
       console.log("⚡ Attempting login with Nostr credentials");
+      
+      // Usa le credenziali generate per il login
       const loginResult = await shogun.login(credentials.username, credentials.password);
       
       if (!loginResult.success) {
@@ -475,11 +519,11 @@ router.post('/nostr/login', authLimiter, async (req, res) => {
         }
       });
 
-    } catch (pluginError) {
-      console.error("❌ Nostr plugin error:", pluginError);
+    } catch (error) {
+      console.error("❌ Nostr authentication error:", error);
       return res.status(400).json({ 
         success: false, 
-        message: pluginError.message || 'Errore plugin Nostr', 
+        message: error.message || 'Errore autenticazione Nostr', 
         data: null 
       });
     }
@@ -521,23 +565,12 @@ router.post('/nostr/register', authLimiter, async (req, res) => {
 
     console.log("⚡ Processing Nostr registration for address:", address.substring(0, 10) + "...");
 
-    // Usa il plugin Nostr di Shogun Core per verifica e generazione credenziali
-    const nostrPlugin = shogun.getPlugin("nostr");
-    if (!nostrPlugin) {
-      console.error("❌ Nostr plugin not found");
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Plugin Nostr non trovato', 
-        data: null 
-      });
-    }
-
     const messageToVerify = message || "I Love Shogun!";
     console.log("⚡ Verifying Nostr signature for message:", messageToVerify);
 
     try {
-      // Verifica la firma usando il plugin
-      const isValid = await nostrPlugin.verifySignature(messageToVerify, signature, address);
+      // Verifica la firma usando la funzione locale
+      const isValid = verifyNostrSignature(messageToVerify, signature, address);
       
       if (!isValid) {
         console.error("❌ Nostr signature verification failed");
@@ -550,9 +583,18 @@ router.post('/nostr/register', authLimiter, async (req, res) => {
 
       console.log("⚡ Nostr signature verified successfully");
 
-      // Usa il plugin per generare le credenziali
-      const credentials = await nostrPlugin.generateCredentials(address, signature, messageToVerify);
+      // Genera le credenziali usando la funzione locale
+      const credentials = await generateNostrCredentials(address, signature, messageToVerify);
       
+      if (!credentials || !credentials.username || !credentials.password) {
+        console.error("❌ Failed to generate Nostr credentials");
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Errore nella generazione delle credenziali', 
+          data: null 
+        });
+      }
+
       console.log("⚡ Creating user with Nostr credentials");
       const signUpResult = await shogun.signUp(credentials.username, credentials.password);
       
@@ -590,11 +632,11 @@ router.post('/nostr/register', authLimiter, async (req, res) => {
         }
       });
 
-    } catch (pluginError) {
-      console.error("❌ Nostr plugin error:", pluginError);
+    } catch (error) {
+      console.error("❌ Nostr registration error:", error);
       return res.status(400).json({ 
         success: false, 
-        message: pluginError.message || 'Errore plugin Nostr', 
+        message: error.message || 'Errore registrazione Nostr', 
         data: null 
       });
     }
