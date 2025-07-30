@@ -250,6 +250,34 @@ export default (app) => {
     res.sendFile(path.resolve(publicPath, "user-upload.html"));
   });
 
+  app.get("/admin", (req, res) => {
+    const publicPath = path.resolve(__dirname, "../public");
+    const adminPath = path.resolve(publicPath, "admin.html");
+    
+    console.log(`🔍 Admin route requested`);
+    console.log(`📁 Public path: ${publicPath}`);
+    console.log(`📄 Admin file path: ${adminPath}`);
+    console.log(`📄 Admin file exists: ${fs.existsSync(adminPath)}`);
+    
+    if (!fs.existsSync(adminPath)) {
+      console.error(`❌ Admin file not found: ${adminPath}`);
+      return res.status(404).json({
+        success: false,
+        error: "Admin panel HTML file not found",
+        path: adminPath
+      });
+    }
+    
+    // Aggiungi header per prevenire il caching
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+    
+    res.sendFile(adminPath);
+  });
+
   app.get("/subscribe", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "subscribe.html"));

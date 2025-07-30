@@ -503,3 +503,45 @@ curl -X POST http://localhost:8765/api/v1/user-uploads/sync-mb-usage/USER_ADDRES
 ## 📄 License
 
 MIT License - see LICENSE file for details
+
+## 🧹 Docker Cleanup Script
+
+Per pulire la cache di Docker senza riavviare i servizi:
+
+```bash
+# Pulizia sicura (raccomandata)
+./docker-cleanup.sh --cache-only
+
+# Pulizia completa (usa con cautela)
+./docker-cleanup.sh --all
+
+# Modalità dry-run (vedi cosa verrebbe pulito)
+./docker-cleanup.sh --dry-run
+
+# Aiuto
+./docker-cleanup.sh --help
+```
+
+### Opzioni disponibili:
+- `--cache-only`: Pulizia sicura (container fermati, immagini non utilizzate, cache build)
+- `--all`: Pulizia completa (include volumi - può cancellare dati)
+- `--containers`: Solo container fermati
+- `--images`: Solo immagini non utilizzate
+- `--networks`: Solo reti non utilizzate
+- `--volumes`: Solo volumi non utilizzati (ATTENZIONE: può cancellare dati)
+- `--build-cache`: Solo cache di build
+- `--dry-run`: Mostra cosa verrebbe pulito senza farlo
+
+### Esempi:
+```bash
+# Pulizia rapida e sicura
+./docker-cleanup.sh
+
+# Verifica cosa verrebbe pulito
+./docker-cleanup.sh --dry-run
+
+# Pulizia completa con conferma
+./docker-cleanup.sh --all
+```
+
+## 🚀 Quick Start

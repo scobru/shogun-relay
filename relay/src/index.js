@@ -806,6 +806,26 @@ async function initializeServer() {
   app.use(express.json()); // Aggiungi supporto per il parsing del body JSON
   app.use(express.urlencoded({ extended: true })); // Aggiungi supporto per i dati del form
 
+  // Route specifica per /admin (DEFINITA PRIMA DEL MIDDLEWARE DI AUTENTICAZIONE)
+  app.get('/admin', (req, res) => {
+    const adminPath = path.resolve(publicPath, "admin.html");
+    if (fs.existsSync(adminPath)) {
+      // Aggiungi header per prevenire il caching
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      res.sendFile(adminPath);
+    } else {
+      res.status(404).json({ 
+        success: false, 
+        error: "Admin panel not found",
+        message: "Admin panel file not available"
+      });
+    }
+  });
+
   // Middleware di protezione per le route statiche che richiedono autenticazione admin
   const protectedStaticRoutes = [
     '/services-dashboard', '/stats', '/charts', '/upload', '/pin-manager', '/create', '/notes'
@@ -1312,26 +1332,6 @@ async function initializeServer() {
 
   // Route statiche (DEFINITE DOPO LE API)
   
-  // Route specifica per /admin
-  app.get('/admin', (req, res) => {
-    const adminPath = path.resolve(publicPath, "admin.html");
-    if (fs.existsSync(adminPath)) {
-      // Aggiungi header per prevenire il caching
-      res.set({
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
-      res.sendFile(adminPath);
-    } else {
-      res.status(404).json({ 
-        success: false, 
-        error: "Admin panel not found",
-        message: "Admin panel file not available"
-      });
-    }
-  });
-
   app.use(express.static(publicPath));
 
   // Initialize garbage collector now that gun is ready
