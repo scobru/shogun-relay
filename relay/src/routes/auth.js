@@ -1084,15 +1084,26 @@ router.post('/oauth/callback', async (req, res) => {
     // Ottieni il pair SEA completo dall'utente autenticato
     const seaPair = shogun.user?._?.sea;
 
+    // Prepara i dati completi dell'utente per il frontend
+    const userData = {
+      authenticated: true,
+      alias: result.user?.name || result.user?.username || result.user?.email || `OAuth User (${provider})`,
+      email: result.user?.email,
+      pub: shogun.user?._?.sea?.pub,
+      epub: shogun.user?._?.sea?.epub,
+      sea: seaPair, // Includi il pair SEA completo
+      profile: {
+        type: 'oauth',
+        provider: provider,
+        name: result.user?.name,
+        picture: result.user?.picture
+      }
+    };
+
     return res.status(200).json({ 
       success: true, 
       message: 'Autenticazione OAuth completata con successo', 
-      data: {
-        provider,
-        user: result.user,
-        sea: seaPair, // Includi il pair SEA completo
-        profile: { type: 'oauth', provider }
-      }
+      data: userData
     });
 
   } catch (error) {
