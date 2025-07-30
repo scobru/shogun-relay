@@ -394,12 +394,12 @@ router.post('/web3/register', authLimiter, async (req, res) => {
 // Route per Nostr authentication
 router.post('/nostr/login', authLimiter, async (req, res) => {
   try {
-    const { address, signature, message } = req.body;
+    const { address } = req.body;
     
-    if (!address || !signature) {
+    if (!address) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Indirizzo e firma Nostr sono richiesti', 
+        message: 'Indirizzo Nostr è richiesto', 
         data: null 
       });
     }
@@ -429,26 +429,10 @@ router.post('/nostr/login', authLimiter, async (req, res) => {
       });
     }
 
-    // Imposta il tipo di connessione per il plugin
-    nostrPlugin.connectedType = "nostr";
-    nostrPlugin.connectedAddress = address;
-
-    // Verifica la firma usando il plugin
-    const isSignatureValid = await nostrPlugin.verifySignature(message, signature, address);
-    
-    if (!isSignatureValid) {
-      console.error("❌ Invalid Nostr signature");
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Firma Nostr non valida', 
-        data: null 
-      });
-    }
-
-    console.log("✅ Nostr signature verified successfully");
-
-    // Genera le credenziali usando il plugin
-    const credentials = await nostrPlugin.generateCredentials(address, signature, message);
+    // Genera credenziali deterministiche usando solo l'address
+    const message = "I Love Shogun!";
+    const deterministicSignature = generateDeterministicSignature(address, message);
+    const credentials = await nostrPlugin.generateCredentials(address, deterministicSignature, message);
     
     if (!credentials || !credentials.username || !credentials.key) {
       console.error("❌ Failed to generate Nostr credentials");
@@ -483,8 +467,7 @@ router.post('/nostr/login', authLimiter, async (req, res) => {
       epub: shogun.user?._?.epub,
       profile: {
         type: 'nostr',
-        address: address,
-        message: message
+        address: address
       }
     };
 
@@ -504,15 +487,32 @@ router.post('/nostr/login', authLimiter, async (req, res) => {
   }
 });
 
+// Funzione per generare firme deterministiche (stessa logica del client)
+function generateDeterministicSignature(address, message) {
+  const data = `${address}_${message}_deterministic`;
+  
+  let hash = 0;
+  for (let i = 0; i < data.length; i++) {
+    const char = data.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  
+  const hashHex = Math.abs(hash).toString(16).padStart(8, '0');
+  const signature = hashHex.repeat(16).substring(0, 128);
+  
+  return signature;
+}
+
 // Route per Nostr registration
 router.post('/nostr/register', authLimiter, async (req, res) => {
   try {
-    const { address, signature, message } = req.body;
+    const { address } = req.body;
     
-    if (!address || !signature) {
+    if (!address) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Indirizzo e firma Nostr sono richiesti', 
+        message: 'Indirizzo Nostr è richiesto', 
         data: null 
       });
     }
@@ -542,26 +542,10 @@ router.post('/nostr/register', authLimiter, async (req, res) => {
       });
     }
 
-    // Imposta il tipo di connessione per il plugin
-    nostrPlugin.connectedType = "nostr";
-    nostrPlugin.connectedAddress = address;
-
-    // Verifica la firma usando il plugin
-    const isSignatureValid = await nostrPlugin.verifySignature(message, signature, address);
-    
-    if (!isSignatureValid) {
-      console.error("❌ Invalid Nostr signature");
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Firma Nostr non valida', 
-        data: null 
-      });
-    }
-
-    console.log("✅ Nostr signature verified successfully");
-
-    // Genera le credenziali usando il plugin
-    const credentials = await nostrPlugin.generateCredentials(address, signature, message);
+    // Genera credenziali deterministiche usando solo l'address
+    const message = "I Love Shogun!";
+    const deterministicSignature = generateDeterministicSignature(address, message);
+    const credentials = await nostrPlugin.generateCredentials(address, deterministicSignature, message);
     
     if (!credentials || !credentials.username || !credentials.key) {
       console.error("❌ Failed to generate Nostr credentials");
@@ -596,8 +580,7 @@ router.post('/nostr/register', authLimiter, async (req, res) => {
       epub: shogun.user?._?.epub,
       profile: {
         type: 'nostr',
-        address: address,
-        message: message
+        address: address
       }
     };
 
