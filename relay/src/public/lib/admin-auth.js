@@ -7,6 +7,12 @@
 
 const ShogunAdmin = (() => {
     const ADMIN_PASSWORD_KEY = 'shogun-relay-admin-password';
+    const defaultOptions = {
+        autoFill: false,
+        showIndicator: false,
+        adminFieldId: 'adminPassword',
+        syncEnabled: true
+    };
     let options = {};
     let passwordChangeCallbacks = [];
 
@@ -19,11 +25,6 @@ const ShogunAdmin = (() => {
             // Se adminToken è uguale alla password corrente, rimuovilo
             localStorage.removeItem('adminToken');
             console.log('🧹 Cleaned up duplicate adminToken key');
-        } else if (adminToken && !currentPassword) {
-            // Se c'è adminToken ma non shogun-relay-admin-password, migra il valore
-            localStorage.setItem(ADMIN_PASSWORD_KEY, adminToken);
-            localStorage.removeItem('adminToken');
-            console.log('🔄 Migrated adminToken to shogun-relay-admin-password');
         }
     }
 
@@ -95,7 +96,7 @@ const ShogunAdmin = (() => {
             return !!this.getPassword();
         },
         clearPassword() {
-            localStorage.removeItem('admin-password');
+            localStorage.removeItem(ADMIN_PASSWORD_KEY);
             _broadcastUpdate();
         },
         getAuthHeaders() {
