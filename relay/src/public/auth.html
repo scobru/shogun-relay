@@ -632,16 +632,25 @@
                 const message = "I Love Shogun!";
                 console.log('⚡ Requesting deterministic signature for message:', message);
                 
-                // Usa signEvent con timestamp fisso per firma deterministica
-                const timestamp = 0; // Timestamp fisso per compatibilità
-                const event = await window.nostr.signEvent({
+                // Usa esattamente lo stesso formato che il plugin si aspetta per la verifica
+                const eventData = {
                     kind: 1,
-                    created_at: timestamp,
+                    created_at: 0, // IMPORTANT: Use a fixed timestamp to make signatures verifiable
                     tags: [],
                     content: message,
-                });
+                    pubkey: pubKey,
+                };
                 
+                // Crea l'evento con l'ID calcolato
+                const nostrEvent = {
+                    ...eventData,
+                    id: "", // L'estensione calcolerà l'ID
+                    sig: "", // L'estensione riempirà la firma
+                };
+                
+                const event = await window.nostr.signEvent(nostrEvent);
                 const signature = event.sig;
+                
                 console.log('⚡ Deterministic signature received:', signature.substring(0, 20) + '...');
                 document.getElementById('nostrSignature').value = signature;
                 
