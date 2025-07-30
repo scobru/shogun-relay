@@ -628,22 +628,33 @@
                 console.log('⚡ Nostr public key:', pubKey);
                 document.getElementById('nostrAddress').value = pubKey;
                 
-                // Richiedi la firma con timestamp fisso per compatibilità
-                const message = "I Love Shogun";
-                const timestamp = 0; // Usa timestamp fisso per compatibilità con il plugin
-                console.log('⚡ Requesting signature for message:', message);
+                // Usa signMessage per una firma deterministica
+                const message = "I Love Shogun!";
+                console.log('⚡ Requesting deterministic signature for message:', message);
                 
-                const signature = await window.nostr.signEvent({
-                    kind: 1,
-                    created_at: timestamp,
-                    tags: [],
-                    content: message,
-                });
+                // Prova prima signMessage (metodo standard per firme deterministiche)
+                let signature;
+                try {
+                    signature = await window.nostr.signMessage(message);
+                    console.log('⚡ Using signMessage for deterministic signature');
+                } catch (signMessageError) {
+                    console.log('⚡ signMessage not available, falling back to signEvent with fixed timestamp');
+                    
+                    // Fallback: usa signEvent con timestamp fisso e parametri deterministici
+                    const timestamp = 0; // Timestamp fisso per compatibilità
+                    const event = await window.nostr.signEvent({
+                        kind: 1,
+                        created_at: timestamp,
+                        tags: [],
+                        content: message,
+                    });
+                    signature = event.sig;
+                }
                 
-                console.log('⚡ Signature received:', signature.sig.substring(0, 20) + '...');
-                document.getElementById('nostrSignature').value = signature.sig;
+                console.log('⚡ Deterministic signature received:', signature.substring(0, 20) + '...');
+                document.getElementById('nostrSignature').value = signature;
                 
-                showStatus('Nostr connesso e firma ottenuta! Ora puoi fare login o registrazione.', 'success');
+                showStatus('Nostr connesso e firma deterministica ottenuta! Ora puoi fare login o registrazione.', 'success');
             } catch (error) {
                 console.error('❌ Nostr connection error:', error);
                 
