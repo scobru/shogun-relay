@@ -687,6 +687,19 @@ export default (app) => {
     });
   });
 
+  // Debug endpoint per verificare la configurazione admin
+  app.get(`${baseRoute}/debug/admin-config`, (req, res) => {
+    res.json({
+      success: true,
+      adminPassword: process.env.ADMIN_PASSWORD ? "CONFIGURED" : "NOT_CONFIGURED",
+      adminPasswordLength: process.env.ADMIN_PASSWORD ? process.env.ADMIN_PASSWORD.length : 0,
+      adminPasswordPreview: process.env.ADMIN_PASSWORD ? 
+        process.env.ADMIN_PASSWORD.substring(0, 4) + "..." + process.env.ADMIN_PASSWORD.substring(process.env.ADMIN_PASSWORD.length - 4) : 
+        "N/A",
+      timestamp: Date.now(),
+    });
+  });
+
   // Route legacy per compatibilità (solo quelle essenziali)
   app.use("/api/contracts", contractsRouter);
   app.use("/api/user-uploads", uploadsRouter);
