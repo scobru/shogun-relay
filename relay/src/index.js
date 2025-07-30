@@ -769,6 +769,7 @@ async function initializeServer() {
         firstSoul.startsWith("shogun/chain_events") || // Eventi del contratto Chain
         firstSoul.startsWith("shogun/mbUsage") || // Utilizzo MB off-chain
         firstSoul.startsWith("shogun/mb_usage") || // Utilizzo MB off-chain (alternativo)
+        firstSoul.startsWith("shogun/usernames") || // Mapping usernames per autenticazione (username -> userPub)
         !firstSoul.includes("/") || // Chiavi a livello singolo (operazioni interne di Gun)
         firstSoul.match(
           /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
