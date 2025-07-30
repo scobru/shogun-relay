@@ -1083,9 +1083,7 @@ async function initializeServer() {
       scope: "shogun",
       web3: { enabled: true },
       webauthn: {
-        enabled: true,
-        rpName: "Shogun Relay",
-        rpId: process.env.RELAY_HOST || "localhost",
+        enabled: false
       },
       nostr: { enabled: true },
       timeouts: {
