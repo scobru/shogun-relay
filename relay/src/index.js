@@ -235,7 +235,11 @@ async function initializeServer() {
         return;
       }
 
-      // Usa un approccio più sicuro per scrivere i dati
+      // Attiva il flag per permettere scritture interne del relay
+      allowInternalOperations = true;
+      console.log("🔓 Enabled internal operations for relay self-write");
+
+      // Usa un approccio più sicuro per scrivere i dati direttamente sul soul (come fa il contratto Chain)
       try {
         const dataNode = gun.get(soul);
         if (!dataNode) {
@@ -270,6 +274,10 @@ async function initializeServer() {
         );
         // Non fallire completamente se la scrittura nella struttura principale fallisce
         // L'evento è già stato salvato nella sezione chain_events
+      } finally {
+        // Ripristina il flag di sicurezza
+        allowInternalOperations = false;
+        console.log("🔒 Disabled internal operations flag");
       }
 
       console.log(`✅ Chain event propagated to GunDB: ${soul} -> ${key}`);
