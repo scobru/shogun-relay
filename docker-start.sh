@@ -73,7 +73,7 @@ if [ "$FORCE_RESTART" = true ]; then
     echo "🔄 Force restart: Stopping containers and removing volumes..."
     $DOCKER_COMPOSE_CMD down -v 2>/dev/null || true
     echo "🗑️  All data has been removed (volumes deleted)"
-elif [ "$PRESERVE_DATA" = true ] || [ "$PRESERVE_DATA" = false ]; then
+else
     # Default behavior: preserve data
     echo "💾 Preserving data: Stopping containers only (volumes kept)..."
     $DOCKER_COMPOSE_CMD down 2>/dev/null || true
