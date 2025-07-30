@@ -420,6 +420,34 @@ export default (app) => {
     res.sendFile(path.resolve(publicPath, "drive.html"));
   });
 
+  app.get("/auth", (req, res) => {
+    const publicPath = path.resolve(__dirname, "../public");
+    const authPath = path.resolve(publicPath, "auth.html");
+    
+    console.log(`🔍 Auth route requested`);
+    console.log(`📁 Public path: ${publicPath}`);
+    console.log(`📄 Auth file path: ${authPath}`);
+    console.log(`📄 Auth file exists: ${fs.existsSync(authPath)}`);
+    
+    if (!fs.existsSync(authPath)) {
+      console.error(`❌ Auth file not found: ${authPath}`);
+      return res.status(404).json({
+        success: false,
+        error: "Auth app HTML file not found",
+        path: authPath
+      });
+    }
+    
+    // Aggiungi header per prevenire il caching
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+    
+    res.sendFile(authPath);
+  });
+
   // Route per IPFS content
   app.get("/ipfs-content/:cid", async (req, res) => {
     const { cid } = req.params;
