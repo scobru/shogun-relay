@@ -5,7 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shogun Relay - Autenticazione</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+    <script>
+        // Fallback per ethers se il CDN non funziona
+        if (typeof ethers === 'undefined') {
+            console.warn('⚠️ Ethers CDN failed, trying alternative...');
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js';
+            script.onload = () => console.log('✅ Ethers loaded from fallback CDN');
+            script.onerror = () => console.error('❌ All ethers CDNs failed');
+            document.head.appendChild(script);
+        }
+    </script>
     <style>
         .loading {
             display: inline-block;
