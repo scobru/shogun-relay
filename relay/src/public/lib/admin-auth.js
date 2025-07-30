@@ -8,6 +8,7 @@
 const ShogunAdmin = (() => {
     const ADMIN_PASSWORD_KEY = 'shogun-relay-admin-password';
     let options = {};
+    let passwordChangeCallbacks = [];
 
     function _broadcastUpdate() {
         if ('BroadcastChannel' in window) {
@@ -22,6 +23,15 @@ const ShogunAdmin = (() => {
                 source: 'local'
             }
         }));
+        
+        // Call all registered callbacks
+        passwordChangeCallbacks.forEach(callback => {
+            try {
+                callback();
+            } catch (error) {
+                console.error('Error in password change callback:', error);
+            }
+        });
     }
 
     function _initField(fieldId, getter) {
@@ -89,6 +99,12 @@ const ShogunAdmin = (() => {
             return {
                 'Authorization': 'Bearer ' + password
             };
+        },
+        
+        onPasswordChange(callback) {
+            if (typeof callback === 'function') {
+                passwordChangeCallbacks.push(callback);
+            }
         }
     };
 })();
