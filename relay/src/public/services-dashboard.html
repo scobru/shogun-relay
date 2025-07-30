@@ -8,6 +8,7 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
     <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="lib/admin-nav.js"></script>
     <style>
         .service-card {
             transition: all 0.3s ease;
@@ -93,6 +94,7 @@
             <div class="flex gap-3">
                 <button onclick="refreshAllServices()" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Refresh All</button>
                 <button onclick="clearAdminPassword()" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium" title="Clear stored admin password">Clear Auth</button>
+                <a href="/admin" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium">🔐 Back to Admin</a>
                 <a href="/" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Back</a>
             </div>
         </div>

@@ -337,10 +337,20 @@
 
         function updateAuthSectionsVisibility() {
             const statusElement = document.getElementById('passwordStatus');
+            const passwordSection = document.getElementById('adminPasswordSection');
+            
             if (ShogunAdmin.hasPassword()) {
                 statusElement.innerHTML = '<span class="text-[#4CAF50]">✅</span><span>Accesso Admin - Tutte le applicazioni disponibili</span>';
+                // Nascondi il box password quando il token è presente
+                if (passwordSection) {
+                    passwordSection.style.display = 'none';
+                }
             } else {
                 statusElement.innerHTML = '<span class="text-[#FFA500]">🔒</span><span>Accesso Limitato - Solo applicazioni pubbliche visibili</span>';
+                // Mostra il box password quando non c'è token
+                if (passwordSection) {
+                    passwordSection.style.display = 'block';
+                }
             }
         }
 
