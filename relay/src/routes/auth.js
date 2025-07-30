@@ -5,10 +5,6 @@ import { ethers } from 'ethers';
 
 const router = express.Router();
 
-const getGunInstance = (req) => {
-  return req.app.get('gunInstance');
-};
-
 // Rate limiting per le route di autenticazione
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minuti
@@ -23,7 +19,7 @@ const authLimiter = rateLimit({
 // Inizializza Shogun Core con la configurazione del relay
 let shogunInstance = null;
 
-function initializeShogunCore(req) {
+function initializeShogunCore() {
   if (shogunInstance) return shogunInstance;
 
   const peers = process.env.RELAY_PEERS ? process.env.RELAY_PEERS.split(',') : [
@@ -31,13 +27,8 @@ function initializeShogunCore(req) {
     "https://gun-manhattan.herokuapp.com/gun",
     "https://peer.wallie.io/gun",
   ];
-
-  const gun = req ? getGunInstance(req) : null;
   
   shogunInstance = new ShogunCore({
-    gunInstance: gun,
-    appToken: process.env.ADMIN_PASSWORD,
-    authToken: process.env.ADMIN_PASSWORD,
     peers: peers,
     scope: "shogun-relay",
     web3: { enabled: true },
@@ -59,8 +50,15 @@ function initializeShogunCore(req) {
 
 // Middleware per ottenere l'istanza Shogun Core
 const getShogunInstance = (req) => {
+  // Prima prova a ottenere l'istanza dal server principale
+  const serverShogunCore = req.app.get('shogunCore');
+  if (serverShogunCore) {
+    return serverShogunCore;
+  }
+  
+  // Fallback: crea una nuova istanza se non è disponibile dal server
   if (!shogunInstance) {
-    shogunInstance = initializeShogunCore(req);
+    shogunInstance = initializeShogunCore();
   }
   return shogunInstance;
 };
@@ -80,11 +78,6 @@ router.post('/register', authLimiter, async (req, res) => {
 
     const shogun = getShogunInstance(req);
     
-    // Inizializza Shogun Core se non è già inizializzato
-    if (!shogun.isInitialized) {
-      await shogun.initialize();
-    }
-
     const signUpResult = await shogun.signUp(email, passphrase);
     
     if (!signUpResult.success) {
@@ -145,10 +138,6 @@ router.post('/login', authLimiter, async (req, res) => {
 
     const shogun = getShogunInstance(req);
     
-    if (!shogun.isInitialized) {
-      await shogun.initialize();
-    }
-
     const loginResult = await shogun.login(email, passphrase);
     
     if (!loginResult.success) {
@@ -215,10 +204,6 @@ router.post('/web3/login', authLimiter, async (req, res) => {
 
     const shogun = getShogunInstance(req);
     
-    if (!shogun.isInitialized) {
-      await shogun.initialize();
-    }
-
     const web3Plugin = shogun.getPlugin("web3");
     if (!web3Plugin || !web3Plugin.isAvailable()) {
       return res.status(400).json({ 
@@ -285,10 +270,6 @@ router.post('/web3/register', authLimiter, async (req, res) => {
 
     const shogun = getShogunInstance(req);
     
-    if (!shogun.isInitialized) {
-      await shogun.initialize();
-    }
-
     const web3Plugin = shogun.getPlugin("web3");
     if (!web3Plugin || !web3Plugin.isAvailable()) {
       return res.status(400).json({ 
@@ -355,10 +336,6 @@ router.post('/nostr/login', authLimiter, async (req, res) => {
 
     const shogun = getShogunInstance(req);
     
-    if (!shogun.isInitialized) {
-      await shogun.initialize();
-    }
-
     const nostrPlugin = shogun.getPlugin("nostr");
     if (!nostrPlugin || !nostrPlugin.isAvailable()) {
       return res.status(400).json({ 
@@ -413,10 +390,6 @@ router.post('/nostr/register', authLimiter, async (req, res) => {
 
     const shogun = getShogunInstance(req);
     
-    if (!shogun.isInitialized) {
-      await shogun.initialize();
-    }
-
     const nostrPlugin = shogun.getPlugin("nostr");
     if (!nostrPlugin || !nostrPlugin.isAvailable()) {
       return res.status(400).json({ 
@@ -461,10 +434,6 @@ router.get('/status', async (req, res) => {
   try {
     const shogun = getShogunInstance(req);
     
-    if (!shogun.isInitialized) {
-      await shogun.initialize();
-    }
-
     const isLoggedIn = shogun.isLoggedIn();
     
     if (!isLoggedIn) {
@@ -540,10 +509,6 @@ router.post('/reset', authLimiter, async (req, res) => {
     
     const shogun = getShogunInstance(req);
     
-    if (!shogun.isInitialized) {
-      await shogun.initialize();
-    }
-
     // Prova a fare login con la nuova password
     const loginResult = await shogun.login(email, newPassphrase);
     
@@ -585,10 +550,6 @@ router.post('/change-password', authLimiter, async (req, res) => {
 
     const shogun = getShogunInstance(req);
     
-    if (!shogun.isInitialized) {
-      await shogun.initialize();
-    }
-
     // Per ora restituiamo un successo mock
     // In un'implementazione reale, qui cambieresti la password
     

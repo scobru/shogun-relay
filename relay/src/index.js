@@ -1056,6 +1056,43 @@ async function initializeServer() {
   // Configura l'istanza Gun per le route di autenticazione
   app.set("gunInstance", gun);
 
+  // Inizializza Shogun Core per l'autenticazione
+  let shogunCore = null;
+  try {
+    console.log("🔐 Initializing Shogun Core for authentication...");
+    const ShogunCoreModule = await import("shogun-core");
+    
+    const peers = process.env.RELAY_PEERS ? process.env.RELAY_PEERS.split(',') : [
+      "wss://ruling-mastodon-improved.ngrok-free.app/gun",
+      "https://gun-manhattan.herokuapp.com/gun",
+      "https://peer.wallie.io/gun",
+    ];
+    
+    shogunCore = new ShogunCoreModule.default({
+      peers: peers,
+      scope: "shogun-relay",
+      web3: { enabled: true },
+      webauthn: {
+        enabled: true,
+        rpName: "Shogun Relay",
+        rpId: process.env.RELAY_HOST || "localhost",
+      },
+      nostr: { enabled: true },
+      timeouts: {
+        login: 30000,
+        signup: 30000,
+        operation: 60000,
+      },
+    });
+
+    await shogunCore.initialize();
+    app.set("shogunCore", shogunCore);
+    console.log("✅ Shogun Core initialized successfully");
+  } catch (error) {
+    console.error("❌ Failed to initialize Shogun Core:", error);
+    // Non bloccare l'avvio del server se Shogun Core fallisce
+  }
+
   // Esponi le funzioni helper per le route
   app.set("addSystemLog", addSystemLog);
   app.set("addTimeSeriesPoint", addTimeSeriesPoint);
