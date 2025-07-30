@@ -9,6 +9,7 @@
     <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="lib/admin-nav.js"></script>
+    <script src="lib/admin-auth.js"></script>
     <style>
         .service-card {
             transition: all 0.3s ease;
@@ -196,20 +197,7 @@
         let servicesStatus = {};
 
         function getAdminPassword() {
-            try {
-                let password = localStorage.getItem('shogun-relay-admin-password') || '';
-                // If no password is stored, prompt user for it
-                if (!password) {
-                    password = prompt('Enter admin password for service operations:');
-                    if (password) {
-                        localStorage.setItem('shogun-relay-admin-password', password);
-                    }
-                }
-                return password;
-            } catch (error) {
-                console.error('Failed to get admin password:', error);
-                return '';
-            }
+            return ShogunAdmin.getPassword();
         }
 
         function log(message, level = 'info') {
@@ -232,12 +220,8 @@
         }
 
         function clearAdminPassword() {
-            try {
-                localStorage.removeItem('shogun-relay-admin-password');
-                log('🔑 Admin password cleared from storage', 'info');
-            } catch (error) {
-                log(`❌ Failed to clear admin password: ${error.message}`, 'error');
-            }
+            ShogunAdmin.clearPassword();
+            log('🔑 Admin password cleared from storage', 'info');
         }
 
         function updateStatusIndicator(service, status) {
@@ -506,6 +490,9 @@
         }
 
         window.addEventListener('load', async () => {
+            // Initialize ShogunAdmin
+            ShogunAdmin.init();
+            
             log('Services dashboard initialized', 'info');
             await refreshAllServices();
             updateInterval = setInterval(refreshAllServices, 30000);
