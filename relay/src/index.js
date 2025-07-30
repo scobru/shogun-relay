@@ -801,6 +801,9 @@ async function initializeServer() {
   app.use(cors());
   app.use(express.json()); // Aggiungi supporto per il parsing del body JSON
   app.use(express.urlencoded({ extended: true })); // Aggiungi supporto per i dati del form
+  
+  // Fix per rate limiting con proxy
+  app.set('trust proxy', 1);
 
   // Route specifica per /admin (DEFINITA PRIMA DEL MIDDLEWARE DI AUTENTICAZIONE)
   app.get('/admin', (req, res) => {
@@ -1057,6 +1060,11 @@ async function initializeServer() {
   try {
     console.log("🔐 Initializing Shogun Core for authentication...");
     console.log("🔐 ShogunCore constructor available:", typeof ShogunCore);
+    console.log("🔐 ShogunCore import check:", ShogunCore ? "SUCCESS" : "FAILED");
+    
+    if (typeof ShogunCore !== 'function') {
+      throw new Error(`ShogunCore is not a constructor. Type: ${typeof ShogunCore}`);
+    }
     
     const peers = process.env.RELAY_PEERS ? process.env.RELAY_PEERS.split(',') : [
       "wss://ruling-mastodon-improved.ngrok-free.app/gun",
