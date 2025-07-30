@@ -247,6 +247,14 @@
                                         <span class="label">Chiave Pubblica Cifrata:</span>
                                         <span id="userEpub">-</span>
                                     </div>
+                                    <div class="profile-item">
+                                        <span class="label">Pair SEA (pub):</span>
+                                        <span id="userSeaPub">-</span>
+                                    </div>
+                                    <div class="profile-item">
+                                        <span class="label">Pair SEA (epub):</span>
+                                        <span id="userSeaEpub">-</span>
+                                    </div>
                                 </div>
                                 <div class="space-y-4">
                                     <div class="profile-item">
@@ -260,6 +268,10 @@
                                     <div class="profile-item">
                                         <span class="label">Stato:</span>
                                         <span class="text-[#4CAF50] font-medium">🔓 Autenticato</span>
+                                    </div>
+                                    <div class="profile-item">
+                                        <span class="label">Pair SEA Completo:</span>
+                                        <span id="userSeaComplete" class="text-xs">-</span>
                                     </div>
                                 </div>
                             </div>
@@ -497,6 +509,17 @@
                 document.getElementById('userEpub').textContent = currentUser.epub || 'N/A';
                 document.getElementById('authType').textContent = currentUser.profile?.type || 'Tradizionale';
                 document.getElementById('walletAddress').textContent = currentUser.address || currentUser.profile?.address || 'N/A';
+                
+                // Popola i dati del pair SEA
+                if (currentUser.sea) {
+                    document.getElementById('userSeaPub').textContent = currentUser.sea.pub || 'N/A';
+                    document.getElementById('userSeaEpub').textContent = currentUser.sea.epub || 'N/A';
+                    document.getElementById('userSeaComplete').textContent = JSON.stringify(currentUser.sea, null, 2);
+                } else {
+                    document.getElementById('userSeaPub').textContent = 'N/A';
+                    document.getElementById('userSeaEpub').textContent = 'N/A';
+                    document.getElementById('userSeaComplete').textContent = 'N/A';
+                }
                 
                 showStatus(`Autenticato come: ${currentUser.alias || currentUser.username || currentUser.email || 'Utente'}`, 'success');
             } else {
