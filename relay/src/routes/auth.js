@@ -1,6 +1,5 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import ShogunCore from 'shogun-core';
 import { ethers } from 'ethers';
 
 const router = express.Router();
@@ -16,58 +15,21 @@ const authLimiter = rateLimit({
   }
 });
 
-// Inizializza Shogun Core con la configurazione del relay
-let shogunInstance = null;
-
-function initializeShogunCore() {
-  if (shogunInstance) return shogunInstance;
-
-  const peers = process.env.RELAY_PEERS ? process.env.RELAY_PEERS.split(',') : [
-    "wss://ruling-mastodon-improved.ngrok-free.app/gun",
-    "https://gun-manhattan.herokuapp.com/gun",
-    "https://peer.wallie.io/gun",
-  ];
-  
-  shogunInstance = new ShogunCore({
-    peers: peers,
-    scope: "shogun-relay",
-    web3: { enabled: true },
-    webauthn: {
-      enabled: true,
-      rpName: "Shogun Relay",
-      rpId: process.env.RELAY_HOST || "localhost",
-    },
-    nostr: { enabled: true },
-    timeouts: {
-      login: 30000,
-      signup: 30000,
-      operation: 60000,
-    },
-  });
-
-  return shogunInstance;
-}
-
-// Middleware per ottenere l'istanza Shogun Core
+// Middleware per ottenere l'istanza Shogun Core dal server principale
 const getShogunInstance = (req) => {
   console.log("🔐 getShogunInstance called");
   
-  // Prima prova a ottenere l'istanza dal server principale
+  // Ottieni l'istanza dal server principale
   const serverShogunCore = req.app.get('shogunCore');
   console.log("🔐 Server Shogun Core available:", !!serverShogunCore);
   
-  if (serverShogunCore) {
-    console.log("🔐 Using Shogun Core from server instance");
-    return serverShogunCore;
+  if (!serverShogunCore) {
+    console.error("❌ Shogun Core not available from server - authentication system unavailable");
+    return null;
   }
   
-  console.warn("⚠️ Shogun Core not available from server, creating fallback instance");
-  // Fallback: crea una nuova istanza se non è disponibile dal server
-  if (!shogunInstance) {
-    console.log("🔐 Creating new Shogun Core instance");
-    shogunInstance = initializeShogunCore();
-  }
-  return shogunInstance;
+  console.log("🔐 Using Shogun Core from server instance");
+  return serverShogunCore;
 };
 
 // Route per la registrazione utente (tradizionale)
@@ -88,9 +50,9 @@ router.post('/register', authLimiter, async (req, res) => {
     // Verifica che Shogun Core sia disponibile
     if (!shogun) {
       console.error("❌ Shogun Core not available for registration");
-      return res.status(500).json({ 
+      return res.status(503).json({ 
         success: false, 
-        message: 'Sistema di autenticazione non disponibile', 
+        message: 'Sistema di autenticazione non disponibile - riprova più tardi', 
         data: null 
       });
     }
@@ -158,9 +120,9 @@ router.post('/login', authLimiter, async (req, res) => {
     // Verifica che Shogun Core sia disponibile
     if (!shogun) {
       console.error("❌ Shogun Core not available for login");
-      return res.status(500).json({ 
+      return res.status(503).json({ 
         success: false, 
-        message: 'Sistema di autenticazione non disponibile', 
+        message: 'Sistema di autenticazione non disponibile - riprova più tardi', 
         data: null 
       });
     }
@@ -203,9 +165,9 @@ router.post('/logout', async (req, res) => {
     // Verifica che Shogun Core sia disponibile
     if (!shogun) {
       console.error("❌ Shogun Core not available for logout");
-      return res.status(500).json({ 
+      return res.status(503).json({ 
         success: false, 
-        message: 'Sistema di autenticazione non disponibile', 
+        message: 'Sistema di autenticazione non disponibile - riprova più tardi', 
         data: null 
       });
     }
@@ -245,9 +207,9 @@ router.post('/web3/login', authLimiter, async (req, res) => {
     // Verifica che Shogun Core sia disponibile
     if (!shogun) {
       console.error("❌ Shogun Core not available for Web3 login");
-      return res.status(500).json({ 
+      return res.status(503).json({ 
         success: false, 
-        message: 'Sistema di autenticazione non disponibile', 
+        message: 'Sistema di autenticazione non disponibile - riprova più tardi', 
         data: null 
       });
     }
@@ -331,9 +293,9 @@ router.post('/web3/register', authLimiter, async (req, res) => {
     // Verifica che Shogun Core sia disponibile
     if (!shogun) {
       console.error("❌ Shogun Core not available for Web3 registration");
-      return res.status(500).json({ 
+      return res.status(503).json({ 
         success: false, 
-        message: 'Sistema di autenticazione non disponibile', 
+        message: 'Sistema di autenticazione non disponibile - riprova più tardi', 
         data: null 
       });
     }
@@ -417,9 +379,9 @@ router.post('/nostr/login', authLimiter, async (req, res) => {
     // Verifica che Shogun Core sia disponibile
     if (!shogun) {
       console.error("❌ Shogun Core not available for Nostr login");
-      return res.status(500).json({ 
+      return res.status(503).json({ 
         success: false, 
-        message: 'Sistema di autenticazione non disponibile', 
+        message: 'Sistema di autenticazione non disponibile - riprova più tardi', 
         data: null 
       });
     }
@@ -481,9 +443,9 @@ router.post('/nostr/register', authLimiter, async (req, res) => {
     // Verifica che Shogun Core sia disponibile
     if (!shogun) {
       console.error("❌ Shogun Core not available for Nostr registration");
-      return res.status(500).json({ 
+      return res.status(503).json({ 
         success: false, 
-        message: 'Sistema di autenticazione non disponibile', 
+        message: 'Sistema di autenticazione non disponibile - riprova più tardi', 
         data: null 
       });
     }
@@ -538,9 +500,9 @@ router.get('/status', async (req, res) => {
     // Verifica che Shogun Core sia disponibile
     if (!shogun) {
       console.error("❌ Shogun Core not available for status check");
-      return res.status(500).json({ 
+      return res.status(503).json({ 
         success: false, 
-        message: 'Sistema di autenticazione non disponibile', 
+        message: 'Sistema di autenticazione non disponibile - riprova più tardi', 
         data: null 
       });
     }
@@ -627,9 +589,9 @@ router.post('/reset', authLimiter, async (req, res) => {
     // Verifica che Shogun Core sia disponibile
     if (!shogun) {
       console.error("❌ Shogun Core not available for password reset");
-      return res.status(500).json({ 
+      return res.status(503).json({ 
         success: false, 
-        message: 'Sistema di autenticazione non disponibile', 
+        message: 'Sistema di autenticazione non disponibile - riprova più tardi', 
         data: null 
       });
     }
@@ -678,9 +640,9 @@ router.post('/change-password', authLimiter, async (req, res) => {
     // Verifica che Shogun Core sia disponibile
     if (!shogun) {
       console.error("❌ Shogun Core not available for password change");
-      return res.status(500).json({ 
+      return res.status(503).json({ 
         success: false, 
-        message: 'Sistema di autenticazione non disponibile', 
+        message: 'Sistema di autenticazione non disponibile - riprova più tardi', 
         data: null 
       });
     }

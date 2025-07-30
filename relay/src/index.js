@@ -1056,12 +1056,15 @@ async function initializeServer() {
   let shogunCore = null;
   try {
     console.log("🔐 Initializing Shogun Core for authentication...");
+    console.log("🔐 ShogunCore constructor available:", typeof ShogunCore);
     
     const peers = process.env.RELAY_PEERS ? process.env.RELAY_PEERS.split(',') : [
       "wss://ruling-mastodon-improved.ngrok-free.app/gun",
       "https://gun-manhattan.herokuapp.com/gun",
       "https://peer.wallie.io/gun",
     ];
+    
+    console.log("🔐 Peers for Shogun Core:", peers);
     
     // Usa l'import già fatto all'inizio del file
     shogunCore = new ShogunCore({
@@ -1088,6 +1091,8 @@ async function initializeServer() {
   } catch (error) {
     console.error("❌ Failed to initialize Shogun Core:", error);
     console.error("❌ Error details:", error.stack);
+    console.error("❌ Error name:", error.name);
+    console.error("❌ Error message:", error.message);
     // Non bloccare l'avvio del server se Shogun Core fallisce
   }
 
