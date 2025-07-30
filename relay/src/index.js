@@ -1074,13 +1074,13 @@ async function initializeServer() {
     
     console.log("🔐 Peers for Shogun Core:", peers);
     
-    // Usa l'import già fatto all'inizio del file
-    shogunCore = new ShogunCore({
+    // Debug: mostra la configurazione
+    const shogunConfig = {
       gunInstance: gun,
       appToken: process.env.ADMIN_PASSWORD,
       authToken: process.env.ADMIN_PASSWORD,
       peers: peers,
-      scope: "shogun-relay",
+      scope: "shogun",
       web3: { enabled: true },
       webauthn: {
         enabled: true,
@@ -1093,10 +1093,31 @@ async function initializeServer() {
         signup: 30000,
         operation: 60000,
       },
-    });
+    };
+    
+    console.log("🔐 Shogun Core configuration:", JSON.stringify(shogunConfig, null, 2));
+    
+    // Usa l'import già fatto all'inizio del file
+    shogunCore = new ShogunCore(shogunConfig);
 
     console.log("🔐 Shogun Core instance created, initializing...");
     await shogunCore.initialize();
+    
+    // Debug: controlla i plugin dopo l'inizializzazione
+    console.log("🔐 Checking plugins after initialization:");
+    console.log("🔐 - web3:", !!shogunCore.getPlugin("web3"));
+    console.log("🔐 - webauthn:", !!shogunCore.getPlugin("webauthn"));
+    console.log("🔐 - nostr:", !!shogunCore.getPlugin("nostr"));
+    console.log("🔐 - oauth:", !!shogunCore.getPlugin("oauth"));
+    
+    // Debug: controlla tutti i plugin registrati
+    console.log("🔐 All registered plugins after initialization:");
+    if (shogunCore.plugins) {
+      for (const [name, plugin] of shogunCore.plugins) {
+        console.log(`🔐   - ${name}:`, typeof plugin);
+      }
+    }
+    
     app.set("shogunCore", shogunCore);
     console.log("✅ Shogun Core initialized successfully");
   } catch (error) {
