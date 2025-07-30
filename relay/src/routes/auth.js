@@ -214,11 +214,34 @@ router.post('/web3/login', authLimiter, async (req, res) => {
       });
     }
 
+    console.log("🔐 Available plugins in Shogun Core:");
+    console.log("🔐 - web3:", !!shogun.getPlugin("web3"));
+    console.log("🔐 - webauthn:", !!shogun.getPlugin("webauthn"));
+    console.log("🔐 - nostr:", !!shogun.getPlugin("nostr"));
+    console.log("🔐 - oauth:", !!shogun.getPlugin("oauth"));
+
     const web3Plugin = shogun.getPlugin("web3");
-    if (!web3Plugin || !web3Plugin.isAvailable()) {
+    console.log("🔐 Web3 plugin obtained:", !!web3Plugin);
+    console.log("🔐 Web3 plugin type:", typeof web3Plugin);
+    
+    if (!web3Plugin) {
+      console.error("❌ Web3 plugin not found");
       return res.status(400).json({ 
         success: false, 
-        message: 'Web3 non disponibile', 
+        message: 'Plugin Web3 non trovato', 
+        data: null 
+      });
+    }
+    
+    console.log("🔐 Checking if Web3 plugin is available...");
+    const isAvailable = web3Plugin.isAvailable ? web3Plugin.isAvailable() : false;
+    console.log("🔐 Web3 plugin available:", isAvailable);
+    
+    if (!isAvailable) {
+      console.error("❌ Web3 plugin not available");
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Web3 non disponibile - verifica che MetaMask sia installato e connesso', 
         data: null 
       });
     }
@@ -300,11 +323,34 @@ router.post('/web3/register', authLimiter, async (req, res) => {
       });
     }
 
+    console.log("🔐 Available plugins in Shogun Core (register):");
+    console.log("🔐 - web3:", !!shogun.getPlugin("web3"));
+    console.log("🔐 - webauthn:", !!shogun.getPlugin("webauthn"));
+    console.log("🔐 - nostr:", !!shogun.getPlugin("nostr"));
+    console.log("🔐 - oauth:", !!shogun.getPlugin("oauth"));
+
     const web3Plugin = shogun.getPlugin("web3");
-    if (!web3Plugin || !web3Plugin.isAvailable()) {
+    console.log("🔐 Web3 plugin obtained (register):", !!web3Plugin);
+    console.log("🔐 Web3 plugin type (register):", typeof web3Plugin);
+    
+    if (!web3Plugin) {
+      console.error("❌ Web3 plugin not found (register)");
       return res.status(400).json({ 
         success: false, 
-        message: 'Web3 non disponibile', 
+        message: 'Plugin Web3 non trovato', 
+        data: null 
+      });
+    }
+    
+    console.log("🔐 Checking if Web3 plugin is available (register)...");
+    const isAvailable = web3Plugin.isAvailable ? web3Plugin.isAvailable() : false;
+    console.log("🔐 Web3 plugin available (register):", isAvailable);
+    
+    if (!isAvailable) {
+      console.error("❌ Web3 plugin not available (register)");
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Web3 non disponibile - verifica che MetaMask sia installato e connesso', 
         data: null 
       });
     }

@@ -257,27 +257,49 @@
         // Web3 Authentication
         async function connectMetaMask() {
             try {
+                showStatus('Connessione a MetaMask in corso...', 'info');
+                
                 if (typeof window.ethereum === 'undefined') {
-                    showStatus('MetaMask non installato', 'error');
+                    showStatus('MetaMask non installato. Installa MetaMask e riprova.', 'error');
                     return;
                 }
 
+                console.log('🔗 Requesting MetaMask accounts...');
                 const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                
+                if (!accounts || accounts.length === 0) {
+                    showStatus('Nessun account MetaMask trovato. Connetti un account e riprova.', 'error');
+                    return;
+                }
+                
                 const address = accounts[0];
+                console.log('🔗 MetaMask address:', address);
                 
                 document.getElementById('web3Address').value = address;
                 
                 // Richiedi la firma
                 const message = "I Love Shogun";
+                console.log('🔗 Requesting signature for message:', message);
+                
                 const signature = await window.ethereum.request({
                     method: 'personal_sign',
                     params: [message, address]
                 });
                 
+                console.log('🔗 Signature received:', signature.substring(0, 20) + '...');
                 document.getElementById('web3Signature').value = signature;
-                showStatus('MetaMask connesso e firma ottenuta!', 'success');
+                
+                showStatus('MetaMask connesso e firma ottenuta! Ora puoi fare login o registrazione.', 'success');
             } catch (error) {
-                showStatus('Errore nella connessione a MetaMask: ' + error.message, 'error');
+                console.error('❌ MetaMask connection error:', error);
+                
+                if (error.code === 4001) {
+                    showStatus('Connessione MetaMask rifiutata dall\'utente.', 'error');
+                } else if (error.code === -32002) {
+                    showStatus('Richiesta MetaMask già in corso. Controlla la finestra di MetaMask.', 'error');
+                } else {
+                    showStatus('Errore nella connessione a MetaMask: ' + error.message, 'error');
+                }
             }
         }
 
