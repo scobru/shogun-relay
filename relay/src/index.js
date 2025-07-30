@@ -1132,7 +1132,7 @@ async function initializeServer() {
             enabled: true,
             clientId: process.env.GOOGLE_CLIENT_ID,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-            redirectUri: process.env.GOOGLE_REDIRECT_URI || `http://${host}:${port}/oauth-callback`,
+            redirectUri: process.env.GOOGLE_REDIRECT_URI || `http://${host}:${port}/api/v1/auth/oauth/callback`,
             scope: ["openid", "email", "profile"],
             authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
             tokenUrl: "https://oauth2.googleapis.com/token",

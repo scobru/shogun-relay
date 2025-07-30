@@ -1045,6 +1045,40 @@ router.post('/oauth/callback', async (req, res) => {
   }
 });
 
+// Route GET per il callback OAuth (redirect alla pagina di autenticazione)
+router.get('/oauth/callback', async (req, res) => {
+  try {
+    const { code, state, error, error_description, provider = 'google' } = req.query;
+    
+    console.log(`🔐 OAuth callback GET request for provider: ${provider}`);
+    
+    // Se c'è un errore OAuth, reindirizza con l'errore
+    if (error) {
+      console.error(`🔐 OAuth error: ${error} - ${error_description || ''}`);
+      const errorUrl = `/auth?error=${encodeURIComponent(error)}&error_description=${encodeURIComponent(error_description || '')}&provider=${provider}`;
+      return res.redirect(errorUrl);
+    }
+    
+    // Se mancano i parametri richiesti, reindirizza con errore
+    if (!code || !state) {
+      console.error('🔐 Missing OAuth parameters: code or state');
+      const errorUrl = `/auth?error=missing_parameters&provider=${provider}`;
+      return res.redirect(errorUrl);
+    }
+    
+    // Reindirizza alla pagina di autenticazione con i parametri OAuth
+    const redirectUrl = `/auth?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}&provider=${provider}`;
+    console.log(`🔐 Redirecting to auth page with OAuth parameters: ${redirectUrl}`);
+    
+    res.redirect(redirectUrl);
+    
+  } catch (error) {
+    console.error('Errore durante il redirect OAuth callback:', error);
+    const errorUrl = `/auth?error=server_error&provider=google`;
+    res.redirect(errorUrl);
+  }
+});
+
 // Route per login OAuth (alternativa)
 router.post('/oauth/:provider/login', async (req, res) => {
   try {

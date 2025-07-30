@@ -662,57 +662,12 @@
             try {
                 showStatus('Avvio autenticazione Google OAuth...', 'info');
                 
-                // Reindirizza all'endpoint OAuth di Google
+                // Reindirizza all'endpoint OAuth di Google nella stessa pagina
                 const oauthUrl = '/api/v1/auth/oauth/google/authorize';
                 console.log('🔐 Redirecting to OAuth URL:', oauthUrl);
                 
-                // Apri in una nuova finestra per evitare problemi di redirect
-                const oauthWindow = window.open(oauthUrl, 'googleOAuth', 'width=500,height=600,scrollbars=yes,resizable=yes');
-                
-                if (!oauthWindow) {
-                    showStatus('Popup bloccato. Abilita i popup per questo sito.', 'error');
-                    return;
-                }
-                
-                // Usa un approccio alternativo per evitare Cross-Origin-Opener-Policy
-                // Invece di polling window.closed, usa un timer e verifica lo stato
-                let checkCount = 0;
-                const maxChecks = 60; // 60 secondi timeout
-                
-                const checkAuthStatus = setInterval(async () => {
-                    checkCount++;
-                    
-                    try {
-                        // Verifica lo stato di autenticazione direttamente
-                        const result = await makeRequest('/status');
-                        if (result.data.authenticated) {
-                            clearInterval(checkAuthStatus);
-                            currentUser = result.data;
-                            updateUI();
-                            showStatus('Autenticazione Google completata con successo!', 'success');
-                            
-                            // Chiudi la finestra popup se possibile
-                            try {
-                                oauthWindow.close();
-                            } catch (e) {
-                                console.log('🔐 OAuth window already closed or cannot be closed');
-                            }
-                        }
-                    } catch (error) {
-                        console.log('🔐 Checking auth status...', checkCount);
-                    }
-                    
-                    // Timeout dopo 60 secondi
-                    if (checkCount >= maxChecks) {
-                        clearInterval(checkAuthStatus);
-                        showStatus('Timeout autenticazione OAuth. Riprova.', 'error');
-                        try {
-                            oauthWindow.close();
-                        } catch (e) {
-                            console.log('🔐 OAuth window already closed');
-                        }
-                    }
-                }, 1000);
+                // Redirect nella stessa pagina
+                window.location.href = oauthUrl;
                 
             } catch (error) {
                 console.error('❌ Google OAuth error:', error);
@@ -725,56 +680,12 @@
             try {
                 showStatus('Avvio registrazione Google OAuth...', 'info');
                 
-                // Reindirizza all'endpoint OAuth di Google per registrazione
+                // Reindirizza all'endpoint OAuth di Google per registrazione nella stessa pagina
                 const oauthUrl = '/api/v1/auth/oauth/google/authorize?action=register';
                 console.log('🔐 Redirecting to OAuth registration URL:', oauthUrl);
                 
-                // Apri in una nuova finestra per evitare problemi di redirect
-                const oauthWindow = window.open(oauthUrl, 'googleOAuth', 'width=500,height=600,scrollbars=yes,resizable=yes');
-                
-                if (!oauthWindow) {
-                    showStatus('Popup bloccato. Abilita i popup per questo sito.', 'error');
-                    return;
-                }
-                
-                // Usa lo stesso approccio per evitare Cross-Origin-Opener-Policy
-                let checkCount = 0;
-                const maxChecks = 60; // 60 secondi timeout
-                
-                const checkAuthStatus = setInterval(async () => {
-                    checkCount++;
-                    
-                    try {
-                        // Verifica lo stato di autenticazione direttamente
-                        const result = await makeRequest('/status');
-                        if (result.data.authenticated) {
-                            clearInterval(checkAuthStatus);
-                            currentUser = result.data;
-                            updateUI();
-                            showStatus('Registrazione Google completata con successo!', 'success');
-                            
-                            // Chiudi la finestra popup se possibile
-                            try {
-                                oauthWindow.close();
-                            } catch (e) {
-                                console.log('🔐 OAuth window already closed or cannot be closed');
-                            }
-                        }
-                    } catch (error) {
-                        console.log('🔐 Checking auth status...', checkCount);
-                    }
-                    
-                    // Timeout dopo 60 secondi
-                    if (checkCount >= maxChecks) {
-                        clearInterval(checkAuthStatus);
-                        showStatus('Timeout registrazione OAuth. Riprova.', 'error');
-                        try {
-                            oauthWindow.close();
-                        } catch (e) {
-                            console.log('🔐 OAuth window already closed');
-                        }
-                    }
-                }, 1000);
+                // Redirect nella stessa pagina
+                window.location.href = oauthUrl;
                 
             } catch (error) {
                 console.error('❌ Google OAuth registration error:', error);
@@ -918,6 +829,9 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
+            // Gestisci callback OAuth se presente nell'URL
+            handleOAuthCallback();
+            
             checkAuthStatus();
             
             // Check Nostr extension availability
@@ -928,6 +842,118 @@
                 console.log('⚡ Nostr extension not available');
             }
         });
+
+        // Gestisci callback OAuth
+        async function handleOAuthCallback() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get("code");
+            const state = urlParams.get("state");
+            const error = urlParams.get("error");
+            const errorDescription = urlParams.get("error_description");
+            const provider = urlParams.get("provider") || "google";
+
+            // Se non ci sono parametri OAuth, esci
+            if (!code && !error) {
+                return;
+            }
+
+            console.log("🔐 OAuth callback parameters detected:", {
+                code: code ? "present" : "missing",
+                state: state ? "present" : "missing",
+                error,
+                errorDescription,
+                provider
+            });
+
+            try {
+                // Controlla errori OAuth
+                if (error) {
+                    throw new Error(
+                        `OAuth error: ${error}${errorDescription ? ` - ${errorDescription}` : ""}`
+                    );
+                }
+
+                // Validazione di sicurezza
+                if (!code) {
+                    throw new Error("Codice di autorizzazione non trovato nell'URL.");
+                }
+
+                if (!state) {
+                    throw new Error(
+                        "Parametro state non trovato nell'URL - possibile attacco CSRF."
+                    );
+                }
+
+                showStatus('Completamento autenticazione OAuth...', 'info');
+
+                // Chiama l'endpoint di callback OAuth
+                const response = await fetch(`${API_BASE}/oauth/callback`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        provider,
+                        code,
+                        state
+                    })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.message || 'Errore durante l\'autenticazione OAuth');
+                }
+
+                if (result.success) {
+                    console.log("🔐 OAuth authentication successful:", result);
+                    
+                    // Aggiorna l'UI con i dati dell'utente
+                    const userData = {
+                        authenticated: true,
+                        alias: result.data.name || result.data.email,
+                        email: result.data.email,
+                        pub: result.data.userPub,
+                        profile: {
+                            type: 'oauth',
+                            provider: provider,
+                            name: result.data.name,
+                            picture: result.data.picture
+                        }
+                    };
+                    
+                    currentUser = userData;
+                    updateUI();
+                    showStatus('Autenticazione Google completata con successo!', 'success');
+                    
+                    // Pulisci l'URL dai parametri OAuth
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                } else {
+                    throw new Error(result.message || "Autenticazione fallita");
+                }
+
+            } catch (error) {
+                console.error("❌ Error handling OAuth callback:", error);
+
+                // Gestisci errori specifici
+                let errorMessage = error.message;
+                
+                if (error.message?.includes("invalid_grant")) {
+                    errorMessage = "La tua sessione è scaduta. Riprova ad accedere.";
+                } else if (error.message?.includes("state parameter expired")) {
+                    errorMessage = "Sessione di autenticazione scaduta. Riprova ad accedere.";
+                } else if (error.message?.includes("CSRF")) {
+                    errorMessage = "Validazione di sicurezza fallita. Riprova ad accedere.";
+                } else if (error.message?.includes("network")) {
+                    errorMessage = "Errore di connessione. Verifica la tua connessione internet.";
+                }
+
+                showStatus(errorMessage, 'error');
+                
+                // Pulisci l'URL dai parametri OAuth anche in caso di errore
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        }
     </script>
 </body>
 </html> 

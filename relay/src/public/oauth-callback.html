@@ -189,13 +189,44 @@
                         detail: { provider, user: result.data }
                     }));
 
-                    showSuccess();
-                    showStatus('Autenticazione OAuth completata con successo!', 'success');
-                    
-                    // Chiudi automaticamente dopo 3 secondi
-                    setTimeout(() => {
-                        closeWindow();
-                    }, 3000);
+                    // Invia i dati all'app principale tramite PostMessage
+                    if (window.opener) {
+                        try {
+                            console.log("🔐 Sending OAuth success data to parent window");
+                            window.opener.postMessage({
+                                type: 'oauth:success',
+                                provider: provider,
+                                user: result.data,
+                                timestamp: Date.now()
+                            }, '*'); // Usa '*' per cross-origin communication
+                            
+                            // Aspetta un po' per assicurarsi che il messaggio sia inviato
+                            setTimeout(() => {
+                                showSuccess();
+                                showStatus('Autenticazione OAuth completata con successo!', 'success');
+                                
+                                // Chiudi automaticamente dopo 2 secondi
+                                setTimeout(() => {
+                                    closeWindow();
+                                }, 2000);
+                            }, 500);
+                        } catch (error) {
+                            console.error("❌ Error sending PostMessage to parent:", error);
+                            // Fallback: chiudi immediatamente
+                            showSuccess();
+                            showStatus('Autenticazione OAuth completata con successo!', 'success');
+                            setTimeout(() => {
+                                closeWindow();
+                            }, 2000);
+                        }
+                    } else {
+                        // Se non c'è parent window, procedi normalmente
+                        showSuccess();
+                        showStatus('Autenticazione OAuth completata con successo!', 'success');
+                        setTimeout(() => {
+                            closeWindow();
+                        }, 2000);
+                    }
                 } else {
                     throw new Error(result.message || "Autenticazione fallita");
                 }
