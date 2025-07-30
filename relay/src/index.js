@@ -1101,7 +1101,14 @@ async function initializeServer() {
     shogunCore = new ShogunCore(shogunConfig);
 
     console.log("🔐 Shogun Core instance created, initializing...");
-    await shogunCore.initialize();
+    
+    try {
+      await shogunCore.initialize();
+      console.log("🔐 Shogun Core initialization completed");
+    } catch (initError) {
+      console.error("❌ Error during Shogun Core initialization:", initError);
+      console.error("❌ Init error stack:", initError.stack);
+    }
     
     // Debug: controlla i plugin dopo l'inizializzazione
     console.log("🔐 Checking plugins after initialization:");
@@ -1116,6 +1123,8 @@ async function initializeServer() {
       for (const [name, plugin] of shogunCore.plugins) {
         console.log(`🔐   - ${name}:`, typeof plugin);
       }
+    } else {
+      console.log("🔐 No plugins map found");
     }
     
     app.set("shogunCore", shogunCore);
