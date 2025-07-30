@@ -391,6 +391,79 @@ router.post('/web3/register', authLimiter, async (req, res) => {
   }
 });
 
+// Route per generare firma Nostr deterministica
+router.post('/nostr/sign', authLimiter, async (req, res) => {
+  try {
+    const { address, message } = req.body;
+    
+    if (!address || !message) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Indirizzo e messaggio sono richiesti', 
+        data: null 
+      });
+    }
+
+    const shogun = getShogunInstance(req);
+    
+    // Verifica che Shogun Core sia disponibile
+    if (!shogun) {
+      console.error("❌ Shogun Core not available for Nostr signing");
+      return res.status(503).json({ 
+        success: false, 
+        message: 'Sistema di autenticazione non disponibile', 
+        data: null 
+      });
+    }
+
+    console.log("⚡ Processing Nostr signature request for address:", address.substring(0, 10) + "...");
+
+    // Usa il plugin Nostr di Shogun Core
+    const nostrPlugin = shogun.getPlugin("nostr");
+    if (!nostrPlugin) {
+      console.error("❌ Nostr plugin not found");
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Plugin Nostr non trovato', 
+        data: null 
+      });
+    }
+
+    try {
+      // Usa il plugin per generare una firma deterministica
+      const signature = await nostrPlugin.requestSignature(address, message);
+      
+      console.log("⚡ Deterministic signature generated successfully");
+
+      return res.status(200).json({ 
+        success: true, 
+        message: 'Firma deterministica generata con successo', 
+        data: {
+          address,
+          message,
+          signature
+        }
+      });
+
+    } catch (pluginError) {
+      console.error("❌ Nostr plugin error:", pluginError);
+      return res.status(400).json({ 
+        success: false, 
+        message: pluginError.message || 'Errore plugin Nostr', 
+        data: null 
+      });
+    }
+
+  } catch (error) {
+    console.error('Errore durante la generazione firma Nostr:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Errore interno del server', 
+      data: null 
+    });
+  }
+});
+
 // Route per Nostr authentication
 router.post('/nostr/login', authLimiter, async (req, res) => {
   try {
@@ -1053,14 +1126,14 @@ router.post('/oauth/callback', async (req, res) => {
 
     console.log(`🔐 Processing OAuth callback for provider: ${provider}`);
 
-    // Completa il flusso OAuth
-    const result = await oauthPlugin.completeOAuth(provider, code, state);
+    // Usa il plugin OAuth per gestire tutto il flusso
+    const result = await oauthPlugin.handleOAuthCallback(provider, code, state);
     
     if (!result.success) {
-      console.error("❌ OAuth completion failed:", result.error);
+      console.error("❌ OAuth callback failed:", result.error);
       return res.status(400).json({ 
         success: false, 
-        message: result.error || 'Completamento OAuth fallito', 
+        message: result.error || 'Autenticazione OAuth fallita', 
         data: null 
       });
     }
@@ -1118,78 +1191,6 @@ router.get('/oauth/callback', async (req, res) => {
     console.error('Errore durante il redirect OAuth callback:', error);
     const errorUrl = `/auth?error=server_error&provider=google`;
     res.redirect(errorUrl);
-  }
-});
-
-// Route per login OAuth (alternativa)
-router.post('/oauth/:provider/login', async (req, res) => {
-  try {
-    const { provider } = req.params;
-    const shogun = getShogunInstance(req);
-    
-    if (!shogun) {
-      console.error("❌ Shogun Core not available for OAuth login");
-      return res.status(503).json({ 
-        success: false, 
-        message: 'Sistema di autenticazione non disponibile', 
-        data: null 
-      });
-    }
-
-    const oauthPlugin = shogun.getPlugin("oauth");
-    if (!oauthPlugin) {
-      console.error("❌ OAuth plugin not found");
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Plugin OAuth non trovato', 
-        data: null 
-      });
-    }
-
-    console.log(`🔐 Initiating OAuth login for provider: ${provider}`);
-
-    // Avvia il login OAuth
-    const result = await oauthPlugin.login(provider);
-    
-    if (!result.success) {
-      console.error("❌ OAuth login initiation failed:", result.error);
-      return res.status(400).json({ 
-        success: false, 
-        message: result.error || 'Avvio login OAuth fallito', 
-        data: null 
-      });
-    }
-
-    if (result.redirectUrl) {
-      // Restituisce l'URL di redirect
-      return res.status(200).json({ 
-        success: true, 
-        message: 'Reindirizzamento OAuth richiesto', 
-        data: {
-          redirectUrl: result.redirectUrl,
-          provider
-        }
-      });
-    } else {
-      // Login completato direttamente
-      return res.status(200).json({ 
-        success: true, 
-        message: 'Login OAuth completato con successo', 
-        data: {
-          provider,
-          user: result.user,
-          profile: { type: 'oauth', provider }
-        }
-      });
-    }
-
-  } catch (error) {
-    console.error('Errore durante il login OAuth:', error);
-    return res.status(500).json({ 
-      success: false, 
-      message: 'Errore interno del server', 
-      data: null 
-    });
   }
 });
 

@@ -628,33 +628,36 @@
                 console.log('⚡ Nostr public key:', pubKey);
                 document.getElementById('nostrAddress').value = pubKey;
                 
-                // Usa signMessage per una firma deterministica
+                // Usa il plugin Nostr di Shogun Core per ottenere una firma deterministica
                 const message = "I Love Shogun!";
-                console.log('⚡ Requesting deterministic signature for message:', message);
+                console.log('⚡ Requesting deterministic signature using Shogun Core plugin');
                 
-                // Prova prima signMessage (metodo standard per firme deterministiche)
-                let signature;
-                try {
-                    signature = await window.nostr.signMessage(message);
-                    console.log('⚡ Using signMessage for deterministic signature');
-                } catch (signMessageError) {
-                    console.log('⚡ signMessage not available, falling back to signEvent with fixed timestamp');
-                    
-                    // Fallback: usa signEvent con timestamp fisso e parametri deterministici
-                    const timestamp = 0; // Timestamp fisso per compatibilità
-                    const event = await window.nostr.signEvent({
-                        kind: 1,
-                        created_at: timestamp,
-                        tags: [],
-                        content: message,
-                    });
-                    signature = event.sig;
+                // Chiama l'endpoint del server che usa il plugin Nostr
+                const response = await fetch(`${API_BASE}/nostr/sign`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        address: pubKey,
+                        message: message
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.message || 'Errore nella richiesta di firma');
+                }
+
+                if (result.success && result.data.signature) {
+                    console.log('⚡ Deterministic signature received from plugin:', result.data.signature.substring(0, 20) + '...');
+                    document.getElementById('nostrSignature').value = result.data.signature;
+                    showStatus('Nostr connesso e firma deterministica ottenuta! Ora puoi fare login o registrazione.', 'success');
+                } else {
+                    throw new Error('Firma non ricevuta dal server');
                 }
                 
-                console.log('⚡ Deterministic signature received:', signature.substring(0, 20) + '...');
-                document.getElementById('nostrSignature').value = signature;
-                
-                showStatus('Nostr connesso e firma deterministica ottenuta! Ora puoi fare login o registrazione.', 'success');
             } catch (error) {
                 console.error('❌ Nostr connection error:', error);
                 
@@ -919,17 +922,18 @@
                 if (result.success) {
                     console.log("🔐 OAuth authentication successful:", result);
                     
+                    // Il plugin OAuth ha già gestito il login automatico
                     // Aggiorna l'UI con i dati dell'utente
                     const userData = {
                         authenticated: true,
-                        alias: result.data.name || result.data.email,
-                        email: result.data.email,
-                        pub: result.data.userPub,
+                        alias: result.data.user.name || result.data.user.email,
+                        email: result.data.user.email,
+                        pub: result.data.user.userPub,
                         profile: {
                             type: 'oauth',
                             provider: provider,
-                            name: result.data.name,
-                            picture: result.data.picture
+                            name: result.data.user.name,
+                            picture: result.data.user.picture
                         }
                     };
                     
