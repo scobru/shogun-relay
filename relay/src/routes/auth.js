@@ -214,51 +214,15 @@ router.post('/web3/login', authLimiter, async (req, res) => {
       });
     }
 
-    console.log("🔐 Available plugins in Shogun Core:");
-    console.log("🔐 - web3:", !!shogun.getPlugin("web3"));
-    console.log("🔐 - webauthn:", !!shogun.getPlugin("webauthn"));
-    console.log("🔐 - nostr:", !!shogun.getPlugin("nostr"));
-    console.log("🔐 - oauth:", !!shogun.getPlugin("oauth"));
-    
-    // Debug: controlla tutti i plugin registrati
-    console.log("🔐 All registered plugins:");
-    if (shogun.plugins) {
-      for (const [name, plugin] of shogun.plugins) {
-        console.log(`🔐   - ${name}:`, typeof plugin);
-      }
-    }
+    console.log("🔐 Processing Web3 login for address:", address.substring(0, 10) + "...");
 
-    const web3Plugin = shogun.getPlugin("web3");
-    console.log("🔐 Web3 plugin obtained:", !!web3Plugin);
-    console.log("🔐 Web3 plugin type:", typeof web3Plugin);
-    
-    if (!web3Plugin) {
-      console.error("❌ Web3 plugin not found");
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Plugin Web3 non trovato', 
-        data: null 
-      });
-    }
-    
-    console.log("🔐 Checking if Web3 plugin is available...");
-    const isAvailable = web3Plugin.isAvailable ? web3Plugin.isAvailable() : false;
-    console.log("🔐 Web3 plugin available:", isAvailable);
-    
-    if (!isAvailable) {
-      console.error("❌ Web3 plugin not available");
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Web3 non disponibile - verifica che MetaMask sia installato e connesso', 
-        data: null 
-      });
-    }
-
-    // Verifica la firma
-    const provider = await web3Plugin.getProvider();
+    // Verifica la firma direttamente con ethers (senza dipendere dal plugin)
     let recoveredAddress;
     try {
-      recoveredAddress = ethers.verifyMessage(message || "I Love Shogun", signature);
+      const messageToVerify = message || "I Love Shogun";
+      console.log("🔐 Verifying signature for message:", messageToVerify);
+      recoveredAddress = ethers.verifyMessage(messageToVerify, signature);
+      console.log("🔐 Recovered address:", recoveredAddress.substring(0, 10) + "...");
     } catch (error) {
       console.error("❌ Error verifying signature:", error);
       return res.status(400).json({ 
@@ -269,16 +233,28 @@ router.post('/web3/login', authLimiter, async (req, res) => {
     }
     
     if (recoveredAddress.toLowerCase() !== address.toLowerCase()) {
+      console.error("❌ Address mismatch:", {
+        provided: address.substring(0, 10) + "...",
+        recovered: recoveredAddress.substring(0, 10) + "..."
+      });
       return res.status(400).json({ 
         success: false, 
-        message: 'Firma non valida', 
+        message: 'Firma non valida - indirizzo non corrisponde', 
         data: null 
       });
     }
 
-    const loginResult = await web3Plugin.login(address);
+    console.log("🔐 Signature verified successfully");
+
+    // Usa le credenziali derivate per il login
+    const username = `web3_${address.substring(0, 10)}`;
+    const password = ethers.sha256(ethers.toUtf8Bytes(signature));
+    
+    console.log("🔐 Attempting login with derived credentials");
+    const loginResult = await shogun.login(username, password);
     
     if (!loginResult.success) {
+      console.error("❌ Web3 login failed:", loginResult.error);
       return res.status(400).json({ 
         success: false, 
         message: loginResult.error || 'Login Web3 fallito', 
@@ -286,14 +262,16 @@ router.post('/web3/login', authLimiter, async (req, res) => {
       });
     }
 
+    console.log("🔐 Web3 login completed successfully");
+
     return res.status(200).json({ 
       success: true, 
       message: 'Login Web3 effettuato con successo', 
       data: {
         address,
-        pub: loginResult.pub,
-        epub: loginResult.epub,
-        profile: loginResult.profile || {}
+        username,
+        pub: loginResult.userPub,
+        profile: { type: 'web3', address }
       }
     });
   } catch (error) {
@@ -331,51 +309,15 @@ router.post('/web3/register', authLimiter, async (req, res) => {
       });
     }
 
-    console.log("🔐 Available plugins in Shogun Core (register):");
-    console.log("🔐 - web3:", !!shogun.getPlugin("web3"));
-    console.log("🔐 - webauthn:", !!shogun.getPlugin("webauthn"));
-    console.log("🔐 - nostr:", !!shogun.getPlugin("nostr"));
-    console.log("🔐 - oauth:", !!shogun.getPlugin("oauth"));
-    
-    // Debug: controlla tutti i plugin registrati
-    console.log("🔐 All registered plugins (register):");
-    if (shogun.plugins) {
-      for (const [name, plugin] of shogun.plugins) {
-        console.log(`🔐   - ${name}:`, typeof plugin);
-      }
-    }
+    console.log("🔐 Processing Web3 registration for address:", address.substring(0, 10) + "...");
 
-    const web3Plugin = shogun.getPlugin("web3");
-    console.log("🔐 Web3 plugin obtained (register):", !!web3Plugin);
-    console.log("🔐 Web3 plugin type (register):", typeof web3Plugin);
-    
-    if (!web3Plugin) {
-      console.error("❌ Web3 plugin not found (register)");
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Plugin Web3 non trovato', 
-        data: null 
-      });
-    }
-    
-    console.log("🔐 Checking if Web3 plugin is available (register)...");
-    const isAvailable = web3Plugin.isAvailable ? web3Plugin.isAvailable() : false;
-    console.log("🔐 Web3 plugin available (register):", isAvailable);
-    
-    if (!isAvailable) {
-      console.error("❌ Web3 plugin not available (register)");
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Web3 non disponibile - verifica che MetaMask sia installato e connesso', 
-        data: null 
-      });
-    }
-
-    // Verifica la firma
-    const provider = await web3Plugin.getProvider();
+    // Verifica la firma direttamente con ethers (senza dipendere dal plugin)
     let recoveredAddress;
     try {
-      recoveredAddress = ethers.verifyMessage(message || "I Love Shogun", signature);
+      const messageToVerify = message || "I Love Shogun";
+      console.log("🔐 Verifying signature for message:", messageToVerify);
+      recoveredAddress = ethers.verifyMessage(messageToVerify, signature);
+      console.log("🔐 Recovered address:", recoveredAddress.substring(0, 10) + "...");
     } catch (error) {
       console.error("❌ Error verifying signature:", error);
       return res.status(400).json({ 
@@ -386,16 +328,28 @@ router.post('/web3/register', authLimiter, async (req, res) => {
     }
     
     if (recoveredAddress.toLowerCase() !== address.toLowerCase()) {
+      console.error("❌ Address mismatch:", {
+        provided: address.substring(0, 10) + "...",
+        recovered: recoveredAddress.substring(0, 10) + "..."
+      });
       return res.status(400).json({ 
         success: false, 
-        message: 'Firma non valida', 
+        message: 'Firma non valida - indirizzo non corrisponde', 
         data: null 
       });
     }
 
-    const signUpResult = await web3Plugin.signUp(address);
+    console.log("🔐 Signature verified successfully");
+
+    // Usa il metodo di autenticazione tradizionale con le credenziali derivate
+    const username = `web3_${address.substring(0, 10)}`;
+    const password = ethers.sha256(ethers.toUtf8Bytes(signature));
+    
+    console.log("🔐 Creating user with derived credentials");
+    const signUpResult = await shogun.signUp(username, password);
     
     if (!signUpResult.success) {
+      console.error("❌ Web3 signup failed:", signUpResult.error);
       return res.status(400).json({ 
         success: false, 
         message: signUpResult.error || 'Registrazione Web3 fallita', 
@@ -403,14 +357,28 @@ router.post('/web3/register', authLimiter, async (req, res) => {
       });
     }
 
+    // Login automatico dopo la registrazione
+    const loginResult = await shogun.login(username, password);
+    
+    if (!loginResult.success) {
+      console.error("❌ Web3 auto-login failed:", loginResult.error);
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Registrazione completata ma login automatico fallito', 
+        data: null 
+      });
+    }
+
+    console.log("🔐 Web3 registration completed successfully");
+
     return res.status(201).json({ 
       success: true, 
-      message: 'Registrazione Web3 completata con successo', 
+      message: 'Utente Web3 creato con successo', 
       data: {
         address,
-        pub: signUpResult.pub,
-        epub: signUpResult.epub,
-        profile: signUpResult.profile || {}
+        username,
+        pub: loginResult.userPub,
+        profile: { type: 'web3', address }
       }
     });
   } catch (error) {
@@ -448,18 +416,43 @@ router.post('/nostr/login', authLimiter, async (req, res) => {
       });
     }
 
+    console.log("⚡ Processing Nostr login for address:", address.substring(0, 10) + "...");
+
+    // Verifica la firma Nostr usando il plugin (che ha la logica di verifica)
     const nostrPlugin = shogun.getPlugin("nostr");
-    if (!nostrPlugin || !nostrPlugin.isAvailable()) {
+    if (!nostrPlugin) {
+      console.error("❌ Nostr plugin not found");
       return res.status(400).json({ 
         success: false, 
-        message: 'Nostr non disponibile', 
+        message: 'Plugin Nostr non trovato', 
         data: null 
       });
     }
 
-    const loginResult = await nostrPlugin.login(address);
+    const messageToVerify = message || "I Love Shogun";
+    console.log("⚡ Verifying Nostr signature for message:", messageToVerify);
+    
+    const isValid = await nostrPlugin.verifySignature(messageToVerify, signature, address);
+    if (!isValid) {
+      console.error("❌ Nostr signature verification failed");
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Firma Nostr non valida', 
+        data: null 
+      });
+    }
+
+    console.log("⚡ Nostr signature verified successfully");
+
+    // Usa le credenziali derivate per il login
+    const username = `nostr_${address.substring(0, 10)}`;
+    const password = ethers.sha256(ethers.toUtf8Bytes(signature));
+    
+    console.log("⚡ Attempting login with derived credentials");
+    const loginResult = await shogun.login(username, password);
     
     if (!loginResult.success) {
+      console.error("❌ Nostr login failed:", loginResult.error);
       return res.status(400).json({ 
         success: false, 
         message: loginResult.error || 'Login Nostr fallito', 
@@ -467,14 +460,16 @@ router.post('/nostr/login', authLimiter, async (req, res) => {
       });
     }
 
+    console.log("⚡ Nostr login completed successfully");
+
     return res.status(200).json({ 
       success: true, 
       message: 'Login Nostr effettuato con successo', 
       data: {
         address,
-        pub: loginResult.pub,
-        epub: loginResult.epub,
-        profile: loginResult.profile || {}
+        username,
+        pub: loginResult.userPub,
+        profile: { type: 'nostr', address }
       }
     });
   } catch (error) {
@@ -512,18 +507,43 @@ router.post('/nostr/register', authLimiter, async (req, res) => {
       });
     }
 
+    console.log("⚡ Processing Nostr registration for address:", address.substring(0, 10) + "...");
+
+    // Verifica la firma Nostr usando il plugin
     const nostrPlugin = shogun.getPlugin("nostr");
-    if (!nostrPlugin || !nostrPlugin.isAvailable()) {
+    if (!nostrPlugin) {
+      console.error("❌ Nostr plugin not found");
       return res.status(400).json({ 
         success: false, 
-        message: 'Nostr non disponibile', 
+        message: 'Plugin Nostr non trovato', 
         data: null 
       });
     }
 
-    const signUpResult = await nostrPlugin.signUp(address);
+    const messageToVerify = message || "I Love Shogun";
+    console.log("⚡ Verifying Nostr signature for message:", messageToVerify);
+    
+    const isValid = await nostrPlugin.verifySignature(messageToVerify, signature, address);
+    if (!isValid) {
+      console.error("❌ Nostr signature verification failed");
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Firma Nostr non valida', 
+        data: null 
+      });
+    }
+
+    console.log("⚡ Nostr signature verified successfully");
+
+    // Usa le credenziali derivate per la registrazione
+    const username = `nostr_${address.substring(0, 10)}`;
+    const password = ethers.sha256(ethers.toUtf8Bytes(signature));
+    
+    console.log("⚡ Creating user with derived credentials");
+    const signUpResult = await shogun.signUp(username, password);
     
     if (!signUpResult.success) {
+      console.error("❌ Nostr signup failed:", signUpResult.error);
       return res.status(400).json({ 
         success: false, 
         message: signUpResult.error || 'Registrazione Nostr fallita', 
@@ -531,14 +551,28 @@ router.post('/nostr/register', authLimiter, async (req, res) => {
       });
     }
 
+    // Login automatico dopo la registrazione
+    const loginResult = await shogun.login(username, password);
+    
+    if (!loginResult.success) {
+      console.error("❌ Nostr auto-login failed:", loginResult.error);
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Registrazione completata ma login automatico fallito', 
+        data: null 
+      });
+    }
+
+    console.log("⚡ Nostr registration completed successfully");
+
     return res.status(201).json({ 
       success: true, 
-      message: 'Registrazione Nostr completata con successo', 
+      message: 'Utente Nostr creato con successo', 
       data: {
         address,
-        pub: signUpResult.pub,
-        epub: signUpResult.epub,
-        profile: signUpResult.profile || {}
+        username,
+        pub: loginResult.userPub,
+        profile: { type: 'nostr', address }
       }
     });
   } catch (error) {
