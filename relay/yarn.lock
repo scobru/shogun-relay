@@ -2995,10 +2995,10 @@ shogun-contracts@^1.2.6:
     hardhat "^2.22.19"
     keccak256 "^1.0.6"
 
-shogun-core@^1.6.6:
-  version "1.6.6"
-  resolved "https://registry.yarnpkg.com/shogun-core/-/shogun-core-1.6.6.tgz#52de48f90586f0c3809d3ef6a88aaaa7020fd0f0"
-  integrity sha512-3+q0hjOCQCtmOby+w5dj0qNIQftIdVQmWCVVRaegAe+X31tjGDJErmatSQ5Yjw9Ag90HhB9o47GfKy18ueqbZA==
+shogun-core@^1.6.7:
+  version "1.6.7"
+  resolved "https://registry.yarnpkg.com/shogun-core/-/shogun-core-1.6.7.tgz#707ca04892305b2b176529dd89793b6d232aed08"
+  integrity sha512-JcKuktMkERovjo8n8y9IBlViUWgc3dhSn19LxnCiikf4Feb/YBHuE5OuAjETN19PorNttmYaAorBZPJ2vS44AA==
   dependencies:
     "@noble/curves" "^1.9.1"
     ajv "^8.17.1"
