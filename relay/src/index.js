@@ -808,9 +808,7 @@ async function initializeServer() {
 
   // Middleware di protezione per le route statiche che richiedono autenticazione admin
   const protectedStaticRoutes = [
-    '/services-dashboard', '/stats', '/charts', '/graph', '/visualGraph',
-    '/upload', '/pin-manager', '/ipfs-status', '/create', '/view',
-    '/chain-contract', '/ipcm-contract', '/notes', '/derive'
+    '/services-dashboard', '/stats', '/charts', '/upload', '/pin-manager', '/create', '/notes'
   ];
 
   app.use((req, res, next) => {
