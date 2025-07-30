@@ -81,6 +81,9 @@ router.post('/register', authLimiter, async (req, res) => {
       // Crea il profilo utente
     const profile = { email, hint };
     await shogun.updateUserAlias(email);
+    
+    // Ottieni il pair SEA completo dall'utente autenticato
+    const seaPair = shogun.user?._?.sea;
           
           return res.status(201).json({ 
             success: true, 
@@ -89,6 +92,7 @@ router.post('/register', authLimiter, async (req, res) => {
               email,
         pub: loginResult.pub,
         epub: loginResult.epub,
+        sea: seaPair, // Includi il pair SEA completo
         profile: profile
       }
     });
@@ -137,6 +141,9 @@ router.post('/login', authLimiter, async (req, res) => {
       });
     }
 
+    // Ottieni il pair SEA completo dall'utente autenticato
+    const seaPair = shogun.user?._?.sea;
+
       return res.status(200).json({ 
         success: true, 
         message: 'Login effettuato con successo', 
@@ -144,6 +151,7 @@ router.post('/login', authLimiter, async (req, res) => {
           email,
         pub: loginResult.pub,
         epub: loginResult.epub,
+        sea: seaPair, // Includi il pair SEA completo
         profile: loginResult.profile || {}
       }
     });
@@ -264,6 +272,9 @@ router.post('/web3/login', authLimiter, async (req, res) => {
 
     console.log("🔐 Web3 login completed successfully");
 
+    // Ottieni il pair SEA completo dall'utente autenticato
+    const seaPair = shogun.user?._?.sea;
+
     return res.status(200).json({ 
       success: true, 
       message: 'Login Web3 effettuato con successo', 
@@ -271,6 +282,7 @@ router.post('/web3/login', authLimiter, async (req, res) => {
         address,
         username,
         pub: loginResult.userPub,
+        sea: seaPair, // Includi il pair SEA completo
         profile: { type: 'web3', address }
       }
     });
@@ -371,6 +383,9 @@ router.post('/web3/register', authLimiter, async (req, res) => {
 
     console.log("🔐 Web3 registration completed successfully");
 
+    // Ottieni il pair SEA completo dall'utente autenticato
+    const seaPair = shogun.user?._?.sea;
+
     return res.status(201).json({ 
       success: true, 
       message: 'Utente Web3 creato con successo', 
@@ -378,6 +393,7 @@ router.post('/web3/register', authLimiter, async (req, res) => {
         address,
         username,
         pub: loginResult.userPub,
+        sea: seaPair, // Includi il pair SEA completo
         profile: { type: 'web3', address }
       }
     });
@@ -459,12 +475,16 @@ router.post('/nostr/login', authLimiter, async (req, res) => {
 
     console.log("✅ Nostr login successful");
 
+    // Ottieni il pair SEA completo dall'utente autenticato
+    const seaPair = shogun.user?._?.sea;
+    
     // Prepara i dati dell'utente per la risposta
     const userData = {
       authenticated: true,
       alias: credentials.username,
       pub: loginResult.userPub,
       epub: shogun.user?._?.epub,
+      sea: seaPair, // Includi il pair SEA completo
       profile: {
         type: 'nostr',
         address: address
@@ -572,12 +592,16 @@ router.post('/nostr/register', authLimiter, async (req, res) => {
 
     console.log("✅ Nostr registration successful");
 
+    // Ottieni il pair SEA completo dall'utente autenticato
+    const seaPair = shogun.user?._?.sea;
+    
     // Prepara i dati dell'utente per la risposta
     const userData = {
       authenticated: true,
       alias: credentials.username,
       pub: signUpResult.userPub,
       epub: shogun.user?._?.epub,
+      sea: seaPair, // Includi il pair SEA completo
       profile: {
         type: 'nostr',
         address: address
@@ -637,7 +661,8 @@ router.get('/status', async (req, res) => {
       authenticated: true,
       pub: shogun.user?._?.sea?.pub,
       epub: shogun.user?._?.sea?.epub,
-      alias: shogun.user?._?.alias
+      alias: shogun.user?._?.alias,
+      sea: shogun.user?._?.sea // Includi il pair SEA completo
     };
 
     console.log("🔐 Returning authenticated user data");
@@ -1056,12 +1081,16 @@ router.post('/oauth/callback', async (req, res) => {
 
     console.log(`🔐 OAuth authentication successful for ${provider}`);
 
+    // Ottieni il pair SEA completo dall'utente autenticato
+    const seaPair = shogun.user?._?.sea;
+
     return res.status(200).json({ 
       success: true, 
       message: 'Autenticazione OAuth completata con successo', 
       data: {
         provider,
         user: result.user,
+        sea: seaPair, // Includi il pair SEA completo
         profile: { type: 'oauth', provider }
       }
     });
