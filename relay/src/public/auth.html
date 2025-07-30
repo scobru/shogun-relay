@@ -499,6 +499,13 @@
             const authForms = document.getElementById('authForms');
             
             if (currentUser) {
+                // Debug: log dei dati ricevuti
+                console.log("🔐 updateUI - currentUser data:", currentUser);
+                console.log("🔐 updateUI - alias:", currentUser.alias);
+                console.log("🔐 updateUI - username:", currentUser.username);
+                console.log("🔐 updateUI - email:", currentUser.email);
+                console.log("🔐 updateUI - profile:", currentUser.profile);
+                
                 // Mostra il profilo utente
                 userProfile.classList.remove('hidden');
                 authForms.classList.add('hidden');
