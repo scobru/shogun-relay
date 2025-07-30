@@ -10,19 +10,36 @@ const ShogunAdmin = (() => {
     let options = {};
     let passwordChangeCallbacks = [];
 
-    function _broadcastUpdate() {
-        if ('BroadcastChannel' in window) {
-            const channel = new BroadcastChannel('shogun-relay-admin');
-            channel.postMessage({ type: 'password-updated' });
-            channel.close();
+    function _cleanupDuplicateKeys() {
+        // Rimuovi la chiave duplicata adminToken se esiste
+        const adminToken = localStorage.getItem('adminToken');
+        const currentPassword = localStorage.getItem(ADMIN_PASSWORD_KEY);
+        
+        if (adminToken && adminToken === currentPassword) {
+            // Se adminToken è uguale alla password corrente, rimuovilo
+            localStorage.removeItem('adminToken');
+            console.log('🧹 Cleaned up duplicate adminToken key');
+        } else if (adminToken && !currentPassword) {
+            // Se c'è adminToken ma non shogun-relay-admin-password, migra il valore
+            localStorage.setItem(ADMIN_PASSWORD_KEY, adminToken);
+            localStorage.removeItem('adminToken');
+            console.log('🔄 Migrated adminToken to shogun-relay-admin-password');
         }
-         // Dispatch a custom event for same-page updates
-        window.dispatchEvent(new CustomEvent('shogun-admin-password-updated', {
-            detail: {
-                hasPassword: ShogunAdmin.hasPassword(),
-                source: 'local'
+    }
+
+    function _broadcastUpdate() {
+        // Broadcast to other tabs/windows
+        if (typeof BroadcastChannel !== 'undefined') {
+            try {
+                const channel = new BroadcastChannel('shogun-admin-auth');
+                channel.postMessage({
+                    type: 'password-updated',
+                    hasPassword: hasPassword()
+                });
+            } catch (error) {
+                console.warn('BroadcastChannel not supported:', error);
             }
-        }));
+        }
         
         // Call all registered callbacks
         passwordChangeCallbacks.forEach(callback => {
@@ -45,34 +62,24 @@ const ShogunAdmin = (() => {
 
     // Public API
     return {
-        init(opts = {}) {
-            options = {
-                autoFill: opts.autoFill || false,
-                showIndicator: opts.showIndicator || false,
-                adminFieldId: opts.adminFieldId || 'adminPassword',
-                syncEnabled: opts.syncEnabled || true,
-                ...opts
-            };
-
-            document.addEventListener('DOMContentLoaded', () => {
-                 _initField(options.adminFieldId, this.getPassword);
-            });
-
-
-            if (options.syncEnabled && 'BroadcastChannel' in window) {
-                const channel = new BroadcastChannel('shogun-relay-admin');
-                channel.onmessage = (event) => {
-                    if (event.data && event.data.type === 'password-updated') {
-                        console.log('Auth details updated in another tab, reloading...');
-                         _initField(options.adminFieldId, this.getPassword);
-                         window.dispatchEvent(new CustomEvent('shogun-admin-password-updated', {
-                            detail: {
-                                hasPassword: this.hasPassword(),
-                                source: 'broadcast'
-                            }
-                        }));
-                    }
-                };
+        init(config = {}) {
+            options = { ...defaultOptions, ...config };
+            
+            // Cleanup duplicate keys on initialization
+            _cleanupDuplicateKeys();
+            
+            // Listen for password updates from other tabs
+            if (typeof BroadcastChannel !== 'undefined') {
+                try {
+                    const channel = new BroadcastChannel('shogun-admin-auth');
+                    channel.onmessage = (event) => {
+                        if (event.data.type === 'password-updated') {
+                            _broadcastUpdate();
+                        }
+                    };
+                } catch (error) {
+                    console.warn('BroadcastChannel not supported:', error);
+                }
             }
         },
 
@@ -105,6 +112,11 @@ const ShogunAdmin = (() => {
             if (typeof callback === 'function') {
                 passwordChangeCallbacks.push(callback);
             }
+        },
+
+        // Cleanup duplicate keys manually
+        cleanupDuplicateKeys() {
+            _cleanupDuplicateKeys();
         }
     };
 })();
