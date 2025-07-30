@@ -919,12 +919,13 @@
 
                 if (result.success) {
                     console.log("🔐 OAuth authentication successful:", result);
+                    console.log("🔐 OAuth user data:", result.data.user);
                     
                     // Il plugin OAuth ha già gestito il login automatico
                     // Aggiorna l'UI con i dati dell'utente
                     const userData = {
                         authenticated: true,
-                        alias: result.data.user.name || result.data.user.email,
+                        alias: result.data.user.name || result.data.user.username || result.data.user.email || `OAuth User (${provider})`,
                         email: result.data.user.email,
                         pub: result.data.user.userPub,
                         profile: {
@@ -935,6 +936,7 @@
                         }
                     };
                     
+                    console.log("🔐 Final user data for UI:", userData);
                     currentUser = userData;
                     updateUI();
                     showStatus('Autenticazione Google completata con successo!', 'success');
