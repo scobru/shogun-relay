@@ -13,6 +13,7 @@ import setSelfAdjustingInterval from "self-adjusting-interval";
 import FormData from "form-data";
 import "./utils/bullet-catcher.js";
 import { ethers } from "ethers";
+import ShogunCore from "shogun-core";
 
 dotenv.config();
 
@@ -1060,7 +1061,6 @@ async function initializeServer() {
   let shogunCore = null;
   try {
     console.log("🔐 Initializing Shogun Core for authentication...");
-    const ShogunCoreModule = await import("shogun-core");
     
     const peers = process.env.RELAY_PEERS ? process.env.RELAY_PEERS.split(',') : [
       "wss://ruling-mastodon-improved.ngrok-free.app/gun",
@@ -1068,7 +1068,8 @@ async function initializeServer() {
       "https://peer.wallie.io/gun",
     ];
     
-    shogunCore = new ShogunCoreModule.default({
+    // Usa l'import già fatto all'inizio del file
+    shogunCore = new ShogunCore({
       peers: peers,
       scope: "shogun-relay",
       web3: { enabled: true },
@@ -1085,11 +1086,13 @@ async function initializeServer() {
       },
     });
 
+    console.log("🔐 Shogun Core instance created, initializing...");
     await shogunCore.initialize();
     app.set("shogunCore", shogunCore);
     console.log("✅ Shogun Core initialized successfully");
   } catch (error) {
     console.error("❌ Failed to initialize Shogun Core:", error);
+    console.error("❌ Error details:", error.stack);
     // Non bloccare l'avvio del server se Shogun Core fallisce
   }
 

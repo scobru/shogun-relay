@@ -53,9 +53,11 @@ const getShogunInstance = (req) => {
   // Prima prova a ottenere l'istanza dal server principale
   const serverShogunCore = req.app.get('shogunCore');
   if (serverShogunCore) {
+    console.log("🔐 Using Shogun Core from server instance");
     return serverShogunCore;
   }
   
+  console.warn("⚠️ Shogun Core not available from server, creating fallback instance");
   // Fallback: crea una nuova istanza se non è disponibile dal server
   if (!shogunInstance) {
     shogunInstance = initializeShogunCore();
@@ -78,8 +80,18 @@ router.post('/register', authLimiter, async (req, res) => {
 
     const shogun = getShogunInstance(req);
     
+    // Verifica che Shogun Core sia disponibile
+    if (!shogun) {
+      console.error("❌ Shogun Core not available for registration");
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Sistema di autenticazione non disponibile', 
+        data: null 
+      });
+    }
+
     const signUpResult = await shogun.signUp(email, passphrase);
-    
+
     if (!signUpResult.success) {
       return res.status(400).json({ 
         success: false, 
@@ -92,22 +104,22 @@ router.post('/register', authLimiter, async (req, res) => {
     const loginResult = await shogun.login(email, passphrase);
     
     if (!loginResult.success) {
-      return res.status(400).json({ 
-        success: false, 
+        return res.status(400).json({ 
+          success: false, 
         message: 'Registrazione completata ma login automatico fallito', 
-        data: null 
-      });
-    }
+          data: null 
+        });
+      }
 
-    // Crea il profilo utente
+      // Crea il profilo utente
     const profile = { email, hint };
     await shogun.updateUserAlias(email);
-
-    return res.status(201).json({ 
-      success: true, 
-      message: 'Utente creato con successo', 
-      data: {
-        email,
+          
+          return res.status(201).json({ 
+            success: true, 
+            message: 'Utente creato con successo', 
+            data: {
+              email,
         pub: loginResult.pub,
         epub: loginResult.epub,
         profile: profile
@@ -126,20 +138,30 @@ router.post('/register', authLimiter, async (req, res) => {
 // Route per il login utente (tradizionale)
 router.post('/login', authLimiter, async (req, res) => {
   try {
-    const { email, passphrase } = req.body;
+  const { email, passphrase } = req.body;
+  
+  if (!email || !passphrase) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Email e passphrase sono richiesti', 
+      data: null 
+    });
+  }
+
+    const shogun = getShogunInstance(req);
     
-    if (!email || !passphrase) {
-      return res.status(400).json({ 
+    // Verifica che Shogun Core sia disponibile
+    if (!shogun) {
+      console.error("❌ Shogun Core not available for login");
+      return res.status(500).json({ 
         success: false, 
-        message: 'Email e passphrase sono richiesti', 
+        message: 'Sistema di autenticazione non disponibile', 
         data: null 
       });
     }
 
-    const shogun = getShogunInstance(req);
-    
     const loginResult = await shogun.login(email, passphrase);
-    
+
     if (!loginResult.success) {
       return res.status(400).json({ 
         success: false, 
@@ -148,11 +170,11 @@ router.post('/login', authLimiter, async (req, res) => {
       });
     }
 
-    return res.status(200).json({ 
-      success: true, 
-      message: 'Login effettuato con successo', 
-      data: {
-        email,
+      return res.status(200).json({ 
+        success: true, 
+        message: 'Login effettuato con successo', 
+        data: {
+          email,
         pub: loginResult.pub,
         epub: loginResult.epub,
         profile: loginResult.profile || {}
@@ -172,13 +194,24 @@ router.post('/login', authLimiter, async (req, res) => {
 router.post('/logout', async (req, res) => {
   try {
     const shogun = getShogunInstance(req);
-    shogun.logout();
     
-    return res.status(200).json({ 
-      success: true, 
-      message: 'Logout effettuato con successo', 
-      data: null 
-    });
+    // Verifica che Shogun Core sia disponibile
+    if (!shogun) {
+      console.error("❌ Shogun Core not available for logout");
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Sistema di autenticazione non disponibile', 
+        data: null 
+      });
+    }
+
+    shogun.logout();
+  
+  return res.status(200).json({ 
+    success: true, 
+    message: 'Logout effettuato con successo', 
+    data: null 
+  });
   } catch (error) {
     console.error('Errore durante il logout:', error);
     return res.status(500).json({ 
@@ -204,6 +237,16 @@ router.post('/web3/login', authLimiter, async (req, res) => {
 
     const shogun = getShogunInstance(req);
     
+    // Verifica che Shogun Core sia disponibile
+    if (!shogun) {
+      console.error("❌ Shogun Core not available for Web3 login");
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Sistema di autenticazione non disponibile', 
+        data: null 
+      });
+    }
+
     const web3Plugin = shogun.getPlugin("web3");
     if (!web3Plugin || !web3Plugin.isAvailable()) {
       return res.status(400).json({ 
@@ -270,6 +313,16 @@ router.post('/web3/register', authLimiter, async (req, res) => {
 
     const shogun = getShogunInstance(req);
     
+    // Verifica che Shogun Core sia disponibile
+    if (!shogun) {
+      console.error("❌ Shogun Core not available for Web3 registration");
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Sistema di autenticazione non disponibile', 
+        data: null 
+      });
+    }
+
     const web3Plugin = shogun.getPlugin("web3");
     if (!web3Plugin || !web3Plugin.isAvailable()) {
       return res.status(400).json({ 
@@ -336,6 +389,16 @@ router.post('/nostr/login', authLimiter, async (req, res) => {
 
     const shogun = getShogunInstance(req);
     
+    // Verifica che Shogun Core sia disponibile
+    if (!shogun) {
+      console.error("❌ Shogun Core not available for Nostr login");
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Sistema di autenticazione non disponibile', 
+        data: null 
+      });
+    }
+
     const nostrPlugin = shogun.getPlugin("nostr");
     if (!nostrPlugin || !nostrPlugin.isAvailable()) {
       return res.status(400).json({ 
@@ -390,6 +453,16 @@ router.post('/nostr/register', authLimiter, async (req, res) => {
 
     const shogun = getShogunInstance(req);
     
+    // Verifica che Shogun Core sia disponibile
+    if (!shogun) {
+      console.error("❌ Shogun Core not available for Nostr registration");
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Sistema di autenticazione non disponibile', 
+        data: null 
+      });
+    }
+
     const nostrPlugin = shogun.getPlugin("nostr");
     if (!nostrPlugin || !nostrPlugin.isAvailable()) {
       return res.status(400).json({ 
@@ -434,6 +507,16 @@ router.get('/status', async (req, res) => {
   try {
     const shogun = getShogunInstance(req);
     
+    // Verifica che Shogun Core sia disponibile
+    if (!shogun) {
+      console.error("❌ Shogun Core not available for status check");
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Sistema di autenticazione non disponibile', 
+        data: null 
+      });
+    }
+
     const isLoggedIn = shogun.isLoggedIn();
     
     if (!isLoggedIn) {
@@ -477,38 +560,48 @@ router.post('/forgot', authLimiter, (req, res) => {
     return res.status(400).json({ 
       success: false, 
       message: 'Email è richiesta', 
-      data: null 
-    });
-  }
-
-  // In un'implementazione reale, qui invieresti una email
-  return res.status(200).json({ 
-    success: true, 
-    message: 'Se l\'email esiste, riceverai un link per reimpostare la password', 
-    data: {
-      email
+        data: null 
+      });
     }
+
+    // In un'implementazione reale, qui invieresti una email
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Se l\'email esiste, riceverai un link per reimpostare la password', 
+      data: {
+      email
+      }
   });
 });
 
 // Route per reimpostare la password (mantenuta per compatibilità)
 router.post('/reset', authLimiter, async (req, res) => {
   try {
-    const { email, newPassphrase, token } = req.body;
+  const { email, newPassphrase, token } = req.body;
+  
+  if (!email || !newPassphrase || !token) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Email, nuova passphrase e token sono richiesti', 
+      data: null 
+    });
+  }
+
+  // In un'implementazione reale, verificheresti il token
+  // Per ora, assumiamo che sia valido
+  
+    const shogun = getShogunInstance(req);
     
-    if (!email || !newPassphrase || !token) {
-      return res.status(400).json({ 
+    // Verifica che Shogun Core sia disponibile
+    if (!shogun) {
+      console.error("❌ Shogun Core not available for password reset");
+      return res.status(500).json({ 
         success: false, 
-        message: 'Email, nuova passphrase e token sono richiesti', 
+        message: 'Sistema di autenticazione non disponibile', 
         data: null 
       });
     }
 
-    // In un'implementazione reale, verificheresti il token
-    // Per ora, assumiamo che sia valido
-    
-    const shogun = getShogunInstance(req);
-    
     // Prova a fare login con la nuova password
     const loginResult = await shogun.login(email, newPassphrase);
     
@@ -516,48 +609,58 @@ router.post('/reset', authLimiter, async (req, res) => {
       return res.status(400).json({ 
         success: false, 
         message: 'Impossibile reimpostare la password', 
-        data: null 
-      });
-    }
-
-    return res.status(200).json({ 
-      success: true, 
-      message: 'Password reimpostata con successo', 
-      data: null 
-    });
+              data: null 
+            });
+          }
+          
+          return res.status(200).json({ 
+            success: true, 
+            message: 'Password reimpostata con successo', 
+            data: null 
+          });
   } catch (error) {
     console.error('Errore durante il reset della password:', error);
     return res.status(500).json({ 
-      success: false, 
+          success: false, 
       message: 'Errore interno del server', 
-      data: null 
-    });
-  }
+          data: null 
+        });
+      }
 });
 
 // Route per cambiare la password
 router.post('/change-password', authLimiter, async (req, res) => {
   try {
-    const { currentPassphrase, newPassphrase } = req.body;
+  const { currentPassphrase, newPassphrase } = req.body;
+  
+  if (!currentPassphrase || !newPassphrase) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Passphrase corrente e nuova sono richieste', 
+      data: null 
+    });
+  }
+
+    const shogun = getShogunInstance(req);
     
-    if (!currentPassphrase || !newPassphrase) {
-      return res.status(400).json({ 
+    // Verifica che Shogun Core sia disponibile
+    if (!shogun) {
+      console.error("❌ Shogun Core not available for password change");
+      return res.status(500).json({ 
         success: false, 
-        message: 'Passphrase corrente e nuova sono richieste', 
+        message: 'Sistema di autenticazione non disponibile', 
         data: null 
       });
     }
 
-    const shogun = getShogunInstance(req);
-    
     // Per ora restituiamo un successo mock
     // In un'implementazione reale, qui cambieresti la password
-    
-    return res.status(200).json({ 
-      success: true, 
-      message: 'Password cambiata con successo', 
-      data: null 
-    });
+
+      return res.status(200).json({ 
+        success: true, 
+        message: 'Password cambiata con successo', 
+        data: null 
+      });
   } catch (error) {
     console.error('Errore durante il cambio password:', error);
     return res.status(500).json({ 
