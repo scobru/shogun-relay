@@ -10,7 +10,6 @@ import dotenv from "dotenv";
 import ip from "ip";
 import qr from "qr";
 import setSelfAdjustingInterval from "self-adjusting-interval";
-import FormData from "form-data";
 import "./utils/bullet-catcher.js";
 import { ethers } from "ethers";
 import ShogunCore from "shogun-core";
@@ -18,16 +17,12 @@ import ShogunCore from "shogun-core";
 dotenv.config();
 
 import Gun from "gun";
-import SEA from "gun/sea.js";
+import "gun/sea.js";
 
 import "gun/lib/stats.js";
 import "gun/lib/webrtc.js";
 import "gun/lib/rfs.js";
 
-import ShogunCoreModule from "shogun-core";
-const { derive } = ShogunCoreModule;
-import http from "http";
-import { createProxyMiddleware } from "http-proxy-middleware";
 import multer from "multer";
 
 // Importa i contratti dal pacchetto shogun-contracts
@@ -1070,6 +1065,9 @@ async function initializeServer() {
     
     // Usa l'import già fatto all'inizio del file
     shogunCore = new ShogunCore({
+      appToken: process.env.ADMIN_PASSWORD,
+      authToken: process.env.ADMIN_PASSWORD,
+      gunInstance: gun,
       peers: peers,
       scope: "shogun-relay",
       web3: { enabled: true },
