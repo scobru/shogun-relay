@@ -628,39 +628,24 @@
                 console.log('⚡ Nostr public key:', pubKey);
                 document.getElementById('nostrAddress').value = pubKey;
                 
-                // Usa il plugin Nostr di Shogun Core per ottenere una firma deterministica
+                // Genera firma deterministica usando signEvent con timestamp fisso
                 const message = "I Love Shogun!";
-                console.log('⚡ Requesting deterministic signature using Shogun Core plugin');
+                console.log('⚡ Requesting deterministic signature for message:', message);
                 
-                // Chiama l'endpoint del server che usa il plugin Nostr per login
-                const response = await fetch(`${API_BASE}/nostr/login`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        address: pubKey
-                    })
+                // Usa signEvent con timestamp fisso per firma deterministica
+                const timestamp = 0; // Timestamp fisso per compatibilità
+                const event = await window.nostr.signEvent({
+                    kind: 1,
+                    created_at: timestamp,
+                    tags: [],
+                    content: message,
                 });
-
-                const result = await response.json();
                 
-                if (!response.ok) {
-                    throw new Error(result.message || 'Errore nella richiesta di firma');
-                }
-
-                if (result.success) {
-                    console.log('⚡ Nostr login successful, signature generated automatically');
-                    // Il plugin ha già generato la firma e fatto login
-                    // Ora possiamo usare la stessa firma per registrazione se necessario
-                    showStatus('Nostr connesso e autenticato con successo!', 'success');
-                    
-                    // Aggiorna l'UI con i dati dell'utente
-                    currentUser = result.data;
-                    updateUI();
-                } else {
-                    throw new Error('Login Nostr fallito');
-                }
+                const signature = event.sig;
+                console.log('⚡ Deterministic signature received:', signature.substring(0, 20) + '...');
+                document.getElementById('nostrSignature').value = signature;
+                
+                showStatus('Nostr connesso e firma deterministica ottenuta! Ora puoi fare login o registrazione.', 'success');
                 
             } catch (error) {
                 console.error('❌ Nostr connection error:', error);
