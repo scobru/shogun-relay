@@ -391,88 +391,15 @@ router.post('/web3/register', authLimiter, async (req, res) => {
   }
 });
 
-// Route per generare firma Nostr deterministica
-router.post('/nostr/sign', authLimiter, async (req, res) => {
-  try {
-    const { address, message } = req.body;
-    
-    if (!address || !message) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Indirizzo e messaggio sono richiesti', 
-        data: null 
-      });
-    }
-
-    const shogun = getShogunInstance(req);
-    
-    // Verifica che Shogun Core sia disponibile
-    if (!shogun) {
-      console.error("❌ Shogun Core not available for Nostr signing");
-      return res.status(503).json({ 
-        success: false, 
-        message: 'Sistema di autenticazione non disponibile', 
-        data: null 
-      });
-    }
-
-    console.log("⚡ Processing Nostr signature request for address:", address.substring(0, 10) + "...");
-
-    // Usa il plugin Nostr di Shogun Core
-    const nostrPlugin = shogun.getPlugin("nostr");
-    if (!nostrPlugin) {
-      console.error("❌ Nostr plugin not found");
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Plugin Nostr non trovato', 
-        data: null 
-      });
-    }
-
-    try {
-      // Usa il plugin per generare una firma deterministica
-      const signature = await nostrPlugin.requestSignature(address, message);
-      
-      console.log("⚡ Deterministic signature generated successfully");
-
-      return res.status(200).json({ 
-        success: true, 
-        message: 'Firma deterministica generata con successo', 
-        data: {
-          address,
-          message,
-          signature
-        }
-      });
-
-    } catch (pluginError) {
-      console.error("❌ Nostr plugin error:", pluginError);
-      return res.status(400).json({ 
-        success: false, 
-        message: pluginError.message || 'Errore plugin Nostr', 
-        data: null 
-      });
-    }
-
-  } catch (error) {
-    console.error('Errore durante la generazione firma Nostr:', error);
-    return res.status(500).json({ 
-      success: false, 
-      message: 'Errore interno del server', 
-      data: null 
-    });
-  }
-});
-
 // Route per Nostr authentication
 router.post('/nostr/login', authLimiter, async (req, res) => {
   try {
-    const { address, signature, message } = req.body;
+    const { address } = req.body;
     
-    if (!address || !signature) {
+    if (!address) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Indirizzo e firma sono richiesti', 
+        message: 'Indirizzo Nostr è richiesto', 
         data: null 
       });
     }
@@ -502,36 +429,15 @@ router.post('/nostr/login', authLimiter, async (req, res) => {
       });
     }
 
-    const messageToVerify = message || "I Love Shogun!";
-    console.log("⚡ Verifying Nostr signature for message:", messageToVerify);
-
-    // Usa il plugin Nostr per verificare la firma e generare le credenziali
     try {
-      // Verifica la firma usando il plugin
-      const isValid = await nostrPlugin.verifySignature(messageToVerify, signature, address);
+      // Usa il plugin per gestire tutto il flusso di login
+      const result = await nostrPlugin.login(address);
       
-      if (!isValid) {
-        console.error("❌ Nostr signature verification failed");
+      if (!result.success) {
+        console.error("❌ Nostr login failed:", result.error);
         return res.status(400).json({ 
           success: false, 
-          message: 'Firma Nostr non valida', 
-          data: null 
-        });
-      }
-
-      console.log("⚡ Nostr signature verified successfully");
-
-      // Usa il plugin per generare le credenziali
-      const credentials = await nostrPlugin.generateCredentials(address, signature, messageToVerify);
-      
-      console.log("⚡ Attempting login with Nostr credentials");
-      const loginResult = await shogun.login(credentials.username, credentials.password);
-      
-      if (!loginResult.success) {
-        console.error("❌ Nostr login failed:", loginResult.error);
-        return res.status(400).json({ 
-          success: false, 
-          message: loginResult.error || 'Login Nostr fallito', 
+          message: result.error || 'Login Nostr fallito', 
           data: null 
         });
       }
@@ -543,8 +449,8 @@ router.post('/nostr/login', authLimiter, async (req, res) => {
         message: 'Login Nostr effettuato con successo', 
         data: {
           address,
-          username: credentials.username,
-          pub: loginResult.userPub,
+          username: result.username,
+          pub: result.userPub,
           profile: { type: 'nostr', address }
         }
       });
@@ -571,12 +477,12 @@ router.post('/nostr/login', authLimiter, async (req, res) => {
 // Route per Nostr registration
 router.post('/nostr/register', authLimiter, async (req, res) => {
   try {
-    const { address, signature, message } = req.body;
+    const { address } = req.body;
     
-    if (!address || !signature) {
+    if (!address) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Indirizzo e firma sono richiesti', 
+        message: 'Indirizzo Nostr è richiesto', 
         data: null 
       });
     }
@@ -606,48 +512,15 @@ router.post('/nostr/register', authLimiter, async (req, res) => {
       });
     }
 
-    const messageToVerify = message || "I Love Shogun!";
-    console.log("⚡ Verifying Nostr signature for message:", messageToVerify);
-
-    // Usa il plugin Nostr per verificare la firma e generare le credenziali
     try {
-      // Verifica la firma usando il plugin
-      const isValid = await nostrPlugin.verifySignature(messageToVerify, signature, address);
+      // Usa il plugin per gestire tutto il flusso di registrazione
+      const result = await nostrPlugin.signUp(address);
       
-      if (!isValid) {
-        console.error("❌ Nostr signature verification failed");
+      if (!result.success) {
+        console.error("❌ Nostr signup failed:", result.error);
         return res.status(400).json({ 
           success: false, 
-          message: 'Firma Nostr non valida', 
-          data: null 
-        });
-      }
-
-      console.log("⚡ Nostr signature verified successfully");
-
-      // Usa il plugin per generare le credenziali
-      const credentials = await nostrPlugin.generateCredentials(address, signature, messageToVerify);
-      
-      console.log("⚡ Creating user with Nostr credentials");
-      const signUpResult = await shogun.signUp(credentials.username, credentials.password);
-      
-      if (!signUpResult.success) {
-        console.error("❌ Nostr signup failed:", signUpResult.error);
-        return res.status(400).json({ 
-          success: false, 
-          message: signUpResult.error || 'Registrazione Nostr fallita', 
-          data: null 
-        });
-      }
-
-      // Login automatico dopo la registrazione
-      const loginResult = await shogun.login(credentials.username, credentials.password);
-      
-      if (!loginResult.success) {
-        console.error("❌ Nostr auto-login failed:", loginResult.error);
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Registrazione completata ma login automatico fallito', 
+          message: result.error || 'Registrazione Nostr fallita', 
           data: null 
         });
       }
@@ -659,8 +532,8 @@ router.post('/nostr/register', authLimiter, async (req, res) => {
         message: 'Utente Nostr creato con successo', 
         data: {
           address,
-          username: credentials.username,
-          pub: loginResult.userPub,
+          username: result.username,
+          pub: result.userPub,
           profile: { type: 'nostr', address }
         }
       });
