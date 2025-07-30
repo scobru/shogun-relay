@@ -32,220 +32,372 @@
             100% { transform: rotate(360deg); }
         }
         
-        /* Animazione di entrata per i tooltip */
-        .tooltip .tooltiptext {
-            transform: translateY(10px);
-            transition: opacity 0.3s, visibility 0.3s, transform 0.3s;
+        .input-custom {
+            width: 100%;
+            background-color: #404040;
+            color: #FFFFFF;
+            border: 1px solid #606060;
+            padding: 1rem 1.5rem;
+            border-radius: 0.75rem;
+            font-family: inherit;
+            font-size: 1rem;
+            transition: all 0.2s ease;
         }
-
-        .tooltip:hover .tooltiptext {
-            transform: translateY(0);
+        
+        .input-custom:focus {
+            outline: none;
+            border-color: #FF69B4;
+            box-shadow: 0 0 0 2px rgba(255, 105, 180, 0.2);
+        }
+        
+        .btn-custom {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #FF69B4;
+            color: #FFFFFF;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+        
+        @media (min-width: 640px) {
+            .btn-custom {
+                width: auto;
+            }
+        }
+        
+        .btn-custom:hover {
+            background-color: #FF1493;
+            transform: translateY(-1px);
+        }
+        
+        .btn-secondary {
+            background-color: #42A5F5;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #64B5F6;
+        }
+        
+        .btn-success {
+            background-color: #4CAF50;
+        }
+        
+        .btn-success:hover {
+            background-color: #45a049;
+        }
+        
+        .btn-warning {
+            background-color: #FF9800;
+        }
+        
+        .btn-warning:hover {
+            background-color: #F57C00;
+        }
+        
+        .btn-nostr {
+            background-color: #FFD700;
+            color: #000000;
+        }
+        
+        .btn-nostr:hover {
+            background-color: #FFC107;
+        }
+        
+        .btn-google {
+            background-color: #4285F4;
+        }
+        
+        .btn-google:hover {
+            background-color: #3367D6;
+        }
+        
+        .auth-section {
+            background-color: #404040;
+            border: 1px solid #606060;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .auth-section h2 {
+            color: #FF69B4;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            color: #E0E0E0;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+        
+        .status-message {
+            padding: 1rem;
+            border-radius: 0.75rem;
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+        
+        .status-success {
+            background-color: #4CAF50;
+            color: #FFFFFF;
+        }
+        
+        .status-error {
+            background-color: #F44336;
+            color: #FFFFFF;
+        }
+        
+        .status-info {
+            background-color: #42A5F5;
+            color: #FFFFFF;
+        }
+        
+        .user-profile {
+            background-color: #404040;
+            border: 1px solid #606060;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+        }
+        
+        .user-profile h2 {
+            color: #FF69B4;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        
+        .profile-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #606060;
+        }
+        
+        .profile-item:last-child {
+            border-bottom: none;
+        }
+        
+        .profile-item .label {
+            color: #FFFFFF;
+            font-weight: 500;
+            margin-right: 1rem;
+        }
+        
+        .profile-item span:not(.label) {
+            color: #E0E0E0;
+            font-family: monospace;
+            font-size: 0.875rem;
+            flex: 1;
+            text-align: right;
+            margin-right: 1rem;
+            word-break: break-all;
         }
     </style>
 </head>
 <body class="antialiased bg-[#1A1A1A]">
-    <div class="container mx-auto px-4 py-8">
-        <div class="max-w-4xl mx-auto">
-            <div class="card bg-[#1A1A1A] border-0 rounded-2xl">
-                <div class="p-8">
-                    <div class="flex flex-col items-center">
-                        <!-- Header con icona e titolo -->
-                        <div class="flex items-center gap-4 mb-8">
-                            <span class="text-[#FF69B4] text-4xl">🔐</span>
-                            <h1 class="text-3xl font-medium text-[#FFFFFF]">Shogun Relay Auth</h1>
-                        </div>
-                        <p class="text-[#8B94FF] mb-8">Sistema di autenticazione multi-wallet<span class="animate-pulse">_</span></p>
+    <div class="container mx-auto p-6">
+        <div class="flex items-center mb-6">
+            <a href="/" class="text-[#42A5F5] hover:text-[#64B5F6] transition-colors text-lg">&larr; Back to Control Panel</a>
+        </div>
 
-                        <!-- Status Display -->
-                        <div id="status" class="mb-6 p-4 rounded-lg hidden w-full max-w-md">
-                            <div id="statusContent"></div>
-                        </div>
+        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
+            <div class="p-8 sm:p-10">
+                <div class="flex flex-col items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-6 text-[#FF69B4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                    </svg>
 
-                        <!-- User Profile Section (visibile solo se autenticato) -->
-                        <div id="userProfile" class="hidden w-full mb-8">
-                            <div class="card bg-[#282828] border-[#404040] rounded-2xl">
-                                <div class="p-6">
-                                    <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">👤 Profilo Utente</h2>
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div class="space-y-4">
-                                            <div>
-                                                <label class="block text-sm font-medium text-[#E0E0E0] mb-2">Alias</label>
-                                                <div class="bg-[#404040] text-[#FFFFFF] p-3 rounded-lg font-mono text-sm" id="userAlias">-</div>
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-medium text-[#E0E0E0] mb-2">Chiave Pubblica Gun</label>
-                                                <div class="bg-[#404040] text-[#FFFFFF] p-3 rounded-lg font-mono text-sm break-all" id="userPub">-</div>
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-medium text-[#E0E0E0] mb-2">Chiave Pubblica Cifrata</label>
-                                                <div class="bg-[#404040] text-[#FFFFFF] p-3 rounded-lg font-mono text-sm break-all" id="userEpub">-</div>
-                                            </div>
-                                        </div>
-                                        <div class="space-y-4">
-                                            <div>
-                                                <label class="block text-sm font-medium text-[#E0E0E0] mb-2">Tipo di Autenticazione</label>
-                                                <div class="bg-[#404040] text-[#FFFFFF] p-3 rounded-lg" id="authType">-</div>
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-medium text-[#E0E0E0] mb-2">Indirizzo Wallet</label>
-                                                <div class="bg-[#404040] text-[#FFFFFF] p-3 rounded-lg font-mono text-sm break-all" id="walletAddress">-</div>
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-medium text-[#E0E0E0] mb-2">Stato</label>
-                                                <div class="flex items-center gap-2">
-                                                    <span class="text-[#4CAF50] text-xl">🔓</span>
-                                                    <span class="text-[#4CAF50] font-medium">Autenticato</span>
-                                                </div>
-                                            </div>
-                                        </div>
+                    <h1 class="text-3xl font-semibold mb-8 text-[#FFFFFF]">Shogun Relay Authentication</h1>
+                    <p class="text-[#8B94FF] mb-8 text-center">Sistema di autenticazione multi-wallet<span class="animate-pulse">_</span></p>
+
+                    <!-- Status Display -->
+                    <div id="status" class="status-message hidden w-full max-w-md"></div>
+
+                    <!-- User Profile Section (visibile solo se autenticato) -->
+                    <div id="userProfile" class="hidden w-full mb-8">
+                        <div class="user-profile">
+                            <h2>👤 Profilo Utente</h2>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="space-y-4">
+                                    <div class="profile-item">
+                                        <span class="label">Alias:</span>
+                                        <span id="userAlias">-</span>
                                     </div>
-                                    <div class="mt-6 flex justify-center">
-                                        <button onclick="logout()" class="bg-[#FF69B4] hover:bg-[#FF1493] text-[#FFFFFF] py-2 px-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:ring-offset-2 transition-colors">
-                                            🚪 Logout
+                                    <div class="profile-item">
+                                        <span class="label">Chiave Pubblica Gun:</span>
+                                        <span id="userPub">-</span>
+                                    </div>
+                                    <div class="profile-item">
+                                        <span class="label">Chiave Pubblica Cifrata:</span>
+                                        <span id="userEpub">-</span>
+                                    </div>
+                                </div>
+                                <div class="space-y-4">
+                                    <div class="profile-item">
+                                        <span class="label">Tipo di Autenticazione:</span>
+                                        <span id="authType">-</span>
+                                    </div>
+                                    <div class="profile-item">
+                                        <span class="label">Indirizzo Wallet:</span>
+                                        <span id="walletAddress">-</span>
+                                    </div>
+                                    <div class="profile-item">
+                                        <span class="label">Stato:</span>
+                                        <span class="text-[#4CAF50] font-medium">🔓 Autenticato</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-6 flex justify-center">
+                                <button onclick="logout()" class="btn-custom">🚪 Logout</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Authentication Forms (visibili solo se non autenticato) -->
+                    <div id="authForms" class="w-full">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <!-- Traditional Auth Section -->
+                            <div class="auth-section">
+                                <h2>👤 Autenticazione Tradizionale</h2>
+                                
+                                <!-- Login Form -->
+                                <div id="loginForm" class="space-y-4">
+                                    <div class="form-group">
+                                        <label>Email</label>
+                                        <input type="email" id="loginEmail" class="input-custom" placeholder="Inserisci la tua email">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Password</label>
+                                        <input type="password" id="loginPassword" class="input-custom" placeholder="Inserisci la password">
+                                    </div>
+                                    <button onclick="traditionalLogin()" class="btn-custom">
+                                        <span id="loginBtnText">Accedi</span>
+                                        <span id="loginLoading" class="loading hidden ml-2"></span>
+                                    </button>
+                                </div>
+
+                                <!-- Register Form -->
+                                <div id="registerForm" class="space-y-4 mt-6 pt-6 border-t border-[#606060]">
+                                    <div class="form-group">
+                                        <label>Email</label>
+                                        <input type="email" id="registerEmail" class="input-custom" placeholder="Inserisci la tua email">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Password</label>
+                                        <input type="password" id="registerPassword" class="input-custom" placeholder="Inserisci la password">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Hint (opzionale)</label>
+                                        <input type="text" id="registerHint" class="input-custom" placeholder="Suggerimento per la password">
+                                    </div>
+                                    <button onclick="traditionalRegister()" class="btn-custom btn-success">
+                                        <span id="registerBtnText">Registrati</span>
+                                        <span id="registerLoading" class="loading hidden ml-2"></span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Wallet Auth Section -->
+                            <div class="space-y-6">
+                                <!-- Web3 Auth Section -->
+                                <div class="auth-section">
+                                    <h2>🦊 Web3 Authentication</h2>
+                                    
+                                    <div class="space-y-4">
+                                        <div class="form-group">
+                                            <label>Indirizzo Wallet</label>
+                                            <input type="text" id="web3Address" placeholder="0x..." class="input-custom">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Firma</label>
+                                            <input type="text" id="web3Signature" placeholder="0x..." class="input-custom">
+                                        </div>
+                                        <div class="flex space-x-2">
+                                            <button onclick="web3Login()" class="btn-custom btn-secondary flex-1">
+                                                <span id="web3LoginBtnText">Login</span>
+                                                <span id="web3LoginLoading" class="loading hidden ml-2"></span>
+                                            </button>
+                                            <button onclick="web3Register()" class="btn-custom btn-secondary flex-1">
+                                                <span id="web3RegisterBtnText">Registrati</span>
+                                                <span id="web3RegisterLoading" class="loading hidden ml-2"></span>
+                                            </button>
+                                        </div>
+                                        <button onclick="connectMetaMask()" class="btn-custom btn-warning">
+                                            🔗 Connetti MetaMask
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Nostr Auth Section -->
+                                <div class="auth-section">
+                                    <h2>⚡ Nostr Authentication</h2>
+                                    
+                                    <div class="space-y-4">
+                                        <div class="form-group">
+                                            <label>Indirizzo Nostr</label>
+                                            <input type="text" id="nostrAddress" placeholder="npub..." class="input-custom">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Firma</label>
+                                            <input type="text" id="nostrSignature" placeholder="..." class="input-custom">
+                                        </div>
+                                        <div class="flex space-x-2">
+                                            <button onclick="nostrLogin()" class="btn-custom btn-nostr flex-1">
+                                                <span id="nostrLoginBtnText">Login</span>
+                                                <span id="nostrLoginLoading" class="loading hidden ml-2"></span>
+                                            </button>
+                                            <button onclick="nostrRegister()" class="btn-custom btn-nostr flex-1">
+                                                <span id="nostrRegisterBtnText">Registrati</span>
+                                                <span id="nostrRegisterLoading" class="loading hidden ml-2"></span>
+                                            </button>
+                                        </div>
+                                        <button onclick="connectNostr()" class="btn-custom btn-nostr">
+                                            ⚡ Connetti Nostr
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- OAuth Auth Section -->
+                                <div class="auth-section">
+                                    <h2>🔐 OAuth Authentication</h2>
+                                    
+                                    <div class="space-y-4">
+                                        <p class="text-[#A0A0A0] text-sm">Accedi con il tuo account Google</p>
+                                        <button onclick="connectGoogleOAuth()" class="btn-custom btn-google flex items-center justify-center gap-3">
+                                            <svg class="w-5 h-5" viewBox="0 0 24 24">
+                                                <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                                <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                                <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                                <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                                            </svg>
+                                            Accedi con Google
                                         </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <!-- Authentication Forms (visibili solo se non autenticato) -->
-                        <div id="authForms" class="w-full">
-                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                <!-- Traditional Auth Section -->
-                                <div class="card bg-[#282828] border-[#404040] rounded-2xl">
-                                    <div class="p-6">
-                                        <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">👤 Autenticazione Tradizionale</h2>
-                                        
-                                        <!-- Login Form -->
-                                        <div id="loginForm" class="space-y-4">
-                                            <div>
-                                                <label class="block text-sm font-medium text-[#E0E0E0] mb-2">Email</label>
-                                                <input type="email" id="loginEmail" class="w-full px-3 py-2 bg-[#404040] text-[#FFFFFF] placeholder-[#A0A0A0] border border-[#606060] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:border-transparent">
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-medium text-[#E0E0E0] mb-2">Password</label>
-                                                <input type="password" id="loginPassword" class="w-full px-3 py-2 bg-[#404040] text-[#FFFFFF] placeholder-[#A0A0A0] border border-[#606060] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:border-transparent">
-                                            </div>
-                                            <button onclick="traditionalLogin()" class="w-full bg-[#FF69B4] hover:bg-[#FF1493] text-[#FFFFFF] py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:ring-offset-2 transition-colors">
-                                                <span id="loginBtnText">Accedi</span>
-                                                <span id="loginLoading" class="loading hidden"></span>
-                                            </button>
-                                        </div>
-
-                                        <!-- Register Form -->
-                                        <div id="registerForm" class="space-y-4 mt-6 pt-6 border-t border-[#404040]">
-                                            <div>
-                                                <label class="block text-sm font-medium text-[#E0E0E0] mb-2">Email</label>
-                                                <input type="email" id="registerEmail" class="w-full px-3 py-2 bg-[#404040] text-[#FFFFFF] placeholder-[#A0A0A0] border border-[#606060] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:border-transparent">
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-medium text-[#E0E0E0] mb-2">Password</label>
-                                                <input type="password" id="registerPassword" class="w-full px-3 py-2 bg-[#404040] text-[#FFFFFF] placeholder-[#A0A0A0] border border-[#606060] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:border-transparent">
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-medium text-[#E0E0E0] mb-2">Hint (opzionale)</label>
-                                                <input type="text" id="registerHint" class="w-full px-3 py-2 bg-[#404040] text-[#FFFFFF] placeholder-[#A0A0A0] border border-[#606060] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:border-transparent">
-                                            </div>
-                                            <button onclick="traditionalRegister()" class="w-full bg-[#4CAF50] hover:bg-[#45a049] text-[#FFFFFF] py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4CAF50] focus:ring-offset-2 transition-colors">
-                                                <span id="registerBtnText">Registrati</span>
-                                                <span id="registerLoading" class="loading hidden"></span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Wallet Auth Section -->
-                                <div class="space-y-6">
-                                    <!-- Web3 Auth Section -->
-                                    <div class="card bg-[#282828] border-[#404040] rounded-2xl">
-                                        <div class="p-6">
-                                            <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">🦊 Web3 Authentication</h2>
-                                            
-                                            <div class="space-y-4">
-                                                <div>
-                                                    <label class="block text-sm font-medium text-[#E0E0E0] mb-2">Indirizzo Wallet</label>
-                                                    <input type="text" id="web3Address" placeholder="0x..." class="w-full px-3 py-2 bg-[#404040] text-[#FFFFFF] placeholder-[#A0A0A0] border border-[#606060] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:border-transparent">
-                                                </div>
-                                                <div>
-                                                    <label class="block text-sm font-medium text-[#E0E0E0] mb-2">Firma</label>
-                                                    <input type="text" id="web3Signature" placeholder="0x..." class="w-full px-3 py-2 bg-[#404040] text-[#FFFFFF] placeholder-[#A0A0A0] border border-[#606060] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:border-transparent">
-                                                </div>
-                                                <div class="flex space-x-2">
-                                                    <button onclick="web3Login()" class="flex-1 bg-[#9C27B0] hover:bg-[#7B1FA2] text-[#FFFFFF] py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C27B0] focus:ring-offset-2 transition-colors">
-                                                        <span id="web3LoginBtnText">Login</span>
-                                                        <span id="web3LoginLoading" class="loading hidden"></span>
-                                                    </button>
-                                                    <button onclick="web3Register()" class="flex-1 bg-[#9C27B0] hover:bg-[#7B1FA2] text-[#FFFFFF] py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9C27B0] focus:ring-offset-2 transition-colors">
-                                                        <span id="web3RegisterBtnText">Registrati</span>
-                                                        <span id="web3RegisterLoading" class="loading hidden"></span>
-                                                    </button>
-                                                </div>
-                                                <button onclick="connectMetaMask()" class="w-full bg-[#FF9800] hover:bg-[#F57C00] text-[#FFFFFF] py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF9800] focus:ring-offset-2 transition-colors">
-                                                    🔗 Connetti MetaMask
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Nostr Auth Section -->
-                                    <div class="card bg-[#282828] border-[#404040] rounded-2xl">
-                                        <div class="p-6">
-                                            <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">⚡ Nostr Authentication</h2>
-                                            
-                                            <div class="space-y-4">
-                                                <div>
-                                                    <label class="block text-sm font-medium text-[#E0E0E0] mb-2">Indirizzo Nostr</label>
-                                                    <input type="text" id="nostrAddress" placeholder="npub..." class="w-full px-3 py-2 bg-[#404040] text-[#FFFFFF] placeholder-[#A0A0A0] border border-[#606060] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:border-transparent">
-                                                </div>
-                                                <div>
-                                                    <label class="block text-sm font-medium text-[#E0E0E0] mb-2">Firma</label>
-                                                    <input type="text" id="nostrSignature" placeholder="..." class="w-full px-3 py-2 bg-[#404040] text-[#FFFFFF] placeholder-[#A0A0A0] border border-[#606060] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:border-transparent">
-                                                </div>
-                                                <div class="flex space-x-2">
-                                                    <button onclick="nostrLogin()" class="flex-1 bg-[#FFD700] hover:bg-[#FFC107] text-[#000000] py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FFD700] focus:ring-offset-2 transition-colors">
-                                                        <span id="nostrLoginBtnText">Login</span>
-                                                        <span id="nostrLoginLoading" class="loading hidden"></span>
-                                                    </button>
-                                                    <button onclick="nostrRegister()" class="flex-1 bg-[#FFD700] hover:bg-[#FFC107] text-[#000000] py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FFD700] focus:ring-offset-2 transition-colors">
-                                                        <span id="nostrRegisterBtnText">Registrati</span>
-                                                        <span id="nostrRegisterLoading" class="loading hidden"></span>
-                                                    </button>
-                                                </div>
-                                                <button onclick="connectNostr()" class="w-full bg-[#FFD700] hover:bg-[#FFC107] text-[#000000] py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FFD700] focus:ring-offset-2 transition-colors">
-                                                    ⚡ Connetti Nostr
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- OAuth Auth Section -->
-                                    <div class="card bg-[#282828] border-[#404040] rounded-2xl">
-                                        <div class="p-6">
-                                            <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">🔐 OAuth Authentication</h2>
-                                            
-                                            <div class="space-y-4">
-                                                <p class="text-[#A0A0A0] text-sm">Accedi con il tuo account Google</p>
-                                                <button onclick="connectGoogleOAuth()" class="w-full bg-[#4285F4] hover:bg-[#3367D6] text-[#FFFFFF] py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4285F4] focus:ring-offset-2 transition-colors flex items-center justify-center gap-3">
-                                                    <svg class="w-5 h-5" viewBox="0 0 24 24">
-                                                        <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                                                        <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                                                        <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                                                        <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                                                    </svg>
-                                                    Accedi con Google
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Footer -->
-                        <div class="mt-12 text-center text-[#A0A0A0] text-sm">
-                            <p>repo build with ❤️ by <a href="https://github.com/scobru" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">scobru</a></p>
-                            <p class="mt-1">part of <a href="https://github.com/scobru/shogun" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">shogun project</a></p>
-                        </div>
+                    <!-- Footer -->
+                    <div class="mt-12 text-center text-[#A0A0A0] text-sm">
+                        <p>repo build with ❤️ by <a href="https://github.com/scobru" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">scobru</a></p>
+                        <p class="mt-1">part of <a href="https://github.com/scobru/shogun" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">shogun project</a></p>
                     </div>
                 </div>
             </div>
@@ -259,16 +411,15 @@
         // Utility functions
         function showStatus(message, type = 'info') {
             const status = document.getElementById('status');
-            const content = document.getElementById('statusContent');
             
-            const colors = {
-                'error': 'bg-red-100 text-red-700 border-red-300',
-                'success': 'bg-green-100 text-green-700 border-green-300',
-                'info': 'bg-blue-100 text-blue-700 border-blue-300'
+            const statusClasses = {
+                'error': 'status-error',
+                'success': 'status-success',
+                'info': 'status-info'
             };
             
-            status.className = `mb-6 p-4 rounded-lg border ${colors[type] || colors.info}`;
-            content.textContent = message;
+            status.className = `status-message ${statusClasses[type] || statusClasses.info}`;
+            status.textContent = message;
             status.classList.remove('hidden');
             
             setTimeout(() => {
