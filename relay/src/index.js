@@ -805,6 +805,41 @@ async function initializeServer() {
   app.use(cors());
   app.use(express.json()); // Aggiungi supporto per il parsing del body JSON
   app.use(express.urlencoded({ extended: true })); // Aggiungi supporto per i dati del form
+
+  // Middleware di protezione per le route statiche che richiedono autenticazione admin
+  const protectedStaticRoutes = [
+    '/services-dashboard', '/stats', '/charts', '/graph', '/visualGraph',
+    '/upload', '/pin-manager', '/ipfs-status', '/create', '/view',
+    '/chain-contract', '/ipcm-contract', '/notes', '/derive'
+  ];
+
+  app.use((req, res, next) => {
+    const path = req.path;
+    
+    // Controlla se la route richiede autenticazione admin
+    if (protectedStaticRoutes.includes(path)) {
+      // Verifica autenticazione admin
+      const authHeader = req.headers["authorization"];
+      const bearerToken = authHeader && authHeader.split(" ")[1];
+      const customToken = req.headers["token"];
+      const token = bearerToken || customToken;
+
+      if (token === process.env.ADMIN_PASSWORD) {
+        next();
+      } else {
+        console.log(`❌ Accesso negato a ${path} - Token mancante o non valido`);
+        return res.status(401).json({ 
+          success: false, 
+          error: "Unauthorized - Admin authentication required",
+          message: "Questa pagina richiede autenticazione admin. Inserisci la password admin nella pagina principale."
+        });
+      }
+    } else {
+      // Route pubblica, continua
+      next();
+    }
+  });
+
   app.use(Gun.serve);
 
   // IPFS File Upload Endpoint

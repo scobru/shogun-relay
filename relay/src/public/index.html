@@ -75,6 +75,16 @@
                 padding: 10px 14px;
             }
         }
+
+        /* Nascondi le applicazioni protette di default */
+        .admin-protected {
+            display: none !important;
+        }
+
+        /* Mostra le applicazioni protette quando l'admin è autenticato */
+        .admin-authenticated .admin-protected {
+            display: flex !important;
+        }
     </style>
 </head>
 
@@ -345,14 +355,8 @@
 
         // Mostra tutte le applicazioni (admin autenticato)
         function showAllApplications() {
-            const protectedApps = document.querySelectorAll('a[href*="/"]');
-            protectedApps.forEach(app => {
-                const lockIcon = app.querySelector('.absolute.right-3');
-                if (lockIcon) {
-                    app.style.display = 'flex';
-                    app.style.opacity = '1';
-                }
-            });
+            // Aggiungi classe al body per mostrare le app protette
+            document.body.classList.add('admin-authenticated');
 
             // Aggiorna il messaggio di stato
             const statusEl = document.getElementById('passwordStatus');
@@ -364,13 +368,8 @@
 
         // Mostra solo le applicazioni pubbliche
         function showPublicApplicationsOnly() {
-            const protectedApps = document.querySelectorAll('a[href*="/"]');
-            protectedApps.forEach(app => {
-                const lockIcon = app.querySelector('.absolute.right-3');
-                if (lockIcon) {
-                    app.style.display = 'none';
-                }
-            });
+            // Rimuovi classe dal body per nascondere le app protette
+            document.body.classList.remove('admin-authenticated');
 
             // Aggiorna il messaggio di stato
             const statusEl = document.getElementById('passwordStatus');
@@ -442,6 +441,7 @@
         // Load event
         window.addEventListener('DOMContentLoaded', async () => {
             updateAuthSectionsVisibility();
+            handleProtectedPageError(); // Aggiungi gestione errori per pagine protette
 
             // Verifica se c'è già una password salvata
             if (ShogunAdmin.hasPassword()) {
