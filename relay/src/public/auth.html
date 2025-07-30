@@ -505,8 +505,17 @@
                 
                 // Popola i dati del profilo
                 document.getElementById('userAlias').textContent = currentUser.alias || currentUser.username || currentUser.email || 'N/A';
-                document.getElementById('userPub').textContent = currentUser.pub || 'N/A';
-                document.getElementById('userEpub').textContent = currentUser.epub || 'N/A';
+                
+                // Usa i valori dal pair SEA per pub ed epub
+                if (currentUser.sea) {
+                    document.getElementById('userPub').textContent = currentUser.sea.pub || 'N/A';
+                    document.getElementById('userEpub').textContent = currentUser.sea.epub || 'N/A';
+                } else {
+                    // Fallback ai valori diretti se il pair SEA non è disponibile
+                    document.getElementById('userPub').textContent = currentUser.pub || 'N/A';
+                    document.getElementById('userEpub').textContent = currentUser.epub || 'N/A';
+                }
+                
                 document.getElementById('authType').textContent = currentUser.profile?.type || 'Tradizionale';
                 document.getElementById('walletAddress').textContent = currentUser.address || currentUser.profile?.address || 'N/A';
                 

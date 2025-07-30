@@ -1062,11 +1062,13 @@ router.post('/oauth/callback', async (req, res) => {
     }
 
     console.log(`🔐 OAuth authentication successful for ${provider}`);
+    console.log(`🔐 OAuth result:`, JSON.stringify(result, null, 2));
+    console.log(`🔐 OAuth user data:`, JSON.stringify(result.user, null, 2));
 
     // Prepara i dati completi dell'utente per il frontend
     const userData = {
       authenticated: true,
-      alias: result.user?.name || result.user?.username || result.user?.email || `OAuth User (${provider})`,
+      alias: result.user?.name || result.user?.email || `OAuth User (${provider})`,
       email: result.user?.email,
       pub: shogun.user?._?.sea?.pub,
       epub: shogun.user?._?.sea?.epub,
@@ -1078,6 +1080,8 @@ router.post('/oauth/callback', async (req, res) => {
         picture: result.user?.picture
       }
     };
+
+    console.log(`🔐 Final user data for frontend:`, JSON.stringify(userData, null, 2));
 
     return res.status(200).json({ 
       success: true, 
