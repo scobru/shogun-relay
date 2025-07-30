@@ -12,7 +12,7 @@ import qr from "qr";
 import setSelfAdjustingInterval from "self-adjusting-interval";
 import "./utils/bullet-catcher.js";
 import { ethers } from "ethers";
-import ShogunCore from "shogun-core";
+import {ShogunCore} from "shogun-core";
 
 dotenv.config();
 
@@ -1076,6 +1076,9 @@ async function initializeServer() {
     
     // Usa l'import già fatto all'inizio del file
     shogunCore = new ShogunCore({
+      gunInstance: gun,
+      appToken: process.env.ADMIN_PASSWORD,
+      authToken: process.env.ADMIN_PASSWORD,
       peers: peers,
       scope: "shogun-relay",
       web3: { enabled: true },
