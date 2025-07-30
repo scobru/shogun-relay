@@ -260,6 +260,72 @@ router.get("/decode-test/:soul/:key", async (req, res) => {
   }
 });
 
+// Route per debug - verifica se i dati sono presenti in GunDB
+router.get("/debug/:soul", async (req, res) => {
+  try {
+    const { soul } = req.params;
+    const gun = req.app.get("gunInstance");
+    
+    if (!gun) {
+      return res.status(500).json({
+        success: false,
+        error: "Gun non inizializzato"
+      });
+    }
+
+    console.log(`🔍 Debug: Checking if soul "${soul}" exists in GunDB`);
+
+    // Prova a leggere il nodo
+    const node = gun.get(soul);
+    const data = await new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        console.warn("⚠️ Debug timeout reading from GunDB");
+        reject(new Error("Timeout"));
+      }, 5000);
+
+      node.once((data) => {
+        clearTimeout(timeoutId);
+        console.log(`🔍 Debug: Data for soul "${soul}":`, data);
+        resolve(data);
+      });
+    });
+
+    // Controlla anche se esiste nella struttura shogun/chain_events
+    console.log(`🔍 Debug: Checking chain_events for soul "${soul}"`);
+    const chainEventsNode = gun.get("shogun").get("chain_events");
+    const eventsData = await new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        console.warn("⚠️ Debug timeout reading chain_events");
+        resolve(null);
+      }, 3000);
+
+      chainEventsNode.once((data) => {
+        clearTimeout(timeoutId);
+        console.log(`🔍 Debug: Chain events data:`, data);
+        resolve(data);
+      });
+    });
+
+    res.json({
+      success: true,
+      soul: soul,
+      nodeExists: !!data,
+      nodeData: data,
+      chainEventsExist: !!eventsData,
+      chainEventsData: eventsData,
+      timestamp: Date.now()
+    });
+
+  } catch (error) {
+    console.error("❌ Debug error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore debug",
+      details: error.message
+    });
+  }
+});
+
 // Route per leggere i dati da GunDB
 router.get("/read/:soul/:key?", async (req, res) => {
   try {
@@ -285,6 +351,8 @@ router.get("/read/:soul/:key?", async (req, res) => {
     // Se non è specificata una chiave, leggi tutto il nodo
     if (!key) {
       const node = gun.get(soul);
+      console.log(`🔍 Reading entire node for soul: ${soul}`);
+      
       const data = await new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {
           console.warn("⚠️ Timeout reading from GunDB");
@@ -293,6 +361,7 @@ router.get("/read/:soul/:key?", async (req, res) => {
 
         node.once((data) => {
           clearTimeout(timeoutId);
+          console.log(`🔍 Received data for soul ${soul}:`, data);
           resolve(data);
         });
       });
@@ -306,6 +375,8 @@ router.get("/read/:soul/:key?", async (req, res) => {
     } else {
       // Leggi una chiave specifica
       const node = gun.get(soul).get(key);
+      console.log(`🔍 Reading specific key: ${key} from soul: ${soul}`);
+      
       const data = await new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {
           console.warn("⚠️ Timeout reading from GunDB");
@@ -314,6 +385,7 @@ router.get("/read/:soul/:key?", async (req, res) => {
 
         node.once((data) => {
           clearTimeout(timeoutId);
+          console.log(`🔍 Received data for ${soul}/${key}:`, data);
           resolve(data);
         });
       });
