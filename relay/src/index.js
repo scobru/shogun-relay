@@ -355,9 +355,9 @@ async function initializeServer() {
                 console.log(
                   "🎉 EVENTO RICEVUTO! Chain contract event received:",
                   {
-                    soul: event.args.soul,
-                    key: event.args.key,
                     value: event.args.value,
+                    soulReadable: event.args.soulReadable,
+                    keyReadable: event.args.keyReadable,
                     blockNumber: event.blockNumber,
                     transactionHash: event.transactionHash,
                     logIndex: event.logIndex,
@@ -365,29 +365,29 @@ async function initializeServer() {
                 );
 
                 // Log dettagliato della struttura degli oggetti
-                console.log("🔍 Soul structure:", {
-                  type: typeof event.args.soul,
-                  isObject: typeof event.args.soul === "object",
+                console.log("🔍 SoulReadable structure:", {
+                  type: typeof event.args.soulReadable,
+                  isObject: typeof event.args.soulReadable === "object",
                   hasHash:
-                    event.args.soul &&
-                    typeof event.args.soul === "object" &&
-                    "hash" in event.args.soul,
+                    event.args.soulReadable &&
+                    typeof event.args.soulReadable === "object" &&
+                    "hash" in event.args.soulReadable,
                   hash:
-                    event.args.soul && typeof event.args.soul === "object"
-                      ? event.args.soul.hash
+                    event.args.soulReadable && typeof event.args.soulReadable === "object"
+                      ? event.args.soulReadable.hash
                       : "N/A",
                 });
 
-                console.log("🔍 Key structure:", {
-                  type: typeof event.args.key,
-                  isObject: typeof event.args.key === "object",
+                console.log("🔍 KeyReadable structure:", {
+                  type: typeof event.args.keyReadable,
+                  isObject: typeof event.args.keyReadable === "object",
                   hasHash:
-                    event.args.key &&
-                    typeof event.args.key === "object" &&
-                    "hash" in event.args.key,
+                    event.args.keyReadable &&
+                    typeof event.args.keyReadable === "object" &&
+                    "hash" in event.args.keyReadable,
                   hash:
-                    event.args.key && typeof event.args.key === "object"
-                      ? event.args.key.hash
+                    event.args.keyReadable && typeof event.args.keyReadable === "object"
+                      ? event.args.keyReadable.hash
                       : "N/A",
                 });
 
@@ -404,14 +404,15 @@ async function initializeServer() {
                   decodedValue = event.args.value;
                 }
 
-                // Decode soul and key from bytes to string
+                // Decode soulReadable and keyReadable from bytes to string
                 let soulString, keyString;
                 try {
                   console.log("🔍 Raw event args:", {
-                    soul: event.args.soul,
-                    key: event.args.key,
-                    soulType: typeof event.args.soul,
-                    keyType: typeof event.args.key,
+                    value: event.args.value,
+                    soulReadable: event.args.soulReadable,
+                    keyReadable: event.args.keyReadable,
+                    soulReadableType: typeof event.args.soulReadable,
+                    keyReadableType: typeof event.args.keyReadable,
                   });
 
                   // Gestisci sia eventi indexed che non-indexed
@@ -419,43 +420,43 @@ async function initializeServer() {
 
                   // Controlla se sono oggetti Indexed (vecchio contratto)
                   if (
-                    event.args.soul &&
-                    typeof event.args.soul === "object" &&
-                    event.args.soul._isIndexed
+                    event.args.soulReadable &&
+                    typeof event.args.soulReadable === "object" &&
+                    event.args.soulReadable._isIndexed
                   ) {
-                    console.log("🔍 Detected indexed soul, using hash");
-                    soulBytes = event.args.soul.hash;
+                    console.log("🔍 Detected indexed soulReadable, using hash");
+                    soulBytes = event.args.soulReadable.hash;
                   } else if (
-                    event.args.soul &&
-                    typeof event.args.soul === "object"
+                    event.args.soulReadable &&
+                    typeof event.args.soulReadable === "object"
                   ) {
                     // Oggetto Result di Ethers.js (nuovo contratto)
                     soulBytes =
-                      event.args.soul.bytes ||
-                      event.args.soul.data ||
-                      event.args.soul;
+                      event.args.soulReadable.bytes ||
+                      event.args.soulReadable.data ||
+                      event.args.soulReadable;
                   } else {
-                    soulBytes = event.args.soul;
+                    soulBytes = event.args.soulReadable;
                   }
 
                   if (
-                    event.args.key &&
-                    typeof event.args.key === "object" &&
-                    event.args.key._isIndexed
+                    event.args.keyReadable &&
+                    typeof event.args.keyReadable === "object" &&
+                    event.args.keyReadable._isIndexed
                   ) {
-                    console.log("🔍 Detected indexed key, using hash");
-                    keyBytes = event.args.key.hash;
+                    console.log("🔍 Detected indexed keyReadable, using hash");
+                    keyBytes = event.args.keyReadable.hash;
                   } else if (
-                    event.args.key &&
-                    typeof event.args.key === "object"
+                    event.args.keyReadable &&
+                    typeof event.args.keyReadable === "object"
                   ) {
                     // Oggetto Result di Ethers.js (nuovo contratto)
                     keyBytes =
-                      event.args.key.bytes ||
-                      event.args.key.data ||
-                      event.args.key;
+                      event.args.keyReadable.bytes ||
+                      event.args.keyReadable.data ||
+                      event.args.keyReadable;
                   } else {
-                    keyBytes = event.args.key;
+                    keyBytes = event.args.keyReadable;
                   }
 
                   console.log("🔍 Extracted bytes:", {
@@ -472,7 +473,7 @@ async function initializeServer() {
                     soulBytes.length === 66
                   ) {
                     console.log(
-                      "⚠️ Soul is keccak256 hash, cannot decode to original string"
+                      "⚠️ SoulReadable is keccak256 hash, cannot decode to original string"
                     );
                     soulString = `hash_${soulBytes.substring(2, 10)}`;
                   } else {
@@ -486,7 +487,7 @@ async function initializeServer() {
                     keyBytes.length === 66
                   ) {
                     console.log(
-                      "⚠️ Key is keccak256 hash, cannot decode to original string"
+                      "⚠️ KeyReadable is keccak256 hash, cannot decode to original string"
                     );
                     keyString = `hash_${keyBytes.substring(2, 10)}`;
                   } else {
@@ -499,13 +500,13 @@ async function initializeServer() {
                   );
                 } catch (error) {
                   console.warn(
-                    "⚠️ Could not decode soul/key as UTF-8, using fallback"
+                    "⚠️ Could not decode soulReadable/keyReadable as UTF-8, using fallback"
                   );
                   console.log("Decode error:", error.message);
 
                   // Se la decodifica fallisce, usa i valori originali
-                  soulString = String(event.args.soul || "");
-                  keyString = String(event.args.key || "");
+                  soulString = String(event.args.soulReadable || "");
+                  keyString = String(event.args.keyReadable || "");
 
                   console.log("🔍 Using fallback values:", {
                     soulString: soulString,
