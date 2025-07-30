@@ -840,7 +840,8 @@ async function initializeServer() {
       const authHeader = req.headers["authorization"];
       const bearerToken = authHeader && authHeader.split(" ")[1];
       const customToken = req.headers["token"];
-      const token = bearerToken || customToken;
+      const formToken = req.query["_auth_token"]; // Token inviato tramite form
+      const token = bearerToken || customToken || formToken;
 
       if (token === process.env.ADMIN_PASSWORD) {
         next();

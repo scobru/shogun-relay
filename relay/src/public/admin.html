@@ -395,6 +395,39 @@
 
             // Auto-focus password field
             document.getElementById('adminPassword').focus();
+
+            // Intercept clicks on admin-protected links and add authorization
+            document.addEventListener('click', function(e) {
+                const link = e.target.closest('a');
+                if (link && link.classList.contains('admin-protected')) {
+                    e.preventDefault();
+                    
+                    const password = ShogunAdmin.getPassword();
+                    if (!password) {
+                        alert('⚠️ Admin password required. Please save your admin password first.');
+                        return;
+                    }
+
+                    const url = link.href;
+                    console.log(`🔐 Navigating to protected page: ${url}`);
+                    
+                    // Create a form to submit with the token
+                    const form = document.createElement('form');
+                    form.method = 'GET';
+                    form.action = url;
+                    form.style.display = 'none';
+                    
+                    // Add authorization header via hidden input
+                    const authInput = document.createElement('input');
+                    authInput.type = 'hidden';
+                    authInput.name = '_auth_token';
+                    authInput.value = password;
+                    form.appendChild(authInput);
+                    
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            });
         });
     </script>
 </body>

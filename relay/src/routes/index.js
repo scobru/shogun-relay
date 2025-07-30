@@ -1593,4 +1593,53 @@ export default (app) => {
       res.status(404).send("Index file not found");
     }
   });
+
+  // Aggiungi middleware per proteggere le route statiche che richiedono autenticazione
+  const protectedStaticRoutes = [
+    "/admin",
+    "/subscribe",
+    "/stats",
+    "/services-dashboard",
+    "/pin-manager",
+    "/notes",
+    "/upload",
+    "/create",
+    "/view",
+    "/edit",
+    "/derive",
+    "/graph",
+    "/chat",
+    "/charts",
+    "/chain-contract",
+    "/ipcm-contract",
+    "/drive",
+  ];
+
+  app.use((req, res, next) => {
+    const path = req.path;
+    
+    // Controlla se la route richiede autenticazione admin
+    if (protectedStaticRoutes.includes(path)) {
+      // Verifica autenticazione admin
+      const authHeader = req.headers["authorization"];
+      const bearerToken = authHeader && authHeader.split(" ")[1];
+      const customToken = req.headers["token"];
+      const formToken = req.query["_auth_token"]; // Token inviato tramite form
+      const token = bearerToken || customToken || formToken;
+
+      if (token === process.env.ADMIN_PASSWORD) {
+        next();
+      } else {
+        console.log(`❌ Accesso negato a ${path} - Token mancante o non valido`);
+        return res.status(401).json({ 
+          success: false, 
+          error: "Unauthorized - Admin authentication required",
+          message: "Questa pagina richiede autenticazione admin. Inserisci la password admin nella pagina principale."
+        });
+      }
+    } else {
+      // Route pubblica, continua
+      next();
+    }
+  });
 };
