@@ -4,7 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shogun Relay Admin Panel</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Shogun Relay Admin Panel - Authentication Required</title>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
     <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
 
@@ -100,7 +103,7 @@
                             d="M5 12h14M12 5l7 7-7 7" />
                     </svg>
 
-                    <h1 id="relay-title" class="text-3xl font-medium mb-8 text-[#FFFFFF]">Shogun Relay Admin Panel</h1>
+                    <h1 id="relay-title" class="text-3xl font-medium mb-8 text-[#FFFFFF]">🔐 Shogun Relay Admin Panel</h1>
                     <p class="text-[#8B94FF] mb-8">Admin authentication required<span class="animate-pulse">_</span></p>
 
                     <!-- Admin Password Section -->
@@ -141,6 +144,23 @@
                                 <span class="text-[#FFA500]">🔒</span>
                                 <span>Accesso Limitato - Solo applicazioni pubbliche visibili</span>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Link per tornare alla home -->
+                    <div class="w-full max-w-md mb-8 p-4 bg-[#282828] rounded-2xl border border-[#404040] shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#42A5F5]" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                                </svg>
+                                <span class="text-[#E0E0E0] text-sm">Back to public interface</span>
+                            </div>
+                            <a href="/" class="btn bg-[#42A5F5] hover:bg-[#2196F3] border-0 text-[#FFFFFF] text-sm px-4 py-2 rounded-xl font-medium transition-all duration-200 shadow-sm hover:shadow-md">
+                                🏠 Home
+                            </a>
                         </div>
                     </div>
 

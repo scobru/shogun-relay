@@ -1316,6 +1316,12 @@ async function initializeServer() {
   app.get('/admin', (req, res) => {
     const adminPath = path.resolve(publicPath, "admin.html");
     if (fs.existsSync(adminPath)) {
+      // Aggiungi header per prevenire il caching
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
       res.sendFile(adminPath);
     } else {
       res.status(404).json({ 
