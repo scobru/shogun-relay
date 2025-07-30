@@ -1311,6 +1311,21 @@ async function initializeServer() {
   }
 
   // Route statiche (DEFINITE DOPO LE API)
+  
+  // Route specifica per /admin
+  app.get('/admin', (req, res) => {
+    const adminPath = path.resolve(publicPath, "admin.html");
+    if (fs.existsSync(adminPath)) {
+      res.sendFile(adminPath);
+    } else {
+      res.status(404).json({ 
+        success: false, 
+        error: "Admin panel not found",
+        message: "Admin panel file not available"
+      });
+    }
+  });
+
   app.use(express.static(publicPath));
 
   // Initialize garbage collector now that gun is ready

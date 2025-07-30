@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shogun Relay Control Panel</title>
+    <title>Shogun Relay Admin Panel</title>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
     <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
 
@@ -75,6 +75,16 @@
                 padding: 10px 14px;
             }
         }
+
+        /* Nascondi le applicazioni protette di default */
+        .admin-protected {
+            display: none !important;
+        }
+
+        /* Mostra le applicazioni protette quando l'admin è autenticato */
+        .admin-authenticated .admin-protected {
+            display: flex !important;
+        }
     </style>
 </head>
 
@@ -90,23 +100,47 @@
                             d="M5 12h14M12 5l7 7-7 7" />
                     </svg>
 
-                    <h1 id="relay-title" class="text-3xl font-medium mb-8 text-[#FFFFFF]">Shogun Relay Control Panel</h1>
-                    <p class="text-[#8B94FF] mb-8">Select a tool to continue<span class="animate-pulse">_</span></p>
+                    <h1 id="relay-title" class="text-3xl font-medium mb-8 text-[#FFFFFF]">Shogun Relay Admin Panel</h1>
+                    <p class="text-[#8B94FF] mb-8">Admin authentication required<span class="animate-pulse">_</span></p>
 
-                    <!-- Admin Access Link -->
-                    <div class="w-full max-w-md mb-8 p-4 bg-[#282828] rounded-2xl border border-[#404040] shadow-lg">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-3">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#FF69B4]" fill="none"
-                                    viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                                </svg>
-                                <span class="text-[#E0E0E0] text-sm">Admin access available</span>
+                    <!-- Admin Password Section -->
+                    <div id="adminPasswordSection"
+                        class="w-full max-w-md mb-8 p-6 bg-[#282828] rounded-2xl border border-[#404040] shadow-lg">
+                        <div class="flex items-center gap-3 mb-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#FF69B4]" fill="none"
+                                viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                            </svg>
+                            <h3 class="text-lg font-medium text-[#FF69B4]">Centralized Admin Authentication</h3>
+                        </div>
+                        <div class="flex items-start gap-2 mb-4">
+                            <span class="text-[#FFA500] text-sm mt-0.5">🔒</span>
+                            <p class="text-sm text-[#E0E0E0] leading-relaxed">
+                                Inserisci la password admin per accedere a tutte le applicazioni. Se la password non è
+                                corretta, saranno visibili solo le applicazioni pubbliche.
+                            </p>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="form-control">
+                                <input type="password" id="adminPassword" 
+                                    class="input w-full bg-[#404040] border-0 text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:ring-opacity-50"
+                                    placeholder="Enter Admin Password" />
                             </div>
-                            <a href="/admin" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] text-sm px-4 py-2 rounded-xl font-medium transition-all duration-200 shadow-sm hover:shadow-md">
-                                🔐 Admin Panel
-                            </a>
+                            <div class="flex gap-3">
+                                <button class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] flex-1 rounded-xl px-4 py-3 font-medium transition-all duration-200 shadow-sm hover:shadow-md" onclick="saveAdminPassword()">
+                                    <span class="mr-2">💾</span>
+                                    Save Password
+                                </button>
+                                <button class="btn bg-transparent border-0 text-[#E0E0E0] hover:text-[#FFFFFF] hover:bg-[#404040] flex-1 rounded-xl px-4 py-3 font-medium transition-all duration-200" onclick="clearAdminPassword()">
+                                    <span class="mr-2">🗑️</span>
+                                    Clear
+                                </button>
+                            </div>
+                            <div id="passwordStatus" class="flex items-center gap-2 text-sm text-center text-[#E0E0E0] opacity-90 min-h-[20px]">
+                                <span class="text-[#FFA500]">🔒</span>
+                                <span>Accesso Limitato - Solo applicazioni pubbliche visibili</span>
+                            </div>
                         </div>
                     </div>
 
@@ -116,6 +150,24 @@
                             <div class="p-6">
                                 <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Monitoring & Analytics</h2>
                                 <div class="space-y-3">
+                                    <a href="/services-dashboard" class="tooltip btn-custom flex items-center gap-3 relative text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected" data-tooltip="Monitor relay services status, check real-time logs and manage system processes">
+                                        <span class="text-[#A0A0A0]">🔧</span>
+                                        <span>Services Dashboard</span>
+                                        <span class="tooltiptext">Monitor relay services status, check real-time logs and manage system processes</span>
+                                        <span class="absolute right-3 text-[#FFA500] text-sm">🔒</span>
+                                    </a>
+                                    <a href="/stats" class="tooltip btn-custom flex items-center gap-3 relative text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected" data-tooltip="View real-time relay statistics: active connections, memory usage, uptime and performance metrics">
+                                        <span class="text-[#64B5F6]">📈</span>
+                                        <span>Live Stats</span>
+                                        <span class="tooltiptext">View real-time relay statistics: active connections, memory usage, uptime and performance metrics</span>
+                                        <span class="absolute right-3 text-[#FFA500] text-sm">🔒</span>
+                                    </a>
+                                    <a href="/charts" class="tooltip btn-custom flex items-center gap-3 relative text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected" data-tooltip="Advanced charts to analyze trends, connections, resource usage and relay performance over time">
+                                        <span class="text-[#64B5F6]">📊</span>
+                                        <span>Advanced Charts</span>
+                                        <span class="tooltiptext">Advanced charts to analyze trends, connections, resource usage and relay performance over time</span>
+                                        <span class="absolute right-3 text-[#FFA500] text-sm">🔒</span>
+                                    </a>
                                     <a href="/graph" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Explore GunDB data structure in real-time, view nodes, relationships and decentralized graph data">
                                         <span class="text-[#42A5F5]">🌐</span>
                                         <span>Live Graph Explorer</span>
@@ -140,6 +192,18 @@
                                         <span>User Upload</span>
                                         <span class="tooltiptext">Upload files for authenticated users with wallet, MB quota management, optional encryption and storage usage tracking</span>
                                     </a>
+                                    <a href="/upload" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected" data-tooltip="Direct file upload to IPFS with optional encryption, admin management and upload status monitoring">
+                                        <span class="text-[#42A5F5]">📤</span>
+                                        <span>Upload to IPFS</span>
+                                        <span class="tooltiptext">Direct file upload to IPFS with optional encryption, admin management and upload status monitoring</span>
+                                        <span class="absolute right-3 text-[#FFA500] text-sm">🔒</span>
+                                    </a>
+                                    <a href="/pin-manager" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected" data-tooltip="Manage IPFS pins, view saved files, remove pins, garbage collection and debug system hashes">
+                                        <span class="text-[#42A5F5]">📌</span>
+                                        <span>IPFS Pin Manager</span>
+                                        <span class="tooltiptext">Manage IPFS pins, view saved files, remove pins, garbage collection and debug system hashes</span>
+                                        <span class="absolute right-3 text-[#FFA500] text-sm">🔒</span>
+                                    </a>
                                     <a href="/ipfs-status" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Check IPFS node status, API version, peer connections and network health metrics">
                                         <span class="text-[#64B5F6]">📊</span>
                                         <span>IPFS Node Status</span>
@@ -154,6 +218,12 @@
                             <div class="p-6">
                                 <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Data Management</h2>
                                 <div class="space-y-3">
+                                    <a href="/create" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected" data-tooltip="Create new data nodes in GunDB, define JSON structure, multiple keys and data relationships">
+                                        <span class="text-[#4CAF50]">➕</span>
+                                        <span>Create Data Node</span>
+                                        <span class="tooltiptext">Create new data nodes in GunDB, define JSON structure, multiple keys and data relationships</span>
+                                        <span class="absolute right-3 text-[#FFA500] text-sm">🔒</span>
+                                    </a>
                                     <a href="/view" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="View and query GunDB data, search by key, filter results and export data in JSON format">
                                         <span class="text-[#42A5F5]">🔍</span>
                                         <span>View/Query Data</span>
@@ -168,6 +238,12 @@
                                         <span class="text-[#9C27B0]">🗂️</span>
                                         <span>IPCM Contract Interface</span>
                                         <span class="tooltiptext">Manage IPCM contract, check connection status, configure parameters and monitor protocol performance</span>
+                                    </a>
+                                    <a href="/notes" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected" data-tooltip="Encrypted administrative notes, secure saving with admin password and private system notes management">
+                                        <span class="text-[#FFC107]">📝</span>
+                                        <span>Admin Notes</span>
+                                        <span class="tooltiptext">Encrypted administrative notes, secure saving with admin password and private system notes management</span>
+                                        <span class="absolute right-3 text-[#FFA500] text-sm">🔒</span>
                                     </a>
                                 </div>
                             </div>
@@ -223,12 +299,84 @@
     </div>
 
     <script>
-        // Initialize admin authentication (for potential future use)
+        // Admin authentication functions
+        function saveAdminPassword() {
+            const password = document.getElementById('adminPassword').value;
+            if (password.trim()) {
+                ShogunAdmin.savePassword(password);
+                updateAuthSectionsVisibility();
+                forceCorrectVisibility();
+            }
+        }
+
+        function clearAdminPassword() {
+            ShogunAdmin.clearPassword();
+            updateAuthSectionsVisibility();
+            forceCorrectVisibility();
+        }
+
+        function updateAuthSectionsVisibility() {
+            const statusElement = document.getElementById('passwordStatus');
+            if (ShogunAdmin.hasPassword()) {
+                statusElement.innerHTML = '<span class="text-[#4CAF50]">✅</span><span>Accesso Admin - Tutte le applicazioni disponibili</span>';
+            } else {
+                statusElement.innerHTML = '<span class="text-[#FFA500]">🔒</span><span>Accesso Limitato - Solo applicazioni pubbliche visibili</span>';
+            }
+        }
+
+        function showAllApplications() {
+            document.body.classList.add('admin-authenticated');
+            updateAuthSectionsVisibility();
+        }
+
+        function showPublicApplicationsOnly() {
+            document.body.classList.remove('admin-authenticated');
+            updateAuthSectionsVisibility();
+        }
+
+        function handleProtectedPageError() {
+            // Gestisci errori di accesso a pagine protette
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('error') === 'unauthorized') {
+                alert('❌ Accesso negato: Questa pagina richiede autenticazione admin.');
+            }
+        }
+
+        function forceCorrectVisibility() {
+            const protectedApps = document.querySelectorAll('.admin-protected');
+            protectedApps.forEach(app => {
+                app.style.display = 'none';
+            });
+            if (ShogunAdmin.hasPassword()) {
+                document.body.classList.add('admin-authenticated');
+                protectedApps.forEach(app => {
+                    app.style.display = 'flex';
+                });
+            } else {
+                document.body.classList.remove('admin-authenticated');
+            }
+        }
+
+        // Initialize admin authentication
         window.addEventListener('DOMContentLoaded', async () => {
-            // Initialize ShogunAdmin (for potential admin features)
+            // Initialize ShogunAdmin
             ShogunAdmin.init();
+            
+            // Update visibility based on stored password
+            updateAuthSectionsVisibility();
+            handleProtectedPageError();
+            forceCorrectVisibility();
+
+            // Listen for password changes
+            ShogunAdmin.onPasswordChange(() => {
+                updateAuthSectionsVisibility();
+                forceCorrectVisibility();
+            });
+
+            // Auto-focus password field
+            document.getElementById('adminPassword').focus();
         });
     </script>
 </body>
 
-</html>
+</html> 
