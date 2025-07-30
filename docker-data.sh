@@ -60,8 +60,17 @@ check_docker() {
 
 # Function to check if docker-compose is available
 check_docker_compose() {
-    if ! command -v docker-compose &> /dev/null; then
-        print_error "docker-compose is not installed or not in PATH"
+    # Check for modern docker compose (without hyphen)
+    if docker compose version >/dev/null 2>&1; then
+        DOCKER_COMPOSE_CMD="docker compose"
+        print_status "Using modern docker compose"
+    # Check for legacy docker-compose (with hyphen)
+    elif command -v docker-compose &> /dev/null; then
+        DOCKER_COMPOSE_CMD="docker-compose"
+        print_status "Using legacy docker-compose"
+    else
+        print_error "Neither 'docker compose' nor 'docker-compose' is available"
+        print_error "Please install Docker Compose and try again"
         exit 1
     fi
 }
@@ -74,7 +83,7 @@ create_backup() {
     
     # Stop services to ensure data consistency
     print_status "Stopping services for consistent backup..."
-    docker-compose down
+    $DOCKER_COMPOSE_CMD down
     
     # Create backup
     print_status "Creating backup archive..."
@@ -88,7 +97,7 @@ create_backup() {
     
     # Restart services
     print_status "Restarting services..."
-    docker-compose up -d
+    $DOCKER_COMPOSE_CMD up -d
     
     print_status "Backup completed: $backup_file"
     print_status "Backup size: $(du -h "$backup_file" | cut -f1)"
@@ -121,7 +130,7 @@ restore_backup() {
     
     # Stop services
     print_status "Stopping services..."
-    docker-compose down
+    $DOCKER_COMPOSE_CMD down
     
     # Remove existing volumes
     print_status "Removing existing volumes..."
@@ -142,7 +151,7 @@ restore_backup() {
     
     # Restart services
     print_status "Restarting services..."
-    docker-compose up -d
+    $DOCKER_COMPOSE_CMD up -d
     
     print_status "Restore completed successfully"
 }
@@ -226,7 +235,7 @@ reset_data() {
     
     # Stop services
     print_status "Stopping services..."
-    docker-compose down
+    $DOCKER_COMPOSE_CMD down
     
     # Remove volumes
     print_status "Removing all data volumes..."

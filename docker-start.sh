@@ -5,6 +5,18 @@
 
 set -e
 
+# Check for docker compose command
+if docker compose version >/dev/null 2>&1; then
+    DOCKER_COMPOSE_CMD="docker compose"
+    echo "Using modern docker compose"
+elif command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+    echo "Using legacy docker-compose"
+else
+    echo "❌ Error: Neither 'docker compose' nor 'docker-compose' is available"
+    exit 1
+fi
+
 # Parse command line arguments
 PRESERVE_DATA=false
 FORCE_RESTART=false
@@ -59,28 +71,28 @@ fi
 # Stop existing container based on flags
 if [ "$FORCE_RESTART" = true ]; then
     echo "🔄 Force restart: Stopping containers and removing volumes..."
-    docker-compose down -v 2>/dev/null || true
+    $DOCKER_COMPOSE_CMD down -v 2>/dev/null || true
     echo "🗑️  All data has been removed (volumes deleted)"
 elif [ "$PRESERVE_DATA" = true ] || [ "$PRESERVE_DATA" = false ]; then
     # Default behavior: preserve data
     echo "💾 Preserving data: Stopping containers only (volumes kept)..."
-    docker-compose down 2>/dev/null || true
+    $DOCKER_COMPOSE_CMD down 2>/dev/null || true
     echo "✅ Data preserved (volumes maintained)"
 fi
 
 # Build and start the stack
 echo "🔨 Building Docker image..."
-docker-compose build
+$DOCKER_COMPOSE_CMD build
 
 echo "🐳 Starting services..."
-docker-compose up -d
+$DOCKER_COMPOSE_CMD up -d
 
 # Wait for services to start
 echo "⏳ Waiting for services to start..."
 sleep 10
 
 # Check if services are running
-if docker-compose ps | grep -q "Up"; then
+if $DOCKER_COMPOSE_CMD ps | grep -q "Up"; then
     echo "✅ Shogun Relay Stack started successfully!"
     echo ""
     
@@ -100,14 +112,14 @@ if docker-compose ps | grep -q "Up"; then
     echo "   🖥️  IPFS Gateway:    http://localhost:8080"
     echo ""
     echo "🔍 Useful commands:"
-    echo "   📊 Logs:            docker-compose logs -f"
+    echo "   📊 Logs:            $DOCKER_COMPOSE_CMD logs -f"
     echo "   ⏲️ Relay Logs:      docker exec shogun-relay-stack tail -f /var/log/supervisor/relay.log" 
     echo "   ⏲️ IPFS  Logs:      docker exec shogun-relay-stack tail -f /var/log/supervisor/ipfs.log"
     echo "   ⏲️ IPFS-INIT  Logs:      docker exec shogun-relay-stack tail -f /var/log/supervisor/ipfs-init.log"
     echo "   📈 Stats:           docker stats shogun-relay-stack"
-    echo "   🔧 Debug:           docker-compose exec shogun-relay bash"
-    echo "   🛑 Stop:            docker-compose down"
-    echo "   🗑️  Reset:           docker-compose down -v"
+    echo "   🔧 Debug:           $DOCKER_COMPOSE_CMD exec shogun-relay bash"
+    echo "   🛑 Stop:            $DOCKER_COMPOSE_CMD down"
+    echo "   🗑️  Reset:           $DOCKER_COMPOSE_CMD down -v"
     echo ""
     echo "🎯 Check service status:"
     echo "   curl http://localhost:8765/health"
@@ -117,6 +129,6 @@ if docker-compose ps | grep -q "Up"; then
     echo "   📦 Restore volumes: docker run --rm -v shogun-relay_gun-data:/data -v \$(pwd):/backup alpine tar xzf /backup/gun-data-backup.tar.gz -C /data"
 else
     echo "❌ Error starting services. Check logs:"
-    echo "   docker-compose logs"
+    echo "   $DOCKER_COMPOSE_CMD logs"
     exit 1
 fi
