@@ -21,7 +21,7 @@ fi
 PRESERVE_DATA=false
 FORCE_RESTART=false
 
-while [[ $# -gt 0 ]]; do
+while [ $# -gt 0 ]; do
     case $1 in
         --preserve-data)
             PRESERVE_DATA=true
