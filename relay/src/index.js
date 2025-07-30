@@ -1065,9 +1065,6 @@ async function initializeServer() {
     
     // Usa l'import già fatto all'inizio del file
     shogunCore = new ShogunCore({
-      appToken: process.env.ADMIN_PASSWORD,
-      authToken: process.env.ADMIN_PASSWORD,
-      gunInstance: gun,
       peers: peers,
       scope: "shogun-relay",
       web3: { enabled: true },
