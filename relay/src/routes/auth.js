@@ -219,6 +219,14 @@ router.post('/web3/login', authLimiter, async (req, res) => {
     console.log("🔐 - webauthn:", !!shogun.getPlugin("webauthn"));
     console.log("🔐 - nostr:", !!shogun.getPlugin("nostr"));
     console.log("🔐 - oauth:", !!shogun.getPlugin("oauth"));
+    
+    // Debug: controlla tutti i plugin registrati
+    console.log("🔐 All registered plugins:");
+    if (shogun.plugins) {
+      for (const [name, plugin] of shogun.plugins) {
+        console.log(`🔐   - ${name}:`, typeof plugin);
+      }
+    }
 
     const web3Plugin = shogun.getPlugin("web3");
     console.log("🔐 Web3 plugin obtained:", !!web3Plugin);
@@ -328,6 +336,14 @@ router.post('/web3/register', authLimiter, async (req, res) => {
     console.log("🔐 - webauthn:", !!shogun.getPlugin("webauthn"));
     console.log("🔐 - nostr:", !!shogun.getPlugin("nostr"));
     console.log("🔐 - oauth:", !!shogun.getPlugin("oauth"));
+    
+    // Debug: controlla tutti i plugin registrati
+    console.log("🔐 All registered plugins (register):");
+    if (shogun.plugins) {
+      for (const [name, plugin] of shogun.plugins) {
+        console.log(`🔐   - ${name}:`, typeof plugin);
+      }
+    }
 
     const web3Plugin = shogun.getPlugin("web3");
     console.log("🔐 Web3 plugin obtained (register):", !!web3Plugin);
