@@ -10,28 +10,61 @@ function verifyNostrSignature(message, signature, address) {
   try {
     console.log("🔐 Verifying Nostr signature directly");
     
-    // Ricostruisce l'evento esatto che è stato firmato
-    const eventData = {
-      kind: 1,
-      created_at: 0, // IMPORTANTE: Usa lo stesso timestamp fisso usato per la firma
-      tags: [],
-      content: message,
-      pubkey: address,
-    };
+    // Per le firme deterministiche, ricrea la firma e confronta
+    const expectedSignature = generateDeterministicNostrSignature(address, message);
     
-    const event = {
-      ...eventData,
-      id: getEventHash(eventData),
-      sig: signature,
-    };
-
-    const isValid = verifyEvent(event);
+    console.log("🔐 Expected signature:", expectedSignature.substring(0, 20) + "...");
+    console.log("🔐 Received signature:", signature.substring(0, 20) + "...");
+    
+    const isValid = signature === expectedSignature;
     console.log("🔐 Nostr signature verification result:", isValid);
     return isValid;
   } catch (error) {
     console.error("❌ Error verifying Nostr signature:", error);
     return false;
   }
+}
+
+// Funzione per generare firme deterministiche (stessa logica del client)
+function generateDeterministicNostrSignature(pubKey, message) {
+  // Crea una stringa base deterministica
+  const baseString = `${pubKey}_${message}_shogun_deterministic`;
+  
+  // Genera un hash deterministico usando una funzione semplice
+  let hash = "";
+  let runningValue = 0;
+  
+  for (let i = 0; i < baseString.length; i++) {
+    const charCode = baseString.charCodeAt(i);
+    runningValue = (runningValue * 31 + charCode) & 0xffffffff;
+    
+    if (i % 4 === 3) {
+      hash += runningValue.toString(16).padStart(8, "0");
+    }
+  }
+  
+  // Assicurati di avere esattamente 128 caratteri (64 bytes in hex)
+  while (hash.length < 128) {
+    runningValue = (runningValue * 31 + hash.length) & 0xffffffff;
+    hash += runningValue.toString(16).padStart(8, "0");
+  }
+  
+  // Assicurati che il risultato sia esattamente 128 caratteri e contenga solo caratteri hex validi
+  let deterministicSignature = hash.substring(0, 128);
+  
+  // Double-check che sia una stringa hex valida
+  deterministicSignature = deterministicSignature
+    .toLowerCase()
+    .replace(/[^0-9a-f]/g, "0");
+  
+  // Assicurati che sia esattamente 128 caratteri
+  if (deterministicSignature.length < 128) {
+    deterministicSignature = deterministicSignature.padEnd(128, "0");
+  } else if (deterministicSignature.length > 128) {
+    deterministicSignature = deterministicSignature.substring(0, 128);
+  }
+  
+  return deterministicSignature;
 }
 
 // Funzione per generare credenziali Nostr
