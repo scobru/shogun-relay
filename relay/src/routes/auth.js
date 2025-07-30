@@ -925,6 +925,7 @@ router.get("/authorize-gun-key/:pubKey", async (req, res) => {
 router.get('/oauth/:provider/authorize', async (req, res) => {
   try {
     const { provider } = req.params;
+    const { action } = req.query; // 'login' o 'register'
     const shogun = getShogunInstance(req);
     
     if (!shogun) {
@@ -946,10 +947,10 @@ router.get('/oauth/:provider/authorize', async (req, res) => {
       });
     }
 
-    console.log(`🔐 Initiating OAuth flow for provider: ${provider}`);
+    console.log(`🔐 Initiating OAuth flow for provider: ${provider}, action: ${action || 'login'}`);
 
-    // Avvia il flusso OAuth
-    const result = await oauthPlugin.initiateOAuth(provider);
+    // Avvia il flusso OAuth con l'azione specificata
+    const result = await oauthPlugin.initiateOAuth(provider, action);
     
     if (!result.success) {
       console.error("❌ OAuth initiation failed:", result.error);
