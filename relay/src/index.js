@@ -12,7 +12,7 @@ import qr from "qr";
 import setSelfAdjustingInterval from "self-adjusting-interval";
 import "./utils/bullet-catcher.js";
 import { ethers } from "ethers";
-import { ShogunCore } from "shogun-core";
+import ShogunCore from "shogun-core";
 
 dotenv.config();
 

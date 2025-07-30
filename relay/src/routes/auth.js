@@ -50,8 +50,12 @@ function initializeShogunCore() {
 
 // Middleware per ottenere l'istanza Shogun Core
 const getShogunInstance = (req) => {
+  console.log("🔐 getShogunInstance called");
+  
   // Prima prova a ottenere l'istanza dal server principale
   const serverShogunCore = req.app.get('shogunCore');
+  console.log("🔐 Server Shogun Core available:", !!serverShogunCore);
+  
   if (serverShogunCore) {
     console.log("🔐 Using Shogun Core from server instance");
     return serverShogunCore;
@@ -60,6 +64,7 @@ const getShogunInstance = (req) => {
   console.warn("⚠️ Shogun Core not available from server, creating fallback instance");
   // Fallback: crea una nuova istanza se non è disponibile dal server
   if (!shogunInstance) {
+    console.log("🔐 Creating new Shogun Core instance");
     shogunInstance = initializeShogunCore();
   }
   return shogunInstance;
@@ -68,15 +73,15 @@ const getShogunInstance = (req) => {
 // Route per la registrazione utente (tradizionale)
 router.post('/register', authLimiter, async (req, res) => {
   try {
-    const { email, passphrase, hint } = req.body;
-    
-    if (!email || !passphrase) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Email e passphrase sono richiesti', 
-        data: null 
-      });
-    }
+  const { email, passphrase, hint } = req.body;
+  
+  if (!email || !passphrase) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Email e passphrase sono richiesti', 
+      data: null 
+    });
+  }
 
     const shogun = getShogunInstance(req);
     
@@ -258,7 +263,17 @@ router.post('/web3/login', authLimiter, async (req, res) => {
 
     // Verifica la firma
     const provider = await web3Plugin.getProvider();
-    const recoveredAddress = ethers.verifyMessage(message || "I Love Shogun", signature);
+    let recoveredAddress;
+    try {
+      recoveredAddress = ethers.verifyMessage(message || "I Love Shogun", signature);
+    } catch (error) {
+      console.error("❌ Error verifying signature:", error);
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Firma non valida', 
+        data: null 
+      });
+    }
     
     if (recoveredAddress.toLowerCase() !== address.toLowerCase()) {
       return res.status(400).json({ 
@@ -334,7 +349,17 @@ router.post('/web3/register', authLimiter, async (req, res) => {
 
     // Verifica la firma
     const provider = await web3Plugin.getProvider();
-    const recoveredAddress = ethers.verifyMessage(message || "I Love Shogun", signature);
+    let recoveredAddress;
+    try {
+      recoveredAddress = ethers.verifyMessage(message || "I Love Shogun", signature);
+    } catch (error) {
+      console.error("❌ Error verifying signature:", error);
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Firma non valida', 
+        data: null 
+      });
+    }
     
     if (recoveredAddress.toLowerCase() !== address.toLowerCase()) {
       return res.status(400).json({ 
@@ -505,7 +530,10 @@ router.post('/nostr/register', authLimiter, async (req, res) => {
 // Route per verificare lo stato di autenticazione
 router.get('/status', async (req, res) => {
   try {
+    console.log("🔐 /status route called");
+    
     const shogun = getShogunInstance(req);
+    console.log("🔐 Shogun instance obtained:", !!shogun);
     
     // Verifica che Shogun Core sia disponibile
     if (!shogun) {
@@ -517,7 +545,9 @@ router.get('/status', async (req, res) => {
       });
     }
 
+    console.log("🔐 Checking if user is logged in...");
     const isLoggedIn = shogun.isLoggedIn();
+    console.log("🔐 User logged in:", isLoggedIn);
     
     if (!isLoggedIn) {
       return res.status(200).json({ 
@@ -537,13 +567,15 @@ router.get('/status', async (req, res) => {
       alias: shogun.user?._?.alias
     };
 
+    console.log("🔐 Returning authenticated user data");
     return res.status(200).json({ 
       success: true, 
       message: 'Utente autenticato', 
       data: userData
     });
   } catch (error) {
-    console.error('Errore durante il controllo dello stato:', error);
+    console.error('❌ Errore durante il controllo dello stato:', error);
+    console.error('❌ Error stack:', error.stack);
     return res.status(500).json({ 
       success: false, 
       message: 'Errore interno del server', 
@@ -606,8 +638,8 @@ router.post('/reset', authLimiter, async (req, res) => {
     const loginResult = await shogun.login(email, newPassphrase);
     
     if (!loginResult.success) {
-      return res.status(400).json({ 
-        success: false, 
+            return res.status(400).json({ 
+              success: false, 
         message: 'Impossibile reimpostare la password', 
               data: null 
             });
