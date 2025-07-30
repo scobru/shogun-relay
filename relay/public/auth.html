@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shogun Relay - Autenticazione</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+    <style>
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <div class="max-w-md mx-auto">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h1 class="text-2xl font-bold text-center mb-6 text-gray-800">
+                    🔐 Shogun Relay Auth
+                </h1>
+
+                <!-- Status Display -->
+                <div id="status" class="mb-6 p-4 rounded-lg hidden">
+                    <div id="statusContent"></div>
+                </div>
+
+                <!-- Traditional Auth Section -->
+                <div class="mb-8">
+                    <h2 class="text-lg font-semibold mb-4 text-gray-700">👤 Autenticazione Tradizionale</h2>
+                    
+                    <!-- Login Form -->
+                    <div id="loginForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Email</label>
+                            <input type="email" id="loginEmail" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Password</label>
+                            <input type="password" id="loginPassword" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <button onclick="traditionalLogin()" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                            <span id="loginBtnText">Accedi</span>
+                            <span id="loginLoading" class="loading hidden"></span>
+                        </button>
+                    </div>
+
+                    <!-- Register Form -->
+                    <div id="registerForm" class="space-y-4 mt-6 pt-6 border-t border-gray-200">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Email</label>
+                            <input type="email" id="registerEmail" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Password</label>
+                            <input type="password" id="registerPassword" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Hint (opzionale)</label>
+                            <input type="text" id="registerHint" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <button onclick="traditionalRegister()" class="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+                            <span id="registerBtnText">Registrati</span>
+                            <span id="registerLoading" class="loading hidden"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Web3 Auth Section -->
+                <div class="mb-8">
+                    <h2 class="text-lg font-semibold mb-4 text-gray-700">🦊 Web3 Authentication</h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Indirizzo Wallet</label>
+                            <input type="text" id="web3Address" placeholder="0x..." class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Firma</label>
+                            <input type="text" id="web3Signature" placeholder="0x..." class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="web3Login()" class="flex-1 bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2">
+                                <span id="web3LoginBtnText">Login</span>
+                                <span id="web3LoginLoading" class="loading hidden"></span>
+                            </button>
+                            <button onclick="web3Register()" class="flex-1 bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2">
+                                <span id="web3RegisterBtnText">Registrati</span>
+                                <span id="web3RegisterLoading" class="loading hidden"></span>
+                            </button>
+                        </div>
+                        <button onclick="connectMetaMask()" class="w-full bg-orange-600 text-white py-2 px-4 rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2">
+                            🔗 Connetti MetaMask
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Nostr Auth Section -->
+                <div class="mb-8">
+                    <h2 class="text-lg font-semibold mb-4 text-gray-700">⚡ Nostr Authentication</h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Indirizzo Nostr</label>
+                            <input type="text" id="nostrAddress" placeholder="npub..." class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Firma</label>
+                            <input type="text" id="nostrSignature" placeholder="..." class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="nostrLogin()" class="flex-1 bg-yellow-600 text-white py-2 px-4 rounded-md hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2">
+                                <span id="nostrLoginBtnText">Login</span>
+                                <span id="nostrLoginLoading" class="loading hidden"></span>
+                            </button>
+                            <button onclick="nostrRegister()" class="flex-1 bg-yellow-600 text-white py-2 px-4 rounded-md hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2">
+                                <span id="nostrRegisterBtnText">Registrati</span>
+                                <span id="nostrRegisterLoading" class="loading hidden"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Logout Button -->
+                <div class="text-center">
+                    <button onclick="logout()" class="bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+                        🚪 Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/v1/auth';
+        let currentUser = null;
+
+        // Utility functions
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            const content = document.getElementById('statusContent');
+            
+            status.className = `mb-6 p-4 rounded-lg ${type === 'error' ? 'bg-red-100 text-red-700' : type === 'success' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`;
+            content.textContent = message;
+            status.classList.remove('hidden');
+            
+            setTimeout(() => {
+                status.classList.add('hidden');
+            }, 5000);
+        }
+
+        function setLoading(buttonId, loadingId, text, isLoading) {
+            const button = document.getElementById(buttonId);
+            const loading = document.getElementById(loadingId);
+            const textElement = document.getElementById(text);
+            
+            if (isLoading) {
+                button.disabled = true;
+                loading.classList.remove('hidden');
+                textElement.style.display = 'none';
+            } else {
+                button.disabled = false;
+                loading.classList.add('hidden');
+                textElement.style.display = 'inline';
+            }
+        }
+
+        async function makeRequest(endpoint, method = 'GET', data = null) {
+            try {
+                const options = {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                };
+
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.message || 'Errore nella richiesta');
+                }
+
+                return result;
+            } catch (error) {
+                console.error('Request error:', error);
+                throw error;
+            }
+        }
+
+        // Traditional Authentication
+        async function traditionalLogin() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            if (!email || !password) {
+                showStatus('Inserisci email e password', 'error');
+                return;
+            }
+
+            setLoading('loginBtnText', 'loginLoading', 'loginBtnText', true);
+
+            try {
+                const result = await makeRequest('/login', 'POST', { email, passphrase: password });
+                currentUser = result.data;
+                showStatus('Login effettuato con successo!', 'success');
+                updateUI();
+            } catch (error) {
+                showStatus(error.message, 'error');
+            } finally {
+                setLoading('loginBtnText', 'loginLoading', 'loginBtnText', false);
+            }
+        }
+
+        async function traditionalRegister() {
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const hint = document.getElementById('registerHint').value;
+
+            if (!email || !password) {
+                showStatus('Inserisci email e password', 'error');
+                return;
+            }
+
+            setLoading('registerBtnText', 'registerLoading', 'registerBtnText', true);
+
+            try {
+                const result = await makeRequest('/register', 'POST', { 
+                    email, 
+                    passphrase: password, 
+                    hint 
+                });
+                currentUser = result.data;
+                showStatus('Registrazione completata con successo!', 'success');
+                updateUI();
+            } catch (error) {
+                showStatus(error.message, 'error');
+            } finally {
+                setLoading('registerBtnText', 'registerLoading', 'registerBtnText', false);
+            }
+        }
+
+        // Web3 Authentication
+        async function connectMetaMask() {
+            try {
+                if (typeof window.ethereum === 'undefined') {
+                    showStatus('MetaMask non installato', 'error');
+                    return;
+                }
+
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                const address = accounts[0];
+                
+                document.getElementById('web3Address').value = address;
+                
+                // Richiedi la firma
+                const message = "I Love Shogun";
+                const signature = await window.ethereum.request({
+                    method: 'personal_sign',
+                    params: [message, address]
+                });
+                
+                document.getElementById('web3Signature').value = signature;
+                showStatus('MetaMask connesso e firma ottenuta!', 'success');
+            } catch (error) {
+                showStatus('Errore nella connessione a MetaMask: ' + error.message, 'error');
+            }
+        }
+
+        async function web3Login() {
+            const address = document.getElementById('web3Address').value;
+            const signature = document.getElementById('web3Signature').value;
+
+            if (!address || !signature) {
+                showStatus('Inserisci indirizzo e firma', 'error');
+                return;
+            }
+
+            setLoading('web3LoginBtnText', 'web3LoginLoading', 'web3LoginBtnText', true);
+
+            try {
+                const result = await makeRequest('/web3/login', 'POST', { 
+                    address, 
+                    signature, 
+                    message: "I Love Shogun" 
+                });
+                currentUser = result.data;
+                showStatus('Login Web3 effettuato con successo!', 'success');
+                updateUI();
+            } catch (error) {
+                showStatus(error.message, 'error');
+            } finally {
+                setLoading('web3LoginBtnText', 'web3LoginLoading', 'web3LoginBtnText', false);
+            }
+        }
+
+        async function web3Register() {
+            const address = document.getElementById('web3Address').value;
+            const signature = document.getElementById('web3Signature').value;
+
+            if (!address || !signature) {
+                showStatus('Inserisci indirizzo e firma', 'error');
+                return;
+            }
+
+            setLoading('web3RegisterBtnText', 'web3RegisterLoading', 'web3RegisterBtnText', true);
+
+            try {
+                const result = await makeRequest('/web3/register', 'POST', { 
+                    address, 
+                    signature, 
+                    message: "I Love Shogun" 
+                });
+                currentUser = result.data;
+                showStatus('Registrazione Web3 completata con successo!', 'success');
+                updateUI();
+            } catch (error) {
+                showStatus(error.message, 'error');
+            } finally {
+                setLoading('web3RegisterBtnText', 'web3RegisterLoading', 'web3RegisterBtnText', false);
+            }
+        }
+
+        // Nostr Authentication
+        async function nostrLogin() {
+            const address = document.getElementById('nostrAddress').value;
+            const signature = document.getElementById('nostrSignature').value;
+
+            if (!address || !signature) {
+                showStatus('Inserisci indirizzo e firma Nostr', 'error');
+                return;
+            }
+
+            setLoading('nostrLoginBtnText', 'nostrLoginLoading', 'nostrLoginBtnText', true);
+
+            try {
+                const result = await makeRequest('/nostr/login', 'POST', { 
+                    address, 
+                    signature, 
+                    message: "I Love Shogun" 
+                });
+                currentUser = result.data;
+                showStatus('Login Nostr effettuato con successo!', 'success');
+                updateUI();
+            } catch (error) {
+                showStatus(error.message, 'error');
+            } finally {
+                setLoading('nostrLoginBtnText', 'nostrLoginLoading', 'nostrLoginBtnText', false);
+            }
+        }
+
+        async function nostrRegister() {
+            const address = document.getElementById('nostrAddress').value;
+            const signature = document.getElementById('nostrSignature').value;
+
+            if (!address || !signature) {
+                showStatus('Inserisci indirizzo e firma Nostr', 'error');
+                return;
+            }
+
+            setLoading('nostrRegisterBtnText', 'nostrRegisterLoading', 'nostrRegisterBtnText', true);
+
+            try {
+                const result = await makeRequest('/nostr/register', 'POST', { 
+                    address, 
+                    signature, 
+                    message: "I Love Shogun" 
+                });
+                currentUser = result.data;
+                showStatus('Registrazione Nostr completata con successo!', 'success');
+                updateUI();
+            } catch (error) {
+                showStatus(error.message, 'error');
+            } finally {
+                setLoading('nostrRegisterBtnText', 'nostrRegisterLoading', 'nostrRegisterBtnText', false);
+            }
+        }
+
+        // Logout
+        async function logout() {
+            try {
+                await makeRequest('/logout', 'POST');
+                currentUser = null;
+                showStatus('Logout effettuato con successo!', 'success');
+                updateUI();
+            } catch (error) {
+                showStatus(error.message, 'error');
+            }
+        }
+
+        // Check authentication status
+        async function checkAuthStatus() {
+            try {
+                const result = await makeRequest('/status');
+                if (result.data.authenticated) {
+                    currentUser = result.data;
+                    updateUI();
+                }
+            } catch (error) {
+                console.log('User not authenticated');
+            }
+        }
+
+        // Update UI based on authentication status
+        function updateUI() {
+            if (currentUser) {
+                showStatus(`Autenticato come: ${currentUser.email || currentUser.address || 'Utente'}`, 'success');
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuthStatus();
+        });
+    </script>
+</body>
+</html> 

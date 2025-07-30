@@ -2,38 +2,6 @@ import express from 'express';
 
 const router = express.Router();
 
-// Route per ottenere le statistiche S3
-router.get("/s3-stats", async (req, res) => {
-  try {
-    console.log("📋 s3-stats: Requesting S3 statistics");
-
-    // Per ora restituiamo statistiche mock
-    // In futuro potremmo integrare con AWS SDK per statistiche reali
-    const s3Stats = {
-      buckets: 2,
-      totalObjects: 1250,
-      totalSize: "2.5 GB",
-      lastSync: new Date().toISOString(),
-      status: "connected"
-    };
-
-    console.log("📋 s3-stats: Returning S3 statistics");
-
-    res.json({
-      success: true,
-      stats: s3Stats,
-      timestamp: Date.now(),
-    });
-  } catch (error) {
-    console.error("❌ s3-stats: Error:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to get S3 statistics",
-      details: error.message,
-    });
-  }
-});
-
 // Route per riavviare un servizio specifico
 router.post("/:service/restart", async (req, res) => {
   try {

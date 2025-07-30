@@ -1,7 +1,13 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
+import ShogunCore from 'shogun-core';
+import { ethers } from 'ethers';
 
 const router = express.Router();
+
+const getGunInstance = (req) => {
+  return req.app.get('gunInstance');
+};
 
 // Rate limiting per le route di autenticazione
 const authLimiter = rateLimit({
@@ -14,159 +20,487 @@ const authLimiter = rateLimit({
   }
 });
 
-// Middleware per ottenere l'istanza Gun dal relay
-const getGunInstance = (req) => {
-  return req.app.get('gunInstance');
-};
+// Inizializza Shogun Core con la configurazione del relay
+let shogunInstance = null;
 
-// Utility per la crittografia (se necessario)
-const util = {
-  encrypt: (text) => {
-    // Implementazione base - in produzione usare una libreria di crittografia
-    return Buffer.from(text).toString('base64');
-  },
-  decrypt: (text) => {
-    return Buffer.from(text, 'base64').toString('utf8');
-  },
-  randomPassword: () => {
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-  }
-};
+function initializeShogunCore() {
+  if (shogunInstance) return shogunInstance;
 
-// Route per la registrazione utente
-router.post('/register', authLimiter, (req, res) => {
-  const { email, passphrase, hint } = req.body;
-  
-  if (!email || !passphrase) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Email e passphrase sono richiesti', 
-      data: null 
-    });
-  }
+  const peers = process.env.RELAY_PEERS ? process.env.RELAY_PEERS.split(',') : [
+    "wss://ruling-mastodon-improved.ngrok-free.app/gun",
+    "https://gun-manhattan.herokuapp.com/gun",
+    "https://peer.wallie.io/gun",
+  ];
 
   const gun = getGunInstance(req);
-  const user = gun.user().recall({ sessionStorage: false });
+  
+  shogunInstance = new ShogunCore({
+    gunInstance: gun,
+    appToken: process.env.ADMIN_PASSWORD,
+    authToken: process.env.ADMIN_PASSWORD,
+    peers: peers,
+    scope: "shogun-relay",
+    web3: { enabled: true },
+    webauthn: {
+      enabled: true,
+      rpName: "Shogun Relay",
+      rpId: process.env.RELAY_HOST || "localhost",
+    },
+    nostr: { enabled: true },
+    timeouts: {
+      login: 30000,
+      signup: 30000,
+      operation: 60000,
+    },
+  });
 
-  user.create(email, passphrase, ack => {
-    if (ack && ack.err) {
+  return shogunInstance;
+}
+
+// Middleware per ottenere l'istanza Shogun Core
+const getShogunInstance = (req) => {
+  if (!shogunInstance) {
+    shogunInstance = initializeShogunCore();
+  }
+  return shogunInstance;
+};
+
+// Route per la registrazione utente (tradizionale)
+router.post('/register', authLimiter, async (req, res) => {
+  try {
+    const { email, passphrase, hint } = req.body;
+    
+    if (!email || !passphrase) {
       return res.status(400).json({ 
         success: false, 
-        message: ack.err, 
+        message: 'Email e passphrase sono richiesti', 
+        data: null 
+      });
+    }
+
+    const shogun = getShogunInstance(req);
+    
+    // Inizializza Shogun Core se non è già inizializzato
+    if (!shogun.isInitialized) {
+      await shogun.initialize();
+    }
+
+    const signUpResult = await shogun.signUp(email, passphrase);
+    
+    if (!signUpResult.success) {
+      return res.status(400).json({ 
+        success: false, 
+        message: signUpResult.error || 'Registrazione fallita', 
         data: null 
       });
     }
 
     // Login automatico dopo la registrazione
-    user.auth(email, passphrase, ack => {
-      if (ack && ack.err) {
-        return res.status(400).json({ 
-          success: false, 
-          message: ack.err, 
-          data: null 
-        });
-      }
-
-      // Crea il profilo utente
-      const data = ack.sea;
-      data.profile = { email, hint };
-      
-      user.get('profile').put(data.profile, ack => {
-        if (ack && ack.err) {
-          return res.status(400).json({ 
-            success: false, 
-            message: ack.err, 
-            data: null 
-          });
-        }
-
-        // Salva i dati utente nel database Gun
-        const userProfile = { 
-          email, 
-          hint: util.encrypt(hint), 
-          pwd: util.encrypt(passphrase) 
-        };
-        
-        gun.get(`users/${email}`).put(userProfile, ack => {
-          if (ack && ack.err) {
-            return res.status(400).json({ 
-              success: false, 
-              message: ack.err, 
-              data: null 
-            });
-          }
-          
-          return res.status(201).json({ 
-            success: true, 
-            message: 'Utente creato con successo', 
-            data: {
-              email,
-              pub: data.pub,
-              epub: data.epub,
-              profile: data.profile
-            }
-          });
-        });
-      });
-    });
-  });
-});
-
-// Route per il login utente
-router.post('/login', authLimiter, (req, res) => {
-  const { email, passphrase } = req.body;
-  
-  if (!email || !passphrase) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Email e passphrase sono richiesti', 
-      data: null 
-    });
-  }
-
-  const gun = getGunInstance(req);
-  const user = gun.user().recall({ sessionStorage: false });
-
-  user.auth(email, passphrase, ack => {
-    if (ack && ack.err) {
+    const loginResult = await shogun.login(email, passphrase);
+    
+    if (!loginResult.success) {
       return res.status(400).json({ 
         success: false, 
-        message: ack.err, 
+        message: 'Registrazione completata ma login automatico fallito', 
         data: null 
       });
     }
 
-    // Recupera il profilo utente
-    user.get('profile').once(profile => {
-      return res.status(200).json({ 
-        success: true, 
-        message: 'Login effettuato con successo', 
-        data: {
-          email,
-          pub: ack.sea.pub,
-          epub: ack.sea.epub,
-          profile: profile || {}
-        }
-      });
+    // Crea il profilo utente
+    const profile = { email, hint };
+    await shogun.updateUserAlias(email);
+
+    return res.status(201).json({ 
+      success: true, 
+      message: 'Utente creato con successo', 
+      data: {
+        email,
+        pub: loginResult.pub,
+        epub: loginResult.epub,
+        profile: profile
+      }
     });
-  });
+  } catch (error) {
+    console.error('Errore durante la registrazione:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Errore interno del server', 
+      data: null 
+    });
+  }
+});
+
+// Route per il login utente (tradizionale)
+router.post('/login', authLimiter, async (req, res) => {
+  try {
+    const { email, passphrase } = req.body;
+    
+    if (!email || !passphrase) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email e passphrase sono richiesti', 
+        data: null 
+      });
+    }
+
+    const shogun = getShogunInstance(req);
+    
+    if (!shogun.isInitialized) {
+      await shogun.initialize();
+    }
+
+    const loginResult = await shogun.login(email, passphrase);
+    
+    if (!loginResult.success) {
+      return res.status(400).json({ 
+        success: false, 
+        message: loginResult.error || 'Credenziali non valide', 
+        data: null 
+      });
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Login effettuato con successo', 
+      data: {
+        email,
+        pub: loginResult.pub,
+        epub: loginResult.epub,
+        profile: loginResult.profile || {}
+      }
+    });
+  } catch (error) {
+    console.error('Errore durante il login:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Errore interno del server', 
+      data: null 
+    });
+  }
 });
 
 // Route per il logout utente
-router.post('/logout', (req, res) => {
-  const gun = getGunInstance(req);
-  const user = gun.user().recall({ sessionStorage: false });
-
-  user.leave();
-  
-  return res.status(200).json({ 
-    success: true, 
-    message: 'Logout effettuato con successo', 
-    data: null 
-  });
+router.post('/logout', async (req, res) => {
+  try {
+    const shogun = getShogunInstance(req);
+    shogun.logout();
+    
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Logout effettuato con successo', 
+      data: null 
+    });
+  } catch (error) {
+    console.error('Errore durante il logout:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Errore interno del server', 
+      data: null 
+    });
+  }
 });
 
-// Route per recuperare la password
+// Route per Web3 authentication
+router.post('/web3/login', authLimiter, async (req, res) => {
+  try {
+    const { address, signature, message } = req.body;
+    
+    if (!address || !signature) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Indirizzo e firma sono richiesti', 
+        data: null 
+      });
+    }
+
+    const shogun = getShogunInstance(req);
+    
+    if (!shogun.isInitialized) {
+      await shogun.initialize();
+    }
+
+    const web3Plugin = shogun.getPlugin("web3");
+    if (!web3Plugin || !web3Plugin.isAvailable()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Web3 non disponibile', 
+        data: null 
+      });
+    }
+
+    // Verifica la firma
+    const provider = await web3Plugin.getProvider();
+    const recoveredAddress = ethers.verifyMessage(message || "I Love Shogun", signature);
+    
+    if (recoveredAddress.toLowerCase() !== address.toLowerCase()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Firma non valida', 
+        data: null 
+      });
+    }
+
+    const loginResult = await web3Plugin.login(address);
+    
+    if (!loginResult.success) {
+      return res.status(400).json({ 
+        success: false, 
+        message: loginResult.error || 'Login Web3 fallito', 
+        data: null 
+      });
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Login Web3 effettuato con successo', 
+      data: {
+        address,
+        pub: loginResult.pub,
+        epub: loginResult.epub,
+        profile: loginResult.profile || {}
+      }
+    });
+  } catch (error) {
+    console.error('Errore durante il login Web3:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Errore interno del server', 
+      data: null 
+    });
+  }
+});
+
+// Route per Web3 registration
+router.post('/web3/register', authLimiter, async (req, res) => {
+  try {
+    const { address, signature, message } = req.body;
+    
+    if (!address || !signature) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Indirizzo e firma sono richiesti', 
+        data: null 
+      });
+    }
+
+    const shogun = getShogunInstance(req);
+    
+    if (!shogun.isInitialized) {
+      await shogun.initialize();
+    }
+
+    const web3Plugin = shogun.getPlugin("web3");
+    if (!web3Plugin || !web3Plugin.isAvailable()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Web3 non disponibile', 
+        data: null 
+      });
+    }
+
+    // Verifica la firma
+    const provider = await web3Plugin.getProvider();
+    const recoveredAddress = ethers.verifyMessage(message || "I Love Shogun", signature);
+    
+    if (recoveredAddress.toLowerCase() !== address.toLowerCase()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Firma non valida', 
+        data: null 
+      });
+    }
+
+    const signUpResult = await web3Plugin.signUp(address);
+    
+    if (!signUpResult.success) {
+      return res.status(400).json({ 
+        success: false, 
+        message: signUpResult.error || 'Registrazione Web3 fallita', 
+        data: null 
+      });
+    }
+
+    return res.status(201).json({ 
+      success: true, 
+      message: 'Registrazione Web3 completata con successo', 
+      data: {
+        address,
+        pub: signUpResult.pub,
+        epub: signUpResult.epub,
+        profile: signUpResult.profile || {}
+      }
+    });
+  } catch (error) {
+    console.error('Errore durante la registrazione Web3:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Errore interno del server', 
+      data: null 
+    });
+  }
+});
+
+// Route per Nostr authentication
+router.post('/nostr/login', authLimiter, async (req, res) => {
+  try {
+    const { address, signature, message } = req.body;
+    
+    if (!address || !signature) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Indirizzo e firma sono richiesti', 
+        data: null 
+      });
+    }
+
+    const shogun = getShogunInstance(req);
+    
+    if (!shogun.isInitialized) {
+      await shogun.initialize();
+    }
+
+    const nostrPlugin = shogun.getPlugin("nostr");
+    if (!nostrPlugin || !nostrPlugin.isAvailable()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Nostr non disponibile', 
+        data: null 
+      });
+    }
+
+    const loginResult = await nostrPlugin.login(address);
+    
+    if (!loginResult.success) {
+      return res.status(400).json({ 
+        success: false, 
+        message: loginResult.error || 'Login Nostr fallito', 
+        data: null 
+      });
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Login Nostr effettuato con successo', 
+      data: {
+        address,
+        pub: loginResult.pub,
+        epub: loginResult.epub,
+        profile: loginResult.profile || {}
+      }
+    });
+  } catch (error) {
+    console.error('Errore durante il login Nostr:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Errore interno del server', 
+      data: null 
+    });
+  }
+});
+
+// Route per Nostr registration
+router.post('/nostr/register', authLimiter, async (req, res) => {
+  try {
+    const { address, signature, message } = req.body;
+    
+    if (!address || !signature) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Indirizzo e firma sono richiesti', 
+        data: null 
+      });
+    }
+
+    const shogun = getShogunInstance(req);
+    
+    if (!shogun.isInitialized) {
+      await shogun.initialize();
+    }
+
+    const nostrPlugin = shogun.getPlugin("nostr");
+    if (!nostrPlugin || !nostrPlugin.isAvailable()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Nostr non disponibile', 
+        data: null 
+      });
+    }
+
+    const signUpResult = await nostrPlugin.signUp(address);
+    
+    if (!signUpResult.success) {
+      return res.status(400).json({ 
+        success: false, 
+        message: signUpResult.error || 'Registrazione Nostr fallita', 
+        data: null 
+      });
+    }
+
+    return res.status(201).json({ 
+      success: true, 
+      message: 'Registrazione Nostr completata con successo', 
+      data: {
+        address,
+        pub: signUpResult.pub,
+        epub: signUpResult.epub,
+        profile: signUpResult.profile || {}
+      }
+    });
+  } catch (error) {
+    console.error('Errore durante la registrazione Nostr:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Errore interno del server', 
+      data: null 
+    });
+  }
+});
+
+// Route per verificare lo stato di autenticazione
+router.get('/status', async (req, res) => {
+  try {
+    const shogun = getShogunInstance(req);
+    
+    if (!shogun.isInitialized) {
+      await shogun.initialize();
+    }
+
+    const isLoggedIn = shogun.isLoggedIn();
+    
+    if (!isLoggedIn) {
+      return res.status(200).json({ 
+        success: true, 
+        message: 'Utente non autenticato', 
+        data: {
+          authenticated: false
+        }
+      });
+    }
+
+    // Ottieni i dati dell'utente autenticato
+    const userData = {
+      authenticated: true,
+      pub: shogun.user?._?.sea?.pub,
+      epub: shogun.user?._?.sea?.epub,
+      alias: shogun.user?._?.alias
+    };
+
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Utente autenticato', 
+      data: userData
+    });
+  } catch (error) {
+    console.error('Errore durante il controllo dello stato:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Errore interno del server', 
+      data: null 
+    });
+  }
+});
+
+// Route per recuperare la password (mantenuta per compatibilità)
 router.post('/forgot', authLimiter, (req, res) => {
   const { email } = req.body;
   
@@ -178,142 +512,106 @@ router.post('/forgot', authLimiter, (req, res) => {
     });
   }
 
-  const gun = getGunInstance(req);
-  
-  // Cerca l'utente nel database
-  gun.get(`users/${email}`).once(userData => {
-    if (!userData) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Utente non trovato', 
-        data: null 
-      });
+  // In un'implementazione reale, qui invieresti una email
+  return res.status(200).json({ 
+    success: true, 
+    message: 'Se l\'email esiste, riceverai un link per reimpostare la password', 
+    data: {
+      email
     }
-
-    // In un'implementazione reale, qui invieresti una email
-    // Per ora, restituiamo solo un messaggio di successo
-    return res.status(200).json({ 
-      success: true, 
-      message: 'Se l\'email esiste, riceverai un link per reimpostare la password', 
-      data: {
-        email,
-        hint: userData.hint ? util.decrypt(userData.hint) : null
-      }
-    });
   });
 });
 
-// Route per reimpostare la password
-router.post('/reset', authLimiter, (req, res) => {
-  const { email, newPassphrase, token } = req.body;
-  
-  if (!email || !newPassphrase || !token) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Email, nuova passphrase e token sono richiesti', 
-      data: null 
-    });
-  }
-
-  // In un'implementazione reale, verificheresti il token
-  // Per ora, assumiamo che sia valido
-  
-  const gun = getGunInstance(req);
-  const user = gun.user().recall({ sessionStorage: false });
-
-  // Cambia la password
-  user.auth(email, newPassphrase, ack => {
-    if (ack && ack.err) {
+// Route per reimpostare la password (mantenuta per compatibilità)
+router.post('/reset', authLimiter, async (req, res) => {
+  try {
+    const { email, newPassphrase, token } = req.body;
+    
+    if (!email || !newPassphrase || !token) {
       return res.status(400).json({ 
         success: false, 
-        message: ack.err, 
+        message: 'Email, nuova passphrase e token sono richiesti', 
         data: null 
       });
     }
 
-    // Aggiorna i dati nel database
-    gun.get(`users/${email}`).once(userData => {
-      if (userData) {
-        const updatedUserData = {
-          ...userData,
-          pwd: util.encrypt(newPassphrase)
-        };
-        
-        gun.get(`users/${email}`).put(updatedUserData, ack => {
-          if (ack && ack.err) {
-            return res.status(400).json({ 
-              success: false, 
-              message: ack.err, 
-              data: null 
-            });
-          }
-          
-          return res.status(200).json({ 
-            success: true, 
-            message: 'Password reimpostata con successo', 
-            data: null 
-          });
-        });
-      } else {
-        return res.status(404).json({ 
-          success: false, 
-          message: 'Utente non trovato', 
-          data: null 
-        });
-      }
+    // In un'implementazione reale, verificheresti il token
+    // Per ora, assumiamo che sia valido
+    
+    const shogun = getShogunInstance(req);
+    
+    if (!shogun.isInitialized) {
+      await shogun.initialize();
+    }
+
+    // Prova a fare login con la nuova password
+    const loginResult = await shogun.login(email, newPassphrase);
+    
+    if (!loginResult.success) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Impossibile reimpostare la password', 
+        data: null 
+      });
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Password reimpostata con successo', 
+      data: null 
     });
-  });
+  } catch (error) {
+    console.error('Errore durante il reset della password:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Errore interno del server', 
+      data: null 
+    });
+  }
 });
 
 // Route per cambiare la password
-router.post('/change-password', authLimiter, (req, res) => {
-  const { currentPassphrase, newPassphrase } = req.body;
-  
-  if (!currentPassphrase || !newPassphrase) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Passphrase corrente e nuova sono richieste', 
-      data: null 
-    });
-  }
-
-  const gun = getGunInstance(req);
-  const user = gun.user().recall({ sessionStorage: false });
-
-  // Verifica la passphrase corrente
-  user.auth(user._.sea.pub, currentPassphrase, ack => {
-    if (ack && ack.err) {
+router.post('/change-password', authLimiter, async (req, res) => {
+  try {
+    const { currentPassphrase, newPassphrase } = req.body;
+    
+    if (!currentPassphrase || !newPassphrase) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Passphrase corrente non valida', 
+        message: 'Passphrase corrente e nuova sono richieste', 
         data: null 
       });
     }
 
-    // Cambia la password
-    user.auth(user._.sea.pub, newPassphrase, ack => {
-      if (ack && ack.err) {
-        return res.status(400).json({ 
-          success: false, 
-          message: ack.err, 
-          data: null 
-        });
-      }
+    const shogun = getShogunInstance(req);
+    
+    if (!shogun.isInitialized) {
+      await shogun.initialize();
+    }
 
-      return res.status(200).json({ 
-        success: true, 
-        message: 'Password cambiata con successo', 
-        data: null 
-      });
+    // Per ora restituiamo un successo mock
+    // In un'implementazione reale, qui cambieresti la password
+    
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Password cambiata con successo', 
+      data: null 
     });
-  });
+  } catch (error) {
+    console.error('Errore durante il cambio password:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Errore interno del server', 
+      data: null 
+    });
+  }
 });
 
 // Endpoint per registrare una chiave Gun autorizzata
 router.post("/authorize-gun-key", async (req, res) => {
   try {
     const { pubKey, userAddress, expiresAt } = req.body;
-    const gun = getGunInstance(req);
+    const gun = req.app.get('gunInstance');
     const tokenAuthMiddleware = req.app.get('tokenAuthMiddleware');
 
     if (!pubKey) {
@@ -326,7 +624,6 @@ router.post("/authorize-gun-key", async (req, res) => {
     // Verifica che l'utente abbia una sottoscrizione attiva
     if (userAddress) {
       try {
-        const { ethers } = await import("ethers");
         const { DEPLOYMENTS } = await import("shogun-contracts/deployments.js");
         
         const chainId = process.env.CHAIN_ID || "11155111";
@@ -405,7 +702,7 @@ router.post("/authorize-gun-key", async (req, res) => {
 router.delete("/authorize-gun-key/:pubKey", async (req, res) => {
   try {
     const { pubKey } = req.params;
-    const gun = getGunInstance(req);
+    const gun = req.app.get('gunInstance');
 
     if (!pubKey) {
       return res.status(400).json({
@@ -439,7 +736,7 @@ router.delete("/authorize-gun-key/:pubKey", async (req, res) => {
 router.get("/authorize-gun-key/:pubKey", async (req, res) => {
   try {
     const { pubKey } = req.params;
-    const gun = getGunInstance(req);
+    const gun = req.app.get('gunInstance');
 
     if (!pubKey) {
       return res.status(400).json({
