@@ -149,6 +149,8 @@
                     <div class="space-y-3 text-base">
                         <div class="flex justify-between"><span class="text-[#E0E0E0]">Status:</span><span id="ipfs-status" class="font-semibold text-[#FFFFFF]">Checking...</span></div>
                         <div class="flex justify-between"><span class="text-[#E0E0E0]">Storage Used:</span><span id="ipfs-storage" class="text-[#FFFFFF]">--</span></div>
+                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Storage Max:</span><span id="ipfs-storage-max" class="text-[#FFFFFF]">--</span></div>
+                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Usage %:</span><span id="ipfs-usage-percent" class="text-[#FFFFFF]">--</span></div>
                         <div class="flex justify-between"><span class="text-[#E0E0E0]">Objects:</span><span id="ipfs-objects" class="text-[#FFFFFF]">--</span></div>
                         <div class="flex justify-between"><span class="text-[#E0E0E0]">Type:</span><span id="ipfs-type" class="text-[#FFFFFF]">--</span></div>
                     </div>
@@ -314,23 +316,37 @@
                             if (statsResponse.ok) {
                                 const statsData = await statsResponse.json();
                                 if (statsData.success && statsData.stats) {
-                                    document.getElementById('ipfs-storage').textContent = `${statsData.stats.repoSizeMB} MB`;
+                                    const usedMB = statsData.stats.repoSizeMB || 0;
+                                    const maxMB = statsData.stats.storageMaxMB || 0;
+                                    const usagePercent = maxMB > 0 ? Math.round((usedMB / maxMB) * 100) : 0;
+                                    
+                                    document.getElementById('ipfs-storage').textContent = `${usedMB} MB`;
+                                    document.getElementById('ipfs-storage-max').textContent = `${maxMB} MB`;
+                                    document.getElementById('ipfs-usage-percent').textContent = `${usagePercent}%`;
                                     document.getElementById('ipfs-objects').textContent = statsData.stats.numObjects;
                                 } else {
                                     document.getElementById('ipfs-storage').textContent = '--';
+                                    document.getElementById('ipfs-storage-max').textContent = '--';
+                                    document.getElementById('ipfs-usage-percent').textContent = '--';
                                     document.getElementById('ipfs-objects').textContent = '--';
                                 }
                             } else {
                                 document.getElementById('ipfs-storage').textContent = '--';
+                                document.getElementById('ipfs-storage-max').textContent = '--';
+                                document.getElementById('ipfs-usage-percent').textContent = '--';
                                 document.getElementById('ipfs-objects').textContent = '--';
                             }
                         } else {
                             document.getElementById('ipfs-storage').textContent = 'Need Auth';
+                            document.getElementById('ipfs-storage-max').textContent = 'Need Auth';
+                            document.getElementById('ipfs-usage-percent').textContent = 'Need Auth';
                             document.getElementById('ipfs-objects').textContent = 'Need Auth';
                         }
                     } catch (statsError) {
                         console.warn('Failed to get IPFS stats:', statsError);
                         document.getElementById('ipfs-storage').textContent = '--';
+                        document.getElementById('ipfs-storage-max').textContent = '--';
+                        document.getElementById('ipfs-usage-percent').textContent = '--';
                         document.getElementById('ipfs-objects').textContent = '--';
                     }
                     
@@ -344,6 +360,8 @@
                 document.getElementById('ipfs-version').textContent = '--';
                 document.getElementById('ipfs-type').textContent = '--';
                 document.getElementById('ipfs-storage').textContent = '--';
+                document.getElementById('ipfs-storage-max').textContent = '--';
+                document.getElementById('ipfs-usage-percent').textContent = '--';
                 document.getElementById('ipfs-objects').textContent = '--';
                 updateStatusIndicator('ipfs', 'offline');
                 log(`IPFS check failed: ${error.message}`, 'error');
