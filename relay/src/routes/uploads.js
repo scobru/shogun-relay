@@ -345,18 +345,60 @@ router.delete("/:identifier/:hash", (req, res, next) => {
 
     // Remove hash from systemhash node
     try {
-      const systemHashesNode = gun.get("shogun").get("systemhash");
-      await new Promise((resolve, reject) => {
-        systemHashesNode.get(hash).put(null, (ack) => {
-          if (ack && ack.err) {
-            console.error('❌ Error removing hash from systemhash node:', ack.err);
-            reject(new Error(ack.err));
-          } else {
-            console.log(`✅ Hash ${hash} removed from systemhash node successfully`);
-            resolve();
-          }
+      const adminToken = process.env.ADMIN_PASSWORD;
+      if (!adminToken) {
+        console.warn(`⚠️ ADMIN_PASSWORD not set, skipping system hash removal`);
+      } else {
+        // Call the remove-system-hash endpoint with admin token
+        const http = require('http');
+        const postData = JSON.stringify({
+          userAddress: identifier
         });
-      });
+        
+        const options = {
+          hostname: 'localhost',
+          port: process.env.PORT || 3000,
+          path: `/api/v1/user-uploads/remove-system-hash/${hash}`,
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(postData),
+            'Authorization': `Bearer ${adminToken}`
+          }
+        };
+
+        await new Promise((resolve, reject) => {
+          const req = http.request(options, (res) => {
+            let data = '';
+            res.on('data', (chunk) => {
+              data += chunk;
+            });
+            res.on('end', () => {
+              try {
+                const result = JSON.parse(data);
+                if (result.success) {
+                  console.log(`✅ Hash ${hash} removed from systemhash node successfully via endpoint`);
+                  resolve();
+                } else {
+                  console.error(`❌ Error removing hash from systemhash node via endpoint:`, result.error);
+                  reject(new Error(result.error));
+                }
+              } catch (parseError) {
+                console.error(`❌ Error parsing system hash removal response:`, parseError);
+                reject(new Error(parseError.message));
+              }
+            });
+          });
+
+          req.on('error', (error) => {
+            console.error(`❌ Error calling system hash removal endpoint:`, error);
+            reject(error);
+          });
+
+          req.write(postData);
+          req.end();
+        });
+      }
     } catch (error) {
       console.warn(`⚠️ Failed to remove hash ${hash} from systemhash node:`, error);
     }

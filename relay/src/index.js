@@ -1151,7 +1151,6 @@ async function initializeServer() {
     // Debug: mostra la configurazione
     const shogunConfig = {
       gunInstance: gun,
-      appToken: process.env.ADMIN_PASSWORD,
       authToken: process.env.ADMIN_PASSWORD,
       peers: peers,
       scope: "shogun",

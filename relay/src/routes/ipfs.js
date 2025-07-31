@@ -354,25 +354,65 @@ router.post("/upload",
 
               // Save hash to systemhash node with Promise
               const saveSystemHashPromise = new Promise((resolve) => {
-                const systemHashesNode = gun.get("shogun").get("systemhash");
-                systemHashesNode.get(fileResult.Hash).put({
+                // Call the save-system-hash endpoint with admin token
+                const adminToken = process.env.ADMIN_PASSWORD;
+                if (!adminToken) {
+                  console.warn(`⚠️ ADMIN_PASSWORD not set, skipping system hash save`);
+                  resolve({ error: "ADMIN_PASSWORD not configured" });
+                  return;
+                }
+
+                const systemHashData = {
                   hash: fileResult.Hash,
                   userAddress: req.userAddress,
-                  timestamp: Date.now(),
-                  fileName: req.file.originalname,
-                  fileSize: req.file.size,
-                  savedAt: new Date().toISOString()
-                }, (ack) => {
-                  console.log(`💾 System hash save ack:`, ack);
-                  if (ack && ack.err) {
-                    console.error(`❌ Error saving system hash:`, ack.err);
-                    // Don't reject, just resolve with error info
-                    resolve({ error: ack.err });
-                  } else {
-                    console.log(`✅ System hash saved successfully`);
-                    resolve({ success: true });
+                  timestamp: Date.now()
+                };
+
+                // Make internal request to save-system-hash endpoint
+                const http = require('http');
+                const postData = JSON.stringify(systemHashData);
+                
+                const options = {
+                  hostname: 'localhost',
+                  port: process.env.PORT || 3000,
+                  path: '/api/v1/user-uploads/save-system-hash',
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(postData),
+                    'Authorization': `Bearer ${adminToken}`
                   }
+                };
+
+                const req = http.request(options, (res) => {
+                  let data = '';
+                  res.on('data', (chunk) => {
+                    data += chunk;
+                  });
+                  res.on('end', () => {
+                    try {
+                      const result = JSON.parse(data);
+                      if (result.success) {
+                        console.log(`✅ System hash saved successfully via endpoint`);
+                        resolve({ success: true });
+                      } else {
+                        console.error(`❌ Error saving system hash via endpoint:`, result.error);
+                        resolve({ error: result.error });
+                      }
+                    } catch (parseError) {
+                      console.error(`❌ Error parsing system hash response:`, parseError);
+                      resolve({ error: parseError.message });
+                    }
+                  });
                 });
+
+                req.on('error', (error) => {
+                  console.error(`❌ Error calling system hash endpoint:`, error);
+                  resolve({ error: error.message });
+                });
+
+                req.write(postData);
+                req.end();
               });
 
               // Wait for critical operations to complete (upload and MB usage)
