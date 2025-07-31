@@ -1160,6 +1160,107 @@ router.get("/test", (req, res, next) => {
   }
 });
 
+// IPFS Repo Stats endpoint
+router.get("/repo/stat", (req, res, next) => {
+  // Usa il middleware di autenticazione esistente
+  const tokenAuthMiddleware = req.app.get('tokenAuthMiddleware');
+  if (tokenAuthMiddleware) {
+    tokenAuthMiddleware(req, res, next);
+  } else {
+    // Fallback se il middleware non è disponibile
+    const authHeader = req.headers["authorization"];
+    const bearerToken = authHeader && authHeader.split(" ")[1];
+    const customToken = req.headers["token"];
+    const token = bearerToken || customToken;
+
+    if (token === process.env.ADMIN_PASSWORD) {
+      next();
+    } else {
+      console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+  }
+}, async (req, res) => {
+  try {
+    console.log("📊 Getting IPFS repository statistics...");
+    
+    const requestOptions = {
+      hostname: "127.0.0.1",
+      port: 5001,
+      path: "/api/v0/repo/stat",
+      method: "POST",
+      headers: {
+        "Content-Length": "0",
+      },
+    };
+
+    if (IPFS_API_TOKEN) {
+      requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+    }
+
+    const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+      let data = "";
+      ipfsRes.on("data", (chunk) => (data += chunk));
+      ipfsRes.on("end", () => {
+        try {
+          const repoStats = JSON.parse(data);
+          
+          // Calculate sizes in MB for easier reading
+          const repoSizeMB = Math.round((repoStats.RepoSize || 0) / (1024 * 1024));
+          const storageSizeMB = Math.round((repoStats.StorageMax || 0) / (1024 * 1024));
+          
+          res.json({
+            success: true,
+            stats: {
+              repoSize: repoStats.RepoSize || 0,
+              repoSizeMB: repoSizeMB,
+              storageMax: repoStats.StorageMax || 0,
+              storageMaxMB: storageSizeMB,
+              numObjects: repoStats.NumObjects || 0,
+              repoPath: repoStats.RepoPath || "unknown",
+              version: repoStats.Version || "unknown"
+            },
+            raw: repoStats
+          });
+        } catch (parseError) {
+          console.error("❌ Failed to parse IPFS repo stat response:", parseError);
+          res.status(500).json({
+            success: false,
+            error: "Failed to parse IPFS repo stat response",
+            rawResponse: data,
+          });
+        }
+      });
+    });
+
+    ipfsReq.on("error", (err) => {
+      console.error("❌ IPFS Repo Stat error:", err);
+      res.status(500).json({
+        success: false,
+        error: err.message,
+      });
+    });
+
+    ipfsReq.setTimeout(10000, () => {
+      ipfsReq.destroy();
+      if (!res.headersSent) {
+        res.status(408).json({
+          success: false,
+          error: "Repository stat timeout",
+        });
+      }
+    });
+
+    ipfsReq.end();
+  } catch (error) {
+    console.error("❌ IPFS Repo Stat error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 // IPFS Version endpoint for connectivity testing
 router.get("/version", (req, res, next) => {
   // Usa il middleware di autenticazione esistente

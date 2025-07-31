@@ -146,130 +146,154 @@
         <!-- Header -->
         <div class="text-center mb-8">
             <div class="flex items-center justify-center mb-6">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-[#FF69B4] mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                </svg>
-                <h1 class="text-3xl font-bold text-[#FFFFFF]">IPFS Pin Manager</h1>
+                <div class="relative">
+                    <div class="absolute -inset-2 bg-gradient-to-r from-[#FF69B4] to-[#42A5F5] rounded-full blur opacity-20"></div>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="relative h-16 w-16 text-[#FF69B4] mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <h1 class="text-4xl font-bold bg-gradient-to-r from-[#FFFFFF] to-[#FF69B4] bg-clip-text text-transparent">IPFS Pin Manager</h1>
+                    <p class="text-[#A0A0A0] text-lg mt-2">Gestisci i tuoi pin IPFS con facilità</p>
+                </div>
             </div>
-            <p class="text-[#A0A0A0] text-lg">Manage IPFS pins and system files</p>
         </div>
 
-        <!-- Results and Logs - SPOSTATO IN ALTO -->
+        <!-- Results and Logs -->
         <div class="mb-8">
-            <div class="card bg-[#404040] border-[#606060] rounded-xl">
-                <div class="card-body p-6">
-                    <h3 class="card-title text-lg font-semibold mb-6 text-[#FF69B4]">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        Results & Logs
+            <div class="card bg-gradient-to-br from-[#404040] to-[#353535] border border-[#606060]/50 rounded-2xl shadow-2xl backdrop-blur-sm">
+                <div class="card-body p-8">
+                    <h3 class="card-title text-xl font-bold mb-8 text-[#FF69B4] flex items-center">
+                        <div class="p-2 bg-[#4CAF50]/20 rounded-xl mr-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                        </div>
+                        Risultati & Log
                     </h3>
                     
-                    <div id="message" class="alert hidden mb-6 bg-[#42A5F5]/20 border-[#42A5F5]/30 text-[#42A5F5] rounded-xl p-4"></div>
-                    <div id="pinList" class="mb-6"></div>
+                    <div id="message" class="alert hidden mb-8 bg-[#42A5F5]/20 border-2 border-[#42A5F5]/30 text-[#42A5F5] rounded-2xl p-6 backdrop-blur-sm"></div>
+                    <div id="pinList" class="mb-8"></div>
                     
                     <!-- Progress Bar -->
-                    <div id="batchProgress" class="hidden mb-6">
-                        <div class="w-full bg-[#282828] rounded-full h-2 mb-3">
-                            <div id="progressBar" class="bg-[#FF69B4] h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    <div id="batchProgress" class="hidden mb-8">
+                        <div class="w-full bg-[#282828]/60 rounded-full h-3 mb-4 overflow-hidden backdrop-blur-sm">
+                            <div id="progressBar" class="bg-gradient-to-r from-[#FF69B4] to-[#42A5F5] h-3 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
                         </div>
-                        <div class="flex justify-between text-sm text-[#A0A0A0]">
-                            <span id="progressText">Processing...</span>
+                        <div class="flex justify-between text-base text-[#E0E0E0] font-medium">
+                            <span id="progressText">Elaborazione...</span>
                             <span><span id="progressCurrent">0</span> / <span id="progressTotal">0</span></span>
                         </div>
                     </div>
                     
                     <!-- Batch Log -->
-                    <div id="batchLog" class="bg-[#282828] rounded-xl p-4 max-h-96 overflow-y-auto font-mono text-sm text-[#E0E0E0]"></div>
+                    <div id="batchLog" class="bg-[#282828]/80 border border-[#606060]/30 rounded-2xl p-6 max-h-96 overflow-y-auto font-mono text-base text-[#E0E0E0] backdrop-blur-sm"></div>
                 </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
         <!-- Pin Management -->
-        <div class="card bg-[#404040] border-[#606060] rounded-xl">
-            <div class="card-body p-6">
-                <h3 class="card-title text-lg font-semibold mb-6 text-[#FF69B4]">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m-9 0h10m-10 0a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2" />
-                    </svg>
-                    Pin Management
-                </h3>
-                
-                <div class="form-control mb-6">
-                    <label class="label">
-                        <span class="label-text font-medium text-[#FFFFFF] text-base">Enter CID to pin/unpin:</span>
-                    </label>
-                    <input type="text" id="cidInput" class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none" placeholder="Qm...">
-                </div>
-                
-                <div class="flex gap-3 mb-6">
-                    <button onclick="addPin()" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] flex-1 rounded-xl px-6 py-3 font-medium shadow-lg hover:shadow-xl transition-all duration-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                        Add Pin
-                    </button>
-                    <button onclick="removePin()" class="btn bg-[#42A5F5] hover:bg-[#64B5F6] border-0 text-[#FFFFFF] flex-1 rounded-xl px-6 py-3 font-medium shadow-lg hover:shadow-xl transition-all duration-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
-                        </svg>
-                        Remove Pin
-                    </button>
-                </div>
-                
-                <div class="space-y-3">
-                    <button onclick="listPins()" class="btn bg-[#4CAF50] hover:bg-[#45A049] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium shadow-lg hover:shadow-xl transition-all duration-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
-                        List All Pins
-                    </button>
+        <div class="lg:col-span-2">
+            <div class="card bg-gradient-to-br from-[#404040] to-[#353535] border border-[#606060]/50 rounded-2xl shadow-2xl backdrop-blur-sm">
+                <div class="card-body p-8">
+                    <h3 class="card-title text-xl font-bold mb-8 text-[#FF69B4] flex items-center">
+                        <div class="p-2 bg-[#FF69B4]/20 rounded-xl mr-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m-9 0h10m-10 0a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2" />
+                            </svg>
+                        </div>
+                        Gestione Pin
+                    </h3>
                     
-                    <button onclick="garbageCollect()" class="btn bg-[#FFA500] hover:bg-[#FF8C00] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium shadow-lg hover:shadow-xl transition-all duration-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        Garbage Collect
-                    </button>
+                    <div class="form-control mb-8">
+                        <label class="label">
+                            <span class="label-text font-semibold text-[#FFFFFF] text-lg">CID da pinnare/spinnare:</span>
+                        </label>
+                        <div class="relative">
+                            <input type="text" id="cidInput" class="input w-full bg-[#282828]/60 border-2 border-[#606060]/30 text-[#FFFFFF] placeholder-[#A0A0A0] rounded-2xl px-6 py-4 text-lg focus:border-[#FF69B4] focus:ring-[#FF69B4] focus:ring-opacity-30 focus:outline-none transition-all duration-200 backdrop-blur-sm" placeholder="Qm... o ba...">
+                            <div class="absolute inset-y-0 right-0 flex items-center pr-6">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#A0A0A0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
                     
-                    <button onclick="debugSystemHashes()" class="btn bg-[#9C27B0] hover:bg-[#7B1FA2] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium shadow-lg hover:shadow-xl transition-all duration-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                        </svg>
-                        Debug System Hashes
-                    </button>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                        <button onclick="addPin()" class="btn bg-gradient-to-r from-[#FF69B4] to-[#FF1493] hover:from-[#FF1493] hover:to-[#DC143C] border-0 text-[#FFFFFF] rounded-2xl px-8 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                            </svg>
+                            Aggiungi Pin
+                        </button>
+                        <button onclick="removePin()" class="btn bg-gradient-to-r from-[#42A5F5] to-[#64B5F6] hover:from-[#1976D2] hover:to-[#42A5F5] border-0 text-[#FFFFFF] rounded-2xl px-8 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+                            </svg>
+                            Rimuovi Pin
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <button onclick="listPins()" class="btn bg-gradient-to-r from-[#4CAF50] to-[#45A049] hover:from-[#388E3C] hover:to-[#4CAF50] border-0 text-[#FFFFFF] w-full rounded-2xl px-8 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                            Visualizza Tutti i Pin
+                        </button>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <button onclick="garbageCollect()" class="btn bg-gradient-to-r from-[#FFA500] to-[#FF8C00] hover:from-[#FF8C00] hover:to-[#FF7F00] border-0 text-[#FFFFFF] rounded-2xl px-6 py-3 font-semibold shadow-lg hover:shadow-xl transition-all duration-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Garbage Collect
+                            </button>
+                            
+                            <button onclick="debugSystemHashes()" class="btn bg-gradient-to-r from-[#9C27B0] to-[#7B1FA2] hover:from-[#7B1FA2] hover:to-[#6A1B99] border-0 text-[#FFFFFF] rounded-2xl px-6 py-3 font-semibold shadow-lg hover:shadow-xl transition-all duration-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                </svg>
+                                Debug Sistema
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Batch Operations -->
-        <div class="card bg-[#404040] border-[#606060] rounded-xl">
-            <div class="card-body p-6">
-                <h3 class="card-title text-lg font-semibold mb-6 text-[#FF69B4]">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                    Batch Operations
-                </h3>
-                
-                <div class="form-control mb-6">
-                    <label class="label cursor-pointer justify-start gap-3">
-                        <input type="checkbox" id="preserveSystemFiles" class="checkbox checkbox-primary" checked>
-                        <span class="label-text font-medium text-[#FFFFFF] text-base">Preserve system files (user uploads)</span>
-                    </label>
-                    <div class="label-text-alt text-[#A0A0A0] mt-2">
-                        When checked, files uploaded by users will not be unpinned
+        <div class="lg:col-span-1">
+            <div class="card bg-gradient-to-br from-[#404040] to-[#353535] border border-[#606060]/50 rounded-2xl shadow-2xl backdrop-blur-sm">
+                <div class="card-body p-8">
+                    <h3 class="card-title text-xl font-bold mb-8 text-[#FF69B4] flex items-center">
+                        <div class="p-2 bg-[#42A5F5]/20 rounded-xl mr-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                        </div>
+                        Operazioni Batch
+                    </h3>
+                    
+                    <div class="form-control mb-8">
+                        <label class="label cursor-pointer justify-start gap-4 p-4 bg-[#282828]/40 rounded-2xl border border-[#606060]/30">
+                            <input type="checkbox" id="preserveSystemFiles" class="checkbox checkbox-primary checkbox-lg" checked>
+                            <div>
+                                <span class="label-text font-semibold text-[#FFFFFF] text-base">Preserva file di sistema</span>
+                                <p class="text-sm text-[#A0A0A0] mt-1">I file caricati dagli utenti non verranno rimossi</p>
+                            </div>
+                        </label>
                     </div>
+                    
+                    <button onclick="unpinAllFiles()" class="btn bg-gradient-to-r from-[#F44336] to-[#D32F2F] hover:from-[#D32F2F] hover:to-[#B71C1C] border-0 text-[#FFFFFF] w-full rounded-2xl px-8 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Rimuovi Tutti i Pin
+                    </button>
                 </div>
-                
-                <button onclick="unpinAllFiles()" class="btn bg-[#F44336] hover:bg-[#D32F2F] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium shadow-lg hover:shadow-xl transition-all duration-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    Unpin All Files
-                </button>
             </div>
         </div>
     </div>
@@ -454,73 +478,116 @@
                 const style = document.createElement('style');
                 style.textContent = `
                     .pin-name {
-                        color: #8af;
-                        margin-top: 5px;
-                        font-size: 0.9em;
+                        color: #42A5F5;
+                        margin-top: 8px;
+                        font-size: 1rem;
+                        font-weight: 500;
                     }
                     .pin-type {
-                        color: #7c7;
-                        font-size: 0.9em;
+                        color: #4CAF50;
+                        font-size: 0.95rem;
+                        font-weight: 500;
                     }
                     .pin-item {
                         display: flex;
                         flex-direction: column;
-                        gap: 5px;
+                        gap: 12px;
+                        background: linear-gradient(135deg, #404040 0%, #353535 100%);
+                        border: 1px solid rgba(96, 96, 96, 0.4);
+                        border-radius: 16px;
+                        padding: 24px;
+                        margin-bottom: 16px;
+                        backdrop-filter: blur(10px);
+                        transition: all 0.3s ease;
+                        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+                    }
+                    .pin-item:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 8px 32px rgba(255, 105, 180, 0.2);
+                        border-color: rgba(255, 105, 180, 0.3);
+                    }
+                    .pin-cid {
+                        font-family: 'JetBrains Mono', 'Fira Code', monospace;
+                        font-size: 14px;
+                        word-break: break-all;
+                        color: #E0E0E0;
+                        background: rgba(40, 40, 40, 0.6);
+                        padding: 12px 16px;
+                        border-radius: 12px;
+                        border: 1px solid rgba(96, 96, 96, 0.3);
                     }
                     .button-group {
                         display: flex;
                         flex-wrap: wrap;
-                        gap: 8px;
-                        margin-top: 5px;
+                        gap: 12px;
+                        margin-top: 16px;
                     }
                     .small-button {
-                        padding: 4px 8px;
-                        font-size: 0.8em;
-                        flex: 0 1 auto;
+                        padding: 10px 16px;
+                        font-size: 0.875rem;
+                        font-weight: 600;
+                        border-radius: 12px;
+                        transition: all 0.3s ease;
+                        cursor: pointer;
+                        border: none;
+                        backdrop-filter: blur(10px);
+                        flex: 1;
+                        min-width: 120px;
+                    }
+                    .small-button:hover {
+                        transform: translateY(-1px);
+                        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
                     }
                     .pin-action {
-                        background-color: #1a4d1a;
-                        border-color: #2a6d2a;
+                        background: linear-gradient(135deg, #4CAF50, #45A049);
+                        color: #FFFFFF;
+                        box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
                     }
                     .pin-action:hover {
-                        background-color: #2a6d2a;
+                        background: linear-gradient(135deg, #45A049, #388E3C);
+                        box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
                     }
                     .unpin-action {
-                        background-color: #8B4000;
-                        border-color: #A04000;
+                        background: linear-gradient(135deg, #FFA500, #FF8C00);
+                        color: #FFFFFF;
+                        box-shadow: 0 4px 12px rgba(255, 165, 0, 0.3);
                     }
                     .unpin-action:hover {
-                        background-color: #A04000;
+                        background: linear-gradient(135deg, #FF8C00, #FF7F00);
+                        box-shadow: 0 6px 20px rgba(255, 165, 0, 0.4);
                     }
                     .remove-action {
-                        background-color: #8B0000;
-                        border-color: #A00000;
+                        background: linear-gradient(135deg, #F44336, #D32F2F);
+                        color: #FFFFFF;
+                        box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
                     }
                     .remove-action:hover {
-                        background-color: #A00000;
+                        background: linear-gradient(135deg, #D32F2F, #B71C1C);
+                        box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4);
                     }
                     .copy-action {
-                        background-color: #444;
+                        background: linear-gradient(135deg, #42A5F5, #1976D2);
+                        color: #FFFFFF;
+                        box-shadow: 0 4px 12px rgba(66, 165, 245, 0.3);
                     }
                     .copy-action:hover {
-                        background-color: #555;
+                        background: linear-gradient(135deg, #1976D2, #1565C0);
+                        box-shadow: 0 6px 20px rgba(66, 165, 245, 0.4);
                     }
                     
                     /* Responsive styles for pin items */
                     @media (max-width: 640px) {
                         .pin-item {
-                            padding: 10px;
+                            padding: 16px;
                         }
                         .button-group {
-                            flex-direction: row;
-                            flex-wrap: wrap;
-                            justify-content: space-between;
+                            flex-direction: column;
+                            gap: 8px;
                         }
                         .small-button {
-                            flex-grow: 1;
-                            margin-bottom: 5px;
+                            width: 100%;
                             text-align: center;
-                            min-width: calc(50% - 5px);
+                            min-width: auto;
                         }
                     }
                 `;
@@ -534,14 +601,13 @@
                     // Add CID
                     const cidEl = document.createElement('div');
                     cidEl.textContent = `CID: ${cid}`;
-                    cidEl.style.fontFamily = 'monospace';
-                    cidEl.style.wordBreak = 'break-all';
+                    cidEl.className = 'pin-cid';
                     pinEl.appendChild(cidEl);
 
                     // Add Type
                     const typeEl = document.createElement('div');
                     typeEl.textContent = `Type: ${info.Type || 'recursive'}`;
-                    typeEl.style.color = '#8af';
+                    typeEl.className = 'pin-type';
                     pinEl.appendChild(typeEl);
 
                     // Add button group
