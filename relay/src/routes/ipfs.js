@@ -307,6 +307,11 @@ router.post("/upload",
               uploadData.sizeMB = fileSizeMB;
               uploadData.userAddress = req.userAddress;
 
+              // Save all necessary values to avoid reference errors
+              const userAddress = req.userAddress;
+              const authType = req.authType;
+              const fileSize = req.file.size;
+
               console.log(`💾 Saving upload to GunDB:`, {
                 userAddress: req.userAddress,
                 fileHash: fileResult.Hash,
@@ -362,9 +367,6 @@ router.post("/upload",
                   return;
                 }
 
-                // Save userAddress to avoid reference error
-                const userAddress = req.userAddress;
-
                 const systemHashData = {
                   hash: fileResult.Hash,
                   userAddress: userAddress,
@@ -386,7 +388,7 @@ router.post("/upload",
                   }
                 };
 
-                const req = http.request(options, (res) => {
+                const httpReq = http.request(options, (res) => {
                   let data = '';
                   res.on('data', (chunk) => {
                     data += chunk;
@@ -408,13 +410,13 @@ router.post("/upload",
                   });
                 });
 
-                req.on('error', (error) => {
+                httpReq.on('error', (error) => {
                   console.error(`❌ Error calling system hash endpoint:`, error);
                   resolve({ error: error.message });
                 });
 
-                req.write(postData);
-                req.end();
+                httpReq.write(postData);
+                httpReq.end();
               });
 
               // Wait for critical operations to complete (upload and MB usage)
