@@ -704,6 +704,7 @@ export default (app) => {
 
   // Route per il contratto Chain
   app.use(`${baseRoute}/chain`, chainRouter);
+  console.log("✅ Chain routes registered at /api/v1/chain");
 
   // Route di test per verificare se le route sono registrate correttamente
   app.get(`${baseRoute}/test`, (req, res) => {
@@ -1530,6 +1531,20 @@ export default (app) => {
           `${baseRoute}/subscriptions/user-subscription-details/:userAddress`,
           `${baseRoute}/services/s3-stats`,
           `${baseRoute}/services/:service/restart`,
+          `${baseRoute}/chain/test`,
+          `${baseRoute}/chain/status`,
+          `${baseRoute}/chain/read/:soul/:key?`,
+          `${baseRoute}/chain/debug/:soul`,
+          `${baseRoute}/chain/events`,
+          `${baseRoute}/chain/contract-read/:soul/:key`,
+          `${baseRoute}/chain/decode-test/:soul/:key`,
+          `${baseRoute}/chain/hash-test/:hash`,
+          `${baseRoute}/chain/start-events`,
+          `${baseRoute}/chain/sync-custom`,
+          `${baseRoute}/chain/listener-status`,
+          `${baseRoute}/chain/test-propagation`,
+          `${baseRoute}/chain/restart-listener`,
+          `${baseRoute}/chain/test-sync`,
           `${baseRoute}/health`,
         ],
       },
