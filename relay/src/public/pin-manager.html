@@ -317,8 +317,8 @@
                 <circle class="progress" cx="30" cy="30" r="25"></circle>
             </svg>
             <div id="loadingText">Caricamento...</div>
-        </div>
     </div>
+        </div>
 
     <div class="container mx-auto p-6">
         <!-- Header -->
@@ -326,7 +326,7 @@
             <div>
                 <h1 class="text-3xl font-bold text-[#FFFFFF]">IPFS Pin Manager</h1>
                 <p class="text-[#A0A0A0] text-lg">Gestisci i tuoi pin IPFS con facilità</p>
-            </div>
+                </div>
             <a href="/" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">
                 ← Torna al Dashboard
             </a>
@@ -338,30 +338,30 @@
                 <h3 class="card-title text-xl font-bold mb-6 text-[#FF69B4] flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
+                            </svg>
                     Aggiungi Pin Rapido
-                </h3>
-                
+                    </h3>
+                    
                 <div class="flex gap-4 items-end">
                     <div class="flex-1">
                         <label class="label">
                             <span class="label-text font-semibold text-[#FFFFFF]">CID IPFS:</span>
                         </label>
                         <input type="text" id="quickCidInput" class="search-bar" placeholder="Qm... o ba...">
-                    </div>
+                        </div>
                     <button onclick="quickAddPin()" class="btn bg-gradient-to-r from-[#FF69B4] to-[#FF1493] hover:from-[#FF1493] hover:to-[#DC143C] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-semibold">
                         📌 Aggiungi
                     </button>
                 </div>
-            </div>
-        </div>
-
+                        </div>
+                    </div>
+                    
         <!-- Statistics Bar -->
         <div class="stats-bar">
             <div class="stat-item">
                 <div class="stat-value" id="totalPins">--</div>
                 <div class="stat-label">Pin Totali</div>
-            </div>
+                </div>
             <div class="stat-item">
                 <div class="stat-value" id="totalSize">--</div>
                 <div class="stat-label">Dimensione Totale</div>
@@ -386,38 +386,38 @@
                 <div class="filter-tab" data-filter="recursive">Ricorsivi</div>
                 <div class="filter-tab" data-filter="direct">Diretti</div>
                 <div class="filter-tab" data-filter="indirect">Indiretti</div>
-            </div>
+                        </div>
         </div>
 
         <!-- Pins Grid -->
         <div id="pinsContainer">
             <div class="pin-grid" id="pinsGrid">
                 <!-- Pins will be loaded here -->
-            </div>
-        </div>
-
+                        </div>
+                    </div>
+                    
         <!-- Empty State -->
         <div id="emptyState" class="text-center py-12" style="display: none;">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24 mx-auto text-[#606060] mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-            </svg>
+                            </svg>
             <h3 class="text-xl font-semibold text-[#A0A0A0] mb-2">Nessun pin trovato</h3>
             <p class="text-[#808080]">Aggiungi il tuo primo pin IPFS per iniziare</p>
-        </div>
-
+                    </div>
+                    
         <!-- Floating Action Buttons -->
         <div class="floating-actions">
             <button onclick="showBatchUnpinModal()" class="fab fab-danger" title="Rimuovi Tutti i Pin">
                 🗑️
-            </button>
+                        </button>
             <button onclick="runGarbageCollection()" class="fab fab-secondary" title="Garbage Collection">
                 🧹
-            </button>
+                            </button>
             <button onclick="showQuickAddModal()" class="fab fab-primary" title="Aggiungi Pin">
                 ➕
-            </button>
+                            </button>
+            </div>
         </div>
-    </div>
 
     <!-- Batch Unpin Modal -->
     <div id="batchUnpinModal" class="modal" style="display: none;">
@@ -428,20 +428,20 @@
             <div class="form-control mb-4">
                 <label class="label cursor-pointer justify-start gap-4">
                     <input type="checkbox" id="preserveSystemFiles" class="checkbox checkbox-primary" checked>
-                    <div>
+                            <div>
                         <span class="label-text font-semibold text-[#FFFFFF]">Preserva file di sistema</span>
                         <p class="text-sm text-[#A0A0A0]">I file caricati dagli utenti non verranno rimossi</p>
+                            </div>
+                        </label>
                     </div>
-                </label>
-            </div>
-            
+                    
             <div class="modal-action">
                 <button onclick="hideBatchUnpinModal()" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl">
                     Annulla
                 </button>
                 <button onclick="confirmBatchUnpin()" class="btn bg-gradient-to-r from-[#F44336] to-[#D32F2F] hover:from-[#D32F2F] hover:to-[#B71C1C] border-0 text-[#FFFFFF] rounded-xl">
                     Conferma
-                </button>
+                    </button>
             </div>
         </div>
     </div>
@@ -729,10 +729,10 @@
                     if (gcResult) {
                         showNotification('File rimosso e garbage collection completata', 'success');
                         await loadPins();
-                    } else {
+                        } else {
                         showNotification('Pin rimosso ma garbage collection fallita', 'error');
+                        }
                     }
-                }
             } catch (error) {
                 showNotification(`Errore: ${error.message}`, 'error');
             } finally {
@@ -821,7 +821,7 @@
                     }
 
                     // Small delay to prevent overwhelming the API
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                        await new Promise(resolve => setTimeout(resolve, 100));
                 }
 
                 updateProgress(100);
