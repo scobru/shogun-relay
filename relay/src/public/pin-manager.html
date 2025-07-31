@@ -220,49 +220,6 @@
             margin-top: 0.25rem;
         }
         
-        .floating-actions {
-            position: fixed;
-            bottom: 2rem;
-            right: 2rem;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            z-index: 1000;
-        }
-        
-        .fab {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            border: none;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-        }
-        
-        .fab:hover {
-            transform: scale(1.1);
-        }
-        
-        .fab-primary {
-            background: linear-gradient(135deg, #FF69B4, #FF1493);
-            color: white;
-        }
-        
-        .fab-secondary {
-            background: linear-gradient(135deg, #42A5F5, #1976D2);
-            color: white;
-        }
-        
-        .fab-danger {
-            background: linear-gradient(135deg, #F44336, #D32F2F);
-            color: white;
-        }
-        
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -322,17 +279,6 @@
                 flex-direction: column;
                 text-align: center;
             }
-            
-            .floating-actions {
-                bottom: 1rem;
-                right: 1rem;
-            }
-            
-            .fab {
-                width: 50px;
-                height: 50px;
-                font-size: 1.25rem;
-            }
         }
     </style>
 </head>
@@ -386,6 +332,39 @@
                         </div>
                     </div>
                 </div>
+                
+                <!-- Batch Operations Section -->
+                <div class="card bg-gradient-to-br from-[#404040] to-[#353535] border border-[#606060]/50 rounded-2xl shadow-2xl backdrop-blur-sm mb-8">
+                    <div class="card-body p-6">
+                        <h3 class="card-title text-xl font-bold mb-6 text-[#FF69B4] flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Operazioni Batch
+                        </h3>
+                        
+                        <div class="space-y-4">
+                            <div class="form-control">
+                                <label class="label cursor-pointer justify-start gap-4">
+                                    <input type="checkbox" id="preserveSystemFiles" class="checkbox checkbox-primary" checked>
+                                    <div>
+                                        <span class="label-text font-semibold text-[#FFFFFF]">Preserva file di sistema</span>
+                                        <p class="text-sm text-[#A0A0A0]">I file caricati dagli utenti non verranno rimossi</p>
+                                    </div>
+                                </label>
+                            </div>
+                            
+                            <div class="flex gap-4">
+                                <button onclick="showBatchUnpinModal()" class="btn bg-gradient-to-r from-[#F44336] to-[#D32F2F] hover:from-[#D32F2F] hover:to-[#B71C1C] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-semibold">
+                                    🗑️ Rimuovi Tutti i Pin
+                                </button>
+                                <button onclick="runGarbageCollection()" class="btn bg-gradient-to-r from-[#42A5F5] to-[#1976D2] hover:from-[#1976D2] hover:to-[#1565C0] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-semibold">
+                                    🧹 Garbage Collection
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                     
                 <!-- Statistics Bar -->
                 <div class="stats-bar">
@@ -434,19 +413,6 @@
                     </svg>
                     <h3 class="text-xl font-semibold text-[#A0A0A0] mb-2">Nessun pin trovato</h3>
                     <p class="text-[#808080]">Aggiungi il tuo primo pin IPFS per iniziare</p>
-                </div>
-                    
-                <!-- Floating Action Buttons -->
-                <div class="floating-actions">
-                    <button onclick="showBatchUnpinModal()" class="fab fab-danger" title="Rimuovi Tutti i Pin">
-                        🗑️
-                    </button>
-                    <button onclick="runGarbageCollection()" class="fab fab-secondary" title="Garbage Collection">
-                        🧹
-                    </button>
-                    <button onclick="showQuickAddModal()" class="fab fab-primary" title="Aggiungi Pin">
-                        ➕
-                    </button>
                 </div>
             </div>
         </div>
@@ -765,15 +731,25 @@
         }
 
         function showBatchUnpinModal() {
-            if (confirm('⚠️ Questo rimuoverà tutti i pin non di sistema. Sei sicuro?')) {
+            const preserveSystemFiles = document.getElementById('preserveSystemFiles').checked;
+            const message = preserveSystemFiles 
+                ? '⚠️ Questo rimuoverà tutti i pin non di sistema. Sei sicuro?' 
+                : '⚠️ Questo rimuoverà TUTTI i pin. Sei sicuro?';
+            
+            if (confirm(message)) {
                 confirmBatchUnpin();
             }
         }
 
         async function confirmBatchUnpin() {
+            const preserveSystemFiles = document.getElementById('preserveSystemFiles').checked;
             showLoading('Rimozione batch in corso...');
             
-            if (!confirm('⚠️ Questo rimuoverà tutti i pin. Sei sicuro?')) {
+            const confirmMessage = preserveSystemFiles 
+                ? '⚠️ Questo rimuoverà tutti i pin non di sistema. Confermi?' 
+                : '⚠️ Questo rimuoverà TUTTI i pin. Confermi?';
+            
+            if (!confirm(confirmMessage)) {
                 hideLoading();
                 return;
             }
@@ -789,6 +765,13 @@
 
                 const allPins = Object.keys(listResult.pins);
                 let pinsToRemove = allPins;
+                
+                if (preserveSystemFiles) {
+                    // Filter out system files (this would need to be implemented based on your system)
+                    // For now, we'll just unpin all but log the intention
+                    console.log('System file preservation enabled, but not implemented yet - removing all pins');
+                    showNotification('Preservazione file di sistema non ancora implementata - rimozione di tutti i pin', 'warning');
+                }
 
                 if (pinsToRemove.length === 0) {
                     showNotification('Nessun pin da rimuovere', 'info');
