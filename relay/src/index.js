@@ -239,28 +239,28 @@ async function initializeServer() {
       allowInternalOperations = true;
       console.log("🔓 Enabled internal operations for relay self-write");
 
-      // Scomponi il soul path per creare la struttura GunDB corretta
-      console.log("🔧 Decomposing soul path:", soul);
-      const soulParts = soul.split('/').filter(part => part.length > 0);
-      console.log("🔧 Soul parts:", soulParts);
-
-      if (soulParts.length === 0) {
-        console.warn("⚠️ Empty soul path, skipping main structure storage");
-        return;
-      }
-
-      // Crea la struttura GunDB corretta
-      let dataNode = gun;
-      for (let i = 0; i < soulParts.length; i++) {
-        const part = soulParts[i];
-        console.log(`🔧 Creating GunDB node for part ${i + 1}/${soulParts.length}: "${part}"`);
-        dataNode = dataNode.get(part);
-      }
-
-      // Ora scrivi il valore con la chiave specificata
-      console.log(`🔧 Writing value "${value}" with key "${key}" to GunDB structure`);
-      
       try {
+        // Scomponi il soul path per creare la struttura GunDB corretta
+        console.log("🔧 Decomposing soul path:", soul);
+        const soulParts = soul.split('/').filter(part => part.length > 0);
+        console.log("🔧 Soul parts:", soulParts);
+
+        if (soulParts.length === 0) {
+          console.warn("⚠️ Empty soul path, skipping main structure storage");
+          return;
+        }
+
+        // Crea la struttura GunDB corretta
+        let dataNode = gun;
+        for (let i = 0; i < soulParts.length; i++) {
+          const part = soulParts[i];
+          console.log(`🔧 Creating GunDB node for part ${i + 1}/${soulParts.length}: "${part}"`);
+          dataNode = dataNode.get(part);
+        }
+
+        // Ora scrivi il valore con la chiave specificata
+        console.log(`🔧 Writing value "${value}" with key "${key}" to GunDB structure`);
+        
         await new Promise((resolve, reject) => {
           const timeoutId = setTimeout(() => {
             console.warn("⚠️ Timeout writing to main GunDB structure");
@@ -282,6 +282,18 @@ async function initializeServer() {
             }
           });
         });
+
+        console.log(`✅ Chain event propagated to GunDB: ${soul} -> ${key}`);
+
+        // Aggiungi al log del sistema
+        addSystemLog("info", "Chain event propagated to GunDB", {
+          soul: soul,
+          key: key,
+          value: value,
+          eventId: eventId,
+          gunDBPath: `${soulParts.join('.')}.${key}`,
+        });
+
       } catch (mainStructureError) {
         console.error(
           "❌ Error writing to main GunDB structure:",
@@ -289,22 +301,21 @@ async function initializeServer() {
         );
         // Non fallire completamente se la scrittura nella struttura principale fallisce
         // L'evento è già stato salvato nella sezione chain_events
+        
+        // Aggiungi al log del sistema anche in caso di errore
+        addSystemLog("warning", "Chain event partially propagated (main structure failed)", {
+          soul: soul,
+          key: key,
+          value: value,
+          eventId: eventId,
+          error: mainStructureError.message,
+        });
       } finally {
         // Ripristina il flag di sicurezza
         allowInternalOperations = false;
         console.log("🔒 Disabled internal operations flag");
       }
 
-      console.log(`✅ Chain event propagated to GunDB: ${soul} -> ${key}`);
-
-      // Aggiungi al log del sistema
-      addSystemLog("info", "Chain event propagated to GunDB", {
-        soul: soul,
-        key: key,
-        value: value,
-        eventId: eventId,
-        gunDBPath: `${soulParts.join('.')}.${key}`,
-      });
     } catch (error) {
       console.error("❌ Failed to propagate chain event to GunDB:", error);
       addSystemLog("error", "Failed to propagate chain event", {
