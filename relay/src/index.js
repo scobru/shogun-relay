@@ -781,7 +781,9 @@ async function initializeServer() {
         !firstSoul.includes("/") || // Chiavi a livello singolo (operazioni interne di Gun)
         firstSoul.match(
           /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
-        )); // UUID souls
+        ) || // UUID souls
+        // NUOVA REGOLA: Permetti path che contengono / ma non iniziano con shogun/ (dati del contratto Chain)
+        (firstSoul.includes("/") && !firstSoul.startsWith("shogun/")));
 
     if (isInternalNamespace) {
       console.log(`🔍 PUT allowed - internal namespace: ${firstSoul}`);
