@@ -95,6 +95,7 @@
             <div class="flex gap-3">
                 <button onclick="refreshAllServices()" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Refresh All</button>
                 <button onclick="clearAdminPassword()" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium" title="Clear stored admin password">Clear Auth</button>
+                <a href="/pin-manager" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Pin Manager</a>
                 <a href="/" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Back</a>
             </div>
         </div>
@@ -296,8 +297,8 @@
 
         async function checkIPFSStatus() {
             try {
-                // First check basic IPFS status
-                const response = await fetch('/ipfs-status');
+                // Use the relay's IPFS status endpoint instead of direct connection
+                const response = await fetch('/api/v1/ipfs/status');
                 const data = await response.json();
 
                 if (data.success) {
@@ -305,7 +306,7 @@
                     document.getElementById('ipfs-version').textContent = data.version || '--';
                     document.getElementById('ipfs-type').textContent = 'IPFS';
                     
-                    // Get repository statistics
+                    // Get repository statistics using relay API
                     try {
                         const password = getAdminPassword();
                         if (password) {

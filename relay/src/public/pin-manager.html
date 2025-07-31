@@ -399,9 +399,12 @@
                     <h1 class="text-2xl font-bold text-[#FFFFFF]">IPFS Pin Manager</h1>
                     <p class="text-[#A0A0A0] text-sm">Gestisci i tuoi pin IPFS con facilità</p>
                 </div>
-                <button onclick="closePinManager()" class="close-modal-btn" title="Chiudi">
-                    ✕
-                </button>
+                <div class="flex items-center gap-4">
+                    <a href="/" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Back</a>
+                    <button onclick="closePinManager()" class="close-modal-btn" title="Chiudi">
+                        ✕
+                    </button>
+                </div>
             </div>
 
             <!-- Body -->
@@ -568,6 +571,11 @@
                 syncEnabled: true
             });
             
+            // Initialize smart back button
+            if (window.replaceExistingBackButtons) {
+                window.replaceExistingBackButtons();
+            }
+            
             // Setup search functionality
             document.getElementById('searchInput').addEventListener('input', (e) => {
                 searchTerm = e.target.value.toLowerCase();
@@ -719,7 +727,7 @@
 
         function updateStats() {
             document.getElementById('totalPins').textContent = allPins.length;
-            document.getElementById('totalSize').textContent = '--'; // We don't have size info from pins API
+            document.getElementById('totalSize').textContent = '--'; // Size info not available from pins API
             document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
         }
 
@@ -874,14 +882,7 @@
             showLoading('Rimozione batch in corso...');
             
             try {
-                // Get system file hashes if preservation is enabled
-                let systemHashes = [];
-                if (preserveSystemFiles) {
-                    // This would need to be implemented based on your system
-                    // For now, we'll just unpin all
-                }
-                
-                // Get all pins
+                // Get all pins using relay API
                 const listResult = await apiCall('/api/v1/ipfs/pins/ls', 'POST', {}, { manageVisibility: false });
                 
                 if (!listResult || !listResult.pins) {
@@ -892,8 +893,10 @@
                 const allPins = Object.keys(listResult.pins);
                 let pinsToRemove = allPins;
                 
-                if (preserveSystemFiles && systemHashes.length > 0) {
-                    pinsToRemove = allPins.filter(pin => !systemHashes.includes(pin));
+                if (preserveSystemFiles) {
+                    // Filter out system files (this would need to be implemented based on your system)
+                    // For now, we'll just unpin all
+                    console.log('System file preservation not implemented, removing all pins');
                 }
 
                 if (pinsToRemove.length === 0) {
