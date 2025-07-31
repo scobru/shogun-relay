@@ -348,10 +348,29 @@ router.get("/read/:soul/:key?", async (req, res) => {
 
     console.log(`🔍 Reading from GunDB: soul="${soul}", key="${key || 'all'}"`);
 
+    // Scomponi il soul path per creare la struttura GunDB corretta
+    console.log("🔧 Decomposing soul path for reading:", soul);
+    const soulParts = soul.split('/').filter(part => part.length > 0);
+    console.log("🔧 Soul parts for reading:", soulParts);
+
+    if (soulParts.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Soul path vuoto o non valido"
+      });
+    }
+
+    // Crea la struttura GunDB corretta per la lettura
+    let dataNode = gun;
+    for (let i = 0; i < soulParts.length; i++) {
+      const part = soulParts[i];
+      console.log(`🔧 Creating GunDB node for reading part ${i + 1}/${soulParts.length}: "${part}"`);
+      dataNode = dataNode.get(part);
+    }
+
     // Se non è specificata una chiave, leggi tutto il nodo
     if (!key) {
-      const node = gun.get(soul);
-      console.log(`🔍 Reading entire node for soul: ${soul}`);
+      console.log(`🔍 Reading entire node for soul: ${soul} (${soulParts.join('.')})`);
       
       const data = await new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {
@@ -359,7 +378,7 @@ router.get("/read/:soul/:key?", async (req, res) => {
           reject(new Error("Timeout"));
         }, 3000);
 
-        node.once((data) => {
+        dataNode.once((data) => {
           clearTimeout(timeoutId);
           console.log(`🔍 Received data for soul ${soul}:`, data);
           resolve(data);
@@ -369,13 +388,13 @@ router.get("/read/:soul/:key?", async (req, res) => {
       res.json({
         success: true,
         soul: soul,
+        gunDBPath: soulParts.join('.'),
         data: data,
         timestamp: Date.now()
       });
     } else {
       // Leggi una chiave specifica
-      const node = gun.get(soul).get(key);
-      console.log(`🔍 Reading specific key: ${key} from soul: ${soul}`);
+      console.log(`🔍 Reading specific key: ${key} from soul: ${soul} (${soulParts.join('.')})`);
       
       const data = await new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {
@@ -383,7 +402,7 @@ router.get("/read/:soul/:key?", async (req, res) => {
           reject(new Error("Timeout"));
         }, 3000);
 
-        node.once((data) => {
+        dataNode.get(key).once((data) => {
           clearTimeout(timeoutId);
           console.log(`🔍 Received data for ${soul}/${key}:`, data);
           resolve(data);
@@ -394,6 +413,7 @@ router.get("/read/:soul/:key?", async (req, res) => {
         success: true,
         soul: soul,
         key: key,
+        gunDBPath: `${soulParts.join('.')}.${key}`,
         value: data,
         timestamp: Date.now()
       });

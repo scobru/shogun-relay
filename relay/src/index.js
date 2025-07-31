@@ -239,14 +239,28 @@ async function initializeServer() {
       allowInternalOperations = true;
       console.log("🔓 Enabled internal operations for relay self-write");
 
-      // Usa un approccio più sicuro per scrivere i dati direttamente sul soul (come fa il contratto Chain)
-      try {
-        const dataNode = gun.get(soul);
-        if (!dataNode) {
-          console.warn("⚠️ Could not get data node for soul:", soul);
-          return;
-        }
+      // Scomponi il soul path per creare la struttura GunDB corretta
+      console.log("🔧 Decomposing soul path:", soul);
+      const soulParts = soul.split('/').filter(part => part.length > 0);
+      console.log("🔧 Soul parts:", soulParts);
 
+      if (soulParts.length === 0) {
+        console.warn("⚠️ Empty soul path, skipping main structure storage");
+        return;
+      }
+
+      // Crea la struttura GunDB corretta
+      let dataNode = gun;
+      for (let i = 0; i < soulParts.length; i++) {
+        const part = soulParts[i];
+        console.log(`🔧 Creating GunDB node for part ${i + 1}/${soulParts.length}: "${part}"`);
+        dataNode = dataNode.get(part);
+      }
+
+      // Ora scrivi il valore con la chiave specificata
+      console.log(`🔧 Writing value "${value}" with key "${key}" to GunDB structure`);
+      
+      try {
         await new Promise((resolve, reject) => {
           const timeoutId = setTimeout(() => {
             console.warn("⚠️ Timeout writing to main GunDB structure");
@@ -263,6 +277,7 @@ async function initializeServer() {
               reject(ack.err);
             } else {
               console.log("✅ Data stored in main structure successfully");
+              console.log(`✅ GunDB path created: ${soulParts.join('.')}.${key} = "${value}"`);
               resolve();
             }
           });
@@ -288,6 +303,7 @@ async function initializeServer() {
         key: key,
         value: value,
         eventId: eventId,
+        gunDBPath: `${soulParts.join('.')}.${key}`,
       });
     } catch (error) {
       console.error("❌ Failed to propagate chain event to GunDB:", error);
