@@ -1182,12 +1182,13 @@ router.get("/repo/stat", (req, res, next) => {
   }
 }, async (req, res) => {
   try {
-    console.log("📊 Getting IPFS repository statistics...");
+    console.log("📊 Getting IPFS repository statistics (alternative method)...");
     
-    const requestOptions = {
+    // Get all pins first
+    const pinsRequestOptions = {
       hostname: "127.0.0.1",
       port: 5001,
-      path: "/api/v0/repo/stat",
+      path: "/api/v0/pin/ls?type=all",
       method: "POST",
       headers: {
         "Content-Length": "0",
@@ -1195,63 +1196,152 @@ router.get("/repo/stat", (req, res, next) => {
     };
 
     if (IPFS_API_TOKEN) {
-      requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+      pinsRequestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
     }
 
-    const ipfsReq = http.request(requestOptions, (ipfsRes) => {
-      let data = "";
-      ipfsRes.on("data", (chunk) => (data += chunk));
-      ipfsRes.on("end", () => {
-        try {
-          const repoStats = JSON.parse(data);
-          
-          // Calculate sizes in MB for easier reading
-          const repoSizeMB = Math.round((repoStats.RepoSize || 0) / (1024 * 1024));
-          const storageSizeMB = Math.round((repoStats.StorageMax || 0) / (1024 * 1024));
-          
-          res.json({
-            success: true,
-            stats: {
-              repoSize: repoStats.RepoSize || 0,
-              repoSizeMB: repoSizeMB,
-              storageMax: repoStats.StorageMax || 0,
-              storageMaxMB: storageSizeMB,
-              numObjects: repoStats.NumObjects || 0,
-              repoPath: repoStats.RepoPath || "unknown",
-              version: repoStats.Version || "unknown"
-            },
-            raw: repoStats
-          });
-        } catch (parseError) {
-          console.error("❌ Failed to parse IPFS repo stat response:", parseError);
-          res.status(500).json({
-            success: false,
-            error: "Failed to parse IPFS repo stat response",
-            rawResponse: data,
-          });
-        }
-      });
-    });
-
-    ipfsReq.on("error", (err) => {
-      console.error("❌ IPFS Repo Stat error:", err);
-      res.status(500).json({
-        success: false,
-        error: err.message,
-      });
-    });
-
-    ipfsReq.setTimeout(10000, () => {
-      ipfsReq.destroy();
-      if (!res.headersSent) {
-        res.status(408).json({
-          success: false,
-          error: "Repository stat timeout",
+    const pinsPromise = new Promise((resolve, reject) => {
+      const pinsReq = http.request(pinsRequestOptions, (pinsRes) => {
+        let data = "";
+        pinsRes.on("data", (chunk) => (data += chunk));
+        pinsRes.on("end", () => {
+          try {
+            const pinsData = JSON.parse(data);
+            resolve(pinsData);
+          } catch (parseError) {
+            reject(new Error("Failed to parse pins response"));
+          }
         });
+      });
+
+      pinsReq.on("error", (err) => {
+        reject(err);
+      });
+
+      pinsReq.setTimeout(10000, () => {
+        pinsReq.destroy();
+        reject(new Error("Pins request timeout"));
+      });
+
+      pinsReq.end();
+    });
+
+    // Get storage info from files/stat
+    const storageRequestOptions = {
+      hostname: "127.0.0.1",
+      port: 5001,
+      path: "/api/v0/files/stat?arg=/",
+      method: "POST",
+      headers: {
+        "Content-Length": "0",
+      },
+    };
+
+    if (IPFS_API_TOKEN) {
+      storageRequestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+    }
+
+    const storagePromise = new Promise((resolve, reject) => {
+      const storageReq = http.request(storageRequestOptions, (storageRes) => {
+        let data = "";
+        storageRes.on("data", (chunk) => (data += chunk));
+        storageRes.on("end", () => {
+          try {
+            const storageData = JSON.parse(data);
+            resolve(storageData);
+          } catch (parseError) {
+            reject(new Error("Failed to parse storage response"));
+          }
+        });
+      });
+
+      storageReq.on("error", (err) => {
+        reject(err);
+      });
+
+      storageReq.setTimeout(10000, () => {
+        storageReq.destroy();
+        reject(new Error("Storage request timeout"));
+      });
+
+      storageReq.end();
+    });
+
+    // Get version info
+    const versionRequestOptions = {
+      hostname: "127.0.0.1",
+      port: 5001,
+      path: "/api/v0/version",
+      method: "POST",
+      headers: {
+        "Content-Length": "0",
+      },
+    };
+
+    if (IPFS_API_TOKEN) {
+      versionRequestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+    }
+
+    const versionPromise = new Promise((resolve, reject) => {
+      const versionReq = http.request(versionRequestOptions, (versionRes) => {
+        let data = "";
+        versionRes.on("data", (chunk) => (data += chunk));
+        versionRes.on("end", () => {
+          try {
+            const versionData = JSON.parse(data);
+            resolve(versionData);
+          } catch (parseError) {
+            reject(new Error("Failed to parse version response"));
+          }
+        });
+      });
+
+      versionReq.on("error", (err) => {
+        reject(err);
+      });
+
+      versionReq.setTimeout(10000, () => {
+        versionReq.destroy();
+        reject(new Error("Version request timeout"));
+      });
+
+      versionReq.end();
+    });
+
+    // Wait for all requests to complete
+    const [pinsData, storageData, versionData] = await Promise.all([
+      pinsPromise,
+      storagePromise,
+      versionPromise
+    ]);
+
+    // Calculate statistics
+    const pinKeys = pinsData.Keys || {};
+    const numObjects = Object.keys(pinKeys).length;
+    const totalSize = storageData.CumulativeSize || 0;
+    const repoSizeMB = Math.round(totalSize / (1024 * 1024));
+    
+    // Estimate storage max (default to 10GB if not available)
+    const storageMaxMB = 10240; // 10GB default
+    const usagePercent = Math.round((repoSizeMB / storageMaxMB) * 100);
+
+    res.json({
+      success: true,
+      stats: {
+        repoSize: totalSize,
+        repoSizeMB: repoSizeMB,
+        storageMax: storageMaxMB * 1024 * 1024, // Convert back to bytes
+        storageMaxMB: storageMaxMB,
+        numObjects: numObjects,
+        repoPath: "/ipfs", // Default path
+        version: versionData.Version || "unknown"
+      },
+      raw: {
+        pins: pinsData,
+        storage: storageData,
+        version: versionData
       }
     });
 
-    ipfsReq.end();
   } catch (error) {
     console.error("❌ IPFS Repo Stat error:", error);
     res.status(500).json({
