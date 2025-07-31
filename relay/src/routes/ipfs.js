@@ -378,7 +378,7 @@ router.post("/upload",
                 
                 const options = {
                   hostname: 'localhost',
-                  port: process.env.PORT || 3000,
+                  port: 8765,
                   path: '/api/v1/user-uploads/save-system-hash',
                   method: 'POST',
                   headers: {

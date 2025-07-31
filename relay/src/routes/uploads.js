@@ -357,7 +357,7 @@ router.delete("/:identifier/:hash", (req, res, next) => {
         
         const options = {
           hostname: 'localhost',
-          port: process.env.PORT || 3000,
+          port: 8765,
           path: `/api/v1/user-uploads/remove-system-hash/${hash}`,
           method: 'DELETE',
           headers: {
