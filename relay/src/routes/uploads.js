@@ -206,6 +206,277 @@ async function deleteUploadAndUpdateMB(userAddress, fileHash, fileSizeMB, req) {
   });
 }
 
+// ROUTE SPECIFICHE - DEVONO ESSERE PRIMA DELLA ROUTE GENERICA /:identifier
+
+// Endpoint per ottenere tutti gli hash del sistema (per il pin manager)
+router.get("/system-hashes", async (req, res) => {
+  try {
+    console.log('🔍 System hashes endpoint called');
+    
+    const hashes = await getAllSystemHashes(req);
+    
+    console.log(`📋 Returning ${hashes.length} system hashes`);
+    
+    res.json({
+      success: true,
+      hashes: hashes,
+      count: hashes.length,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error("System hashes error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore interno del server",
+      details: error.message,
+    });
+  }
+});
+
+// Endpoint per ottenere gli hash dal nodo systemhash
+router.get("/system-hashes-map", async (req, res) => {
+  try {
+    console.log('🔍 System hashes map endpoint called');
+    
+    const gun = getGunInstance(req);
+    if (!gun) {
+      console.warn('Gun instance not available for system hashes map');
+      return res.status(500).json({
+        success: false,
+        error: "Gun instance not available"
+      });
+    }
+    
+    const systemHashesMap = await new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        console.log('⏰ Timeout for system hashes map retrieval');
+        resolve({});
+      }, 10000);
+
+      const systemHashesNode = gun.get("shogun").get("systemhash");
+      
+      systemHashesNode.once((systemHashesData) => {
+        clearTimeout(timeoutId);
+        
+        if (!systemHashesData || typeof systemHashesData !== "object") {
+          console.log('📋 No system hashes found, returning empty map');
+          resolve({});
+          return;
+        }
+
+        // Filtra le chiavi che non sono metadati Gun
+        const hashMap = {};
+        Object.keys(systemHashesData).forEach(key => {
+          if (key !== "_" && key !== "#" && key !== ">" && key !== "<") {
+            hashMap[key] = systemHashesData[key];
+          }
+        });
+
+        console.log(`📋 Found ${Object.keys(hashMap).length} system hashes in map`);
+        resolve(hashMap);
+      });
+    });
+    
+    res.json({
+      success: true,
+      systemHashes: systemHashesMap,
+      count: Object.keys(systemHashesMap).length,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error("System hashes map error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore interno del server",
+      details: error.message,
+    });
+  }
+});
+
+// Endpoint per salvare un hash nel nodo systemhash
+router.post("/save-system-hash", (req, res, next) => {
+  // Check both admin and user authentication
+  const authHeader = req.headers["authorization"];
+  const bearerToken = authHeader && authHeader.split(" ")[1];
+  const customToken = req.headers["token"];
+  const userAddress = req.headers["x-user-address"];
+  const signature = req.headers["x-wallet-signature"];
+  
+  const adminToken = bearerToken || customToken;
+  const isAdmin = adminToken === process.env.ADMIN_PASSWORD;
+  const isUser = userAddress && signature;
+  
+  if (isAdmin) {
+    req.authType = 'admin';
+    next();
+  } else if (isUser) {
+    // Verify wallet signature for user uploads
+    const message = req.headers["x-signature-message"] || "I Love Shogun";
+    const verifyWalletSignature = req.app.get('verifyWalletSignature');
+    
+    if (verifyWalletSignature && verifyWalletSignature(message, signature, userAddress)) {
+      req.authType = 'user';
+      req.userAddress = userAddress;
+      next();
+    } else {
+      console.log("User auth failed - Address:", userAddress, "Signature:", signature?.substring(0, 20) + "...");
+      res.status(401).json({ success: false, error: "Invalid wallet signature" });
+    }
+  } else {
+    console.log("Auth failed - Admin token:", adminToken ? "provided" : "missing", "User:", userAddress ? "provided" : "missing");
+    res.status(401).json({ success: false, error: "Unauthorized - Admin token or valid wallet signature required" });
+  }
+}, async (req, res) => {
+  try {
+    const { hash, userAddress, timestamp } = req.body;
+
+    if (!hash || !userAddress) {
+      return res.status(400).json({
+        success: false,
+        error: "Hash e userAddress richiesti"
+      });
+    }
+
+    console.log(`💾 Saving hash to systemhash node: ${hash} for user: ${userAddress}`);
+
+    const gun = getGunInstance(req);
+    if (!gun) {
+      return res.status(500).json({
+        success: false,
+        error: "Gun instance not available"
+      });
+    }
+
+    // Salva l'hash nel nodo systemhash
+    await new Promise((resolve, reject) => {
+      const systemHashesNode = gun.get("shogun").get("systemhash");
+      
+      systemHashesNode.get(hash).put({
+        hash: hash,
+        userAddress: userAddress,
+        timestamp: timestamp || Date.now(),
+        savedAt: new Date().toISOString()
+      }, (ack) => {
+        if (ack && ack.err) {
+          console.error('❌ Error saving hash to systemhash node:', ack.err);
+          reject(new Error(ack.err));
+        } else {
+          console.log(`✅ Hash ${hash} saved to systemhash node successfully`);
+          resolve();
+        }
+      });
+    });
+
+    res.json({
+      success: true,
+      message: "Hash saved to systemhash node successfully",
+      hash: hash,
+      userAddress: userAddress,
+      timestamp: timestamp
+    });
+
+  } catch (error) {
+    console.error("Save system hash error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore interno del server",
+      details: error.message,
+    });
+  }
+});
+
+// Endpoint per rimuovere un hash dal nodo systemhash
+router.delete("/remove-system-hash/:hash", (req, res, next) => {
+  // Check both admin and user authentication
+  const authHeader = req.headers["authorization"];
+  const bearerToken = authHeader && authHeader.split(" ")[1];
+  const customToken = req.headers["token"];
+  const userAddress = req.headers["x-user-address"];
+  const signature = req.headers["x-wallet-signature"];
+  
+  const adminToken = bearerToken || customToken;
+  const isAdmin = adminToken === process.env.ADMIN_PASSWORD;
+  const isUser = userAddress && signature;
+  
+  if (isAdmin) {
+    req.authType = 'admin';
+    next();
+  } else if (isUser) {
+    // Verify wallet signature for user uploads
+    const message = req.headers["x-signature-message"] || "I Love Shogun";
+    const verifyWalletSignature = req.app.get('verifyWalletSignature');
+    
+    if (verifyWalletSignature && verifyWalletSignature(message, signature, userAddress)) {
+      req.authType = 'user';
+      req.userAddress = userAddress;
+      next();
+    } else {
+      console.log("User auth failed - Address:", userAddress, "Signature:", signature?.substring(0, 20) + "...");
+      res.status(401).json({ success: false, error: "Invalid wallet signature" });
+    }
+  } else {
+    console.log("Auth failed - Admin token:", adminToken ? "provided" : "missing", "User:", userAddress ? "provided" : "missing");
+    res.status(401).json({ success: false, error: "Unauthorized - Admin token or valid wallet signature required" });
+  }
+}, async (req, res) => {
+  try {
+    const { hash } = req.params;
+    const { userAddress } = req.body;
+
+    if (!hash) {
+      return res.status(400).json({
+        success: false,
+        error: "Hash richiesto"
+      });
+    }
+
+    console.log(`🗑️ Removing hash from systemhash node: ${hash}`);
+
+    const gun = getGunInstance(req);
+    if (!gun) {
+      return res.status(500).json({
+        success: false,
+        error: "Gun instance not available"
+      });
+    }
+
+    // Rimuovi l'hash dal nodo systemhash
+    await new Promise((resolve, reject) => {
+      const systemHashesNode = gun.get("shogun").get("systemhash");
+      
+      systemHashesNode.get(hash).put(null, (ack) => {
+        if (ack && ack.err) {
+          console.error('❌ Error removing hash from systemhash node:', ack.err);
+          reject(new Error(ack.err));
+        } else {
+          console.log(`✅ Hash ${hash} removed from systemhash node successfully`);
+          resolve();
+        }
+      });
+    });
+
+    res.json({
+      success: true,
+      message: "Hash removed from systemhash node successfully",
+      hash: hash,
+      userAddress: userAddress,
+      timestamp: Date.now()
+    });
+
+  } catch (error) {
+    console.error("Remove system hash error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Errore interno del server",
+      details: error.message,
+    });
+  }
+});
+
+// ROUTE GENERICHE - DEVONO ESSERE DOPO LE ROUTE SPECIFICHE
+
 // Endpoint per recuperare gli upload di un utente
 router.get("/:identifier", async (req, res) => {
   try {
@@ -474,273 +745,6 @@ router.post("/sync-mb-usage/:userAddress", async (req, res) => {
     });
   } catch (error) {
     console.error("Sync MB usage error:", error);
-    res.status(500).json({
-      success: false,
-      error: "Errore interno del server",
-      details: error.message,
-    });
-  }
-});
-
-// Endpoint per ottenere tutti gli hash del sistema (per il pin manager)
-router.get("/system-hashes", async (req, res) => {
-  try {
-    console.log('🔍 System hashes endpoint called');
-    
-    const hashes = await getAllSystemHashes(req);
-    
-    console.log(`📋 Returning ${hashes.length} system hashes`);
-    
-    res.json({
-      success: true,
-      hashes: hashes,
-      count: hashes.length,
-      timestamp: new Date().toISOString()
-    });
-
-  } catch (error) {
-    console.error("System hashes error:", error);
-    res.status(500).json({
-      success: false,
-      error: "Errore interno del server",
-      details: error.message,
-    });
-  }
-});
-
-// Endpoint per ottenere gli hash dal nodo systemhash
-router.get("/system-hashes-map", async (req, res) => {
-  try {
-    console.log('🔍 System hashes map endpoint called');
-    
-    const gun = getGunInstance(req);
-    if (!gun) {
-      console.warn('Gun instance not available for system hashes map');
-      return res.status(500).json({
-        success: false,
-        error: "Gun instance not available"
-      });
-    }
-    
-    const systemHashesMap = await new Promise((resolve) => {
-      const timeoutId = setTimeout(() => {
-        console.log('⏰ Timeout for system hashes map retrieval');
-        resolve({});
-      }, 10000);
-
-      const systemHashesNode = gun.get("shogun").get("systemhash");
-      
-      systemHashesNode.once((systemHashesData) => {
-        clearTimeout(timeoutId);
-        
-        if (!systemHashesData || typeof systemHashesData !== "object") {
-          console.log('📋 No system hashes found, returning empty map');
-          resolve({});
-          return;
-        }
-
-        // Filtra le chiavi che non sono metadati Gun
-        const hashMap = {};
-        Object.keys(systemHashesData).forEach(key => {
-          if (key !== "_" && key !== "#" && key !== ">" && key !== "<") {
-            hashMap[key] = systemHashesData[key];
-          }
-        });
-
-        console.log(`📋 Found ${Object.keys(hashMap).length} system hashes in map`);
-        resolve(hashMap);
-      });
-    });
-    
-    res.json({
-      success: true,
-      systemHashes: systemHashesMap,
-      count: Object.keys(systemHashesMap).length,
-      timestamp: new Date().toISOString()
-    });
-
-  } catch (error) {
-    console.error("System hashes map error:", error);
-    res.status(500).json({
-      success: false,
-      error: "Errore interno del server",
-      details: error.message,
-    });
-  }
-});
-
-// Endpoint per salvare un hash nel nodo systemhash
-router.post("/save-system-hash", (req, res, next) => {
-  // Check both admin and user authentication
-  const authHeader = req.headers["authorization"];
-  const bearerToken = authHeader && authHeader.split(" ")[1];
-  const customToken = req.headers["token"];
-  const userAddress = req.headers["x-user-address"];
-  const signature = req.headers["x-wallet-signature"];
-  
-  const adminToken = bearerToken || customToken;
-  const isAdmin = adminToken === process.env.ADMIN_PASSWORD;
-  const isUser = userAddress && signature;
-  
-  if (isAdmin) {
-    req.authType = 'admin';
-    next();
-  } else if (isUser) {
-    // Verify wallet signature for user uploads
-    const message = req.headers["x-signature-message"] || "I Love Shogun";
-    const verifyWalletSignature = req.app.get('verifyWalletSignature');
-    
-    if (verifyWalletSignature && verifyWalletSignature(message, signature, userAddress)) {
-      req.authType = 'user';
-      req.userAddress = userAddress;
-      next();
-    } else {
-      console.log("User auth failed - Address:", userAddress, "Signature:", signature?.substring(0, 20) + "...");
-      res.status(401).json({ success: false, error: "Invalid wallet signature" });
-    }
-  } else {
-    console.log("Auth failed - Admin token:", adminToken ? "provided" : "missing", "User:", userAddress ? "provided" : "missing");
-    res.status(401).json({ success: false, error: "Unauthorized - Admin token or valid wallet signature required" });
-  }
-}, async (req, res) => {
-  try {
-    const { hash, userAddress, timestamp } = req.body;
-
-    if (!hash || !userAddress) {
-      return res.status(400).json({
-        success: false,
-        error: "Hash e userAddress richiesti"
-      });
-    }
-
-    console.log(`💾 Saving hash to systemhash node: ${hash} for user: ${userAddress}`);
-
-    const gun = getGunInstance(req);
-    if (!gun) {
-      return res.status(500).json({
-        success: false,
-        error: "Gun instance not available"
-      });
-    }
-
-    // Salva l'hash nel nodo systemhash
-    await new Promise((resolve, reject) => {
-      const systemHashesNode = gun.get("shogun").get("systemhash");
-      
-      systemHashesNode.get(hash).put({
-        hash: hash,
-        userAddress: userAddress,
-        timestamp: timestamp || Date.now(),
-        savedAt: new Date().toISOString()
-      }, (ack) => {
-        if (ack && ack.err) {
-          console.error('❌ Error saving hash to systemhash node:', ack.err);
-          reject(new Error(ack.err));
-        } else {
-          console.log(`✅ Hash ${hash} saved to systemhash node successfully`);
-          resolve();
-        }
-      });
-    });
-
-    res.json({
-      success: true,
-      message: "Hash saved to systemhash node successfully",
-      hash: hash,
-      userAddress: userAddress,
-      timestamp: timestamp
-    });
-
-  } catch (error) {
-    console.error("Save system hash error:", error);
-    res.status(500).json({
-      success: false,
-      error: "Errore interno del server",
-      details: error.message,
-    });
-  }
-});
-
-// Endpoint per rimuovere un hash dal nodo systemhash
-router.delete("/remove-system-hash/:hash", (req, res, next) => {
-  // Check both admin and user authentication
-  const authHeader = req.headers["authorization"];
-  const bearerToken = authHeader && authHeader.split(" ")[1];
-  const customToken = req.headers["token"];
-  const userAddress = req.headers["x-user-address"];
-  const signature = req.headers["x-wallet-signature"];
-  
-  const adminToken = bearerToken || customToken;
-  const isAdmin = adminToken === process.env.ADMIN_PASSWORD;
-  const isUser = userAddress && signature;
-  
-  if (isAdmin) {
-    req.authType = 'admin';
-    next();
-  } else if (isUser) {
-    // Verify wallet signature for user uploads
-    const message = req.headers["x-signature-message"] || "I Love Shogun";
-    const verifyWalletSignature = req.app.get('verifyWalletSignature');
-    
-    if (verifyWalletSignature && verifyWalletSignature(message, signature, userAddress)) {
-      req.authType = 'user';
-      req.userAddress = userAddress;
-      next();
-    } else {
-      console.log("User auth failed - Address:", userAddress, "Signature:", signature?.substring(0, 20) + "...");
-      res.status(401).json({ success: false, error: "Invalid wallet signature" });
-    }
-  } else {
-    console.log("Auth failed - Admin token:", adminToken ? "provided" : "missing", "User:", userAddress ? "provided" : "missing");
-    res.status(401).json({ success: false, error: "Unauthorized - Admin token or valid wallet signature required" });
-  }
-}, async (req, res) => {
-  try {
-    const { hash } = req.params;
-    const { userAddress } = req.body;
-
-    if (!hash) {
-      return res.status(400).json({
-        success: false,
-        error: "Hash richiesto"
-      });
-    }
-
-    console.log(`🗑️ Removing hash from systemhash node: ${hash}`);
-
-    const gun = getGunInstance(req);
-    if (!gun) {
-      return res.status(500).json({
-        success: false,
-        error: "Gun instance not available"
-      });
-    }
-
-    // Rimuovi l'hash dal nodo systemhash
-    await new Promise((resolve, reject) => {
-      const systemHashesNode = gun.get("shogun").get("systemhash");
-      
-      systemHashesNode.get(hash).put(null, (ack) => {
-        if (ack && ack.err) {
-          console.error('❌ Error removing hash from systemhash node:', ack.err);
-          reject(new Error(ack.err));
-        } else {
-          console.log(`✅ Hash ${hash} removed from systemhash node successfully`);
-          resolve();
-        }
-      });
-    });
-
-    res.json({
-      success: true,
-      message: "Hash removed from systemhash node successfully",
-      hash: hash,
-      userAddress: userAddress,
-      timestamp: Date.now()
-    });
-
-  } catch (error) {
-    console.error("Remove system hash error:", error);
     res.status(500).json({
       success: false,
       error: "Errore interno del server",
