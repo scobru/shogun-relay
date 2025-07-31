@@ -362,14 +362,16 @@ router.post("/upload",
                   return;
                 }
 
+                // Save userAddress to avoid reference error
+                const userAddress = req.userAddress;
+
                 const systemHashData = {
                   hash: fileResult.Hash,
-                  userAddress: req.userAddress,
+                  userAddress: userAddress,
                   timestamp: Date.now()
                 };
 
                 // Make internal request to save-system-hash endpoint
-                const http = require('http');
                 const postData = JSON.stringify(systemHashData);
                 
                 const options = {

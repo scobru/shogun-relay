@@ -1,4 +1,5 @@
 import express from 'express';
+import http from 'http';
 
 const router = express.Router();
 
@@ -350,7 +351,6 @@ router.delete("/:identifier/:hash", (req, res, next) => {
         console.warn(`⚠️ ADMIN_PASSWORD not set, skipping system hash removal`);
       } else {
         // Call the remove-system-hash endpoint with admin token
-        const http = require('http');
         const postData = JSON.stringify({
           userAddress: identifier
         });
