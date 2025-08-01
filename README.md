@@ -2,15 +2,20 @@
 
 A complete **GunDB relay server** with integrated IPFS storage, authentication, decentralized user management, and advanced file storage system.
 
+![Shogun Relay Admin Panel](image.png)
+_Shogun Relay Admin Panel - Complete control interface for managing your decentralized infrastructure_
+
 ## 🚀 Features
 
 ### 🔐 Authentication & Security
+
 - **Admin Authentication**: Centralized admin token management with auto-fill
 - **IPFS API Protection**: JWT-based authentication for IPFS API endpoints
 - **Wallet Signature Authentication**: Ethereum wallet-based authentication for user operations
 - **Rate Limiting**: Protection against abuse and spam
 
 ### 🌐 GunDB Relay Core
+
 - **Decentralized Database**: Full GunDB relay with WebSocket support
 - **Real-time Synchronization**: Live data sync across all connected peers
 - **Graph Database**: Hierarchical data structure with soul/key/value pairs
@@ -19,6 +24,7 @@ A complete **GunDB relay server** with integrated IPFS storage, authentication, 
 - **Garbage Collection**: Automatic cleanup of unused data
 
 ### 📁 File Management System
+
 - **User File Uploads**: Decentralized file storage with GunDB metadata
 - **IPFS Integration**: Direct IPFS storage with pin management
 - **File Encryption**: Optional file encryption before upload
@@ -51,6 +57,7 @@ A complete **GunDB relay server** with integrated IPFS storage, authentication, 
 ## �� API Endpoints
 
 ### GunDB Core
+
 ```bash
 # GunDB WebSocket endpoint
 GET /gun                    # GunDB WebSocket connection
@@ -62,6 +69,7 @@ POST /api/v1/system/node/:key      # Create/update GunDB node
 ```
 
 ### IPFS Management (Integrated)
+
 ```bash
 # Pin Management
 POST /api/v1/ipfs/pins/add          # Add pin
@@ -395,6 +403,7 @@ GET /api/v1/user-uploads/system-hashes
 - **4001**: IPFS Swarm (P2P, integrated)
 
 ### Main Interfaces
+
 - `/`: Control Panel with navigation
 - `/gun`: **GunDB WebSocket endpoint** (Primary)
 - `/pin-manager`: IPFS pin management (Integrated)
@@ -407,7 +416,47 @@ GET /api/v1/user-uploads/system-hashes
 
 ## 🔧 Development
 
+### Admin Panel Interface
+
+The Shogun Relay includes a comprehensive admin panel that provides centralized management of all relay functions:
+
+#### 📊 Monitoring & Analytics
+
+- **Services Dashboard**: Real-time monitoring of all relay services
+- **Live Stats**: Performance metrics and system status
+- **Advanced Charts**: Data visualization and usage analytics
+- **Live Graph Explorer**: Interactive GunDB data exploration
+- **Visual Graph Data**: D3.js powered network visualization
+
+#### 📁 Storage & Files
+
+- **User Upload Management**: Monitor and manage user file uploads
+- **Upload to IPFS**: Direct IPFS file upload interface
+- **IPFS Pin Manager**: Comprehensive pin management with batch operations
+- **IPFS Node Status**: Real-time IPFS node monitoring
+
+#### 🗄️ Data Management
+
+- **Create Data Node**: Direct GunDB node creation interface
+- **View/Query Data**: Advanced data browsing and search
+- **Chain Contract Interface**: Blockchain integration for data storage
+- **IPCM Contract Interface**: IPFS CID mapping management
+- **Admin Notes**: Internal documentation and notes system
+
+#### 💬 Communication
+
+- **Public Chat**: Community communication interface
+
+#### 🔐 Security & Tools
+
+- **Relay Subscription**: Subscription management system
+- **Derive Keys**: Cryptographic key derivation tools
+- **IPFS API Version**: API version management and monitoring
+
+The admin panel requires authentication and provides a unified interface for managing your entire decentralized infrastructure from a single location.
+
 ### Project Structure
+
 ```
 shogun-relay/
 ├── relay/
@@ -430,6 +479,7 @@ shogun-relay/
 ```
 
 ### Key Components
+
 - **GunDB Core**: Decentralized database relay with WebSocket support
 - **IPFS Integration**: HTTP proxy to IPFS API with authentication
 - **File Upload**: Multer-based file handling with encryption
@@ -441,6 +491,7 @@ shogun-relay/
 ### Common Issues
 
 **GunDB Connection Problems**
+
 ```bash
 # Test GunDB connection
 curl http://localhost:8765/gun
@@ -453,6 +504,7 @@ curl http://localhost:8765/gun.js
 ```
 
 **IPFS Connection Problems (Integrated)**
+
 ```bash
 # Check IPFS status
 curl -H "Authorization: Bearer $IPFS_API_TOKEN" http://localhost:5001/api/v0/version
@@ -462,6 +514,7 @@ docker exec shogun-relay-stack cat /tmp/ipfs-jwt-token
 ```
 
 **File Upload Problems**
+
 ```bash
 # Debug user uploads
 curl http://localhost:8765/api/v1/user-uploads/debug/USER_ADDRESS
@@ -471,6 +524,7 @@ curl -X POST http://localhost:8765/api/v1/user-uploads/sync-mb-usage/USER_ADDRES
 ```
 
 ### Performance Optimization
+
 - **GunDB Timeouts**: Increased timeouts for large datasets
 - **IPFS Garbage Collection**: Regular cleanup to free disk space
 - **Batch Operations**: Efficient bulk operations with progress tracking
@@ -523,6 +577,7 @@ Per pulire la cache di Docker senza riavviare i servizi:
 ```
 
 ### Opzioni disponibili:
+
 - `--cache-only`: Pulizia sicura (container fermati, immagini non utilizzate, cache build)
 - `--all`: Pulizia completa (include volumi - può cancellare dati)
 - `--containers`: Solo container fermati
@@ -533,6 +588,7 @@ Per pulire la cache di Docker senza riavviare i servizi:
 - `--dry-run`: Mostra cosa verrebbe pulito senza farlo
 
 ### Esempi:
+
 ```bash
 # Pulizia rapida e sicura
 ./docker-cleanup.sh
