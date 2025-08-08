@@ -808,9 +808,8 @@ async function initializeServer() {
         !firstSoul.includes("/") || // Chiavi a livello singolo (operazioni interne di Gun)
         firstSoul.match(
           /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
-        ) || // UUID souls
-        // NUOVA REGOLA: Permetti path che contengono / ma non iniziano con shogun/ (dati del contratto Chain)
-        (firstSoul.includes("/") && !firstSoul.startsWith("shogun/")));
+        )) // UUID souls
+);
 
     if (isInternalNamespace) {
       console.log(`🔍 PUT allowed - internal namespace: ${firstSoul}`);
@@ -968,32 +967,39 @@ async function initializeServer() {
   function verifyWalletSignature(message, signature, expectedAddress) {
     try {
       // Verifica che l'address sia valido
-      if (
-        !expectedAddress ||
-        !expectedAddress.startsWith("0x") ||
-        expectedAddress.length !== 42
-      ) {
+      if (!expectedAddress || !ethers.isAddress(expectedAddress)) {
+        console.warn("⚠️ Invalid expected address:", expectedAddress);
         return false;
       }
 
       // Verifica che la firma sia valida
-      if (
-        !signature ||
-        !signature.startsWith("0x") ||
-        signature.length !== 132
-      ) {
+      if (!signature || !ethers.isHexString(signature, 65)) {
+        console.warn("⚠️ Invalid signature format:", signature);
         return false;
       }
 
-      // Per ora restituiamo true se i formati sono corretti
-      // In futuro potremmo implementare la verifica crittografica completa
       console.log(`🔐 Verifying signature for address: ${expectedAddress}`);
       console.log(`🔐 Message: ${message}`);
       console.log(`🔐 Signature: ${signature.substring(0, 20)}...`);
 
-      return true;
+      // Esegui la verifica crittografica
+      const recoveredAddress = ethers.verifyMessage(message, signature);
+
+      // Confronta l'address recuperato con quello atteso (case-insensitive)
+      const isValid =
+        recoveredAddress.toLowerCase() === expectedAddress.toLowerCase();
+
+      if (isValid) {
+        console.log(`✅ Signature verified successfully for ${expectedAddress}`);
+      } else {
+        console.warn(
+          `❌ Signature verification failed. Recovered: ${recoveredAddress}, Expected: ${expectedAddress}`
+        );
+      }
+
+      return isValid;
     } catch (error) {
-      console.error("❌ Error verifying wallet signature:", error);
+      console.error("❌ Error verifying wallet signature:", error.message);
       return false;
     }
   }
