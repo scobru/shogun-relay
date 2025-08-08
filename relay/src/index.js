@@ -883,47 +883,6 @@ async function initializeServer() {
     }
   });
 
-  // Middleware di protezione per le route statiche che richiedono autenticazione admin
-  const protectedStaticRoutes = [
-    "/services-dashboard",
-    "/stats",
-    "/charts",
-    "/upload",
-    "/pin-manager",
-    "/create",
-    "/notes",
-  ];
-
-  app.use((req, res, next) => {
-    const path = req.path;
-
-    // Controlla se la route richiede autenticazione admin
-    if (protectedStaticRoutes.includes(path)) {
-      // Verifica autenticazione admin
-      const authHeader = req.headers["authorization"];
-      const bearerToken = authHeader && authHeader.split(" ")[1];
-      const customToken = req.headers["token"];
-      const formToken = req.query["_auth_token"]; // Token inviato tramite form
-      const token = bearerToken || customToken || formToken;
-
-      if (token === process.env.ADMIN_PASSWORD) {
-        next();
-      } else {
-        console.log(
-          `❌ Accesso negato a ${path} - Token mancante o non valido`
-        );
-        return res.status(401).json({
-          success: false,
-          error: "Unauthorized - Admin authentication required",
-          message:
-            "Questa pagina richiede autenticazione admin. Inserisci la password admin nella pagina principale.",
-        });
-      }
-    } else {
-      // Route pubblica, continua
-      next();
-    }
-  });
 
   app.use(Gun.serve);
 
@@ -951,92 +910,7 @@ async function initializeServer() {
     }
   };
 
-  // Middleware per endpoint user che verifica l'header x-user-address
-  const userAuthMiddleware = (req, res, next) => {
-    const pubKey = req.headers["x-pubkey"];
-    if (!pubKey) {
-      return res.status(401).json({
-        success: false,
-        error: "x-pubkey header richiesto",
-      });
-    }
-    req.userPubKey = pubKey;
-    next();
-  };
 
-  // Funzione per verificare la firma del wallet
-  function verifyWalletSignature(message, signature, expectedAddress) {
-    try {
-      // Verifica che l'address sia valido
-      if (
-        !expectedAddress ||
-        !expectedAddress.startsWith("0x") ||
-        expectedAddress.length !== 42
-      ) {
-        return false;
-      }
-
-      // Verifica che la firma sia valida
-      if (
-        !signature ||
-        !signature.startsWith("0x") ||
-        signature.length !== 132
-      ) {
-        return false;
-      }
-
-      // Per ora restituiamo true se i formati sono corretti
-      // In futuro potremmo implementare la verifica crittografica completa
-      console.log(`🔐 Verifying signature for address: ${expectedAddress}`);
-      console.log(`🔐 Message: ${message}`);
-      console.log(`🔐 Signature: ${signature.substring(0, 20)}...`);
-
-      return true;
-    } catch (error) {
-      console.error("❌ Error verifying wallet signature:", error);
-      return false;
-    }
-  }
-
-  // Middleware per autenticare le richieste con firma del wallet
-  const walletSignatureMiddleware = (req, res, next) => {
-    try {
-      const userAddress = req.headers["x-user-address"];
-      const signature = req.headers["x-wallet-signature"];
-      const message = req.headers["x-signature-message"] || "I Love Shogun";
-
-      if (!userAddress) {
-        return res.status(401).json({
-          success: false,
-          error: "x-user-address header richiesto",
-        });
-      }
-
-      if (!signature) {
-        return res.status(401).json({
-          success: false,
-          error: "x-wallet-signature header richiesto per autenticazione",
-        });
-      }
-
-      // Verifica la firma
-      if (!verifyWalletSignature(message, signature, userAddress)) {
-        return res.status(401).json({
-          success: false,
-          error: "Firma del wallet non valida",
-        });
-      }
-
-      console.log(`✅ Wallet signature verified for: ${userAddress}`);
-      next();
-    } catch (error) {
-      console.error("❌ Wallet signature middleware error:", error);
-      res.status(500).json({
-        success: false,
-        error: "Errore di autenticazione",
-      });
-    }
-  };
 
   // IPFS upload endpoint (admin) - DEPRECATED: use /api/v1/ipfs/upload instead
   app.post(
@@ -1273,9 +1147,6 @@ async function initializeServer() {
 
   // Esponi i middleware di autenticazione per le route
   app.set("tokenAuthMiddleware", tokenAuthMiddleware);
-  app.set("userAuthMiddleware", userAuthMiddleware);
-  app.set("walletSignatureMiddleware", walletSignatureMiddleware);
-  app.set("verifyWalletSignature", verifyWalletSignature);
 
   // Esponi la variabile per operazioni interne
   app.set("allowInternalOperations", () => allowInternalOperations);

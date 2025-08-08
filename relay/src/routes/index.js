@@ -34,6 +34,8 @@ const tokenAuthMiddleware = (req, res, next) => {
   }
 };
 
+import { verifyWalletSignature } from "../utils/auth.js";
+
 // Middleware per autenticare le richieste con firma del wallet
 const walletSignatureMiddleware = (req, res, next) => {
   try {
@@ -55,13 +57,15 @@ const walletSignatureMiddleware = (req, res, next) => {
       });
     }
 
-    // Per ora restituiamo true se i formati sono corretti
-    // In futuro potremmo implementare la verifica crittografica completa
-    console.log(`🔐 Verifying signature for address: ${userAddress}`);
-    console.log(`🔐 Message: ${message}`);
-    console.log(`🔐 Signature: ${signature.substring(0, 20)}...`);
+    // Verifica la firma utilizzando la funzione centralizzata e sicura
+    if (!verifyWalletSignature(message, signature, userAddress)) {
+      return res.status(401).json({
+        success: false,
+        error: "Firma del wallet non valida",
+      });
+    }
 
-    console.log(`✅ Wallet signature verified for: ${userAddress}`);
+    // Se la firma è valida, procedi
     next();
   } catch (error) {
     console.error("❌ Wallet signature middleware error:", error);
@@ -103,6 +107,55 @@ export default (app) => {
 
   // Applica rate limiting generale
   app.use(generalLimiter);
+
+  // Aggiungi middleware per proteggere le route statiche che richiedono autenticazione
+  const protectedStaticRoutes = [
+    "/admin",
+    "/subscribe",
+    "/stats",
+    "/services-dashboard",
+    "/pin-manager",
+    "/notes",
+    "/upload",
+    "/create",
+    "/view",
+    "/edit",
+    "/derive",
+    "/graph",
+    "/chat",
+    "/charts",
+    "/chain-contract",
+    "/ipcm-contract",
+    "/drive",
+  ];
+
+  app.use((req, res, next) => {
+    const path = req.path;
+
+    // Controlla se la route richiede autenticazione admin
+    if (protectedStaticRoutes.includes(path)) {
+      // Verifica autenticazione admin
+      const authHeader = req.headers["authorization"];
+      const bearerToken = authHeader && authHeader.split(" ")[1];
+      const customToken = req.headers["token"];
+      const formToken = req.query["_auth_token"]; // Token inviato tramite form
+      const token = bearerToken || customToken || formToken;
+
+      if (token === process.env.ADMIN_PASSWORD) {
+        next();
+      } else {
+        console.log(`❌ Accesso negato a ${path} - Token mancante o non valido`);
+        return res.status(401).json({
+          success: false,
+          error: "Unauthorized - Admin authentication required",
+          message: "Questa pagina richiede autenticazione admin. Inserisci la password admin nella pagina principale."
+        });
+      }
+    } else {
+      // Route pubblica, continua
+      next();
+    }
+  });
 
   // --- IPFS Desktop Proxy Configuration ---
   const IPFS_GATEWAY_URL =
@@ -685,9 +738,6 @@ export default (app) => {
   app.use(`${baseRoute}/system`, systemRouter);
 
   // Route per le note
-  app.use(`${baseRoute}/notes`, notesRouter);
-
-  // Route per le note admin criptate (v1)
   app.use(`${baseRoute}/notes`, notesRouter);
 
   // Route di debug
@@ -1637,52 +1687,4 @@ export default (app) => {
     }
   });
 
-  // Aggiungi middleware per proteggere le route statiche che richiedono autenticazione
-  const protectedStaticRoutes = [
-    "/admin",
-    "/subscribe",
-    "/stats",
-    "/services-dashboard",
-    "/pin-manager",
-    "/notes",
-    "/upload",
-    "/create",
-    "/view",
-    "/edit",
-    "/derive",
-    "/graph",
-    "/chat",
-    "/charts",
-    "/chain-contract",
-    "/ipcm-contract",
-    "/drive",
-  ];
-
-  app.use((req, res, next) => {
-    const path = req.path;
-    
-    // Controlla se la route richiede autenticazione admin
-    if (protectedStaticRoutes.includes(path)) {
-      // Verifica autenticazione admin
-      const authHeader = req.headers["authorization"];
-      const bearerToken = authHeader && authHeader.split(" ")[1];
-      const customToken = req.headers["token"];
-      const formToken = req.query["_auth_token"]; // Token inviato tramite form
-      const token = bearerToken || customToken || formToken;
-
-      if (token === process.env.ADMIN_PASSWORD) {
-        next();
-      } else {
-        console.log(`❌ Accesso negato a ${path} - Token mancante o non valido`);
-        return res.status(401).json({ 
-          success: false, 
-          error: "Unauthorized - Admin authentication required",
-          message: "Questa pagina richiede autenticazione admin. Inserisci la password admin nella pagina principale."
-        });
-      }
-    } else {
-      // Route pubblica, continua
-      next();
-    }
-  });
 };
