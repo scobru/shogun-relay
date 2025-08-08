@@ -26,7 +26,8 @@ const tokenAuthMiddleware = (req, res, next) => {
   const token = bearerToken || customToken;
 
   if (token === process.env.ADMIN_PASSWORD) {
-    // Use a more secure token in production
+    // ATTENZIONE: Questa è una validazione di base. In un ambiente di produzione,
+    // si dovrebbe utilizzare un sistema di token più sicuro (es. JWT).
     next();
   } else {
     console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
@@ -55,8 +56,12 @@ const walletSignatureMiddleware = (req, res, next) => {
       });
     }
 
-    // Per ora restituiamo true se i formati sono corretti
-    // In futuro potremmo implementare la verifica crittografica completa
+    // --- !!! ATTENZIONE: VULNERABILITÀ DI SICUREZZA !!! ---
+    // La logica di verifica della firma del wallet non è implementata.
+    // Il codice attuale si limita a controllare la presenza degli header,
+    // ma non esegue alcuna verifica crittografica.
+    // Questo NON è sicuro e deve essere sostituito con una vera implementazione
+    // di `ethers.verifyMessage()` o una libreria simile.
     console.log(`🔐 Verifying signature for address: ${userAddress}`);
     console.log(`🔐 Message: ${message}`);
     console.log(`🔐 Signature: ${signature.substring(0, 20)}...`);
@@ -104,7 +109,10 @@ export default (app) => {
   // Applica rate limiting generale
   app.use(generalLimiter);
 
-  // --- IPFS Desktop Proxy Configuration ---
+  // --- IPFS Proxy Configuration ---
+  // La sezione seguente imposta dei proxy per l'interazione con un nodo IPFS locale.
+  // Questo permette al frontend di accedere ai contenuti e all'API di IPFS
+  // tramite il server relay, evitando problemi di CORS e centralizzando la configurazione.
   const IPFS_GATEWAY_URL =
     process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
   const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN || process.env.IPFS_API_KEY;
@@ -244,209 +252,91 @@ export default (app) => {
     }, 5000);
   });
 
-  // Route per servire i file HTML specifici (DOPO le route API)
-  app.get("/user-upload", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "user-upload.html"));
-  });
+  // --- Gestione delle route per servire file statici ---
+  const publicPath = path.resolve(__dirname, "../public");
 
-  app.get("/admin", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    const adminPath = path.resolve(publicPath, "admin.html");
-    
-    console.log(`🔍 Admin route requested`);
-    console.log(`📁 Public path: ${publicPath}`);
-    console.log(`📄 Admin file path: ${adminPath}`);
-    console.log(`📄 Admin file exists: ${fs.existsSync(adminPath)}`);
-    
-    if (!fs.existsSync(adminPath)) {
-      console.error(`❌ Admin file not found: ${adminPath}`);
-      return res.status(404).json({
-        success: false,
-        error: "Admin panel HTML file not found",
-        path: adminPath
-      });
-    }
-    
-    // Aggiungi header per prevenire il caching
-    res.set({
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache',
-      'Expires': '0'
-    });
-    
-    res.sendFile(adminPath);
-  });
-
-  app.get("/subscribe", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "subscribe.html"));
-  });
-
-  app.get("/stats", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "stats.html"));
-  });
-
-  app.get("/services-dashboard", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "services-dashboard.html"));
-  });
-
-  app.get("/pin-manager", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "pin-manager.html"));
-  });
-
-  app.get("/notes", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "notes.html"));
-  });
-
-  app.get("/upload", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "upload.html"));
-  });
-
-  app.get("/create", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "create.html"));
-  });
-
-  app.get("/view", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "view.html"));
-  });
-
-  app.get("/edit", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "edit.html"));
-  });
-
-  app.get("/derive", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "derive.html"));
-  });
-
-  app.get("/graph", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "graph.html"));
-  });
-
-  app.get("/chat", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "chat.html"));
-  });
-
-  app.get("/charts", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "charts.html"));
-  });
-
-  app.get("/chain-contract", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "chain-contract.html"));
-  });
-
-  app.get("/ipcm-contract", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    const filePath = path.resolve(publicPath, "ipcm-contract.html");
-    
-    console.log(`🔍 IPCM Contract route requested`);
-    console.log(`📁 Public path: ${publicPath}`);
-    console.log(`📄 File path: ${filePath}`);
-    console.log(`📄 File exists: ${fs.existsSync(filePath)}`);
-    
+  // Helper per servire un file, con opzioni per logging e caching
+  const serveStaticFile = (res, filePath, noCache = false) => {
+    // Controlla se il file esiste prima di inviarlo
     if (!fs.existsSync(filePath)) {
       console.error(`❌ File not found: ${filePath}`);
       return res.status(404).json({
         success: false,
-        error: "IPCM contract HTML file not found",
-        path: filePath
+        error: "File not found",
+        path: filePath,
       });
     }
-    
-    res.sendFile(filePath);
-  });
 
-  // Route per servire i file JavaScript dalla directory lib
-  app.get("/lib/:filename", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    const filePath = path.resolve(publicPath, "lib", req.params.filename);
-    
-    console.log(`🔍 Lib file requested: ${req.params.filename}`);
-    console.log(`📄 File path: ${filePath}`);
-    console.log(`📄 File exists: ${fs.existsSync(filePath)}`);
-    
-    if (!fs.existsSync(filePath)) {
-      console.error(`❌ Lib file not found: ${filePath}`);
-      return res.status(404).json({
-        success: false,
-        error: "JavaScript file not found",
-        path: filePath
+    // Imposta header per disabilitare la cache se richiesto
+    if (noCache) {
+      res.set({
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
       });
     }
-    
-    // Set correct content type for JavaScript files
-    res.setHeader('Content-Type', 'application/javascript');
     res.sendFile(filePath);
+  };
+
+  // Array di route che servono semplicemente un file HTML
+  const simpleHtmlRoutes = [
+    "user-upload", "subscribe", "stats", "services-dashboard", "pin-manager",
+    "notes", "upload", "create", "view", "edit", "derive", "graph",
+    "chat", "charts", "chain-contract", "drive"
+  ];
+
+  // Registra le route semplici in modo programmatico
+  simpleHtmlRoutes.forEach(routeName => {
+    app.get(`/${routeName}`, (req, res) => {
+      const filePath = path.resolve(publicPath, `${routeName}.html`);
+      // Per queste route semplici, non controlliamo l'esistenza in anticipo
+      // per mantenere il comportamento originale. res.sendFile gestirà i 404.
+      res.sendFile(filePath);
+    });
   });
 
-  // Route per servire i file CSS dalla directory styles
-  app.get("/styles/:filename", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    const filePath = path.resolve(publicPath, "styles", req.params.filename);
-    
-    console.log(`🔍 Styles file requested: ${req.params.filename}`);
-    console.log(`📄 File path: ${filePath}`);
-    console.log(`📄 File exists: ${fs.existsSync(filePath)}`);
-    
-    if (!fs.existsSync(filePath)) {
-      console.error(`❌ Styles file not found: ${filePath}`);
-      return res.status(404).json({
-        success: false,
-        error: "CSS file not found",
-        path: filePath
-      });
-    }
-    
-    // Set correct content type for CSS files
-    res.setHeader('Content-Type', 'text/css');
-    res.sendFile(filePath);
+  // Route con logica o opzioni di caching specifiche
+  app.get("/admin", (req, res) => {
+    console.log(`🔍 Admin route requested`);
+    const adminPath = path.resolve(publicPath, "admin.html");
+    serveStaticFile(res, adminPath, true); // noCache = true
   });
 
-  app.get("/drive", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "drive.html"));
+  app.get("/ipcm-contract", (req, res) => {
+    console.log(`🔍 IPCM Contract route requested`);
+    const filePath = path.resolve(publicPath, "ipcm-contract.html");
+    serveStaticFile(res, filePath);
   });
 
   app.get("/auth", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    const authPath = path.resolve(publicPath, "auth.html");
-    
     console.log(`🔍 Auth route requested`);
-    console.log(`📁 Public path: ${publicPath}`);
-    console.log(`📄 Auth file path: ${authPath}`);
-    console.log(`📄 Auth file exists: ${fs.existsSync(authPath)}`);
-    
-    if (!fs.existsSync(authPath)) {
-      console.error(`❌ Auth file not found: ${authPath}`);
-      return res.status(404).json({
-        success: false,
-        error: "Auth app HTML file not found",
-        path: authPath
-      });
-    }
-    
-    // Aggiungi header per prevenire il caching
-    res.set({
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache',
-      'Expires': '0'
-    });
-    
-    res.sendFile(authPath);
+    const authPath = path.resolve(publicPath, "auth.html");
+    serveStaticFile(res, authPath, true); // noCache = true
   });
+
+  // Route per servire file da directory specifiche (lib, styles)
+  const createAssetRoute = (routePrefix, directory, contentType) => {
+    app.get(`/${routePrefix}/:filename`, (req, res) => {
+      const { filename } = req.params;
+      console.log(`🔍 ${directory} file requested: ${filename}`);
+      const filePath = path.resolve(publicPath, directory, filename);
+
+      if (!fs.existsSync(filePath)) {
+        console.error(`❌ ${directory} file not found: ${filePath}`);
+        return res.status(404).json({
+          success: false,
+          error: `${contentType} file not found`,
+          path: filePath,
+        });
+      }
+
+      res.setHeader('Content-Type', contentType);
+      res.sendFile(filePath);
+    });
+  };
+
+  createAssetRoute("lib", "lib", "application/javascript");
+  createAssetRoute("styles", "styles", "text/css");
 
   // Route per IPFS content
   app.get("/ipfs-content/:cid", async (req, res) => {
@@ -666,6 +556,11 @@ export default (app) => {
     }
   });
 
+  // --- Route API Modulari (v1) ---
+  // Vengono registrate le route principali dell'applicazione, importate da file separati
+  // per mantenere il codice organizzato.
+  // Tutte queste route sono prefissate con /api/v1.
+
   // Route di autenticazione
   app.use(`${baseRoute}/auth`, authRouter);
 
@@ -729,7 +624,10 @@ export default (app) => {
     });
   });
 
-  // Route legacy per compatibilità (solo quelle essenziali)
+  // --- Route API Legacy ---
+  // Le stesse route modulari vengono registrate anche sotto il prefisso /api (senza v1)
+  // per garantire la retrocompatibilità con client più vecchi.
+  // Si consiglia di utilizzare gli endpoint v1 per le nuove implementazioni.
   app.use("/api/contracts", contractsRouter);
   app.use("/api/user-uploads", uploadsRouter);
   app.use("/api/ipfs", ipfsRouter);
@@ -1637,52 +1535,4 @@ export default (app) => {
     }
   });
 
-  // Aggiungi middleware per proteggere le route statiche che richiedono autenticazione
-  const protectedStaticRoutes = [
-    "/admin",
-    "/subscribe",
-    "/stats",
-    "/services-dashboard",
-    "/pin-manager",
-    "/notes",
-    "/upload",
-    "/create",
-    "/view",
-    "/edit",
-    "/derive",
-    "/graph",
-    "/chat",
-    "/charts",
-    "/chain-contract",
-    "/ipcm-contract",
-    "/drive",
-  ];
-
-  app.use((req, res, next) => {
-    const path = req.path;
-    
-    // Controlla se la route richiede autenticazione admin
-    if (protectedStaticRoutes.includes(path)) {
-      // Verifica autenticazione admin
-      const authHeader = req.headers["authorization"];
-      const bearerToken = authHeader && authHeader.split(" ")[1];
-      const customToken = req.headers["token"];
-      const formToken = req.query["_auth_token"]; // Token inviato tramite form
-      const token = bearerToken || customToken || formToken;
-
-      if (token === process.env.ADMIN_PASSWORD) {
-        next();
-      } else {
-        console.log(`❌ Accesso negato a ${path} - Token mancante o non valido`);
-        return res.status(401).json({ 
-          success: false, 
-          error: "Unauthorized - Admin authentication required",
-          message: "Questa pagina richiede autenticazione admin. Inserisci la password admin nella pagina principale."
-        });
-      }
-    } else {
-      // Route pubblica, continua
-      next();
-    }
-  });
 };
