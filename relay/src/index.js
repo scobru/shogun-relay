@@ -808,8 +808,7 @@ async function initializeServer() {
         !firstSoul.includes("/") || // Chiavi a livello singolo (operazioni interne di Gun)
         firstSoul.match(
           /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
-        )) // UUID souls
-);
+        )); // UUID souls
 
     if (isInternalNamespace) {
       console.log(`🔍 PUT allowed - internal namespace: ${firstSoul}`);
