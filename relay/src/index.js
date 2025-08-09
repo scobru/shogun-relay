@@ -242,7 +242,7 @@ async function initializeServer() {
       try {
         // Scomponi il soul path per creare la struttura GunDB corretta
         console.log("🔧 Decomposing soul path:", soul);
-        const soulParts = soul.split('/').filter(part => part.length > 0);
+        const soulParts = soul.split("/").filter((part) => part.length > 0);
         console.log("🔧 Soul parts:", soulParts);
 
         if (soulParts.length === 0) {
@@ -254,13 +254,19 @@ async function initializeServer() {
         let dataNode = gun;
         for (let i = 0; i < soulParts.length; i++) {
           const part = soulParts[i];
-          console.log(`🔧 Creating GunDB node for part ${i + 1}/${soulParts.length}: "${part}"`);
+          console.log(
+            `🔧 Creating GunDB node for part ${i + 1}/${
+              soulParts.length
+            }: "${part}"`
+          );
           dataNode = dataNode.get(part);
         }
 
         // Ora scrivi il valore con la chiave specificata
-        console.log(`🔧 Writing value "${value}" with key "${key}" to GunDB structure`);
-        
+        console.log(
+          `🔧 Writing value "${value}" with key "${key}" to GunDB structure`
+        );
+
         await new Promise((resolve, reject) => {
           const timeoutId = setTimeout(() => {
             console.warn("⚠️ Timeout writing to main GunDB structure");
@@ -277,7 +283,11 @@ async function initializeServer() {
               reject(ack.err);
             } else {
               console.log("✅ Data stored in main structure successfully");
-              console.log(`✅ GunDB path created: ${soulParts.join('.')}.${key} = "${value}"`);
+              console.log(
+                `✅ GunDB path created: ${soulParts.join(
+                  "."
+                )}.${key} = "${value}"`
+              );
               resolve();
             }
           });
@@ -291,9 +301,8 @@ async function initializeServer() {
           key: key,
           value: value,
           eventId: eventId,
-          gunDBPath: `${soulParts.join('.')}.${key}`,
+          gunDBPath: `${soulParts.join(".")}.${key}`,
         });
-
       } catch (mainStructureError) {
         console.error(
           "❌ Error writing to main GunDB structure:",
@@ -301,21 +310,24 @@ async function initializeServer() {
         );
         // Non fallire completamente se la scrittura nella struttura principale fallisce
         // L'evento è già stato salvato nella sezione chain_events
-        
+
         // Aggiungi al log del sistema anche in caso di errore
-        addSystemLog("warning", "Chain event partially propagated (main structure failed)", {
-          soul: soul,
-          key: key,
-          value: value,
-          eventId: eventId,
-          error: mainStructureError.message,
-        });
+        addSystemLog(
+          "warning",
+          "Chain event partially propagated (main structure failed)",
+          {
+            soul: soul,
+            key: key,
+            value: value,
+            eventId: eventId,
+            error: mainStructureError.message,
+          }
+        );
       } finally {
         // Ripristina il flag di sicurezza
         allowInternalOperations = false;
         console.log("🔒 Disabled internal operations flag");
       }
-
     } catch (error) {
       console.error("❌ Failed to propagate chain event to GunDB:", error);
       addSystemLog("error", "Failed to propagate chain event", {
@@ -408,7 +420,8 @@ async function initializeServer() {
                     typeof event.args.soulReadable === "object" &&
                     "hash" in event.args.soulReadable,
                   hash:
-                    event.args.soulReadable && typeof event.args.soulReadable === "object"
+                    event.args.soulReadable &&
+                    typeof event.args.soulReadable === "object"
                       ? event.args.soulReadable.hash
                       : "N/A",
                 });
@@ -421,7 +434,8 @@ async function initializeServer() {
                     typeof event.args.keyReadable === "object" &&
                     "hash" in event.args.keyReadable,
                   hash:
-                    event.args.keyReadable && typeof event.args.keyReadable === "object"
+                    event.args.keyReadable &&
+                    typeof event.args.keyReadable === "object"
                       ? event.args.keyReadable.hash
                       : "N/A",
                 });
@@ -844,41 +858,41 @@ async function initializeServer() {
   app.set("trust proxy", 1);
 
   // Route specifica per /admin (DEFINITA PRIMA DEL MIDDLEWARE DI AUTENTICAZIONE)
-  app.get('/admin', (req, res) => {
+  app.get("/admin", (req, res) => {
     const adminPath = path.resolve(publicPath, "admin.html");
     if (fs.existsSync(adminPath)) {
       // Aggiungi header per prevenire il caching
       res.set({
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
       });
       res.sendFile(adminPath);
     } else {
-      res.status(404).json({ 
-        success: false, 
+      res.status(404).json({
+        success: false,
         error: "Admin panel not found",
-        message: "Admin panel file not available"
+        message: "Admin panel file not available",
       });
     }
   });
 
   // Route specifica per /oauth-callback (DEFINITA PRIMA DEL MIDDLEWARE DI AUTENTICAZIONE)
-  app.get('/oauth-callback', (req, res) => {
+  app.get("/oauth-callback", (req, res) => {
     const callbackPath = path.resolve(publicPath, "oauth-callback.html");
     if (fs.existsSync(callbackPath)) {
       // Aggiungi header per prevenire il caching
       res.set({
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
       });
       res.sendFile(callbackPath);
     } else {
-      res.status(404).json({ 
-        success: false, 
+      res.status(404).json({
+        success: false,
         error: "OAuth callback page not found",
-        message: "OAuth callback page not available"
+        message: "OAuth callback page not available",
       });
     }
   });
@@ -965,33 +979,66 @@ async function initializeServer() {
   };
 
   // Funzione per verificare la firma del wallet
+  /**
+   * Verifica una firma EOA (EIP-191 personal_sign) recuperando l'indirizzo dal messaggio firmato
+   * e confrontandolo con l'indirizzo atteso.
+   * Supporta messaggi stringa e payload hex (0x...) come bytes.
+   */
   function verifyWalletSignature(message, signature, expectedAddress) {
     try {
-      // Verifica che l'address sia valido
-      if (
-        !expectedAddress ||
-        !expectedAddress.startsWith("0x") ||
-        expectedAddress.length !== 42
-      ) {
+      // Validazioni di base
+      if (!expectedAddress || !ethers.isAddress(expectedAddress)) {
+        return false;
+      }
+      if (!signature || typeof signature !== "string") {
+        return false;
+      }
+      if (message === undefined || message === null) {
         return false;
       }
 
-      // Verifica che la firma sia valida
-      if (
-        !signature ||
-        !signature.startsWith("0x") ||
-        signature.length !== 132
-      ) {
+      const normalizedExpected = ethers.getAddress(expectedAddress);
+
+      // Recupera l'indirizzo dalla firma
+      let recoveredAddress = null;
+      try {
+        recoveredAddress = ethers.verifyMessage(message, signature);
+      } catch (primaryError) {
+        // Fallback: se il messaggio è in hex, prova come bytes
+        if (typeof message === "string" && message.startsWith("0x")) {
+          try {
+            recoveredAddress = ethers.verifyMessage(
+              ethers.getBytes(message),
+              signature
+            );
+          } catch (bytesError) {
+            return false;
+          }
+        } else {
+          return false;
+        }
+      }
+
+      if (!recoveredAddress || !ethers.isAddress(recoveredAddress)) {
         return false;
       }
 
-      // Per ora restituiamo true se i formati sono corretti
-      // In futuro potremmo implementare la verifica crittografica completa
-      console.log(`🔐 Verifying signature for address: ${expectedAddress}`);
-      console.log(`🔐 Message: ${message}`);
-      console.log(`🔐 Signature: ${signature.substring(0, 20)}...`);
+      const isMatch =
+        ethers.getAddress(recoveredAddress) === normalizedExpected;
+      if (!isMatch) {
+        console.warn("❌ Wallet signature mismatch", {
+          expected: normalizedExpected,
+          recovered: ethers.getAddress(recoveredAddress),
+        });
+      } else {
+        console.log(
+          `🔐 Verified signature. Recovered: ${ethers.getAddress(
+            recoveredAddress
+          )}`
+        );
+      }
 
-      return true;
+      return isMatch;
     } catch (error) {
       console.error("❌ Error verifying wallet signature:", error);
       return false;
@@ -1169,7 +1216,9 @@ async function initializeServer() {
             enabled: true,
             clientId: process.env.GOOGLE_CLIENT_ID,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-            redirectUri: process.env.GOOGLE_REDIRECT_URI || `http://${host}:${port}/api/v1/auth/oauth/callback`,
+            redirectUri:
+              process.env.GOOGLE_REDIRECT_URI ||
+              `http://${host}:${port}/api/v1/auth/oauth/callback`,
             scope: ["openid", "email", "profile"],
             authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
             tokenUrl: "https://oauth2.googleapis.com/token",
