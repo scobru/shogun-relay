@@ -2,6 +2,31 @@
 // MUST be required after Gun to work
 
 import express from "express";
+
+// Helper function to sanitize data for GunDB storage
+function sanitizeForGunDB(data) {
+  if (data === null || data === undefined) {
+    return data;
+  }
+
+  try {
+    // Test if data is serializable
+    JSON.stringify(data);
+    return data;
+  } catch (error) {
+    // If not serializable, create a safe representation
+    if (typeof data === "object") {
+      return {
+        _error: "Object could not be serialized",
+        _type: typeof data,
+        _constructor: data.constructor?.name || "Unknown",
+        _stringified: String(data),
+      };
+    } else {
+      return String(data);
+    }
+  }
+}
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -164,11 +189,15 @@ async function initializeServer() {
   // System logging function
   function addSystemLog(level, message, data = null) {
     const timestamp = new Date().toISOString();
+
+    // Sanitize data to prevent JSON serialization errors
+    const sanitizedData = sanitizeForGunDB(data);
+
     const logEntry = {
       timestamp,
       level,
       message,
-      data,
+      data: sanitizedData,
     };
 
     console.log(`[${timestamp}] ${level.toUpperCase()}: ${message}`);
@@ -200,27 +229,28 @@ async function initializeServer() {
       // Memorizza i dati dell'evento in GunDB
       console.log("💾 Storing event data in GunDB...");
       const eventNode = gun.get("shogun").get("chain_events").get(eventId);
+
+      // Create a clean event data object with only serializable properties
+      const eventData = {
+        soul: sanitizeForGunDB(soul),
+        key: sanitizeForGunDB(key),
+        value: sanitizeForGunDB(value),
+        blockNumber: sanitizeForGunDB(event.blockNumber),
+        transactionHash: sanitizeForGunDB(event.transactionHash),
+        timestamp: Date.now(),
+        propagated: true,
+      };
+
       await new Promise((resolve, reject) => {
-        eventNode.put(
-          {
-            soul: soul,
-            key: key,
-            value: value,
-            blockNumber: event.blockNumber,
-            transactionHash: event.transactionHash,
-            timestamp: Date.now(),
-            propagated: true,
-          },
-          (ack) => {
-            if (ack.err) {
-              console.error("❌ Error storing event data:", ack.err);
-              reject(ack.err);
-            } else {
-              console.log("✅ Event data stored successfully");
-              resolve();
-            }
+        eventNode.put(eventData, (ack) => {
+          if (ack.err) {
+            console.error("❌ Error storing event data:", ack.err);
+            reject(ack.err);
+          } else {
+            console.log("✅ Event data stored successfully");
+            resolve();
           }
-        );
+        });
       });
 
       // Memorizza anche i dati nella struttura principale di GunDB usando dati leggibili
@@ -263,8 +293,9 @@ async function initializeServer() {
         }
 
         // Ora scrivi il valore con la chiave specificata
+        const sanitizedValue = sanitizeForGunDB(value);
         console.log(
-          `🔧 Writing value "${value}" with key "${key}" to GunDB structure`
+          `🔧 Writing value "${sanitizedValue}" with key "${key}" to GunDB structure`
         );
 
         await new Promise((resolve, reject) => {
@@ -273,7 +304,7 @@ async function initializeServer() {
             reject(new Error("Timeout"));
           }, 5000);
 
-          dataNode.get(key).put(value, (ack) => {
+          dataNode.get(key).put(sanitizedValue, (ack) => {
             clearTimeout(timeoutId);
             if (ack.err) {
               console.error(
@@ -286,22 +317,26 @@ async function initializeServer() {
               console.log(
                 `✅ GunDB path created: ${soulParts.join(
                   "."
-                )}.${key} = "${value}"`
+                )}.${key} = "${sanitizedValue}"`
               );
               resolve();
             }
           });
         });
 
-        console.log(`✅ Chain event propagated to GunDB: ${soul} -> ${key}`);
+        console.log(
+          `✅ Chain event propagated to GunDB: ${soul} -> ${key} = ${sanitizedValue}`
+        );
 
         // Aggiungi al log del sistema
         addSystemLog("info", "Chain event propagated to GunDB", {
           soul: soul,
           key: key,
-          value: value,
+          value: sanitizedValue,
           eventId: eventId,
           gunDBPath: `${soulParts.join(".")}.${key}`,
+          blockNumber: event.blockNumber,
+          transactionHash: event.transactionHash,
         });
       } catch (mainStructureError) {
         console.error(
@@ -318,9 +353,11 @@ async function initializeServer() {
           {
             soul: soul,
             key: key,
-            value: value,
+            value: sanitizedValue,
             eventId: eventId,
             error: mainStructureError.message,
+            blockNumber: event.blockNumber,
+            transactionHash: event.transactionHash,
           }
         );
       } finally {
@@ -333,7 +370,10 @@ async function initializeServer() {
       addSystemLog("error", "Failed to propagate chain event", {
         soul: soul,
         key: key,
+        value: sanitizeForGunDB(value),
         error: error.message,
+        blockNumber: event?.blockNumber,
+        transactionHash: event?.transactionHash,
       });
     }
   }
@@ -627,10 +667,14 @@ async function initializeServer() {
   // Funzione per i dati di serie temporale
   function addTimeSeriesPoint(key, value) {
     const timestamp = Date.now();
+
+    // Sanitize value to prevent JSON serialization errors
+    const sanitizedValue = sanitizeForGunDB(value);
+
     const dataPoint = {
       timestamp,
       key,
-      value,
+      value: sanitizedValue,
     };
 
     if (gun) {
