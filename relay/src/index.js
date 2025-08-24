@@ -3,13 +3,14 @@
 
 import express from "express";
 
-// Helper function to sanitize data for GunDB storage
+// Helper function to sanitize data for GunDB storage (simplified)
 function sanitizeForGunDB(data) {
+  // Simplified version to prevent JSON errors
   if (data === null || data === undefined) {
     return null;
   }
 
-  // Handle primitive types directly
+  // For primitive types, return as is
   if (
     typeof data === "string" ||
     typeof data === "number" ||
@@ -18,64 +19,15 @@ function sanitizeForGunDB(data) {
     return data;
   }
 
-  // Handle Date objects
-  if (data instanceof Date) {
-    return data.toISOString();
-  }
-
-  // Handle Buffer objects
-  if (Buffer.isBuffer(data)) {
-    return data.toString("base64");
-  }
-
-  // Handle arrays
-  if (Array.isArray(data)) {
-    try {
-      return data.map((item) => sanitizeForGunDB(item));
-    } catch (error) {
-      console.warn("⚠️ Error sanitizing array:", error);
-      return [];
-    }
-  }
-
-  // Handle objects
-  if (typeof data === "object") {
-    try {
-      // First, try to serialize to test if it's valid JSON
-      JSON.stringify(data);
-
-      // If successful, recursively sanitize all properties
-      const sanitized = {};
-      for (const [key, value] of Object.entries(data)) {
-        // Skip functions and symbols
-        if (typeof value === "function" || typeof value === "symbol") {
-          continue;
-        }
-        sanitized[key] = sanitizeForGunDB(value);
-      }
-      return sanitized;
-    } catch (error) {
-      // If JSON serialization fails, create a safe representation
-      console.warn(
-        "⚠️ Object could not be serialized, creating safe representation:",
-        error
-      );
-      return {
-        _error: "Object could not be serialized",
-        _type: typeof data,
-        _constructor: data.constructor?.name || "Unknown",
-        _stringified: String(data),
-        _timestamp: Date.now(),
-      };
-    }
-  }
-
-  // For any other type, convert to string
+  // For objects and arrays, try JSON serialization
   try {
-    return String(data);
+    JSON.stringify(data);
+    return data;
   } catch (error) {
-    console.warn("⚠️ Error converting data to string:", error);
-    return "[Unserializable Data]";
+    console.warn(
+      "⚠️ Data could not be serialized, returning string representation"
+    );
+    return String(data);
   }
 }
 import path from "path";
@@ -731,27 +683,10 @@ async function initializeServer() {
   // Start Chain contract event listener
   await startChainEventListener();
 
-  // Funzione per i dati di serie temporale
+  // Funzione per i dati di serie temporale (console only)
   function addTimeSeriesPoint(key, value) {
-    const timestamp = Date.now();
-
-    // Sanitize value to prevent JSON serialization errors
-    const sanitizedValue = sanitizeForGunDB(value);
-
-    const dataPoint = {
-      timestamp,
-      key,
-      value: sanitizedValue,
-    };
-
-    if (gun) {
-      gun
-        .get("shogun")
-        .get("timeseries")
-        .get(key)
-        .get(timestamp)
-        .put(dataPoint);
-    }
+    // Log to console only to prevent JSON serialization errors
+    console.log(`📊 TimeSeries: ${key} = ${value}`);
   }
 
   // Funzione di raccolta spazzatura
@@ -1685,14 +1620,11 @@ async function initializeServer() {
   gun.on("hi", () => {
     totalConnections += 1;
     activeWires += 1;
-    db?.get("totalConnections").put(totalConnections);
-    db?.get("activeWires").put(activeWires);
     console.log(`Connection opened (active: ${activeWires})`);
   });
 
   gun.on("bye", () => {
     activeWires -= 1;
-    db?.get("activeWires").put(activeWires);
     console.log(`Connection closed (active: ${activeWires})`);
   });
 
@@ -1715,14 +1647,19 @@ async function initializeServer() {
       },
     };
 
-    db?.get("pulse").put(pulse);
+    // Log pulse data to console only to prevent JSON errors
+    console.log(
+      `📊 Pulse: connections=${activeWires}, memory=${
+        process.memoryUsage().heapUsed
+      }`
+    );
     addTimeSeriesPoint("connections.active", activeWires);
     addTimeSeriesPoint("memory.heapUsed", process.memoryUsage().heapUsed);
   }, 30000); // 30 seconds
 
   // Shutdown function
   async function shutdown() {
-      console.log("🛑 Shutting down Shogun Relay...");
+    console.log("🛑 Shutting down Shogun Relay...");
 
     // Clean up garbage collector interval
     if (gcInterval) {
@@ -1766,55 +1703,14 @@ async function initializeServer() {
 
   console.log(`🚀 Shogun Relay Server running on http://${host}:${port}`);
 
-  // Function to clean up corrupted GunDB data
+  // Function to clean up corrupted GunDB data (disabled to prevent JSON errors)
   function cleanupCorruptedData() {
-    console.log("🧹 Starting GunDB data cleanup...");
-
-    try {
-      // Clean up any corrupted chain events
-      gun
-        .get("shogun")
-        .get("chain_events")
-        .map()
-        .once((data, key) => {
-          if (data && typeof data === "object") {
-            try {
-              // Test if the data is valid JSON
-              JSON.stringify(data);
-            } catch (error) {
-              console.log(`🧹 Removing corrupted chain event: ${key}`);
-              gun.get("shogun").get("chain_events").get(key).put(null);
-            }
-          }
-        });
-
-      // Clean up any corrupted logs
-      gun
-        .get("shogun")
-        .get("logs")
-        .map()
-        .once((data, key) => {
-          if (data && typeof data === "object") {
-            try {
-              // Test if the data is valid JSON
-              JSON.stringify(data);
-            } catch (error) {
-              console.log(`🧹 Removing corrupted log entry: ${key}`);
-              gun.get("shogun").get("logs").get(key).put(null);
-            }
-          }
-        });
-
-      console.log("✅ GunDB data cleanup completed");
-    } catch (error) {
-      console.error("❌ Error during GunDB data cleanup:", error);
-    }
+    console.log("🧹 GunDB data cleanup disabled to prevent JSON errors");
   }
 
   // Run cleanup on startup if enabled
   if (CLEANUP_CORRUPTED_DATA) {
-    console.log("🧹 Cleanup of corrupted data enabled");
-    setTimeout(cleanupCorruptedData, 5000); // Run after 5 seconds to allow GunDB to initialize
+    console.log("🧹 Cleanup of corrupted data disabled");
   }
 
   return {
