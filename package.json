@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "shogun-core": "^1.9.4"
+  }
+}

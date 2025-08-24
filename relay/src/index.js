@@ -111,6 +111,8 @@ import { DEPLOYMENTS } from "shogun-contracts/deployments.js";
 
 const namespace = "shogun";
 
+const CLEANUP_CORRUPTED_DATA = process.env.CLEANUP_CORRUPTED_DATA || true;
+
 // --- IPFS Configuration ---
 const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
 const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN;
@@ -1857,7 +1859,7 @@ function cleanupCorruptedData() {
 }
 
 // Run cleanup on startup if enabled
-if (process.env.CLEANUP_CORRUPTED_DATA === "true") {
+if (CLEANUP_CORRUPTED_DATA) {
   console.log("🧹 Cleanup of corrupted data enabled");
   setTimeout(cleanupCorruptedData, 5000); // Run after 5 seconds to allow GunDB to initialize
 }

@@ -1,21 +1,21 @@
-import express from 'express';
+import express from "express";
 
 const router = express.Router();
 
 // Funzione per convertire chainId in nome della chain
 function getChainName(chainId) {
   const chainMap = {
-    "1": "mainnet",
-    "11155111": "sepolia",
-    "137": "polygon",
-    "80001": "mumbai"
+    1: "mainnet",
+    11155111: "sepolia",
+    137: "polygon",
+    80001: "mumbai",
   };
   return chainMap[chainId] || chainId;
 }
 
 // Middleware per ottenere l'istanza Gun dal relay
 const getGunInstance = (req) => {
-  return req.app.get('gunInstance');
+  return req.app.get("gunInstance");
 };
 
 // Health check endpoint
@@ -50,7 +50,8 @@ router.get("/contract-config", (req, res) => {
       chainId: process.env.CHAIN_ID || "11155111",
       provider: process.env.ALCHEMY_API_KEY ? "Alchemy" : "Not configured",
       contracts: {
-        relayPaymentRouter: process.env.RELAY_CONTRACT_ADDRESS || "Not configured",
+        relayPaymentRouter:
+          process.env.RELAY_CONTRACT_ADDRESS || "Not configured",
       },
     },
   });
@@ -96,7 +97,7 @@ router.get("/contract-status", async (req, res) => {
     // Test basic contract interaction
     try {
       await contract.getFunction("owner")();
-      
+
       res.json({
         success: true,
         status: "connected",
@@ -316,7 +317,8 @@ router.get("/user-subscription-details/:userAddress", async (req, res) => {
           relayAddress
         );
 
-        const [startTime, endTime, amountPaid, mbAllocated, isActive] = subscriptionDetails;
+        const [startTime, endTime, amountPaid, mbAllocated, isActive] =
+          subscriptionDetails;
 
         if (isActive && Number(mbAllocated) > 0) {
           activeSubscription = {
@@ -325,9 +327,9 @@ router.get("/user-subscription-details/:userAddress", async (req, res) => {
             endTime: endTime.toString(),
             amountPaid: amountPaid.toString(),
             mbAllocated: mbAllocated.toString(),
-            relayAddress: relayAddress
+            relayAddress: relayAddress,
           };
-          
+
           foundRelay = relayAddress;
           break;
         }
@@ -344,7 +346,7 @@ router.get("/user-subscription-details/:userAddress", async (req, res) => {
       userAddress,
       subscription: activeSubscription || {
         isActive: false,
-        reason: "No active subscription found"
+        reason: "No active subscription found",
       },
       balance: {
         wei: balance.toString(),
@@ -365,7 +367,7 @@ router.get("/user-subscription-details/:userAddress", async (req, res) => {
 router.get("/alldata", (req, res) => {
   try {
     const gun = getGunInstance(req);
-    
+
     // Get all data from Gun database
     gun.get("shogun").once((data) => {
       res.json({
@@ -389,61 +391,61 @@ router.get("/stats", (req, res) => {
     const now = Date.now();
     const uptime = process.uptime() * 1000; // Convert to milliseconds
     const memoryUsage = process.memoryUsage();
-    
+
     // Calculate rates (simplified - you might want to track these over time)
     const getRate = Math.random() * 10; // Placeholder
-    const putRate = Math.random() * 5;  // Placeholder
-    
+    const putRate = Math.random() * 5; // Placeholder
+
     const stats = {
       // Basic system info
       up: {
-        time: uptime
+        time: uptime,
       },
       memory: {
         heapUsed: memoryUsage.heapUsed,
         heapTotal: memoryUsage.heapTotal,
         external: memoryUsage.external,
-        rss: memoryUsage.rss
+        rss: memoryUsage.rss,
       },
       cpu: process.cpuUsage(),
       timestamp: now,
       version: process.env.npm_package_version || "1.0.0",
-      
+
       // Gun-specific stats (placeholders - you might want to track these from Gun)
       peers: {
         count: Math.floor(Math.random() * 10) + 1, // Placeholder
-        time: uptime
+        time: uptime,
       },
       node: {
         count: Math.floor(Math.random() * 100) + 10, // Placeholder
         memory: {
           heapUsed: memoryUsage.heapUsed,
-          heapTotal: memoryUsage.heapTotal
-        }
+          heapTotal: memoryUsage.heapTotal,
+        },
       },
-      
+
       // DAM (Data Access Manager) stats
       dam: {
         in: {
           rate: getRate,
-          count: Math.floor(Math.random() * 1000) + 100
+          count: Math.floor(Math.random() * 1000) + 100,
         },
         out: {
           rate: putRate,
-          count: Math.floor(Math.random() * 500) + 50
-        }
+          count: Math.floor(Math.random() * 500) + 50,
+        },
       },
-      
+
       // Additional stats for charts
       over: 5000, // 5 seconds in milliseconds
-      
+
       // Time series data (empty for now)
-      all: {}
+      all: {},
     };
 
     res.json({
       success: true,
-      ...stats
+      ...stats,
     });
   } catch (error) {
     console.error("❌ Stats error:", error);
@@ -458,8 +460,8 @@ router.get("/stats", (req, res) => {
 router.post("/gc/trigger", (req, res) => {
   try {
     // Trigger garbage collection
-    const addSystemLog = req.app.get('addSystemLog');
-    const runGarbageCollector = req.app.get('runGarbageCollector');
+    const addSystemLog = req.app.get("addSystemLog");
+    const runGarbageCollector = req.app.get("runGarbageCollector");
 
     if (addSystemLog) {
       addSystemLog("info", "Manual garbage collection triggered");
@@ -487,7 +489,7 @@ router.post("/gc/trigger", (req, res) => {
 router.post("/stats/update", (req, res) => {
   try {
     const { key, value } = req.body;
-    const addTimeSeriesPoint = req.app.get('addTimeSeriesPoint');
+    const addTimeSeriesPoint = req.app.get("addTimeSeriesPoint");
 
     if (!key || value === undefined) {
       return res.status(400).json({
@@ -521,55 +523,55 @@ router.get("/stats.json", (req, res) => {
   try {
     const now = Date.now();
     const uptime = process.uptime() * 1000; // Convert to milliseconds
-    
+
     // Get memory usage
     const memoryUsage = process.memoryUsage();
-    
+
     // Calculate rates (simplified - you might want to track these over time)
     const getRate = Math.random() * 10; // Placeholder
-    const putRate = Math.random() * 5;  // Placeholder
-    
+    const putRate = Math.random() * 5; // Placeholder
+
     const stats = {
       // Basic system info
       up: {
-        time: uptime
+        time: uptime,
       },
       memory: {
         heapUsed: memoryUsage.heapUsed,
         heapTotal: memoryUsage.heapTotal,
         external: memoryUsage.external,
-        rss: memoryUsage.rss
+        rss: memoryUsage.rss,
       },
       cpu: process.cpuUsage(),
       timestamp: now,
       version: process.env.npm_package_version || "1.0.0",
-      
+
       // Gun-specific stats (placeholders - you might want to track these from Gun)
       peers: {
         count: Math.floor(Math.random() * 10) + 1, // Placeholder
-        time: uptime
+        time: uptime,
       },
       node: {
-        count: Math.floor(Math.random() * 100) + 10 // Placeholder
+        count: Math.floor(Math.random() * 100) + 10, // Placeholder
       },
-      
+
       // DAM (Data Access Manager) stats
       dam: {
         in: {
           rate: getRate,
-          count: Math.floor(Math.random() * 1000) + 100
+          count: Math.floor(Math.random() * 1000) + 100,
         },
         out: {
           rate: putRate,
-          count: Math.floor(Math.random() * 500) + 50
-        }
+          count: Math.floor(Math.random() * 500) + 50,
+        },
       },
-      
+
       // Additional stats for charts
       over: 5000, // 5 seconds in milliseconds
-      
+
       // Time series data (empty for now)
-      all: {}
+      all: {},
     };
 
     res.setHeader("Content-Type", "application/json");
@@ -587,7 +589,7 @@ router.get("/stats.json", (req, res) => {
 router.post("/derive", async (req, res) => {
   try {
     const { password, extra, options } = req.body;
-    
+
     if (!password) {
       return res.status(400).json({
         success: false,
@@ -620,20 +622,20 @@ router.get("/node/*", async (req, res) => {
   try {
     const path = req.params[0];
     const gun = getGunInstance(req);
-    
+
     const getGunNodeFromPath = (pathString) => {
       const pathParts = pathString.split("/").filter(Boolean);
       let node = gun;
-      
+
       for (const part of pathParts) {
         node = node.get(part);
       }
-      
+
       return node;
     };
 
     const node = getGunNodeFromPath(path);
-    
+
     node.once((data) => {
       res.json({
         success: true,
@@ -656,7 +658,7 @@ router.post("/node/*", async (req, res) => {
     const path = req.params[0];
     const { data } = req.body;
     const gun = getGunInstance(req);
-    
+
     if (!path || path.trim() === "") {
       return res
         .status(400)
@@ -664,34 +666,34 @@ router.post("/node/*", async (req, res) => {
     }
 
     if (data === undefined) {
-      return res
-        .status(400)
-        .json({ 
-          success: false, 
-          error: "Invalid data: undefined at test.",
-          path: path,
-          receivedBody: req.body
-        });
+      return res.status(400).json({
+        success: false,
+        error: "Invalid data: undefined at test.",
+        path: path,
+        receivedBody: req.body,
+      });
     }
 
     console.log(`📝 Creating node at path: "${path}" with data:`, data);
-    
+
     const getGunNodeFromPath = (pathString) => {
       const pathParts = pathString.split("/").filter(Boolean);
       let node = gun;
-      
+
       for (const part of pathParts) {
         node = node.get(part);
       }
-      
+
       return node;
     };
 
     const node = getGunNodeFromPath(path);
 
     // Get the setAllowInternalOperations function
-    const setAllowInternalOperations = req.app.get('setAllowInternalOperations');
-    
+    const setAllowInternalOperations = req.app.get(
+      "setAllowInternalOperations"
+    );
+
     // Temporarily allow internal operations during this REST API call
     setAllowInternalOperations(true);
 
@@ -746,7 +748,7 @@ router.delete("/node/*", async (req, res) => {
   try {
     const path = req.params[0];
     const gun = getGunInstance(req);
-    
+
     if (!path || path.trim() === "") {
       return res
         .status(400)
@@ -754,22 +756,24 @@ router.delete("/node/*", async (req, res) => {
     }
 
     console.log(`🗑️ Deleting node at path: "${path}"`);
-    
+
     const getGunNodeFromPath = (pathString) => {
       const pathParts = pathString.split("/").filter(Boolean);
       let node = gun;
-      
+
       for (const part of pathParts) {
         node = node.get(part);
       }
-      
+
       return node;
     };
 
     const node = getGunNodeFromPath(path);
 
     // Get the setAllowInternalOperations function
-    const setAllowInternalOperations = req.app.get('setAllowInternalOperations');
+    const setAllowInternalOperations = req.app.get(
+      "setAllowInternalOperations"
+    );
 
     // Temporarily allow internal operations during this REST API call
     setAllowInternalOperations(true);
@@ -785,10 +789,7 @@ router.delete("/node/*", async (req, res) => {
           node.put(null, (ack) => {
             clearTimeout(timeout);
             if (ack.err) {
-              console.error(
-                `❌ Gun delete error for path "${path}":`,
-                ack.err
-              );
+              console.error(`❌ Gun delete error for path "${path}":`, ack.err);
               reject(new Error(ack.err));
             } else {
               console.log(`✅ Gun delete success for path "${path}":`, ack);
@@ -810,7 +811,11 @@ router.delete("/node/*", async (req, res) => {
     }
 
     console.log(`✅ Node successfully deleted at path: "${path}"`);
-    return res.json({ success: true, path, message: "Node deleted successfully" });
+    return res.json({
+      success: true,
+      path,
+      message: "Node deleted successfully",
+    });
   } catch (error) {
     console.error(
       `❌ Error in DELETE /node/* for path "${req.params[0]}":`,
@@ -824,14 +829,114 @@ router.delete("/node/*", async (req, res) => {
   }
 });
 
+// Logs endpoint for real-time relay logs
+router.get("/logs", (req, res) => {
+  try {
+    const gun = getGunInstance(req);
+    const limit = parseInt(req.query.limit) || 100;
+    const since = req.query.since ? parseInt(req.query.since) : null;
+
+    // Get logs from GunDB
+    const logsNode = gun.get("shogun").get("logs");
+
+    logsNode.map().once(
+      (logEntry, key) => {
+        if (logEntry && typeof logEntry === "object") {
+          // Filter by timestamp if since parameter is provided
+          if (since && logEntry.timestamp && logEntry.timestamp < since) {
+            return;
+          }
+
+          // Add key to log entry for identification
+          logEntry.id = key;
+          return logEntry;
+        }
+      },
+      (logs) => {
+        // Convert logs object to array and sort by timestamp
+        let logsArray = [];
+        if (logs && typeof logs === "object") {
+          logsArray = Object.values(logs).filter(
+            (log) => log && typeof log === "object"
+          );
+        }
+
+        // Sort by timestamp (newest first)
+        logsArray.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+        // Apply limit
+        logsArray = logsArray.slice(0, limit);
+
+        res.json({
+          success: true,
+          logs: logsArray,
+          count: logsArray.length,
+          timestamp: Date.now(),
+        });
+      }
+    );
+  } catch (error) {
+    console.error("❌ Logs GET error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Clear logs endpoint
+router.delete("/logs", (req, res) => {
+  try {
+    const gun = getGunInstance(req);
+    const logsNode = gun.get("shogun").get("logs");
+
+    // Get the setAllowInternalOperations function
+    const setAllowInternalOperations = req.app.get(
+      "setAllowInternalOperations"
+    );
+
+    // Temporarily allow internal operations during this REST API call
+    setAllowInternalOperations(true);
+
+    try {
+      // Clear all logs by putting null to the logs node
+      logsNode.put(null, (ack) => {
+        if (ack.err) {
+          console.error("❌ Error clearing logs:", ack.err);
+          res.status(500).json({
+            success: false,
+            error: ack.err,
+          });
+        } else {
+          console.log("✅ All logs cleared successfully");
+          res.json({
+            success: true,
+            message: "All logs cleared successfully",
+            timestamp: Date.now(),
+          });
+        }
+      });
+    } finally {
+      // Reset flag
+      setAllowInternalOperations(false);
+    }
+  } catch (error) {
+    console.error("❌ Clear logs error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 // Peers endpoints
 router.get("/peers", (req, res) => {
   try {
     const gun = getGunInstance(req);
-    
+
     // Get peers information
     const peers = gun._.opt.peers || {};
-    
+
     res.json({
       success: true,
       peers: Object.keys(peers),
@@ -851,7 +956,7 @@ router.post("/peers/add", (req, res) => {
   try {
     const { peer } = req.body;
     const gun = getGunInstance(req);
-    
+
     if (!peer) {
       return res.status(400).json({
         success: false,
@@ -861,7 +966,7 @@ router.post("/peers/add", (req, res) => {
 
     // Add peer to Gun
     gun.opt({ peers: [peer] });
-    
+
     res.json({
       success: true,
       message: "Peer added successfully",
@@ -877,4 +982,4 @@ router.post("/peers/add", (req, res) => {
   }
 });
 
-export default router; 
+export default router;
