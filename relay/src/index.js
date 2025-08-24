@@ -510,6 +510,18 @@ async function initializeServer() {
               } to ${currentBlock}`
             );
 
+            addSystemLog(
+              "info",
+              `Polling for events from block ${
+                lastProcessedBlock + 1
+              } to ${currentBlock}`,
+              {
+                fromBlock: lastProcessedBlock + 1,
+                toBlock: currentBlock,
+                event: "polling_started",
+              }
+            );
+
             try {
               const events = await chainContract.queryFilter(
                 chainContract.filters.NodeUpdated(),
@@ -518,6 +530,12 @@ async function initializeServer() {
               );
 
               console.log(`📡 Found ${events.length} new events`);
+              addSystemLog("info", `Found ${events.length} new events`, {
+                eventCount: events.length,
+                fromBlock: lastProcessedBlock + 1,
+                toBlock: currentBlock,
+                event: "events_found",
+              });
 
               // Processa ogni evento
               for (const event of events) {
@@ -1709,12 +1727,22 @@ async function initializeServer() {
     db?.get("totalConnections").put(totalConnections);
     db?.get("activeWires").put(activeWires);
     console.log(`Connection opened (active: ${activeWires})`);
+    addSystemLog("info", `Connection opened (active: ${activeWires})`, {
+      totalConnections,
+      activeWires,
+      event: "connection_opened",
+    });
   });
 
   gun.on("bye", () => {
     activeWires -= 1;
     db?.get("activeWires").put(activeWires);
     console.log(`Connection closed (active: ${activeWires})`);
+    addSystemLog("info", `Connection closed (active: ${activeWires})`, {
+      totalConnections,
+      activeWires,
+      event: "connection_closed",
+    });
   });
 
   gun.on("out", { get: { "#": { "*": "" } } });

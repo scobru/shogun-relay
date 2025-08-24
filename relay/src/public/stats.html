@@ -392,7 +392,8 @@
 
                             <!-- Live Logs -->
                             <div class="mt-8">
-                                <h3 class="text-lg mb-4 text-[#FFFFFF]">Live Relay Logs</h3>
+                                <h3 class="text-lg mb-4 text-[#FFFFFF]">Live Relay Logs (from
+                                    /var/log/supervisor/relay.log)</h3>
                                 <div class="mb-4">
                                     <div class="flex gap-3 mb-3">
                                         <button id="toggleLogsBtn"
@@ -405,7 +406,7 @@
                                         </button>
                                         <button id="clearLogsDbBtn"
                                             class="btn bg-[#D32F2F] hover:bg-[#B71C1C] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium">
-                                            🗑️ Clear Database
+                                            🗑️ Clear GunDB Logs
                                         </button>
                                         <select id="logLevelFilter"
                                             class="input bg-[#282828] border-[#606060] text-[#FFFFFF] rounded-xl px-4 py-3">
@@ -801,12 +802,12 @@
         async function clearLogsFromDatabase() {
             const token = getAuthToken();
             if (!token) {
-                alert('Authentication required to clear logs from database.');
+                alert('Authentication required to clear GunDB logs.');
                 return;
             }
 
             // Confirm before clearing
-            if (!confirm('⚠️ This will permanently delete ALL logs from the database. This action cannot be undone. Are you sure you want to continue?')) {
+            if (!confirm('⚠️ This will permanently delete ALL GunDB logs. File logs are managed by the system and cannot be cleared from here. Are you sure you want to continue?')) {
                 return;
             }
 
@@ -814,7 +815,7 @@
                 // Show loading state
                 clearLogsDbBtn.textContent = '🔄 Clearing...';
                 clearLogsDbBtn.disabled = true;
-                logsStatusEl.textContent = 'Clearing logs from database...';
+                logsStatusEl.textContent = 'Clearing GunDB logs...';
 
                 const response = await fetch('/api/v1/system/logs', {
                     method: 'DELETE',
@@ -832,23 +833,23 @@
                     updateLogsDisplay();
                     updateLogsStats();
 
-                    logsContainer.innerHTML = '<div class="text-[#4CAF50] text-center py-8">✅ All logs cleared from database successfully</div>';
-                    logsStatusEl.textContent = 'Database logs cleared successfully';
+                    logsContainer.innerHTML = '<div class="text-[#4CAF50] text-center py-8">✅ GunDB logs cleared successfully. File logs are managed by the system.</div>';
+                    logsStatusEl.textContent = 'GunDB logs cleared successfully';
 
                     // Show success message
                     setTimeout(() => {
                         logsStatusEl.textContent = 'Ready to start live logs';
                     }, 3000);
                 } else {
-                    throw new Error(result.error || 'Failed to clear logs from database');
+                    throw new Error(result.error || 'Failed to clear GunDB logs');
                 }
             } catch (error) {
-                console.error('Error clearing logs from database:', error);
+                console.error('Error clearing GunDB logs:', error);
                 logsStatusEl.textContent = `Error: ${error.message}`;
-                logsContainer.innerHTML = '<div class="text-[#F44336] text-center py-8">❌ Failed to clear logs from database</div>';
+                logsContainer.innerHTML = '<div class="text-[#F44336] text-center py-8">❌ Failed to clear GunDB logs</div>';
             } finally {
                 // Reset button state
-                clearLogsDbBtn.textContent = '🗑️ Clear Database';
+                clearLogsDbBtn.textContent = '🗑️ Clear GunDB Logs';
                 clearLogsDbBtn.disabled = false;
             }
         }

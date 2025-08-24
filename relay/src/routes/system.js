@@ -1,4 +1,5 @@
 import express from "express";
+import fs from "fs";
 
 const router = express.Router();
 
@@ -829,52 +830,55 @@ router.delete("/node/*", async (req, res) => {
   }
 });
 
-// Logs endpoint for real-time relay logs
+// Logs endpoint for real-time relay logs from file
 router.get("/logs", (req, res) => {
   try {
-    const gun = getGunInstance(req);
     const limit = parseInt(req.query.limit) || 100;
-    const since = req.query.since ? parseInt(req.query.since) : null;
+    const tail = parseInt(req.query.tail) || 100; // Number of lines to read from end
 
-    // Get logs from GunDB
-    const logsNode = gun.get("shogun").get("logs");
+    // Read relay log file directly
+    const logFilePath = "/var/log/supervisor/relay.log";
 
-    logsNode.map().once(
-      (logEntry, key) => {
-        if (logEntry && typeof logEntry === "object") {
-          // Filter by timestamp if since parameter is provided
-          if (since && logEntry.timestamp && logEntry.timestamp < since) {
-            return;
-          }
+    // Check if file exists
+    if (!fs.existsSync(logFilePath)) {
+      return res.json({
+        success: true,
+        logs: [],
+        count: 0,
+        message: "Log file not found",
+        timestamp: Date.now(),
+      });
+    }
 
-          // Add key to log entry for identification
-          logEntry.id = key;
-          return logEntry;
-        }
-      },
-      (logs) => {
-        // Convert logs object to array and sort by timestamp
-        let logsArray = [];
-        if (logs && typeof logs === "object") {
-          logsArray = Object.values(logs).filter(
-            (log) => log && typeof log === "object"
-          );
-        }
+    // Read the last N lines from the log file
+    const logContent = fs.readFileSync(logFilePath, "utf8");
+    const lines = logContent.split("\n").filter((line) => line.trim() !== "");
 
-        // Sort by timestamp (newest first)
-        logsArray.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    // Get the last N lines
+    const lastLines = lines.slice(-tail);
 
-        // Apply limit
-        logsArray = logsArray.slice(0, limit);
+    // Parse log entries (simple parsing for now)
+    const logEntries = lastLines.map((line, index) => {
+      const timestamp = new Date().toISOString(); // Default timestamp
+      return {
+        id: `line_${lines.length - tail + index}`,
+        timestamp,
+        level: "info",
+        message: line,
+        lineNumber: lines.length - tail + index + 1,
+      };
+    });
 
-        res.json({
-          success: true,
-          logs: logsArray,
-          count: logsArray.length,
-          timestamp: Date.now(),
-        });
-      }
-    );
+    // Apply limit
+    const limitedLogs = logEntries.slice(-limit);
+
+    res.json({
+      success: true,
+      logs: limitedLogs,
+      count: limitedLogs.length,
+      totalLines: lines.length,
+      timestamp: Date.now(),
+    });
   } catch (error) {
     console.error("❌ Logs GET error:", error);
     res.status(500).json({
@@ -884,7 +888,7 @@ router.get("/logs", (req, res) => {
   }
 });
 
-// Clear logs endpoint
+// Clear logs endpoint (clears GunDB logs only)
 router.delete("/logs", (req, res) => {
   try {
     const gun = getGunInstance(req);
@@ -899,19 +903,20 @@ router.delete("/logs", (req, res) => {
     setAllowInternalOperations(true);
 
     try {
-      // Clear all logs by putting null to the logs node
+      // Clear GunDB logs only (file logs are managed by the system)
       logsNode.put(null, (ack) => {
         if (ack.err) {
-          console.error("❌ Error clearing logs:", ack.err);
+          console.error("❌ Error clearing GunDB logs:", ack.err);
           res.status(500).json({
             success: false,
             error: ack.err,
           });
         } else {
-          console.log("✅ All logs cleared successfully");
+          console.log("✅ GunDB logs cleared successfully");
           res.json({
             success: true,
-            message: "All logs cleared successfully",
+            message:
+              "GunDB logs cleared successfully (file logs are managed by the system)",
             timestamp: Date.now(),
           });
         }
