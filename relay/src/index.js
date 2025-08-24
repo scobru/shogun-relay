@@ -6,25 +6,76 @@ import express from "express";
 // Helper function to sanitize data for GunDB storage
 function sanitizeForGunDB(data) {
   if (data === null || data === undefined) {
+    return null;
+  }
+
+  // Handle primitive types directly
+  if (
+    typeof data === "string" ||
+    typeof data === "number" ||
+    typeof data === "boolean"
+  ) {
     return data;
   }
 
-  try {
-    // Test if data is serializable
-    JSON.stringify(data);
-    return data;
-  } catch (error) {
-    // If not serializable, create a safe representation
-    if (typeof data === "object") {
+  // Handle Date objects
+  if (data instanceof Date) {
+    return data.toISOString();
+  }
+
+  // Handle Buffer objects
+  if (Buffer.isBuffer(data)) {
+    return data.toString("base64");
+  }
+
+  // Handle arrays
+  if (Array.isArray(data)) {
+    try {
+      return data.map((item) => sanitizeForGunDB(item));
+    } catch (error) {
+      console.warn("⚠️ Error sanitizing array:", error);
+      return [];
+    }
+  }
+
+  // Handle objects
+  if (typeof data === "object") {
+    try {
+      // First, try to serialize to test if it's valid JSON
+      JSON.stringify(data);
+
+      // If successful, recursively sanitize all properties
+      const sanitized = {};
+      for (const [key, value] of Object.entries(data)) {
+        // Skip functions and symbols
+        if (typeof value === "function" || typeof value === "symbol") {
+          continue;
+        }
+        sanitized[key] = sanitizeForGunDB(value);
+      }
+      return sanitized;
+    } catch (error) {
+      // If JSON serialization fails, create a safe representation
+      console.warn(
+        "⚠️ Object could not be serialized, creating safe representation:",
+        error
+      );
       return {
         _error: "Object could not be serialized",
         _type: typeof data,
         _constructor: data.constructor?.name || "Unknown",
         _stringified: String(data),
+        _timestamp: Date.now(),
       };
-    } else {
-      return String(data);
     }
+  }
+
+  // For any other type, convert to string
+  try {
+    return String(data);
+  } catch (error) {
+    console.warn("⚠️ Error converting data to string:", error);
+    return "[Unserializable Data]";
   }
 }
 import path from "path";
@@ -222,6 +273,18 @@ async function initializeServer() {
     }
 
     try {
+      // Validate and sanitize input data
+      const sanitizedSoul =
+        typeof soul === "string" ? soul.trim() : String(soul || "");
+      const sanitizedKey =
+        typeof key === "string" ? key.trim() : String(key || "");
+
+      if (!sanitizedSoul || !sanitizedKey) {
+        console.warn("⚠️ Invalid soul or key, skipping event propagation");
+        console.log("Soul:", sanitizedSoul, "Key:", sanitizedKey);
+        return;
+      }
+
       // Crea un identificatore univoco per questo evento
       const eventId = `${event.transactionHash}-${event.logIndex || 0}`;
       console.log("📋 Event ID:", eventId);
@@ -232,14 +295,23 @@ async function initializeServer() {
 
       // Create a clean event data object with only serializable properties
       const eventData = {
-        soul: sanitizeForGunDB(soul),
-        key: sanitizeForGunDB(key),
+        soul: sanitizedSoul,
+        key: sanitizedKey,
         value: sanitizeForGunDB(value),
         blockNumber: sanitizeForGunDB(event.blockNumber),
         transactionHash: sanitizeForGunDB(event.transactionHash),
         timestamp: Date.now(),
         propagated: true,
       };
+
+      // Validate the event data before storing
+      try {
+        JSON.stringify(eventData);
+      } catch (jsonError) {
+        console.error("❌ Event data is not JSON serializable:", jsonError);
+        console.log("❌ Event data:", eventData);
+        return;
+      }
 
       await new Promise((resolve, reject) => {
         eventNode.put(eventData, (ack) => {
@@ -256,23 +328,16 @@ async function initializeServer() {
       // Memorizza anche i dati nella struttura principale di GunDB usando dati leggibili
       console.log("💾 Storing data in main GunDB structure...");
 
-      // Verifica che soul e key siano stringhe valide
-      if (typeof soul !== "string" || typeof key !== "string") {
-        console.warn(
-          "⚠️ Soul or key is not a string, skipping main structure storage"
-        );
-        console.log("Soul type:", typeof soul, "Key type:", typeof key);
-        return;
-      }
-
       // Attiva il flag per permettere scritture interne del relay
       allowInternalOperations = true;
       console.log("🔓 Enabled internal operations for relay self-write");
 
       try {
         // Scomponi il soul path per creare la struttura GunDB corretta
-        console.log("🔧 Decomposing soul path:", soul);
-        const soulParts = soul.split("/").filter((part) => part.length > 0);
+        console.log("🔧 Decomposing soul path:", sanitizedSoul);
+        const soulParts = sanitizedSoul
+          .split("/")
+          .filter((part) => part.length > 0);
         console.log("🔧 Soul parts:", soulParts);
 
         if (soulParts.length === 0) {
@@ -294,8 +359,18 @@ async function initializeServer() {
 
         // Ora scrivi il valore con la chiave specificata
         const sanitizedValue = sanitizeForGunDB(value);
+
+        // Validate the value before storing
+        try {
+          JSON.stringify(sanitizedValue);
+        } catch (jsonError) {
+          console.error("❌ Value is not JSON serializable:", jsonError);
+          console.log("❌ Value:", sanitizedValue);
+          return;
+        }
+
         console.log(
-          `🔧 Writing value "${sanitizedValue}" with key "${key}" to GunDB structure`
+          `🔧 Writing value "${sanitizedValue}" with key "${sanitizedKey}" to GunDB structure`
         );
 
         await new Promise((resolve, reject) => {
@@ -304,7 +379,7 @@ async function initializeServer() {
             reject(new Error("Timeout"));
           }, 5000);
 
-          dataNode.get(key).put(sanitizedValue, (ack) => {
+          dataNode.get(sanitizedKey).put(sanitizedValue, (ack) => {
             clearTimeout(timeoutId);
             if (ack.err) {
               console.error(
@@ -317,7 +392,7 @@ async function initializeServer() {
               console.log(
                 `✅ GunDB path created: ${soulParts.join(
                   "."
-                )}.${key} = "${sanitizedValue}"`
+                )}.${sanitizedKey} = "${sanitizedValue}"`
               );
               resolve();
             }
@@ -325,16 +400,16 @@ async function initializeServer() {
         });
 
         console.log(
-          `✅ Chain event propagated to GunDB: ${soul} -> ${key} = ${sanitizedValue}`
+          `✅ Chain event propagated to GunDB: ${sanitizedSoul} -> ${sanitizedKey} = ${sanitizedValue}`
         );
 
         // Aggiungi al log del sistema
         addSystemLog("info", "Chain event propagated to GunDB", {
-          soul: soul,
-          key: key,
+          soul: sanitizedSoul,
+          key: sanitizedKey,
           value: sanitizedValue,
           eventId: eventId,
-          gunDBPath: `${soulParts.join(".")}.${key}`,
+          gunDBPath: `${soulParts.join(".")}.${sanitizedKey}`,
           blockNumber: event.blockNumber,
           transactionHash: event.transactionHash,
         });
@@ -351,8 +426,8 @@ async function initializeServer() {
           "warning",
           "Chain event partially propagated (main structure failed)",
           {
-            soul: soul,
-            key: key,
+            soul: sanitizedSoul,
+            key: sanitizedKey,
             value: sanitizedValue,
             eventId: eventId,
             error: mainStructureError.message,
@@ -368,8 +443,8 @@ async function initializeServer() {
     } catch (error) {
       console.error("❌ Failed to propagate chain event to GunDB:", error);
       addSystemLog("error", "Failed to propagate chain event", {
-        soul: soul,
-        key: key,
+        soul: sanitizedSoul,
+        key: sanitizedKey,
         value: sanitizeForGunDB(value),
         error: error.message,
         blockNumber: event?.blockNumber,
@@ -1179,7 +1254,7 @@ async function initializeServer() {
   const gunConfig = {
     super: false,
     file: "radata",
-    radisk: true,
+    radisk: process.env.DISABLE_RADISK !== "true", // Allow disabling radisk via env var
     web: server,
     isValid: hasValidToken,
     uuid: process.env.RELAY_NAME,
@@ -1190,9 +1265,18 @@ async function initializeServer() {
     wait: 500,
     webrtc: true,
     peers: peers,
+    // Add better error handling for radisk
+    chunk: 1000, // Smaller chunks to reduce memory usage
+    pack: 1000, // Smaller pack size
+    // Add JSON error handling
+    jsonify: false, // Disable automatic JSON parsing to prevent errors
   };
 
-  console.log("📁 Using local file storage only");
+  if (process.env.DISABLE_RADISK === "true") {
+    console.log("📁 Radisk disabled via environment variable");
+  } else {
+    console.log("📁 Using local file storage with radisk");
+  }
 
   Gun.on("opt", function (ctx) {
     if (ctx.once) {
@@ -1716,3 +1800,59 @@ async function initializeServer() {
 
 // Avvia il server
 initializeServer().catch(console.error);
+
+// Function to clean up corrupted GunDB data
+function cleanupCorruptedData() {
+  if (!gun) {
+    console.warn("⚠️ Gun not initialized, cannot cleanup data");
+    return;
+  }
+
+  console.log("🧹 Starting GunDB data cleanup...");
+
+  try {
+    // Clean up any corrupted chain events
+    gun
+      .get("shogun")
+      .get("chain_events")
+      .map()
+      .once((data, key) => {
+        if (data && typeof data === "object") {
+          try {
+            // Test if the data is valid JSON
+            JSON.stringify(data);
+          } catch (error) {
+            console.log(`🧹 Removing corrupted chain event: ${key}`);
+            gun.get("shogun").get("chain_events").get(key).put(null);
+          }
+        }
+      });
+
+    // Clean up any corrupted logs
+    gun
+      .get("shogun")
+      .get("logs")
+      .map()
+      .once((data, key) => {
+        if (data && typeof data === "object") {
+          try {
+            // Test if the data is valid JSON
+            JSON.stringify(data);
+          } catch (error) {
+            console.log(`🧹 Removing corrupted log entry: ${key}`);
+            gun.get("shogun").get("logs").get(key).put(null);
+          }
+        }
+      });
+
+    console.log("✅ GunDB data cleanup completed");
+  } catch (error) {
+    console.error("❌ Error during GunDB data cleanup:", error);
+  }
+}
+
+// Run cleanup on startup if enabled
+if (process.env.CLEANUP_CORRUPTED_DATA === "true") {
+  console.log("🧹 Cleanup of corrupted data enabled");
+  setTimeout(cleanupCorruptedData, 5000); // Run after 5 seconds to allow GunDB to initialize
+}
