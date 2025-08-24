@@ -244,25 +244,26 @@ async function initializeServer() {
   // Initialize Chain contract
   await initializeChainContract();
 
-  // System logging function
+  // System logging function (console only, no GunDB storage)
   function addSystemLog(level, message, data = null) {
     const timestamp = new Date().toISOString();
 
-    // Sanitize data to prevent JSON serialization errors
-    const sanitizedData = sanitizeForGunDB(data);
-
-    const logEntry = {
-      timestamp,
-      level,
-      message,
-      data: sanitizedData,
-    };
-
+    // Log to console only (file logs are managed by the system)
     console.log(`[${timestamp}] ${level.toUpperCase()}: ${message}`);
 
-    // Store in Gun database for persistence
-    if (gun) {
-      gun.get("shogun").get("logs").get(timestamp).put(logEntry);
+    // Optionally log data if provided and not null
+    if (data !== null && data !== undefined) {
+      try {
+        console.log(
+          `[${timestamp}] ${level.toUpperCase()}: Data:`,
+          JSON.stringify(data, null, 2)
+        );
+      } catch (jsonError) {
+        console.log(
+          `[${timestamp}] ${level.toUpperCase()}: Data (non-serializable):`,
+          String(data)
+        );
+      }
     }
   }
 
@@ -410,16 +411,10 @@ async function initializeServer() {
           `✅ Chain event propagated to GunDB: ${sanitizedSoul} -> ${sanitizedKey} = ${sanitizedValue}`
         );
 
-        // Aggiungi al log del sistema
-        addSystemLog("info", "Chain event propagated to GunDB", {
-          soul: sanitizedSoul,
-          key: sanitizedKey,
-          value: sanitizedValue,
-          eventId: eventId,
-          gunDBPath: `${soulParts.join(".")}.${sanitizedKey}`,
-          blockNumber: event.blockNumber,
-          transactionHash: event.transactionHash,
-        });
+        // Log success (console only)
+        console.log(
+          `✅ Chain event propagated to GunDB: ${sanitizedSoul} -> ${sanitizedKey} = ${sanitizedValue}`
+        );
       } catch (mainStructureError) {
         console.error(
           "❌ Error writing to main GunDB structure:",
@@ -428,19 +423,9 @@ async function initializeServer() {
         // Non fallire completamente se la scrittura nella struttura principale fallisce
         // L'evento è già stato salvato nella sezione chain_events
 
-        // Aggiungi al log del sistema anche in caso di errore
-        addSystemLog(
-          "warning",
-          "Chain event partially propagated (main structure failed)",
-          {
-            soul: sanitizedSoul,
-            key: sanitizedKey,
-            value: sanitizedValue,
-            eventId: eventId,
-            error: mainStructureError.message,
-            blockNumber: event.blockNumber,
-            transactionHash: event.transactionHash,
-          }
+        // Log warning (console only)
+        console.log(
+          `⚠️ Chain event partially propagated (main structure failed): ${mainStructureError.message}`
         );
       } finally {
         // Ripristina il flag di sicurezza
@@ -449,14 +434,7 @@ async function initializeServer() {
       }
     } catch (error) {
       console.error("❌ Failed to propagate chain event to GunDB:", error);
-      addSystemLog("error", "Failed to propagate chain event", {
-        soul: sanitizedSoul,
-        key: sanitizedKey,
-        value: sanitizeForGunDB(value),
-        error: error.message,
-        blockNumber: event?.blockNumber,
-        transactionHash: event?.transactionHash,
-      });
+      console.log(`❌ Failed to propagate chain event: ${error.message}`);
     }
   }
 
@@ -510,16 +488,11 @@ async function initializeServer() {
               } to ${currentBlock}`
             );
 
-            addSystemLog(
-              "info",
-              `Polling for events from block ${
+            // Log polling start (console only)
+            console.log(
+              `🔍 Polling for events from block ${
                 lastProcessedBlock + 1
-              } to ${currentBlock}`,
-              {
-                fromBlock: lastProcessedBlock + 1,
-                toBlock: currentBlock,
-                event: "polling_started",
-              }
+              } to ${currentBlock}`
             );
 
             try {
@@ -530,12 +503,6 @@ async function initializeServer() {
               );
 
               console.log(`📡 Found ${events.length} new events`);
-              addSystemLog("info", `Found ${events.length} new events`, {
-                eventCount: events.length,
-                fromBlock: lastProcessedBlock + 1,
-                toBlock: currentBlock,
-                event: "events_found",
-              });
 
               // Processa ogni evento
               for (const event of events) {
@@ -794,7 +761,6 @@ async function initializeServer() {
       return;
     }
     console.log("🗑️ Running Garbage Collector...");
-    addSystemLog("info", "Garbage collection started");
     let cleanedCount = 0;
 
     // Assicurati che gun sia inizializzato prima di accedere alle sue proprietà
@@ -825,15 +791,10 @@ async function initializeServer() {
       console.log(
         `🗑️ Garbage Collector finished. Cleaned ${cleanedCount} nodes.`
       );
-      addSystemLog(
-        "info",
-        `Garbage collection completed. Cleaned ${cleanedCount} nodes`
-      );
     } else {
       console.log(
         "🗑️ Garbage Collector finished. No unprotected nodes found to clean."
       );
-      addSystemLog("info", "Garbage collection completed. No nodes to clean");
     }
   }
 
@@ -850,7 +811,7 @@ async function initializeServer() {
           GC_INTERVAL / 1000 / 60
         } minutes.`
       );
-      addSystemLog("info", "Garbage collector initialized");
+      console.log("✅ Garbage collector initialized");
       // Esegui una volta all'avvio per un ritardo
       setTimeout(runGarbageCollector, 30 * 1000); // Esegui 30s dopo l'avvio
     } else {
@@ -1727,22 +1688,12 @@ async function initializeServer() {
     db?.get("totalConnections").put(totalConnections);
     db?.get("activeWires").put(activeWires);
     console.log(`Connection opened (active: ${activeWires})`);
-    addSystemLog("info", `Connection opened (active: ${activeWires})`, {
-      totalConnections,
-      activeWires,
-      event: "connection_opened",
-    });
   });
 
   gun.on("bye", () => {
     activeWires -= 1;
     db?.get("activeWires").put(activeWires);
     console.log(`Connection closed (active: ${activeWires})`);
-    addSystemLog("info", `Connection closed (active: ${activeWires})`, {
-      totalConnections,
-      activeWires,
-      event: "connection_closed",
-    });
   });
 
   gun.on("out", { get: { "#": { "*": "" } } });
@@ -1771,8 +1722,7 @@ async function initializeServer() {
 
   // Shutdown function
   async function shutdown() {
-    console.log("🛑 Shutting down Shogun Relay...");
-    addSystemLog("info", "Server shutdown initiated");
+      console.log("🛑 Shutting down Shogun Relay...");
 
     // Clean up garbage collector interval
     if (gcInterval) {
@@ -1815,12 +1765,6 @@ async function initializeServer() {
   }
 
   console.log(`🚀 Shogun Relay Server running on http://${host}:${port}`);
-  addSystemLog("info", "Server started successfully", {
-    host,
-    port,
-    namespace,
-    peers: peers.length,
-  });
 
   // Function to clean up corrupted GunDB data
   function cleanupCorruptedData() {
