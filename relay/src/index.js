@@ -98,6 +98,11 @@ import "gun/sea.js";
 import "gun/lib/stats.js";
 import "gun/lib/webrtc.js";
 import "gun/lib/rfs.js";
+import "gun/lib/rs3.js";
+import "gun/lib/radisk.js";
+import "gun/lib/axe.js";
+import "gun/lib/wire.js";
+import "gun/lib/yson.js";
 
 import multer from "multer";
 
