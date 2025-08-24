@@ -297,6 +297,27 @@ async function initializeServer() {
       const eventId = `${event.transactionHash}-${event.logIndex || 0}`;
       console.log("📋 Event ID:", eventId);
 
+      // Check if this event has already been processed to prevent duplicates
+      if (processedEventIds.has(eventId)) {
+        console.log(
+          `⏭️ Event ${eventId} already processed (in-memory), skipping`
+        );
+        return;
+      }
+
+      const processedEvents = gun.get("shogun").get("processed_events");
+      const isProcessed = await new Promise((resolve) => {
+        processedEvents.get(eventId).once((data) => {
+          resolve(!!data);
+        });
+      });
+
+      if (isProcessed) {
+        console.log(`⏭️ Event ${eventId} already processed (GunDB), skipping`);
+        processedEventIds.add(eventId); // Add to in-memory set for future checks
+        return;
+      }
+
       // Memorizza i dati dell'evento in GunDB
       console.log("💾 Storing event data in GunDB...");
       const eventNode = gun.get("shogun").get("chain_events").get(eventId);
@@ -411,10 +432,28 @@ async function initializeServer() {
           `✅ Chain event propagated to GunDB: ${sanitizedSoul} -> ${sanitizedKey} = ${sanitizedValue}`
         );
 
+        // Mark this event as processed to prevent duplicates
+        processedEventIds.add(eventId); // Add to in-memory set immediately
+        await new Promise((resolve) => {
+          processedEvents
+            .get(eventId)
+            .put({ processed: true, timestamp: Date.now() }, (ack) => {
+              if (ack.err) {
+                console.warn("⚠️ Could not mark event as processed:", ack.err);
+              } else {
+                console.log(`✅ Event ${eventId} marked as processed`);
+              }
+              resolve();
+            });
+        });
+
         // Log success (console only)
         console.log(
           `✅ Chain event propagated to GunDB: ${sanitizedSoul} -> ${sanitizedKey} = ${sanitizedValue}`
         );
+
+        // Add a small delay to allow any follow-up GunDB operations to complete
+        await new Promise((resolve) => setTimeout(resolve, 100));
       } catch (mainStructureError) {
         console.error(
           "❌ Error writing to main GunDB structure:",
@@ -804,6 +843,7 @@ async function initializeServer() {
 
   // Flag per consentire operazioni interne durante REST API
   let allowInternalOperations = false;
+  const processedEventIds = new Set(); // In-memory deduplication
 
   // Funzione helper per trovare il relay corrente basandosi sull'URL
   async function getCurrentRelayAddress() {
@@ -904,6 +944,7 @@ async function initializeServer() {
         firstSoul.startsWith("shogun/timeseries") || // Dati di serie temporale
         firstSoul.startsWith("shogun/logs") || // Log del sistema
         firstSoul.startsWith("shogun/chain_events") || // Eventi del contratto Chain
+        firstSoul.startsWith("shogun/processed_events") || // Eventi processati per deduplicazione
         firstSoul.startsWith("shogun/mbUsage") || // Utilizzo MB off-chain
         firstSoul.startsWith("shogun/mb_usage") || // Utilizzo MB off-chain (alternativo)
         firstSoul.startsWith("shogun/usernames") || // Mapping usernames per autenticazione (username -> userPub)
@@ -916,6 +957,9 @@ async function initializeServer() {
 
     if (isInternalNamespace) {
       console.log(`🔍 PUT allowed - internal namespace: ${firstSoul}`);
+      console.log(
+        `🔍 Debug - isInternalNamespace check passed for: ${firstSoul}`
+      );
       return true;
     }
 
@@ -929,6 +973,14 @@ async function initializeServer() {
     }
 
     console.log(`❌ PUT denied - no valid auth: ${firstSoul}`);
+    console.log(
+      `🔍 Debug - allowInternalOperations: ${allowInternalOperations}`
+    );
+    console.log(`🔍 Debug - RELAY_PROTECTED: ${process.env.RELAY_PROTECTED}`);
+    console.log(`🔍 Debug - has headers: ${!!(msg && msg.headers)}`);
+    console.log(
+      `🔍 Debug - has token: ${!!(msg && msg.headers && msg.headers.token)}`
+    );
     return false;
   }
 
