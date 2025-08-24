@@ -3,14 +3,13 @@
 
 import express from "express";
 
-// Helper function to sanitize data for GunDB storage (simplified)
+// Helper function to sanitize data for GunDB storage
 function sanitizeForGunDB(data) {
-  // Simplified version to prevent JSON errors
   if (data === null || data === undefined) {
     return null;
   }
 
-  // For primitive types, return as is
+  // Handle primitive types directly
   if (
     typeof data === "string" ||
     typeof data === "number" ||
@@ -19,15 +18,64 @@ function sanitizeForGunDB(data) {
     return data;
   }
 
-  // For objects and arrays, try JSON serialization
+  // Handle Date objects
+  if (data instanceof Date) {
+    return data.toISOString();
+  }
+
+  // Handle Buffer objects
+  if (Buffer.isBuffer(data)) {
+    return data.toString("base64");
+  }
+
+  // Handle arrays
+  if (Array.isArray(data)) {
+    try {
+      return data.map((item) => sanitizeForGunDB(item));
+    } catch (error) {
+      console.warn("⚠️ Error sanitizing array:", error);
+      return [];
+    }
+  }
+
+  // Handle objects
+  if (typeof data === "object") {
+    try {
+      // First, try to serialize to test if it's valid JSON
+      JSON.stringify(data);
+
+      // If successful, recursively sanitize all properties
+      const sanitized = {};
+      for (const [key, value] of Object.entries(data)) {
+        // Skip functions and symbols
+        if (typeof value === "function" || typeof value === "symbol") {
+          continue;
+        }
+        sanitized[key] = sanitizeForGunDB(value);
+      }
+      return sanitized;
+    } catch (error) {
+      // If JSON serialization fails, create a safe representation
+      console.warn(
+        "⚠️ Object could not be serialized, creating safe representation:",
+        error
+      );
+      return {
+        _error: "Object could not be serialized",
+        _type: typeof data,
+        _constructor: data.constructor?.name || "Unknown",
+        _stringified: String(data),
+        _timestamp: Date.now(),
+      };
+    }
+  }
+
+  // For any other type, convert to string
   try {
-    JSON.stringify(data);
-    return data;
-  } catch (error) {
-    console.warn(
-      "⚠️ Data could not be serialized, returning string representation"
-    );
     return String(data);
+  } catch (error) {
+    console.warn("⚠️ Error converting data to string:", error);
+    return "[Unserializable Data]";
   }
 }
 import path from "path";
@@ -49,8 +97,8 @@ import "gun/sea.js";
 
 import "gun/lib/stats.js";
 import "gun/lib/webrtc.js";
-//import "gun/lib/rfs.js";
-//import "gun/lib/rs3.js";
+import "gun/lib/rfs.js";
+import "gun/lib/rs3.js";
 import "gun/lib/radisk.js";
 import "gun/lib/axe.js";
 import "gun/lib/wire.js";
@@ -1620,11 +1668,14 @@ async function initializeServer() {
   gun.on("hi", () => {
     totalConnections += 1;
     activeWires += 1;
+    db?.get("totalConnections").put(totalConnections);
+    db?.get("activeWires").put(activeWires);
     console.log(`Connection opened (active: ${activeWires})`);
   });
 
   gun.on("bye", () => {
     activeWires -= 1;
+    db?.get("activeWires").put(activeWires);
     console.log(`Connection closed (active: ${activeWires})`);
   });
 
@@ -1647,12 +1698,7 @@ async function initializeServer() {
       },
     };
 
-    // Log pulse data to console only to prevent JSON errors
-    console.log(
-      `📊 Pulse: connections=${activeWires}, memory=${
-        process.memoryUsage().heapUsed
-      }`
-    );
+    db?.get("pulse").put(pulse);
     addTimeSeriesPoint("connections.active", activeWires);
     addTimeSeriesPoint("memory.heapUsed", process.memoryUsage().heapUsed);
   }, 30000); // 30 seconds
@@ -1703,14 +1749,55 @@ async function initializeServer() {
 
   console.log(`🚀 Shogun Relay Server running on http://${host}:${port}`);
 
-  // Function to clean up corrupted GunDB data (disabled to prevent JSON errors)
+  // Function to clean up corrupted GunDB data
   function cleanupCorruptedData() {
-    console.log("🧹 GunDB data cleanup disabled to prevent JSON errors");
+    console.log("🧹 Starting GunDB data cleanup...");
+
+    try {
+      // Clean up any corrupted chain events
+      gun
+        .get("shogun")
+        .get("chain_events")
+        .map()
+        .once((data, key) => {
+          if (data && typeof data === "object") {
+            try {
+              // Test if the data is valid JSON
+              JSON.stringify(data);
+            } catch (error) {
+              console.log(`🧹 Removing corrupted chain event: ${key}`);
+              gun.get("shogun").get("chain_events").get(key).put(null);
+            }
+          }
+        });
+
+      // Clean up any corrupted logs
+      gun
+        .get("shogun")
+        .get("logs")
+        .map()
+        .once((data, key) => {
+          if (data && typeof data === "object") {
+            try {
+              // Test if the data is valid JSON
+              JSON.stringify(data);
+            } catch (error) {
+              console.log(`🧹 Removing corrupted log entry: ${key}`);
+              gun.get("shogun").get("logs").get(key).put(null);
+            }
+          }
+        });
+
+      console.log("✅ GunDB data cleanup completed");
+    } catch (error) {
+      console.error("❌ Error during GunDB data cleanup:", error);
+    }
   }
 
   // Run cleanup on startup if enabled
   if (CLEANUP_CORRUPTED_DATA) {
-    console.log("🧹 Cleanup of corrupted data disabled");
+    console.log("🧹 Cleanup of corrupted data enabled");
+    setTimeout(cleanupCorruptedData, 5000); // Run after 5 seconds to allow GunDB to initialize
   }
 
   return {
