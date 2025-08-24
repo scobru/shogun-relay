@@ -1794,6 +1794,57 @@ async function initializeServer() {
     peers: peers.length,
   });
 
+  // Function to clean up corrupted GunDB data
+  function cleanupCorruptedData() {
+    console.log("🧹 Starting GunDB data cleanup...");
+
+    try {
+      // Clean up any corrupted chain events
+      gun
+        .get("shogun")
+        .get("chain_events")
+        .map()
+        .once((data, key) => {
+          if (data && typeof data === "object") {
+            try {
+              // Test if the data is valid JSON
+              JSON.stringify(data);
+            } catch (error) {
+              console.log(`🧹 Removing corrupted chain event: ${key}`);
+              gun.get("shogun").get("chain_events").get(key).put(null);
+            }
+          }
+        });
+
+      // Clean up any corrupted logs
+      gun
+        .get("shogun")
+        .get("logs")
+        .map()
+        .once((data, key) => {
+          if (data && typeof data === "object") {
+            try {
+              // Test if the data is valid JSON
+              JSON.stringify(data);
+            } catch (error) {
+              console.log(`🧹 Removing corrupted log entry: ${key}`);
+              gun.get("shogun").get("logs").get(key).put(null);
+            }
+          }
+        });
+
+      console.log("✅ GunDB data cleanup completed");
+    } catch (error) {
+      console.error("❌ Error during GunDB data cleanup:", error);
+    }
+  }
+
+  // Run cleanup on startup if enabled
+  if (CLEANUP_CORRUPTED_DATA) {
+    console.log("🧹 Cleanup of corrupted data enabled");
+    setTimeout(cleanupCorruptedData, 5000); // Run after 5 seconds to allow GunDB to initialize
+  }
+
   return {
     server,
     gun,
@@ -1807,59 +1858,3 @@ async function initializeServer() {
 
 // Avvia il server
 initializeServer().catch(console.error);
-
-// Function to clean up corrupted GunDB data
-function cleanupCorruptedData() {
-  if (!gun) {
-    console.warn("⚠️ Gun not initialized, cannot cleanup data");
-    return;
-  }
-
-  console.log("🧹 Starting GunDB data cleanup...");
-
-  try {
-    // Clean up any corrupted chain events
-    gun
-      .get("shogun")
-      .get("chain_events")
-      .map()
-      .once((data, key) => {
-        if (data && typeof data === "object") {
-          try {
-            // Test if the data is valid JSON
-            JSON.stringify(data);
-          } catch (error) {
-            console.log(`🧹 Removing corrupted chain event: ${key}`);
-            gun.get("shogun").get("chain_events").get(key).put(null);
-          }
-        }
-      });
-
-    // Clean up any corrupted logs
-    gun
-      .get("shogun")
-      .get("logs")
-      .map()
-      .once((data, key) => {
-        if (data && typeof data === "object") {
-          try {
-            // Test if the data is valid JSON
-            JSON.stringify(data);
-          } catch (error) {
-            console.log(`🧹 Removing corrupted log entry: ${key}`);
-            gun.get("shogun").get("logs").get(key).put(null);
-          }
-        }
-      });
-
-    console.log("✅ GunDB data cleanup completed");
-  } catch (error) {
-    console.error("❌ Error during GunDB data cleanup:", error);
-  }
-}
-
-// Run cleanup on startup if enabled
-if (CLEANUP_CORRUPTED_DATA) {
-  console.log("🧹 Cleanup of corrupted data enabled");
-  setTimeout(cleanupCorruptedData, 5000); // Run after 5 seconds to allow GunDB to initialize
-}
