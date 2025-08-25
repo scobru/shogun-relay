@@ -718,7 +718,7 @@ var DFS = (function () {
     });
 
     // Usa il nuovo metodo di caricamento diretto per ottenere tutti i nodi
-    loadAllNodesDirectly(soul);
+    dfs.loadAllNodesDirectly(soul);
   };
 
   dfs.node = function (node) {
@@ -897,8 +897,8 @@ function updateStatus(message, isError = false) {
 }
 
 // Make functions available globally
-window.dfs = dfs;
-window.loadAllNodesDirectly = dfs.loadAllNodesDirectly;
+window.dfs = DFS;
+window.loadAllNodesDirectly = DFS.loadAllNodesDirectly;
 window.update = update; // Make update function globally available
 
 // Also expose the DFS object and its functions globally
