@@ -82,8 +82,8 @@
         <div class="flex justify-between items-center">
           <h3 class="card-title">Data Inspector</h3>
           <div class="flex gap-2">
-            <button id="loadAllNodesBtn" class="btn btn-sm btn-accent" onclick="loadAllNodesMode()">
-              🕸️ Load All Nodes
+            <button id="loadAllNodesBtn" class="btn btn-sm btn-accent" disabled>
+              ⏳ Loading...
             </button>
             <button id="save" class="btn btn-accent">Save Changes</button>
           </div>
@@ -253,6 +253,25 @@
     waitForDFS()
       .then(() => {
         updateStatus("All modules loaded. Ready to use!");
+
+        // Set up Load All Nodes button event listener
+        const loadAllNodesBtn = document.getElementById("loadAllNodesBtn");
+        if (loadAllNodesBtn) {
+          // Enable the button now that functions are ready
+          loadAllNodesBtn.disabled = false;
+          loadAllNodesBtn.textContent = "🕸️ Load All Nodes";
+          loadAllNodesBtn.title = "Click to load all nodes from the specified key";
+
+          loadAllNodesBtn.addEventListener("click", function (ev) {
+            ev.preventDefault();
+            if (typeof window.loadAllNodesMode === 'function') {
+              window.loadAllNodesMode();
+            } else {
+              updateStatus("❌ Load All Nodes function not available", true);
+              console.error("❌ loadAllNodesMode function not available");
+            }
+          });
+        }
 
         // Override the start function with a safer version
         const startButton = document.getElementById("startButton");
