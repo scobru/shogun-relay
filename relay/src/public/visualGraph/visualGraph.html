@@ -1,371 +1,352 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="night">
-  <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="Access-Control-Allow-Origin" content="*" />
-    <title>Graph Visualizer</title>
-    <link
-      href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css"
-      rel="stylesheet"
-      type="text/css"
-    />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="../styles/wormhole.css" />
-    <link rel="stylesheet" href="vGmain.css" />
-    <!-- Include centralized admin authentication -->
-    <script src="../lib/admin-auth.js"></script>
-  </head>
-  <body class="min-h-screen bg-base-200 text-base-content">
-    <div class="navbar bg-base-300">
-      <div class="flex-1">
-        <img
-          src="visualGraphIcon.svg"
-          width="25"
-          height="25"
-          alt=""
-          class="mr-2"
-        />
-        <h2 class="text-xl font-semibold">Visualization</h2>
-      </div>
-      <div class="flex-none">
-        <span id="peerList" class="text-sm opacity-70"></span>
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Access-Control-Allow-Origin" content="*" />
+  <title>Graph Visualizer</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/styles/wormhole.css" />
+  <link rel="stylesheet" href="/visualGraph/vGmain.css" />
+  <!-- Include centralized admin authentication -->
+  <script src="/lib/admin-auth.js"></script>
+</head>
+
+<body class="min-h-screen bg-base-200 text-base-content">
+  <div class="navbar bg-base-300">
+    <div class="flex-1">
+      <img src="/visualGraph/visualGraphIcon.svg" width="25" height="25" alt="" class="mr-2" />
+      <h2 class="text-xl font-semibold">Visualization</h2>
+    </div>
+    <div class="flex-none">
+      <span id="peerList" class="text-sm opacity-70"></span>
+    </div>
+  </div>
+
+  <div class="container mx-auto p-4 flex flex-col gap-4 min-h-[calc(100vh-4rem)]">
+    <!-- Input Controls -->
+    <div class="card bg-base-300 shadow-xl">
+      <div class="card-body p-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="form-control">
+            <label class="label" for="relayPeer">
+              <span class="label-text">Relay Peer URL:</span>
+            </label>
+            <input id="relayPeer" type="text" class="input input-bordered w-full"
+              placeholder="https://relay.shogun-eco.xyz/gun" value="https://relay.shogun-eco.xyz/gun" />
+          </div>
+
+          <div class="form-control">
+            <label class="label" for="authToken">
+              <span class="label-text">Auth Token:</span>
+            </label>
+            <input id="authToken" type="password" class="input input-bordered w-full"
+              placeholder="Enter auth token (auto-loaded if saved)" />
+          </div>
+
+          <div class="form-control">
+            <label class="label" for="key">
+              <span class="label-text">Key to Start from:</span>
+            </label>
+            <input id="key" class="input input-bordered w-full" />
+          </div>
+
+          <div class="form-control">
+            <label class="label" for="label">
+              <span class="label-text">Property to be used as Label:</span>
+            </label>
+            <input id="label" class="input input-bordered w-full custom" />
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4 mt-4">
+          <button id="startButton" class="btn btn-primary flex-1">
+            Start
+          </button>
+          <div id="status" class="text-sm opacity-70 flex-1"></div>
+        </div>
       </div>
     </div>
 
-    <div
-      class="container mx-auto p-4 flex flex-col gap-4 min-h-[calc(100vh-4rem)]"
-    >
-      <!-- Input Controls -->
-      <div class="card bg-base-300 shadow-xl">
-        <div class="card-body p-4">
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="form-control">
-              <label class="label" for="relayPeer">
-                <span class="label-text">Relay Peer URL:</span>
-              </label>
-              <input
-                id="relayPeer"
-                type="text"
-                class="input input-bordered w-full"
-                placeholder="https://ruling-mastodon-improved.ngrok-free.app"
-                value="https://ruling-mastodon-improved.ngrok-free.app"
-              />
-            </div>
+    <!-- Graph Viewer -->
+    <div class="card bg-base-300 shadow-xl flex-1">
+      <div class="card-body p-0">
+        <svg class="w-full h-full min-h-[400px]"></svg>
+      </div>
+    </div>
 
-            <div class="form-control">
-              <label class="label" for="authToken">
-                <span class="label-text">Auth Token:</span>
-              </label>
-              <input
-                id="authToken"
-                type="password"
-                class="input input-bordered w-full"
-                placeholder="Enter auth token (auto-loaded if saved)"
-              />
-            </div>
-
-            <div class="form-control">
-              <label class="label" for="key">
-                <span class="label-text">Key to Start from:</span>
-              </label>
-              <input id="key" class="input input-bordered w-full" />
-            </div>
-
-            <div class="form-control">
-              <label class="label" for="label">
-                <span class="label-text">Property to be used as Label:</span>
-              </label>
-              <input id="label" class="input input-bordered w-full custom" />
-            </div>
-          </div>
-
-          <div class="flex items-center gap-4 mt-4">
-            <button id="startButton" class="btn btn-primary flex-1">
-              Start
+    <!-- Data Inspector -->
+    <div class="card bg-base-300 shadow-xl">
+      <div class="card-body p-4">
+        <div class="flex justify-between items-center">
+          <h3 class="card-title">Data Inspector</h3>
+          <div class="flex gap-2">
+            <button id="loadAllNodesBtn" class="btn btn-sm btn-accent" onclick="loadAllNodesMode()">
+              🕸️ Load All Nodes
             </button>
-            <div id="status" class="text-sm opacity-70 flex-1"></div>
+            <button id="save" class="btn btn-accent">Save Changes</button>
           </div>
         </div>
-      </div>
-
-      <!-- Graph Viewer -->
-      <div class="card bg-base-300 shadow-xl flex-1">
-        <div class="card-body p-0">
-          <svg class="w-full h-full min-h-[400px]"></svg>
-        </div>
-      </div>
-
-      <!-- Data Inspector -->
-      <div class="card bg-base-300 shadow-xl">
-        <div class="card-body p-4">
-          <div class="flex justify-between items-center">
-            <h3 class="card-title">Data Inspector</h3>
-            <div class="flex gap-2">
-              <button id="loadAllNodesBtn" class="btn btn-sm btn-accent" onclick="loadAllNodesMode()">
-                🕸️ Load All Nodes
-              </button>
-              <button id="save" class="btn btn-accent">Save Changes</button>
-            </div>
-          </div>
-          <div id="detail" class="cont overflow-auto max-h-[200px] mt-2"></div>
-        </div>
+        <div id="detail" class="cont overflow-auto max-h-[200px] mt-2"></div>
       </div>
     </div>
+  </div>
 
-    <!-- Scripts -->
-    <script src="https://d3js.org/d3.v5.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gun/lib/promise.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gun/lib/webrtc.js"></script>
+  <!-- Scripts -->
+  <script src="https://d3js.org/d3.v5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gun/lib/promise.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gun/lib/webrtc.js"></script>
 
 
-    <!-- Button Logic -->
-    <script type="text/javascript">
-      // Initialize admin authentication
-      document.addEventListener("DOMContentLoaded", () => {
-        ShogunAdmin.init({
-          autoFill: true,
-          showIndicator: true,
-          fieldId: "authToken",
-          syncEnabled: true,
+  <!-- Button Logic -->
+  <script type="text/javascript">
+    // Initialize admin authentication
+    document.addEventListener("DOMContentLoaded", () => {
+      ShogunAdmin.init({
+        autoFill: true,
+        showIndicator: true,
+        fieldId: "authToken",
+        syncEnabled: true,
+      });
+    });
+
+    // Listen for password updates
+    window.addEventListener("shogun-admin-password-updated", (event) => {
+      console.log("Admin password updated");
+    });
+
+    // Status update function
+    function updateStatus(message, isError = false) {
+      const statusEl = document.getElementById("status");
+      if (statusEl) {
+        statusEl.textContent = message;
+        statusEl.style.color = isError ? "#ff0000" : "#666";
+      }
+      console.log(isError ? "ERROR:" : "INFO:", message);
+    }
+
+    // Clear old data more selectively
+    try {
+      // Only clear gun-related data, not all localStorage
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith("gun/") || key.startsWith("radata")) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (e) {
+      updateStatus("Warning: Could not clear localStorage", true);
+    }
+
+    let gun = null;
+    let isGunReady = false;
+
+    // Initialize default peers - will be updated when user changes the input
+
+    // Configure the middleware GLOBALLY before ANY Gun instance creation
+    updateStatus("Configuring Gun middleware...");
+
+    // Function to create Gun instance with current peer configuration
+    function createGunInstance() {
+      const relayPeerInput = document.getElementById("relayPeer");
+      const currentPeer = relayPeerInput
+        ? relayPeerInput.value.trim()
+        : peer
+
+      if (!currentPeer) {
+        updateStatus("Error: Empty peer URL", true);
+        return null;
+      }
+
+      peers = [currentPeer];
+      updateStatus(`Creating Gun instance with peer: ${currentPeer}`);
+
+      Gun.on("opt", function (ctx) {
+        if (ctx.once) {
+          return;
+        }
+        ctx.on("out", function (msg) {
+          const to = this.to;
+          // Use centralized admin password
+          const authToken =
+            ShogunAdmin.getPassword() ||
+            (document.getElementById("authToken")
+              ? document.getElementById("authToken").value.trim()
+              : "");
+          if (authToken) {
+            // Add headers for all outgoing messages, especially 'put'
+            msg.headers = {
+              ...msg.headers, // Preserve existing headers
+              token: authToken,
+              Authorization: "Bearer " + authToken,
+            };
+          }
+          console.log(msg);
+          to.next(msg); // pass to next middleware
         });
       });
 
-      // Listen for password updates
-      window.addEventListener("shogun-admin-password-updated", (event) => {
-        console.log("Admin password updated");
-      });
-
-      // Status update function
-      function updateStatus(message, isError = false) {
-        const statusEl = document.getElementById("status");
-        if (statusEl) {
-          statusEl.textContent = message;
-          statusEl.style.color = isError ? "#ff0000" : "#666";
-        }
-        console.log(isError ? "ERROR:" : "INFO:", message);
-      }
-
-      // Clear old data more selectively
       try {
-        // Only clear gun-related data, not all localStorage
-        Object.keys(localStorage).forEach((key) => {
-          if (key.startsWith("gun/") || key.startsWith("radata")) {
-            localStorage.removeItem(key);
-          }
-        });
-      } catch (e) {
-        updateStatus("Warning: Could not clear localStorage", true);
-      }
+        gun = new Gun({ peers: peers, localStorage: false });
 
-      let gun = null;
-      let isGunReady = false;
+        let graph = {
+          nodes: [],
+          edges: [],
+        };
 
-      // Initialize default peers - will be updated when user changes the input
-
-      // Configure the middleware GLOBALLY before ANY Gun instance creation
-      updateStatus("Configuring Gun middleware...");
-
-      // Function to create Gun instance with current peer configuration
-      function createGunInstance() {
-        const relayPeerInput = document.getElementById("relayPeer");
-        const currentPeer = relayPeerInput
-          ? relayPeerInput.value.trim()
-          : peer
-
-        if (!currentPeer) {
-          updateStatus("Error: Empty peer URL", true);
-          return null;
+        let peerList = document.getElementById("peerList");
+        if (peerList) {
+          peerList.innerHTML = currentPeer;
         }
 
-        peers = [currentPeer];
-        updateStatus(`Creating Gun instance with peer: ${currentPeer}`);
+        // Make gun instance globally available
+        window.gun = gun;
+        window.graph = graph;
+        isGunReady = true;
 
-        Gun.on("opt", function (ctx) {
-          if (ctx.once) {
-            return;
+        updateStatus("Gun instance created successfully");
+        return gun;
+      } catch (error) {
+        updateStatus(`Error creating Gun instance: ${error.message}`, true);
+        return null;
+      }
+    }
+
+    // Create initial instance after DOM is ready
+    document.addEventListener("DOMContentLoaded", function () {
+      setTimeout(function () {
+        const gunInstance = createGunInstance();
+        if (gunInstance) {
+          updateStatus("Ready to start visualization");
+        }
+      }, 500);
+    });
+  </script>
+  <script src="/visualGraph/visualGraph.js"></script>
+  <script src="/visualGraph/abstraction.js"></script>
+  <script>
+    // Wait for all scripts to load and DFS to be available
+    function waitForDFS() {
+      return new Promise((resolve, reject) => {
+        let attempts = 0;
+        const maxAttempts = 50;
+
+        const checkDFS = () => {
+          attempts++;
+          if (typeof window.DFS !== "undefined" && window.DFS.search) {
+            updateStatus("DFS module loaded successfully!");
+            resolve();
+          } else if (attempts >= maxAttempts) {
+            updateStatus("Timeout waiting for DFS module", true);
+            reject(new Error("DFS module failed to load"));
+          } else {
+            setTimeout(checkDFS, 100);
           }
-          ctx.on("out", function (msg) {
-            const to = this.to;
+        };
+        checkDFS();
+      });
+    }
+
+    // Initialize everything once DFS is ready
+    waitForDFS()
+      .then(() => {
+        updateStatus("All modules loaded. Ready to use!");
+
+        // Override the start function with a safer version
+        const startButton = document.getElementById("startButton");
+        if (startButton) {
+          startButton.addEventListener("click", function (ev) {
+            ev.preventDefault();
+            updateStatus("Start button clicked...");
+
+            const relayPeer = document
+              .getElementById("relayPeer")
+              .value.trim();
             // Use centralized admin password
             const authToken =
               ShogunAdmin.getPassword() ||
-              (document.getElementById("authToken")
-                ? document.getElementById("authToken").value.trim()
-                : "");
-            if (authToken) {
-              // Add headers for all outgoing messages, especially 'put'
-              msg.headers = {
-                ...msg.headers, // Preserve existing headers
-                token: authToken,
-                Authorization: "Bearer " + authToken,
-              };
+              document.getElementById("authToken").value.trim();
+            const key = document.getElementById("key").value.trim();
+            const label = document.getElementById("label").value.trim();
+
+            // Validation
+            if (!relayPeer) {
+              updateStatus("Please enter a relay peer URL", true);
+              alert("Please enter a relay peer URL");
+              return;
             }
-            console.log(msg);
-            to.next(msg); // pass to next middleware
-          });
-        });
 
-        try {
-          gun = new Gun({ peers: peers, localStorage: false });
-
-          let graph = {
-            nodes: [],
-            edges: [],
-          };
-
-          let peerList = document.getElementById("peerList");
-          if (peerList) {
-            peerList.innerHTML = currentPeer;
-          }
-
-          // Make gun instance globally available
-          window.gun = gun;
-          window.graph = graph;
-          isGunReady = true;
-
-          updateStatus("Gun instance created successfully");
-          return gun;
-        } catch (error) {
-          updateStatus(`Error creating Gun instance: ${error.message}`, true);
-          return null;
-        }
-      }
-
-      // Create initial instance after DOM is ready
-      document.addEventListener("DOMContentLoaded", function () {
-        setTimeout(function () {
-          const gunInstance = createGunInstance();
-          if (gunInstance) {
-            updateStatus("Ready to start visualization");
-          }
-        }, 500);
-      });
-    </script>
-    <script src="visualGraph.js"></script>
-    <script src="abstraction.js"></script>
-    <script>
-      // Wait for all scripts to load and DFS to be available
-      function waitForDFS() {
-        return new Promise((resolve, reject) => {
-          let attempts = 0;
-          const maxAttempts = 50;
-
-          const checkDFS = () => {
-            attempts++;
-            if (typeof window.DFS !== "undefined" && window.DFS.search) {
-              updateStatus("DFS module loaded successfully!");
-              resolve();
-            } else if (attempts >= maxAttempts) {
-              updateStatus("Timeout waiting for DFS module", true);
-              reject(new Error("DFS module failed to load"));
-            } else {
-              setTimeout(checkDFS, 100);
+            if (!authToken) {
+              updateStatus(
+                "Please enter an auth token. Set it in the Control Panel for automatic loading.",
+                true
+              );
+              alert(
+                "Please enter an auth token. Set it in the Control Panel for automatic loading."
+              );
+              return;
             }
-          };
-          checkDFS();
-        });
-      }
 
-      // Initialize everything once DFS is ready
-      waitForDFS()
-        .then(() => {
-          updateStatus("All modules loaded. Ready to use!");
+            if (!key) {
+              updateStatus("Please enter a key to start from", true);
+              alert("Please enter a key to start from");
+              return;
+            }
 
-          // Override the start function with a safer version
-          const startButton = document.getElementById("startButton");
-          if (startButton) {
-            startButton.addEventListener("click", function (ev) {
-              ev.preventDefault();
-              updateStatus("Start button clicked...");
-
-              const relayPeer = document
-                .getElementById("relayPeer")
-                .value.trim();
-              // Use centralized admin password
-              const authToken =
-                ShogunAdmin.getPassword() ||
-                document.getElementById("authToken").value.trim();
-              const key = document.getElementById("key").value.trim();
-              const label = document.getElementById("label").value.trim();
-
-              // Validation
-              if (!relayPeer) {
-                updateStatus("Please enter a relay peer URL", true);
-                alert("Please enter a relay peer URL");
-                return;
-              }
-
-              if (!authToken) {
-                updateStatus(
-                  "Please enter an auth token. Set it in the Control Panel for automatic loading.",
-                  true
-                );
+            if (!isGunReady || !window.gun) {
+              updateStatus("Gun instance not ready, recreating...");
+              const gunInstance = createGunInstance();
+              if (!gunInstance) {
+                updateStatus("Failed to create Gun instance", true);
                 alert(
-                  "Please enter an auth token. Set it in the Control Panel for automatic loading."
+                  "Failed to connect to Gun database. Please check your settings."
                 );
                 return;
               }
+            }
 
-              if (!key) {
-                updateStatus("Please enter a key to start from", true);
-                alert("Please enter a key to start from");
+            // Recreate Gun instance with current peer if it changed
+            const currentPeers = window.gun ? window.gun._.opt.peers : {};
+            const currentPeer = Object.keys(currentPeers)[0];
+            if (!currentPeer || currentPeer !== relayPeer) {
+              updateStatus("Peer changed, recreating Gun instance...");
+              const gunInstance = createGunInstance();
+              if (!gunInstance) {
+                updateStatus("Failed to recreate Gun instance", true);
+                alert(
+                  "Failed to connect to the new peer. Please check the URL."
+                );
                 return;
               }
+            }
 
-              if (!isGunReady || !window.gun) {
-                updateStatus("Gun instance not ready, recreating...");
-                const gunInstance = createGunInstance();
-                if (!gunInstance) {
-                  updateStatus("Failed to create Gun instance", true);
-                  alert(
-                    "Failed to connect to Gun database. Please check your settings."
-                  );
-                  return;
-                }
+            if (window.DFS && window.DFS.search) {
+              updateStatus(
+                `Starting DFS search with key: ${key}${label ? `, label: ${label}` : ""
+                }`
+              );
+              try {
+                window.DFS.search(key, label);
+              } catch (error) {
+                updateStatus(`DFS search error: ${error.message}`, true);
+                alert(`Search failed: ${error.message}`);
               }
+            } else {
+              updateStatus("DFS module not available", true);
+              alert("DFS module is not available. Please refresh the page.");
+            }
+          });
+        }
+      })
+      .catch((error) => {
+        updateStatus(`Failed to initialize: ${error.message}`, true);
+        alert(
+          "Failed to initialize the application. Please refresh the page."
+        );
+      });
+  </script>
+</body>
 
-              // Recreate Gun instance with current peer if it changed
-              const currentPeers = window.gun ? window.gun._.opt.peers : {};
-              const currentPeer = Object.keys(currentPeers)[0];
-              if (!currentPeer || currentPeer !== relayPeer) {
-                updateStatus("Peer changed, recreating Gun instance...");
-                const gunInstance = createGunInstance();
-                if (!gunInstance) {
-                  updateStatus("Failed to recreate Gun instance", true);
-                  alert(
-                    "Failed to connect to the new peer. Please check the URL."
-                  );
-                  return;
-                }
-              }
-
-              if (window.DFS && window.DFS.search) {
-                updateStatus(
-                  `Starting DFS search with key: ${key}${
-                    label ? `, label: ${label}` : ""
-                  }`
-                );
-                try {
-                  window.DFS.search(key, label);
-                } catch (error) {
-                  updateStatus(`DFS search error: ${error.message}`, true);
-                  alert(`Search failed: ${error.message}`);
-                }
-              } else {
-                updateStatus("DFS module not available", true);
-                alert("DFS module is not available. Please refresh the page.");
-              }
-            });
-          }
-        })
-        .catch((error) => {
-          updateStatus(`Failed to initialize: ${error.message}`, true);
-          alert(
-            "Failed to initialize the application. Please refresh the page."
-          );
-        });
-    </script>
-  </body>
 </html>
