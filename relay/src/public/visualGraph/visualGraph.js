@@ -526,16 +526,31 @@ var DFS = (function () {
     console.log("Graph edges length:", window.graph.edges.length);
 
     // Check if update function exists
+    console.log("🔍 Checking for update function...");
+    console.log("🔍 typeof update:", typeof update);
+    console.log("🔍 update function available:", typeof update === "function");
+    console.log(
+      "🔍 window.update available:",
+      typeof window.update === "function"
+    );
+
     if (typeof update === "function") {
       console.log("Calling update() function...");
       update();
+    } else if (typeof window.update === "function") {
+      console.log("Calling window.update() function...");
+      window.update();
     } else {
       console.error("❌ update() function not found!");
+      console.error(
+        "❌ Available global functions:",
+        Object.keys(window).filter((k) => typeof window[k] === "function")
+      );
     }
   };
 
   // Funzione per caricare tutti i nodi direttamente (come Graph Explorer)
-  function loadAllNodesDirectly(soul) {
+  dfs.loadAllNodesDirectly = function (soul) {
     console.log("🔄 Loading all nodes directly for soul:", soul);
 
     // Reset state
@@ -545,6 +560,11 @@ var DFS = (function () {
     visitedCount = 0;
 
     // Carica il nodo principale
+    const renderTimeout = setTimeout(() => {
+      console.log("⏰ Render timeout reached, forcing render...");
+      dfs.render();
+    }, 3000); // 3 secondi di timeout
+
     window.gun.get(soul).once(function (node) {
       if (!node) {
         console.log("❌ No data found for soul:", soul);
@@ -553,9 +573,11 @@ var DFS = (function () {
 
       console.log("📋 Main node data:", node);
       const mainSoul = Gun.node.soul(node);
+      console.log("🔧 Adding main node to map:", mainSoul);
       nodes.set(mainSoul, { id: mainSoul, label: mainSoul });
       visited.add(mainSoul);
       visitedCount++;
+      console.log("📊 Current nodes map size:", nodes.size);
 
       // Trova tutti i riferimenti nel nodo principale
       const references = [];
@@ -582,7 +604,11 @@ var DFS = (function () {
 
       if (totalRefs === 0) {
         console.log("📋 No references found, rendering single node");
-        dfs.render();
+        clearTimeout(renderTimeout); // Pulisci il timeout
+        setTimeout(() => {
+          console.log("🎨 Calling dfs.render() for single node...");
+          dfs.render();
+        }, 100);
         return;
       }
 
@@ -596,16 +622,21 @@ var DFS = (function () {
             const refSoul = Gun.node.soul(refNode);
             console.log("📋 Referenced node loaded:", refSoul, refNode);
 
+            console.log("🔧 Adding referenced node to map:", refSoul);
             nodes.set(refSoul, { id: refSoul, label: refSoul });
             visited.add(refSoul);
             visitedCount++;
+            console.log("📊 Current nodes map size:", nodes.size);
 
             // Aggiungi l'edge
-            edges.set(ref.source + ref.target, {
+            const edgeKey = ref.source + ref.target;
+            console.log("🔗 Adding edge to map:", edgeKey);
+            edges.set(edgeKey, {
               source: ref.source,
               target: ref.target,
               property: ref.property,
             });
+            console.log("📊 Current edges map size:", edges.size);
 
             // Trova riferimenti secondari
             Object.keys(refNode).forEach((prop) => {
@@ -629,19 +660,30 @@ var DFS = (function () {
                       const secondarySoul = Gun.node.soul(secondaryNode);
                       console.log("📋 Secondary node loaded:", secondarySoul);
 
+                      console.log(
+                        "🔧 Adding secondary node to map:",
+                        secondarySoul
+                      );
                       nodes.set(secondarySoul, {
                         id: secondarySoul,
                         label: secondarySoul,
                       });
                       visited.add(secondarySoul);
                       visitedCount++;
+                      console.log("📊 Current nodes map size:", nodes.size);
 
                       // Aggiungi l'edge secondario
-                      edges.set(refSoul + secondaryRef, {
+                      const secondaryEdgeKey = refSoul + secondaryRef;
+                      console.log(
+                        "🔗 Adding secondary edge to map:",
+                        secondaryEdgeKey
+                      );
+                      edges.set(secondaryEdgeKey, {
                         source: refSoul,
                         target: secondaryRef,
                         property: prop,
                       });
+                      console.log("📊 Current edges map size:", edges.size);
                     }
                   });
                 }
@@ -650,16 +692,21 @@ var DFS = (function () {
           }
 
           // Quando tutti i nodi principali sono caricati, renderizza
+          console.log(
+            `📊 Progress: ${loadedCount}/${totalRefs} primary nodes loaded`
+          );
           if (loadedCount === totalRefs) {
             console.log("✅ All primary nodes loaded, rendering graph");
+            clearTimeout(renderTimeout); // Pulisci il timeout
             setTimeout(() => {
+              console.log("🎨 Calling dfs.render()...");
               dfs.render();
             }, 500);
           }
         });
       });
     });
-  }
+  };
 
   dfs.search = function (soul, label, limit, opt) {
     console.log("Starting DFS with soul:", soul);
@@ -851,7 +898,11 @@ function updateStatus(message, isError = false) {
 
 // Make functions available globally
 window.dfs = dfs;
-window.loadAllNodesDirectly = loadAllNodesDirectly;
+window.loadAllNodesDirectly = dfs.loadAllNodesDirectly;
+window.update = update; // Make update function globally available
+
+// Also expose the DFS object and its functions globally
+window.DFS = DFS;
 
 // Funzione per attivare la modalità "Load All Nodes"
 function loadAllNodesMode() {
@@ -868,6 +919,8 @@ function loadAllNodesMode() {
   // Usa il nuovo metodo di caricamento diretto
   if (typeof window.loadAllNodesDirectly === "function") {
     window.loadAllNodesDirectly(key);
+  } else if (typeof window.dfs?.loadAllNodesDirectly === "function") {
+    window.dfs.loadAllNodesDirectly(key);
   } else {
     console.error("❌ loadAllNodesDirectly function not available");
     updateStatus(
@@ -883,6 +936,12 @@ function loadAllNodesMode() {
         );
         updateStatus("✅ Retrying Load All Nodes...");
         window.loadAllNodesDirectly(key);
+      } else if (typeof window.dfs?.loadAllNodesDirectly === "function") {
+        console.log(
+          "✅ dfs.loadAllNodesDirectly function now available, retrying..."
+        );
+        updateStatus("✅ Retrying Load All Nodes...");
+        window.dfs.loadAllNodesDirectly(key);
       } else {
         console.error(
           "❌ loadAllNodesDirectly function still not available after retry"
