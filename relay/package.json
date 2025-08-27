@@ -39,8 +39,8 @@
     "nostr-tools": "^2.15.2",
     "qr": "^0.5.0",
     "self-adjusting-interval": "^1.0.0",
-    "shogun-contracts": "^1.2.6",
-    "shogun-core": "^1.6.16",
+    "shogun-contracts": "^1.2.7",
+    "shogun-core": "^1.9.4",
     "ws": "^8.14.2"
   },
   "devDependencies": {

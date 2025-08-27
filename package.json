@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "shogun-contracts": "^1.2.7",
-    "shogun-core": "^1.9.4"
-  }
-}
