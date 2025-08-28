@@ -690,14 +690,6 @@ router.post("/node/*", async (req, res) => {
 
     const node = getGunNodeFromPath(path);
 
-    // Get the setAllowInternalOperations function
-    const setAllowInternalOperations = req.app.get(
-      "setAllowInternalOperations"
-    );
-
-    // Temporarily allow internal operations during this REST API call
-    setAllowInternalOperations(true);
-
     try {
       // Properly promisify the Gun put operation
       const putResult = await new Promise((resolve, reject) => {
@@ -727,7 +719,6 @@ router.post("/node/*", async (req, res) => {
       });
     } finally {
       // Reset flag
-      setAllowInternalOperations(false);
     }
 
     console.log(`✅ Node successfully created/updated at path: "${path}"`);
@@ -771,14 +762,6 @@ router.delete("/node/*", async (req, res) => {
 
     const node = getGunNodeFromPath(path);
 
-    // Get the setAllowInternalOperations function
-    const setAllowInternalOperations = req.app.get(
-      "setAllowInternalOperations"
-    );
-
-    // Temporarily allow internal operations during this REST API call
-    setAllowInternalOperations(true);
-
     try {
       // Properly promisify the Gun delete operation
       await new Promise((resolve, reject) => {
@@ -808,7 +791,6 @@ router.delete("/node/*", async (req, res) => {
       });
     } finally {
       // Reset flag
-      setAllowInternalOperations(false);
     }
 
     console.log(`✅ Node successfully deleted at path: "${path}"`);
@@ -894,14 +876,6 @@ router.delete("/logs", (req, res) => {
     const gun = getGunInstance(req);
     const logsNode = gun.get("shogun").get("logs");
 
-    // Get the setAllowInternalOperations function
-    const setAllowInternalOperations = req.app.get(
-      "setAllowInternalOperations"
-    );
-
-    // Temporarily allow internal operations during this REST API call
-    setAllowInternalOperations(true);
-
     try {
       // Clear GunDB logs only (file logs are managed by the system)
       logsNode.put(null, (ack) => {
@@ -923,7 +897,6 @@ router.delete("/logs", (req, res) => {
       });
     } finally {
       // Reset flag
-      setAllowInternalOperations(false);
     }
   } catch (error) {
     console.error("❌ Clear logs error:", error);
