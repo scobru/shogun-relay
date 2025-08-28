@@ -913,7 +913,6 @@ async function initializeServer() {
   // Funzione di validazione del token
   function hasValidToken(msg) {
     if (process.env.RELAY_PROTECTED === "false") {
-      console.log("🔍 PUT allowed - protected disabled");
       return true;
     }
 
