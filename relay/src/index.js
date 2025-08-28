@@ -129,6 +129,7 @@ const GC_EXCLUDED_NAMESPACES = [
   "!", // Protects the root node, often used for system-level pointers.
   "relays", // Protects relay server health-check data.
   "shogun",
+  "shogun/",
 ];
 // How often to run the garbage collector (milliseconds).
 const GC_INTERVAL = 5 * 60 * 1000; // 5 minutes
