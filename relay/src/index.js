@@ -357,10 +357,6 @@ async function initializeServer() {
       // Memorizza anche i dati nella struttura principale di GunDB usando dati leggibili
       console.log("💾 Storing data in main GunDB structure...");
 
-      // Attiva il flag per permettere scritture interne del relay
-      allowInternalOperations = true;
-      console.log("🔓 Enabled internal operations for relay self-write");
-
       try {
         // Scomponi il soul path per creare la struttura GunDB corretta
         console.log("🔧 Decomposing soul path:", sanitizedSoul);
@@ -468,8 +464,7 @@ async function initializeServer() {
         );
       } finally {
         // Ripristina il flag di sicurezza
-        allowInternalOperations = false;
-        console.log("🔒 Disabled internal operations flag");
+        console.log("Propagated to GunDB");
       }
     } catch (error) {
       console.error("❌ Failed to propagate chain event to GunDB:", error);
@@ -842,7 +837,6 @@ async function initializeServer() {
   }
 
   // Flag per consentire operazioni interne durante REST API
-  let allowInternalOperations = false;
   const processedEventIds = new Set(); // In-memory deduplication
 
   // Funzione helper per trovare il relay corrente basandosi sull'URL
@@ -923,46 +917,6 @@ async function initializeServer() {
       return true;
     }
 
-    // Analizza le anime (souls) che sta cercando di modificare
-    const souls = Object.keys(msg.put || {});
-    const firstSoul = souls[0];
-
-    // Permetti operazioni temporanee durante REST API
-    if (allowInternalOperations) {
-      console.log(`🔍 PUT allowed - internal operation flag: ${firstSoul}`);
-      return true;
-    }
-
-    // Permetti operazioni interne di Gun senza autenticazione
-    const isInternalNamespace =
-      firstSoul &&
-      (firstSoul.startsWith("~") || // Namespace utente
-        firstSoul.startsWith("!") || // Namespace radice
-        firstSoul === "shogun" || // Operazioni interne di Shogun
-        firstSoul.startsWith("shogun/relays") || // Dati di salute del relay
-        firstSoul.startsWith("shogun/uploads") || // Upload utente (permette salvataggio upload utente)
-        firstSoul.startsWith("shogun/timeseries") || // Dati di serie temporale
-        firstSoul.startsWith("shogun/logs") || // Log del sistema
-        firstSoul.startsWith("shogun/chain_events") || // Eventi del contratto Chain
-        firstSoul.startsWith("shogun/processed_events") || // Eventi processati per deduplicazione
-        firstSoul.startsWith("shogun/mbUsage") || // Utilizzo MB off-chain
-        firstSoul.startsWith("shogun/mb_usage") || // Utilizzo MB off-chain (alternativo)
-        firstSoul.startsWith("shogun/usernames") || // Mapping usernames per autenticazione (username -> userPub)
-        !firstSoul.includes("/") || // Chiavi a livello singolo (operazioni interne di Gun)
-        firstSoul.match(
-          /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
-        ) || // UUID souls
-        // NUOVA REGOLA: Permetti path che contengono / ma non iniziano con shogun/ (dati del contratto Chain)
-        (firstSoul.includes("/") && !firstSoul.startsWith("shogun/")));
-
-    if (isInternalNamespace) {
-      console.log(`🔍 PUT allowed - internal namespace: ${firstSoul}`);
-      console.log(
-        `🔍 Debug - isInternalNamespace check passed for: ${firstSoul}`
-      );
-      return true;
-    }
-
     // Se ha headers, verifica il token
     if (msg && msg.headers && msg.headers.token) {
       const hasValidAuth = msg.headers.token === process.env.ADMIN_PASSWORD;
@@ -973,14 +927,6 @@ async function initializeServer() {
     }
 
     console.log(`❌ PUT denied - no valid auth: ${firstSoul}`);
-    console.log(
-      `🔍 Debug - allowInternalOperations: ${allowInternalOperations}`
-    );
-    console.log(`🔍 Debug - RELAY_PROTECTED: ${process.env.RELAY_PROTECTED}`);
-    console.log(`🔍 Debug - has headers: ${!!(msg && msg.headers)}`);
-    console.log(
-      `🔍 Debug - has token: ${!!(msg && msg.headers && msg.headers.token)}`
-    );
     return false;
   }
 
@@ -1474,12 +1420,6 @@ async function initializeServer() {
   app.set("userAuthMiddleware", userAuthMiddleware);
   app.set("walletSignatureMiddleware", walletSignatureMiddleware);
   app.set("verifyWalletSignature", verifyWalletSignature);
-
-  // Esponi la variabile per operazioni interne
-  app.set("allowInternalOperations", () => allowInternalOperations);
-  app.set("setAllowInternalOperations", (value) => {
-    allowInternalOperations = value;
-  });
 
   // Funzione per calcolare l'utilizzo MB off-chain (versione ottimizzata)
   async function getOffChainMBUsage(userAddress) {
