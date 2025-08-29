@@ -105,7 +105,6 @@ import "gun/lib/axe.js";
 import "gun/lib/wire.js";
 import "gun/lib/yson.js";
 
-
 import multer from "multer";
 
 // Importa i contratti dal pacchetto shogun-contracts
@@ -923,12 +922,12 @@ async function initializeServer() {
     if (msg && msg.headers && msg.headers.token) {
       const hasValidAuth = msg.headers.token === process.env.ADMIN_PASSWORD;
       if (hasValidAuth) {
-        console.log(`🔍 PUT allowed - valid token: ${firstSoul}`);
+        console.log(`🔍 PUT allowed - valid token: ${msg.headers}`);
         return true;
       }
     }
 
-    console.log(`❌ PUT denied - no valid auth: ${firstSoul}`);
+    console.log(`❌ PUT denied - no valid auth: ${msg.headers}`);
     return false;
   }
 
