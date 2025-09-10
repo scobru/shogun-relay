@@ -348,15 +348,6 @@
                         <div class="admin-controls">
                             <h2 class="text-xl font-bold mb-6 text-[#FF69B4]">Admin Controls</h2>
 
-                            <!-- Garbage Collector Control -->
-                            <div class="mb-8">
-                                <h3 class="text-lg mb-4 text-[#FFFFFF]">Garbage Collector</h3>
-                                <button id="triggerGC"
-                                    class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium">
-                                    🗑️ Trigger Garbage Collection
-                                </button>
-                                <div id="gcStatus" class="mt-3 text-base"></div>
-                            </div>
 
                             <!-- Stats Modification -->
                             <div class="mb-8">
@@ -475,7 +466,6 @@
         const uptimeEl = document.getElementById('uptime');
         const errorEl = document.getElementById('error');
         const lastUpdatedEl = document.getElementById('lastUpdated');
-        const gcStatusEl = document.getElementById('gcStatus');
         const updateStatusEl = document.getElementById('updateStatus');
         const peerStatusEl = document.getElementById('peerStatus');
         const peerListEl = document.getElementById('peerList');
@@ -508,33 +498,6 @@
             return token;
         }
 
-        // Function to trigger garbage collection
-        async function triggerGC() {
-            const token = getAuthToken();
-            if (!token) {
-                gcStatusEl.innerHTML = '<span class="text-error">Authentication required</span>';
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/v1/system/gc/trigger', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    gcStatusEl.innerHTML = '<span class="text-success">✓ Garbage collection triggered successfully</span>';
-                } else {
-                    gcStatusEl.innerHTML = `<span class="text-error">✗ Error: ${result.error}</span>`;
-                }
-            } catch (error) {
-                gcStatusEl.innerHTML = `<span class="text-error">✗ Error: ${error.message}</span>`;
-            }
-        }
 
         // Function to update stats
         async function updateStat(key) {
@@ -576,7 +539,6 @@
         }
 
         // Add event listeners
-        document.getElementById('triggerGC').addEventListener('click', triggerGC);
         document.getElementById('addPeerBtn').addEventListener('click', addPeer);
 
         // Live logs event listeners

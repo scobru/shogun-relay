@@ -168,7 +168,6 @@
                 <div class="card-body p-6">
                     <h2 class="card-title text-lg text-[#FF69B4] mb-6">Quick Actions</h2>
                     <div class="space-y-4">
-                        <button onclick="runGarbageCollection()" class="btn bg-[#42A5F5] hover:bg-[#64B5F6] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium">🗑️ Run GC</button>
                         <button onclick="healthCheck()" class="btn bg-[#4CAF50] hover:bg-[#45A049] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium">🔍 Health Check</button>
                         <button onclick="restartAllServices()" class="btn bg-[#FFA500] hover:bg-[#FF8C00] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium">🔄 Restart All</button>
                     </div>
@@ -507,29 +506,6 @@
             setTimeout(refreshAllServices, 5000);
         }
 
-        async function runGarbageCollection() {
-            const password = getAdminPassword();
-            if (!password) {
-                alert('⚠️ Admin password required for garbage collection');
-                return;
-            }
-
-            try {
-                log('Running garbage collection...', 'info');
-                const response = await fetch('/api/v1/system/gc/trigger', {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${password}` }
-                });
-
-                if (response.ok) {
-                    log('✅ Garbage collection completed successfully', 'success');
-                } else {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-            } catch (error) {
-                log(`❌ Garbage collection failed: ${error.message}`, 'error');
-            }
-        }
 
         async function healthCheck() {
             log('Running comprehensive health check...', 'info');

@@ -120,19 +120,6 @@ const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN;
 const IPFS_GATEWAY_URL =
   process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
 
-// --- Garbage Collection Configuration ---
-const GC_ENABLED = process.env.GC_ENABLED === "true";
-// Namespaces to protect from garbage collection.
-const GC_EXCLUDED_NAMESPACES = [
-  // --- CRITICAL GUN METADATA ---
-  "~", // Protects all user spaces, including user data and aliases (~@username).
-  "!", // Protects the root node, often used for system-level pointers.
-  "relays", // Protects relay server health-check data.
-  "shogun",
-  "shogun/",
-];
-// How often to run the garbage collector (milliseconds).
-const GC_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 // ES Module equivalent for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -773,70 +760,7 @@ async function initializeServer() {
     console.log(`📊 TimeSeries: ${key} = ${value}`);
   }
 
-  // Funzione di raccolta spazzatura
-  function runGarbageCollector() {
-    if (!GC_ENABLED) {
-      console.log("🗑️ Garbage Collector is disabled.");
-      return;
-    }
-    console.log("🗑️ Running Garbage Collector...");
-    let cleanedCount = 0;
 
-    // Assicurati che gun sia inizializzato prima di accedere alle sue proprietà
-    if (!gun || !gun._ || !gun._.graph) {
-      console.warn(
-        "⚠️ Gun non ancora inizializzato, saltando la raccolta spazzatura"
-      );
-      return;
-    }
-
-    const graph = gun._.graph;
-
-    for (const soul in graph) {
-      if (Object.prototype.hasOwnProperty.call(graph, soul)) {
-        const isProtected = GC_EXCLUDED_NAMESPACES.some((ns) =>
-          soul.startsWith(ns)
-        );
-
-        if (!isProtected) {
-          gun.get(soul).put(null);
-          cleanedCount++;
-          console.log(`🗑️ Pulito nodo non protetto: ${soul}`);
-        }
-      }
-    }
-
-    if (cleanedCount > 0) {
-      console.log(
-        `🗑️ Garbage Collector finished. Cleaned ${cleanedCount} nodes.`
-      );
-    } else {
-      console.log(
-        "🗑️ Garbage Collector finished. No unprotected nodes found to clean."
-      );
-    }
-  }
-
-  // Memorizza il riferimento all'intervallo di GC per il cleanup
-  let gcInterval = null;
-
-  // Inizializza il garbage collector
-  function initializeGarbageCollector() {
-    if (GC_ENABLED) {
-      console.log("🗑️ Initializing garbage collector...");
-      gcInterval = setInterval(runGarbageCollector, GC_INTERVAL);
-      console.log(
-        `✅ Garbage Collector scheduled to run every ${
-          GC_INTERVAL / 1000 / 60
-        } minutes.`
-      );
-      console.log("✅ Garbage collector initialized");
-      // Esegui una volta all'avvio per un ritardo
-      setTimeout(runGarbageCollector, 30 * 1000); // Esegui 30s dopo l'avvio
-    } else {
-      console.log("🗑️ Garbage collection disabled");
-    }
-  }
 
   // Flag per consentire operazioni interne durante REST API
   const processedEventIds = new Set(); // In-memory deduplication
@@ -1378,7 +1302,6 @@ async function initializeServer() {
   // Esponi le funzioni helper per le route
   app.set("addSystemLog", addSystemLog);
   app.set("addTimeSeriesPoint", addTimeSeriesPoint);
-  app.set("runGarbageCollector", runGarbageCollector);
   app.set("getCurrentRelayAddress", getCurrentRelayAddress);
 
   // Esponi le funzioni del contratto Chain per le route
@@ -1649,8 +1572,6 @@ async function initializeServer() {
 
   app.use(express.static(publicPath));
 
-  // Initialize garbage collector now that gun is ready
-  initializeGarbageCollector();
 
   // Set up relay stats database
   const db = gun.get(namespace).get("relays").get(host);
@@ -1699,18 +1620,6 @@ async function initializeServer() {
   // Shutdown function
   async function shutdown() {
     console.log("🛑 Shutting down Shogun Relay...");
-
-    // Clean up garbage collector interval
-    if (gcInterval) {
-      clearInterval(gcInterval);
-      console.log("✅ Garbage collector interval cleared");
-    }
-
-    // Clean up listener health check interval
-    // if (listenerHealthCheckInterval) { // This line is removed as per the edit hint
-    //   clearInterval(listenerHealthCheckInterval);
-    //   console.log("✅ Listener health check interval cleared");
-    // }
 
     // Close server
     if (server) {
@@ -1799,7 +1708,6 @@ async function initializeServer() {
     db,
     addSystemLog,
     addTimeSeriesPoint,
-    runGarbageCollector,
     shutdown,
   };
 }
