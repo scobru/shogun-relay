@@ -104,6 +104,8 @@ import "gun/lib/radisk.js";
 import "gun/lib/axe.js";
 import "gun/lib/wire.js";
 import "gun/lib/yson.js";
+import "gun/lib/evict.js";
+import "gun/lib/les.js";
 
 import multer from "multer";
 
@@ -1144,7 +1146,7 @@ async function initializeServer() {
 
   // Initialize Gun with conditional support
   const gunConfig = {
-    super: false,
+    super: true,
     file: "radata",
     radisk: process.env.DISABLE_RADISK !== "true", // Allow disabling radisk via env var
     web: server,
@@ -1157,11 +1159,13 @@ async function initializeServer() {
     wait: 500,
     webrtc: true,
     peers: peers,
-    // Add better error handling for radisk
-    chunk: 1000, // Smaller chunks to reduce memory usage
-    pack: 1000, // Smaller pack size
-    // Add JSON error handling
-    jsonify: false, // Disable automatic JSON parsing to prevent errors
+    chunk: 1000, 
+    pack: 1000,
+    jsonify: true, // Disable automatic JSON parsing to prevent errors
+    gc_enable: true,
+    gc_info_enable: true,
+    gc_info_mini: true,
+    ws: true,
   };
 
   if (process.env.DISABLE_RADISK === "true") {
