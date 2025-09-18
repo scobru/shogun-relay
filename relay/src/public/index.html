@@ -119,15 +119,15 @@
                             <div class="p-6">
                                 <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Storage & Files</h2>
                                 <div class="space-y-3">
-                                    <a href="/user-upload" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Upload files for authenticated users with wallet, MB quota management, optional encryption and storage usage tracking">
-                                        <span class="text-[#42A5F5]">📤</span>
-                                        <span>User Upload</span>
-                                        <span class="tooltiptext">Upload files for authenticated users with wallet, MB quota management, optional encryption and storage usage tracking</span>
-                                    </a>
                                     <a href="/ipfs-status" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Check IPFS node status, API version, peer connections and network health metrics">
                                         <span class="text-[#64B5F6]">📊</span>
                                         <span>IPFS Node Status</span>
                                         <span class="tooltiptext">Check IPFS node status, API version, peer connections and network health metrics</span>
+                                    </a>
+                                    <a href="/pin-manager" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Manage IPFS pins, add/remove content pins and monitor pinned content status">
+                                        <span class="text-[#FF9800]">📌</span>
+                                        <span>Pin Manager</span>
+                                        <span class="tooltiptext">Manage IPFS pins, add/remove content pins and monitor pinned content status</span>
                                     </a>
                                 </div>
                             </div>
@@ -138,20 +138,20 @@
                             <div class="p-6">
                                 <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Data Management</h2>
                                 <div class="space-y-3">
-                                    <a href="/view" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="View and query GunDB data, search by key, filter results and export data in JSON format">
-                                        <span class="text-[#42A5F5]">🔍</span>
-                                        <span>View/Query Data</span>
-                                        <span class="tooltiptext">View and query GunDB data, search by key, filter results and export data in JSON format</span>
+                                    <a href="/admin" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Admin panel for GunDB management, system monitoring and configuration">
+                                        <span class="text-[#42A5F5]">⚙️</span>
+                                        <span>Admin Panel</span>
+                                        <span class="tooltiptext">Admin panel for GunDB management, system monitoring and configuration</span>
                                     </a>
-                                    <a href="/chain-contract" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Interface to interact with Chain contract, sync blockchain events with GunDB and monitor on-chain updates">
-                                        <span class="text-[#FF9800]">⛓️</span>
-                                        <span>Chain Contract Interface</span>
-                                        <span class="tooltiptext">Interface to interact with Chain contract, sync blockchain events with GunDB and monitor on-chain updates</span>
+                                    <a href="/services-dashboard" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Monitor system services, check status and manage service configurations">
+                                        <span class="text-[#64B5F6]">📊</span>
+                                        <span>Services Dashboard</span>
+                                        <span class="tooltiptext">Monitor system services, check status and manage service configurations</span>
                                     </a>
-                                    <a href="/ipcm-contract" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Manage IPCM contract, check connection status, configure parameters and monitor protocol performance">
-                                        <span class="text-[#9C27B0]">🗂️</span>
-                                        <span>IPCM Contract Interface</span>
-                                        <span class="tooltiptext">Manage IPCM contract, check connection status, configure parameters and monitor protocol performance</span>
+                                    <a href="/charts" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="View system statistics, performance metrics and data visualization charts">
+                                        <span class="text-[#4CAF50]">📈</span>
+                                        <span>Charts & Stats</span>
+                                        <span class="tooltiptext">View system statistics, performance metrics and data visualization charts</span>
                                     </a>
                                 </div>
                             </div>
@@ -176,16 +176,6 @@
                             <div class="p-6">
                                 <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Security & Tools</h2>
                                 <div class="space-y-3">
-                                    <a href="/auth" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Multi-authentication system with traditional login, Web3 wallet integration, and Nostr support">
-                                        <span class="text-[#FF69B4]">🔐</span>
-                                        <span>Authentication</span>
-                                        <span class="tooltiptext">Multi-authentication system with traditional login, Web3 wallet integration, and Nostr support</span>
-                                    </a>
-                                    <a href="/subscribe" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Manage relay subscriptions, connect MetaMask wallet, pay in ETH and monitor subscription status">
-                                        <span class="text-[#4CAF50]">🔗</span>
-                                        <span>Relay Subscription</span>
-                                        <span class="tooltiptext">Manage relay subscriptions, connect MetaMask wallet, pay in ETH and monitor subscription status</span>
-                                    </a>
                                     <a href="/derive" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Derive cryptographic keys, generate public/private key pairs and manage secure digital identities">
                                         <span class="text-[#FF9800]">🔑</span>
                                         <span>Derive Keys</span>

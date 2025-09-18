@@ -1,6 +1,6 @@
 # Shogun Relay
 
-A complete **GunDB relay server** with integrated IPFS storage, authentication, decentralized user management, and advanced file storage system.
+A complete **GunDB relay server** with integrated IPFS storage for admin use. Provides decentralized database functionality with IPFS file management capabilities.
 
 ![Shogun Relay Admin Panel](image.png)
 _Shogun Relay Admin Panel - Complete control interface for managing your decentralized infrastructure_
