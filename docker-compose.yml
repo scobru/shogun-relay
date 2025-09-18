@@ -29,14 +29,10 @@ services:
       - RELAY_NAME=OP1
       - RELAY_PEERS=wss://ruling-mastodon-improved.ngrok-free.app/gun
       - RELAY_PROTECTED=true
-      - ALCHEMY_API_KEY=yjhjIoJ3o_at8ALT7nCJtFtjdqFpiBdx
       - IPFS_API_URL=http://127.0.0.1:5001
       - IPFS_GATEWAY_URL=http://127.0.0.1:8080
       - IPFS_API_TOKEN=shogun2025
       - IPFS_API_KEY=shogun2025
-      - GOOGLE_CLIENT_ID=
-      - GOOGLE_CLIENT_SECRET=
-      - GOOGLE_REDIRECT_URI=
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8765/health"]

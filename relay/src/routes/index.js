@@ -34,57 +34,16 @@ const tokenAuthMiddleware = (req, res, next) => {
   }
 };
 
-// Middleware per autenticare le richieste con firma del wallet
-const walletSignatureMiddleware = (req, res, next) => {
-  try {
-    const userAddress = req.headers["x-user-address"];
-    const signature = req.headers["x-wallet-signature"];
-    const message = req.headers["x-signature-message"] || "I Love Shogun";
-
-    if (!userAddress) {
-      return res.status(401).json({
-        success: false,
-        error: "x-user-address header richiesto",
-      });
-    }
-
-    if (!signature) {
-      return res.status(401).json({
-        success: false,
-        error: "x-wallet-signature header richiesto per autenticazione",
-      });
-    }
-
-    // Per ora restituiamo true se i formati sono corretti
-    // In futuro potremmo implementare la verifica crittografica completa
-    console.log(`🔐 Verifying signature for address: ${userAddress}`);
-    console.log(`🔐 Message: ${message}`);
-    console.log(`🔐 Signature: ${signature.substring(0, 20)}...`);
-
-    console.log(`✅ Wallet signature verified for: ${userAddress}`);
-    next();
-  } catch (error) {
-    console.error("❌ Wallet signature middleware error:", error);
-    res.status(500).json({
-      success: false,
-      error: "Errore di autenticazione",
-    });
-  }
-};
 
 // Importa i moduli delle routes
-import contractsRouter from "./contracts.js";
 import uploadsRouter from "./uploads.js";
 import ipfsRouter from "./ipfs.js";
 import systemRouter from "./system.js";
 import notesRouter from "./notes.js";
 import debugRouter from "./debug.js";
-import authRouter from "./auth.js";
 import usersRouter from "./users.js";
-import subscriptionsRouter from "./subscriptions.js";
 import servicesRouter from "./services.js";
 import visualGraphRouter from "./visualGraph.js";
-import chainRouter from "./chain.js";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -343,31 +302,6 @@ export default (app) => {
     res.sendFile(path.resolve(publicPath, "charts.html"));
   });
 
-  app.get("/chain-contract", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "chain-contract.html"));
-  });
-
-  app.get("/ipcm-contract", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    const filePath = path.resolve(publicPath, "ipcm-contract.html");
-    
-    console.log(`🔍 IPCM Contract route requested`);
-    console.log(`📁 Public path: ${publicPath}`);
-    console.log(`📄 File path: ${filePath}`);
-    console.log(`📄 File exists: ${fs.existsSync(filePath)}`);
-    
-    if (!fs.existsSync(filePath)) {
-      console.error(`❌ File not found: ${filePath}`);
-      return res.status(404).json({
-        success: false,
-        error: "IPCM contract HTML file not found",
-        path: filePath
-      });
-    }
-    
-    res.sendFile(filePath);
-  });
 
   // Route per servire i file JavaScript dalla directory lib
   app.get("/lib/:filename", (req, res) => {
@@ -667,13 +601,10 @@ export default (app) => {
   });
 
   // Route di autenticazione
-  app.use(`${baseRoute}/auth`, authRouter);
 
   // Route per la gestione utenti
   app.use(`${baseRoute}/users`, usersRouter);
 
-  // Route per i contratti smart contract
-  app.use(`${baseRoute}/contracts`, contractsRouter);
 
   // Route per gli upload degli utenti
   app.use(`${baseRoute}/user-uploads`, uploadsRouter);
@@ -693,8 +624,6 @@ export default (app) => {
   // Route di debug
   app.use(`${baseRoute}/debug`, debugRouter);
 
-  // Route per le sottoscrizioni
-  app.use(`${baseRoute}/subscriptions`, subscriptionsRouter);
 
   // Route per i servizi
   app.use(`${baseRoute}/services`, servicesRouter);
@@ -702,9 +631,6 @@ export default (app) => {
   // Route per il grafico visivo
   app.use(`${baseRoute}/visualGraph`, visualGraphRouter);
 
-  // Route per il contratto Chain
-  app.use(`${baseRoute}/chain`, chainRouter);
-  console.log("✅ Chain routes registered at /api/v1/chain");
 
   // Route di test per verificare se le route sono registrate correttamente
   app.get(`${baseRoute}/test`, (req, res) => {
@@ -730,16 +656,12 @@ export default (app) => {
   });
 
   // Route legacy per compatibilità (solo quelle essenziali)
-  app.use("/api/contracts", contractsRouter);
   app.use("/api/user-uploads", uploadsRouter);
   app.use("/api/ipfs", ipfsRouter);
   app.use("/api/system", systemRouter);
   app.use("/api/notes", notesRouter);
   app.use("/api/debug", debugRouter);
-  app.use("/api/subscriptions", subscriptionsRouter);
   app.use("/api/services", servicesRouter);
-  app.use("/api/auth", authRouter);
-  app.use("/api/chain", chainRouter);
 
   // Route legacy per le note admin criptate (v1)
   app.use("/api/v1/notes", notesRouter);
@@ -842,46 +764,7 @@ export default (app) => {
 
       // Verifica che l'utente abbia una sottoscrizione attiva
       if (userAddress) {
-        try {
-          const { ethers } = await import("ethers");
-          const { DEPLOYMENTS } = await import(
-            "shogun-contracts/deployments.js"
-          );
-
-          const chainId = process.env.CHAIN_ID || "11155111";
-          const web3ProviderUrl = `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`;
-
-          if (process.env.ALCHEMY_API_KEY) {
-            const provider = new ethers.JsonRpcProvider(web3ProviderUrl);
-            const chainDeployments = DEPLOYMENTS[chainId];
-            const relayContract =
-              chainDeployments?.["Relay#RelayPaymentRouter"];
-
-            if (relayContract) {
-              const contract = new ethers.Contract(
-                relayContract.address,
-                relayContract.abi,
-                provider
-              );
-
-              const isSubscribed = await contract.checkUserSubscription(
-                userAddress
-              );
-              if (!isSubscribed) {
-                return res.status(403).json({
-                  success: false,
-                  error: "Utente non ha una sottoscrizione attiva",
-                });
-              }
-            }
-          }
-        } catch (e) {
-          console.error("Errore verifica sottoscrizione:", e);
-          return res.status(500).json({
-            success: false,
-            error: "Errore verifica sottoscrizione",
-          });
-        }
+        // Blockchain subscription verification removed
       }
 
       // Calcola la data di scadenza (default: 30 giorni)
@@ -894,7 +777,7 @@ export default (app) => {
         authorized: true,
         authorizedAt: Date.now(),
         expiresAt: expirationDate,
-        authMethod: userAddress ? "smart_contract" : "manual",
+        authMethod: "manual",
       };
 
       const authNode = gun.get("shogun").get("authorized_keys").get(pubKey);
@@ -1174,7 +1057,6 @@ export default (app) => {
   // IPFS upload user endpoint
   app.post(
     "/ipfs-upload-user",
-    walletSignatureMiddleware,
     upload.single("file"),
     async (req, res) => {
       try {
@@ -1364,126 +1246,7 @@ export default (app) => {
     });
   });
 
-  // Contract config legacy
-  app.get("/api/contract-config", async (req, res) => {
-    try {
-      const { DEPLOYMENTS } = await import("shogun-contracts/deployments.js");
-      const chainId = process.env.CHAIN_ID || "11155111";
 
-      if (!DEPLOYMENTS[chainId]) {
-        return res.status(404).json({
-          success: false,
-          error: `No deployments found for chain ID: ${chainId}`,
-        });
-      }
-
-      const chainDeployments = DEPLOYMENTS[chainId];
-      const contracts = {
-        relayPaymentRouter:
-          chainDeployments["Relay#RelayPaymentRouter"] || null,
-        stealthPool: chainDeployments["Stealth#StealthPool"] || null,
-        pairRecovery: chainDeployments["Recovery#PairRecovery"] || null,
-        integrity: chainDeployments["Security#Integrity"] || null,
-        paymentForwarder: chainDeployments["Stealth#PayamentForwarder"] || null,
-        stealthKeyRegistry:
-          chainDeployments["Stealth#StealthKeyRegistry"] || null,
-        bridgeDex: chainDeployments["Bridge#BridgeDex"] || null,
-      };
-
-      res.json({
-        success: true,
-        chainId: chainId,
-        contracts: contracts,
-        timestamp: Date.now(),
-      });
-    } catch (error) {
-      console.error("❌ Contract Config Error:", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to load contract configuration",
-        details: error.message,
-      });
-    }
-  });
-
-  // Contract status legacy
-  app.get("/api/contract-status", async (req, res) => {
-    try {
-      const { ethers } = await import("ethers");
-      const { DEPLOYMENTS } = await import("shogun-contracts/deployments.js");
-
-      const chainId = process.env.CHAIN_ID || "11155111";
-      const web3ProviderUrl = `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`;
-
-      if (!process.env.ALCHEMY_API_KEY) {
-        return res.json({
-          success: false,
-          status: "not_configured",
-          error: "ALCHEMY_API_KEY not configured",
-        });
-      }
-
-      const provider = new ethers.JsonRpcProvider(web3ProviderUrl);
-      const network = await provider.getNetwork();
-
-      const chainDeployments = DEPLOYMENTS[chainId];
-      const relayContract = chainDeployments?.["Relay#RelayPaymentRouter"];
-
-      if (!relayContract) {
-        return res.json({
-          success: false,
-          status: "contract_not_found",
-          error: "Relay contract not found in deployments",
-        });
-      }
-
-      const contract = new ethers.Contract(
-        relayContract.address,
-        relayContract.abi,
-        provider
-      );
-
-      // Test basic contract interaction
-      try {
-        await contract.getFunction("owner")();
-
-        res.json({
-          success: true,
-          status: "connected",
-          network: {
-            name: network.name,
-            chainId: network.chainId.toString(),
-          },
-          contract: {
-            address: relayContract.address,
-            name: "RelayPaymentRouter",
-            status: "accessible",
-          },
-        });
-      } catch (contractError) {
-        res.json({
-          success: false,
-          status: "contract_error",
-          error: contractError.message,
-          network: {
-            name: network.name,
-            chainId: network.chainId.toString(),
-          },
-          contract: {
-            address: relayContract.address,
-            name: "RelayPaymentRouter",
-            status: "error",
-          },
-        });
-      }
-    } catch (error) {
-      res.json({
-        success: false,
-        status: "error",
-        error: error.message,
-      });
-    }
-  });
 
   // --- FINE ROUTE LEGACY ---
 
@@ -1509,16 +1272,8 @@ export default (app) => {
         path: req.path,
         method: req.method,
         availableEndpoints: [
-          `${baseRoute}/auth/register`,
-          `${baseRoute}/auth/login`,
-          `${baseRoute}/auth/forgot`,
-          `${baseRoute}/auth/reset`,
-          `${baseRoute}/auth/change-password`,
           `${baseRoute}/users/profile`,
           `${baseRoute}/users/:pubkey`,
-          `${baseRoute}/contracts`,
-          `${baseRoute}/contracts/config`,
-          `${baseRoute}/contracts/:contractName`,
           `${baseRoute}/user-uploads/:identifier`,
           `${baseRoute}/ipfs/upload`,
           `${baseRoute}/ipfs/status`,
@@ -1527,24 +1282,8 @@ export default (app) => {
           `${baseRoute}/system/stats`,
           `${baseRoute}/notes`,
           `${baseRoute}/debug/mb-usage/:userAddress`,
-          `${baseRoute}/subscriptions/subscription-status/:identifier`,
-          `${baseRoute}/subscriptions/user-subscription-details/:userAddress`,
           `${baseRoute}/services/s3-stats`,
           `${baseRoute}/services/:service/restart`,
-          `${baseRoute}/chain/test`,
-          `${baseRoute}/chain/status`,
-          `${baseRoute}/chain/read/:soul/:key?`,
-          `${baseRoute}/chain/debug/:soul`,
-          `${baseRoute}/chain/events`,
-          `${baseRoute}/chain/contract-read/:soul/:key`,
-          `${baseRoute}/chain/decode-test/:soul/:key`,
-          `${baseRoute}/chain/hash-test/:hash`,
-          `${baseRoute}/chain/start-events`,
-          `${baseRoute}/chain/sync-custom`,
-          `${baseRoute}/chain/listener-status`,
-          `${baseRoute}/chain/test-propagation`,
-          `${baseRoute}/chain/restart-listener`,
-          `${baseRoute}/chain/test-sync`,
           `${baseRoute}/health`,
         ],
       },
@@ -1573,12 +1312,7 @@ export default (app) => {
       }
 
       const gun = req.app.get("gunInstance");
-      const getOffChainMBUsage = req.app.get("getOffChainMBUsage");
-
-      // Ottieni l'utilizzo MB corrente prima del reset
-      const previousMBUsed = getOffChainMBUsage
-        ? await getOffChainMBUsage(identifier)
-        : 0;
+      // MB usage tracking removed
 
       // Reset dell'utilizzo MB
       const mbUsageNode = gun.get("shogun").get("mb_usage").get(identifier);
@@ -1653,8 +1387,6 @@ export default (app) => {
     "/graph",
     "/chat",
     "/charts",
-    "/chain-contract",
-    "/ipcm-contract",
     "/drive",
   ];
 
