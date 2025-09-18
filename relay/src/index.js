@@ -86,6 +86,7 @@ import dotenv from "dotenv";
 import ip from "ip";
 import qr from "qr";
 import setSelfAdjustingInterval from "self-adjusting-interval";
+
 import "./utils/bullet-catcher.js";
 
 dotenv.config();
@@ -174,9 +175,6 @@ async function initializeServer() {
     // Log to console only to prevent JSON serialization errors
     console.log(`📊 TimeSeries: ${key} = ${value}`);
   }
-
-
-
 
 
   // Funzione di validazione del token

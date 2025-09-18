@@ -1,6 +1,6 @@
 # Shogun Relay - Quick Start Guide 🚀
 
-Get your **GunDB relay server** with integrated IPFS storage running with HTTPS in under 10 minutes!
+Get your **GunDB relay server** with integrated IPFS storage for admin use running with HTTPS in under 10 minutes!
 
 ## 📋 Prerequisites
 
@@ -54,142 +54,41 @@ ngrok http 8765
 - **API Endpoints**: `https://your-subdomain.ngrok.io/api/*`
 - **Health Check**: `https://your-subdomain.ngrok.io/health`
 
-## 🔐 New User Authentication APIs
+## 🔐 Admin Authentication
 
-The relay now includes a complete user authentication system with GunDB:
+The relay uses centralized admin token authentication for all protected operations:
 
-### Authentication Endpoints
-
-```bash
-# Register a new user
-POST https://your-subdomain.ngrok.io/api/v1/auth/register
-{
-  "email": "user@example.com",
-  "passphrase": "secure-password",
-  "hint": "password-hint"
-}
-
-# Login user
-POST https://your-subdomain.ngrok.io/api/v1/auth/login
-{
-  "email": "user@example.com", 
-  "passphrase": "secure-password"
-}
-
-# Password recovery
-POST https://your-subdomain.ngrok.io/api/v1/auth/forgot
-{
-  "email": "user@example.com",
-  "hint": "password-hint"
-}
-
-# Reset password
-POST https://your-subdomain.ngrok.io/api/v1/auth/reset
-{
-  "email": "user@example.com",
-  "oldPassphrase": "temp-password",
-  "newPassphrase": "new-secure-password"
-}
-
-# Change password
-POST https://your-subdomain.ngrok.io/api/v1/auth/change-password
-{
-  "email": "user@example.com",
-  "oldPassphrase": "current-password",
-  "newPassphrase": "new-password"
-}
-```
-
-### User Management Endpoints
+### Admin Authentication
 
 ```bash
-# Get current user profile
-GET https://your-subdomain.ngrok.io/api/v1/users
-Headers: { "authorization": "user-pubkey" }
-
-# Get specific user profile
-GET https://your-subdomain.ngrok.io/api/v1/users/:pubkey
-
-# Update user profile
-PUT https://your-subdomain.ngrok.io/api/v1/users/profile
-Headers: { "authorization": "user-pubkey" }
-{
-  "profile": {
-    "name": "John Doe",
-    "bio": "Developer"
-  }
-}
-
-# Get user statistics
-GET https://your-subdomain.ngrok.io/api/v1/users/stats/:pubkey
+# Header format for all admin operations
+Authorization: Bearer YOUR_ADMIN_TOKEN
+# OR
+token: YOUR_ADMIN_TOKEN
 ```
 
-### Test Authentication APIs
+### Test Admin APIs
 
 ```bash
 # Health check
 curl https://your-subdomain.ngrok.io/api/v1/health
 
-# Register a test user
-curl -X POST https://your-subdomain.ngrok.io/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","passphrase":"password123","hint":"test"}'
+# System info
+curl -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
+     https://your-subdomain.ngrok.io/api/v1/system/relay-info
 
-# Login with the user
-curl -X POST https://your-subdomain.ngrok.io/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","passphrase":"password123"}'
+# Get system stats
+curl -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
+     https://your-subdomain.ngrok.io/api/v1/system/stats
 ```
 
-### Test Contract APIs
+### Test System Hash APIs (Admin Only)
 
 ```bash
-# Get all available contracts
-curl https://your-subdomain.ngrok.io/api/contracts
-
-# Get relay payment router ABI
-curl https://your-subdomain.ngrok.io/api/contracts/relay-payment-router/abi
-
-# Get contract address
-curl https://your-subdomain.ngrok.io/api/contracts/relay-payment-router/address
-
-# Get complete configuration
-curl https://your-subdomain.ngrok.io/api/contracts/config
-```
-
-### Test IPCM Contract APIs
-
-```bash
-# Get IPCM contract configuration
-curl https://your-subdomain.ngrok.io/api/v1/contracts/ipcm
-
-# Get IPCM factory ABI
-curl https://your-subdomain.ngrok.io/api/v1/contracts/ipcm/abi
-
-# Get IPCM factory address
-curl https://your-subdomain.ngrok.io/api/v1/contracts/ipcm/address
-```
-
-### Test Chain Contract APIs
-
-```bash
-# Get Chain contract configuration
-curl https://your-subdomain.ngrok.io/api/v1/contracts/chain
-
-# Get Chain contract ABI
-curl https://your-subdomain.ngrok.io/api/v1/contracts/chain/abi
-
-# Get Chain contract address
-curl https://your-subdomain.ngrok.io/api/v1/contracts/chain/address
-```
-
-### Test System Hash APIs
-
-```bash
-# Get all system file hashes (for pin manager)
+# Get all system file hashes (for pin manager protection)
 curl https://your-subdomain.ngrok.io/api/v1/user-uploads/system-hashes
 
-# Get system hashes map with details
+# Get system hashes map with details (for pin manager protection)
 curl https://your-subdomain.ngrok.io/api/v1/user-uploads/system-hashes-map
 
 # Save a hash to system hashes (admin)
@@ -204,6 +103,8 @@ curl -X DELETE https://your-subdomain.ngrok.io/api/v1/user-uploads/remove-system
   -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
   -d '{"userAddress":"admin-remove"}'
 ```
+
+**Note:** These endpoints use the legacy `/user-uploads/` path but now only manage system file hashes for pin manager protection, not user files.
 
 ## 🎯 Visual Graph Interface
 
@@ -305,65 +206,6 @@ const gun = Gun({
 });
 ```
 
-## ⛓️ Contract Interfaces
-
-The relay includes two powerful contract interfaces for blockchain integration:
-
-### IPCM Contract Interface (`/ipcm-contract`)
-**IPFS CID Mapping Contract** - Manage IPFS content identifiers on-chain
-
-#### Features
-- **IPCM Factory Operations**: Create and manage IPCM instances
-- **Instance Management**: Load, update, and query IPCM instances
-- **CID Mapping**: Update IPFS CID mappings for decentralized content
-- **Owner Management**: Transfer ownership of IPCM instances
-- **Batch Operations**: Get all instances or user-specific instances
-
-#### Smart Contract Integration
-- **Sepolia Testnet**: Deployed on Ethereum Sepolia testnet
-- **Factory Pattern**: IPCMFactory contract for instance creation
-- **Owner-based Access**: Only instance owners can update mappings
-- **Ethereum Wallet**: MetaMask integration for transactions
-
-#### Quick Start with IPCM Contract
-1. **Connect Wallet**: MetaMask with Sepolia network
-2. **Create IPCM**: Deploy new IPCM instance for CID mapping
-3. **Load Instance**: Connect to existing IPCM instance
-4. **Update Mapping**: Change IPFS CID mapping
-5. **Query Data**: Get current mapping and instance details
-
-### Chain Contract Interface (`/chain-contract`)
-**GunDB Chain Integration** - Write and read data to/from blockchain
-
-#### Features
-- **GunDB Integration**: Direct blockchain storage for GunDB data
-- **Data Writing**: Store GunDB nodes on-chain with soul/key/value
-- **Data Reading**: Retrieve blockchain-stored GunDB data
-- **Hash Generation**: Automatic keccak256 hashing for soul and keys
-- **Dual Storage**: Write to both GunDB and blockchain
-
-#### Smart Contract Integration
-- **Chain.sol Contract**: Custom smart contract for GunDB data
-- **Sepolia Testnet**: Deployed on Ethereum Sepolia testnet
-- **Gas Optimization**: Efficient storage patterns
-- **Data Verification**: On-chain data integrity checks
-
-#### Quick Start with Chain Contract
-1. **Connect Wallet**: MetaMask with Sepolia network
-2. **Write Data**: Store GunDB data on blockchain
-3. **Read Data**: Retrieve blockchain-stored data
-4. **Dual Mode**: Write to GunDB only or both systems
-5. **Data Inspection**: View and verify stored data
-
-### Contract Interface Access
-```bash
-# Direct access
-https://your-subdomain.ngrok.io/ipcm-contract
-https://your-subdomain.ngrok.io/chain-contract
-
-# From main interface
-https://your-subdomain.ngrok.io → Click "IPCM Contract Interface" or "Chain Contract Interface"
-```
 
 ## 🏠 Option 2: Local Development (HTTP Only)
 
@@ -394,8 +236,9 @@ curl https://your-subdomain.ngrok.io/health
 # Basic stats
 curl https://your-subdomain.ngrok.io/api/stats
 
-# New authentication health check
-curl https://your-subdomain.ngrok.io/api/v1/health
+# Admin health check
+curl -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
+     https://your-subdomain.ngrok.io/api/v1/health
 ```
 
 ## 💡 Quick Tips
@@ -404,31 +247,35 @@ curl https://your-subdomain.ngrok.io/api/v1/health
 - Use ngrok's free plan for testing (dynamic URLs)
 - Keep the ngrok terminal window open
 - Use `docker logs -f shogun-relay-stack` to monitor
-- Test authentication APIs with tools like Postman or curl
+- Test admin APIs with tools like Postman or curl
 
 ### For Production
 - Purchase ngrok static endpoint or use proper SSL certificates
 - Configure environment variables for security
 - Set up monitoring and backups
-- Implement proper rate limiting for authentication endpoints
+- Implement proper rate limiting for admin endpoints
 
 ### Troubleshooting
 - **Container not starting**: Check `docker logs shogun-relay-stack`
 - **ngrok connection issues**: Verify your authtoken and account limits
 - **Can't access interface**: Ensure port 8765 is exposed in Docker
-- **Authentication errors**: Check rate limiting and GunDB connectivity
+- **Authentication errors**: Check admin token and GunDB connectivity
 
 ## 🌟 Next Steps
 
-1. **Connect your app**: Use `https://your-subdomain.ngrok.io/gun` as your **GunDB peer**
-2. **Upload files**: Visit `/upload` to test IPFS storage (integrated)
-3. **Monitor performance**: Check `/stats` for real-time metrics
-4. **Explore data**: Visit `/visualGraph` for interactive GunDB visualization
-5. **Manage pins**: Use `/pin-manager` for IPFS pin management (integrated)
-6. **Test authentication**: Use the new `/api/v1/auth/*` endpoints
-7. **Manage users**: Explore user management APIs
-8. **Deploy contracts**: Use `/ipcm-contract` for IPFS CID mapping
-9. **Chain integration**: Use `/chain-contract` for GunDB blockchain storage
+### **Admin-Only Features (Authentication Required):**
+1. **Admin panel**: Access `/admin` for comprehensive management
+2. **Upload files**: Visit `/upload` to test IPFS storage (admin)
+3. **Monitor performance**: Check `/stats` for real-time metrics (admin)
+4. **Manage pins**: Use `/pin-manager` for IPFS pin management (admin)
+5. **System monitoring**: Use `/services-dashboard` for service monitoring (admin)
+6. **Charts**: Visit `/charts` for data visualization (admin)
+
+### **Public Features (No Authentication Required):**
+7. **Connect your app**: Use `https://your-subdomain.ngrok.io/gun` as your **GunDB peer**
+8. **Explore data**: Visit `/visualGraph` for interactive GunDB visualization
+9. **Chat**: Use `/chat` for community communication
+10. **Derive keys**: Use `/derive` for cryptographic key derivation
 
 ## 🗂️ IPFS Pin Manager
 
@@ -444,14 +291,14 @@ Advanced pin management with automatic system file protection.
 
 ### System File Protection
 - **Automatic Detection**: System hashes are automatically managed when files are uploaded/removed
-- **Preservation Toggle**: Checkbox to protect user uploads during bulk operations
+- **Preservation Toggle**: Checkbox to protect system files during bulk operations
 - **Smart Filtering**: Only non-system files are unpinned when preservation is enabled
 - **Detailed Statistics**: Shows total pins, preserved files, and files to remove
 
 ### Usage
 1. **Individual Pins**: Enter CID and use Add/Remove buttons
 2. **Batch Operations**: Use "Unpin All Files" with preservation toggle
-3. **System Files**: Checkbox protects user uploads by default
+3. **System Files**: Checkbox protects system files by default
 4. **Progress Tracking**: Real-time progress with detailed logs
 5. **Garbage Collection**: Optional cleanup after unpinning
 
@@ -469,7 +316,7 @@ https://your-subdomain.ngrok.io → Click "Pin Manager"
 - **Full Documentation**: See [README.md](README.md) for complete feature list
 - **API Reference**: Check the web interface for endpoint documentation
 - **Configuration**: See environment variables in README.md
-- **Authentication**: See [API_AUTHENTICATION.md](relay/API_AUTHENTICATION.md) for detailed auth docs
+- **Admin Authentication**: See README.md for admin authentication details
 
 ---
 
