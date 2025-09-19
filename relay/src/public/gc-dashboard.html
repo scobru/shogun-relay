@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shogun-GC Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #667eea;
+        }
+        
+        .stat-card h3 {
+            color: #666;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+        
+        .stat-card .value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+        
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+        }
+        
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #229954;
+            transform: translateY(-2px);
+        }
+        
+        .config-section {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        .config-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .config-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .config-item label {
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 5px;
+        }
+        
+        .config-item input, .config-item select {
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        
+        .config-item input:focus, .config-item select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .log-section {
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        
+        .log-section h3 {
+            color: #fff;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-active {
+            background: #27ae60;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-inactive {
+            background: #e74c3c;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Shogun-GC Dashboard</h1>
+        
+        <div id="alert-container"></div>
+        
+        <!-- Status Overview -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>GC Status</h3>
+                <div class="value">
+                    <span id="gc-status-indicator" class="status-indicator status-inactive"></span>
+                    <span id="gc-status-text">Loading...</span>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <h3>Tracked Nodes</h3>
+                <div class="value" id="tracked-nodes">-</div>
+            </div>
+            
+            <div class="stat-card">
+                <h3>Total Runs</h3>
+                <div class="value" id="total-runs">-</div>
+            </div>
+            
+            <div class="stat-card">
+                <h3>Nodes Freed</h3>
+                <div class="value" id="nodes-freed">-</div>
+            </div>
+            
+            <div class="stat-card">
+                <h3>Memory Usage</h3>
+                <div class="value" id="memory-usage">-</div>
+            </div>
+            
+            <div class="stat-card">
+                <h3>Last Run</h3>
+                <div class="value" id="last-run">-</div>
+            </div>
+        </div>
+        
+        <!-- Controls -->
+        <div class="controls">
+            <button class="btn btn-primary" onclick="refreshStats()">🔄 Refresh Stats</button>
+            <button class="btn btn-danger" onclick="triggerGC()">🗑️ Trigger GC</button>
+            <button class="btn btn-success" onclick="toggleAutoRefresh()">⏰ Auto Refresh</button>
+            <a href="/admin" class="btn btn-primary">← Back to Admin</a>
+        </div>
+        
+        <!-- Configuration -->
+        <div class="config-section">
+            <h3>⚙️ Configuration</h3>
+            <div class="config-grid">
+                <div class="config-item">
+                    <label>GC Enabled</label>
+                    <select id="gc-enabled">
+                        <option value="true">Enabled</option>
+                        <option value="false">Disabled</option>
+                    </select>
+                </div>
+                
+                <div class="config-item">
+                    <label>GC Delay (ms)</label>
+                    <input type="number" id="gc-delay" placeholder="30000">
+                </div>
+                
+                <div class="config-item">
+                    <label>Memory Threshold</label>
+                    <input type="number" id="gc-threshold" step="0.1" placeholder="0.8">
+                </div>
+                
+                <div class="config-item">
+                    <label>Max Tracked Nodes</label>
+                    <input type="number" id="gc-max-nodes" placeholder="10000">
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="updateConfig()" style="margin-top: 15px;">💾 Update Config</button>
+        </div>
+        
+        <!-- Activity Log -->
+        <div class="log-section">
+            <h3>📊 Activity Log</h3>
+            <div id="activity-log">
+                <div>Loading activity log...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let autoRefreshInterval = null;
+        let logEntries = [];
+        
+        // Get auth token from localStorage or prompt
+        function getAuthToken() {
+            let token = localStorage.getItem('admin_token');
+            if (!token) {
+                token = prompt('Enter admin password:');
+                if (token) {
+                    localStorage.setItem('admin_token', token);
+                }
+            }
+            return token;
+        }
+        
+        // Show alert message
+        function showAlert(message, type = 'success') {
+            const alertContainer = document.getElementById('alert-container');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alertContainer.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+        
+        // Add log entry
+        function addLogEntry(message) {
+            const timestamp = new Date().toLocaleString();
+            logEntries.unshift(`[${timestamp}] ${message}`);
+            
+            // Keep only last 50 entries
+            if (logEntries.length > 50) {
+                logEntries = logEntries.slice(0, 50);
+            }
+            
+            updateLogDisplay();
+        }
+        
+        // Update log display
+        function updateLogDisplay() {
+            const logContainer = document.getElementById('activity-log');
+            logContainer.innerHTML = logEntries.map(entry => `<div>${entry}</div>`).join('');
+        }
+        
+        // Refresh GC statistics
+        async function refreshStats() {
+            try {
+                addLogEntry('Refreshing GC statistics...');
+                
+                const response = await fetch('/gc-status');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const stats = data.stats;
+                    
+                    // Update status
+                    const statusIndicator = document.getElementById('gc-status-indicator');
+                    const statusText = document.getElementById('gc-status-text');
+                    
+                    if (stats.config.gc_enable) {
+                        statusIndicator.className = 'status-indicator status-active';
+                        statusText.textContent = 'Active';
+                    } else {
+                        statusIndicator.className = 'status-indicator status-inactive';
+                        statusText.textContent = 'Disabled';
+                    }
+                    
+                    // Update stats
+                    document.getElementById('tracked-nodes').textContent = stats.trackedNodes || 0;
+                    document.getElementById('total-runs').textContent = stats.totalRuns || 0;
+                    document.getElementById('nodes-freed').textContent = stats.totalFreed || 0;
+                    
+                    if (stats.memoryUsage) {
+                        const memMB = (stats.memoryUsage.heapUsed / 1024 / 1024).toFixed(2);
+                        document.getElementById('memory-usage').textContent = `${memMB} MB`;
+                    }
+                    
+                    if (stats.lastRun) {
+                        const lastRunDate = new Date(stats.lastRun);
+                        document.getElementById('last-run').textContent = lastRunDate.toLocaleTimeString();
+                    }
+                    
+                    addLogEntry(`Stats refreshed - ${stats.trackedNodes} nodes tracked, ${stats.totalFreed} freed`);
+                } else {
+                    showAlert('Failed to get GC status', 'error');
+                    addLogEntry('Failed to get GC status');
+                }
+            } catch (error) {
+                console.error('Error refreshing stats:', error);
+                showAlert('Error refreshing stats', 'error');
+                addLogEntry(`Error: ${error.message}`);
+            }
+        }
+        
+        // Trigger manual garbage collection
+        async function triggerGC() {
+            try {
+                addLogEntry('Triggering manual garbage collection...');
+                
+                const token = getAuthToken();
+                if (!token) {
+                    showAlert('Admin token required', 'error');
+                    return;
+                }
+                
+                const response = await fetch('/gc-trigger', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showAlert('Manual garbage collection triggered successfully');
+                    addLogEntry('Manual GC triggered successfully');
+                    
+                    // Refresh stats after a short delay
+                    setTimeout(refreshStats, 2000);
+                } else {
+                    showAlert(`Failed to trigger GC: ${data.error}`, 'error');
+                    addLogEntry(`Failed to trigger GC: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Error triggering GC:', error);
+                showAlert('Error triggering GC', 'error');
+                addLogEntry(`Error: ${error.message}`);
+            }
+        }
+        
+        // Toggle auto refresh
+        function toggleAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                showAlert('Auto refresh disabled');
+                addLogEntry('Auto refresh disabled');
+            } else {
+                autoRefreshInterval = setInterval(refreshStats, 10000); // 10 seconds
+                showAlert('Auto refresh enabled (10s interval)');
+                addLogEntry('Auto refresh enabled');
+            }
+        }
+        
+        // Update configuration
+        async function updateConfig() {
+            try {
+                addLogEntry('Updating GC configuration...');
+                
+                const config = {
+                    gc_enable: document.getElementById('gc-enabled').value === 'true',
+                    gc_delay: parseInt(document.getElementById('gc-delay').value) || 30000,
+                    gc_threshold: parseFloat(document.getElementById('gc-threshold').value) || 0.8,
+                    gc_max_nodes: parseInt(document.getElementById('gc-max-nodes').value) || 10000
+                };
+                
+                // Note: This would require a new endpoint to update config
+                // For now, just show a message
+                showAlert('Configuration update requires server restart');
+                addLogEntry('Config update requested (requires restart)');
+                
+            } catch (error) {
+                console.error('Error updating config:', error);
+                showAlert('Error updating configuration', 'error');
+                addLogEntry(`Error: ${error.message}`);
+            }
+        }
+        
+        // Initialize dashboard
+        function initDashboard() {
+            addLogEntry('Shogun-GC Dashboard initialized');
+            refreshStats();
+        }
+        
+        // Start auto refresh on load
+        window.addEventListener('load', () => {
+            initDashboard();
+            autoRefreshInterval = setInterval(refreshStats, 30000); // 30 seconds
+        });
+        
+        // Clean up on unload
+        window.addEventListener('beforeunload', () => {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -88,7 +88,7 @@ import ip from "ip";
 import setSelfAdjustingInterval from "self-adjusting-interval";
 
 import "./utils/bullet-catcher.js";
-import "./utils/shogun-gc.js";
+import ShogunGC from "./utils/shogun-gc.js";
 
 dotenv.config();
 
@@ -361,6 +361,23 @@ async function initializeServer() {
   }
 
   const gun = Gun(gunConfig);
+
+  // Initialize Shogun-GC after Gun is created
+  try {
+    // Get GC config from gunConfig
+    const gcOptions = {};
+    Object.keys(gunConfig).forEach(key => {
+      if (key.startsWith('gc_')) {
+        gcOptions[key] = gunConfig[key];
+      }
+    });
+    
+    // Initialize the garbage collector
+    ShogunGC.initialize(gun._.root, gcOptions);
+    console.log("✅ Shogun-GC initialized successfully");
+  } catch (error) {
+    console.error("❌ Failed to initialize Shogun-GC:", error);
+  }
 
   // Configura l'istanza Gun per le route di autenticazione
   app.set("gunInstance", gun);
