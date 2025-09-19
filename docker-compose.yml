@@ -33,6 +33,13 @@ services:
       - IPFS_GATEWAY_URL=http://127.0.0.1:8080
       - IPFS_API_TOKEN=shogun2025
       - IPFS_API_KEY=shogun2025
+      - GC_ENABLE=true
+      - GC_DELAY=30000
+      - GC_THRESHOLD=0.8
+      - GC_INFO_ENABLE=true
+      - GC_INFO_INTERVAL=60000
+      - GC_MAX_NODES=10000
+      - GC_PROTECTED_NAMESPACES=shogun,relays,pulse,logs
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
