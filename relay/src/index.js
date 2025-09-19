@@ -93,7 +93,7 @@ dotenv.config();
 
 import Gun from "gun";
 import "gun/sea.js";
-import "./lib/les.js";
+
 
 import "gun/lib/stats.js";
 import "gun/lib/webrtc.js";
@@ -104,6 +104,7 @@ import "gun/lib/axe.js";
 import "gun/lib/wire.js";
 import "gun/lib/yson.js";
 import "gun/lib/evict.js";
+import "./lib/les.js";
 
 import multer from "multer";
 

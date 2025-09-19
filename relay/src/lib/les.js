@@ -40,7 +40,7 @@
 	if(!(typeof window !== "undefined") && USELOCALGUN)
 		console.log("NOTE: You currently have LES.js set to use the 'local' file version of gun, This might crash if set wrong!");
 	
-	var Gun = (typeof window !== "undefined") ? window.Gun : (USELOCALGUN ? require('../gun') : require("gun"));
+	var Gun = (typeof window !== "undefined") ? window.Gun : (USELOCALGUN ? import("gun") : import("gun"));
 	
 	//Removes a node from the garbage collection until next write
 	Gun.chain.gcDequeue = function() {
