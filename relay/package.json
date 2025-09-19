@@ -34,8 +34,6 @@
     "is-fn": "^3.0.0",
     "multer": "^2.0.1",
     "node-fetch": "^3.3.2",
-    "qr": "^0.5.0",
-    "qr-image": "^3.2.0",
     "self-adjusting-interval": "^1.0.0",
     "ws": "^8.14.2"
   },
