@@ -163,7 +163,6 @@ The relay provides a complete GunDB relay server with real-time synchronization 
 - **Graph Database**: Hierarchical data structure with soul/key/value pairs
 - **WebRTC Integration**: Peer-to-peer connections for enhanced decentralization
 - **Local Storage**: Persistent data storage with radisk
-- **Garbage Collection**: Automatic cleanup of unused data
 - **Authentication**: Token-based access control for protected operations
 
 ### Connect to GunDB
@@ -285,7 +284,6 @@ Advanced pin management with automatic system file protection.
 - **Individual Pin Operations**: Add, remove, and manage individual pins
 - **Batch Unpin All**: Bulk operation with progress tracking and system file preservation
 - **System File Protection**: Automatically preserves user uploads during bulk operations
-- **Garbage Collection**: Integrated IPFS cleanup with confirmation
 - **Modern UI**: Clean, responsive interface with consistent design
 - **Real-time Progress**: Detailed progress tracking with logs
 
@@ -300,7 +298,6 @@ Advanced pin management with automatic system file protection.
 2. **Batch Operations**: Use "Unpin All Files" with preservation toggle
 3. **System Files**: Checkbox protects system files by default
 4. **Progress Tracking**: Real-time progress with detailed logs
-5. **Garbage Collection**: Optional cleanup after unpinning
 
 ### Access
 ```bash

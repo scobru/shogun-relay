@@ -260,37 +260,6 @@ router.get("/stats.json", (req, res) => {
   }
 });
 
-// Derive endpoint
-router.post("/derive", async (req, res) => {
-  try {
-    const { password, extra, options } = req.body;
-
-    if (!password) {
-      return res.status(400).json({
-        success: false,
-        error: "Password is required",
-      });
-    }
-
-    const ShogunCoreModule = await import("shogun-core");
-    const { derive } = ShogunCoreModule;
-
-    // Chiama la funzione derive con i parametri corretti
-    const derivedKeys = await derive(password, extra, options);
-
-    res.json({
-      success: true,
-      derivedKeys: derivedKeys,
-      timestamp: Date.now(),
-    });
-  } catch (error) {
-    console.error("❌ Derive error:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
 
 // Gun node operations
 router.get("/node/*", async (req, res) => {

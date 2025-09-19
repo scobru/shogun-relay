@@ -103,7 +103,7 @@ import "gun/lib/radisk.js";
 import "gun/lib/axe.js";
 import "gun/lib/wire.js";
 import "gun/lib/yson.js";
-import "gun/lib/evict.js";
+//import "gun/lib/evict.js";
 import "gun/lib/les.js";
 
 import multer from "multer";
@@ -318,19 +318,6 @@ async function initializeServer() {
 
 
 
-  // IPFS upload endpoint (admin) - DEPRECATED: use /api/v1/ipfs/upload instead
-  app.post(
-    "/ipfs-upload",
-    tokenAuthMiddleware,
-    upload.single("file"),
-    async (req, res) => {
-      res.status(410).json({
-        success: false,
-        error: "This endpoint is deprecated. Use /api/v1/ipfs/upload instead.",
-        message: "Please update your client to use the new API endpoint.",
-      });
-    }
-  );
 
 
   // --- Start Server Function ---

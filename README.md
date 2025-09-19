@@ -20,7 +20,6 @@ _Shogun Relay Admin Panel - Complete control interface for managing your decentr
 - **Graph Database**: Hierarchical data structure with soul/key/value pairs
 - **WebRTC Support**: Peer-to-peer connections for enhanced decentralization
 - **Local Storage**: Persistent data storage with radisk
-- **Garbage Collection**: Automatic cleanup of unused data
 
 ### 📁 Admin File Management System
 
@@ -42,7 +41,6 @@ _Shogun Relay Admin Panel - Complete control interface for managing your decentr
 - **Comprehensive Pin Management**: Add, remove, and list IPFS pins
 - **Batch Operations**: Bulk unpin with progress tracking
 - **System File Preservation**: Protect user uploads during bulk operations
-- **Garbage Collection**: Integrated IPFS garbage collection
 - **Connection Testing**: IPFS API connectivity verification
 
 ### 📊 Admin Management
@@ -83,7 +81,6 @@ DELETE /api/v1/system/node/*                  # Delete GunDB node
 POST /api/v1/ipfs/pins/add          # Add pin
 POST /api/v1/ipfs/pins/rm           # Remove pin
 POST /api/v1/ipfs/pins/ls           # List all pins
-POST /api/v1/ipfs/repo/gc           # Garbage collection
 GET  /api/v1/ipfs/version           # IPFS version info
 GET  /api/v1/ipfs/status            # IPFS status
 GET  /api/v1/ipfs/repo/stat         # IPFS repository stats
@@ -133,8 +130,6 @@ POST /api/v1/system/stats/update              # Update stats
 GET  /api/v1/system/stats.json                # Stats JSON
 
 # System Operations
-POST /api/v1/system/gc/trigger                # Trigger garbage collection
-POST /api/v1/system/derive                    # Derive keys
 GET  /api/v1/system/logs                      # Get logs
 DELETE /api/v1/system/logs                    # Clear logs
 GET  /api/v1/system/peers                     # Get peers
@@ -194,7 +189,6 @@ GET  /upload                                  # Upload interface (admin)
 GET  /charts                                  # Charts interface (admin)
 
 # Public Interfaces (No Authentication Required)
-GET  /derive                                  # Derive interface
 GET  /graph                                   # Graph interface
 GET  /chat                                    # Chat interface
 
@@ -269,7 +263,6 @@ The main admin panel provides centralized management of all relay functions:
 
 #### 🔐 Security & Tools
 
-- **Derive Keys**: Cryptographic key derivation tools
 - **IPFS API Version**: API version management and monitoring
 
 **Note:** The Data Management section is currently empty as all blockchain-related data management features have been removed.
@@ -315,7 +308,6 @@ Advanced pin management with automatic system file protection:
 - **Individual Pin Operations**: Add, remove, and manage individual pins
 - **Batch Unpin All**: Bulk operation with progress tracking
 - **System File Protection**: Automatically preserves user uploads
-- **Garbage Collection**: Integrated IPFS cleanup with confirmation
 - **Modern Design**: Clean, responsive interface
 - **Real-time Progress**: Detailed progress tracking with logs
 
@@ -330,7 +322,6 @@ Advanced pin management with automatic system file protection:
 
 #### **Public Interfaces (No Authentication Required):**
 - **Chat Interface** (`/chat`): Community communication
-- **Derive Interface** (`/derive`): Key derivation tools
 - **Graph Interface** (`/graph`): Data visualization
 
 ## 🎯 Visual Graph
@@ -373,7 +364,6 @@ Advanced pin management with automatic system file protection and modern UI.
 - **Individual Pin Operations**: Add, remove, and manage individual pins with clean interface
 - **Batch Unpin All**: Bulk operation with progress tracking and system file preservation
 - **System File Protection**: Automatically preserves user uploads during bulk operations
-- **Garbage Collection**: Integrated IPFS cleanup with confirmation
 - **Modern Design**: Clean, responsive interface with consistent color scheme
 - **Real-time Progress**: Detailed progress tracking with comprehensive logs
 - **Smart Filtering**: Intelligent system file detection and preservation
@@ -401,7 +391,6 @@ When "🛡️ Preserve system files" is enabled:
 2. **Batch Operations**: Use "Unpin All Files" with preservation toggle
 3. **System Files**: Checkbox protects user uploads by default
 4. **Progress Tracking**: Real-time progress with detailed logs
-5. **Garbage Collection**: Optional cleanup after unpinning with confirmation
 
 ### API Integration
 
@@ -548,7 +537,6 @@ GET /api/v1/system/health
 - `/gun`: **GunDB WebSocket endpoint** (Primary)
 - `/visualGraph`: Interactive GunDB visualization
 - `/chat`: Community communication
-- `/derive`: Key derivation tools
 - `/graph`: Data visualization
 
 ## 🔧 Development
@@ -653,7 +641,6 @@ curl -H "Authorization: Bearer $IPFS_API_TOKEN" http://localhost:5001/api/v0/ver
 ### Performance Optimization
 
 - **GunDB Timeouts**: Increased timeouts for large datasets
-- **IPFS Garbage Collection**: Regular cleanup to free disk space
 - **Batch Operations**: Efficient bulk operations with progress tracking
 - **Caching**: Browser-based caching for static assets
 
@@ -672,7 +659,6 @@ curl -H "Authorization: Bearer $IPFS_API_TOKEN" http://localhost:5001/api/v0/ver
 - **Graph Database**: Hierarchical data structure with soul/key/value pairs
 - **WebRTC Support**: Peer-to-peer connections for enhanced decentralization
 - **Local Storage**: Persistent data storage with radisk
-- **Garbage Collection**: Automatic cleanup of unused data
 
 ### 📁 Admin File Management System
 
