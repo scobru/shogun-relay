@@ -105,10 +105,9 @@ import "gun/lib/wire.js";
 import "gun/lib/yson.js";
 import "gun/lib/evict.js";
 
-import "lib/les.js";
+import "./lib/les.js";
 
 import multer from "multer";
-
 
 const namespace = "shogun";
 
@@ -119,7 +118,6 @@ const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
 const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN;
 const IPFS_GATEWAY_URL =
   process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
-
 
 // ES Module equivalent for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -139,8 +137,6 @@ if (isNaN(port) || port <= 0 || port >= 65536) {
 }
 let path_public = process.env.RELAY_PATH || "public";
 let showQr = process.env.RELAY_QR !== "false";
-
-
 
 // Main server initialization function
 async function initializeServer() {
@@ -169,14 +165,11 @@ async function initializeServer() {
     }
   }
 
-
-
   // Funzione per i dati di serie temporale (console only)
   function addTimeSeriesPoint(key, value) {
     // Log to console only to prevent JSON serialization errors
     console.log(`📊 TimeSeries: ${key} = ${value}`);
   }
-
 
   // Funzione di validazione del token
   function hasValidToken(msg) {
@@ -316,11 +309,6 @@ async function initializeServer() {
     }
   };
 
-
-
-
-
-
   // --- Start Server Function ---
   async function startServer() {
     const server = app.listen(port, (error) => {
@@ -354,7 +342,7 @@ async function initializeServer() {
     wait: 500,
     webrtc: true,
     peers: peers,
-    chunk: 1000, 
+    chunk: 1000,
     pack: 1000,
     jsonify: true, // Disable automatic JSON parsing to prevent errors
     gc_enable: true,
@@ -388,23 +376,17 @@ async function initializeServer() {
   // Configura l'istanza Gun per le route di autenticazione
   app.set("gunInstance", gun);
 
-
   // Esponi le funzioni helper per le route
   app.set("addSystemLog", addSystemLog);
   app.set("addTimeSeriesPoint", addTimeSeriesPoint);
-
 
   // Esponi la mappatura per le route
   // app.set("originalNamesMap", originalNamesMap); // Removed as per edit hint
   // app.set("addHashMapping", addHashMapping); // Removed as per edit hint
   // app.set("calculateKeccak256Hash", calculateKeccak256Hash); // Removed as per edit hint
 
-
   // Esponi i middleware di autenticazione per le route
   app.set("tokenAuthMiddleware", tokenAuthMiddleware);
-
-
-
 
   // Esponi le configurazioni IPFS
   app.set("IPFS_API_URL", IPFS_API_URL);
@@ -505,7 +487,6 @@ async function initializeServer() {
 
   app.use(express.static(publicPath));
 
-
   // Set up relay stats database
   const db = gun.get(namespace).get("relays").get(host);
 
@@ -589,7 +570,6 @@ async function initializeServer() {
     console.log("🧹 Starting GunDB data cleanup...");
 
     try {
-
       // Clean up any corrupted logs
       gun
         .get("shogun")
