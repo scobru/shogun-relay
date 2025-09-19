@@ -84,7 +84,6 @@ import { fileURLToPath } from "url";
 import cors from "cors";
 import dotenv from "dotenv";
 import ip from "ip";
-import qr from "qr-image";
 
 import setSelfAdjustingInterval from "self-adjusting-interval";
 
@@ -135,7 +134,6 @@ if (isNaN(port) || port <= 0 || port >= 65536) {
   port = 8765;
 }
 let path_public = process.env.RELAY_PATH || "public";
-let showQr = process.env.RELAY_QR !== "false";
 
 // Main server initialization function
 async function initializeServer() {
@@ -356,20 +354,6 @@ async function initializeServer() {
     console.log("📁 Using local file storage with radisk");
   }
 
-  Gun.on("opt", function (ctx) {
-    if (ctx.once) {
-      return;
-    }
-    ctx.on("out", function (msg) {
-      let to = this.to;
-      // Adds headers for put
-      msg.headers = {
-        token: process.env.ADMIN_PASSWORD,
-      };
-      to.next(msg); // pass to next middleware
-    });
-  });
-
   const gun = Gun(gunConfig);
 
   // Configura l'istanza Gun per le route di autenticazione
@@ -549,18 +533,6 @@ async function initializeServer() {
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
 
-  // Show QR code if enabled
-  if (showQr) {
-    const url = `http://${host}:${port}`;
-    console.log(`📱 QR Code for: ${url}`);
-    try {
-      const qrCode = qr.image(url, { type: "terminal", small: true });
-      console.log(qrCode);
-    } catch (qrError) {
-      console.log(`📱 QR Code generation failed: ${qrError.message}`);
-      console.log(`📱 URL: ${url}`);
-    }
-  }
 
   console.log(`🚀 Shogun Relay Server running on http://${host}:${port}`);
 
