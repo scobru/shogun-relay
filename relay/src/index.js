@@ -85,6 +85,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import ip from "ip";
 import qr from "qr-image";
+
 import setSelfAdjustingInterval from "self-adjusting-interval";
 
 import "./utils/bullet-catcher.js";
@@ -98,14 +99,12 @@ import "gun/lib/les.js";
 import "gun/lib/stats.js";
 import "gun/lib/webrtc.js";
 import "gun/lib/rfs.js";
-import "gun/lib/rs3.js";
 import "gun/lib/radix.js";
 import "gun/lib/radisk.js";
 import "gun/lib/axe.js";
 import "gun/lib/wire.js";
 import "gun/lib/yson.js";
 import "gun/lib/evict.js";
-
 
 import multer from "multer";
 
