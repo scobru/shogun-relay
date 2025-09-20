@@ -198,6 +198,8 @@ async function initializeServer() {
   // Fix per rate limiting con proxy
   app.set("trust proxy", 1);
 
+  
+
   // Route specifica per /admin (DEFINITA PRIMA DEL MIDDLEWARE DI AUTENTICAZIONE)
   app.get("/admin", (req, res) => {
     const adminPath = path.resolve(publicPath, "admin.html");
@@ -341,7 +343,6 @@ async function initializeServer() {
     chunk: 1000,
     pack: 1000,
     jsonify: true, // Disable automatic JSON parsing to prevent errors
-    ws: true,
     // Shogun-GC Configuration
     gc_enable: process.env.GC_ENABLE !== "false", // Enable by default
     gc_delay: parseInt(process.env.GC_DELAY) || 30000, // 30 seconds
@@ -357,6 +358,8 @@ async function initializeServer() {
   } else {
     console.log("📁 Using local file storage with radisk");
   }
+
+  Gun.serve(app);
 
   const gun = Gun(gunConfig);
 
