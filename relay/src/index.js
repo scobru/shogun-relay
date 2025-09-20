@@ -100,8 +100,6 @@ import "gun/lib/webrtc.js";
 import "gun/lib/rfs.js";
 import "gun/lib/radix.js";
 import "gun/lib/radisk.js";
-import "gun/lib/axe.js";
-import "gun/lib/wire.js";
 import "gun/lib/yson.js";
 import "gun/lib/evict.js";
 
