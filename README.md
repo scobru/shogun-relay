@@ -89,6 +89,7 @@ POST /api/v1/ipfs/pins/ls           # List all pins
 GET  /api/v1/ipfs/version           # IPFS version info
 GET  /api/v1/ipfs/status            # IPFS status
 GET  /api/v1/ipfs/repo/stat         # IPFS repository stats
+POST /api/v1/ipfs/repo/gc           # Run garbage collection
 
 # File Upload & Content
 POST /api/v1/ipfs/upload            # Upload file to IPFS
@@ -96,7 +97,8 @@ GET  /api/v1/ipfs/content/:cid      # Get IPFS content
 GET  /api/v1/ipfs/content-json/:cid # Get IPFS content as JSON
 
 # IPFS API Proxy (Admin only)
-GET  /api/v1/ipfs/proxy/*           # IPFS API proxy endpoints
+POST /api/v0/*                      # Direct IPFS API proxy (admin)
+POST /api/v1/ipfs/api/*             # IPFS API proxy via relay (admin)
 GET  /api/v1/ipfs/test              # Test IPFS connection
 
 # IPFS Gateway
