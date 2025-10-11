@@ -1,5 +1,10 @@
 # Shogun Relay
 
+[![npm](https://img.shields.io/badge/npm-v1.9.4-blue)](https://www.npmjs.com/package/shogun-relay)
+[![License](https://img.shields.io/badge/license-MIT-yellow)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3.3-blue)](https://www.typescriptlang.org/)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/scobru/shogun-relay)
+
 A complete **GunDB relay server** with integrated IPFS storage for admin use. Provides decentralized database functionality with IPFS file management capabilities.
 
 ![Shogun Relay Admin Panel](image.png)

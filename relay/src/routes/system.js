@@ -131,35 +131,6 @@ router.get("/stats", (req, res) => {
   }
 });
 
-// Garbage collection trigger endpoint
-router.post("/gc/trigger", (req, res) => {
-  try {
-    // Trigger garbage collection
-    const addSystemLog = req.app.get("addSystemLog");
-    const runGarbageCollector = req.app.get("runGarbageCollector");
-
-    if (addSystemLog) {
-      addSystemLog("info", "Manual garbage collection triggered");
-    }
-
-    if (runGarbageCollector) {
-      runGarbageCollector();
-    }
-
-    res.json({
-      success: true,
-      message: "Garbage collection triggered",
-      timestamp: Date.now(),
-    });
-  } catch (error) {
-    console.error("❌ GC trigger error:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
 // Stats update endpoint
 router.post("/stats/update", (req, res) => {
   try {

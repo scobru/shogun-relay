@@ -88,13 +88,12 @@ import ip from "ip";
 import setSelfAdjustingInterval from "self-adjusting-interval";
 
 import "./utils/bullet-catcher.js";
-import ShogunGC from "./utils/shogun-gc.js";
 
 dotenv.config();
 
 import Gun from "gun";
-import "gun/sea.js";
 
+import "gun/sea.js";
 import "gun/lib/stats.js";
 import "gun/lib/webrtc.js";
 import "gun/lib/rfs.js";
@@ -247,7 +246,6 @@ async function initializeServer() {
     "/charts",
     "/upload",
     "/pin-manager",
-    "/gc-dashboard",
   ];
 
   app.use((req, res, next) => {
@@ -343,14 +341,6 @@ async function initializeServer() {
     chunk: 1000,
     pack: 1000,
     jsonify: true, // Disable automatic JSON parsing to prevent errors
-    // Shogun-GC Configuration
-    gc_enable: process.env.GC_ENABLE !== "false", // Enable by default
-    gc_delay: parseInt(process.env.GC_DELAY) || 30000, // 30 seconds
-    gc_threshold: parseFloat(process.env.GC_THRESHOLD) || 0.8, // 80% memory usage
-    gc_info_enable: process.env.GC_INFO_ENABLE !== "false", // Enable by default
-    gc_info_interval: parseInt(process.env.GC_INFO_INTERVAL) || 60000, // 1 minute
-    gc_max_nodes: parseInt(process.env.GC_MAX_NODES) || 10000,
-    gc_namespace_protection: (process.env.GC_PROTECTED_NAMESPACES || "shogun,relays,pulse,logs").split(','),
   };
 
   if (process.env.DISABLE_RADISK === "true") {
@@ -362,23 +352,6 @@ async function initializeServer() {
   Gun.serve(app);
 
   const gun = Gun(gunConfig);
-
-  // Initialize Shogun-GC after Gun is created
-  try {
-    // Get GC config from gunConfig
-    const gcOptions = {};
-    Object.keys(gunConfig).forEach(key => {
-      if (key.startsWith('gc_')) {
-        gcOptions[key] = gunConfig[key];
-      }
-    });
-    
-    // Initialize the garbage collector
-    ShogunGC.initialize(gun._.root, gcOptions);
-    console.log("✅ Shogun-GC initialized successfully");
-  } catch (error) {
-    console.error("❌ Failed to initialize Shogun-GC:", error);
-  }
 
   // Configura l'istanza Gun per le route di autenticazione
   app.set("gunInstance", gun);
@@ -417,77 +390,7 @@ async function initializeServer() {
       memoryUsage: process.memoryUsage(),
     };
 
-    // Add GC information if available
-    if (global.ShogunGC) {
-      try {
-        const gcStats = global.ShogunGC.stats();
-        healthData.garbageCollection = {
-          enabled: gcStats.config.gc_enable,
-          trackedNodes: gcStats.trackedNodes,
-          totalRuns: gcStats.totalRuns,
-          totalFreed: gcStats.totalFreed,
-          lastRun: gcStats.lastRun,
-          avgRunTime: gcStats.avgRunTime
-        };
-      } catch (error) {
-        console.warn("⚠️ Error getting GC stats for health check:", error);
-      }
-    }
-
     res.json(healthData);
-  });
-
-  // GC status endpoint
-  app.get("/gc-status", (req, res) => {
-    try {
-      if (global.ShogunGC) {
-        const stats = global.ShogunGC.stats();
-        res.json({
-          success: true,
-          status: "enabled",
-          stats: stats,
-          timestamp: new Date().toISOString()
-        });
-      } else {
-        res.json({
-          success: false,
-          status: "not_initialized",
-          message: "Shogun-GC not available"
-        });
-      }
-    } catch (error) {
-      console.error("❌ GC Status Error:", error);
-      res.status(500).json({
-        success: false,
-        status: "error",
-        error: error.message
-      });
-    }
-  });
-
-  // Manual GC trigger endpoint (admin only)
-  app.post("/gc-trigger", tokenAuthMiddleware, (req, res) => {
-    try {
-      if (global.ShogunGC) {
-        global.ShogunGC.trigger();
-        res.json({
-          success: true,
-          message: "Manual garbage collection triggered",
-          timestamp: new Date().toISOString()
-        });
-      } else {
-        res.status(500).json({
-          success: false,
-          error: "Shogun-GC not available"
-        });
-      }
-    } catch (error) {
-      console.error("❌ GC Trigger Error:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message
-      });
-    }
   });
 
   // IPFS status endpoint
