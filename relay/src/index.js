@@ -101,7 +101,6 @@ import "gun/lib/evict.js";
 import "gun/lib/rfs.js";
 import "gun/lib/radix.js";
 import "gun/lib/radisk.js";
-import "gun/lib/ws.js";
 import "gun/lib/wire.js";
 import "gun/lib/axe.js";
 
