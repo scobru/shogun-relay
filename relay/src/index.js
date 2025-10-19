@@ -101,6 +101,9 @@ import "gun/lib/evict.js";
 import "gun/lib/rfs.js";
 import "gun/lib/radix.js";
 import "gun/lib/radisk.js";
+import "gun/lib/ws.js";
+import "gun/lib/wire.js";
+import "gun/lib/axe.js";
 
 import multer from "multer";
 import QuickLRU from "quick-lru";
@@ -432,6 +435,15 @@ async function initializeServer() {
     chunk: 1000,
     pack: 1000,
     jsonify: true, // Disable automatic JSON parsing to prevent errors
+    ws: {
+      server: server,
+      port: port,
+      path: "/gun",
+      web: null,
+      noServer: false,
+      drain: null,
+      wait: 500,
+    },
   };
 
   if (process.env.DISABLE_RADISK === "true") {

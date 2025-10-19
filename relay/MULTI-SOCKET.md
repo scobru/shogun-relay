@@ -1,4 +1,4 @@
-cd# Multi-Socket Gun Relay
+# Multi-Socket Gun Relay
 
 Il server relay di Shogun supporta istanze Gun multiple con isolamento dei dati tramite path-based routing.
 
