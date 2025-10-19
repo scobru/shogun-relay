@@ -435,15 +435,6 @@ async function initializeServer() {
     chunk: 1000,
     pack: 1000,
     jsonify: true, // Disable automatic JSON parsing to prevent errors
-    ws: {
-      server: server,
-      port: port,
-      path: "/gun",
-      web: null,
-      noServer: false,
-      drain: null,
-      wait: 500,
-    },
   };
 
   if (process.env.DISABLE_RADISK === "true") {
