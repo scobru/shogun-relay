@@ -1,104 +1,88 @@
-# Multi-Socket Gun Relay
+# Shogun Gun Relay
 
-Il server relay di Shogun supporta istanze Gun multiple con isolamento dei dati tramite path-based routing.
+Il server relay di Shogun fornisce un'istanza Gun persistente e robusta per la sincronizzazione dei dati.
 
 ## Funzionalità
 
-### Istanza Persistente (Default)
+### Istanza Persistente
 - **Path**: `/gun`
 - **Persistenza**: Abilitata con radisk
 - **Storage**: Filesystem (`radata/`)
 - **Peers**: Configurabile tramite `RELAY_PEERS`
 - **Uso**: Dati permanenti, sincronizzazione tra peer
-
-### Istanze Effimere (Multi-Socket)
-- **Path**: Qualsiasi path diverso da `/gun` (es. `/ephemeral/session123`, `/temp/myroom`)
-- **Persistenza**: Disabilitata (solo in memoria)
-- **Storage**: Nessuno (nomem adapter)
-- **Peers**: Isolate, nessun peering
-- **Uso**: Sessioni temporanee, chat room, dati volatili
-- **Lifecycle**: Cache LRU con eviction automatica
+- **Features**: Auto-reconnection, heartbeat, gestione errori robusta
 
 ## Configurazione
 
 ### Variabili d'Ambiente
 
 ```bash
-# Abilita logging debug per multi-socket
+# Abilita logging debug
 DEBUG=true
 
-# Numero massimo di istanze effimere (default: 50)
-MAX_EPHEMERAL_SOCKETS=100
+# Disabilita radisk se necessario
+DISABLE_RADISK=false
+
+# Pulisci dati corrotti all'avvio
+CLEANUP_CORRUPTED_DATA=true
 ```
 
 ## Esempi d'Uso
 
-### Client JavaScript - Istanza Persistente
+### Client JavaScript
 
 ```javascript
-// Connessione all'istanza persistente principale
+// Connessione al relay Shogun
 const gun = Gun({
-  peers: ['ws://localhost:8765/gun']
+  peers: ['ws://localhost:8765/gun'],
+  // Configurazione ottimizzata per il relay
+  wire: true,
+  webrtc: true,
+  wait: 300,
+  retry: 3,
+  reconnect: true
 });
 
 // I dati sono persistenti e sincronizzati
 gun.get('users').get('alice').put({ name: 'Alice' });
-```
 
-### Client JavaScript - Istanza Effimera
-
-```javascript
-// Crea una sessione temporanea isolata
-const sessionId = Math.random().toString(36).substring(7);
-const ephemeralGun = Gun({
-  peers: [`ws://localhost:8765/ephemeral/${sessionId}`],
-  localStorage: false
-});
-
-// I dati esistono solo in memoria e non vengono persistiti
-ephemeralGun.get('chat').get('messages').put({ 
-  text: 'Questo messaggio sparirà quando il server riavvia' 
+// Sincronizzazione real-time
+gun.get('messages').map().on((data, key) => {
+  console.log('Nuovo messaggio:', data);
 });
 ```
 
-### Chat Room Isolate
+### Gestione Connessioni Robusta
 
 ```javascript
-// Stanza 1 - dati non condivisi con stanza 2
-const room1 = Gun({
-  peers: ['ws://localhost:8765/rooms/room-alpha']
+// Monitoraggio stato connessione
+gun.on('hi', (peer) => {
+  console.log('🟢 Connesso al relay:', peer);
 });
 
-// Stanza 2 - completamente isolata
-const room2 = Gun({
-  peers: ['ws://localhost:8765/rooms/room-beta']
+gun.on('bye', (peer) => {
+  console.log('🔴 Disconnesso dal relay:', peer);
 });
 
-room1.get('messages').put({ room: 'alpha', msg: 'Ciao!' });
-room2.get('messages').put({ room: 'beta', msg: 'Hello!' });
-// I messaggi NON vengono condivisi tra le stanze
-```
-
-### Sessioni Temporanee per WebRTC Signaling
-
-```javascript
-// Ideale per WebRTC signaling ephemeral
-const signaling = Gun({
-  peers: [`ws://localhost:8765/webrtc/${peerId}`]
+// Gestione errori e riconnessione automatica
+gun.on('out', (msg) => {
+  if (msg.put) {
+    console.log('📤 Invio dati:', Object.keys(msg.put).length, 'nodi');
+  }
 });
 
-signaling.get('offer').on(data => {
-  // Ricevi offer WebRTC
+gun.on('in', (msg) => {
+  if (msg.put) {
+    console.log('📥 Ricevuto:', Object.keys(msg.put).length, 'nodi');
+  }
 });
-
-signaling.get('answer').put(myAnswer);
 ```
 
 ## Monitoraggio
 
 ### Endpoint API
 
-#### Health Check con Info Multi-Socket
+#### Health Check
 ```bash
 GET /health
 
@@ -106,66 +90,73 @@ Response:
 {
   "success": true,
   "status": "healthy",
+  "timestamp": "2025-01-15T10:30:00.000Z",
   "uptime": 123.45,
   "activeConnections": 5,
-  "ephemeralSockets": {
-    "count": 3,
-    "maxSize": 50
+  "totalConnections": 12,
+  "memoryUsage": {
+    "rss": 45678912,
+    "heapTotal": 12345678,
+    "heapUsed": 8765432
   }
 }
 ```
 
-#### Lista Istanze Effimere Attive
+#### IPFS Status
 ```bash
-GET /ephemeral-sockets
+GET /ipfs-status
 
 Response:
 {
   "success": true,
-  "count": 3,
-  "maxSize": 50,
-  "sockets": [
-    {
-      "path": "/ephemeral/abc123",
-      "created": "2025-01-15T10:30:00.000Z",
-      "uptime": 300000
-    },
-    {
-      "path": "/rooms/lobby",
-      "created": "2025-01-15T10:25:00.000Z",
-      "uptime": 600000
-    }
-  ]
+  "status": "connected",
+  "version": "0.20.0",
+  "apiUrl": "http://127.0.0.1:5001"
 }
 ```
 
-## Gestione della Cache
+## Caratteristiche Avanzate
 
-Le istanze effimere utilizzano un **LRU (Least Recently Used) cache**:
+### Auto-Reconnection
+- Riconnessione automatica in caso di disconnessione
+- Heartbeat per rilevare connessioni stale
+- Retry con backoff esponenziale
 
-- Quando si raggiunge `MAX_EPHEMERAL_SOCKETS`, l'istanza meno recentemente usata viene eliminata
-- Le connessioni attive tengono "calda" l'istanza nella cache
-- Quando un'istanza viene evicted, tutte le connessioni vengono chiuse
-- Riconnettersi crea una nuova istanza vuota
+### Gestione Errori
+- Cleanup automatico dati corrotti
+- Sanitizzazione dati per GunDB
+- Logging dettagliato per debug
+
+### Performance
+- Configurazione ottimizzata per real-time sync
+- Supporto WebRTC per connessioni dirette
+- Batching intelligente per ridurre overhead
 
 ## Casi d'Uso
 
-### ✅ Quando Usare Istanze Effimere
+### ✅ Ideale Per
 
-- Chat temporanee o room di discussione
-- WebRTC signaling
-- Sessioni di collaborazione temporanee
-- Gaming multiplayer (stato di sessione)
-- Form collaborativi temporanei
-- Whiteboard condivise effimere
+- Applicazioni real-time collaborative
+- Sincronizzazione dati multi-dispositivo
+- Chat e messaging
+- Gaming multiplayer
+- Documenti collaborativi
+- IoT data streaming
 
-### ✅ Quando Usare Istanza Persistente
+### 🔧 Configurazione Ottimale
 
-- Dati utente permanenti
-- Contenuti da pubblicare
-- Storico messaggi da conservare
-- Configurazioni applicazione
-- Dati da sincronizzare tra dispositivi
+```javascript
+const gun = Gun({
+  peers: ['ws://localhost:8765/gun'],
+  // Configurazione ottimizzata
+  wire: true,        // Protocollo wire efficiente
+  webrtc: true,      // Connessioni dirette P2P
+  wait: 300,         // Batch processing veloce
+  retry: 3,          // Tentativi di riconnessione
+  reconnect: true,   // Auto-reconnection
+  heartbeat: 30000   // Heartbeat ogni 30s
+});
+```
 
 ## Architettura
 
@@ -174,61 +165,59 @@ Le istanze effimere utilizzano un **LRU (Least Recently Used) cache**:
 │   Shogun Relay Server                   │
 ├─────────────────────────────────────────┤
 │                                         │
-│  /gun (Persistent)                      │
+│  /gun (Single Persistent Instance)      │
 │  ├─ RadDisk Storage                     │
 │  ├─ Peer Sync                           │
-│  └─ WebSocket Server                    │
-│                                         │
-│  /ephemeral/* (Ephemeral)               │
-│  ├─ NoMem Adapter                       │
-│  ├─ Isolated                            │
-│  ├─ LRU Cache (max 50)                  │
-│  └─ Dedicated WebSocket Servers         │
+│  ├─ WebSocket Server                    │
+│  ├─ Auto-Reconnection                   │
+│  ├─ Heartbeat Monitoring                │
+│  └─ Error Recovery                      │
 │                                         │
 └─────────────────────────────────────────┘
 ```
 
+## Vantaggi
+
+### Semplicità
+- Una sola istanza Gun da gestire
+- Configurazione unificata
+- Debugging semplificato
+
+### Affidabilità
+- Gestione errori robusta
+- Auto-reconnection
+- Cleanup automatico dati corrotti
+
+### Performance
+- Configurazione ottimizzata
+- Supporto WebRTC
+- Batching intelligente
+
 ## Troubleshooting
 
-### Le istanze effimere spariscono
+### Problemi di Connessione
+```bash
+# Controlla stato relay
+curl http://localhost:8765/health
 
-**Causa**: Raggiunto il limite LRU cache  
-**Soluzione**: Aumenta `MAX_EPHEMERAL_SOCKETS` o usa l'istanza persistente
+# Verifica IPFS
+curl http://localhost:8765/ipfs-status
+```
 
-### Dati non sincronizzati tra path diversi
+### Debug Dettagliato
+```bash
+# Abilita logging debug
+export DEBUG=true
 
-**Comportamento previsto**: Le istanze sono isolate per design  
-**Soluzione**: Usa lo stesso path per condividere dati
+# Pulisci dati corrotti
+export CLEANUP_CORRUPTED_DATA=true
+```
 
-### Memoria elevata
+### Performance
+```bash
+# Disabilita radisk se necessario
+export DISABLE_RADISK=true
 
-**Causa**: Troppe istanze effimere attive  
-**Soluzione**: Riduci `MAX_EPHEMERAL_SOCKETS` o implementa timeout di inattività
-
-## Sicurezza
-
-- Le istanze effimere **NON** supportano autenticazione Gun SEA per default
-- Considera l'implementazione di middleware di autenticazione a livello WebSocket
-- I dati non vengono persistiti ma restano in memoria fino all'eviction
-- Implementa rate limiting per prevenire abuse di creazione istanze
-
-## Performance
-
-- Le istanze effimere sono **più veloci** (no I/O disco)
-- Consumano **meno risorse** (no radisk overhead)
-- Ideali per **alta frequenza** di messaggi temporanei
-- Scalano meglio per **sessioni brevi**
-
-## Compatibilità
-
-Compatibile con:
-- Gun.js v0.2020.x
-- WebSocket standard
-- Tutte le librerie Gun client (browser, Node.js)
-- Gun SEA (su istanza persistente)
-
-Non compatibile con:
-- Gun RFS (su istanze effimere)
-- Gun RadDisk (su istanze effimere)
-- Cross-path synchronization
-
+# Configura peer esterni
+export RELAY_PEERS=ws://peer1:8765/gun,ws://peer2:8765/gun
+```

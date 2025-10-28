@@ -1,7 +1,7 @@
 {
   "name": "shogun-enhanced-relay",
   "version": "1.0.0",
-  "description": "Enhanced Gun.js relay server with wire protocol and networking optimizations",
+  "description": "Enhanced Gun.js relay server with robust connection management and real-time sync",
   "type": "module",
   "main": "src/index.js",
   "scripts": {
@@ -34,9 +34,7 @@
     "is-fn": "^3.0.0",
     "multer": "^2.0.1",
     "node-fetch": "^3.3.2",
-    "quick-lru": "^7.0.0",
-    "self-adjusting-interval": "^1.0.0",
-    "ws": "^8.14.2"
+    "self-adjusting-interval": "^1.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

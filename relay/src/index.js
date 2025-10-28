@@ -93,10 +93,18 @@ dotenv.config();
 
 import Gun from "gun";
 
+import "gun/sea.js";
+import "gun/lib/stats.js";
+import "gun/lib/webrtc.js";
+import "gun/lib/yson.js";
+import "gun/lib/evict.js";
+import "gun/lib/rfs.js";
+import "gun/lib/radix.js";
+import "gun/lib/radisk.js";
+import "gun/lib/wire.js";
+import "gun/lib/axe.js";
+
 import multer from "multer";
-import QuickLRU from "quick-lru";
-import { WebSocketServer } from "ws";
-import createNoMemAdapter from "./utils/nomem.js";
 
 const namespace = "shogun";
 
@@ -315,94 +323,6 @@ async function initializeServer() {
   const peers = peersString ? peersString.split(",") : [];
   console.log("🔍 Peers:", peers);
 
-  // Multi-Socket Support: LRU cache for ephemeral Gun instances
-  const ephemeralGuns = new QuickLRU({
-    maxSize: parseInt(process.env.MAX_EPHEMERAL_SOCKETS) || 50,
-    onEviction: (pathname, gunInstance) => {
-      console.log(`🗑️ Evicting ephemeral Gun instance: ${pathname}`);
-      // Cleanup Gun instance if needed
-      if (gunInstance?.gun?._.opt?.ws?.server) {
-        try {
-          gunInstance.gun._.opt.ws.server.close();
-        } catch (e) {
-          console.warn("Warning during Gun instance cleanup:", e.message);
-        }
-      }
-    },
-  });
-
-  // Multi-Socket WebSocket Upgrade Handler
-  server.on("upgrade", async function (request, socket, head) {
-    const url = new URL(request.url, `http://${request.headers.host}`);
-    const pathname = url.pathname || "/gun";
-
-    const debug = process.env.DEBUG === "true";
-    if (debug) console.log("🔌 WebSocket upgrade request:", pathname);
-
-    // Main persistent Gun instance on /gun
-    if (pathname === "/gun") {
-      // Let the main Gun instance handle this
-      return;
-    }
-
-    // Ephemeral Gun instances on other paths
-    let gunData = null;
-
-    if (ephemeralGuns.has(pathname)) {
-      // Reuse existing ephemeral instance
-      if (debug) console.log("♻️ Recycling ephemeral Gun:", pathname);
-      gunData = ephemeralGuns.get(pathname);
-    } else {
-      // Create new ephemeral Gun instance
-      if (debug) console.log("🆕 Creating ephemeral Gun:", pathname);
-
-      const noMem = createNoMemAdapter();
-      const ephemeralGun = new Gun({
-        peers: [], // Isolated, no peering
-        localStorage: false,
-        radisk: false,
-        file: false, // No file storage
-        store: noMem(),
-        multicast: false,
-        axe: false,
-      });
-
-      // Create dedicated WebSocket server for this instance
-      const wss = new WebSocketServer({ noServer: true });
-
-      // Wire up Gun's WebSocket handling
-      wss.on("connection", function (ws, req) {
-        if (debug) console.log("✅ Ephemeral Gun connected:", pathname);
-
-        // Attach Gun's wire protocol
-        ephemeralGun.wsp(ws);
-
-        ws.on("close", () => {
-          if (debug) console.log("❌ Ephemeral Gun disconnected:", pathname);
-        });
-      });
-
-      gunData = {
-        gun: ephemeralGun,
-        wss: wss,
-        pathname: pathname,
-        created: Date.now(),
-      };
-
-      ephemeralGuns.set(pathname, gunData);
-    }
-
-    if (gunData && gunData.wss) {
-      // Handle WebSocket upgrade for this ephemeral instance
-      gunData.wss.handleUpgrade(request, socket, head, function (ws) {
-        gunData.wss.emit("connection", ws, request);
-      });
-    } else {
-      if (debug) console.log("⚠️ No WebSocket server for path:", pathname);
-      socket.destroy();
-    }
-  });
-
   // Initialize Gun with conditional support
   const gunConfig = {
     super: true,
@@ -411,6 +331,16 @@ async function initializeServer() {
     web: server,
     isValid: hasValidToken,
     uuid: process.env.RELAY_NAME,
+    localStorage: false, // Abilita localStorage per persistenza
+    wire: true,
+    axe: true,
+    rfs: true,
+    wait: 500,
+    webrtc: true,
+    peers: peers,
+    chunk: 1000,
+    pack: 1000,
+    jsonify: true, // Disable automatic JSON parsing to prevent errors
   };
 
   if (process.env.DISABLE_RADISK === "true") {
@@ -458,32 +388,9 @@ async function initializeServer() {
       activeConnections: activeWires || 0,
       totalConnections: totalConnections || 0,
       memoryUsage: process.memoryUsage(),
-      ephemeralSockets: {
-        count: ephemeralGuns.size,
-        maxSize: ephemeralGuns.maxSize,
-      },
     };
 
     res.json(healthData);
-  });
-
-  // Ephemeral sockets status endpoint
-  app.get("/ephemeral-sockets", (req, res) => {
-    const sockets = [];
-    for (const [pathname, data] of ephemeralGuns.entries()) {
-      sockets.push({
-        path: pathname,
-        created: new Date(data.created).toISOString(),
-        uptime: Date.now() - data.created,
-      });
-    }
-
-    res.json({
-      success: true,
-      count: ephemeralGuns.size,
-      maxSize: ephemeralGuns.maxSize,
-      sockets: sockets,
-    });
   });
 
   // IPFS status endpoint
