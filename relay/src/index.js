@@ -116,6 +116,8 @@ const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN;
 const IPFS_GATEWAY_URL =
   process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
 
+const isProtectedRelay = process.env.RELAY_PROTECTED === "true" ? true : false;
+
 // ES Module equivalent for __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -169,7 +171,7 @@ async function initializeServer() {
 
   // Funzione di validazione del token
   function hasValidToken(msg) {
-    if (process.env.RELAY_PROTECTED === "false") {
+    if (isProtectedRelay === false) {
       return true;
     }
 
@@ -324,12 +326,14 @@ async function initializeServer() {
   console.log("🔍 Peers:", peers);
 
   // Initialize Gun with conditional support
+  const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
+  console.log("📁 Data directory:", dataDir);
+  
   const gunConfig = {
     super: true,
-    file: "radata",
+    file: dataDir,
     radisk: process.env.DISABLE_RADISK !== "true", // Allow disabling radisk via env var
     web: server,
-    isValid: hasValidToken,
     uuid: process.env.RELAY_NAME,
     localStorage: false, // Abilita localStorage per persistenza
     wire: true,
@@ -347,6 +351,11 @@ async function initializeServer() {
     console.log("📁 Radisk disabled via environment variable");
   } else {
     console.log("📁 Using local file storage with radisk");
+  }
+
+  if (isProtectedRelay) {
+    console.log("📁 Using protected relay");
+    gunConfig.isValid = hasValidToken;
   }
 
   Gun.serve(app);
