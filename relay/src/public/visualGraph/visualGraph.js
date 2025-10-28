@@ -559,11 +559,11 @@ var DFS = (function () {
     nodes = new Map();
     visitedCount = 0;
 
-    // Carica il nodo principale
+    // Carica il nodo principale con timeout più lungo per grafi grandi
     const renderTimeout = setTimeout(() => {
       console.log("⏰ Render timeout reached, forcing render...");
       dfs.render();
-    }, 3000); // 3 secondi di timeout
+    }, 10000); // 10 secondi di timeout per grafi più grandi
 
     window.gun.get(soul).once(function (node) {
       if (!node) {
@@ -598,9 +598,11 @@ var DFS = (function () {
 
       console.log("🔗 Found references:", references);
 
-      // Carica tutti i nodi referenziati
+      // Carica tutti i nodi referenziati con throttling
       let loadedCount = 0;
       const totalRefs = references.length;
+      const maxConcurrent = 5; // Limita richieste simultanee
+      let currentConcurrent = 0;
 
       if (totalRefs === 0) {
         console.log("📋 No references found, rendering single node");
@@ -612,10 +614,19 @@ var DFS = (function () {
         return;
       }
 
-      references.forEach((ref) => {
-        console.log("🔗 Loading referenced node:", ref.target);
+      // Funzione per caricare un nodo con throttling
+      function loadNodeWithThrottling(ref, index) {
+        if (currentConcurrent >= maxConcurrent) {
+          // Ritarda il caricamento se abbiamo troppe richieste attive
+          setTimeout(() => loadNodeWithThrottling(ref, index), 100 * index);
+          return;
+        }
+
+        currentConcurrent++;
+        console.log("🔗 Loading referenced node:", ref.target, `(${currentConcurrent}/${maxConcurrent})`);
 
         window.gun.get(ref.target).once(function (refNode) {
+          currentConcurrent--;
           loadedCount++;
 
           if (refNode) {
@@ -704,6 +715,11 @@ var DFS = (function () {
             }, 500);
           }
         });
+      }
+
+      // Avvia il caricamento con throttling
+      references.forEach((ref, index) => {
+        setTimeout(() => loadNodeWithThrottling(ref, index), 50 * index);
       });
     });
   };

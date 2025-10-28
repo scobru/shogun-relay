@@ -189,7 +189,22 @@
       });
 
       try {
-        gun = new Gun({ peers: peers, localStorage: false });
+        // Enhanced Gun configuration matching graph.html
+        gun = new Gun({ 
+          peers: peers, 
+          localStorage: false,
+          // Enhanced sync configurations
+          wire: true,        // Enable wire protocol for efficiency
+          webrtc: true,      // Enable WebRTC for direct peer connections
+          wait: 300,         // Faster batch processing
+          until: 250,        // Shorter timeout for queries
+          batch: 5,          // Small batch size for real-time updates
+          retry: 3,          // Number of retry attempts
+          // Connection resilience
+          reconnect: true,   // Enable automatic reconnection
+          heartbeat: 30000,  // Heartbeat every 30 seconds
+          timeout: 15000     // Connection timeout
+        });
 
         let graph = {
           nodes: [],
@@ -199,6 +214,64 @@
         let peerList = document.getElementById("peerList");
         if (peerList) {
           peerList.innerHTML = currentPeer;
+        }
+
+        // Enhanced connection monitoring and auto-reconnection
+        let connectionState = {
+          isConnected: false,
+          lastPing: Date.now(),
+          reconnectAttempts: 0,
+          maxReconnectAttempts: 5,
+          reconnectDelay: 2000
+        };
+
+        // Monitor connection health
+        gun.on('hi', (peer) => {
+          connectionState.isConnected = true;
+          connectionState.lastPing = Date.now();
+          connectionState.reconnectAttempts = 0;
+          console.log('🟢 Gun connected to peer:', peer);
+          updateStatus('🟢 Connected to relay');
+        });
+
+        gun.on('bye', (peer) => {
+          connectionState.isConnected = false;
+          console.log('🔴 Gun disconnected from peer:', peer);
+          updateStatus('🔴 Disconnected from relay');
+          attemptReconnection();
+        });
+
+        // Heartbeat to detect stale connections
+        setInterval(() => {
+          const timeSinceLastPing = Date.now() - connectionState.lastPing;
+          if (timeSinceLastPing > 60000 && connectionState.isConnected) {
+            console.warn('⚠️ Connection may be stale, attempting reconnection');
+            attemptReconnection();
+          }
+        }, 30000);
+
+        // Auto-reconnection logic
+        function attemptReconnection() {
+          if (connectionState.reconnectAttempts >= connectionState.maxReconnectAttempts) {
+            console.error('❌ Max reconnection attempts reached');
+            updateStatus('❌ Connection failed - max attempts reached', true);
+            return;
+          }
+
+          connectionState.reconnectAttempts++;
+          updateStatus(`🔄 Reconnecting... (${connectionState.reconnectAttempts}/${connectionState.maxReconnectAttempts})`);
+          
+          setTimeout(() => {
+            try {
+              const gunInstance = createGunInstance();
+              if (gunInstance) {
+                updateStatus('✅ Reconnected successfully');
+              }
+            } catch (error) {
+              console.error('Reconnection failed:', error);
+              setTimeout(attemptReconnection, connectionState.reconnectDelay * connectionState.reconnectAttempts);
+            }
+          }, connectionState.reconnectDelay);
         }
 
         // Make gun instance globally available
