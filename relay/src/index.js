@@ -333,7 +333,7 @@ async function initializeServer() {
     uuid: process.env.RELAY_NAME,
     localStorage: false, // Abilita localStorage per persistenza
     wire: true,
-    axe: true,
+    axe: false,
     rfs: true,
     wait: 500,
     webrtc: true,
