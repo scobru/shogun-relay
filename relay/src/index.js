@@ -334,6 +334,7 @@ async function initializeServer() {
     file: dataDir,
     radisk: process.env.DISABLE_RADISK !== "true", // Allow disabling radisk via env var
     web: server,
+    isValid: hasValidToken,
     uuid: process.env.RELAY_NAME,
     localStorage: false, // Abilita localStorage per persistenza
     wire: true,
@@ -351,11 +352,6 @@ async function initializeServer() {
     console.log("📁 Radisk disabled via environment variable");
   } else {
     console.log("📁 Using local file storage with radisk");
-  }
-
-  if (isProtectedRelay) {
-    console.log("📁 Using protected relay");
-    gunConfig.isValid = hasValidToken;
   }
 
   Gun.serve(app);
