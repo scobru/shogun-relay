@@ -93,17 +93,6 @@ dotenv.config();
 
 import Gun from "gun";
 
-import "gun/sea.js";
-import "gun/lib/stats.js";
-import "gun/lib/webrtc.js";
-import "gun/lib/yson.js";
-import "gun/lib/evict.js";
-import "gun/lib/rfs.js";
-import "gun/lib/radix.js";
-import "gun/lib/radisk.js";
-import "gun/lib/wire.js";
-import "gun/lib/axe.js";
-
 import multer from "multer";
 import QuickLRU from "quick-lru";
 import { WebSocketServer } from "ws";
@@ -422,16 +411,6 @@ async function initializeServer() {
     web: server,
     isValid: hasValidToken,
     uuid: process.env.RELAY_NAME,
-    localStorage: false, // Abilita localStorage per persistenza
-    wire: true,
-    axe: true,
-    rfs: true,
-    wait: 500,
-    webrtc: true,
-    peers: peers,
-    chunk: 1000,
-    pack: 1000,
-    jsonify: true, // Disable automatic JSON parsing to prevent errors
   };
 
   if (process.env.DISABLE_RADISK === "true") {
