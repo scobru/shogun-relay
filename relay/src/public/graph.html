@@ -340,8 +340,7 @@
     <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gun/lib/promise.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gun/lib/webrtc.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gun/lib/wire.js"></script>
+
     <script>
       const graphContainer = document.getElementById("graphContainer");
       const nodeCountEl = document.getElementById("nodeCount");
@@ -468,8 +467,8 @@
             localStorage: false, 
             radisk: false,
             // Enhanced sync configurations
-            wire: true,        // Enable wire protocol for efficiency
-            webrtc: true,      // Enable WebRTC for direct peer connections
+            wire: false,        // Enable wire protocol for efficiency
+            axe: false,        // Enable axe protocol for efficiency
             wait: 300,         // Faster batch processing (vs default 1000ms)
             until: 250,        // Shorter timeout for queries
             batch: 5,          // Small batch size for real-time updates

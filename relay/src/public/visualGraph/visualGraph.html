@@ -34,7 +34,7 @@
               <span class="label-text">Relay Peer URL:</span>
             </label>
             <input id="relayPeer" type="text" class="input input-bordered w-full"
-              placeholder="https://relay.shogun-eco.xyz/gun" value="https://relay.shogun-eco.xyz/gun" />
+              placeholder="https://shogunnode.scobrudot.dev/gun" value="https://shogunnode.scobrudot.dev/gun" />
           </div>
 
           <div class="form-control">
@@ -98,7 +98,6 @@
   <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/gun/lib/promise.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/gun/lib/webrtc.js"></script>
 
 
   <!-- Button Logic -->
@@ -194,7 +193,8 @@
           peers: peers, 
           localStorage: false,
           // Enhanced sync configurations
-          wire: true,        // Enable wire protocol for efficiency
+          wire: false,        // Enable wire protocol for efficiency
+          axe: false,        // Enable axe protocol for efficiency
           webrtc: true,      // Enable WebRTC for direct peer connections
           wait: 300,         // Faster batch processing
           until: 250,        // Shorter timeout for queries
