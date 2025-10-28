@@ -202,8 +202,6 @@ async function initializeServer() {
   // Fix per rate limiting con proxy
   app.set("trust proxy", 1);
 
-  
-
   // Route specifica per /admin (DEFINITA PRIMA DEL MIDDLEWARE DI AUTENTICAZIONE)
   app.get("/admin", (req, res) => {
     const adminPath = path.resolve(publicPath, "admin.html");
@@ -329,7 +327,7 @@ async function initializeServer() {
   console.log("🔍 Peers:", peers);
 
   // Multi-Socket Support: LRU cache for ephemeral Gun instances
-  const ephemeralGuns = new QuickLRU({ 
+  const ephemeralGuns = new QuickLRU({
     maxSize: parseInt(process.env.MAX_EPHEMERAL_SOCKETS) || 50,
     onEviction: (pathname, gunInstance) => {
       console.log(`🗑️ Evicting ephemeral Gun instance: ${pathname}`);
@@ -341,14 +339,14 @@ async function initializeServer() {
           console.warn("Warning during Gun instance cleanup:", e.message);
         }
       }
-    }
+    },
   });
 
   // Multi-Socket WebSocket Upgrade Handler
-  server.on("upgrade", async function(request, socket, head) {
+  server.on("upgrade", async function (request, socket, head) {
     const url = new URL(request.url, `http://${request.headers.host}`);
     const pathname = url.pathname || "/gun";
-    
+
     const debug = process.env.DEBUG === "true";
     if (debug) console.log("🔌 WebSocket upgrade request:", pathname);
 
@@ -368,7 +366,7 @@ async function initializeServer() {
     } else {
       // Create new ephemeral Gun instance
       if (debug) console.log("🆕 Creating ephemeral Gun:", pathname);
-      
+
       const noMem = createNoMemAdapter();
       const ephemeralGun = new Gun({
         peers: [], // Isolated, no peering
@@ -377,19 +375,19 @@ async function initializeServer() {
         file: false, // No file storage
         store: noMem(),
         multicast: false,
-        axe: false
+        axe: false,
       });
 
       // Create dedicated WebSocket server for this instance
       const wss = new WebSocketServer({ noServer: true });
-      
+
       // Wire up Gun's WebSocket handling
-      wss.on("connection", function(ws, req) {
+      wss.on("connection", function (ws, req) {
         if (debug) console.log("✅ Ephemeral Gun connected:", pathname);
-        
+
         // Attach Gun's wire protocol
         ephemeralGun.wsp(ws);
-        
+
         ws.on("close", () => {
           if (debug) console.log("❌ Ephemeral Gun disconnected:", pathname);
         });
@@ -399,7 +397,7 @@ async function initializeServer() {
         gun: ephemeralGun,
         wss: wss,
         pathname: pathname,
-        created: Date.now()
+        created: Date.now(),
       };
 
       ephemeralGuns.set(pathname, gunData);
@@ -407,7 +405,7 @@ async function initializeServer() {
 
     if (gunData && gunData.wss) {
       // Handle WebSocket upgrade for this ephemeral instance
-      gunData.wss.handleUpgrade(request, socket, head, function(ws) {
+      gunData.wss.handleUpgrade(request, socket, head, function (ws) {
         gunData.wss.emit("connection", ws, request);
       });
     } else {
@@ -424,7 +422,7 @@ async function initializeServer() {
     web: server,
     isValid: hasValidToken,
     uuid: process.env.RELAY_NAME,
-    localStorage: true, // Abilita localStorage per persistenza
+    localStorage: false, // Abilita localStorage per persistenza
     wire: true,
     axe: true,
     rfs: true,
@@ -483,8 +481,8 @@ async function initializeServer() {
       memoryUsage: process.memoryUsage(),
       ephemeralSockets: {
         count: ephemeralGuns.size,
-        maxSize: ephemeralGuns.maxSize
-      }
+        maxSize: ephemeralGuns.maxSize,
+      },
     };
 
     res.json(healthData);
@@ -497,7 +495,7 @@ async function initializeServer() {
       sockets.push({
         path: pathname,
         created: new Date(data.created).toISOString(),
-        uptime: Date.now() - data.created
+        uptime: Date.now() - data.created,
       });
     }
 
@@ -505,7 +503,7 @@ async function initializeServer() {
       success: true,
       count: ephemeralGuns.size,
       maxSize: ephemeralGuns.maxSize,
-      sockets: sockets
+      sockets: sockets,
     });
   });
 
@@ -647,7 +645,6 @@ async function initializeServer() {
   // Handle shutdown signals
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
-
 
   console.log(`🚀 Shogun Relay Server running on http://${host}:${port}`);
 
