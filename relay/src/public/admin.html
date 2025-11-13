@@ -103,7 +103,8 @@
                             d="M5 12h14M12 5l7 7-7 7" />
                     </svg>
 
-                    <h1 id="relay-title" class="text-3xl font-medium mb-8 text-[#FFFFFF]">🔐 Shogun Relay Admin Panel</h1>
+                    <h1 id="relay-title" class="text-3xl font-medium mb-8 text-[#FFFFFF]">🔐 Shogun Relay Admin Panel
+                    </h1>
                     <p class="text-[#8B94FF] mb-8">Admin authentication required<span class="animate-pulse">_</span></p>
 
                     <!-- Admin Password Section -->
@@ -126,27 +127,34 @@
                         </div>
                         <div class="space-y-4">
                             <div class="form-control">
-                                <input type="password" id="adminPassword" 
+                                <input type="password" id="adminPassword"
                                     class="input w-full bg-[#404040] border-0 text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:ring-opacity-50"
                                     placeholder="Enter Admin Password" />
                             </div>
                             <div class="flex gap-3">
-                                <button class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] flex-1 rounded-xl px-4 py-3 font-medium transition-all duration-200 shadow-sm hover:shadow-md" onclick="saveAdminPassword()">
+                                <button
+                                    class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] flex-1 rounded-xl px-4 py-3 font-medium transition-all duration-200 shadow-sm hover:shadow-md"
+                                    onclick="saveAdminPassword()">
                                     <span class="mr-2">💾</span>
                                     Save Password
                                 </button>
-                                <button class="btn bg-transparent border-0 text-[#E0E0E0] hover:text-[#FFFFFF] hover:bg-[#404040] flex-1 rounded-xl px-4 py-3 font-medium transition-all duration-200" onclick="clearAdminPassword()">
+                                <button
+                                    class="btn bg-transparent border-0 text-[#E0E0E0] hover:text-[#FFFFFF] hover:bg-[#404040] flex-1 rounded-xl px-4 py-3 font-medium transition-all duration-200"
+                                    onclick="clearAdminPassword()">
                                     <span class="mr-2">🗑️</span>
                                     Clear
                                 </button>
                             </div>
                             <div class="flex gap-3 mt-2">
-                                <button class="btn bg-[#FF9800] hover:bg-[#F57C00] border-0 text-[#FFFFFF] w-full rounded-xl px-4 py-2 font-medium transition-all duration-200" onclick="cleanupDuplicateKeys()" title="Remove duplicate adminToken key">
+                                <button
+                                    class="btn bg-[#FF9800] hover:bg-[#F57C00] border-0 text-[#FFFFFF] w-full rounded-xl px-4 py-2 font-medium transition-all duration-200"
+                                    onclick="cleanupDuplicateKeys()" title="Remove duplicate adminToken key">
                                     <span class="mr-2">🧹</span>
                                     Clean Duplicate Keys
                                 </button>
                             </div>
-                            <div id="passwordStatus" class="flex items-center gap-2 text-sm text-center text-[#E0E0E0] opacity-90 min-h-[20px]">
+                            <div id="passwordStatus"
+                                class="flex items-center gap-2 text-sm text-center text-[#E0E0E0] opacity-90 min-h-[20px]">
                                 <span class="text-[#FFA500]">🔒</span>
                                 <span>Accesso Limitato - Solo applicazioni pubbliche visibili</span>
                             </div>
@@ -164,7 +172,8 @@
                                 </svg>
                                 <span class="text-[#E0E0E0] text-sm">Back to public interface</span>
                             </div>
-                            <a href="/" class="btn bg-[#42A5F5] hover:bg-[#2196F3] border-0 text-[#FFFFFF] text-sm px-4 py-2 rounded-xl font-medium transition-all duration-200 shadow-sm hover:shadow-md">
+                            <a href="/"
+                                class="btn bg-[#42A5F5] hover:bg-[#2196F3] border-0 text-[#FFFFFF] text-sm px-4 py-2 rounded-xl font-medium transition-all duration-200 shadow-sm hover:shadow-md">
                                 🏠 Home
                             </a>
                         </div>
@@ -176,15 +185,21 @@
                             <div class="p-6">
                                 <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Monitoring & Analytics</h2>
                                 <div class="space-y-3">
-                                    <a href="/graph" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Explore GunDB data structure in real-time, view nodes, relationships and decentralized graph data">
+                                    <a href="/graph"
+                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl"
+                                        data-tooltip="Explore GunDB data structure in real-time, view nodes, relationships and decentralized graph data">
                                         <span class="text-[#42A5F5]">🌐</span>
                                         <span>Live Graph Explorer</span>
-                                        <span class="tooltiptext">Explore GunDB data structure in real-time, view nodes, relationships and decentralized graph data</span>
+                                        <span class="tooltiptext">Explore GunDB data structure in real-time, view nodes,
+                                            relationships and decentralized graph data</span>
                                     </a>
-                                    <a href="/visualGraph" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Interactive graphical visualization of GunDB data with drag-and-drop interface to explore data structure">
+                                    <a href="/visualGraph"
+                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl"
+                                        data-tooltip="Interactive graphical visualization of GunDB data with drag-and-drop interface to explore data structure">
                                         <span class="text-[#A0A0A0]">🕸️</span>
                                         <span>Visual Graph Data</span>
-                                        <span class="tooltiptext">Interactive graphical visualization of GunDB data with drag-and-drop interface to explore data structure</span>
+                                        <span class="tooltiptext">Interactive graphical visualization of GunDB data with
+                                            drag-and-drop interface to explore data structure</span>
                                     </a>
                                 </div>
                             </div>
@@ -195,46 +210,64 @@
                             <div class="p-6">
                                 <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Storage & Files</h2>
                                 <div class="space-y-3">
-                                    <a href="/upload" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected" data-tooltip="Direct file upload to IPFS with optional encryption, admin management and upload status monitoring">
+                                    <a href="/upload"
+                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected"
+                                        data-tooltip="Direct file upload to IPFS with optional encryption, admin management and upload status monitoring">
                                         <span class="text-[#42A5F5]">📤</span>
                                         <span>Upload to IPFS</span>
-                                        <span class="tooltiptext">Direct file upload to IPFS with optional encryption, admin management and upload status monitoring</span>
+                                        <span class="tooltiptext">Direct file upload to IPFS with optional encryption,
+                                            admin management and upload status monitoring</span>
                                         <span class="absolute right-3 text-[#FFA500] text-sm">🔒</span>
                                     </a>
-                                    <a href="/pin-manager" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected" data-tooltip="Manage IPFS pins, view saved files, remove pins, garbage collection and debug system hashes">
+                                    <a href="/pin-manager"
+                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected"
+                                        data-tooltip="Manage IPFS pins, view saved files, remove pins, garbage collection and debug system hashes">
                                         <span class="text-[#42A5F5]">📌</span>
                                         <span>IPFS Pin Manager</span>
-                                        <span class="tooltiptext">Manage IPFS pins, view saved files, remove pins, garbage collection and debug system hashes</span>
+                                        <span class="tooltiptext">Manage IPFS pins, view saved files, remove pins,
+                                            garbage collection and debug system hashes</span>
                                         <span class="absolute right-3 text-[#FFA500] text-sm">🔒</span>
                                     </a>
-                                    <a href="/ipfs-status" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Check IPFS node status, API version, peer connections and network health metrics">
+                                    <a href="/ipfs-status"
+                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl"
+                                        data-tooltip="Check IPFS node status, API version, peer connections and network health metrics">
                                         <span class="text-[#64B5F6]">📊</span>
                                         <span>IPFS Node Status</span>
-                                        <span class="tooltiptext">Check IPFS node status, API version, peer connections and network health metrics</span>
+                                        <span class="tooltiptext">Check IPFS node status, API version, peer connections
+                                            and network health metrics</span>
                                     </a>
                                 </div>
                             </div>
                         </div>
 
-                         <!-- Data Management -->
-                         <div class="card bg-[#282828] border-[#404040] rounded-2xl">
+                        <!-- Data Management -->
+                        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
                             <div class="p-6">
                                 <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Data Management</h2>
                                 <div class="space-y-3">
-                                    <a href="/admin" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Admin panel for GunDB management, system monitoring and configuration">
+                                    <a href="/admin"
+                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl"
+                                        data-tooltip="Admin panel for GunDB management, system monitoring and configuration">
                                         <span class="text-[#42A5F5]">⚙️</span>
                                         <span>Admin Panel</span>
-                                        <span class="tooltiptext">Admin panel for GunDB management, system monitoring and configuration</span>
+                                        <span class="tooltiptext">Admin panel for GunDB management, system monitoring
+                                            and configuration</span>
                                     </a>
-                                    <a href="/services-dashboard" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected" data-tooltip="Monitor system services, check status and manage service configurations">
+                                    <a href="/services-dashboard"
+                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected"
+                                        data-tooltip="Monitor system services, check status and manage service configurations">
                                         <span class="text-[#64B5F6]">📊</span>
                                         <span>Services Dashboard</span>
-                                        <span class="tooltiptext">Monitor system services, check status and manage service configurations</span>
+                                        <span class="tooltiptext">Monitor system services, check status and manage
+                                            service configurations</span>
                                     </a>
-                                    <a href="/charts" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected" data-tooltip="View system statistics, performance metrics and data visualization charts">
+                                    <a href="/charts"
+                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected"
+                                        data-tooltip="View system statistics, performance metrics and data visualization charts ">
                                         <span class="text-[#4CAF50]">📈</span>
                                         <span>Charts & Stats</span>
-                                        <span class="tooltiptext">View system statistics, performance metrics and data visualization charts</span>
+                                        <span class="tooltiptext">View system statistics, performance metrics and data
+                                            visualization charts</span>
                                     </a>
                                 </div>
                             </div>
@@ -245,10 +278,13 @@
                             <div class="p-6">
                                 <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Communication</h2>
                                 <div class="space-y-3">
-                                    <a href="/chat" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Real-time public chat, encrypted messages, timestamps and decentralized conversation management">
+                                    <a href="/chat"
+                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl"
+                                        data-tooltip="Real-time public chat, encrypted messages, timestamps and decentralized conversation management">
                                         <span class="text-[#4CAF50]">💬</span>
                                         <span>Public Chat</span>
-                                        <span class="tooltiptext">Real-time public chat, encrypted messages, timestamps and decentralized conversation management</span>
+                                        <span class="tooltiptext">Real-time public chat, encrypted messages, timestamps
+                                            and decentralized conversation management</span>
                                     </a>
                                 </div>
                             </div>
@@ -259,10 +295,13 @@
                             <div class="p-6">
                                 <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Security & Tools</h2>
                                 <div class="space-y-3">
-                                    <a href="/ipfs-status" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Check IPFS API version, verify compatibility and IPFS protocol status">
+                                    <a href="/ipfs-status"
+                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl"
+                                        data-tooltip="Check IPFS API version, verify compatibility and IPFS protocol status">
                                         <span class="text-[#A0A0A0]">🔧</span>
                                         <span>IPFS API Version</span>
-                                        <span class="tooltiptext">Check IPFS API version, verify compatibility and IPFS protocol status</span>
+                                        <span class="tooltiptext">Check IPFS API version, verify compatibility and IPFS
+                                            protocol status</span>
                                     </a>
                                 </div>
                             </div>
@@ -271,8 +310,10 @@
 
                     <!-- Footer -->
                     <div class="mt-12 text-center text-[#A0A0A0] text-sm">
-                        <p>repo build with ❤️ by <a href="https://github.com/scobru" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">scobru</a></p>
-                        <p class="mt-1">part of <a href="https://github.com/scobru/shogun" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">shogun project</a></p>
+                        <p>repo build with ❤️ by <a href="https://github.com/scobru"
+                                class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">scobru</a></p>
+                        <p class="mt-1">part of <a href="https://github.com/scobru/shogun"
+                                class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">shogun project</a></p>
                     </div>
                 </div>
             </div>
@@ -304,7 +345,7 @@
         function updateAuthSectionsVisibility() {
             const statusElement = document.getElementById('passwordStatus');
             const passwordSection = document.getElementById('adminPasswordSection');
-            
+
             if (ShogunAdmin.hasPassword()) {
                 statusElement.innerHTML = '<span class="text-[#4CAF50]">✅</span><span>Accesso Admin - Tutte le applicazioni disponibili</span>';
                 // Nascondi il box password quando il token è presente
@@ -357,7 +398,7 @@
         window.addEventListener('DOMContentLoaded', async () => {
             // Initialize ShogunAdmin
             ShogunAdmin.init();
-            
+
             // Update visibility based on stored password
             updateAuthSectionsVisibility();
             handleProtectedPageError();
@@ -373,11 +414,11 @@
             document.getElementById('adminPassword').focus();
 
             // Intercept clicks on admin-protected links and add authorization
-            document.addEventListener('click', function(e) {
+            document.addEventListener('click', function (e) {
                 const link = e.target.closest('a');
                 if (link && link.classList.contains('admin-protected')) {
                     e.preventDefault();
-                    
+
                     const password = ShogunAdmin.getPassword();
                     if (!password) {
                         alert('⚠️ Admin password required. Please save your admin password first.');
@@ -386,20 +427,20 @@
 
                     const url = link.href;
                     console.log(`🔐 Navigating to protected page: ${url}`);
-                    
+
                     // Create a form to submit with the token
                     const form = document.createElement('form');
                     form.method = 'GET';
                     form.action = url;
                     form.style.display = 'none';
-                    
+
                     // Add authorization header via hidden input
                     const authInput = document.createElement('input');
                     authInput.type = 'hidden';
                     authInput.name = '_auth_token';
                     authInput.value = password;
                     form.appendChild(authInput);
-                    
+
                     document.body.appendChild(form);
                     form.submit();
                 }
@@ -408,4 +449,4 @@
     </script>
 </body>
 
-</html> 
+</html>

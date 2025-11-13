@@ -144,6 +144,18 @@
                 </svg>
                 Upload File
               </button>
+              <div class="form-group mt-6">
+                <label class="block text-lg font-medium mb-3 text-[#FFFFFF]" for="fileNameInput">
+                  File Name Override (optional):
+                </label>
+                <input
+                  type="text"
+                  id="fileNameInput"
+                  class="input input-bordered w-full bg-[#1A1A1A] border-[#404040] text-[#E0E0E0]"
+                  placeholder="Leave empty to use the original file name"
+                  autocomplete="off"
+                />
+              </div>
             </div>
 
             <div id="message" class="message"></div>
@@ -163,6 +175,7 @@
     const dropArea = document.getElementById("dropArea");
     const uploadProgress = document.getElementById("uploadProgress");
     const progressBar = document.getElementById("progressBar");
+    const fileNameInput = document.getElementById("fileNameInput");
 
     // Drag and drop functionality
     ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
@@ -192,11 +205,19 @@
 
     dropArea.addEventListener("drop", handleDrop, false);
     dropArea.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => updateFileNameInput(fileInput.files[0]));
 
     function handleDrop(e) {
       const dt = e.dataTransfer;
       const files = dt.files;
       fileInput.files = files;
+      updateFileNameInput(files[0]);
+    }
+
+    function updateFileNameInput(file) {
+      if (file && !fileNameInput.value.trim()) {
+        fileNameInput.value = file.name;
+      }
     }
 
     const showMessage = (text, type = "error") => {
@@ -244,6 +265,8 @@
       progressBar.textContent = "0%";
 
       let fileToUpload = file;
+      const userProvidedName = fileNameInput.value.trim();
+      const baseFileName = userProvidedName || file.name;
 
       if (encryptCheck.checked) {
         try {
@@ -259,7 +282,10 @@
 
 
           const encryptedData = await SEA.encrypt(base64data, token);
-          fileToUpload = new File([encryptedData], file.name + ".enc", {
+          const encryptionFileName = baseFileName.endsWith(".enc")
+            ? baseFileName
+            : `${baseFileName}.enc`;
+          fileToUpload = new File([encryptedData], encryptionFileName, {
             type: "text/plain",
           });
 
@@ -275,7 +301,8 @@
       }
 
       const formData = new FormData();
-      formData.append("file", fileToUpload);
+      const uploadFileName = fileToUpload.name || baseFileName;
+      formData.append("file", fileToUpload, uploadFileName);
 
       try {
         const response = await fetch("/api/v1/ipfs/upload", {
