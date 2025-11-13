@@ -228,6 +228,14 @@
                                             garbage collection and debug system hashes</span>
                                         <span class="absolute right-3 text-[#FFA500] text-sm">🔒</span>
                                     </a>
+                                    <a href="/api/v1/ipfs/webui" target="_blank" rel="noopener"
+                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected"
+                                        data-tooltip="Apri l'interfaccia WebUI di Kubo IPFS protetta tramite token admin">
+                                        <span class="text-[#64B5F6]">🧭</span>
+                                        <span>Kubo IPFS WebUI</span>
+                                        <span class="tooltiptext">Apri l'interfaccia WebUI di Kubo IPFS protetta tramite token admin</span>
+                                        <span class="absolute right-3 text-[#FFA500] text-sm">🔒</span>
+                                    </a>
                                     <a href="/ipfs-status"
                                         class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl"
                                         data-tooltip="Check IPFS node status, API version, peer connections and network health metrics">
@@ -425,24 +433,16 @@
                         return;
                     }
 
-                    const url = link.href;
-                    console.log(`🔐 Navigating to protected page: ${url}`);
+                    const url = new URL(link.getAttribute('href'), window.location.origin);
+                    url.searchParams.set('auth_token', password);
 
-                    // Create a form to submit with the token
-                    const form = document.createElement('form');
-                    form.method = 'GET';
-                    form.action = url;
-                    form.style.display = 'none';
+                    console.log(`🔐 Navigating to protected page: ${url.toString()}`);
 
-                    // Add authorization header via hidden input
-                    const authInput = document.createElement('input');
-                    authInput.type = 'hidden';
-                    authInput.name = '_auth_token';
-                    authInput.value = password;
-                    form.appendChild(authInput);
-
-                    document.body.appendChild(form);
-                    form.submit();
+                    if (link.target === '_blank') {
+                        window.open(url.toString(), '_blank', 'noopener');
+                    } else {
+                        window.location.href = url.toString();
+                    }
                 }
             });
         });

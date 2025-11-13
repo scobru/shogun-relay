@@ -118,6 +118,51 @@ router.use(
   })
 );
 
+// Middleware di autenticazione per webui
+function ensureAdmin(req, res, next) {
+  const authHeader = req.headers["authorization"];
+  const bearerToken = authHeader && authHeader.split(" ")[1];
+  const customHeaderToken = req.headers["token"];
+  const queryToken =
+    req.query?.auth_token ||
+    req.query?.token ||
+    req.query?._auth_token;
+  const token = bearerToken || customHeaderToken || queryToken;
+
+  if (token === process.env.ADMIN_PASSWORD) {
+    // Rimuovi il token dalla query string prima di proxy-passarlo
+    if (queryToken) {
+      const cleanedQuery = { ...req.query };
+      delete cleanedQuery.auth_token;
+      delete cleanedQuery.token;
+
+      const queryString = new URLSearchParams(cleanedQuery).toString();
+      req.url = req.path + (queryString ? `?${queryString}` : "");
+    }
+
+    next();
+  } else {
+    res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+}
+
+// Proxy protetto per la Web UI di Kubo
+router.use(
+  "/webui",
+  ensureAdmin,
+  createProxyMiddleware({
+    target: IPFS_API_URL,
+    changeOrigin: true,
+    ws: true,
+    pathRewrite: (path) => path.replace(/^\/webui/, "/webui"),
+    logLevel: "warn",
+    onProxyReq: (proxyReq) => {
+      // Assicurati che l'header Host corrisponda al target
+      proxyReq.setHeader("Host", new URL(IPFS_API_URL).host);
+    },
+  })
+);
+
 // Custom IPFS API endpoints with better error handling
 router.post("/api/:endpoint(*)", async (req, res) => {
   try {
