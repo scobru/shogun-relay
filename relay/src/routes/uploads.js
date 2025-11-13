@@ -251,6 +251,8 @@ router.post("/save-system-hash", (req, res, next) => {
       fileSize,
       isEncrypted,
       contentType,
+      relayUrl,
+      originalName,
     } = req.body;
 
     if (!hash || !userAddress) {
@@ -296,6 +298,14 @@ router.post("/save-system-hash", (req, res, next) => {
 
       if (contentType) {
         hashRecord.contentType = contentType;
+      }
+
+      if (relayUrl) {
+        hashRecord.relayUrl = relayUrl;
+      }
+
+      if (originalName) {
+        hashRecord.originalName = originalName;
       }
 
       systemHashesNode.get(hash).put(hashRecord, (ack) => {
