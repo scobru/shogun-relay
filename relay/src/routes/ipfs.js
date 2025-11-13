@@ -169,6 +169,24 @@ router.use(
       // Assicurati che l'header Host corrisponda al target
       proxyReq.setHeader("Host", new URL(IPFS_API_URL).host);
     },
+    onProxyRes: (proxyRes) => {
+      const csp = proxyRes.headers["content-security-policy"];
+      if (csp) {
+        proxyRes.headers["content-security-policy"] = csp
+          .split(";")
+          .filter((directive) => {
+            const trimmed = directive.trim().toLowerCase();
+            return (
+              !trimmed.startsWith("frame-ancestors") &&
+              !trimmed.startsWith("frame-src")
+            );
+          })
+          .join("; ");
+      }
+
+      delete proxyRes.headers["x-frame-options"];
+      delete proxyRes.headers["strict-transport-security"];
+    },
   })
 );
 
