@@ -348,16 +348,27 @@ export default (app) => {
     }
 
     try {
-      // Create request to local gateway
+      const gatewayUrl = new URL(IPFS_GATEWAY_URL);
+      const protocolModule =
+        gatewayUrl.protocol === "https:"
+          ? await import("https")
+          : await import("http");
+
       const requestOptions = {
-        hostname: new URL(IPFS_GATEWAY_URL).hostname,
-        port: new URL(IPFS_GATEWAY_URL).port,
+        hostname: gatewayUrl.hostname,
+        port: gatewayUrl.port
+          ? Number(gatewayUrl.port)
+          : gatewayUrl.protocol === "https:"
+          ? 443
+          : 80,
         path: `/ipfs/${cid}`,
         method: "GET",
+        headers: {
+          Host: gatewayUrl.host,
+        },
       };
 
-      const http = await import("http");
-      const ipfsReq = http.get(requestOptions, (ipfsRes) => {
+      const ipfsReq = protocolModule.request(requestOptions, (ipfsRes) => {
         // If no token, just stream the response
         if (!token) {
           console.log(
@@ -431,6 +442,7 @@ export default (app) => {
               details: decryptError.message,
             });
           }
+          res.end(chunk);
         });
       });
 
@@ -442,6 +454,8 @@ export default (app) => {
           details: error.message,
         });
       });
+
+      ipfsReq.end();
     } catch (error) {
       console.error("❌ IPFS Content error:", error);
       res.status(500).json({
@@ -465,15 +479,27 @@ export default (app) => {
     }
 
     try {
+      const gatewayUrl = new URL(IPFS_GATEWAY_URL);
+      const protocolModule =
+        gatewayUrl.protocol === "https:"
+          ? await import("https")
+          : await import("http");
+
       const requestOptions = {
-        hostname: new URL(IPFS_GATEWAY_URL).hostname,
-        port: new URL(IPFS_GATEWAY_URL).port,
+        hostname: gatewayUrl.hostname,
+        port: gatewayUrl.port
+          ? Number(gatewayUrl.port)
+          : gatewayUrl.protocol === "https:"
+          ? 443
+          : 80,
         path: `/ipfs/${cid}`,
         method: "GET",
+        headers: {
+          Host: gatewayUrl.host,
+        },
       };
 
-      const http = await import("http");
-      const ipfsReq = http.get(requestOptions, (ipfsRes) => {
+      const ipfsReq = protocolModule.request(requestOptions, (ipfsRes) => {
         if (!token) {
           let body = "";
           ipfsRes.on("data", (chunk) => (body += chunk));
@@ -537,6 +563,8 @@ export default (app) => {
           details: error.message,
         });
       });
+
+      ipfsReq.end();
     } catch (error) {
       res.status(500).json({
         success: false,
