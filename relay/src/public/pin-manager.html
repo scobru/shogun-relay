@@ -502,6 +502,7 @@
         let previewObjectUrl = null;
         let previewBlob = null;
         let previewContentType = null;
+        let previewFileName = null;
 
         // Initialize admin authentication
         document.addEventListener('DOMContentLoaded', () => {
@@ -673,7 +674,8 @@
                         type: info.Type || 'recursive',
                         name: displayName,
                         timestamp: metadata.timestamp || Date.now(),
-                        metadata
+                        metadata,
+                        rawInfo: info
                     };
                 });
                 
@@ -726,8 +728,10 @@
                 <div class="pin-card">
                     <div class="cid-display">${pin.cid}</div>
                     <div class="pin-meta">
-                        <span class="pin-type-badge">${pin.type}</span>
-                        <span class="text-[#A0A0A0] text-sm">${pin.name || 'Senza nome'}</span>
+                        <div class="pin-type-badge">${pin.type}</div>
+                        <div class="text-[#A0A0A0] text-sm">
+                            ${(pin.name || (pin.rawInfo && pin.rawInfo.Metadata?.name) || '').trim() || 'Senza nome'}
+                        </div>
                     </div>
                     <div class="pin-actions">
                         <button onclick="previewCid('${pin.cid}')" class="action-btn btn-preview" title="Anteprima">
@@ -802,6 +806,7 @@
             }
             previewBlob = null;
             previewContentType = null;
+            previewFileName = null;
             currentPreviewCid = null;
             currentPreviewMetadata = null;
             document.getElementById('previewCid').textContent = '';
@@ -926,6 +931,7 @@
                 previewContentType = contentType;
                 currentPreviewCid = cid;
                 currentPreviewMetadata = metadata || null;
+                previewFileName = displayName;
 
                 document.getElementById('previewCid').textContent = cid;
                 document.getElementById('previewMeta').textContent = metaPieces.join(' • ');
@@ -975,8 +981,16 @@
                 previewObjectUrl = url;
             }
             const extension = getExtensionFromType(previewContentType);
+            const metadata = currentPreviewMetadata || systemHashMap[currentPreviewCid] || {};
+            const filename =
+                previewFileName ||
+                metadata.displayName ||
+                metadata.fileName ||
+                metadata.originalName ||
+                currentPreviewCid;
+
             link.href = url;
-            link.download = `${currentPreviewCid}${extension}`;
+            link.download = `${filename}${extension || ''}`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
