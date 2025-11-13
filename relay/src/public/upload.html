@@ -267,6 +267,7 @@
       let fileToUpload = file;
       const userProvidedName = fileNameInput.value.trim();
       const baseFileName = userProvidedName || file.name;
+      let uploadFileName = baseFileName;
 
       if (encryptCheck.checked) {
         try {
@@ -288,6 +289,7 @@
           fileToUpload = new File([encryptedData], encryptionFileName, {
             type: "text/plain",
           });
+          uploadFileName = encryptionFileName;
 
           progressBar.style.width = "50%";
           progressBar.textContent = "Encrypted! Uploading...";
@@ -301,7 +303,7 @@
       }
 
       const formData = new FormData();
-      const uploadFileName = fileToUpload.name || baseFileName;
+      uploadFileName = fileToUpload.name || uploadFileName || baseFileName;
       formData.append("file", fileToUpload, uploadFileName);
 
       try {
@@ -364,9 +366,10 @@
                 hash: hash,
                 userAddress: 'admin-upload',
                 timestamp: Date.now(),
-                fileName: file.name,
-                fileSize: file.size,
-                isEncrypted: isEncrypted
+                fileName: uploadFileName,
+                fileSize: fileToUpload.size ?? file.size,
+                isEncrypted: isEncrypted,
+                contentType: fileToUpload.type || file.type || null
               })
             });
 

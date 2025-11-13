@@ -314,7 +314,15 @@ router.post("/save-system-hash", (req, res, next) => {
   }
 }, async (req, res) => {
   try {
-    const { hash, userAddress, timestamp } = req.body;
+    const {
+      hash,
+      userAddress,
+      timestamp,
+      fileName,
+      fileSize,
+      isEncrypted,
+      contentType,
+    } = req.body;
 
     if (!hash || !userAddress) {
       return res.status(400).json({
@@ -337,12 +345,31 @@ router.post("/save-system-hash", (req, res, next) => {
     await new Promise((resolve, reject) => {
       const systemHashesNode = gun.get("shogun").get("systemhash");
       
-      systemHashesNode.get(hash).put({
+      const hashRecord = {
         hash: hash,
         userAddress: userAddress,
         timestamp: timestamp || Date.now(),
-        savedAt: new Date().toISOString()
-      }, (ack) => {
+        savedAt: new Date().toISOString(),
+      };
+
+      if (fileName) {
+        hashRecord.fileName = fileName;
+        hashRecord.displayName = fileName;
+      }
+
+      if (typeof fileSize === "number") {
+        hashRecord.fileSize = fileSize;
+      }
+
+      if (typeof isEncrypted === "boolean") {
+        hashRecord.isEncrypted = isEncrypted;
+      }
+
+      if (contentType) {
+        hashRecord.contentType = contentType;
+      }
+
+      systemHashesNode.get(hash).put(hashRecord, (ack) => {
         if (ack && ack.err) {
           console.error('❌ Error saving hash to systemhash node:', ack.err);
           reject(new Error(ack.err));

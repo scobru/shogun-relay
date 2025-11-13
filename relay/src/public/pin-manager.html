@@ -493,6 +493,7 @@
 
     <script>
         let allPins = [];
+        let systemHashMap = {};
         let filteredPins = [];
         let currentFilter = 'all';
         let searchTerm = '';
@@ -648,15 +649,30 @@
         async function loadPins() {
             showLoading('Caricamento pin...');
             
-            const result = await apiCall('/api/v1/ipfs/pins/ls', 'POST', {}, { manageVisibility: false });
+            const [pinsResult, systemHashesResult] = await Promise.all([
+                apiCall('/api/v1/ipfs/pins/ls', 'POST', {}, { manageVisibility: false }),
+                apiCall('/api/v1/user-uploads/system-hashes-map', 'GET', undefined, { manageVisibility: false })
+            ]);
             
-            if (result && result.pins) {
-                allPins = Object.entries(result.pins).map(([cid, info]) => ({
-                    cid,
-                    type: info.Type || 'recursive',
-                    name: info.Name || '',
-                    timestamp: Date.now() // We don't have real timestamp from API
-                }));
+            systemHashMap = (systemHashesResult && systemHashesResult.systemHashes) || {};
+            
+            if (pinsResult && pinsResult.pins) {
+                allPins = Object.entries(pinsResult.pins).map(([cid, info]) => {
+                    const metadata = systemHashMap[cid] || {};
+                    const displayName =
+                        metadata.displayName ||
+                        metadata.fileName ||
+                        metadata.name ||
+                        info.Name ||
+                        '';
+                    
+                    return {
+                        cid,
+                        type: info.Type || 'recursive',
+                        name: displayName,
+                        timestamp: metadata.timestamp || Date.now()
+                    };
+                });
                 
                 updateStats();
                 filterPins();
