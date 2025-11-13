@@ -8,6 +8,32 @@ const getGunInstance = (req) => {
   return req.app.get('gunInstance');
 };
 
+const GUN_META_KEYS = ["_", "#", ">", "<"];
+
+function normalizeGunRecord(record) {
+  if (!record || typeof record !== "object") {
+    return record;
+  }
+
+  const normalized = {};
+  Object.entries(record).forEach(([key, value]) => {
+    if (GUN_META_KEYS.includes(key)) {
+      return;
+    }
+
+    if (value && typeof value === "object") {
+      if (typeof value["#"] === "string") {
+        normalized[key] = value["#"];
+        return;
+      }
+    }
+
+    normalized[key] = value;
+  });
+
+  return normalized;
+}
+
 // Funzione helper per ottenere tutti gli hash del sistema
 async function getAllSystemHashes(req) {
   const gun = getGunInstance(req);
@@ -269,7 +295,7 @@ router.get("/system-hashes-map", async (req, res) => {
         const hashMap = {};
         Object.keys(systemHashesData).forEach(key => {
           if (key !== "_" && key !== "#" && key !== ">" && key !== "<") {
-            hashMap[key] = systemHashesData[key];
+            hashMap[key] = normalizeGunRecord(systemHashesData[key]);
           }
         });
 

@@ -326,31 +326,16 @@
           progressBar.style.width = "100%";
           progressBar.textContent = "Upload Complete!";
 
-          const { hash, ipfsUrl, gatewayUrl, publicGateway } = result.file;
+          const { hash } = result.file;
           const isEncrypted = encryptCheck.checked;
           
-          // Debug logging
-          console.log("🔍 Debug info:", result.debug);
-          console.log("🔍 Original ipfsUrl:", ipfsUrl);
-          console.log("🔍 Token:", token ? token.substring(0, 10) + "..." : "undefined");
-          console.log("🔍 Is encrypted:", isEncrypted);
+          // Build relay URL (always go through relay viewer)
+          const baseUrl = window.location.origin;
+          const finalIpfsUrl = isEncrypted
+            ? `${baseUrl}/ipfs-content/${hash}?token=${encodeURIComponent(token)}`
+            : `${baseUrl}/ipfs-content/${hash}`;
           
-          // Ensure ipfsUrl is valid
-          let finalIpfsUrl = ipfsUrl;
-          if (ipfsUrl && ipfsUrl !== "undefined" && !ipfsUrl.includes("undefined")) {
-            finalIpfsUrl = isEncrypted
-              ? `${ipfsUrl}?token=${encodeURIComponent(token)}`
-              : ipfsUrl;
-          } else {
-            // Fallback URL construction
-            const baseUrl = window.location.origin;
-            finalIpfsUrl = isEncrypted
-              ? `${baseUrl}/ipfs-content/${hash}?token=${encodeURIComponent(token)}`
-              : `${baseUrl}/ipfs-content/${hash}`;
-          }
-
-          console.log(`🔗 Generated URL: ${finalIpfsUrl}`);
-          console.log(`🔑 Token used: ${token ? token.substring(0, 10) + "..." : "undefined"}`);
+          console.log(`🔗 Relay URL: ${finalIpfsUrl}`);
           console.log(`🔒 Is encrypted: ${isEncrypted}`);
 
           // Add file to system hashes (admin upload)
@@ -374,8 +359,8 @@
             });
 
             if (systemHashResponse.ok) {
-              const systemHashResult = await systemHashResponse.json();
-              console.log('✅ File added to system hashes:', systemHashResult);
+              await systemHashResponse.json();
+              console.log('✅ File added to system hashes');
             } else {
               console.warn('⚠️ Failed to add file to system hashes:', systemHashResponse.status);
               const errorText = await systemHashResponse.text();
@@ -387,17 +372,14 @@
           }
 
           const successMessage = `
-                        <div class="flex flex-col gap-2">
-                            <div class="font-semibold text-success">✅ File uploaded successfully!</div>
-                            <div class="font-mono text-sm">Hash: ${hash}</div>
-                            <div class="flex flex-col gap-1">
-                                <a href="${finalIpfsUrl}" target="_blank" class="link">🔗 Relay URL ${isEncrypted ? "(decrypted)" : ""
-            }</a>
-                                <a href="${gatewayUrl}" target="_blank" class="link">🌐 Local Gateway</a>
-                                <a href="${publicGateway}" target="_blank" class="link">🌍 Public Gateway</a>
-                            </div>
-                        </div>
-                    `;
+            <div class="flex flex-col gap-2">
+              <div class="font-semibold text-success">✅ File uploaded successfully!</div>
+              <div class="font-mono text-sm">Hash: ${hash}</div>
+              <div class="flex flex-col gap-1">
+                <a href="${finalIpfsUrl}" target="_blank" class="link">🔗 Relay URL ${isEncrypted ? "(decrypted)" : ""}</a>
+              </div>
+            </div>
+          `;
           showMessage(successMessage, "success");
         } else {
           throw new Error(
