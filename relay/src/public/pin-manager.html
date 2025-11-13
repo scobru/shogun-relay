@@ -498,6 +498,7 @@
         let currentFilter = 'all';
         let searchTerm = '';
         let currentPreviewCid = null;
+        let currentPreviewMetadata = null;
         let previewObjectUrl = null;
         let previewBlob = null;
         let previewContentType = null;
@@ -670,7 +671,8 @@
                         cid,
                         type: info.Type || 'recursive',
                         name: displayName,
-                        timestamp: metadata.timestamp || Date.now()
+                        timestamp: metadata.timestamp || Date.now(),
+                        metadata
                     };
                 });
                 
@@ -800,6 +802,7 @@
             previewBlob = null;
             previewContentType = null;
             currentPreviewCid = null;
+            currentPreviewMetadata = null;
             document.getElementById('previewCid').textContent = '';
             document.getElementById('previewMeta').textContent = '';
             document.getElementById('previewContent').innerHTML = 'Seleziona un pin per visualizzarne il contenuto.';
@@ -909,6 +912,7 @@
                 previewBlob = blob;
                 previewContentType = contentType;
                 currentPreviewCid = cid;
+                currentPreviewMetadata = systemHashMap[cid] || null;
 
                 document.getElementById('previewCid').textContent = cid;
                 document.getElementById('previewMeta').textContent = metaPieces.join(' • ');
@@ -929,7 +933,21 @@
                 showNotification('Nessun CID selezionato', 'error');
                 return;
             }
-            window.open(`https://ipfs.io/ipfs/${currentPreviewCid}`, '_blank', 'noopener');
+            
+            let url = `${window.location.origin}/ipfs-content/${currentPreviewCid}`;
+            const metadata = currentPreviewMetadata || systemHashMap[currentPreviewCid] || {};
+            const password = ShogunAdmin.getPassword();
+
+            if (metadata.isEncrypted) {
+                if (!password) {
+                    showNotification('Token admin richiesto per aprire contenuti cifrati', 'error');
+                    return;
+                }
+                const separator = url.includes('?') ? '&' : '?';
+                url = `${url}${separator}token=${encodeURIComponent(password)}`;
+            }
+
+            window.open(url, '_blank', 'noopener');
         }
 
         function downloadPreview() {

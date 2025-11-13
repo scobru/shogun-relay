@@ -155,11 +155,14 @@ router.use(
     changeOrigin: true,
     ws: true,
     pathRewrite: (path) => {
-      const rewritten = path.replace(/^\/webui/, "/webui");
-      if (rewritten === "/webui") {
+      if (!path || path === "/" || path === "") {
         return "/webui/";
       }
-      return rewritten;
+
+      const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+      const rewritten = `/webui${normalizedPath}`;
+
+      return rewritten.endsWith("//") ? rewritten.slice(0, -1) : rewritten;
     },
     logLevel: "warn",
     onProxyReq: (proxyReq) => {
