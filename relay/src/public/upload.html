@@ -354,7 +354,9 @@
                 fileName: uploadFileName,
                 fileSize: fileToUpload.size ?? file.size,
                 isEncrypted: isEncrypted,
-                contentType: fileToUpload.type || file.type || null
+                contentType: fileToUpload.type || file.type || null,
+                relayUrl: finalIpfsUrl,
+                originalName: file.name
               })
             });
 

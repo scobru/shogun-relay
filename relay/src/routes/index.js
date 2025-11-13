@@ -201,6 +201,27 @@ export default (app) => {
     }, 5000);
   });
 
+  app.get("/api/v1/ipfs/webui", (req, res) => {
+    const token =
+      req.query?.auth_token ||
+      req.query?._auth_token ||
+      (req.headers["authorization"] &&
+        req.headers["authorization"].split(" ")[1]) ||
+      req.headers["token"];
+
+    if (token === process.env.ADMIN_PASSWORD) {
+      res.redirect(
+        "/api/v1/ipfs/webui/?auth_token=" +
+          encodeURIComponent(token)
+      );
+      return;
+    }
+
+    res.redirect(
+      `/admin?error=unauthorized&path=${encodeURIComponent(req.originalUrl)}`
+    );
+  });
+
 
   app.get("/admin", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");

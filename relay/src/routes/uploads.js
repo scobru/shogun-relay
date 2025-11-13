@@ -26,6 +26,9 @@ function normalizeGunRecord(record) {
         normalized[key] = value["#"];
         return;
       }
+
+      normalized[key] = normalizeGunRecord(value);
+      return;
     }
 
     normalized[key] = value;
@@ -95,106 +98,6 @@ async function getAllSystemHashes(req) {
         });
       });
     });
-  });
-}
-
-// Funzione helper per ottenere l'utilizzo MB off-chain
-async function getOffChainMBUsage(userAddress, req) {
-  const gun = getGunInstance(req);
-  if (!gun) {
-    console.warn('Gun instance not available for MB usage calculation');
-    return 0;
-  }
-  
-  console.log(`🔍 Calculating offchain MB usage for: ${userAddress}`);
-  
-  return new Promise((resolve) => {
-    const timeoutId = setTimeout(() => {
-      console.log(`⏰ Timeout for MB usage calculation for: ${userAddress}`);
-      resolve(0);
-    }, 3000); // Timeout ridotto da 10 secondi a 3 secondi
-
-    const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
-    
-    uploadsNode.once((parentData) => {
-      clearTimeout(timeoutId);
-      
-      if (!parentData || typeof parentData !== "object") {
-        console.log(`📋 No uploads found for ${userAddress}, returning 0 MB`);
-        resolve(0);
-        return;
-      }
-
-      const hashKeys = Object.keys(parentData).filter(
-        (key) => key !== "_" && key !== "#" && key !== ">" && key !== "<"
-      );
-
-      if (hashKeys.length === 0) {
-        console.log(`📋 No files found for ${userAddress}, returning 0 MB`);
-        resolve(0);
-        return;
-      }
-
-      let totalMB = 0;
-      let completedReads = 0;
-      const totalReads = hashKeys.length;
-
-      // Timeout aggiuntivo per le letture individuali dei file
-      const fileReadTimeout = setTimeout(() => {
-        console.log(`⏰ File read timeout for ${userAddress}, using partial calculation`);
-        resolve(totalMB);
-      }, 2500);
-
-      hashKeys.forEach((hash) => {
-        uploadsNode.get(hash).once((uploadData) => {
-          completedReads++;
-
-          if (uploadData && uploadData.sizeMB) {
-            totalMB += uploadData.sizeMB;
-          }
-
-          if (completedReads === totalReads) {
-            clearTimeout(fileReadTimeout);
-            console.log(`📊 Final MB calculation for ${userAddress}: ${totalMB} MB from ${totalReads} files`);
-            resolve(totalMB);
-          }
-        });
-      });
-    });
-  });
-}
-
-// Funzione helper per salvare upload e aggiornare MB
-async function saveUploadAndUpdateMB(userAddress, fileHash, uploadData, fileSizeMB, req) {
-  const gun = getGunInstance(req);
-  return new Promise((resolve, reject) => {
-    try {
-      gun.get("shogun").get("uploads").get(userAddress).get(fileHash).put(uploadData, (ack) => {
-        if (ack && ack.err) {
-          reject(new Error(ack.err));
-          return;
-        }
-
-        gun.get("shogun").get("mbUsage").get(userAddress).once((currentData) => {
-          const currentMB = currentData ? (currentData.mbUsed || 0) : 0;
-          const newMB = currentMB + fileSizeMB;
-
-          gun.get("shogun").get("mbUsage").get(userAddress).put({
-            mbUsed: newMB,
-            lastUpdated: Date.now(),
-            userAddress: userAddress
-          }, (mbAck) => {
-            if (mbAck && mbAck.err) {
-              reject(new Error(mbAck.err));
-            } else {
-              resolve(newMB);
-            }
-          });
-        });
-      });
-    } catch (error) {
-      reject(error);
-    }
   });
 }
 
@@ -627,10 +530,6 @@ router.delete("/:identifier/:hash", (req, res, next) => {
     const fileSizeMB = Math.ceil(fileData.size / (1024 * 1024));
     console.log(`📊 File size: ${fileData.size} bytes (${fileSizeMB} MB)`);
 
-    const previousMBUsed = await getOffChainMBUsage(identifier, req);
-    await deleteUploadAndUpdateMB(identifier, hash, fileSizeMB, req);
-    const newMBUsed = await getOffChainMBUsage(identifier, req);
-
     // Remove hash from systemhash node
     try {
       const adminToken = process.env.ADMIN_PASSWORD;
@@ -699,12 +598,7 @@ router.delete("/:identifier/:hash", (req, res, next) => {
         name: fileData.name,
         size: fileData.size,
         sizeMB: fileData.sizeMB,
-      },
-      mbUsage: {
-        previousMB: previousMBUsed,
-        currentMB: newMBUsed,
-        freedMB: previousMBUsed - newMBUsed,
-      },
+      }
     });
   } catch (error) {
     console.error("Delete error:", error);
@@ -712,62 +606,5 @@ router.delete("/:identifier/:hash", (req, res, next) => {
   }
 });
 
-// Endpoint per sincronizzare i MB utilizzati
-router.post("/sync-mb-usage/:userAddress", async (req, res) => {
-  try {
-    const { userAddress } = req.params;
 
-    if (!userAddress) {
-      return res.status(400).json({
-        success: false,
-        error: "Indirizzo utente richiesto",
-      });
-    }
-
-    console.log(`🔄 Syncing MB usage for user: ${userAddress}`);
-
-    const totalSizeMB = await getOffChainMBUsage(userAddress, req);
-
-    const gun = getGunInstance(req);
-    const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
-    const fileCount = await new Promise((resolve) => {
-      const timeoutId = setTimeout(() => {
-        resolve(0);
-      }, 2000); // Timeout ridotto da 5 secondi a 2 secondi
-
-      uploadsNode.once((parentData) => {
-        clearTimeout(timeoutId);
-        if (!parentData || typeof parentData !== "object") {
-          resolve(0);
-          return;
-        }
-        const hashKeys = Object.keys(parentData).filter(
-          (key) => key !== "_" && key !== "#" && key !== ">" && key !== "<"
-        );
-        resolve(hashKeys.length);
-      });
-    });
-
-    console.log(`✅ MB usage synced: ${totalSizeMB} MB (${fileCount} files)`);
-
-    res.json({
-      success: true,
-      message: "MB usage synchronized successfully",
-      userAddress,
-      mbUsed: totalSizeMB,
-      fileCount: fileCount,
-      lastUpdated: new Date().toISOString(),
-      storage: "real-time-calculation",
-    });
-  } catch (error) {
-    console.error("Sync MB usage error:", error);
-    res.status(500).json({
-      success: false,
-      error: "Errore interno del server",
-      details: error.message,
-    });
-  }
-});
-
-export { getOffChainMBUsage };
 export default router;

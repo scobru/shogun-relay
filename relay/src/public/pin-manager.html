@@ -663,6 +663,7 @@
                     const displayName =
                         metadata.displayName ||
                         metadata.fileName ||
+                        metadata.originalName ||
                         metadata.name ||
                         info.Name ||
                         '';
@@ -863,7 +864,19 @@
                 const contentLength = parseInt(response.headers.get('Content-Length') || '0', 10);
 
                 let previewHtml = '';
-                let metaPieces = [`Tipo: ${contentType}`];
+                const metadata = systemHashMap[cid] || {};
+                const displayName =
+                    metadata.displayName ||
+                    metadata.fileName ||
+                    metadata.originalName ||
+                    metadata.name ||
+                    '';
+
+                let metaPieces = [];
+                if (displayName) {
+                    metaPieces.push(`Nome: ${displayName}`);
+                }
+                metaPieces.push(`Tipo: ${contentType}`);
                 if (contentLength) {
                     metaPieces.push(`Dimensione: ${formatBytes(contentLength)}`);
                 }
@@ -912,7 +925,7 @@
                 previewBlob = blob;
                 previewContentType = contentType;
                 currentPreviewCid = cid;
-                currentPreviewMetadata = systemHashMap[cid] || null;
+                currentPreviewMetadata = metadata || null;
 
                 document.getElementById('previewCid').textContent = cid;
                 document.getElementById('previewMeta').textContent = metaPieces.join(' • ');
@@ -934,11 +947,11 @@
                 return;
             }
             
-            let url = `${window.location.origin}/ipfs-content/${currentPreviewCid}`;
             const metadata = currentPreviewMetadata || systemHashMap[currentPreviewCid] || {};
+            let url = metadata.relayUrl || `${window.location.origin}/ipfs-content/${currentPreviewCid}`;
             const password = ShogunAdmin.getPassword();
 
-            if (metadata.isEncrypted) {
+            if (metadata.isEncrypted && !url.includes("token=")) {
                 if (!password) {
                     showNotification('Token admin richiesto per aprire contenuti cifrati', 'error');
                     return;
