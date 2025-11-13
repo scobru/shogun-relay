@@ -11,283 +11,392 @@
     <script src="lib/admin-nav.js"></script>
     <style>
       :root {
-        --cyber-primary: #22d3ee;
-        --cyber-secondary: #a855f7;
-        --cyber-bg: radial-gradient(circle at 18% 12%, rgba(168, 85, 247, 0.25), transparent 45%),
-          radial-gradient(circle at 82% 8%, rgba(34, 211, 238, 0.22), transparent 55%),
-          #050714;
-        --cyber-panel: rgba(6, 11, 30, 0.82);
-        --cyber-border: rgba(34, 211, 238, 0.28);
+        --relay-bg: #1a1a1a;
+        --relay-panel: #282828;
+        --relay-input: #404040;
+        --relay-border: #404040;
+        --relay-border-light: #606060;
+        --relay-text-primary: #ffffff;
+        --relay-text-secondary: #e0e0e0;
+        --relay-text-muted: #a0a0a0;
+        --relay-accent: #ff69b4;
+        --relay-accent-hover: #ff1493;
+        --relay-link: #42a5f5;
+        --relay-success: #4caf50;
+        --relay-warning: #ffa500;
+        --relay-error: #f44336;
       }
 
       body {
-        font-family: "Space Grotesk", "Inter", system-ui, sans-serif;
-        background: var(--cyber-bg);
-        color: #e0f2f1;
-        min-height: 100vh;
+        font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+        background-color: var(--relay-bg);
+        color: var(--relay-text-secondary);
       }
 
-      .cyber-heading {
-        text-shadow: 0 0 12px rgba(34, 211, 238, 0.6), 0 0 24px rgba(168, 85, 247, 0.35);
+      a {
+        color: var(--relay-link);
+        text-decoration: none;
       }
 
-      .cyber-card {
-        background: var(--cyber-panel);
-        border: 1px solid var(--cyber-border);
-        box-shadow: 0 18px 48px rgba(34, 211, 238, 0.18), inset 0 0 0 1px rgba(168, 85, 247, 0.14);
-        backdrop-filter: blur(18px);
+      a:hover {
+        color: #64b5f6;
       }
 
-      .cyber-divider {
-        background: linear-gradient(90deg, rgba(34, 211, 238, 0), rgba(34, 211, 238, 0.45), rgba(168, 85, 247, 0));
-        height: 1px;
-        border: 0;
+      .page-container {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 2.5rem 1.5rem 3rem;
       }
 
-      .cyber-input {
-        background: rgba(9, 13, 32, 0.92);
-        border: 1px solid rgba(34, 211, 238, 0.32);
-        color: #e0f2f1;
-        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      .page-card {
+        background-color: var(--relay-panel);
+        border: 1px solid var(--relay-border);
+        border-radius: 1.5rem;
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.35);
+        padding: 2.75rem 2.5rem;
       }
 
-      .cyber-input:focus {
-        outline: none;
-        border-color: var(--cyber-primary);
-        box-shadow: 0 0 14px rgba(34, 211, 238, 0.32);
+      @media (max-width: 640px) {
+        .page-card {
+          padding: 1.75rem;
+        }
       }
 
-      .cyber-button {
-        position: relative;
-        overflow: hidden;
-        border: 1px solid rgba(34, 211, 238, 0.28);
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      .page-title {
+        font-size: clamp(2rem, 4vw, 2.5rem);
+        color: var(--relay-text-primary);
+        font-weight: 600;
+        text-align: center;
+        margin-bottom: 0.75rem;
       }
 
-      .cyber-button::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(120deg, rgba(34, 211, 238, 0.35), rgba(168, 85, 247, 0.4));
-        opacity: 0;
-        transition: opacity 0.2s ease;
+      .page-subtitle {
+        text-align: center;
+        color: var(--relay-text-muted);
+        margin-bottom: 2.25rem;
       }
 
-      .cyber-button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 14px 28px rgba(34, 211, 238, 0.26);
+      .section-card {
+        background-color: var(--relay-panel);
+        border: 1px solid var(--relay-border);
+        border-radius: 1.25rem;
+        padding: 1.75rem;
+        margin-top: 1.75rem;
       }
 
-      .cyber-button:hover::after {
-        opacity: 0.22;
+      .pill-heading {
+        display: inline-block;
+        color: var(--relay-accent);
+        font-size: 0.75rem;
+        letter-spacing: 0.35em;
+        text-transform: uppercase;
       }
 
-      .node-key {
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .section-title {
+        font-size: 1.35rem;
+        color: var(--relay-text-primary);
+        font-weight: 600;
+      }
+
+      .section-description {
+        margin-top: 0.25rem;
+        color: var(--relay-text-muted);
+        font-size: 0.92rem;
+      }
+
+      .input-group {
+        display: grid;
+        gap: 1rem;
+      }
+
+      @media (min-width: 640px) {
+        .input-group {
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: center;
+        }
+      }
+
+      .relay-input {
+        width: 100%;
+        background-color: var(--relay-input);
+        border: 1px solid var(--relay-border-light);
+        border-radius: 0.85rem;
+        padding: 0.75rem 1rem;
+        color: var(--relay-text-primary);
+        font-size: 0.95rem;
+      }
+
+      .relay-input::placeholder {
+        color: var(--relay-text-muted);
+      }
+
+      .relay-input:focus {
+        outline: 2px solid var(--relay-accent);
+        outline-offset: 2px;
+      }
+
+      .relay-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.85rem;
+        font-weight: 600;
+        padding: 0.65rem 1.4rem;
+        font-size: 0.95rem;
+        border: none;
         cursor: pointer;
-        color: var(--cyber-primary);
-        transition: text-shadow 0.2s ease;
+        transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
       }
 
-      .node-key:hover {
-        text-shadow: 0 0 10px rgba(34, 211, 238, 0.8);
+      .relay-button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 24px rgba(255, 105, 180, 0.2);
+      }
+
+      .relay-button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .relay-button.primary {
+        background-color: var(--relay-accent);
+        color: #ffffff;
+      }
+
+      .relay-button.primary:hover {
+        background-color: var(--relay-accent-hover);
+      }
+
+      .relay-button.neutral {
+        background-color: rgba(255, 255, 255, 0.06);
+        color: var(--relay-text-secondary);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .relay-button.neutral:hover {
+        background-color: rgba(255, 255, 255, 0.12);
+      }
+
+      .status-text {
+        font-size: 0.85rem;
+        margin-top: 0.75rem;
+      }
+
+      .status-text.info {
+        color: var(--relay-text-muted);
+      }
+
+      .status-text.success {
+        color: var(--relay-success);
+      }
+
+      .status-text.warning {
+        color: var(--relay-warning);
+      }
+
+      .status-text.error {
+        color: var(--relay-error);
+      }
+
+      .explorer-panel {
+        background-color: var(--relay-input);
+        border: 1px solid var(--relay-border-light);
+        border-radius: 1rem;
+        padding: 1.25rem;
+      }
+
+      .explorer-panel pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: rgba(0, 0, 0, 0.35);
+        border-radius: 0.75rem;
+        padding: 1rem;
+        margin-top: 1rem;
+        font-family: "JetBrains Mono", "Fira Code", monospace;
+        font-size: 0.85rem;
+      }
+
+      .explorer-list li {
+        background-color: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 0.85rem;
+        padding: 1rem;
+      }
+
+      .explorer-list li + li {
+        margin-top: 0.75rem;
+      }
+
+      .property-actions button {
+        font-size: 0.75rem;
+        padding: 0.35rem 0.65rem;
+        border-radius: 0.65rem;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+      }
+
+      .property-actions button:first-child {
+        background-color: rgba(255, 215, 0, 0.2);
+        color: #ffd700;
+      }
+
+      .property-actions button:first-child:hover {
+        background-color: rgba(255, 215, 0, 0.3);
+      }
+
+      .property-actions button:last-child {
+        background-color: rgba(244, 67, 54, 0.25);
+        color: #ff7961;
+      }
+
+      .property-actions button:last-child:hover {
+        background-color: rgba(244, 67, 54, 0.35);
       }
     </style>
   </head>
-  <body class="text-slate-100">
-    <div class="container max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div class="flex items-center mb-6">
-        <a href="/" class="text-cyan-300 hover:text-cyan-200 transition-colors text-sm">Back to Control Panel</a>
-      </div>
-
-      <header class="text-center mb-10">
-        <p class="uppercase tracking-[0.45em] text-xs text-cyan-300/70 mb-3">GunDB Relay Toolkit</p>
-        <h1 class="text-4xl sm:text-5xl font-semibold cyber-heading text-cyan-200">Shogun Relay Graph Explorer</h1>
-        <p class="mt-4 max-w-2xl mx-auto text-sm text-cyan-100/70">
-          Authenticate with your alias to browse private spaces or follow any public coordinates. Inspect, modify, and export
-          live GunDB data while keeping relay peers in sync.
-        </p>
-      </header>
-
-      <section id="authSection" class="cyber-card rounded-2xl p-6 sm:p-7 lg:p-8">
-        <div class="flex items-center justify-between gap-4 mb-6">
-          <h2 class="text-2xl font-semibold text-cyan-200">User Authentication</h2>
-          <span class="text-xs tracking-[0.3em] text-cyan-300/60 uppercase">Access Control</span>
-        </div>
-        <hr class="cyber-divider mb-6" />
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <label class="text-sm text-cyan-100/80 space-y-2" for="username">
-            <span>Alias</span>
-            <input
-              type="text"
-              id="username"
-              placeholder="e.g. neon-operator"
-              class="cyber-input w-full px-3 py-2 rounded-lg"
-            />
-          </label>
-          <label class="text-sm text-cyan-100/80 space-y-2" for="password">
-            <span>Password</span>
-            <input
-              type="password"
-              id="password"
-              placeholder="Password"
-              class="cyber-input w-full px-3 py-2 rounded-lg"
-            />
-          </label>
-        </div>
-        <div class="flex flex-wrap items-center justify-end gap-3 mt-6">
-          <button id="btnCreate" class="cyber-button px-5 py-2 rounded-lg bg-emerald-500/20 text-emerald-200">
-            Create Account
-          </button>
-          <button id="btnLogin" class="cyber-button px-5 py-2 rounded-lg bg-cyan-500/20 text-cyan-200">
-            Log In
-          </button>
-        </div>
-        <div id="authMessage" class="mt-4 text-sm text-rose-300"></div>
-      </section>
-
-      <section class="cyber-card rounded-2xl p-6 sm:p-7 lg:p-8 mt-8">
-        <div class="flex items-center justify-between gap-4 mb-6">
-          <h2 class="text-2xl font-semibold text-cyan-200">Public Graph Console</h2>
-          <span class="text-xs tracking-[0.3em] text-cyan-300/60 uppercase">Open Access</span>
-        </div>
-        <p class="text-sm text-cyan-100/70">
-          Provide a Gun coordinate such as <code>shogun-wormhole.wormhole-transfers</code> or
-          <code>~pubKey.user.profile</code> to explore without authenticating.
-        </p>
-        <div class="flex flex-col sm:flex-row gap-3 mt-4">
-          <input
-            type="text"
-            id="publicPathInput"
-            placeholder="Enter Gun path to explore"
-            class="cyber-input flex-grow px-3 py-2 rounded-lg"
-          />
-          <button id="btnExplorePublic" class="cyber-button px-5 py-2 rounded-lg bg-fuchsia-500/20 text-fuchsia-200">
-            Explore Path
-          </button>
-        </div>
-        <p id="publicExplorerMessage" class="hidden mt-3 text-xs"></p>
-
-        <div class="mt-8">
-          <h3 class="text-lg font-semibold text-cyan-200 mb-2">Relay Peers</h3>
-          <p class="text-sm text-cyan-100/70">
-            Add additional peers (for example <code>https://relay.example.com/gun</code> or <code>wss://relay.example.com/gun</code>)
-            to improve replication coverage. Peers are stored only for this session.
+  <body>
+    <div class="page-container">
+      <div class="page-card">
+        <div class="text-center">
+          <a href="/" class="inline-flex items-center gap-2 text-sm text-[#8B94FF] mb-6">
+            <span>&larr;</span>
+            <span>Back to Control Panel</span>
+          </a>
+          <h1 class="page-title">Shogun Relay Graph Explorer</h1>
+          <p class="page-subtitle">
+            Inspect GunDB data, traverse linked nodes, and export relay snapshots using the shared Shogun palette.
           </p>
-          <div class="flex flex-col sm:flex-row gap-3 mt-4">
-            <input
-              type="text"
-              id="newPeerInput"
-              placeholder="https://my-relay.example.com/gun"
-              class="cyber-input flex-grow px-3 py-2 rounded-lg"
-            />
-            <button id="btnAddPeer" class="cyber-button px-5 py-2 rounded-lg bg-cyan-500/20 text-cyan-200">
-              Add Relay
-            </button>
-          </div>
-          <p id="peerFeedback" class="hidden mt-2 text-xs"></p>
         </div>
-      </section>
 
-      <section class="cyber-card rounded-2xl p-6 sm:p-7 lg:p-8 mt-8">
-        <div class="flex items-center justify-between gap-4 mb-6">
-          <h2 class="text-2xl font-semibold text-cyan-200">Data Operations</h2>
-          <span class="text-xs tracking-[0.3em] text-cyan-300/60 uppercase">Admin Toolkit</span>
-        </div>
-        <p class="text-sm text-cyan-100/70">
-          Use an administrator token to export a full snapshot of the relay's graph. Tokens sync automatically with the
-          Control Panel when available.
-        </p>
-        <div class="mt-4 grid gap-3 sm:grid-cols-[2fr,auto]">
-          <input
-            type="password"
-            id="adminToken"
-            placeholder="Admin token (auto-loaded if saved)"
-            class="cyber-input px-3 py-2 rounded-lg"
-          />
-          <button id="btnLoadAllNodes" class="cyber-button px-5 py-2 rounded-lg bg-indigo-500/20 text-indigo-200">
-            Load Full Graph Snapshot
-          </button>
-        </div>
-        <p id="statusMessage" class="hidden"></p>
-        <div id="graphSummary" class="mt-3 text-xs text-cyan-200/60"></div>
-        <pre
-          id="graphDump"
-          class="hidden mt-4 bg-slate-950/70 border border-cyan-500/20 rounded-xl p-4 text-[11px] leading-relaxed text-cyan-100/80 overflow-x-auto max-h-64"
-        ></pre>
-      </section>
-
-      <section id="explorerSection" class="hidden mt-10 space-y-7">
-        <div class="cyber-card rounded-2xl p-6">
-          <div class="flex flex-wrap justify-between items-start gap-5">
-            <div class="space-y-2">
-              <h2 class="text-xl font-semibold text-cyan-200">Session Status</h2>
-              <p id="userInfo" class="text-sm text-cyan-100/75 break-all"></p>
-              <p id="peerStatus" class="text-xs text-slate-400"></p>
+        <section id="authSection" class="section-card mt-10">
+          <div class="section-header">
+            <div>
+              <span class="pill-heading">Authentication</span>
+              <h2 class="section-title mt-2">Relay Credentials</h2>
+              <p class="section-description">
+                Log in with your alias and password to edit protected GunDB spaces. Use public mode to read without authentication.
+              </p>
             </div>
-            <button id="btnLogout" class="cyber-button px-4 py-2 rounded-lg bg-rose-500/20 text-rose-200">
-              Log Out
-            </button>
           </div>
-        </div>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="text-sm text-[#E0E0E0] space-y-2" for="username">
+              <span>Alias</span>
+              <input id="username" type="text" class="relay-input" placeholder="e.g. neon-operator" />
+            </label>
+            <label class="text-sm text-[#E0E0E0] space-y-2" for="password">
+              <span>Password</span>
+              <input id="password" type="password" class="relay-input" placeholder="Password" />
+            </label>
+          </div>
+          <div class="flex flex-wrap justify-end gap-3 mt-6">
+            <button id="btnCreate" class="relay-button neutral">Create Account</button>
+            <button id="btnLogin" class="relay-button primary">Log In</button>
+          </div>
+          <p id="authMessage" class="status-text info"></p>
+        </section>
 
-        <div class="cyber-card rounded-2xl p-6">
-          <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
-            <div class="flex items-center gap-3">
-              <button
-                id="btnGoToRoot"
-                class="cyber-button px-3 py-1 text-sm rounded-lg bg-slate-900/70 text-cyan-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Jump to origin
-              </button>
-              <div class="text-xs text-cyan-100/60 break-all">
-                <span class="uppercase tracking-wide text-cyan-300/70">Path:</span>
-                <span id="currentPath" class="font-mono text-cyan-200"></span>
+        <section class="section-card">
+          <div class="section-header">
+            <div>
+              <span class="pill-heading">Public Access</span>
+              <h2 class="section-title mt-2">Graph Console</h2>
+              <p class="section-description">
+                Follow any Gun coordinate (for example <code>shogun-relay.logs.events</code>) to inspect live relay data instantly.
+              </p>
+            </div>
+          </div>
+          <div class="input-group">
+            <input id="publicPathInput" type="text" class="relay-input" placeholder="Enter Gun path to explore" />
+            <button id="btnExplorePublic" class="relay-button primary">Explore Path</button>
+          </div>
+          <p id="publicExplorerMessage" class="status-text info"></p>
+
+          <div class="mt-8">
+            <h3 class="text-lg font-semibold text-[#FFFFFF]">Relay Peers</h3>
+            <p class="section-description">
+              Append HTTPS or WSS endpoints to improve synchronization. Peers remain active only for the current session.
+            </p>
+            <div class="input-group mt-3">
+              <input id="newPeerInput" type="text" class="relay-input" placeholder="https://relay.example.com/gun" />
+              <button id="btnAddPeer" class="relay-button neutral">Add Relay</button>
+            </div>
+            <p id="peerFeedback" class="status-text info"></p>
+          </div>
+        </section>
+
+        <section class="section-card">
+          <div class="section-header">
+            <div>
+              <span class="pill-heading">Snapshot</span>
+              <h2 class="section-title mt-2">Data Operations</h2>
+              <p class="section-description">
+                Export a full snapshot of the relay graph using your administrator token. Tokens sync automatically when available.
+              </p>
+            </div>
+          </div>
+          <div class="input-group">
+            <input id="adminToken" type="password" class="relay-input" placeholder="Admin token (auto-loaded if saved)" />
+            <button id="btnLoadAllNodes" class="relay-button neutral">Load Full Graph Snapshot</button>
+          </div>
+          <p id="statusMessage" class="status-text info"></p>
+          <div id="graphSummary" class="text-xs text-[#A0A0A0] mt-3"></div>
+          <pre id="graphDump" class="hidden"></pre>
+        </section>
+
+        <section id="explorerSection" class="section-card hidden">
+          <div class="section-header">
+            <div>
+              <span class="pill-heading">Explorer</span>
+              <h2 class="section-title mt-2">Session Status</h2>
+              <p id="userInfo" class="section-description"></p>
+              <p id="peerStatus" class="status-text info"></p>
+            </div>
+            <button id="btnLogout" class="relay-button neutral">Log Out</button>
+          </div>
+
+          <div class="section-card" style="background-color: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05);">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div class="flex items-center gap-3 text-xs text-[#A0A0A0]">
+                <button id="btnGoToRoot" class="relay-button neutral" style="padding: 0.4rem 0.85rem; font-size: 0.8rem;">Jump to origin</button>
+                <span class="uppercase tracking-[0.3em]">Path:</span>
+                <span id="currentPath" class="font-mono text-[#FFFFFF]"></span>
               </div>
+              <span class="text-xs text-[#A0A0A0]">Select a linked property to follow referenced nodes.</span>
             </div>
-            <span class="text-xs text-cyan-200/60">
-              Select a linked property to follow referenced nodes.
-            </span>
-          </div>
-          <div>
-            <h3 class="text-lg font-semibold text-cyan-200 mb-2">Node Properties</h3>
-            <div
-              id="explorerContent"
-              class="min-h-[120px] p-4 rounded-xl bg-slate-950/70 border border-cyan-400/15 font-mono text-sm overflow-x-auto"
-            >
+            <div id="explorerContent" class="explorer-panel text-sm text-[#E0E0E0]">
               Select a node to inspect its state.
             </div>
           </div>
-        </div>
 
-        <div class="cyber-card rounded-2xl p-6">
-          <h3 class="text-xl font-semibold text-cyan-200 mb-4">Write Operations</h3>
-          <div class="flex flex-col sm:flex-row gap-3">
-            <input
-              type="text"
-              id="newKey"
-              placeholder="Property key"
-              class="cyber-input flex-grow px-3 py-2 rounded-lg"
-            />
-            <input
-              type="text"
-              id="newValue"
-              placeholder='Value (JSON or text)'
-              class="cyber-input flex-grow px-3 py-2 rounded-lg"
-            />
-            <button id="btnAddProperty" class="cyber-button px-5 py-2 rounded-lg bg-cyan-500/20 text-cyan-200">
-              Add or Update
-            </button>
+          <div class="section-card" style="background-color: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05);">
+            <h3 class="text-lg font-semibold text-[#FFFFFF] mb-3">Write Operations</h3>
+            <div class="input-group">
+              <input id="newKey" type="text" class="relay-input" placeholder="Property key" />
+              <input id="newValue" type="text" class="relay-input" placeholder='Value (JSON or text)' />
+              <button id="btnAddProperty" class="relay-button primary">Add or Update</button>
+            </div>
+            <p class="section-description mt-2">
+              Executes <code>[currentNode].[key] = value</code>. Existing keys are overwritten immediately.
+            </p>
           </div>
-          <p class="mt-2 text-xs text-cyan-200/60">
-            Executes <code>[currentNode].[key] = value</code>. Existing keys are overwritten immediately.
-          </p>
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
 
     <script>
       const DEFAULT_PEERS = [window.location.origin + "/gun"];
-
       const gun = Gun({ peers: DEFAULT_PEERS, retry: 2000 });
       const user = gun.user();
       window.gun = gun;
@@ -336,91 +445,44 @@
         if (!statusMessage) return;
         if (!message) {
           statusMessage.textContent = "";
-          statusMessage.hidden = true;
+          statusMessage.className = "status-text info";
           return;
         }
-        statusMessage.hidden = false;
-        statusMessage.className = "mt-3 text-sm";
         statusMessage.textContent = message;
-        statusMessage.classList.remove("text-cyan-200", "text-emerald-300", "text-amber-300", "text-rose-300");
-        switch (type) {
-          case "success":
-            statusMessage.classList.add("text-emerald-300");
-            break;
-          case "warning":
-            statusMessage.classList.add("text-amber-300");
-            break;
-          case "error":
-            statusMessage.classList.add("text-rose-300");
-            break;
-          default:
-            statusMessage.classList.add("text-cyan-200");
-        }
+        statusMessage.className = "status-text " + type;
       }
 
       function setPublicExplorerMessage(message, type = "info") {
         if (!publicExplorerMessage) return;
         if (!message) {
           publicExplorerMessage.textContent = "";
-          publicExplorerMessage.hidden = true;
+          publicExplorerMessage.className = "status-text info";
           return;
         }
-        publicExplorerMessage.hidden = false;
         publicExplorerMessage.textContent = message;
-        publicExplorerMessage.className = "mt-3 text-xs";
-        publicExplorerMessage.classList.remove("text-emerald-300", "text-amber-300", "text-rose-300", "text-slate-400");
-        switch (type) {
-          case "success":
-            publicExplorerMessage.classList.add("text-emerald-300");
-            break;
-          case "warning":
-            publicExplorerMessage.classList.add("text-amber-300");
-            break;
-          case "error":
-            publicExplorerMessage.classList.add("text-rose-300");
-            break;
-          default:
-            publicExplorerMessage.classList.add("text-slate-400");
-        }
+        publicExplorerMessage.className = "status-text " + type;
       }
 
       function setPeerFeedback(message, type = "info") {
         if (!peerFeedback) return;
         if (!message) {
           peerFeedback.textContent = "";
-          peerFeedback.hidden = true;
+          peerFeedback.className = "status-text info";
           return;
         }
-        peerFeedback.hidden = false;
         peerFeedback.textContent = message;
-        peerFeedback.className = "mt-2 text-xs";
-        peerFeedback.classList.remove("text-emerald-300", "text-amber-300", "text-rose-300", "text-slate-400");
-        switch (type) {
-          case "success":
-            peerFeedback.classList.add("text-emerald-300");
-            break;
-          case "warning":
-            peerFeedback.classList.add("text-amber-300");
-            break;
-          case "error":
-            peerFeedback.classList.add("text-rose-300");
-            break;
-          default:
-            peerFeedback.classList.add("text-slate-400");
-        }
+        peerFeedback.className = "status-text " + type;
       }
 
       function updatePeerStatusDisplay() {
         if (!peerStatus) return;
         if (activePeers.size === 0) {
           peerStatus.textContent = "Connecting to peers...";
-          peerStatus.classList.remove("text-emerald-300");
-          peerStatus.classList.add("text-slate-400");
+          peerStatus.className = "status-text info";
         } else {
           peerStatus.textContent =
             "Connected to " + activePeers.size + " peer(s): " + Array.from(activePeers).join(", ");
-          peerStatus.classList.remove("text-slate-400");
-          peerStatus.classList.add("text-emerald-300");
+          peerStatus.className = "status-text success";
         }
       }
 
@@ -436,12 +498,11 @@
       function getAuthToken() {
         if (window.ShogunAdmin && typeof ShogunAdmin.getPassword === "function") {
           const saved = ShogunAdmin.getPassword();
-          if (saved) {
-            if (adminTokenInput && !adminTokenInput.value) {
-              adminTokenInput.value = saved;
-            }
+          if (saved && adminTokenInput && !adminTokenInput.value) {
+            adminTokenInput.value = saved;
             return saved;
           }
+          if (saved) return saved;
         }
         return adminTokenInput ? adminTokenInput.value.trim() : "";
       }
@@ -483,15 +544,12 @@
         if (explorerMode === "user" && user.is) {
           const alias = user.is.alias;
           const pub = user.is.pub;
-          const aliasInfo = alias ? "Alias: " + alias + " - " : "";
+          const aliasInfo = alias ? "Alias: " + alias + " • " : "";
           userInfo.textContent = aliasInfo + "Public key: " + pub;
-          btnLogout.classList.remove("hidden");
         } else if (explorerMode === "public") {
           userInfo.textContent = "Public mode • Root: " + rootPathString;
-          btnLogout.classList.add("hidden");
         } else {
           userInfo.textContent = "";
-          btnLogout.classList.add("hidden");
         }
       }
 
@@ -610,24 +668,25 @@
         }
 
         const list = document.createElement("ul");
-        list.className = "space-y-3";
+        list.className = "explorer-list";
 
         keys.forEach((key) => {
           const value = data[key];
           const item = document.createElement("li");
-          item.className =
-            "flex flex-wrap items-start justify-between gap-3 p-3 bg-slate-900/70 border border-cyan-500/20 rounded-xl";
 
-          const left = document.createElement("div");
-          left.className = "space-y-1 break-all";
+          const top = document.createElement("div");
+          top.className = "flex items-start justify-between gap-4";
+
+          const labelWrapper = document.createElement("div");
+          labelWrapper.className = "space-y-1 flex-1";
 
           const label = document.createElement("div");
-          label.className = "font-semibold text-cyan-100";
+          label.className = "font-semibold text-[#FFFFFF]";
           label.textContent = key;
-          left.appendChild(label);
+          labelWrapper.appendChild(label);
 
           const valueEl = document.createElement("div");
-          valueEl.className = "text-sm text-cyan-200/70 break-all";
+          valueEl.className = "text-sm text-[#E0E0E0] break-all";
 
           if (typeof value === "object" && value !== null && value["#"]) {
             valueEl.textContent = "Linked node: " + value["#"];
@@ -645,13 +704,12 @@
             valueEl.textContent = JSON.stringify(value);
           }
 
-          left.appendChild(valueEl);
+          labelWrapper.appendChild(valueEl);
 
           const actions = document.createElement("div");
-          actions.className = "flex gap-2";
+          actions.className = "property-actions flex gap-2";
 
           const editBtn = document.createElement("button");
-          editBtn.className = "px-2 py-1 text-xs bg-amber-500/80 text-slate-900 rounded-md hover:bg-amber-400";
           editBtn.textContent = "Modify";
           editBtn.addEventListener("click", () => {
             const nextValue = prompt("Enter a new value for '" + key + "':", JSON.stringify(value));
@@ -671,7 +729,6 @@
           });
 
           const deleteBtn = document.createElement("button");
-          deleteBtn.className = "px-2 py-1 text-xs bg-rose-600 text-slate-100 rounded-md hover:bg-rose-500";
           deleteBtn.textContent = "Set null";
           deleteBtn.addEventListener("click", () => {
             if (!confirm("Set '" + key + "' to null?")) return;
@@ -680,7 +737,10 @@
           });
 
           actions.append(editBtn, deleteBtn);
-          item.append(left, actions);
+
+          top.appendChild(labelWrapper);
+          top.appendChild(actions);
+          item.appendChild(top);
           list.appendChild(item);
         });
 
@@ -905,7 +965,7 @@
         passwordInput.value = "";
         const alias = user.is ? user.is.alias : null;
         const pub = (user.is && user.is.pub) || (ack && ack.pub) || "not available";
-        const aliasInfo = alias ? "Alias: " + alias + " - " : "";
+        const aliasInfo = alias ? "Alias: " + alias + " • " : "";
         userInfo.textContent = aliasInfo + "Public key: " + pub;
         btnLogout.classList.remove("hidden");
         startExplorer(user, "user", "user");
@@ -931,9 +991,9 @@
         }
       });
 
-      setStatus("");
-      setPublicExplorerMessage("");
-      setPeerFeedback("");
+      setStatus("", "info");
+      setPublicExplorerMessage("", "info");
+      setPeerFeedback("", "info");
       updatePeerStatusDisplay();
       updateRootButtonState();
     </script>

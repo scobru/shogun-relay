@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="en">
-<head>
+  <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Shogun Relay - Visual Graph</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link
       rel="stylesheet"
       href="https://unpkg.com/vis-network/styles/vis-network.min.css"
@@ -14,273 +14,443 @@
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
       :root {
-        --cyber-primary: #22d3ee;
-        --cyber-secondary: #a855f7;
-        --cyber-bg: radial-gradient(circle at 18% 12%, rgba(168, 85, 247, 0.25), transparent 45%),
-          radial-gradient(circle at 82% 8%, rgba(14, 165, 233, 0.22), transparent 55%),
-          #050714;
-        --cyber-panel: rgba(6, 11, 30, 0.8);
-        --cyber-border: rgba(34, 211, 238, 0.28);
+        --relay-bg: #1a1a1a;
+        --relay-panel: #282828;
+        --relay-input: #404040;
+        --relay-border: #404040;
+        --relay-border-light: #606060;
+        --relay-text-primary: #ffffff;
+        --relay-text-secondary: #e0e0e0;
+        --relay-text-muted: #a0a0a0;
+        --relay-accent: #ff69b4;
+        --relay-accent-hover: #ff1493;
+        --relay-link: #42a5f5;
+        --relay-success: #4caf50;
+        --relay-warning: #ffa500;
+        --relay-error: #f44336;
       }
 
       body {
-        font-family: "Space Grotesk", "Inter", system-ui, sans-serif;
-        background: var(--cyber-bg);
-        color: #e0f2f1;
+        font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+        background-color: var(--relay-bg);
+        color: var(--relay-text-secondary);
         min-height: 100vh;
       }
 
-      .cyber-heading {
-        text-shadow: 0 0 14px rgba(34, 211, 238, 0.55), 0 0 30px rgba(168, 85, 247, 0.35);
+      a {
+        color: var(--relay-link);
+        text-decoration: none;
       }
 
-      .cyber-card {
-        background: var(--cyber-panel);
-        border: 1px solid var(--cyber-border);
-        box-shadow: 0 18px 45px rgba(34, 211, 238, 0.18), inset 0 0 0 1px rgba(168, 85, 247, 0.15);
-        backdrop-filter: blur(18px);
+      a:hover {
+        color: #64b5f6;
       }
 
-      .cyber-divider {
-        background: linear-gradient(90deg, rgba(34, 211, 238, 0), rgba(34, 211, 238, 0.4), rgba(168, 85, 247, 0));
-        height: 1px;
-        border: 0;
+      .page-container {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 2.5rem 1.5rem 3.5rem;
       }
 
-      .cyber-input {
-        background: rgba(7, 13, 32, 0.9);
-        border: 1px solid rgba(34, 211, 238, 0.28);
-        color: #e0f2f1;
-        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      .page-header {
+        text-align: center;
+        margin-bottom: 2.5rem;
       }
 
-      .cyber-input:focus {
-        outline: none;
-        border-color: var(--cyber-primary);
-        box-shadow: 0 0 14px rgba(34, 211, 238, 0.35);
+      .page-title {
+        font-size: clamp(2.25rem, 4.5vw, 3rem);
+        color: var(--relay-text-primary);
+        font-weight: 600;
       }
 
-      .cyber-button {
-        position: relative;
-        overflow: hidden;
-        border: 1px solid rgba(34, 211, 238, 0.28);
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      .page-subtitle {
+        margin-top: 0.75rem;
+        color: var(--relay-text-muted);
+        max-width: 720px;
+        margin-left: auto;
+        margin-right: auto;
+        font-size: 0.95rem;
       }
 
-      .cyber-button::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(120deg, rgba(34, 211, 238, 0.35), rgba(168, 85, 247, 0.4));
-        opacity: 0;
-        transition: opacity 0.2s ease;
+      .section-card {
+        background-color: var(--relay-panel);
+        border: 1px solid var(--relay-border);
+        border-radius: 1.5rem;
+        padding: 2rem;
+        margin-top: 1.75rem;
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.35);
       }
 
-      .cyber-button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 15px 28px rgba(34, 211, 238, 0.28);
+      @media (max-width: 640px) {
+        .section-card {
+          padding: 1.5rem;
+        }
       }
 
-      .cyber-button:hover::after {
-        opacity: 0.25;
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+        align-items: flex-end;
+        margin-bottom: 1.5rem;
       }
 
-      #graphNetwork {
-        background: linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(8, 20, 54, 0.92));
+      .section-heading {
+        display: grid;
+        gap: 0.5rem;
+      }
+
+      .pill-heading {
+        font-size: 0.75rem;
+        letter-spacing: 0.35em;
+        text-transform: uppercase;
+        color: var(--relay-accent);
+      }
+
+      .section-title {
+        font-size: 1.35rem;
+        color: var(--relay-text-primary);
+        font-weight: 600;
+      }
+
+      .section-description {
+        color: var(--relay-text-muted);
+        font-size: 0.92rem;
+      }
+
+      .relay-input {
+        width: 100%;
+        background-color: var(--relay-input);
+        border: 1px solid var(--relay-border-light);
         border-radius: 0.85rem;
-        box-shadow: inset 0 0 0 1px rgba(94, 234, 212, 0.18);
+        padding: 0.75rem 1rem;
+        color: var(--relay-text-primary);
+        font-size: 0.95rem;
+      }
+
+      .relay-input::placeholder {
+        color: var(--relay-text-muted);
+      }
+
+      .relay-input:focus {
+        outline: 2px solid var(--relay-accent);
+        outline-offset: 2px;
+      }
+
+      .relay-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.85rem;
+        font-weight: 600;
+        padding: 0.65rem 1.4rem;
+        font-size: 0.95rem;
+        border: none;
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+      }
+
+      .relay-button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 24px rgba(255, 105, 180, 0.2);
+      }
+
+      .relay-button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .relay-button.primary {
+        background-color: var(--relay-accent);
+        color: #ffffff;
+      }
+
+      .relay-button.primary:hover {
+        background-color: var(--relay-accent-hover);
+      }
+
+      .relay-button.neutral {
+        background-color: rgba(255, 255, 255, 0.06);
+        color: var(--relay-text-secondary);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .relay-button.neutral:hover {
+        background-color: rgba(255, 255, 255, 0.12);
+      }
+
+      .status-text {
+        font-size: 0.85rem;
+        margin-top: 0.75rem;
+      }
+
+      .status-text.info {
+        color: var(--relay-text-muted);
+      }
+
+      .status-text.success {
+        color: var(--relay-success);
+      }
+
+      .status-text.warning {
+        color: var(--relay-warning);
+      }
+
+      .status-text.error {
+        color: var(--relay-error);
+      }
+
+      .explorer-grid {
+        display: grid;
+        gap: 1.5rem;
+      }
+
+      @media (min-width: 1024px) {
+        .explorer-grid {
+          grid-template-columns: 2fr 1fr;
+        }
+      }
+
+      .graph-wrapper {
+        background-color: var(--relay-input);
+        border: 1px solid var(--relay-border-light);
+        border-radius: 1.25rem;
+        height: 420px;
+        overflow: hidden;
+      }
+
+      .properties-panel {
+        background-color: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 1.25rem;
+        padding: 1.25rem;
+        max-height: 420px;
+        overflow: auto;
+      }
+
+      .property-card {
+        background-color: rgba(0, 0, 0, 0.25);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 0.85rem;
+        padding: 1rem;
+      }
+
+      .property-card + .property-card {
+        margin-top: 1rem;
+      }
+
+      .property-actions button {
+        font-size: 0.75rem;
+        padding: 0.35rem 0.65rem;
+        border-radius: 0.65rem;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+      }
+
+      .property-actions button:first-child {
+        background-color: rgba(255, 215, 0, 0.2);
+        color: #ffd700;
+      }
+
+      .property-actions button:first-child:hover {
+        background-color: rgba(255, 215, 0, 0.3);
+      }
+
+      .property-actions button:last-child {
+        background-color: rgba(244, 67, 54, 0.25);
+        color: #ff7961;
+      }
+
+      .property-actions button:last-child:hover {
+        background-color: rgba(244, 67, 54, 0.35);
+      }
+
+      .selected-panel {
+        background-color: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 1.25rem;
+        padding: 1.25rem;
+        margin-top: 1.5rem;
+      }
+
+      .write-panel {
+        background-color: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 1.25rem;
+        padding: 1.25rem;
+      }
+
+      .write-panel input {
+        min-width: 0;
+      }
+
+      .relay-nav {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #8b94ff;
+        margin-bottom: 2rem;
+        font-size: 0.9rem;
+      }
+
+      .relay-nav span {
+        display: inline-flex;
+        align-items: center;
       }
 
       .vis-network {
-        border-radius: 0.85rem;
+        background-color: rgba(0, 0, 0, 0.2);
       }
     </style>
   </head>
-  <body class="text-slate-100">
-    <div class="container max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-10">
-      <header class="text-center mb-10">
-        <p class="uppercase tracking-[0.45em] text-xs text-cyan-300/70 mb-3">GunDB Toolkit</p>
-        <h1 class="text-3xl sm:text-5xl font-semibold cyber-heading text-cyan-200">
-          Shogun Relay Visual Graph
-        </h1>
-        <p class="text-sm text-cyan-100/70 mt-3 max-w-3xl mx-auto">
-          Authenticate with your alias or inspect public coordinates. Interact with a neon network map, patch in new relays,
-          and traverse linked nodes with live GunDB data flows.
+  <body>
+    <div class="page-container">
+      <a href="/" class="relay-nav">
+        <span>&larr;</span>
+        <span>Back to Control Panel</span>
+      </a>
+
+      <header class="page-header">
+        <p class="uppercase tracking-[0.35em] text-xs text-[#FF69B4]">Monitoring &amp; Analytics</p>
+        <h1 class="page-title">Shogun Relay Visual Graph</h1>
+        <p class="page-subtitle">
+          Inspect GunDB nodes using an interactive network visualization. Remains consistent with the Shogun dark theme while
+          offering public exploration, peer management, and write capabilities.
         </p>
       </header>
 
-      <section id="authSection" class="cyber-card border border-cyan-500/25 p-6 sm:p-7 rounded-2xl shadow-lg">
-        <div class="flex items-center justify-between gap-4 mb-6">
-          <div>
-            <h2 class="text-2xl font-semibold text-cyan-200">User Authentication</h2>
-            <p class="text-xs uppercase tracking-[0.35em] text-cyan-300/70">Access Control</p>
+      <section id="authSection" class="section-card">
+        <div class="section-header">
+          <div class="section-heading">
+            <span class="pill-heading">Access Control</span>
+            <h2 class="section-title">User Authentication</h2>
+            <p class="section-description">
+              Sign in with your alias and SEA password to inspect private nodes. Public mode stays available for read-only paths.
+            </p>
           </div>
-          <span class="text-xs text-cyan-200/60">Alias-first login, keeps SEA credentials cached</span>
         </div>
-        <hr class="cyber-divider mb-6" />
         <div class="grid gap-4 md:grid-cols-2">
-          <label for="username" class="flex flex-col gap-2 text-sm text-cyan-100/80">
+          <label class="text-sm text-[#E0E0E0] space-y-2" for="username">
             <span>Alias</span>
             <input
               id="username"
               type="text"
-              placeholder="eg neon-operator"
-              class="cyber-input w-full px-3 py-2 rounded-lg"
+              placeholder="e.g. neon-operator"
+              class="relay-input"
             />
           </label>
-          <label for="password" class="flex flex-col gap-2 text-sm text-cyan-100/80">
+          <label class="text-sm text-[#E0E0E0] space-y-2" for="password">
             <span>Password</span>
             <input
               id="password"
               type="password"
               placeholder="Password"
-              class="cyber-input w-full px-3 py-2 rounded-lg"
+              class="relay-input"
             />
-            </label>
+          </label>
         </div>
         <div class="flex flex-wrap justify-end gap-3 mt-6">
-          <button
-            id="btnCreate"
-            class="cyber-button px-4 py-2 bg-emerald-500/20 text-emerald-200 rounded-lg"
-          >
-            Create Account
-          </button>
-          <button
-            id="btnLogin"
-            class="cyber-button px-4 py-2 bg-cyan-500/20 text-cyan-200 rounded-lg"
-          >
-            Log In
-          </button>
-          </div>
-        <p id="authMessage" class="mt-3 text-sm text-rose-400"></p>
+          <button id="btnCreate" class="relay-button neutral">Create Account</button>
+          <button id="btnLogin" class="relay-button primary">Log In</button>
+        </div>
+        <p id="authMessage" class="status-text error"></p>
       </section>
 
-      <section class="mt-10 grid gap-6 lg:grid-cols-2">
-        <div class="cyber-card border border-cyan-500/25 p-6 rounded-2xl shadow-lg">
-          <h2 class="text-xl font-semibold text-cyan-200 mb-3">Public graph scanning</h2>
-          <p class="text-sm text-cyan-100/70 mb-4">
-            Feed any Gun coordinate (for example <code>shogun-wormhole.wormhole-transfers</code> or <code>~pubKey.user.signal</code>)
-            to visualize the live dataset without authentication.
-          </p>
-          <div class="flex flex-col sm:flex-row gap-3">
-            <input
-              id="publicPathInput"
-              type="text"
-              placeholder="Enter Gun path to explore"
-              class="cyber-input flex-1 px-3 py-2 rounded-lg"
-            />
-            <button
-              id="btnExplorePublic"
-              class="cyber-button px-4 py-2 bg-fuchsia-500/20 text-fuchsia-200 rounded-lg"
-            >
-              Explore
-            </button>
+      <section class="section-card">
+        <div class="section-header">
+          <div class="section-heading">
+            <span class="pill-heading">Public Mode</span>
+            <h2 class="section-title">Graph Scanning</h2>
+            <p class="section-description">
+              Visualize any Gun coordinate (for example <code>shogun-wormhole.wormhole-transfers</code> or <code>~pubKey.user.signal</code>)
+              without authenticating.
+            </p>
           </div>
-          <p id="publicExplorerMessage" class="mt-2 text-xs text-cyan-200/60"></p>
-          </div>
-
-        <div class="cyber-card border border-cyan-500/25 p-6 rounded-2xl shadow-lg">
-          <h2 class="text-xl font-semibold text-cyan-200 mb-3">Relay injection</h2>
-          <p class="text-sm text-cyan-100/70 mb-4">
-            Attach extra Gun peers to boost synchronization. Accepts URLs starting with
-            <code>https://</code>, <code>http://</code>, <code>wss://</code>, or <code>ws://</code>.
-          </p>
-          <div class="flex flex-col sm:flex-row gap-3">
-            <input
-              id="newPeerInput"
-              type="text"
-              placeholder="https://my-relay.example.com/gun"
-              class="cyber-input flex-1 px-3 py-2 rounded-lg"
-            />
-            <button
-              id="btnAddPeer"
-              class="cyber-button px-4 py-2 bg-cyan-500/20 text-cyan-200 rounded-lg"
-            >
-              Add relay
-            </button>
-          </div>
-          <p id="peerFeedback" class="mt-2 text-xs text-cyan-200/60"></p>
         </div>
+        <div class="flex flex-col sm:flex-row gap-3">
+          <input id="publicPathInput" type="text" class="relay-input" placeholder="Enter Gun path to explore" />
+          <button id="btnExplorePublic" class="relay-button primary">Explore</button>
+        </div>
+        <p id="publicExplorerMessage" class="status-text info"></p>
       </section>
 
-      <section id="explorerSection" class="hidden mt-10 space-y-6">
-        <div class="cyber-card border border-cyan-500/25 p-6 rounded-2xl shadow-lg flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 class="text-lg font-semibold text-cyan-200">Session status</h2>
-            <p id="userInfo" class="text-sm text-cyan-100/80 break-all"></p>
-            <p id="peerStatus" class="text-xs text-cyan-200/60"></p>
+      <section class="section-card">
+        <div class="section-header">
+          <div class="section-heading">
+            <span class="pill-heading">Peers</span>
+            <h2 class="section-title">Relay Injection</h2>
+            <p class="section-description">
+              Add extra Gun peers (<code>https://</code>, <code>wss://</code>) to improve synchronization. Peers remain active for this session only.
+            </p>
           </div>
-          <button
-            id="btnLogout"
-            class="hidden cyber-button px-4 py-2 bg-rose-500/20 text-rose-200 rounded-lg"
-          >
-            Log Out
-          </button>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-3">
+          <input id="newPeerInput" type="text" class="relay-input" placeholder="https://my-relay.example.com/gun" />
+          <button id="btnAddPeer" class="relay-button neutral">Add relay</button>
+        </div>
+        <p id="peerFeedback" class="status-text info"></p>
+      </section>
+
+      <section id="explorerSection" class="section-card hidden">
+        <div class="section-header">
+          <div class="section-heading">
+            <span class="pill-heading">Session</span>
+            <h2 class="section-title">Session status</h2>
+            <p id="userInfo" class="section-description"></p>
+            <p id="peerStatus" class="status-text info"></p>
+          </div>
+          <button id="btnLogout" class="relay-button neutral hidden">Log Out</button>
         </div>
 
-        <div class="cyber-card border border-cyan-500/25 p-6 rounded-2xl shadow-lg">
-          <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
-            <div class="flex items-center gap-3">
+        <div class="section-card" style="background-color: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05);">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div class="flex items-center gap-3 text-xs text-[#A0A0A0]">
               <button
                 id="btnGoToRoot"
-                class="cyber-button px-3 py-1 text-sm bg-slate-900/80 text-cyan-200 rounded-lg disabled:opacity-60 disabled:cursor-not-allowed"
+                class="relay-button neutral"
+                style="padding: 0.4rem 0.85rem; font-size: 0.8rem;"
               >
                 Jump to origin
               </button>
-              <div class="text-xs text-cyan-200/60 break-all">
-                <span class="uppercase tracking-wide text-cyan-300/70">Path:</span>
-                <span id="currentPath" class="font-mono text-cyan-200"></span>
-              </div>
+              <span class="uppercase tracking-[0.3em]">Path:</span>
+              <span id="currentPath" class="font-mono text-[#FFFFFF]"></span>
             </div>
-            <span id="graphStatus" class="text-xs text-cyan-200/60">
+            <span id="graphStatus" class="text-xs text-[#A0A0A0]">
               Double click an orange node to follow linked sets.
             </span>
           </div>
 
-          <div class="grid gap-6 lg:grid-cols-3">
-            <div class="lg:col-span-2 space-y-4">
-              <div class="relative h-96">
-                <div id="graphNetwork" class="h-full w-full"></div>
-              </div>
+          <div class="explorer-grid">
+            <div class="graph-wrapper">
+              <div id="graphNetwork" class="h-full w-full"></div>
             </div>
-            <div class="bg-slate-950/60 border border-cyan-500/20 rounded-lg p-4 overflow-y-auto max-h-96">
-              <h3 class="text-md font-semibold text-cyan-200 mb-3">Properties</h3>
-              <div id="propertyList" class="space-y-3 text-sm text-cyan-100/80"></div>
-      </div>
-    </div>
+            <div class="properties-panel">
+              <h3 class="text-md font-semibold text-[#FFFFFF] mb-3">Properties</h3>
+              <div id="propertyList" class="text-sm text-[#E0E0E0] space-y-3"></div>
+            </div>
+          </div>
 
-          <div class="bg-slate-950/40 border border-cyan-500/20 rounded-lg p-4 mt-6">
-            <h3 class="text-md font-semibold text-cyan-200 mb-2">Selected node details</h3>
-            <div id="nodeDetails" class="text-sm text-cyan-200/65">
+          <div class="selected-panel mt-6">
+            <h3 class="text-md font-semibold text-[#FFFFFF] mb-2">Selected node details</h3>
+            <div id="nodeDetails" class="text-sm text-[#E0E0E0]/70">
               Select a node in the graph to view metadata.
             </div>
-      </div>
-    </div>
-
-        <div class="cyber-card border border-cyan-500/25 p-6 rounded-2xl shadow-lg">
-          <h3 class="text-xl font-semibold text-cyan-200 mb-3">Write operations</h3>
-          <div class="flex flex-col md:flex-row gap-3">
-            <input
-              id="newKey"
-              type="text"
-              placeholder="Property key"
-              class="cyber-input flex-1 px-3 py-2 rounded-lg"
-            />
-            <input
-              id="newValue"
-              type="text"
-              placeholder='Value (JSON or text)'
-              class="cyber-input flex-1 px-3 py-2 rounded-lg"
-            />
-            <button
-              id="btnAddProperty"
-              class="cyber-button px-4 py-2 bg-cyan-500/20 text-cyan-200 rounded-lg"
-            >
-              Add or Set
-            </button>
           </div>
-          <p class="mt-2 text-xs text-cyan-200/60">
-            Runs [currentNode].[key] = value. Existing keys are overwritten.
+        </div>
+
+        <div class="write-panel mt-6">
+          <h3 class="text-xl font-semibold text-[#FFFFFF] mb-3">Write operations</h3>
+          <div class="flex flex-col md:flex-row gap-3">
+            <input id="newKey" type="text" class="relay-input" placeholder="Property key" />
+            <input id="newValue" type="text" class="relay-input" placeholder='Value (JSON or text)' />
+            <button id="btnAddProperty" class="relay-button primary">Add / Set</button>
+          </div>
+          <p class="section-description mt-2">
+            Runs <code>[currentNode].[key] = value</code>. Existing keys are overwritten.
           </p>
         </div>
       </section>
@@ -349,64 +519,62 @@
           physics: {
             enabled: true,
             barnesHut: {
-              gravitationalConstant: -3000,
-              centralGravity: 0.15,
-              springLength: 160,
-              springConstant: 0.03
+              gravitationalConstant: -2800,
+              centralGravity: 0.18,
+              springLength: 150,
+              springConstant: 0.035
             }
           },
           interaction: {
             hover: true,
             tooltipDelay: 150,
             zoomView: true,
-            navigationButtons: true
+            navigationButtons: false
           },
           edges: {
-            color: { color: "#64748b", highlight: "#f59e0b" },
+            color: { color: "#64748b", highlight: "#ff69b4" },
             width: 2,
             smooth: { type: "dynamic" }
           },
           nodes: {
-            font: { color: "#e2e8f0", size: 16, face: "Inter" },
+            font: { color: "#e0e0e0", size: 16, face: "Inter" },
             borderWidth: 1,
-            shadow: true
+            shadow: false
           }
         };
         network = new vis.Network(graphContainer, { nodes: nodesDataSet, edges: edgesDataSet }, options);
         network.on("doubleClick", handleNetworkDoubleClick);
         network.on("selectNode", handleNetworkSelectNode);
         network.on("deselectNode", () => {
-          nodeDetails.textContent = "Select a node in the graph to view details.";
+          nodeDetails.textContent = "Select a node in the graph to view metadata.";
         });
       }
 
       function truncateValue(value, limit = 60) {
         if (value.length <= limit) return value;
-        return value.slice(0, limit - 3) + "...";
+        return value.slice(0, limit - 3) + "…";
       }
 
       function updatePeerStatusDisplay() {
         if (!peerStatus) return;
         if (activePeers.size === 0) {
           peerStatus.textContent = "Connecting to relays...";
-          peerStatus.classList.remove("text-emerald-400");
-          peerStatus.classList.add("text-slate-500");
+          peerStatus.className = "status-text info";
         } else {
-          peerStatus.textContent = "Connected to " + activePeers.size + " relays: " + Array.from(activePeers).join(", ");
-          peerStatus.classList.remove("text-slate-500");
-          peerStatus.classList.add("text-emerald-400");
+          peerStatus.textContent = `Connected to ${activePeers.size} relays: ${Array.from(activePeers).join(", ")}`;
+          peerStatus.className = "status-text success";
         }
       }
 
       gun.on("hi", (peer) => {
-        if (peer && peer.url) {
+        if (peer?.url) {
           activePeers.add(peer.url);
           updatePeerStatusDisplay();
         }
       });
 
       gun.on("bye", (peer) => {
-        if (peer && peer.url) {
+        if (peer?.url) {
           activePeers.delete(peer.url);
           updatePeerStatusDisplay();
         }
@@ -415,7 +583,7 @@
       function updateRootButtonState() {
         btnGoToRoot.disabled = !rootNode;
         if (rootNode) {
-          btnGoToRoot.textContent = "Jump to '" + (rootPathString || "root") + "'";
+          btnGoToRoot.textContent = `Jump to '${rootPathString || "root"}'`;
         } else {
           btnGoToRoot.textContent = "Jump to origin";
         }
@@ -423,38 +591,12 @@
 
       function setPublicExplorerMessage(message, type = "info") {
         publicExplorerMessage.textContent = message;
-        publicExplorerMessage.className = "mt-2 text-xs";
-        switch (type) {
-          case "error":
-            publicExplorerMessage.classList.add("text-rose-400");
-            break;
-          case "success":
-            publicExplorerMessage.classList.add("text-emerald-400");
-            break;
-          case "warning":
-            publicExplorerMessage.classList.add("text-amber-400");
-            break;
-          default:
-            publicExplorerMessage.classList.add("text-slate-400");
-        }
+        publicExplorerMessage.className = "status-text " + type;
       }
 
       function setPeerFeedback(message, type = "info") {
         peerFeedback.textContent = message;
-        peerFeedback.className = "mt-2 text-xs";
-        switch (type) {
-          case "error":
-            peerFeedback.classList.add("text-rose-400");
-            break;
-          case "success":
-            peerFeedback.classList.add("text-emerald-400");
-            break;
-          case "warning":
-            peerFeedback.classList.add("text-amber-400");
-            break;
-          default:
-            peerFeedback.classList.add("text-slate-400");
-        }
+        peerFeedback.className = "status-text " + type;
       }
 
       function resolvePathToNode(pathString) {
@@ -473,20 +615,19 @@
         let resolvedPath = segments[0];
         for (let i = 1; i < segments.length; i += 1) {
           nodeInstance = nodeInstance.get(segments[i]);
-          resolvedPath += "." + segments[i];
+          resolvedPath += `.${segments[i]}`;
         }
         return { node: nodeInstance, resolvedPath };
       }
 
       function updateExplorerHeader() {
         if (explorerMode === "user" && user.is) {
-          const alias = user.is.alias;
-          const pub = user.is.pub;
-          const aliasInfo = alias ? "Alias: " + alias + " - " : "";
-          userInfo.textContent = aliasInfo + "Public key (pub): " + pub;
+          const { alias, pub } = user.is || {};
+          const aliasInfo = alias ? `Alias: ${alias} • ` : "";
+          userInfo.textContent = `${aliasInfo}Public key (pub): ${pub || "not available"}`;
           btnLogout.classList.remove("hidden");
         } else if (explorerMode === "public") {
-          userInfo.textContent = "Public mode - Root: " + rootPathString;
+          userInfo.textContent = `Public mode • Root: ${rootPathString}`;
           btnLogout.classList.add("hidden");
         } else {
           userInfo.textContent = "";
@@ -506,9 +647,9 @@
 
       function startPublicExplorer(rawPath) {
         try {
-          const resolved = resolvePathToNode(rawPath);
-          setPublicExplorerMessage("Exploring path: " + resolved.resolvedPath, "success");
-          startExplorer(resolved.node, resolved.resolvedPath, "public");
+          const { node, resolvedPath } = resolvePathToNode(rawPath);
+          setPublicExplorerMessage(`Exploring path: ${resolvedPath}`, "success");
+          startExplorer(node, resolvedPath, "public");
         } catch (error) {
           setPublicExplorerMessage(error.message || "Invalid path provided.", "error");
         }
@@ -531,9 +672,9 @@
         try {
           configuredPeers.add(trimmed);
           gun.opt({ peers: [trimmed] });
-          setPeerFeedback("Relay added: " + trimmed, "success");
+          setPeerFeedback(`Relay added: ${trimmed}`, "success");
         } catch (error) {
-          setPeerFeedback("Unable to add relay: " + error.message, "error");
+          setPeerFeedback(`Unable to add relay: ${error.message}`, "error");
         }
       }
 
@@ -567,7 +708,7 @@
           if (hasAnyChild) {
             renderFromData(aggregated, nodeInstance);
           } else {
-            propertyList.innerHTML = '<div class="text-sm text-cyan-200/60">This node is empty or not accessible.</div>';
+            propertyList.innerHTML = '<div class="text-sm text-[#A0A0A0]">This node is empty or not accessible.</div>';
             nodesDataSet.clear();
             edgesDataSet.clear();
             linkResolvers.clear();
@@ -605,10 +746,10 @@
           label: rootId,
           shape: "circle",
           color: {
-            background: "#2563eb",
-            border: "#60a5fa"
+            background: "#FF69B4",
+            border: "#FF1493"
           },
-          font: { color: "#e0f2fe", size: 18 }
+          font: { color: "#ffffff", size: 18 }
         });
 
         if (data === null || data === undefined) {
@@ -619,13 +760,13 @@
         if (typeof data !== "object") {
           const primitiveLabel = truncateValue(String(data));
           nodesDataSet.add({
-            id: rootId + ".__primitive",
+            id: `${rootId}.__primitive`,
             label: primitiveLabel,
             shape: "box",
-            color: { background: "#22c55e", border: "#14532d" },
+            color: { background: "#4CAF50", border: "#2E7D32" },
             font: { color: "#0f172a" }
           });
-          edgesDataSet.add({ from: rootId, to: rootId + ".__primitive", arrows: "to" });
+          edgesDataSet.add({ from: rootId, to: `${rootId}.__primitive`, arrows: "to" });
           graphStatus.textContent = "Primitive value.";
           return;
         }
@@ -638,37 +779,37 @@
 
         keys.forEach((key) => {
           const value = data[key];
-          const childId = rootId + "." + key;
+          const childId = `${rootId}.${key}`;
           if (typeof value === "object" && value !== null && value["#"]) {
             nodesDataSet.add({
               id: childId,
-              label: key + "\n[node]",
+              label: `${key}\n[node]`,
               shape: "dot",
-              color: { background: "#f97316", border: "#fb923c" },
+              color: { background: "#FFA500", border: "#FF8C00" },
               font: { color: "#1f2937", size: 16 },
-              title: "Double click to open " + childId
+              title: `Double click to open ${childId}`
             });
             linkResolvers.set(childId, {
               type: "link",
               key,
-              path: (currentPathString ? currentPathString + "." : "") + key,
+              path: `${currentPathString}.${key}`,
               node: nodeInstance.get(key)
             });
           } else if (value === null) {
             nodesDataSet.add({
               id: childId,
-              label: key + "\n[null]",
+              label: `${key}\n[null]`,
               shape: "box",
-              color: { background: "#ef4444", border: "#b91c1c" },
+              color: { background: "#f87171", border: "#b91c1c" },
               font: { color: "#fee2e2" }
             });
           } else {
             const printable = truncateValue(JSON.stringify(value));
             nodesDataSet.add({
               id: childId,
-              label: key + "\n" + printable,
+              label: `${key}\n${printable}`,
               shape: "box",
-              color: { background: "#22c55e", border: "#15803d" },
+              color: { background: "#4CAF50", border: "#2E7D32" },
               font: { color: "#0f172a" }
             });
           }
@@ -676,48 +817,47 @@
         });
 
         network.fit({ animation: { duration: 600, easing: "easeInOutCubic" } });
-        graphStatus.textContent = "Double click orange nodes to follow linked references.";
+        graphStatus.textContent = "Double-click orange nodes to follow linked references.";
       }
 
       function renderPropertyList(data, nodeInstance) {
         propertyList.innerHTML = "";
         if (data === null || data === undefined) {
-          propertyList.innerHTML = '<div class="text-sm text-cyan-200/60">Node is null or undefined.</div>';
+          propertyList.innerHTML = '<div class="text-sm text-[#A0A0A0]">Node is null or undefined.</div>';
           return;
         }
         if (typeof data !== "object") {
           propertyList.innerHTML =
-            '<div class="text-sm text-cyan-100/80">Value: <span class="font-mono text-emerald-400">' +
+            '<div class="text-sm text-[#E0E0E0]">Value: <span class="font-mono text-[#FF69B4]">' +
             truncateValue(String(data)) +
             "</span></div>";
           return;
         }
         const keys = Object.keys(data).filter((k) => k !== "_" && k !== "#").sort();
         if (keys.length === 0) {
-          propertyList.innerHTML = '<div class="text-sm text-cyan-200/60">No properties available.</div>';
-            return;
-          }
+          propertyList.innerHTML = '<div class="text-sm text-[#A0A0A0]">No properties available.</div>';
+          return;
+        }
         keys.forEach((key) => {
           const value = data[key];
           const wrapper = document.createElement("div");
-          wrapper.className = "border border-slate-800 rounded-md p-3 flex flex-col gap-2 bg-slate-900/70";
+          wrapper.className = "property-card";
 
           const header = document.createElement("div");
           header.className = "flex items-center justify-between gap-2";
 
           const label = document.createElement("div");
-          label.className = "font-semibold text-indigo-200 break-all";
+          label.className = "font-semibold text-[#FFFFFF] break-all";
           label.textContent = key;
           header.appendChild(label);
 
           const actions = document.createElement("div");
-          actions.className = "flex gap-2";
+          actions.className = "property-actions flex gap-2";
 
           const setBtn = document.createElement("button");
-          setBtn.className = "px-2 py-1 text-xs bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-md";
           setBtn.textContent = "Modify";
           setBtn.addEventListener("click", () => {
-            const newValue = prompt("Enter a new value for '" + key + "':", JSON.stringify(value));
+            const newValue = prompt(`Enter a new value for '${key}':`, JSON.stringify(value));
             if (newValue === null) return;
             try {
               let parsed;
@@ -729,15 +869,14 @@
               nodeInstance.get(key).put(parsed);
               setTimeout(() => exploreNode(currentNode, currentPathString), 150);
             } catch (error) {
-              alert("Invalid value: " + error.message);
+              alert(`Invalid value: ${error.message}`);
             }
           });
 
           const deleteBtn = document.createElement("button");
-          deleteBtn.className = "px-2 py-1 text-xs bg-rose-600 hover:bg-rose-500 text-white rounded-md";
           deleteBtn.textContent = "Delete";
           deleteBtn.addEventListener("click", () => {
-            if (!confirm("Set '" + key + "' to null?")) return;
+            if (!confirm(`Set '${key}' to null?`)) return;
             nodeInstance.get(key).put(null);
             setTimeout(() => exploreNode(currentNode, currentPathString), 150);
           });
@@ -746,9 +885,9 @@
           header.appendChild(actions);
 
           const valuePreview = document.createElement("div");
-          valuePreview.className = "text-xs text-cyan-200/60 break-all";
+          valuePreview.className = "text-xs text-[#A0A0A0] break-all";
           if (typeof value === "object" && value !== null && value["#"]) {
-            valuePreview.textContent = "Linked node: " + value["#"];
+            valuePreview.textContent = `Linked node: ${value["#"]}`;
           } else {
             valuePreview.textContent = truncateValue(JSON.stringify(value));
           }
@@ -760,22 +899,22 @@
 
       function handleNetworkSelectNode(params) {
         if (!params.nodes.length) {
-          nodeDetails.textContent = "Select a node in the graph to view details.";
+          nodeDetails.textContent = "Select a node in the graph to view metadata.";
           return;
         }
         const nodeId = params.nodes[0];
         if (nodeId === (currentPathString || "root")) {
-          nodeDetails.textContent = "Current node: " + currentPathString;
+          nodeDetails.textContent = `Current node: ${currentPathString}`;
           return;
         }
         const resolver = linkResolvers.get(nodeId);
         if (resolver) {
-          nodeDetails.textContent = "Linked to: " + resolver.path;
+          nodeDetails.textContent = `Linked to: ${resolver.path}`;
           return;
         }
         const nodeData = nodesDataSet.get(nodeId);
         if (nodeData) {
-          nodeDetails.textContent = "Property: " + nodeData.label.replace("\n", " -> ");
+          nodeDetails.textContent = `Property: ${nodeData.label.replace("\n", " → ")}`;
         }
       }
 
@@ -792,8 +931,8 @@
         currentNode = nodeInstance;
         currentPathString = pathString;
         currentPathEl.textContent = pathString;
-        graphStatus.textContent = "Loading data...";
-        propertyList.innerHTML = '<div class="text-sm text-cyan-200/60">Loading data...</div>';
+        graphStatus.textContent = "Loading data…";
+        propertyList.innerHTML = '<div class="text-sm text-[#A0A0A0]">Loading data…</div>';
 
         let resolved = false;
         const timeoutId = setTimeout(() => {
@@ -816,14 +955,14 @@
       function addProperty() {
         const key = newKeyInput.value.trim();
         const valueRaw = newValueInput.value.trim();
-            if (!key) {
+        if (!key) {
           alert("Property key is required.");
-              return;
-            }
+          return;
+        }
         if (!currentNode) {
           alert("No node selected at the moment.");
-                return;
-              }
+          return;
+        }
         try {
           let parsedValue;
           try {
@@ -836,7 +975,7 @@
           newValueInput.value = "";
           setTimeout(() => exploreNode(currentNode, currentPathString), 150);
         } catch (error) {
-          alert("Save failed: " + error.message);
+          alert(`Save failed: ${error.message}`);
         }
       }
 
@@ -845,12 +984,12 @@
         const password = passwordInput.value.trim();
         if (!username || !password) {
           authMessage.textContent = "Alias and password are required.";
-                return;
-              }
+          return;
+        }
         authMessage.textContent = "Creating account...";
         user.create(username, password, (ack) => {
           if (ack.err) {
-            authMessage.textContent = "Error: " + ack.err;
+            authMessage.textContent = `Error: ${ack.err}`;
           } else {
             authMessage.textContent = "Account created. You can log in now.";
           }
@@ -867,8 +1006,8 @@
         authMessage.textContent = "Authenticating...";
         user.auth(username, password, (ack) => {
           if (ack.err) {
-            authMessage.textContent = "Error: " + ack.err;
-            } else {
+            authMessage.textContent = `Error: ${ack.err}`;
+          } else {
             authMessage.textContent = "Login successful!";
           }
         });
@@ -887,7 +1026,7 @@
         nodesDataSet.clear();
         edgesDataSet.clear();
         linkResolvers.clear();
-        graphStatus.textContent = "Double click a linked node to dive deeper.";
+        graphStatus.textContent = "Double-click a linked node to dive deeper.";
         currentPathEl.textContent = "";
       });
 
@@ -937,16 +1076,15 @@
         explorerSection.classList.remove("hidden");
         usernameInput.value = "";
         passwordInput.value = "";
-        const alias = user.is ? user.is.alias : null;
-        const pub = (user.is && user.is.pub) || (ack && ack.pub) || "not available";
-        const aliasInfo = alias ? "Alias: " + alias + " - " : "";
-        userInfo.textContent = aliasInfo + "Public key (pub): " + pub;
+        const { alias, pub } = user.is || {};
+        const aliasInfo = alias ? `Alias: ${alias} • ` : "";
+        userInfo.textContent = `${aliasInfo}Public key (pub): ${pub || ack?.pub || "not available"}`;
         btnLogout.classList.remove("hidden");
         startExplorer(user, "user", "user");
       });
 
       updatePeerStatusDisplay();
       updateRootButtonState();
-  </script>
-</body>
+    </script>
+  </body>
 </html>
