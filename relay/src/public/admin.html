@@ -435,6 +435,7 @@
 
                     const url = new URL(link.getAttribute('href'), window.location.origin);
                     url.searchParams.set('auth_token', password);
+                    url.searchParams.set('_auth_token', password);
 
                     console.log(`🔐 Navigating to protected page: ${url.toString()}`);
 

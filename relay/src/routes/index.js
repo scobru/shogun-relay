@@ -796,7 +796,8 @@ export default (app) => {
       const bearerToken = authHeader && authHeader.split(" ")[1];
       const customToken = req.headers["token"];
       const formToken = req.query["_auth_token"]; // Token inviato tramite form
-      const token = bearerToken || customToken || formToken;
+      const queryToken = req.query["auth_token"];
+      const token = bearerToken || customToken || formToken || queryToken;
 
       if (token === process.env.ADMIN_PASSWORD) {
         next();
