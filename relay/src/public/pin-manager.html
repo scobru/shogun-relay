@@ -103,7 +103,7 @@
         
         .pin-actions {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
             gap: 0.5rem;
         }
         
@@ -136,6 +136,9 @@
         
         .btn-remove { background: linear-gradient(135deg, #F44336, #D32F2F); color: white; }
         .btn-remove:hover { background: linear-gradient(135deg, #D32F2F, #B71C1C); }
+        
+        .btn-preview { background: linear-gradient(135deg, #8B94FF, #6366F1); color: white; }
+        .btn-preview:hover { background: linear-gradient(135deg, #6366F1, #4F46E5); }
         
         .search-bar {
             background: rgba(40, 40, 40, 0.8);
@@ -264,6 +267,57 @@
             stroke-dasharray: 157;
             stroke-dashoffset: 157;
             transition: stroke-dashoffset 0.3s ease;
+        }
+        
+        .preview-panel {
+            display: none;
+            margin-top: 1.5rem;
+            background: linear-gradient(135deg, #404040, #353535);
+            border: 1px solid rgba(96, 96, 96, 0.4);
+            border-radius: 16px;
+            padding: 1.5rem;
+        }
+        
+        .preview-panel.active {
+            display: block;
+        }
+        
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .preview-content {
+            background: rgba(40, 40, 40, 0.85);
+            border: 1px solid rgba(96, 96, 96, 0.4);
+            border-radius: 12px;
+            padding: 1rem;
+            max-height: 400px;
+            overflow: auto;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.85rem;
+            color: #E0E0E0;
+        }
+        
+        .preview-content img,
+        .preview-content video {
+            max-width: 100%;
+            border-radius: 12px;
+        }
+        
+        .preview-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        
+        .preview-meta {
+            font-size: 0.8rem;
+            color: #A0A0A0;
+            margin-bottom: 0.75rem;
         }
         
         @media (max-width: 768px) {
@@ -405,6 +459,25 @@
                         <!-- Pins will be loaded here -->
                     </div>
                 </div>
+                
+                <!-- Preview Panel -->
+                <div id="previewPanel" class="preview-panel">
+                    <div class="preview-header">
+                        <div>
+                            <h3 class="text-lg font-semibold text-[#FFFFFF] mb-1">Anteprima contenuto</h3>
+                            <p id="previewCid" class="text-xs text-[#A0A0A0] font-mono break-all"></p>
+                        </div>
+                        <div class="preview-actions">
+                            <button onclick="openPreviewInGateway()" class="relay-button neutral">🌐 Apri gateway</button>
+                            <button onclick="downloadPreview()" class="relay-button neutral">⬇️ Scarica</button>
+                            <button onclick="closePreview()" class="relay-button primary">Chiudi</button>
+                        </div>
+                    </div>
+                    <div id="previewMeta" class="preview-meta"></div>
+                    <div id="previewContent" class="preview-content text-sm text-[#E0E0E0]">
+                        Seleziona un pin per visualizzarne il contenuto.
+                    </div>
+                </div>
                     
                 <!-- Empty State -->
                 <div id="emptyState" class="text-center py-12" style="display: none;">
@@ -423,6 +496,10 @@
         let filteredPins = [];
         let currentFilter = 'all';
         let searchTerm = '';
+        let currentPreviewCid = null;
+        let previewObjectUrl = null;
+        let previewBlob = null;
+        let previewContentType = null;
 
         // Initialize admin authentication
         document.addEventListener('DOMContentLoaded', () => {
@@ -458,6 +535,8 @@
             if (ShogunAdmin.hasPassword()) {
                 setTimeout(loadPins, 1000);
             }
+
+            closePreview();
         });
 
         // Listen for password updates
@@ -632,6 +711,9 @@
                         <span class="text-[#A0A0A0] text-sm">${pin.name || 'Senza nome'}</span>
                     </div>
                     <div class="pin-actions">
+                        <button onclick="previewCid('${pin.cid}')" class="action-btn btn-preview" title="Anteprima">
+                            👁️
+                        </button>
                         <button onclick="copyCid('${pin.cid}')" class="action-btn btn-copy" title="Copia CID">
                             📋
                         </button>
@@ -678,6 +760,179 @@
             if (result) {
                 showNotification('Pin riapplicato con successo', 'success');
             }
+        }
+
+        function escapeHtml(value) {
+            if (value === null || value === undefined) return '';
+            return String(value).replace(/[&<>"']/g, function (match) {
+                const escapeMap = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;',
+                };
+                return escapeMap[match];
+            });
+        }
+
+        function resetPreviewState() {
+            if (previewObjectUrl) {
+                URL.revokeObjectURL(previewObjectUrl);
+                previewObjectUrl = null;
+            }
+            previewBlob = null;
+            previewContentType = null;
+            currentPreviewCid = null;
+            document.getElementById('previewCid').textContent = '';
+            document.getElementById('previewMeta').textContent = '';
+            document.getElementById('previewContent').innerHTML = 'Seleziona un pin per visualizzarne il contenuto.';
+        }
+
+        function closePreview() {
+            const panel = document.getElementById('previewPanel');
+            resetPreviewState();
+            panel.classList.remove('active');
+        }
+
+        function activatePreview() {
+            const panel = document.getElementById('previewPanel');
+            panel.classList.add('active');
+        }
+
+        function formatBytes(bytes) {
+            if (!bytes || isNaN(bytes)) return '';
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+            const value = bytes / Math.pow(1024, exponent);
+            return `${value.toFixed(2)} ${units[exponent]}`;
+        }
+
+        function getExtensionFromType(type) {
+            if (!type) return '';
+            if (type.includes('json')) return '.json';
+            if (type.startsWith('text/')) return '.txt';
+            if (type.startsWith('image/')) return '.' + type.split('/')[1];
+            if (type.startsWith('video/')) return '.' + type.split('/')[1];
+            if (type.startsWith('audio/')) return '.' + type.split('/')[1];
+            return '';
+        }
+
+        async function previewCid(cid) {
+            const authHeaders = ShogunAdmin.getAuthHeaders();
+            if (!authHeaders['Authorization']) {
+                showNotification('Admin Token is required. Please set it in the Control Panel.', 'error');
+                return;
+            }
+
+            showLoading('Caricamento contenuto…');
+            resetPreviewState();
+
+            try {
+                const response = await fetch(`/api/v1/ipfs/content/${cid}`, {
+                    headers: {
+                        ...authHeaders,
+                        'Accept': '*/*'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const contentType = response.headers.get('Content-Type') || 'application/octet-stream';
+                const contentLength = parseInt(response.headers.get('Content-Length') || '0', 10);
+
+                let previewHtml = '';
+                let metaPieces = [`Tipo: ${contentType}`];
+                if (contentLength) {
+                    metaPieces.push(`Dimensione: ${formatBytes(contentLength)}`);
+                }
+
+                let blob;
+
+                if (contentType.startsWith('image/')) {
+                    blob = await response.blob();
+                    previewObjectUrl = URL.createObjectURL(blob);
+                    previewHtml = `<img src="${previewObjectUrl}" alt="${escapeHtml(cid)}" />`;
+                } else if (contentType.startsWith('video/')) {
+                    blob = await response.blob();
+                    previewObjectUrl = URL.createObjectURL(blob);
+                    previewHtml = `
+                        <video controls src="${previewObjectUrl}" style="width:100%; border-radius: 12px;">
+                            Il tuo browser non supporta la riproduzione video.
+                        </video>`;
+                } else if (contentType.startsWith('audio/')) {
+                    blob = await response.blob();
+                    previewObjectUrl = URL.createObjectURL(blob);
+                    previewHtml = `
+                        <audio controls src="${previewObjectUrl}" style="width:100%;">
+                            Il tuo browser non supporta la riproduzione audio.
+                        </audio>`;
+                } else if (contentType.includes('application/json')) {
+                    const text = await response.text();
+                    blob = new Blob([text], { type: 'application/json' });
+                    previewHtml = `<pre>${escapeHtml(text)}</pre>`;
+                    previewObjectUrl = URL.createObjectURL(blob);
+                } else if (contentType.startsWith('text/') || contentType === 'application/javascript' || contentType === 'application/xml') {
+                    const text = await response.text();
+                    blob = new Blob([text], { type: contentType || 'text/plain' });
+                    previewHtml = `<pre>${escapeHtml(text)}</pre>`;
+                    previewObjectUrl = URL.createObjectURL(blob);
+                } else {
+                    blob = await response.blob();
+                    previewObjectUrl = URL.createObjectURL(blob);
+                    previewHtml = `
+                        <p class="text-[#A0A0A0] mb-3">
+                            Il contenuto non è direttamente visualizzabile. Utilizza i pulsanti sopra per aprirlo nel gateway o scaricarlo.
+                        </p>
+                        <p class="text-xs text-[#808080]">CID: ${escapeHtml(cid)}</p>
+                    `;
+                }
+
+                previewBlob = blob;
+                previewContentType = contentType;
+                currentPreviewCid = cid;
+
+                document.getElementById('previewCid').textContent = cid;
+                document.getElementById('previewMeta').textContent = metaPieces.join(' • ');
+                document.getElementById('previewContent').innerHTML = previewHtml;
+
+                activatePreview();
+                document.getElementById('previewPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } catch (error) {
+                showNotification(`Impossibile caricare il contenuto: ${error.message}`, 'error');
+                closePreview();
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function openPreviewInGateway() {
+            if (!currentPreviewCid) {
+                showNotification('Nessun CID selezionato', 'error');
+                return;
+            }
+            window.open(`https://ipfs.io/ipfs/${currentPreviewCid}`, '_blank', 'noopener');
+        }
+
+        function downloadPreview() {
+            if (!previewBlob || !currentPreviewCid) {
+                showNotification('Nessun contenuto da scaricare', 'error');
+                return;
+            }
+
+            const link = document.createElement('a');
+            const url = previewObjectUrl || URL.createObjectURL(previewBlob);
+            if (!previewObjectUrl) {
+                previewObjectUrl = url;
+            }
+            const extension = getExtensionFromType(previewContentType);
+            link.href = url;
+            link.download = `${currentPreviewCid}${extension}`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         async function unpinCid(cid) {
@@ -858,7 +1113,8 @@
         // Expose functions globally for external use
         window.PinManager = {
             loadPins: loadPins,
-            refreshPins: refreshPins
+            refreshPins: refreshPins,
+            previewCid: previewCid
         };
     </script>
 </body>
