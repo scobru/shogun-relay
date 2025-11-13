@@ -1,444 +1,952 @@
-<!DOCTYPE html>
-<html lang="en" data-theme="night">
-
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta http-equiv="Access-Control-Allow-Origin" content="*" />
-  <title>Graph Visualizer</title>
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shogun Relay - Visual Graph</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="/styles/wormhole.css" />
-  <link rel="stylesheet" href="/visualGraph/vGmain.css" />
-  <!-- Include centralized admin authentication -->
-  <script src="/lib/admin-auth.js"></script>
-</head>
-
-<body class="min-h-screen bg-base-200 text-base-content">
-  <div class="navbar bg-base-300">
-    <div class="flex-1">
-      <img src="/visualGraph/visualGraphIcon.svg" width="25" height="25" alt="" class="mr-2" />
-      <h2 class="text-xl font-semibold">Visualization</h2>
-    </div>
-    <div class="flex-none">
-      <span id="peerList" class="text-sm opacity-70"></span>
-    </div>
-  </div>
-
-  <div class="container mx-auto p-4 flex flex-col gap-4 min-h-[calc(100vh-4rem)]">
-    <!-- Input Controls -->
-    <div class="card bg-base-300 shadow-xl">
-      <div class="card-body p-4">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div class="form-control">
-            <label class="label" for="relayPeer">
-              <span class="label-text">Relay Peer URL:</span>
-            </label>
-            <input id="relayPeer" type="text" class="input input-bordered w-full"
-              placeholder="https://shogunnode.scobrudot.dev/gun" value="https://shogunnode.scobrudot.dev/gun" />
-          </div>
-
-          <div class="form-control">
-            <label class="label" for="authToken">
-              <span class="label-text">Auth Token:</span>
-            </label>
-            <input id="authToken" type="password" class="input input-bordered w-full"
-              placeholder="Enter auth token (auto-loaded if saved)" />
-          </div>
-
-          <div class="form-control">
-            <label class="label" for="key">
-              <span class="label-text">Key to Start from:</span>
-            </label>
-            <input id="key" class="input input-bordered w-full" />
-          </div>
-
-          <div class="form-control">
-            <label class="label" for="label">
-              <span class="label-text">Property to be used as Label:</span>
-            </label>
-            <input id="label" class="input input-bordered w-full custom" />
-          </div>
-        </div>
-
-        <div class="flex items-center gap-4 mt-4">
-          <button id="startButton" class="btn btn-primary flex-1">
-            Start
-          </button>
-          <div id="status" class="text-sm opacity-70 flex-1"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Graph Viewer -->
-    <div class="card bg-base-300 shadow-xl flex-1">
-      <div class="card-body p-0">
-        <svg class="w-full h-full min-h-[400px]"></svg>
-      </div>
-    </div>
-
-    <!-- Data Inspector -->
-    <div class="card bg-base-300 shadow-xl">
-      <div class="card-body p-4">
-        <div class="flex justify-between items-center">
-          <h3 class="card-title">Data Inspector</h3>
-          <div class="flex gap-2">
-            <button id="loadAllNodesBtn" class="btn btn-sm btn-accent" disabled>
-              ⏳ Loading...
-            </button>
-            <button id="save" class="btn btn-accent">Save Changes</button>
-          </div>
-        </div>
-        <div id="detail" class="cont overflow-auto max-h-[200px] mt-2"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Scripts -->
-  <script src="https://d3js.org/d3.v5.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/gun/lib/promise.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
-
-
-  <!-- Button Logic -->
-  <script type="text/javascript">
-    // Initialize admin authentication
-    document.addEventListener("DOMContentLoaded", () => {
-      ShogunAdmin.init({
-        autoFill: true,
-        showIndicator: true,
-        fieldId: "authToken",
-        syncEnabled: true,
-      });
-    });
-
-    // Listen for password updates
-    window.addEventListener("shogun-admin-password-updated", (event) => {
-      console.log("Admin password updated");
-    });
-
-    // Status update function
-    function updateStatus(message, isError = false) {
-      const statusEl = document.getElementById("status");
-      if (statusEl) {
-        statusEl.textContent = message;
-        statusEl.style.color = isError ? "#ff0000" : "#666";
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/vis-network/styles/vis-network.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+      :root {
+        --cyber-primary: #22d3ee;
+        --cyber-secondary: #a855f7;
+        --cyber-bg: radial-gradient(circle at 18% 12%, rgba(168, 85, 247, 0.25), transparent 45%),
+          radial-gradient(circle at 82% 8%, rgba(14, 165, 233, 0.22), transparent 55%),
+          #050714;
+        --cyber-panel: rgba(6, 11, 30, 0.8);
+        --cyber-border: rgba(34, 211, 238, 0.28);
       }
-      console.log(isError ? "ERROR:" : "INFO:", message);
-    }
 
-    // Clear old data more selectively
-    try {
-      // Only clear gun-related data, not all localStorage
-      Object.keys(localStorage).forEach((key) => {
-        if (key.startsWith("gun/") || key.startsWith("radata")) {
-          localStorage.removeItem(key);
+      body {
+        font-family: "Space Grotesk", "Inter", system-ui, sans-serif;
+        background: var(--cyber-bg);
+        color: #e0f2f1;
+        min-height: 100vh;
+      }
+
+      .cyber-heading {
+        text-shadow: 0 0 14px rgba(34, 211, 238, 0.55), 0 0 30px rgba(168, 85, 247, 0.35);
+      }
+
+      .cyber-card {
+        background: var(--cyber-panel);
+        border: 1px solid var(--cyber-border);
+        box-shadow: 0 18px 45px rgba(34, 211, 238, 0.18), inset 0 0 0 1px rgba(168, 85, 247, 0.15);
+        backdrop-filter: blur(18px);
+      }
+
+      .cyber-divider {
+        background: linear-gradient(90deg, rgba(34, 211, 238, 0), rgba(34, 211, 238, 0.4), rgba(168, 85, 247, 0));
+        height: 1px;
+        border: 0;
+      }
+
+      .cyber-input {
+        background: rgba(7, 13, 32, 0.9);
+        border: 1px solid rgba(34, 211, 238, 0.28);
+        color: #e0f2f1;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .cyber-input:focus {
+        outline: none;
+        border-color: var(--cyber-primary);
+        box-shadow: 0 0 14px rgba(34, 211, 238, 0.35);
+      }
+
+      .cyber-button {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(34, 211, 238, 0.28);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      .cyber-button::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(120deg, rgba(34, 211, 238, 0.35), rgba(168, 85, 247, 0.4));
+        opacity: 0;
+        transition: opacity 0.2s ease;
+      }
+
+      .cyber-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 15px 28px rgba(34, 211, 238, 0.28);
+      }
+
+      .cyber-button:hover::after {
+        opacity: 0.25;
+      }
+
+      #graphNetwork {
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(8, 20, 54, 0.92));
+        border-radius: 0.85rem;
+        box-shadow: inset 0 0 0 1px rgba(94, 234, 212, 0.18);
+      }
+
+      .vis-network {
+        border-radius: 0.85rem;
+      }
+    </style>
+  </head>
+  <body class="text-slate-100">
+    <div class="container max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-10">
+      <header class="text-center mb-10">
+        <p class="uppercase tracking-[0.45em] text-xs text-cyan-300/70 mb-3">GunDB Toolkit</p>
+        <h1 class="text-3xl sm:text-5xl font-semibold cyber-heading text-cyan-200">
+          Shogun Relay Visual Graph
+        </h1>
+        <p class="text-sm text-cyan-100/70 mt-3 max-w-3xl mx-auto">
+          Authenticate with your alias or inspect public coordinates. Interact with a neon network map, patch in new relays,
+          and traverse linked nodes with live GunDB data flows.
+        </p>
+      </header>
+
+      <section id="authSection" class="cyber-card border border-cyan-500/25 p-6 sm:p-7 rounded-2xl shadow-lg">
+        <div class="flex items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-2xl font-semibold text-cyan-200">User Authentication</h2>
+            <p class="text-xs uppercase tracking-[0.35em] text-cyan-300/70">Access Control</p>
+          </div>
+          <span class="text-xs text-cyan-200/60">Alias-first login, keeps SEA credentials cached</span>
+        </div>
+        <hr class="cyber-divider mb-6" />
+        <div class="grid gap-4 md:grid-cols-2">
+          <label for="username" class="flex flex-col gap-2 text-sm text-cyan-100/80">
+            <span>Alias</span>
+            <input
+              id="username"
+              type="text"
+              placeholder="eg neon-operator"
+              class="cyber-input w-full px-3 py-2 rounded-lg"
+            />
+          </label>
+          <label for="password" class="flex flex-col gap-2 text-sm text-cyan-100/80">
+            <span>Password</span>
+            <input
+              id="password"
+              type="password"
+              placeholder="Password"
+              class="cyber-input w-full px-3 py-2 rounded-lg"
+            />
+            </label>
+        </div>
+        <div class="flex flex-wrap justify-end gap-3 mt-6">
+          <button
+            id="btnCreate"
+            class="cyber-button px-4 py-2 bg-emerald-500/20 text-emerald-200 rounded-lg"
+          >
+            Create Account
+          </button>
+          <button
+            id="btnLogin"
+            class="cyber-button px-4 py-2 bg-cyan-500/20 text-cyan-200 rounded-lg"
+          >
+            Log In
+          </button>
+          </div>
+        <p id="authMessage" class="mt-3 text-sm text-rose-400"></p>
+      </section>
+
+      <section class="mt-10 grid gap-6 lg:grid-cols-2">
+        <div class="cyber-card border border-cyan-500/25 p-6 rounded-2xl shadow-lg">
+          <h2 class="text-xl font-semibold text-cyan-200 mb-3">Public graph scanning</h2>
+          <p class="text-sm text-cyan-100/70 mb-4">
+            Feed any Gun coordinate (for example <code>shogun-wormhole.wormhole-transfers</code> or <code>~pubKey.user.signal</code>)
+            to visualize the live dataset without authentication.
+          </p>
+          <div class="flex flex-col sm:flex-row gap-3">
+            <input
+              id="publicPathInput"
+              type="text"
+              placeholder="Enter Gun path to explore"
+              class="cyber-input flex-1 px-3 py-2 rounded-lg"
+            />
+            <button
+              id="btnExplorePublic"
+              class="cyber-button px-4 py-2 bg-fuchsia-500/20 text-fuchsia-200 rounded-lg"
+            >
+              Explore
+            </button>
+          </div>
+          <p id="publicExplorerMessage" class="mt-2 text-xs text-cyan-200/60"></p>
+          </div>
+
+        <div class="cyber-card border border-cyan-500/25 p-6 rounded-2xl shadow-lg">
+          <h2 class="text-xl font-semibold text-cyan-200 mb-3">Relay injection</h2>
+          <p class="text-sm text-cyan-100/70 mb-4">
+            Attach extra Gun peers to boost synchronization. Accepts URLs starting with
+            <code>https://</code>, <code>http://</code>, <code>wss://</code>, or <code>ws://</code>.
+          </p>
+          <div class="flex flex-col sm:flex-row gap-3">
+            <input
+              id="newPeerInput"
+              type="text"
+              placeholder="https://my-relay.example.com/gun"
+              class="cyber-input flex-1 px-3 py-2 rounded-lg"
+            />
+            <button
+              id="btnAddPeer"
+              class="cyber-button px-4 py-2 bg-cyan-500/20 text-cyan-200 rounded-lg"
+            >
+              Add relay
+            </button>
+          </div>
+          <p id="peerFeedback" class="mt-2 text-xs text-cyan-200/60"></p>
+        </div>
+      </section>
+
+      <section id="explorerSection" class="hidden mt-10 space-y-6">
+        <div class="cyber-card border border-cyan-500/25 p-6 rounded-2xl shadow-lg flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 class="text-lg font-semibold text-cyan-200">Session status</h2>
+            <p id="userInfo" class="text-sm text-cyan-100/80 break-all"></p>
+            <p id="peerStatus" class="text-xs text-cyan-200/60"></p>
+          </div>
+          <button
+            id="btnLogout"
+            class="hidden cyber-button px-4 py-2 bg-rose-500/20 text-rose-200 rounded-lg"
+          >
+            Log Out
+          </button>
+        </div>
+
+        <div class="cyber-card border border-cyan-500/25 p-6 rounded-2xl shadow-lg">
+          <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <div class="flex items-center gap-3">
+              <button
+                id="btnGoToRoot"
+                class="cyber-button px-3 py-1 text-sm bg-slate-900/80 text-cyan-200 rounded-lg disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                Jump to origin
+              </button>
+              <div class="text-xs text-cyan-200/60 break-all">
+                <span class="uppercase tracking-wide text-cyan-300/70">Path:</span>
+                <span id="currentPath" class="font-mono text-cyan-200"></span>
+              </div>
+            </div>
+            <span id="graphStatus" class="text-xs text-cyan-200/60">
+              Double click an orange node to follow linked sets.
+            </span>
+          </div>
+
+          <div class="grid gap-6 lg:grid-cols-3">
+            <div class="lg:col-span-2 space-y-4">
+              <div class="relative h-96">
+                <div id="graphNetwork" class="h-full w-full"></div>
+              </div>
+            </div>
+            <div class="bg-slate-950/60 border border-cyan-500/20 rounded-lg p-4 overflow-y-auto max-h-96">
+              <h3 class="text-md font-semibold text-cyan-200 mb-3">Properties</h3>
+              <div id="propertyList" class="space-y-3 text-sm text-cyan-100/80"></div>
+      </div>
+    </div>
+
+          <div class="bg-slate-950/40 border border-cyan-500/20 rounded-lg p-4 mt-6">
+            <h3 class="text-md font-semibold text-cyan-200 mb-2">Selected node details</h3>
+            <div id="nodeDetails" class="text-sm text-cyan-200/65">
+              Select a node in the graph to view metadata.
+            </div>
+      </div>
+    </div>
+
+        <div class="cyber-card border border-cyan-500/25 p-6 rounded-2xl shadow-lg">
+          <h3 class="text-xl font-semibold text-cyan-200 mb-3">Write operations</h3>
+          <div class="flex flex-col md:flex-row gap-3">
+            <input
+              id="newKey"
+              type="text"
+              placeholder="Property key"
+              class="cyber-input flex-1 px-3 py-2 rounded-lg"
+            />
+            <input
+              id="newValue"
+              type="text"
+              placeholder='Value (JSON or text)'
+              class="cyber-input flex-1 px-3 py-2 rounded-lg"
+            />
+            <button
+              id="btnAddProperty"
+              class="cyber-button px-4 py-2 bg-cyan-500/20 text-cyan-200 rounded-lg"
+            >
+              Add or Set
+            </button>
+          </div>
+          <p class="mt-2 text-xs text-cyan-200/60">
+            Runs [currentNode].[key] = value. Existing keys are overwritten.
+          </p>
+        </div>
+      </section>
+    </div>
+
+    <script type="module">
+      const GUN_PEERS = [
+        "https://5eh4twk2f62autunsje4panime.srv.us/gun",
+        "wss://5eh4twk2f62autunsje4panime.srv.us/gun",
+        "https://ojepkbvhx4ok25py2qw4hsa76y.srv.us/gun",
+        "wss://ojepkbvhx4ok25py2qw4hsa76y.srv.us/gun",
+        "https://g3ru5bwxmezpuu3ktnoclbpiw4.srv.us/gun",
+        "wss://g3ru5bwxmezpuu3ktnoclbpiw4.srv.us/gun"
+      ];
+
+      const gun = Gun({ peers: GUN_PEERS, retry: 2000 });
+      const user = gun.user();
+      window.gun = gun;
+      window.user = user;
+
+      const authSection = document.getElementById("authSection");
+      const explorerSection = document.getElementById("explorerSection");
+      const authMessage = document.getElementById("authMessage");
+      const userInfo = document.getElementById("userInfo");
+      const peerStatus = document.getElementById("peerStatus");
+      const currentPathEl = document.getElementById("currentPath");
+      const publicExplorerMessage = document.getElementById("publicExplorerMessage");
+      const peerFeedback = document.getElementById("peerFeedback");
+      const nodeDetails = document.getElementById("nodeDetails");
+      const propertyList = document.getElementById("propertyList");
+      const graphStatus = document.getElementById("graphStatus");
+      const graphContainer = document.getElementById("graphNetwork");
+
+      const usernameInput = document.getElementById("username");
+      const passwordInput = document.getElementById("password");
+      const publicPathInput = document.getElementById("publicPathInput");
+      const newPeerInput = document.getElementById("newPeerInput");
+      const newKeyInput = document.getElementById("newKey");
+      const newValueInput = document.getElementById("newValue");
+
+      const btnCreate = document.getElementById("btnCreate");
+      const btnLogin = document.getElementById("btnLogin");
+      const btnLogout = document.getElementById("btnLogout");
+      const btnExplorePublic = document.getElementById("btnExplorePublic");
+      const btnAddPeer = document.getElementById("btnAddPeer");
+      const btnGoToRoot = document.getElementById("btnGoToRoot");
+      const btnAddProperty = document.getElementById("btnAddProperty");
+
+      let currentNode = null;
+      let currentPathString = "";
+      let explorerMode = null;
+      let rootNode = null;
+      let rootPathString = "";
+
+      const activePeers = new Set();
+      const configuredPeers = new Set(GUN_PEERS);
+
+      const nodesDataSet = new vis.DataSet();
+      const edgesDataSet = new vis.DataSet();
+      const linkResolvers = new Map();
+      let network = null;
+
+      function ensureNetwork() {
+        if (network) return;
+        const options = {
+          physics: {
+            enabled: true,
+            barnesHut: {
+              gravitationalConstant: -3000,
+              centralGravity: 0.15,
+              springLength: 160,
+              springConstant: 0.03
+            }
+          },
+          interaction: {
+            hover: true,
+            tooltipDelay: 150,
+            zoomView: true,
+            navigationButtons: true
+          },
+          edges: {
+            color: { color: "#64748b", highlight: "#f59e0b" },
+            width: 2,
+            smooth: { type: "dynamic" }
+          },
+          nodes: {
+            font: { color: "#e2e8f0", size: 16, face: "Inter" },
+            borderWidth: 1,
+            shadow: true
+          }
+        };
+        network = new vis.Network(graphContainer, { nodes: nodesDataSet, edges: edgesDataSet }, options);
+        network.on("doubleClick", handleNetworkDoubleClick);
+        network.on("selectNode", handleNetworkSelectNode);
+        network.on("deselectNode", () => {
+          nodeDetails.textContent = "Select a node in the graph to view details.";
+        });
+      }
+
+      function truncateValue(value, limit = 60) {
+        if (value.length <= limit) return value;
+        return value.slice(0, limit - 3) + "...";
+      }
+
+      function updatePeerStatusDisplay() {
+        if (!peerStatus) return;
+        if (activePeers.size === 0) {
+          peerStatus.textContent = "Connecting to relays...";
+          peerStatus.classList.remove("text-emerald-400");
+          peerStatus.classList.add("text-slate-500");
+        } else {
+          peerStatus.textContent = "Connected to " + activePeers.size + " relays: " + Array.from(activePeers).join(", ");
+          peerStatus.classList.remove("text-slate-500");
+          peerStatus.classList.add("text-emerald-400");
+        }
+      }
+
+      gun.on("hi", (peer) => {
+        if (peer && peer.url) {
+          activePeers.add(peer.url);
+          updatePeerStatusDisplay();
         }
       });
-    } catch (e) {
-      updateStatus("Warning: Could not clear localStorage", true);
-    }
 
-    let gun = null;
-    let isGunReady = false;
+      gun.on("bye", (peer) => {
+        if (peer && peer.url) {
+          activePeers.delete(peer.url);
+          updatePeerStatusDisplay();
+        }
+      });
 
-    // Initialize default peers - will be updated when user changes the input
-
-    // Configure the middleware GLOBALLY before ANY Gun instance creation
-    updateStatus("Configuring Gun middleware...");
-
-    // Function to create Gun instance with current peer configuration
-    function createGunInstance() {
-      const relayPeerInput = document.getElementById("relayPeer");
-      const currentPeer = relayPeerInput
-        ? relayPeerInput.value.trim()
-        : peer
-
-      if (!currentPeer) {
-        updateStatus("Error: Empty peer URL", true);
-        return null;
+      function updateRootButtonState() {
+        btnGoToRoot.disabled = !rootNode;
+        if (rootNode) {
+          btnGoToRoot.textContent = "Jump to '" + (rootPathString || "root") + "'";
+        } else {
+          btnGoToRoot.textContent = "Jump to origin";
+        }
       }
 
-      peers = [currentPeer];
-      updateStatus(`Creating Gun instance with peer: ${currentPeer}`);
+      function setPublicExplorerMessage(message, type = "info") {
+        publicExplorerMessage.textContent = message;
+        publicExplorerMessage.className = "mt-2 text-xs";
+        switch (type) {
+          case "error":
+            publicExplorerMessage.classList.add("text-rose-400");
+            break;
+          case "success":
+            publicExplorerMessage.classList.add("text-emerald-400");
+            break;
+          case "warning":
+            publicExplorerMessage.classList.add("text-amber-400");
+            break;
+          default:
+            publicExplorerMessage.classList.add("text-slate-400");
+        }
+      }
 
-      Gun.on("opt", function (ctx) {
-        if (ctx.once) {
+      function setPeerFeedback(message, type = "info") {
+        peerFeedback.textContent = message;
+        peerFeedback.className = "mt-2 text-xs";
+        switch (type) {
+          case "error":
+            peerFeedback.classList.add("text-rose-400");
+            break;
+          case "success":
+            peerFeedback.classList.add("text-emerald-400");
+            break;
+          case "warning":
+            peerFeedback.classList.add("text-amber-400");
+            break;
+          default:
+            peerFeedback.classList.add("text-slate-400");
+        }
+      }
+
+      function resolvePathToNode(pathString) {
+        const sanitized = (pathString || "").trim();
+        if (!sanitized) {
+          return { node: gun, resolvedPath: "root" };
+        }
+        const segments = sanitized
+          .split(".")
+          .map((segment) => segment.trim())
+          .filter(Boolean);
+        if (segments.length === 0) {
+          return { node: gun, resolvedPath: "root" };
+        }
+        let nodeInstance = gun.get(segments[0]);
+        let resolvedPath = segments[0];
+        for (let i = 1; i < segments.length; i += 1) {
+          nodeInstance = nodeInstance.get(segments[i]);
+          resolvedPath += "." + segments[i];
+        }
+        return { node: nodeInstance, resolvedPath };
+      }
+
+      function updateExplorerHeader() {
+        if (explorerMode === "user" && user.is) {
+          const alias = user.is.alias;
+          const pub = user.is.pub;
+          const aliasInfo = alias ? "Alias: " + alias + " - " : "";
+          userInfo.textContent = aliasInfo + "Public key (pub): " + pub;
+          btnLogout.classList.remove("hidden");
+        } else if (explorerMode === "public") {
+          userInfo.textContent = "Public mode - Root: " + rootPathString;
+          btnLogout.classList.add("hidden");
+        } else {
+          userInfo.textContent = "";
+          btnLogout.classList.add("hidden");
+        }
+      }
+
+      function startExplorer(nodeInstance, pathString, mode) {
+        explorerMode = mode;
+        rootNode = nodeInstance;
+        rootPathString = pathString || "root";
+        updateExplorerHeader();
+        updateRootButtonState();
+        explorerSection.classList.remove("hidden");
+        exploreNode(nodeInstance, pathString || "root");
+      }
+
+      function startPublicExplorer(rawPath) {
+        try {
+          const resolved = resolvePathToNode(rawPath);
+          setPublicExplorerMessage("Exploring path: " + resolved.resolvedPath, "success");
+          startExplorer(resolved.node, resolved.resolvedPath, "public");
+        } catch (error) {
+          setPublicExplorerMessage(error.message || "Invalid path provided.", "error");
+        }
+      }
+
+      function addPeer(url) {
+        const trimmed = (url || "").trim();
+        if (!trimmed) {
+          setPeerFeedback("Provide a relay URL.", "warning");
           return;
         }
-        ctx.on("out", function (msg) {
-          const to = this.to;
-          // Use centralized admin password
-          const authToken =
-            ShogunAdmin.getPassword() ||
-            (document.getElementById("authToken")
-              ? document.getElementById("authToken").value.trim()
-              : "");
-          if (authToken) {
-            // Add headers for all outgoing messages, especially 'put'
-            msg.headers = {
-              ...msg.headers, // Preserve existing headers
-              token: authToken,
-              Authorization: "Bearer " + authToken,
-            };
+        if (!/^https?:\/\//i.test(trimmed) && !/^wss?:\/\//i.test(trimmed)) {
+          setPeerFeedback("Relay URLs must begin with https://, http://, wss://, or ws://.", "error");
+          return;
+        }
+        if (configuredPeers.has(trimmed)) {
+          setPeerFeedback("Relay already configured.", "warning");
+          return;
+        }
+        try {
+          configuredPeers.add(trimmed);
+          gun.opt({ peers: [trimmed] });
+          setPeerFeedback("Relay added: " + trimmed, "success");
+        } catch (error) {
+          setPeerFeedback("Unable to add relay: " + error.message, "error");
+        }
+      }
+
+      function attemptRenderSetFallback(nodeInstance) {
+        const aggregated = {};
+        const seenKeys = new Set();
+        let hasAnyChild = false;
+        let idleTimer = null;
+        let finalized = false;
+        const MAX_WAIT_MS = 2000;
+        const QUIET_WINDOW_MS = 350;
+
+        const mapChain = nodeInstance.map();
+        const maxTimer = setTimeout(finalize, MAX_WAIT_MS);
+
+        function cleanup() {
+          if (idleTimer) {
+            clearTimeout(idleTimer);
+            idleTimer = null;
           }
-          console.log(msg);
-          to.next(msg); // pass to next middleware
-        });
-      });
-
-      try {
-        // Enhanced Gun configuration matching graph.html
-        gun = new Gun({ 
-          peers: peers, 
-          localStorage: false,
-          // Enhanced sync configurations
-          wire: false,        // Enable wire protocol for efficiency
-          axe: false,        // Enable axe protocol for efficiency
-          webrtc: true,      // Enable WebRTC for direct peer connections
-          wait: 300,         // Faster batch processing
-          until: 250,        // Shorter timeout for queries
-          batch: 5,          // Small batch size for real-time updates
-          retry: 3,          // Number of retry attempts
-          // Connection resilience
-          reconnect: true,   // Enable automatic reconnection
-          heartbeat: 30000,  // Heartbeat every 30 seconds
-          timeout: 15000     // Connection timeout
-        });
-
-        let graph = {
-          nodes: [],
-          edges: [],
-        };
-
-        let peerList = document.getElementById("peerList");
-        if (peerList) {
-          peerList.innerHTML = currentPeer;
+          clearTimeout(maxTimer);
+          if (typeof mapChain.off === "function") {
+            mapChain.off();
+          }
         }
 
-        // Enhanced connection monitoring and auto-reconnection
-        let connectionState = {
-          isConnected: false,
-          lastPing: Date.now(),
-          reconnectAttempts: 0,
-          maxReconnectAttempts: 5,
-          reconnectDelay: 2000
-        };
-
-        // Monitor connection health
-        gun.on('hi', (peer) => {
-          connectionState.isConnected = true;
-          connectionState.lastPing = Date.now();
-          connectionState.reconnectAttempts = 0;
-          console.log('🟢 Gun connected to peer:', peer);
-          updateStatus('🟢 Connected to relay');
-        });
-
-        gun.on('bye', (peer) => {
-          connectionState.isConnected = false;
-          console.log('🔴 Gun disconnected from peer:', peer);
-          updateStatus('🔴 Disconnected from relay');
-          attemptReconnection();
-        });
-
-        // Heartbeat to detect stale connections
-        setInterval(() => {
-          const timeSinceLastPing = Date.now() - connectionState.lastPing;
-          if (timeSinceLastPing > 60000 && connectionState.isConnected) {
-            console.warn('⚠️ Connection may be stale, attempting reconnection');
-            attemptReconnection();
+        function finalize() {
+          if (finalized) return;
+          finalized = true;
+          cleanup();
+          if (hasAnyChild) {
+            renderFromData(aggregated, nodeInstance);
+          } else {
+            propertyList.innerHTML = '<div class="text-sm text-cyan-200/60">This node is empty or not accessible.</div>';
+            nodesDataSet.clear();
+            edgesDataSet.clear();
+            linkResolvers.clear();
           }
-        }, 30000);
+        }
 
-        // Auto-reconnection logic
-        function attemptReconnection() {
-          if (connectionState.reconnectAttempts >= connectionState.maxReconnectAttempts) {
-            console.error('❌ Max reconnection attempts reached');
-            updateStatus('❌ Connection failed - max attempts reached', true);
+        mapChain.once((childData, childKey) => {
+          if (!childKey || seenKeys.has(childKey)) {
             return;
           }
-
-          connectionState.reconnectAttempts++;
-          updateStatus(`🔄 Reconnecting... (${connectionState.reconnectAttempts}/${connectionState.maxReconnectAttempts})`);
-          
-          setTimeout(() => {
-            try {
-              const gunInstance = createGunInstance();
-              if (gunInstance) {
-                updateStatus('✅ Reconnected successfully');
-              }
-            } catch (error) {
-              console.error('Reconnection failed:', error);
-              setTimeout(attemptReconnection, connectionState.reconnectDelay * connectionState.reconnectAttempts);
-            }
-          }, connectionState.reconnectDelay);
-        }
-
-        // Make gun instance globally available
-        window.gun = gun;
-        window.graph = graph;
-        isGunReady = true;
-
-        updateStatus("Gun instance created successfully");
-        return gun;
-      } catch (error) {
-        updateStatus(`Error creating Gun instance: ${error.message}`, true);
-        return null;
-      }
-    }
-
-    // Create initial instance after DOM is ready
-    document.addEventListener("DOMContentLoaded", function () {
-      setTimeout(function () {
-        const gunInstance = createGunInstance();
-        if (gunInstance) {
-          updateStatus("Ready to start visualization");
-        }
-      }, 500);
-    });
-  </script>
-  <script src="/visualGraph/visualGraph.js"></script>
-  <script src="/visualGraph/abstraction.js"></script>
-  <script>
-    // Wait for all scripts to load and DFS to be available
-    function waitForDFS() {
-      return new Promise((resolve, reject) => {
-        let attempts = 0;
-        const maxAttempts = 50;
-
-        const checkDFS = () => {
-          attempts++;
-          if (typeof window.DFS !== "undefined" && window.DFS.search) {
-            updateStatus("DFS module loaded successfully!");
-            resolve();
-          } else if (attempts >= maxAttempts) {
-            updateStatus("Timeout waiting for DFS module", true);
-            reject(new Error("DFS module failed to load"));
-          } else {
-            setTimeout(checkDFS, 100);
+          seenKeys.add(childKey);
+          hasAnyChild = true;
+          aggregated[childKey] = childData;
+          if (idleTimer) {
+            clearTimeout(idleTimer);
           }
-        };
-        checkDFS();
-      });
-    }
+          idleTimer = setTimeout(finalize, QUIET_WINDOW_MS);
+        });
+      }
 
-    // Initialize everything once DFS is ready
-    waitForDFS()
-      .then(() => {
-        updateStatus("All modules loaded. Ready to use!");
+      function renderFromData(data, nodeInstance) {
+        renderGraph(data, nodeInstance);
+        renderPropertyList(data, nodeInstance);
+      }
 
-        // Set up Load All Nodes button event listener
-        const loadAllNodesBtn = document.getElementById("loadAllNodesBtn");
-        if (loadAllNodesBtn) {
-          // Enable the button now that functions are ready
-          loadAllNodesBtn.disabled = false;
-          loadAllNodesBtn.textContent = "🕸️ Load All Nodes";
-          loadAllNodesBtn.title = "Click to load all nodes from the specified key";
+      function renderGraph(data, nodeInstance) {
+        ensureNetwork();
+        nodesDataSet.clear();
+        edgesDataSet.clear();
+        linkResolvers.clear();
 
-          loadAllNodesBtn.addEventListener("click", function (ev) {
-            ev.preventDefault();
-            if (typeof window.loadAllNodesMode === 'function') {
-              window.loadAllNodesMode();
-            } else {
-              updateStatus("❌ Load All Nodes function not available", true);
-              console.error("❌ loadAllNodesMode function not available");
-            }
-          });
+        const rootId = currentPathString || "root";
+        nodesDataSet.add({
+          id: rootId,
+          label: rootId,
+          shape: "circle",
+          color: {
+            background: "#2563eb",
+            border: "#60a5fa"
+          },
+          font: { color: "#e0f2fe", size: 18 }
+        });
+
+        if (data === null || data === undefined) {
+          graphStatus.textContent = "Node is empty or not accessible.";
+          return;
         }
 
-        // Override the start function with a safer version
-        const startButton = document.getElementById("startButton");
-        if (startButton) {
-          startButton.addEventListener("click", function (ev) {
-            ev.preventDefault();
-            updateStatus("Start button clicked...");
+        if (typeof data !== "object") {
+          const primitiveLabel = truncateValue(String(data));
+          nodesDataSet.add({
+            id: rootId + ".__primitive",
+            label: primitiveLabel,
+            shape: "box",
+            color: { background: "#22c55e", border: "#14532d" },
+            font: { color: "#0f172a" }
+          });
+          edgesDataSet.add({ from: rootId, to: rootId + ".__primitive", arrows: "to" });
+          graphStatus.textContent = "Primitive value.";
+          return;
+        }
 
-            const relayPeer = document
-              .getElementById("relayPeer")
-              .value.trim();
-            // Use centralized admin password
-            const authToken =
-              ShogunAdmin.getPassword() ||
-              document.getElementById("authToken").value.trim();
-            const key = document.getElementById("key").value.trim();
-            const label = document.getElementById("label").value.trim();
+        const keys = Object.keys(data).filter((k) => k !== "_" && k !== "#").sort();
+        if (keys.length === 0) {
+          graphStatus.textContent = "This node has no properties.";
+          return;
+        }
 
-            // Validation
-            if (!relayPeer) {
-              updateStatus("Please enter a relay peer URL", true);
-              alert("Please enter a relay peer URL");
-              return;
-            }
+        keys.forEach((key) => {
+          const value = data[key];
+          const childId = rootId + "." + key;
+          if (typeof value === "object" && value !== null && value["#"]) {
+            nodesDataSet.add({
+              id: childId,
+              label: key + "\n[node]",
+              shape: "dot",
+              color: { background: "#f97316", border: "#fb923c" },
+              font: { color: "#1f2937", size: 16 },
+              title: "Double click to open " + childId
+            });
+            linkResolvers.set(childId, {
+              type: "link",
+              key,
+              path: (currentPathString ? currentPathString + "." : "") + key,
+              node: nodeInstance.get(key)
+            });
+          } else if (value === null) {
+            nodesDataSet.add({
+              id: childId,
+              label: key + "\n[null]",
+              shape: "box",
+              color: { background: "#ef4444", border: "#b91c1c" },
+              font: { color: "#fee2e2" }
+            });
+          } else {
+            const printable = truncateValue(JSON.stringify(value));
+            nodesDataSet.add({
+              id: childId,
+              label: key + "\n" + printable,
+              shape: "box",
+              color: { background: "#22c55e", border: "#15803d" },
+              font: { color: "#0f172a" }
+            });
+          }
+          edgesDataSet.add({ from: rootId, to: childId, arrows: "to", smooth: { type: "dynamic" } });
+        });
 
-            if (!authToken) {
-              updateStatus(
-                "Please enter an auth token. Set it in the Control Panel for automatic loading.",
-                true
-              );
-              alert(
-                "Please enter an auth token. Set it in the Control Panel for automatic loading."
-              );
-              return;
-            }
+        network.fit({ animation: { duration: 600, easing: "easeInOutCubic" } });
+        graphStatus.textContent = "Double click orange nodes to follow linked references.";
+      }
 
-            if (!key) {
-              updateStatus("Please enter a key to start from", true);
-              alert("Please enter a key to start from");
-              return;
-            }
+      function renderPropertyList(data, nodeInstance) {
+        propertyList.innerHTML = "";
+        if (data === null || data === undefined) {
+          propertyList.innerHTML = '<div class="text-sm text-cyan-200/60">Node is null or undefined.</div>';
+          return;
+        }
+        if (typeof data !== "object") {
+          propertyList.innerHTML =
+            '<div class="text-sm text-cyan-100/80">Value: <span class="font-mono text-emerald-400">' +
+            truncateValue(String(data)) +
+            "</span></div>";
+          return;
+        }
+        const keys = Object.keys(data).filter((k) => k !== "_" && k !== "#").sort();
+        if (keys.length === 0) {
+          propertyList.innerHTML = '<div class="text-sm text-cyan-200/60">No properties available.</div>';
+            return;
+          }
+        keys.forEach((key) => {
+          const value = data[key];
+          const wrapper = document.createElement("div");
+          wrapper.className = "border border-slate-800 rounded-md p-3 flex flex-col gap-2 bg-slate-900/70";
 
-            if (!isGunReady || !window.gun) {
-              updateStatus("Gun instance not ready, recreating...");
-              const gunInstance = createGunInstance();
-              if (!gunInstance) {
-                updateStatus("Failed to create Gun instance", true);
-                alert(
-                  "Failed to connect to Gun database. Please check your settings."
-                );
-                return;
-              }
-            }
+          const header = document.createElement("div");
+          header.className = "flex items-center justify-between gap-2";
 
-            // Recreate Gun instance with current peer if it changed
-            const currentPeers = window.gun ? window.gun._.opt.peers : {};
-            const currentPeer = Object.keys(currentPeers)[0];
-            if (!currentPeer || currentPeer !== relayPeer) {
-              updateStatus("Peer changed, recreating Gun instance...");
-              const gunInstance = createGunInstance();
-              if (!gunInstance) {
-                updateStatus("Failed to recreate Gun instance", true);
-                alert(
-                  "Failed to connect to the new peer. Please check the URL."
-                );
-                return;
-              }
-            }
+          const label = document.createElement("div");
+          label.className = "font-semibold text-indigo-200 break-all";
+          label.textContent = key;
+          header.appendChild(label);
 
-            if (window.DFS && window.DFS.search) {
-              updateStatus(
-                `Starting DFS search with key: ${key}${label ? `, label: ${label}` : ""
-                }`
-              );
+          const actions = document.createElement("div");
+          actions.className = "flex gap-2";
+
+          const setBtn = document.createElement("button");
+          setBtn.className = "px-2 py-1 text-xs bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-md";
+          setBtn.textContent = "Modify";
+          setBtn.addEventListener("click", () => {
+            const newValue = prompt("Enter a new value for '" + key + "':", JSON.stringify(value));
+            if (newValue === null) return;
+            try {
+              let parsed;
               try {
-                window.DFS.search(key, label);
-              } catch (error) {
-                updateStatus(`DFS search error: ${error.message}`, true);
-                alert(`Search failed: ${error.message}`);
+                parsed = JSON.parse(newValue);
+              } catch (parseErr) {
+                parsed = newValue;
               }
-            } else {
-              updateStatus("DFS module not available", true);
-              alert("DFS module is not available. Please refresh the page.");
+              nodeInstance.get(key).put(parsed);
+              setTimeout(() => exploreNode(currentNode, currentPathString), 150);
+            } catch (error) {
+              alert("Invalid value: " + error.message);
             }
           });
+
+          const deleteBtn = document.createElement("button");
+          deleteBtn.className = "px-2 py-1 text-xs bg-rose-600 hover:bg-rose-500 text-white rounded-md";
+          deleteBtn.textContent = "Delete";
+          deleteBtn.addEventListener("click", () => {
+            if (!confirm("Set '" + key + "' to null?")) return;
+            nodeInstance.get(key).put(null);
+            setTimeout(() => exploreNode(currentNode, currentPathString), 150);
+          });
+
+          actions.append(setBtn, deleteBtn);
+          header.appendChild(actions);
+
+          const valuePreview = document.createElement("div");
+          valuePreview.className = "text-xs text-cyan-200/60 break-all";
+          if (typeof value === "object" && value !== null && value["#"]) {
+            valuePreview.textContent = "Linked node: " + value["#"];
+          } else {
+            valuePreview.textContent = truncateValue(JSON.stringify(value));
+          }
+
+          wrapper.append(header, valuePreview);
+          propertyList.appendChild(wrapper);
+        });
+      }
+
+      function handleNetworkSelectNode(params) {
+        if (!params.nodes.length) {
+          nodeDetails.textContent = "Select a node in the graph to view details.";
+          return;
         }
-      })
-      .catch((error) => {
-        updateStatus(`Failed to initialize: ${error.message}`, true);
-        alert(
-          "Failed to initialize the application. Please refresh the page."
-        );
+        const nodeId = params.nodes[0];
+        if (nodeId === (currentPathString || "root")) {
+          nodeDetails.textContent = "Current node: " + currentPathString;
+          return;
+        }
+        const resolver = linkResolvers.get(nodeId);
+        if (resolver) {
+          nodeDetails.textContent = "Linked to: " + resolver.path;
+          return;
+        }
+        const nodeData = nodesDataSet.get(nodeId);
+        if (nodeData) {
+          nodeDetails.textContent = "Property: " + nodeData.label.replace("\n", " -> ");
+        }
+      }
+
+      function handleNetworkDoubleClick(params) {
+        if (!params.nodes.length) return;
+        const nodeId = params.nodes[0];
+        const resolver = linkResolvers.get(nodeId);
+        if (resolver) {
+          exploreNode(resolver.node, resolver.path);
+        }
+      }
+
+      function exploreNode(nodeInstance, pathString) {
+        currentNode = nodeInstance;
+        currentPathString = pathString;
+        currentPathEl.textContent = pathString;
+        graphStatus.textContent = "Loading data...";
+        propertyList.innerHTML = '<div class="text-sm text-cyan-200/60">Loading data...</div>';
+
+        let resolved = false;
+        const timeoutId = setTimeout(() => {
+          if (!resolved) {
+            graphStatus.textContent = "No data received. Check relay connectivity.";
+          }
+        }, 6000);
+
+        nodeInstance.once((data) => {
+          resolved = true;
+          clearTimeout(timeoutId);
+          if (data === null || data === undefined) {
+            attemptRenderSetFallback(nodeInstance);
+          } else {
+            renderFromData(data, nodeInstance);
+          }
+        }, { wait: 1200 });
+      }
+
+      function addProperty() {
+        const key = newKeyInput.value.trim();
+        const valueRaw = newValueInput.value.trim();
+            if (!key) {
+          alert("Property key is required.");
+              return;
+            }
+        if (!currentNode) {
+          alert("No node selected at the moment.");
+                return;
+              }
+        try {
+          let parsedValue;
+          try {
+            parsedValue = JSON.parse(valueRaw);
+          } catch (error) {
+            parsedValue = valueRaw;
+          }
+          currentNode.get(key).put(parsedValue);
+          newKeyInput.value = "";
+          newValueInput.value = "";
+          setTimeout(() => exploreNode(currentNode, currentPathString), 150);
+        } catch (error) {
+          alert("Save failed: " + error.message);
+        }
+      }
+
+      btnCreate.addEventListener("click", () => {
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value.trim();
+        if (!username || !password) {
+          authMessage.textContent = "Alias and password are required.";
+                return;
+              }
+        authMessage.textContent = "Creating account...";
+        user.create(username, password, (ack) => {
+          if (ack.err) {
+            authMessage.textContent = "Error: " + ack.err;
+          } else {
+            authMessage.textContent = "Account created. You can log in now.";
+          }
+        });
       });
+
+      btnLogin.addEventListener("click", () => {
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value.trim();
+        if (!username || !password) {
+          authMessage.textContent = "Alias and password are required.";
+          return;
+        }
+        authMessage.textContent = "Authenticating...";
+        user.auth(username, password, (ack) => {
+          if (ack.err) {
+            authMessage.textContent = "Error: " + ack.err;
+            } else {
+            authMessage.textContent = "Login successful!";
+          }
+        });
+      });
+
+      btnLogout.addEventListener("click", () => {
+        user.leave();
+        explorerMode = null;
+        rootNode = null;
+        rootPathString = "";
+        updateExplorerHeader();
+        updateRootButtonState();
+        explorerSection.classList.add("hidden");
+        authSection.classList.remove("hidden");
+        propertyList.innerHTML = "";
+        nodesDataSet.clear();
+        edgesDataSet.clear();
+        linkResolvers.clear();
+        graphStatus.textContent = "Double click a linked node to dive deeper.";
+        currentPathEl.textContent = "";
+      });
+
+      btnExplorePublic.addEventListener("click", () => {
+        startPublicExplorer(publicPathInput.value);
+      });
+
+      publicPathInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          startPublicExplorer(publicPathInput.value);
+        }
+      });
+
+      btnAddPeer.addEventListener("click", () => {
+        addPeer(newPeerInput.value);
+        newPeerInput.value = "";
+      });
+
+      newPeerInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          addPeer(newPeerInput.value);
+          newPeerInput.value = "";
+        }
+      });
+
+      btnGoToRoot.addEventListener("click", () => {
+        if (!rootNode) {
+          setPublicExplorerMessage("Choose a path to explore first.", "warning");
+          return;
+        }
+        exploreNode(rootNode, rootPathString);
+      });
+
+      btnAddProperty.addEventListener("click", addProperty);
+
+      newValueInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          addProperty();
+        }
+      });
+
+      gun.on("auth", (ack) => {
+        authSection.classList.add("hidden");
+        explorerSection.classList.remove("hidden");
+        usernameInput.value = "";
+        passwordInput.value = "";
+        const alias = user.is ? user.is.alias : null;
+        const pub = (user.is && user.is.pub) || (ack && ack.pub) || "not available";
+        const aliasInfo = alias ? "Alias: " + alias + " - " : "";
+        userInfo.textContent = aliasInfo + "Public key (pub): " + pub;
+        btnLogout.classList.remove("hidden");
+        startExplorer(user, "user", "user");
+      });
+
+      updatePeerStatusDisplay();
+      updateRootButtonState();
   </script>
 </body>
-
 </html>

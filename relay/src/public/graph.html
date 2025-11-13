@@ -1,1105 +1,941 @@
-<!DOCTYPE html>
-<html lang="en" data-theme="night">
+<!doctype html>
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Live Gun Graph Explorer</title>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-    <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
+    <title>Shogun Relay Graph Explorer</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <!-- Include centralized admin authentication -->
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
     <script src="lib/admin-auth.js"></script>
     <script src="lib/admin-nav.js"></script>
     <style>
-      .graph-container {
-        display: flex;
-        flex-direction: column;
-        gap: 1.5rem;
-        margin-top: 1.5rem;
+      :root {
+        --cyber-primary: #22d3ee;
+        --cyber-secondary: #a855f7;
+        --cyber-bg: radial-gradient(circle at 18% 12%, rgba(168, 85, 247, 0.25), transparent 45%),
+          radial-gradient(circle at 82% 8%, rgba(34, 211, 238, 0.22), transparent 55%),
+          #050714;
+        --cyber-panel: rgba(6, 11, 30, 0.82);
+        --cyber-border: rgba(34, 211, 238, 0.28);
       }
-      .node-item {
-        background-color: #404040;
-        border: 1px solid #606060;
-        border-radius: 1rem;
+
+      body {
+        font-family: "Space Grotesk", "Inter", system-ui, sans-serif;
+        background: var(--cyber-bg);
+        color: #e0f2f1;
+        min-height: 100vh;
+      }
+
+      .cyber-heading {
+        text-shadow: 0 0 12px rgba(34, 211, 238, 0.6), 0 0 24px rgba(168, 85, 247, 0.35);
+      }
+
+      .cyber-card {
+        background: var(--cyber-panel);
+        border: 1px solid var(--cyber-border);
+        box-shadow: 0 18px 48px rgba(34, 211, 238, 0.18), inset 0 0 0 1px rgba(168, 85, 247, 0.14);
+        backdrop-filter: blur(18px);
+      }
+
+      .cyber-divider {
+        background: linear-gradient(90deg, rgba(34, 211, 238, 0), rgba(34, 211, 238, 0.45), rgba(168, 85, 247, 0));
+        height: 1px;
+        border: 0;
+      }
+
+      .cyber-input {
+        background: rgba(9, 13, 32, 0.92);
+        border: 1px solid rgba(34, 211, 238, 0.32);
+        color: #e0f2f1;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .cyber-input:focus {
+        outline: none;
+        border-color: var(--cyber-primary);
+        box-shadow: 0 0 14px rgba(34, 211, 238, 0.32);
+      }
+
+      .cyber-button {
+        position: relative;
         overflow: hidden;
-        transition: all 0.2s ease;
-        width: 100%;
+        border: 1px solid rgba(34, 211, 238, 0.28);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
       }
-      .node-header {
-        padding: 1rem 1.5rem;
+
+      .cyber-button::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(120deg, rgba(34, 211, 238, 0.35), rgba(168, 85, 247, 0.4));
+        opacity: 0;
+        transition: opacity 0.2s ease;
+      }
+
+      .cyber-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 28px rgba(34, 211, 238, 0.26);
+      }
+
+      .cyber-button:hover::after {
+        opacity: 0.22;
+      }
+
+      .node-key {
         cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        background-color: rgba(255, 255, 255, 0.05);
-        border-bottom: 1px solid #606060;
-        flex-wrap: wrap;
+        color: var(--cyber-primary);
+        transition: text-shadow 0.2s ease;
       }
-      .node-header:hover {
-        background-color: rgba(255, 255, 255, 0.1);
-      }
-      .node-id {
-        font-weight: bold;
-        word-break: break-all;
-        max-width: 100%;
-        color: #FFFFFF;
-      }
-      .node-id.user-key {
-        color: #FF69B4;
-      }
-      .toggle-icon {
-        font-size: 14px;
-        transition: transform 0.2s ease;
-        flex-shrink: 0;
-        color: #FF69B4;
-      }
-      .toggle-icon.expanded {
-        transform: rotate(90deg);
-      }
-      .node-content {
-        display: none;
-        padding: 1.5rem;
-      }
-      .node-content.show {
-        display: block;
-        animation: fadeIn 0.2s ease;
-      }
-      .property {
-        margin-bottom: 1rem;
-        padding: 1rem;
-        background-color: rgba(255, 255, 255, 0.05);
-        border-radius: 1rem;
-        border-left: 3px solid #FF69B4;
-        overflow-x: auto;
-      }
-      .property-key {
-        font-weight: bold;
-        color: #FF69B4;
-        margin-bottom: 0.5rem;
-        font-size: 1rem;
-      }
-      .property-value {
-        color: #E0E0E0;
-        font-family: inherit;
-        word-break: break-all;
-        font-size: 1rem;
-      }
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-        }
-        to {
-          opacity: 1;
-        }
-      }
-      pre {
-        white-space: pre-wrap;
-        word-break: break-all;
-        background-color: rgba(255, 255, 255, 0.05);
-        padding: 1rem;
-        border-radius: 1rem;
-        overflow-x: auto;
-        color: #E0E0E0;
-        font-size: 0.9rem;
-      }
-      .btn-custom.btn-sm {
-        padding: 0.5rem 1rem;
-        font-size: 0.875rem;
-        line-height: 1.25rem;
-        background-color: #FF69B4;
-        color: #FFFFFF;
-        border: none;
-        border-radius: 0.75rem;
-        cursor: pointer;
-        transition: all 0.2s ease;
-      }
-      .btn-custom.btn-sm:hover {
-        background-color: #FF1493;
-        transform: translateY(-1px);
-      }
-      .alert.alert-success {
-        background-color: rgba(76, 175, 80, 0.2);
-        border-color: rgba(76, 175, 80, 0.3);
-        color: #4CAF50;
-        border-radius: 1rem;
-        padding: 1rem 1.5rem;
-      }
-      
-      /* Responsive styles */
-      .stats {
-        padding: 1.5rem;
-        border-radius: 1rem;
-        background-color: #404040;
-        border: 1px solid #606060;
-        margin-bottom: 1.5rem;
-        overflow-x: auto;
-      }
-      
-      .stats-content {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 1rem;
-        color: #E0E0E0;
-        font-size: 1rem;
-      }
-      
-      .stats-label {
-        font-weight: bold;
-        white-space: nowrap;
-        color: #FFFFFF;
-      }
-      
-      /* Mobile optimizations */
-      @media (max-width: 640px) {
-        .container {
-          padding: 1rem;
-        }
-        
-        .card .p-8 {
-          padding: 1.5rem;
-        }
-        
-        .node-header {
-          padding: 1rem;
-        }
-        
-        .property {
-          padding: 1rem;
-        }
-        
-        .btn-row {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.75rem;
-          margin-bottom: 0.75rem;
-        }
-        
-        .btn-custom {
-          flex: 1;
-          min-width: fit-content;
-          text-align: center;
-          white-space: nowrap;
-        }
-        
-        .input-row {
-          display: flex;
-          flex-direction: column;
-          gap: 0.75rem;
-        }
-        
-        .input-row .input-custom {
-          width: 100%;
-        }
-        
-        .input-row .btn-custom {
-          width: 100%;
-        }
-      }
-      
-      /* Link container responsiveness */
-      .link-container {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 0.75rem;
-        margin: 0.5rem 0;
-      }
-      
-      /* Node header responsiveness */
-      .node-meta {
-        display: flex;
-        align-items: center;
-        margin-left: auto;
-        gap: 0.75rem;
-        flex-wrap: wrap;
-      }
-      
-      /* Connection status responsiveness */
-      .connection-status {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        margin-top: 0.75rem;
-        flex-wrap: wrap;
+
+      .node-key:hover {
+        text-shadow: 0 0 10px rgba(34, 211, 238, 0.8);
       }
     </style>
   </head>
-  <body class="antialiased bg-[#1A1A1A]">
-    <div class="container mx-auto p-6">
+  <body class="text-slate-100">
+    <div class="container max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="flex items-center mb-6">
-        <a href="/" class="text-[#42A5F5] hover:text-[#64B5F6] transition-colors text-lg">&larr; Back to Control Panel</a>
+        <a href="/" class="text-cyan-300 hover:text-cyan-200 transition-colors text-sm">Back to Control Panel</a>
       </div>
 
-      <div class="card bg-[#282828] border-[#404040] rounded-2xl">
-        <div class="p-8 sm:p-10">
-          <div class="flex flex-col items-center">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-16 w-16 mb-6 text-[#FF69B4]"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+      <header class="text-center mb-10">
+        <p class="uppercase tracking-[0.45em] text-xs text-cyan-300/70 mb-3">GunDB Relay Toolkit</p>
+        <h1 class="text-4xl sm:text-5xl font-semibold cyber-heading text-cyan-200">Shogun Relay Graph Explorer</h1>
+        <p class="mt-4 max-w-2xl mx-auto text-sm text-cyan-100/70">
+          Authenticate with your alias to browse private spaces or follow any public coordinates. Inspect, modify, and export
+          live GunDB data while keeping relay peers in sync.
+        </p>
+      </header>
+
+      <section id="authSection" class="cyber-card rounded-2xl p-6 sm:p-7 lg:p-8">
+        <div class="flex items-center justify-between gap-4 mb-6">
+          <h2 class="text-2xl font-semibold text-cyan-200">User Authentication</h2>
+          <span class="text-xs tracking-[0.3em] text-cyan-300/60 uppercase">Access Control</span>
+        </div>
+        <hr class="cyber-divider mb-6" />
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <label class="text-sm text-cyan-100/80 space-y-2" for="username">
+            <span>Alias</span>
+            <input
+              type="text"
+              id="username"
+              placeholder="e.g. neon-operator"
+              class="cyber-input w-full px-3 py-2 rounded-lg"
+            />
+          </label>
+          <label class="text-sm text-cyan-100/80 space-y-2" for="password">
+            <span>Password</span>
+            <input
+              type="password"
+              id="password"
+              placeholder="Password"
+              class="cyber-input w-full px-3 py-2 rounded-lg"
+            />
+          </label>
+        </div>
+        <div class="flex flex-wrap items-center justify-end gap-3 mt-6">
+          <button id="btnCreate" class="cyber-button px-5 py-2 rounded-lg bg-emerald-500/20 text-emerald-200">
+            Create Account
+          </button>
+          <button id="btnLogin" class="cyber-button px-5 py-2 rounded-lg bg-cyan-500/20 text-cyan-200">
+            Log In
+          </button>
+        </div>
+        <div id="authMessage" class="mt-4 text-sm text-rose-300"></div>
+      </section>
+
+      <section class="cyber-card rounded-2xl p-6 sm:p-7 lg:p-8 mt-8">
+        <div class="flex items-center justify-between gap-4 mb-6">
+          <h2 class="text-2xl font-semibold text-cyan-200">Public Graph Console</h2>
+          <span class="text-xs tracking-[0.3em] text-cyan-300/60 uppercase">Open Access</span>
+        </div>
+        <p class="text-sm text-cyan-100/70">
+          Provide a Gun coordinate such as <code>shogun-wormhole.wormhole-transfers</code> or
+          <code>~pubKey.user.profile</code> to explore without authenticating.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-3 mt-4">
+          <input
+            type="text"
+            id="publicPathInput"
+            placeholder="Enter Gun path to explore"
+            class="cyber-input flex-grow px-3 py-2 rounded-lg"
+          />
+          <button id="btnExplorePublic" class="cyber-button px-5 py-2 rounded-lg bg-fuchsia-500/20 text-fuchsia-200">
+            Explore Path
+          </button>
+        </div>
+        <p id="publicExplorerMessage" class="hidden mt-3 text-xs"></p>
+
+        <div class="mt-8">
+          <h3 class="text-lg font-semibold text-cyan-200 mb-2">Relay Peers</h3>
+          <p class="text-sm text-cyan-100/70">
+            Add additional peers (for example <code>https://relay.example.com/gun</code> or <code>wss://relay.example.com/gun</code>)
+            to improve replication coverage. Peers are stored only for this session.
+          </p>
+          <div class="flex flex-col sm:flex-row gap-3 mt-4">
+            <input
+              type="text"
+              id="newPeerInput"
+              placeholder="https://my-relay.example.com/gun"
+              class="cyber-input flex-grow px-3 py-2 rounded-lg"
+            />
+            <button id="btnAddPeer" class="cyber-button px-5 py-2 rounded-lg bg-cyan-500/20 text-cyan-200">
+              Add Relay
+            </button>
+          </div>
+          <p id="peerFeedback" class="hidden mt-2 text-xs"></p>
+        </div>
+      </section>
+
+      <section class="cyber-card rounded-2xl p-6 sm:p-7 lg:p-8 mt-8">
+        <div class="flex items-center justify-between gap-4 mb-6">
+          <h2 class="text-2xl font-semibold text-cyan-200">Data Operations</h2>
+          <span class="text-xs tracking-[0.3em] text-cyan-300/60 uppercase">Admin Toolkit</span>
+        </div>
+        <p class="text-sm text-cyan-100/70">
+          Use an administrator token to export a full snapshot of the relay's graph. Tokens sync automatically with the
+          Control Panel when available.
+        </p>
+        <div class="mt-4 grid gap-3 sm:grid-cols-[2fr,auto]">
+          <input
+            type="password"
+            id="adminToken"
+            placeholder="Admin token (auto-loaded if saved)"
+            class="cyber-input px-3 py-2 rounded-lg"
+          />
+          <button id="btnLoadAllNodes" class="cyber-button px-5 py-2 rounded-lg bg-indigo-500/20 text-indigo-200">
+            Load Full Graph Snapshot
+          </button>
+        </div>
+        <p id="statusMessage" class="hidden"></p>
+        <div id="graphSummary" class="mt-3 text-xs text-cyan-200/60"></div>
+        <pre
+          id="graphDump"
+          class="hidden mt-4 bg-slate-950/70 border border-cyan-500/20 rounded-xl p-4 text-[11px] leading-relaxed text-cyan-100/80 overflow-x-auto max-h-64"
+        ></pre>
+      </section>
+
+      <section id="explorerSection" class="hidden mt-10 space-y-7">
+        <div class="cyber-card rounded-2xl p-6">
+          <div class="flex flex-wrap justify-between items-start gap-5">
+            <div class="space-y-2">
+              <h2 class="text-xl font-semibold text-cyan-200">Session Status</h2>
+              <p id="userInfo" class="text-sm text-cyan-100/75 break-all"></p>
+              <p id="peerStatus" class="text-xs text-slate-400"></p>
+            </div>
+            <button id="btnLogout" class="cyber-button px-4 py-2 rounded-lg bg-rose-500/20 text-rose-200">
+              Log Out
+            </button>
+          </div>
+        </div>
+
+        <div class="cyber-card rounded-2xl p-6">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <button
+                id="btnGoToRoot"
+                class="cyber-button px-3 py-1 text-sm rounded-lg bg-slate-900/70 text-cyan-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Jump to origin
+              </button>
+              <div class="text-xs text-cyan-100/60 break-all">
+                <span class="uppercase tracking-wide text-cyan-300/70">Path:</span>
+                <span id="currentPath" class="font-mono text-cyan-200"></span>
+              </div>
+            </div>
+            <span class="text-xs text-cyan-200/60">
+              Select a linked property to follow referenced nodes.
+            </span>
+          </div>
+          <div>
+            <h3 class="text-lg font-semibold text-cyan-200 mb-2">Node Properties</h3>
+            <div
+              id="explorerContent"
+              class="min-h-[120px] p-4 rounded-xl bg-slate-950/70 border border-cyan-400/15 font-mono text-sm overflow-x-auto"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.5"
-                d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
-              />
-            </svg>
-
-            <h1 class="text-3xl font-semibold mb-8 text-center text-[#FFFFFF]">Live Gun Graph Explorer</h1>
-
-            <div class="w-full space-y-6 sm:space-y-8">
-              <div class="stats">
-                <div class="input-row sm:flex sm:items-center sm:gap-6">
-                  <span class="stats-label block mb-3 sm:mb-0">Authentication:</span>
-                  <input
-                    type="password"
-                    id="authToken"
-                    class="input w-full sm:flex-1 bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none"
-                    placeholder="Admin Token (auto-loaded if saved)"
-                  />
-                </div>
-              </div>
-
-              <div class="stats">
-                <div class="input-row sm:flex sm:items-center sm:gap-6">
-                  <span class="stats-label block mb-3 sm:mb-0">Graph Explorer:</span>
-                  <div class="flex gap-3 w-full">
-                    <input
-                      type="text"
-                      id="soulInput"
-                      class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none flex-1"
-                      placeholder="Enter node soul (or leave empty to see all)"
-                    />
-                    <button onclick="loadNodeFromInput()" class="btn-custom btn-sm whitespace-nowrap">
-                      Load
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="stats overflow-x-auto">
-                <div class="stats-content">
-                  <span class="stats-label">Graph Stats:</span>
-                  <span id="nodeCount" class="text-[#FF69B4]">0</span> nodes loaded | Last updated:
-                  <span id="lastUpdate" class="text-[#A0A0A0]">Never</span>
-                </div>
-              </div>
-
-              <!-- Add sync controls section -->
-              <div class="stats">
-                <div>
-                  <span class="stats-label block mb-3">Graph Traversal:</span>
-                  <div class="btn-row mb-4">
-                    <button onclick="loadConnectedGraphFromInput()" class="btn-custom btn-sm">
-                      🕸️ Load Connected Graph
-                    </button>
-                    <select id="maxDepth" class="input bg-[#282828] border-[#606060] text-[#FFFFFF] rounded-xl px-4 py-2" style="width: auto;">
-                      <option value="2">Depth 2</option>
-                      <option value="3" selected>Depth 3</option>
-                      <option value="4">Depth 4</option>
-                      <option value="5">Depth 5</option>
-                    </select>
-                  </div>
-                  <div class="text-sm text-[#A0A0A0] border-t border-[#606060] pt-3">
-                    🕸️ Automatically follow references to load the entire connected graph
-                  </div>
-                </div>
-              </div>
-
-              <div class="stats">
-                <div>
-                  <span class="stats-label block mb-3">Real-time Sync:</span>
-                  <div class="btn-row mb-4">
-                    <button onclick="enableGlobalRealTimeSync()" class="btn-custom btn-sm">
-                      Enable Real-time Updates
-                    </button>
-                    <button onclick="disableGlobalRealTimeSync()" class="btn-custom btn-sm">
-                      Disable Real-time
-                    </button>
-                  </div>
-                  <div class="text-sm text-[#A0A0A0] border-t border-[#606060] pt-3">
-                    💡 Enable real-time sync to see live updates as data changes on the relay
-                  </div>
-                </div>
-              </div>
-
-              <div id="error" class="alert alert-error hidden bg-[#F44336]/20 border-[#F44336]/30 text-[#F44336] rounded-xl p-4"></div>
-              <div id="graphContainer" class="graph-container">
-                <!-- Graph nodes will be injected here -->
-              </div>
+              Select a node to inspect its state.
             </div>
           </div>
         </div>
-      </div>
+
+        <div class="cyber-card rounded-2xl p-6">
+          <h3 class="text-xl font-semibold text-cyan-200 mb-4">Write Operations</h3>
+          <div class="flex flex-col sm:flex-row gap-3">
+            <input
+              type="text"
+              id="newKey"
+              placeholder="Property key"
+              class="cyber-input flex-grow px-3 py-2 rounded-lg"
+            />
+            <input
+              type="text"
+              id="newValue"
+              placeholder='Value (JSON or text)'
+              class="cyber-input flex-grow px-3 py-2 rounded-lg"
+            />
+            <button id="btnAddProperty" class="cyber-button px-5 py-2 rounded-lg bg-cyan-500/20 text-cyan-200">
+              Add or Update
+            </button>
+          </div>
+          <p class="mt-2 text-xs text-cyan-200/60">
+            Executes <code>[currentNode].[key] = value</code>. Existing keys are overwritten immediately.
+          </p>
+        </div>
+      </section>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gun/lib/promise.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
-
     <script>
-      const graphContainer = document.getElementById("graphContainer");
-      const nodeCountEl = document.getElementById("nodeCount");
-      const lastUpdateEl = document.getElementById("lastUpdate");
-      const errorEl = document.getElementById("error");
+      const DEFAULT_PEERS = [window.location.origin + "/gun"];
 
-      let gun;
-      let currentGraph = {};
-      let expandedNodes = new Set();
-      let requestedSouls = new Set();
+      const gun = Gun({ peers: DEFAULT_PEERS, retry: 2000 });
+      const user = gun.user();
+      window.gun = gun;
+      window.user = user;
 
-      function formatValue(value) {
-        if (value === null) {
-          return document.createTextNode("null");
-        }
-        const type = typeof value;
-        if (type === "object") {
-          if (value["#"]) {
-            // GunDB link - enhanced with navigation and status
-            const linkContainer = document.createElement("div");
-            linkContainer.className = "link-container";
-            
-            const link = document.createElement("a");
-            link.href = "#";
-            link.textContent = `🔗 ${value["#"]}`;
-            link.style.cssText = "color: #42A5F5; text-decoration: none; font-family: monospace; overflow-wrap: break-word; max-width: 100%;";
-            link.onclick = (e) => {
-              e.preventDefault();
-              navigateToNode(value["#"]);
-            };
-            
-            // Add status indicator
-            const statusIndicator = document.createElement("span");
-            const isLoaded = currentGraph.hasOwnProperty(value["#"]);
-            statusIndicator.textContent = isLoaded ? "✅" : "⏳";
-            statusIndicator.title = isLoaded ? "Node loaded" : "Node not loaded yet";
-            statusIndicator.style.cssText = "font-size: 12px;";
-            
-            // Add quick load button for unloaded nodes
-            if (!isLoaded) {
-              const loadBtn = document.createElement("button");
-              loadBtn.textContent = "Load";
-              loadBtn.style.cssText = "font-size: 10px; padding: 2px 6px; margin-left: 4px; background: #42A5F5; color: white; border: none; border-radius: 4px; cursor: pointer;";
-              loadBtn.onclick = (e) => {
-                e.stopPropagation();
-                loadNode(value["#"]);
-                loadBtn.disabled = true;
-                loadBtn.textContent = "Loading...";
-              };
-              linkContainer.appendChild(loadBtn);
-            }
-            
-            linkContainer.appendChild(link);
-            linkContainer.appendChild(statusIndicator);
-            return linkContainer;
-          }
-          try {
-            // Pretty-print other objects
-            const pre = document.createElement("pre");
-            pre.textContent = JSON.stringify(value, null, 2);
-            return pre;
-          } catch (e) {
-            return document.createTextNode("[Unserializable Object]");
-          }
-        }
-        return document.createTextNode(String(value));
-      }
+      const authSection = document.getElementById("authSection");
+      const explorerSection = document.getElementById("explorerSection");
+      const authMessage = document.getElementById("authMessage");
+      const userInfo = document.getElementById("userInfo");
+      const peerStatus = document.getElementById("peerStatus");
+      const currentPathEl = document.getElementById("currentPath");
+      const explorerContent = document.getElementById("explorerContent");
+      const publicExplorerMessage = document.getElementById("publicExplorerMessage");
+      const peerFeedback = document.getElementById("peerFeedback");
+      const statusMessage = document.getElementById("statusMessage");
+      const graphSummary = document.getElementById("graphSummary");
+      const graphDump = document.getElementById("graphDump");
+      const adminTokenInput = document.getElementById("adminToken");
 
-      function navigateToNode(nodeId) {
-        if (!currentGraph.hasOwnProperty(nodeId)) {
-          loadNode(nodeId);
-        }
+      const usernameInput = document.getElementById("username");
+      const passwordInput = document.getElementById("password");
+      const publicPathInput = document.getElementById("publicPathInput");
+      const newPeerInput = document.getElementById("newPeerInput");
+      const newKeyInput = document.getElementById("newKey");
+      const newValueInput = document.getElementById("newValue");
 
-        if (!expandedNodes.has(nodeId)) {
-          expandedNodes.add(nodeId);
-          renderGraph(); // Re-render to show expanded state
-        }
+      const btnCreate = document.getElementById("btnCreate");
+      const btnLogin = document.getElementById("btnLogin");
+      const btnLogout = document.getElementById("btnLogout");
+      const btnGoToRoot = document.getElementById("btnGoToRoot");
+      const btnAddProperty = document.getElementById("btnAddProperty");
+      const btnExplorePublic = document.getElementById("btnExplorePublic");
+      const btnAddPeer = document.getElementById("btnAddPeer");
+      const btnLoadAllNodes = document.getElementById("btnLoadAllNodes");
 
-        // After re-render, find the element and scroll to it.
-        setTimeout(() => {
-          const element = document.querySelector(`[data-node-id="${nodeId}"]`);
-          if (element) {
-            element.scrollIntoView({ behavior: "smooth", block: "center" });
-            element.style.transition = "background-color 0.3s ease-in-out";
-            element.style.backgroundColor = "#4a4a4a";
-            setTimeout(() => {
-              element.style.backgroundColor = "";
-            }, 1500);
-          } else {
-            console.warn(
-              `navigateToNode: Could not find node '${nodeId}' in the DOM.`
-            );
-          }
-        }, 100);
-      }
+      const configuredPeers = new Set(DEFAULT_PEERS);
+      const activePeers = new Set();
 
-      // Initialize Gun connection
-      function initGun() {
-        const peer = `${window.location.protocol}//${window.location.host}/gun`;
-        try {
-          Gun.on("opt", function (ctx) {
-            if (ctx.once) {
-              return;
-            }
-            ctx.on("out", function (msg) {
-              const to = this.to;
-              const headers = ShogunAdmin.getAuthHeaders();
-              if (headers['Authorization']) {
-                  const token = headers['Authorization'].split(' ')[1];
-                   msg.headers = {
-                    ...msg.headers, // Preserve existing headers
-                    token: token,
-                    Authorization: `Bearer ${token}`,
-                };
-              }
-              console.log(msg);
-              to.next(msg); // pass to next middleware
-            });
-          });
+      let currentNode = null;
+      let currentPathString = "";
+      let rootNode = null;
+      let rootPathString = "";
+      let explorerMode = null;
 
-          // Enhanced Gun configuration for better synchronization
-          gun = Gun({ 
-            peers: [peer], 
-            localStorage: false, 
-            radisk: false,
-            // Enhanced sync configurations
-            wire: false,        // Enable wire protocol for efficiency
-            axe: false,        // Enable axe protocol for efficiency
-            wait: 300,         // Faster batch processing (vs default 1000ms)
-            until: 250,        // Shorter timeout for queries
-            batch: 5,          // Small batch size for real-time updates
-            retry: 3,          // Number of retry attempts
-            // Connection resilience
-            reconnect: true,   // Enable automatic reconnection
-            heartbeat: 30000,  // Heartbeat every 30 seconds
-            timeout: 15000     // Connection timeout
-          });
-
-          // Enhanced connection monitoring and auto-reconnection
-          let connectionState = {
-            isConnected: false,
-            lastPing: Date.now(),
-            reconnectAttempts: 0,
-            maxReconnectAttempts: 5,
-            reconnectDelay: 2000
-          };
-
-          // Monitor connection health
-          gun.on('hi', (peer) => {
-            connectionState.isConnected = true;
-            connectionState.lastPing = Date.now();
-            connectionState.reconnectAttempts = 0;
-            console.log('🟢 Gun connected to peer:', peer);
-            updateConnectionStatus('connected');
-          });
-
-          gun.on('bye', (peer) => {
-            connectionState.isConnected = false;
-            console.log('🔴 Gun disconnected from peer:', peer);
-            updateConnectionStatus('disconnected');
-            attemptReconnection();
-          });
-
-          // Monitor sync events
-          gun.on('out', (msg) => {
-            if (msg.get) {
-              console.log('📤 GET request:', msg.get);
-            }
-            if (msg.put) {
-              console.log('📤 PUT request:', Object.keys(msg.put).length, 'nodes');
-            }
-          });
-
-          gun.on('in', (msg) => {
-            connectionState.lastPing = Date.now();
-            if (msg.put) {
-              console.log('📥 Received data:', Object.keys(msg.put).length, 'nodes');
-              // Trigger re-render if we have active nodes
-              if (Object.keys(currentGraph).length > 0) {
-                setTimeout(renderGraph, 100);
-              }
-            }
-          });
-
-          // Heartbeat to detect stale connections
-          setInterval(() => {
-            const timeSinceLastPing = Date.now() - connectionState.lastPing;
-            if (timeSinceLastPing > 60000 && connectionState.isConnected) {
-              console.warn('⚠️  Connection may be stale, attempting reconnection');
-              attemptReconnection();
-            }
-          }, 30000);
-
-          // Auto-reconnection logic
-          function attemptReconnection() {
-            if (connectionState.reconnectAttempts >= connectionState.maxReconnectAttempts) {
-              console.error('❌ Max reconnection attempts reached');
-              updateConnectionStatus('failed');
-              return;
-            }
-
-            connectionState.reconnectAttempts++;
-            updateConnectionStatus('reconnecting');
-            
-            console.log(`🔄 Reconnection attempt ${connectionState.reconnectAttempts}/${connectionState.maxReconnectAttempts}`);
-            
-            setTimeout(() => {
-              try {
-                // Reinitialize Gun connection
-                initGun();
-              } catch (error) {
-                console.error('Reconnection failed:', error);
-                setTimeout(attemptReconnection, connectionState.reconnectDelay * connectionState.reconnectAttempts);
-              }
-            }, connectionState.reconnectDelay);
-          }
-
-          // Real-time sync for specific nodes
-          function enableRealTimeSync(soul) {
-            if (!soul) return;
-            
-            gun.get(soul).on((data, key) => {
-              console.log(`🔄 Real-time update for ${key}:`, data);
-              if (data) {
-                const cleanData = { ...data };
-                delete cleanData._;
-                currentGraph[key] = cleanData;
-                renderGraph();
-              }
-            });
-          }
-
-          // Add connection status indicator
-          function updateConnectionStatus(status) {
-            const statusEl = document.getElementById('connectionStatus') || createStatusIndicator();
-            const statusMap = {
-              connected: { text: '🟢 Connected', class: 'text-green-500' },
-              disconnected: { text: '🔴 Disconnected', class: 'text-red-500' },
-              reconnecting: { text: '🟡 Reconnecting...', class: 'text-yellow-500' },
-              failed: { text: '❌ Connection Failed', class: 'text-red-600' }
-            };
-            
-            const statusInfo = statusMap[status] || statusMap.disconnected;
-            statusEl.textContent = statusInfo.text;
-            statusEl.className = statusInfo.class + ' font-medium';
-          }
-
-          function createStatusIndicator() {
-            const statusEl = document.createElement('span');
-            statusEl.id = 'connectionStatus';
-            statusEl.textContent = '🟡 Connecting...';
-            statusEl.className = 'text-yellow-500 font-medium';
-            
-            // Add to stats section
-            const statsSection = document.querySelector('.stats');
-            if (statsSection) {
-              const statusContainer = document.createElement('div');
-              statusContainer.className = 'connection-status';
-              statusContainer.innerHTML = '<strong class="stats-label">Connection Status:</strong> ';
-              statusContainer.appendChild(statusEl);
-              statsSection.appendChild(statusContainer);
-            }
-            
-            return statusEl;
-          }
-
-          window.gun = gun;
-          window.enableRealTimeSync = enableRealTimeSync;
-          console.log("Gun initialized successfully with enhanced sync", peer);
-          errorEl.style.display = "none";
-        } catch (error) {
-          console.error("Failed to initialize Gun:", error);
-          showError("Failed to connect to Gun database: " + error.message);
-        }
-      }
-
-      function loadNode(soul) {
-        if (!soul || requestedSouls.has(soul)) {
+      function setStatus(message, type = "info") {
+        if (!statusMessage) return;
+        if (!message) {
+          statusMessage.textContent = "";
+          statusMessage.hidden = true;
           return;
         }
-        console.log(`Requesting node: ${soul}`);
-        requestedSouls.add(soul);
-        showError("");
-
-        // Use .once() to get the data for a soul
-        gun.get(soul).once((data, key) => {
-          console.log(`Received data for ${key}:`, data);
-          if (data) {
-            // Clean metadata before storing
-            const cleanData = { ...data };
-            delete cleanData._;
-            currentGraph[key] = cleanData;
-            
-            // Auto-follow references if enabled
-            if (globalRealTimeEnabled) {
-              followReferences(cleanData, key);
-            }
-          } else {
-            // If data is null or undefined, store it to indicate we've checked.
-            currentGraph[key] = null;
-          }
-          renderGraph();
-        });
+        statusMessage.hidden = false;
+        statusMessage.className = "mt-3 text-sm";
+        statusMessage.textContent = message;
+        statusMessage.classList.remove("text-cyan-200", "text-emerald-300", "text-amber-300", "text-rose-300");
+        switch (type) {
+          case "success":
+            statusMessage.classList.add("text-emerald-300");
+            break;
+          case "warning":
+            statusMessage.classList.add("text-amber-300");
+            break;
+          case "error":
+            statusMessage.classList.add("text-rose-300");
+            break;
+          default:
+            statusMessage.classList.add("text-cyan-200");
+        }
       }
 
-      // New function to automatically follow references
-      function followReferences(nodeData, sourceSoul, depth = 0, maxDepth = 3) {
-        if (depth >= maxDepth || !nodeData) return;
-        
-        Object.keys(nodeData).forEach(key => {
-          const value = nodeData[key];
-          // Check if this is a Gun reference
-          if (value && typeof value === 'object' && value['#']) {
-            const targetSoul = value['#'];
-            console.log(`🔗 Following reference: ${sourceSoul} -> ${targetSoul} (depth: ${depth})`);
-            
-            // Load the referenced node if not already loaded
-            if (!requestedSouls.has(targetSoul)) {
-              setTimeout(() => {
-                gun.get(targetSoul).once((data, key) => {
-                  if (data) {
-                    const cleanData = { ...data };
-                    delete cleanData._;
-                    currentGraph[key] = cleanData;
-                    renderGraph();
-                    
-                    // Recursively follow references from this node
-                    if (depth < maxDepth - 1) {
-                      followReferences(cleanData, key, depth + 1, maxDepth);
-                    }
-                  }
-                });
-                requestedSouls.add(targetSoul);
-              }, 100 * depth); // Stagger requests to avoid overwhelming
-            }
-          }
-        });
+      function setPublicExplorerMessage(message, type = "info") {
+        if (!publicExplorerMessage) return;
+        if (!message) {
+          publicExplorerMessage.textContent = "";
+          publicExplorerMessage.hidden = true;
+          return;
+        }
+        publicExplorerMessage.hidden = false;
+        publicExplorerMessage.textContent = message;
+        publicExplorerMessage.className = "mt-3 text-xs";
+        publicExplorerMessage.classList.remove("text-emerald-300", "text-amber-300", "text-rose-300", "text-slate-400");
+        switch (type) {
+          case "success":
+            publicExplorerMessage.classList.add("text-emerald-300");
+            break;
+          case "warning":
+            publicExplorerMessage.classList.add("text-amber-300");
+            break;
+          case "error":
+            publicExplorerMessage.classList.add("text-rose-300");
+            break;
+          default:
+            publicExplorerMessage.classList.add("text-slate-400");
+        }
       }
 
-      function loadNodeFromInput() {
-        const soul = document.getElementById("soulInput").value;
-        if (soul) {
-          // Clear the graph for a focused view
-          currentGraph = {};
-          requestedSouls = new Set();
-          loadNode(soul);
+      function setPeerFeedback(message, type = "info") {
+        if (!peerFeedback) return;
+        if (!message) {
+          peerFeedback.textContent = "";
+          peerFeedback.hidden = true;
+          return;
+        }
+        peerFeedback.hidden = false;
+        peerFeedback.textContent = message;
+        peerFeedback.className = "mt-2 text-xs";
+        peerFeedback.classList.remove("text-emerald-300", "text-amber-300", "text-rose-300", "text-slate-400");
+        switch (type) {
+          case "success":
+            peerFeedback.classList.add("text-emerald-300");
+            break;
+          case "warning":
+            peerFeedback.classList.add("text-amber-300");
+            break;
+          case "error":
+            peerFeedback.classList.add("text-rose-300");
+            break;
+          default:
+            peerFeedback.classList.add("text-slate-400");
+        }
+      }
+
+      function updatePeerStatusDisplay() {
+        if (!peerStatus) return;
+        if (activePeers.size === 0) {
+          peerStatus.textContent = "Connecting to peers...";
+          peerStatus.classList.remove("text-emerald-300");
+          peerStatus.classList.add("text-slate-400");
         } else {
-          loadAllNodes();
+          peerStatus.textContent =
+            "Connected to " + activePeers.size + " peer(s): " + Array.from(activePeers).join(", ");
+          peerStatus.classList.remove("text-slate-400");
+          peerStatus.classList.add("text-emerald-300");
         }
       }
 
-      // Enhanced function to load connected graph
-      function loadConnectedGraph(startSoul, maxDepth = 3) {
-        if (!startSoul) {
-          showError("Please provide a starting node soul");
-          return;
+      function updateRootButtonState() {
+        btnGoToRoot.disabled = !rootNode;
+        if (rootNode) {
+          btnGoToRoot.textContent = "Jump to '" + (rootPathString || "root") + "'";
+        } else {
+          btnGoToRoot.textContent = "Jump to origin";
         }
-        
-        console.log(`🕸️ Loading connected graph starting from: ${startSoul} (max depth: ${maxDepth})`);
-        showError(`🕸️ Loading connected graph from: ${startSoul} (depth: ${maxDepth})...`, false);
-        
-        // Clear current graph
-        currentGraph = {};
-        requestedSouls = new Set();
-        
-        // Start traversal
-        traverseGraph(startSoul, 0, maxDepth);
       }
 
-      function traverseGraph(soul, depth, maxDepth) {
-        if (depth >= maxDepth || requestedSouls.has(soul)) {
-          return;
-        }
-        
-        console.log(`🔍 Traversing node: ${soul} (depth: ${depth})`);
-        requestedSouls.add(soul);
-        
-        gun.get(soul).once((data, key) => {
-          if (data) {
-            // Store the node data
-            const cleanData = { ...data };
-            delete cleanData._;
-            currentGraph[key] = cleanData;
-            renderGraph();
-            
-            // Find all references in this node
-            const references = [];
-            Object.keys(cleanData).forEach(prop => {
-              const value = cleanData[prop];
-              if (value && typeof value === 'object' && value['#']) {
-                references.push(value['#']);
-              }
-            });
-            
-            console.log(`📎 Found ${references.length} references in ${key}:`, references);
-            
-            // Traverse referenced nodes
-            references.forEach((refSoul, index) => {
-              setTimeout(() => {
-                traverseGraph(refSoul, depth + 1, maxDepth);
-              }, 50 * index); // Stagger requests to avoid overwhelming
-            });
-            
-            // Update progress
-            if (depth === 0) {
-              setTimeout(() => {
-                const nodeCount = Object.keys(currentGraph).length;
-                showError(`✅ Graph traversal complete! Loaded ${nodeCount} connected nodes`, false);
-                setTimeout(() => showError(''), 5000);
-              }, 1000);
+      function getAuthToken() {
+        if (window.ShogunAdmin && typeof ShogunAdmin.getPassword === "function") {
+          const saved = ShogunAdmin.getPassword();
+          if (saved) {
+            if (adminTokenInput && !adminTokenInput.value) {
+              adminTokenInput.value = saved;
             }
-          } else {
-            console.log(`❌ No data found for node: ${soul}`);
+            return saved;
           }
+        }
+        return adminTokenInput ? adminTokenInput.value.trim() : "";
+      }
+
+      function getAuthHeaders() {
+        const token = getAuthToken();
+        if (!token) {
+          return {};
+        }
+        return {
+          Authorization: "Bearer " + token,
+          token
+        };
+      }
+
+      function resolvePathToNode(pathString) {
+        const sanitized = (pathString || "").trim();
+        if (!sanitized) {
+          return { node: gun, resolvedPath: "root" };
+        }
+        const segments = sanitized
+          .split(".")
+          .map((segment) => segment.trim())
+          .filter(Boolean);
+        if (segments.length === 0) {
+          return { node: gun, resolvedPath: "root" };
+        }
+        let nodeInstance = gun.get(segments[0]);
+        let resolvedPath = segments[0];
+        for (let i = 1; i < segments.length; i += 1) {
+          nodeInstance = nodeInstance.get(segments[i]);
+          resolvedPath += "." + segments[i];
+        }
+        return { node: nodeInstance, resolvedPath };
+      }
+
+      function updateExplorerHeader() {
+        if (!userInfo) return;
+        if (explorerMode === "user" && user.is) {
+          const alias = user.is.alias;
+          const pub = user.is.pub;
+          const aliasInfo = alias ? "Alias: " + alias + " - " : "";
+          userInfo.textContent = aliasInfo + "Public key: " + pub;
+          btnLogout.classList.remove("hidden");
+        } else if (explorerMode === "public") {
+          userInfo.textContent = "Public mode • Root: " + rootPathString;
+          btnLogout.classList.add("hidden");
+        } else {
+          userInfo.textContent = "";
+          btnLogout.classList.add("hidden");
+        }
+      }
+
+      function startExplorer(nodeInstance, pathString, mode) {
+        explorerMode = mode;
+        rootNode = nodeInstance;
+        rootPathString = pathString || "root";
+        updateExplorerHeader();
+        updateRootButtonState();
+        explorerSection.classList.remove("hidden");
+        exploreNode(nodeInstance, pathString || "root");
+      }
+
+      function startPublicExplorer(rawPath) {
+        try {
+          const { node, resolvedPath } = resolvePathToNode(rawPath);
+          setPublicExplorerMessage("Exploring path: " + resolvedPath, "success");
+          startExplorer(node, resolvedPath, "public");
+        } catch (error) {
+          setPublicExplorerMessage(error.message || "Invalid path provided.", "error");
+        }
+      }
+
+      function addPeer(url) {
+        const trimmed = (url || "").trim();
+        if (!trimmed) {
+          setPeerFeedback("Provide a relay URL.", "warning");
+          return;
+        }
+        if (!/^https?:\/\//i.test(trimmed) && !/^wss?:\/\//i.test(trimmed)) {
+          setPeerFeedback("Relay URLs must begin with https://, http://, wss://, or ws://.", "error");
+          return;
+        }
+        if (configuredPeers.has(trimmed)) {
+          setPeerFeedback("Relay already configured.", "warning");
+          return;
+        }
+        try {
+          configuredPeers.add(trimmed);
+          gun.opt({ peers: [trimmed] });
+          setPeerFeedback("Relay added: " + trimmed, "success");
+        } catch (error) {
+          setPeerFeedback("Unable to add relay: " + error.message, "error");
+        }
+      }
+
+      function attemptRenderSetFallback(nodeInstance) {
+        const aggregated = {};
+        const seenKeys = new Set();
+        let hasAnyChild = false;
+        let idleTimer = null;
+        let finalized = false;
+        const MAX_WAIT_MS = 2000;
+        const QUIET_WINDOW_MS = 350;
+
+        const mapChain = nodeInstance.map();
+        const maxTimer = setTimeout(finalize, MAX_WAIT_MS);
+
+        function cleanup() {
+          if (idleTimer) {
+            clearTimeout(idleTimer);
+            idleTimer = null;
+          }
+          clearTimeout(maxTimer);
+          if (typeof mapChain.off === "function") {
+            mapChain.off();
+          }
+        }
+
+        function finalize() {
+          if (finalized) return;
+          finalized = true;
+          cleanup();
+          if (hasAnyChild) {
+            renderData(aggregated, nodeInstance);
+          } else {
+            explorerContent.innerHTML =
+              '<div class="text-cyan-200/60 italic">This node is empty or not accessible.</div>';
+          }
+        }
+
+        mapChain.once((childData, childKey) => {
+          if (!childKey || seenKeys.has(childKey)) {
+            return;
+          }
+          seenKeys.add(childKey);
+          hasAnyChild = true;
+          aggregated[childKey] = childData;
+          if (idleTimer) {
+            clearTimeout(idleTimer);
+          }
+          idleTimer = setTimeout(finalize, QUIET_WINDOW_MS);
         });
       }
 
-      function loadAllNodes() {
-        const authHeaders = ShogunAdmin.getAuthHeaders();
-        if (!authHeaders['Authorization']) {
-          showError(
-            "Admin Token is required to load all graph data. Please set it in the Control Panel."
-          );
+      function renderData(data, nodeInstance) {
+        explorerContent.innerHTML = "";
+
+        if (data === null || data === undefined) {
+          explorerContent.innerHTML = '<div class="text-cyan-200/60 italic">Node is null or undefined.</div>';
           return;
         }
-        showError(""); // Clear previous errors
 
-        console.log("Loading all data from server...");
+        if (typeof data !== "object") {
+          explorerContent.textContent = "Primitive value: " + data;
+          return;
+        }
 
-        fetch("/api/v1/system/alldata", {
-          headers: authHeaders,
-        })
+        const keys = Object.keys(data)
+          .filter((k) => k !== "_" && k !== "#")
+          .sort();
+
+        if (keys.length === 0) {
+          explorerContent.innerHTML = '<div class="text-cyan-200/60 italic">This node has no properties.</div>';
+          return;
+        }
+
+        const list = document.createElement("ul");
+        list.className = "space-y-3";
+
+        keys.forEach((key) => {
+          const value = data[key];
+          const item = document.createElement("li");
+          item.className =
+            "flex flex-wrap items-start justify-between gap-3 p-3 bg-slate-900/70 border border-cyan-500/20 rounded-xl";
+
+          const left = document.createElement("div");
+          left.className = "space-y-1 break-all";
+
+          const label = document.createElement("div");
+          label.className = "font-semibold text-cyan-100";
+          label.textContent = key;
+          left.appendChild(label);
+
+          const valueEl = document.createElement("div");
+          valueEl.className = "text-sm text-cyan-200/70 break-all";
+
+          if (typeof value === "object" && value !== null && value["#"]) {
+            valueEl.textContent = "Linked node: " + value["#"];
+            valueEl.classList.add("italic");
+            label.classList.add("node-key");
+            label.title = "Follow " + key;
+            label.addEventListener("click", () => {
+              const nextPath = currentPathString ? currentPathString + "." + key : key;
+              exploreNode(nodeInstance.get(key), nextPath);
+            });
+          } else if (value === null) {
+            valueEl.textContent = "null";
+            valueEl.classList.add("italic");
+          } else {
+            valueEl.textContent = JSON.stringify(value);
+          }
+
+          left.appendChild(valueEl);
+
+          const actions = document.createElement("div");
+          actions.className = "flex gap-2";
+
+          const editBtn = document.createElement("button");
+          editBtn.className = "px-2 py-1 text-xs bg-amber-500/80 text-slate-900 rounded-md hover:bg-amber-400";
+          editBtn.textContent = "Modify";
+          editBtn.addEventListener("click", () => {
+            const nextValue = prompt("Enter a new value for '" + key + "':", JSON.stringify(value));
+            if (nextValue === null) return;
+            try {
+              let parsed;
+              try {
+                parsed = JSON.parse(nextValue);
+              } catch (parseErr) {
+                parsed = nextValue;
+              }
+              nodeInstance.get(key).put(parsed);
+              setTimeout(() => exploreNode(currentNode, currentPathString), 150);
+            } catch (error) {
+              alert("Invalid value: " + error.message);
+            }
+          });
+
+          const deleteBtn = document.createElement("button");
+          deleteBtn.className = "px-2 py-1 text-xs bg-rose-600 text-slate-100 rounded-md hover:bg-rose-500";
+          deleteBtn.textContent = "Set null";
+          deleteBtn.addEventListener("click", () => {
+            if (!confirm("Set '" + key + "' to null?")) return;
+            nodeInstance.get(key).put(null);
+            setTimeout(() => exploreNode(currentNode, currentPathString), 150);
+          });
+
+          actions.append(editBtn, deleteBtn);
+          item.append(left, actions);
+          list.appendChild(item);
+        });
+
+        explorerContent.appendChild(list);
+      }
+
+      function exploreNode(nodeInstance, pathString) {
+        currentNode = nodeInstance;
+        currentPathString = pathString;
+        currentPathEl.textContent = pathString;
+        explorerContent.innerHTML = '<div class="text-cyan-200/60">Loading data...</div>';
+
+        let resolved = false;
+        const timeoutId = setTimeout(() => {
+          if (!resolved) {
+            explorerContent.innerHTML =
+              '<div class="text-rose-300 text-sm">No data received. Check relay connectivity.</div>';
+          }
+        }, 6000);
+
+        nodeInstance.once((data) => {
+          resolved = true;
+          clearTimeout(timeoutId);
+          if (data === null || data === undefined) {
+            attemptRenderSetFallback(nodeInstance);
+          } else {
+            renderData(data, nodeInstance);
+          }
+        }, { wait: 1200 });
+      }
+
+      function addProperty() {
+        const key = newKeyInput.value.trim();
+        const valueRaw = newValueInput.value.trim();
+        if (!key) {
+          alert("Property key is required.");
+          return;
+        }
+        if (!currentNode) {
+          alert("No node selected at the moment.");
+          return;
+        }
+        try {
+          let parsedValue;
+          try {
+            parsedValue = JSON.parse(valueRaw);
+          } catch (error) {
+            parsedValue = valueRaw;
+          }
+          currentNode.get(key).put(parsedValue);
+          newKeyInput.value = "";
+          newValueInput.value = "";
+          setTimeout(() => exploreNode(currentNode, currentPathString), 150);
+        } catch (error) {
+          alert("Save failed: " + error.message);
+        }
+      }
+
+      function loadAllNodes(event) {
+        if (event) event.preventDefault();
+        const headers = getAuthHeaders();
+        if (!headers.Authorization) {
+          setStatus("Admin token required to load the full graph.", "error");
+          return;
+        }
+        setStatus("Requesting graph snapshot...", "info");
+        graphSummary.textContent = "";
+        if (graphDump) {
+          graphDump.textContent = "";
+          graphDump.classList.add("hidden");
+        }
+        if (btnLoadAllNodes) {
+          btnLoadAllNodes.disabled = true;
+          btnLoadAllNodes.textContent = "Loading...";
+        }
+        fetch("/api/v1/system/alldata", { headers })
           .then((response) => {
             if (!response.ok) {
-              const errorText =
-                response.statusText || "Server returned an error";
-              showError(
-                `Error fetching data: HTTP ${response.status} - ${errorText}`
-              );
-              throw new Error(`HTTP ${response.status}`);
+              throw new Error("HTTP " + response.status + " " + response.statusText);
             }
             return response.json();
           })
-          .then((result) => {
-            if (result.success) {
-              console.log("Loaded data from server:", result);
-              currentGraph = result.data || {};
-              requestedSouls = new Set(Object.keys(currentGraph)); // Mark all as requested
-              renderGraph();
-              console.log(
-                `Loaded ${result.nodeCount} nodes (${result.rawSize} bytes raw data)`
-              );
-            } else {
-              showError("Failed to load data: " + result.error);
+          .then((payload) => {
+            if (!payload.success) {
+              throw new Error(payload.error || "Unknown error");
             }
+            const { nodeCount = 0, rawSize = 0, data = {} } = payload;
+            const sizeKb = rawSize ? (rawSize / 1024).toFixed(1) : "0";
+            graphSummary.textContent =
+              "Loaded " + nodeCount + " node(s), " + sizeKb + " KB snapshot at " + new Date().toLocaleTimeString();
+            if (graphDump) {
+              const preview = JSON.stringify(data, null, 2) || "{}";
+              graphDump.textContent =
+                preview.length > 4000 ? preview.slice(0, 4000) + "\n// truncated for preview" : preview;
+              graphDump.classList.remove("hidden");
+            }
+            setStatus("Full graph snapshot loaded successfully.", "success");
           })
           .catch((error) => {
-            console.error("Error fetching data:", error);
-            if (!error.message.startsWith("HTTP")) {
-              showError("Error fetching data: " + error.message);
+            setStatus("Unable to load full graph: " + error.message, "error");
+          })
+          .finally(() => {
+            if (btnLoadAllNodes) {
+              btnLoadAllNodes.disabled = false;
+              btnLoadAllNodes.textContent = "Load Full Graph Snapshot";
             }
           });
       }
 
-      function showError(message) {
-        errorEl.textContent = message;
-        errorEl.style.display = message ? "block" : "none";
-      }
-
-      function formatNodeId(nodeId) {
-        // Check if it's a user key (starts with ~)
-        if (nodeId.startsWith("~")) {
-          return {
-            isUser: true,
-            display: nodeId.substring(88) || "[root]",
-            full: nodeId,
-          };
+      gun.on("hi", (peer) => {
+        if (peer && peer.url) {
+          activePeers.add(peer.url);
+          updatePeerStatusDisplay();
         }
-        return {
-          isUser: false,
-          display: nodeId,
-          full: nodeId,
-        };
-      }
+      });
 
-      function createNodeElement(nodeId, nodeData) {
-        const nodeInfo = formatNodeId(nodeId);
-        const isExpanded = expandedNodes.has(nodeId);
-
-        const nodeEl = document.createElement("div");
-        nodeEl.className = "node-item";
-        nodeEl.dataset.nodeId = nodeId;
-
-        const properties = Object.entries(nodeData || {}).filter(
-          ([key, value]) => key !== "_" && value != null && value !== ""
-        );
-
-        // Count references for enhanced display
-        const references = properties.filter(([key, value]) => 
-          value && typeof value === 'object' && value['#']
-        );
-
-        const header = document.createElement("div");
-        header.className = "node-header";
-        header.onclick = () => toggleNode(nodeId);
-
-        const toggleIcon = document.createElement("span");
-        toggleIcon.className = `toggle-icon ${isExpanded ? "expanded" : ""}`;
-        toggleIcon.textContent = "▶";
-        header.appendChild(toggleIcon);
-
-        const idSpan = document.createElement("span");
-        idSpan.className = `node-id ${nodeInfo.isUser ? "user-key" : ""}`;
-        idSpan.title = nodeInfo.full;
-        idSpan.textContent = nodeInfo.display;
-        header.appendChild(idSpan);
-
-        // Enhanced property count with reference info - now in a container for better responsiveness
-        const nodeMeta = document.createElement("div");
-        nodeMeta.className = "node-meta";
-        
-        const propText = `${properties.length} properties`;
-        const refText = references.length > 0 ? `🔗 ${references.length} refs` : '';
-        
-        const propsCount = document.createElement("span");
-        propsCount.style.cssText = "color: #A0A0A0; font-size: 0.9em;";
-        propsCount.textContent = propText;
-        nodeMeta.appendChild(propsCount);
-        
-        if (references.length > 0) {
-          const refsCount = document.createElement("span");
-          refsCount.style.cssText = "color: #A0A0A0; font-size: 0.9em;";
-          refsCount.textContent = refText;
-          nodeMeta.appendChild(refsCount);
+      gun.on("bye", (peer) => {
+        if (peer && peer.url) {
+          activePeers.delete(peer.url);
+          updatePeerStatusDisplay();
         }
-        
-        header.appendChild(nodeMeta);
+      });
 
-        // Add quick actions for nodes with references
-        if (references.length > 0) {
-          const expandAllBtn = document.createElement("button");
-          expandAllBtn.textContent = "🕸️";
-          expandAllBtn.title = "Load all connected nodes";
-          expandAllBtn.style.cssText = "margin-left: 8px; background: none; border: none; cursor: pointer; font-size: 16px;";
-          expandAllBtn.onclick = (e) => {
-            e.stopPropagation();
-            loadConnectedGraph(nodeId, 2);
-          };
-          nodeMeta.appendChild(expandAllBtn);
-        }
-
-        const content = document.createElement("div");
-        content.className = `node-content ${isExpanded ? "show" : ""}`;
-
-        properties.forEach(([key, value]) => {
-          const propDiv = document.createElement("div");
-          propDiv.className = "property";
-
-          // Highlight reference properties
-          if (value && typeof value === 'object' && value['#']) {
-            propDiv.style.borderLeft = "3px solid #42A5F5";
-            propDiv.style.background = "rgba(66, 165, 245, 0.1)";
-          }
-
-          const keyDiv = document.createElement("div");
-          keyDiv.className = "property-key";
-          keyDiv.textContent = key;
-          propDiv.appendChild(keyDiv);
-
-          const valueDiv = document.createElement("div");
-          valueDiv.className = "property-value";
-          valueDiv.appendChild(formatValue(value));
-          propDiv.appendChild(valueDiv);
-
-          content.appendChild(propDiv);
-        });
-
-        nodeEl.appendChild(header);
-        nodeEl.appendChild(content);
-
-        return nodeEl;
-      }
-
-      function toggleNode(nodeId) {
-        if (expandedNodes.has(nodeId)) {
-          expandedNodes.delete(nodeId);
-        } else {
-          expandedNodes.add(nodeId);
-        }
-        renderGraph();
-      }
-
-      function renderGraph() {
-        try {
-          // Clear container
-          graphContainer.innerHTML = "";
-
-          const nodes = Object.entries(currentGraph);
-
-          if (nodes.length === 0) {
-            graphContainer.innerHTML =
-              '<div class="text-center p-8 text-[#A0A0A0] text-lg">No data loaded. Enter a node soul or click "🕸️ Load Connected Graph" to begin exploring.</div>';
-          } else {
-            // Sort nodes to show connected ones first
-            nodes.sort(([a], [b]) => {
-              // Sort user keys first, then by reference count, then alphabetically
-              const aIsUser = a.startsWith("~");
-              const bIsUser = b.startsWith("~");
-              
-              if (aIsUser && !bIsUser) return -1;
-              if (!aIsUser && bIsUser) return 1;
-              
-              // Count references for sorting
-              const aRefs = countReferences(currentGraph[a]);
-              const bRefs = countReferences(currentGraph[b]);
-              
-              if (aRefs !== bRefs) return bRefs - aRefs; // More references first
-              
-              return a.localeCompare(b);
-            });
-
-            // Render each node
-            nodes.forEach(([nodeId, nodeData]) => {
-              const nodeEl = createNodeElement(nodeId, nodeData);
-              graphContainer.appendChild(nodeEl);
-            });
-          }
-
-          // Update stats with additional info
-          const totalRefs = Object.values(currentGraph).reduce((sum, data) => sum + countReferences(data), 0);
-          nodeCountEl.textContent = `${nodes.length} nodes, ${totalRefs} references`;
-          lastUpdateEl.textContent = new Date().toLocaleTimeString();
-        } catch (error) {
-          console.error("Error rendering graph:", error);
-          showError("Error rendering graph: " + error.message);
-        }
-      }
-
-      function countReferences(nodeData) {
-        if (!nodeData) return 0;
-        return Object.values(nodeData).filter(value => 
-          value && typeof value === 'object' && value['#']
-        ).length;
-      }
-
-      // Global real-time sync management
-      let globalRealTimeEnabled = false;
-      let realTimeSyncHandlers = new Map();
-
-      function enableGlobalRealTimeSync() {
-        globalRealTimeEnabled = true;
-        console.log('🔄 Enabling global real-time sync for all loaded nodes');
-        
-        // Enable real-time sync for all currently loaded nodes
-        Object.keys(currentGraph).forEach(soul => {
-          enableRealTimeSync(soul);
-        });
-        
-        showError('✅ Real-time sync enabled for all nodes', false);
-        setTimeout(() => showError(''), 3000);
-      }
-
-      function disableGlobalRealTimeSync() {
-        globalRealTimeEnabled = false;
-        console.log('⏸️ Disabling global real-time sync');
-        
-        // Disable all real-time sync handlers
-        realTimeSyncHandlers.forEach((handler, soul) => {
-          handler.off();
-        });
-        realTimeSyncHandlers.clear();
-        
-        showError('⏸️ Real-time sync disabled', false);
-        setTimeout(() => showError(''), 3000);
-      }
-
-      // Enhanced real-time sync function
-      function enableRealTimeSync(soul) {
-        if (!soul || realTimeSyncHandlers.has(soul)) return;
-        
-        console.log(`🔄 Enabling real-time sync for: ${soul}`);
-        
-        const handler = gun.get(soul).on((data, key) => {
-          console.log(`📡 Real-time update for ${key}:`, data);
-          if (data) {
-            const cleanData = { ...data };
-            delete cleanData._;
-            currentGraph[key] = cleanData;
-            renderGraph();
-            
-            // Show visual indication of update
-            setTimeout(() => {
-              const nodeEl = document.querySelector(`[data-node-id="${key}"]`);
-              if (nodeEl) {
-                nodeEl.style.transition = 'box-shadow 0.3s ease';
-                nodeEl.style.boxShadow = '0 0 10px rgba(66, 165, 245, 0.5)';
-                setTimeout(() => {
-                  nodeEl.style.boxShadow = '';
-                }, 2000);
-              }
-            }, 100);
-          }
-        });
-        
-        realTimeSyncHandlers.set(soul, handler);
-      }
-
-      // Sync status monitoring
-      function showSyncStats() {
-        const stats = {
-          totalNodes: Object.keys(currentGraph).length,
-          syncedNodes: realTimeSyncHandlers.size,
-          connectionState: gun ? 'connected' : 'disconnected'
-        };
-        console.log('📊 Sync Statistics:', stats);
-        return stats;
-      }
-
-      // Make functions available globally
-      window.toggleNode = toggleNode;
-      window.loadNodeFromInput = loadNodeFromInput;
-      window.loadAllNodes = loadAllNodes;
-      window.enableGlobalRealTimeSync = enableGlobalRealTimeSync;
-      window.disableGlobalRealTimeSync = disableGlobalRealTimeSync;
-      window.enableRealTimeSync = enableRealTimeSync;
-      window.showSyncStats = showSyncStats;
-      window.loadConnectedGraph = loadConnectedGraph;
-      window.traverseGraph = traverseGraph;
-      
-      // Helper function for UI
-      function loadConnectedGraphFromInput() {
-        const soul = document.getElementById("soulInput").value;
-        const maxDepth = parseInt(document.getElementById("maxDepth").value) || 3;
-        
-        if (!soul) {
-          showError("Please enter a node soul to start graph traversal");
+      btnCreate.addEventListener("click", () => {
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value.trim();
+        if (!username || !password) {
+          authMessage.textContent = "Alias and password are required.";
           return;
         }
-        
-        loadConnectedGraph(soul, maxDepth);
-      }
-      
-      window.loadConnectedGraphFromInput = loadConnectedGraphFromInput;
-
-      // Initialize admin authentication
-      document.addEventListener("DOMContentLoaded", () => {
-        ShogunAdmin.init({
-          autoFill: true,
-          showIndicator: true,
-          adminFieldId: "adminPassword",
-          syncEnabled: true,
+        authMessage.textContent = "Creating account...";
+        user.create(username, password, (ack) => {
+          if (ack.err) {
+            authMessage.textContent = "Error: " + ack.err;
+          } else {
+            authMessage.textContent = "Account created. You can log in now.";
+          }
         });
       });
 
-      // Initialize and start updating
-      initGun();
+      btnLogin.addEventListener("click", () => {
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value.trim();
+        if (!username || !password) {
+          authMessage.textContent = "Alias and password are required.";
+          return;
+        }
+        authMessage.textContent = "Authenticating...";
+        user.auth(username, password, (ack) => {
+          if (ack.err) {
+            authMessage.textContent = "Error: " + ack.err;
+          } else {
+            authMessage.textContent = "Login successful!";
+          }
+        });
+      });
 
-      // Initial render
-      setTimeout(renderGraph, 500);
+      btnLogout.addEventListener("click", () => {
+        user.leave();
+        explorerMode = null;
+        rootNode = null;
+        rootPathString = "";
+        updateExplorerHeader();
+        updateRootButtonState();
+        explorerSection.classList.add("hidden");
+        authSection.classList.remove("hidden");
+        explorerContent.innerHTML = "Select a node to inspect its state.";
+        currentNode = null;
+        currentPathString = "";
+        currentPathEl.textContent = "";
+      });
+
+      btnExplorePublic.addEventListener("click", () => {
+        startPublicExplorer(publicPathInput.value);
+      });
+
+      publicPathInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          startPublicExplorer(publicPathInput.value);
+        }
+      });
+
+      btnAddPeer.addEventListener("click", () => {
+        addPeer(newPeerInput.value);
+        newPeerInput.value = "";
+      });
+
+      newPeerInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          addPeer(newPeerInput.value);
+          newPeerInput.value = "";
+        }
+      });
+
+      btnGoToRoot.addEventListener("click", () => {
+        if (!rootNode) {
+          setPublicExplorerMessage("Choose a path to explore first.", "warning");
+          return;
+        }
+        exploreNode(rootNode, rootPathString);
+      });
+
+      btnAddProperty.addEventListener("click", addProperty);
+
+      newValueInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          addProperty();
+        }
+      });
+
+      if (btnLoadAllNodes) {
+        btnLoadAllNodes.addEventListener("click", loadAllNodes);
+      }
+
+      gun.on("auth", (ack) => {
+        authSection.classList.add("hidden");
+        explorerSection.classList.remove("hidden");
+        usernameInput.value = "";
+        passwordInput.value = "";
+        const alias = user.is ? user.is.alias : null;
+        const pub = (user.is && user.is.pub) || (ack && ack.pub) || "not available";
+        const aliasInfo = alias ? "Alias: " + alias + " - " : "";
+        userInfo.textContent = aliasInfo + "Public key: " + pub;
+        btnLogout.classList.remove("hidden");
+        startExplorer(user, "user", "user");
+      });
+
+      document.addEventListener("DOMContentLoaded", () => {
+        if (window.ShogunAdmin && typeof ShogunAdmin.init === "function") {
+          ShogunAdmin.init({
+            autoFill: true,
+            showIndicator: true,
+            fieldId: "adminToken",
+            syncEnabled: true
+          });
+        }
+      });
+
+      window.addEventListener("shogun-admin-password-updated", () => {
+        if (window.ShogunAdmin && typeof ShogunAdmin.getPassword === "function" && adminTokenInput) {
+          const latest = ShogunAdmin.getPassword();
+          if (latest) {
+            adminTokenInput.value = latest;
+          }
+        }
+      });
+
+      setStatus("");
+      setPublicExplorerMessage("");
+      setPeerFeedback("");
+      updatePeerStatusDisplay();
+      updateRootButtonState();
     </script>
   </body>
 </html>
