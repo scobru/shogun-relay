@@ -154,7 +154,13 @@ router.use(
     target: IPFS_API_URL,
     changeOrigin: true,
     ws: true,
-    pathRewrite: (path) => path.replace(/^\/webui/, "/webui"),
+    pathRewrite: (path) => {
+      const rewritten = path.replace(/^\/webui/, "/webui");
+      if (rewritten === "/webui") {
+        return "/webui/";
+      }
+      return rewritten;
+    },
     logLevel: "warn",
     onProxyReq: (proxyReq) => {
       // Assicurati che l'header Host corrisponda al target

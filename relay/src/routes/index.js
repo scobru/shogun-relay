@@ -39,9 +39,7 @@ const tokenAuthMiddleware = (req, res, next) => {
 import uploadsRouter from "./uploads.js";
 import ipfsRouter from "./ipfs.js";
 import systemRouter from "./system.js";
-import notesRouter from "./notes.js";
 import debugRouter from "./debug.js";
-import usersRouter from "./users.js";
 import servicesRouter from "./services.js";
 import visualGraphRouter from "./visualGraph.js";
 
@@ -575,10 +573,6 @@ export default (app) => {
 
   // Route di autenticazione
 
-  // Route per la gestione utenti
-  app.use(`${baseRoute}/users`, usersRouter);
-
-
   // Route per gli upload degli utenti
   app.use(`${baseRoute}/user-uploads`, uploadsRouter);
 
@@ -587,12 +581,6 @@ export default (app) => {
 
   // Route di sistema e debug
   app.use(`${baseRoute}/system`, systemRouter);
-
-  // Route per le note
-  app.use(`${baseRoute}/notes`, notesRouter);
-
-  // Route per le note admin criptate (v1)
-  app.use(`${baseRoute}/notes`, notesRouter);
 
   // Route di debug
   app.use(`${baseRoute}/debug`, debugRouter);
