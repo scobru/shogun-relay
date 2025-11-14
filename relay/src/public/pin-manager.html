@@ -359,7 +359,7 @@
                             <circle class="bg" cx="30" cy="30" r="25"></circle>
                             <circle class="progress" cx="30" cy="30" r="25"></circle>
                         </svg>
-                        <div id="loadingText">Caricamento...</div>
+                        <div id="loadingText">Loading...</div>
                     </div>
                 </div>
 
@@ -370,7 +370,7 @@
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                             </svg>
-                            Aggiungi Pin Rapido
+                            Quick Add Pin
                         </h3>
                         
                         <div class="flex gap-4 items-end">
@@ -394,7 +394,7 @@
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
-                            Operazioni Batch
+                            Batch Operations
                         </h3>
                         
                         <div class="space-y-4">
@@ -402,15 +402,15 @@
                                 <label class="label cursor-pointer justify-start gap-4">
                                     <input type="checkbox" id="preserveSystemFiles" class="checkbox checkbox-primary" checked>
                                     <div>
-                                        <span class="label-text font-semibold text-[#FFFFFF]">Preserva file di sistema</span>
-                                        <p class="text-sm text-[#A0A0A0]">I file caricati dagli utenti non verranno rimossi</p>
+                                        <span class="label-text font-semibold text-[#FFFFFF]">Preserve system files</span>
+                                        <p class="text-sm text-[#A0A0A0]">User uploaded files will not be removed</p>
                                     </div>
                                 </label>
                             </div>
                             
                             <div class="flex gap-4">
                                 <button onclick="showBatchUnpinModal()" class="btn bg-gradient-to-r from-[#F44336] to-[#D32F2F] hover:from-[#D32F2F] hover:to-[#B71C1C] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-semibold">
-                                    🗑️ Rimuovi Tutti i Pin
+                                    🗑️ Remove All Pins
                                 </button>
                                 <button onclick="runGarbageCollection()" class="btn bg-gradient-to-r from-[#42A5F5] to-[#1976D2] hover:from-[#1976D2] hover:to-[#1565C0] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-semibold">
                                     🧹 Garbage Collection
@@ -443,13 +443,13 @@
 
                 <!-- Search and Filters -->
                 <div class="mb-6">
-                    <input type="text" id="searchInput" class="search-bar" placeholder="🔍 Cerca per CID...">
+                    <input type="text" id="searchInput" class="search-bar" placeholder="🔍 Search by CID...">
                     
                     <div class="filter-tabs mt-4">
-                        <div class="filter-tab active" data-filter="all">Tutti</div>
-                        <div class="filter-tab" data-filter="recursive">Ricorsivi</div>
-                        <div class="filter-tab" data-filter="direct">Diretti</div>
-                        <div class="filter-tab" data-filter="indirect">Indiretti</div>
+                        <div class="filter-tab active" data-filter="all">All</div>
+                        <div class="filter-tab" data-filter="recursive">Recursive</div>
+                        <div class="filter-tab" data-filter="direct">Direct</div>
+                        <div class="filter-tab" data-filter="indirect">Indirect</div>
                     </div>
                 </div>
 
@@ -464,18 +464,18 @@
                 <div id="previewPanel" class="preview-panel">
                     <div class="preview-header">
                         <div>
-                            <h3 class="text-lg font-semibold text-[#FFFFFF] mb-1">Anteprima contenuto</h3>
+                            <h3 class="text-lg font-semibold text-[#FFFFFF] mb-1">Content Preview</h3>
                             <p id="previewCid" class="text-xs text-[#A0A0A0] font-mono break-all"></p>
                         </div>
                         <div class="preview-actions">
-                            <button onclick="openPreviewInGateway()" class="relay-button neutral">🌐 Apri gateway</button>
-                            <button onclick="downloadPreview()" class="relay-button neutral">⬇️ Scarica</button>
-                            <button onclick="closePreview()" class="relay-button primary">Chiudi</button>
+                            <button onclick="openPreviewInGateway()" class="relay-button neutral">🌐 Open Gateway</button>
+                            <button onclick="downloadPreview()" class="relay-button neutral">⬇️ Download</button>
+                            <button onclick="closePreview()" class="relay-button primary">Close</button>
                         </div>
                     </div>
                     <div id="previewMeta" class="preview-meta"></div>
                     <div id="previewContent" class="preview-content text-sm text-[#E0E0E0]">
-                        Seleziona un pin per visualizzarne il contenuto.
+                        Select a pin to view its content.
                     </div>
                 </div>
                     
@@ -484,8 +484,8 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24 mx-auto text-[#606060] mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                     </svg>
-                    <h3 class="text-xl font-semibold text-[#A0A0A0] mb-2">Nessun pin trovato</h3>
-                    <p class="text-[#808080]">Aggiungi il tuo primo pin IPFS per iniziare</p>
+                    <h3 class="text-xl font-semibold text-[#A0A0A0] mb-2">No pins found</h3>
+                    <p class="text-[#808080]">Add your first IPFS pin to get started</p>
                 </div>
             </div>
         </div>
@@ -550,7 +550,7 @@
             }
         });
 
-        function showLoading(message = 'Caricamento...') {
+        function showLoading(message = 'Loading...') {
             document.getElementById('loadingText').textContent = message;
             document.getElementById('loadingOverlay').style.display = 'flex';
         }
@@ -649,7 +649,7 @@
         }
 
         async function loadPins() {
-            showLoading('Caricamento pin...');
+            showLoading('Loading pins...');
             
             const [pinsResult, systemHashesResult] = await Promise.all([
                 apiCall('/api/v1/ipfs/pins/ls', 'POST', {}, { manageVisibility: false }),
@@ -707,12 +707,12 @@
                 
                 updateStats();
                 filterPins();
-                showNotification(`Caricati ${allPins.length} pin`, 'success');
+                showNotification(`Loaded ${allPins.length} pins`, 'success');
             } else {
                 allPins = [];
                 updateStats();
                 filterPins();
-                showNotification('Nessun pin trovato', 'info');
+                showNotification('No pins found', 'info');
             }
             
             hideLoading();
@@ -772,7 +772,7 @@
                         <button onclick="unpinCid('${pin.cid}')" class="action-btn btn-unpin" title="Unpin">
                             📍
                         </button>
-                        <button onclick="removeCid('${pin.cid}')" class="action-btn btn-remove" title="Rimuovi">
+                        <button onclick="removeCid('${pin.cid}')" class="action-btn btn-remove" title="Remove">
                             🗑️
                         </button>
                     </div>
@@ -783,13 +783,13 @@
         async function quickAddPin() {
             const cid = document.getElementById('quickCidInput').value.trim();
             if (!cid) {
-                showNotification('Inserisci un CID valido', 'error');
+                showNotification('Please enter a valid CID', 'error');
                 return;
             }
 
             const result = await apiCall('/api/v1/ipfs/pins/add', 'POST', { cid }, { manageVisibility: false });
             if (result) {
-                showNotification('Pin aggiunto con successo', 'success');
+                showNotification('Pin added successfully', 'success');
                 document.getElementById('quickCidInput').value = '';
                 await loadPins();
             }
@@ -798,16 +798,16 @@
         async function copyCid(cid) {
             try {
                 await navigator.clipboard.writeText(cid);
-                showNotification('CID copiato negli appunti', 'success');
+                showNotification('CID copied to clipboard', 'success');
             } catch (error) {
-                showNotification('Errore nel copiare il CID', 'error');
+                showNotification('Error copying CID', 'error');
             }
         }
 
         async function repinCid(cid) {
             const result = await apiCall('/api/v1/ipfs/pins/add', 'POST', { cid }, { manageVisibility: false });
             if (result) {
-                showNotification('Pin riapplicato con successo', 'success');
+                showNotification('Pin reapplied successfully', 'success');
             }
         }
 
@@ -837,7 +837,7 @@
             currentPreviewMetadata = null;
             document.getElementById('previewCid').textContent = '';
             document.getElementById('previewMeta').textContent = '';
-            document.getElementById('previewContent').innerHTML = 'Seleziona un pin per visualizzarne il contenuto.';
+            document.getElementById('previewContent').innerHTML = 'Select a pin to view its content.';
         }
 
         function closePreview() {
@@ -876,7 +876,7 @@
                 return;
             }
 
-            showLoading('Caricamento contenuto…');
+            showLoading('Loading content…');
             resetPreviewState();
 
             try {
@@ -905,11 +905,11 @@
 
                 let metaPieces = [];
                 if (displayName) {
-                    metaPieces.push(`Nome: ${displayName}`);
+                    metaPieces.push(`Name: ${displayName}`);
                 }
-                metaPieces.push(`Tipo: ${contentType}`);
+                metaPieces.push(`Type: ${contentType}`);
                 if (contentLength) {
-                    metaPieces.push(`Dimensione: ${formatBytes(contentLength)}`);
+                    metaPieces.push(`Size: ${formatBytes(contentLength)}`);
                 }
 
                 let blob;
@@ -947,7 +947,7 @@
                     previewObjectUrl = URL.createObjectURL(blob);
                     previewHtml = `
                         <p class="text-[#A0A0A0] mb-3">
-                            Il contenuto non è direttamente visualizzabile. Utilizza i pulsanti sopra per aprirlo nel gateway o scaricarlo.
+                            Content is not directly viewable. Use the buttons above to open it in the gateway or download it.
                         </p>
                         <p class="text-xs text-[#808080]">CID: ${escapeHtml(cid)}</p>
                     `;
@@ -966,7 +966,7 @@
                 activatePreview();
                 document.getElementById('previewPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
             } catch (error) {
-                showNotification(`Impossibile caricare il contenuto: ${error.message}`, 'error');
+                showNotification(`Unable to load content: ${error.message}`, 'error');
                 closePreview();
             } finally {
                 hideLoading();
@@ -985,7 +985,7 @@
 
             if (metadata.isEncrypted && !url.includes("token=")) {
                 if (!password) {
-                    showNotification('Token admin richiesto per aprire contenuti cifrati', 'error');
+                    showNotification('Admin token required to open encrypted content', 'error');
                     return;
                 }
                 const separator = url.includes('?') ? '&' : '?';
@@ -997,7 +997,7 @@
 
         function downloadPreview() {
             if (!previewBlob || !currentPreviewCid) {
-                showNotification('Nessun contenuto da scaricare', 'error');
+                showNotification('No content to download', 'error');
                 return;
             }
 
@@ -1023,50 +1023,50 @@
         }
 
         async function unpinCid(cid) {
-            if (!confirm('Sei sicuro di voler rimuovere questo pin?')) return;
+            if (!confirm('Are you sure you want to remove this pin?')) return;
             
             const result = await apiCall('/api/v1/ipfs/pins/rm', 'POST', { cid }, { manageVisibility: false });
             if (result) {
-                showNotification('Pin rimosso con successo', 'success');
+                showNotification('Pin removed successfully', 'success');
                 await loadPins();
             }
         }
 
         async function removeCid(cid) {
-            if (!confirm('Questo rimuoverà il pin e eseguirà la garbage collection. Sei sicuro?')) return;
+            if (!confirm('This will remove the pin and run garbage collection. Are you sure?')) return;
             
-            showLoading('Rimozione in corso...');
+            showLoading('Removing...');
             
             try {
                 // Unpin first
                 const unpinResult = await apiCall('/api/v1/ipfs/pins/rm', 'POST', { cid }, { manageVisibility: false });
                 if (unpinResult) {
-                    showNotification('Pin rimosso, esecuzione garbage collection...', 'info');
+                    showNotification('Pin removed, running garbage collection...', 'info');
                     
                     // Run garbage collection
                     const gcResult = await apiCall('/api/v1/ipfs/repo/gc', 'POST', {}, { manageVisibility: false });
                     if (gcResult) {
-                        showNotification('File rimosso e garbage collection completata', 'success');
+                        showNotification('File removed and garbage collection completed', 'success');
                         await loadPins();
                     } else {
-                        showNotification('Pin rimosso ma garbage collection fallita', 'error');
+                        showNotification('Pin removed but garbage collection failed', 'error');
                     }
                 }
             } catch (error) {
-                showNotification(`Errore: ${error.message}`, 'error');
+                showNotification(`Error: ${error.message}`, 'error');
             } finally {
                 hideLoading();
             }
         }
 
         async function runGarbageCollection() {
-            if (!confirm('Eseguire la garbage collection? Questo processo può richiedere tempo.')) return;
+            if (!confirm('Run garbage collection? This process may take some time.')) return;
             
-            showLoading('Garbage collection in corso...');
+            showLoading('Running garbage collection...');
             const result = await apiCall('/api/v1/ipfs/repo/gc', 'POST', {}, { manageVisibility: false });
             
             if (result) {
-                showNotification('Garbage collection completata con successo', 'success');
+                showNotification('Garbage collection completed successfully', 'success');
             }
             
             hideLoading();
@@ -1075,8 +1075,8 @@
         function showBatchUnpinModal() {
             const preserveSystemFiles = document.getElementById('preserveSystemFiles').checked;
             const message = preserveSystemFiles 
-                ? '⚠️ Questo rimuoverà tutti i pin non di sistema. Sei sicuro?' 
-                : '⚠️ Questo rimuoverà TUTTI i pin. Sei sicuro?';
+                ? '⚠️ This will remove all non-system pins. Are you sure?' 
+                : '⚠️ This will remove ALL pins. Are you sure?';
             
             if (confirm(message)) {
                 confirmBatchUnpin();
@@ -1085,11 +1085,11 @@
 
         async function confirmBatchUnpin() {
             const preserveSystemFiles = document.getElementById('preserveSystemFiles').checked;
-            showLoading('Rimozione batch in corso...');
+            showLoading('Running batch removal...');
             
             const confirmMessage = preserveSystemFiles 
-                ? '⚠️ Questo rimuoverà tutti i pin non di sistema. Confermi?' 
-                : '⚠️ Questo rimuoverà TUTTI i pin. Confermi?';
+                ? '⚠️ This will remove all non-system pins. Confirm?' 
+                : '⚠️ This will remove ALL pins. Confirm?';
             
             if (!confirm(confirmMessage)) {
                 hideLoading();
@@ -1112,11 +1112,11 @@
                     // Filter out system files (this would need to be implemented based on your system)
                     // For now, we'll just unpin all but log the intention
                     console.log('System file preservation enabled, but not implemented yet - removing all pins');
-                    showNotification('Preservazione file di sistema non ancora implementata - rimozione di tutti i pin', 'warning');
+                    showNotification('System file preservation not yet implemented - removing all pins', 'warning');
                 }
 
                 if (pinsToRemove.length === 0) {
-                    showNotification('Nessun pin da rimuovere', 'info');
+                    showNotification('No pins to remove', 'info');
                     return;
                 }
 
@@ -1128,7 +1128,7 @@
                     const progress = Math.round(((i + 1) / pinsToRemove.length) * 100);
                     
                     updateProgress(progress);
-                    showLoading(`Rimozione ${i + 1}/${pinsToRemove.length}: ${cid.substring(0, 12)}...`);
+                    showLoading(`Removing ${i + 1}/${pinsToRemove.length}: ${cid.substring(0, 12)}...`);
 
                     try {
                         const result = await apiCall('/api/v1/ipfs/pins/rm', 'POST', { cid }, { manageVisibility: false });
@@ -1146,14 +1146,14 @@
                 }
 
                 updateProgress(100);
-                showNotification(`Batch completato: ${successCount} rimossi, ${errorCount} errori`, successCount > 0 ? 'success' : 'error');
+                showNotification(`Batch completed: ${successCount} removed, ${errorCount} errors`, successCount > 0 ? 'success' : 'error');
                 
                 if (successCount > 0) {
                     await loadPins();
                 }
                 
             } catch (error) {
-                showNotification(`Errore batch: ${error.message}`, 'error');
+                showNotification(`Batch error: ${error.message}`, 'error');
             } finally {
                 hideLoading();
                 updateProgress(0);

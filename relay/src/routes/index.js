@@ -293,6 +293,11 @@ export default (app) => {
     res.sendFile(path.resolve(publicPath, "charts.html"));
   });
 
+  app.get("/endpoints", (req, res) => {
+    const publicPath = path.resolve(__dirname, "../public");
+    res.sendFile(path.resolve(publicPath, "endpoints.html"));
+  });
+
 
   // Route per servire i file JavaScript dalla directory lib
   app.get("/lib/:filename", (req, res) => {

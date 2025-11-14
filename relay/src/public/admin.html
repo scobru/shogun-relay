@@ -15,7 +15,7 @@
     <script src="lib/admin-auth.js"></script>
 
     <style>
-        /* Tooltip personalizzato per il tema dark */
+        /* Custom tooltip for dark theme */
         .tooltip {
             position: relative;
             display: inline-block;
@@ -59,7 +59,7 @@
             opacity: 1;
         }
 
-        /* Animazione di entrata per i tooltip */
+        /* Tooltip entrance animation */
         .tooltip .tooltiptext {
             transform: translateY(10px);
             transition: opacity 0.3s, visibility 0.3s, transform 0.3s;
@@ -69,7 +69,7 @@
             transform: translateY(0);
         }
 
-        /* Responsive per mobile */
+        /* Mobile responsive */
         @media (max-width: 768px) {
             .tooltip .tooltiptext {
                 width: 240px;
@@ -79,12 +79,12 @@
             }
         }
 
-        /* Nascondi le applicazioni protette di default */
+        /* Hide protected applications by default */
         .admin-protected {
             display: none !important;
         }
 
-        /* Mostra le applicazioni protette quando l'admin è autenticato */
+        /* Show protected applications when admin is authenticated */
         .admin-authenticated .admin-protected {
             display: flex !important;
         }
@@ -121,8 +121,7 @@
                         <div class="flex items-start gap-2 mb-4">
                             <span class="text-[#FFA500] text-sm mt-0.5">🔒</span>
                             <p class="text-sm text-[#E0E0E0] leading-relaxed">
-                                Inserisci la password admin per accedere a tutte le applicazioni. Se la password non è
-                                corretta, saranno visibili solo le applicazioni pubbliche.
+                                Enter the admin password to access all applications. If the password is incorrect, only public applications will be visible.
                             </p>
                         </div>
                         <div class="space-y-4">
@@ -156,12 +155,12 @@
                             <div id="passwordStatus"
                                 class="flex items-center gap-2 text-sm text-center text-[#E0E0E0] opacity-90 min-h-[20px]">
                                 <span class="text-[#FFA500]">🔒</span>
-                                <span>Accesso Limitato - Solo applicazioni pubbliche visibili</span>
+                                <span>Limited Access - Only public applications visible</span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Link per tornare alla home -->
+                    <!-- Link to return to home -->
                     <div class="w-full max-w-md mb-8 p-4 bg-[#282828] rounded-2xl border border-[#404040] shadow-lg">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-3">
@@ -355,14 +354,14 @@
             const passwordSection = document.getElementById('adminPasswordSection');
 
             if (ShogunAdmin.hasPassword()) {
-                statusElement.innerHTML = '<span class="text-[#4CAF50]">✅</span><span>Accesso Admin - Tutte le applicazioni disponibili</span>';
-                // Nascondi il box password quando il token è presente
+                statusElement.innerHTML = '<span class="text-[#4CAF50]">✅</span><span>Admin Access - All applications available</span>';
+                // Hide password box when token is present
                 if (passwordSection) {
                     passwordSection.style.display = 'none';
                 }
             } else {
-                statusElement.innerHTML = '<span class="text-[#FFA500]">🔒</span><span>Accesso Limitato - Solo applicazioni pubbliche visibili</span>';
-                // Mostra il box password quando non c'è token
+                statusElement.innerHTML = '<span class="text-[#FFA500]">🔒</span><span>Limited Access - Only public applications visible</span>';
+                // Show password box when there's no token
                 if (passwordSection) {
                     passwordSection.style.display = 'block';
                 }
@@ -380,10 +379,10 @@
         }
 
         function handleProtectedPageError() {
-            // Gestisci errori di accesso a pagine protette
+            // Handle errors accessing protected pages
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.get('error') === 'unauthorized') {
-                alert('❌ Accesso negato: Questa pagina richiede autenticazione admin.');
+                alert('❌ Access denied: This page requires admin authentication.');
             }
         }
 
