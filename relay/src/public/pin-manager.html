@@ -658,9 +658,15 @@
             
             systemHashMap = (systemHashesResult && systemHashesResult.systemHashes) || {};
             
+            console.log('🗂️ System Hash Map retrieved:', systemHashMap);
+            console.log('🗂️ Number of system hashes:', Object.keys(systemHashMap).length);
+            
             if (pinsResult && pinsResult.pins) {
                 allPins = Object.entries(pinsResult.pins).map(([cid, info]) => {
                     const metadata = systemHashMap[cid] || {};
+                    
+                    console.log(`🔍 Looking up metadata for CID: ${cid}`);
+                    console.log(`🔍 Found metadata:`, JSON.stringify(metadata, null, 2));
                     
                     // Try multiple fields to get the display name
                     const displayName =
@@ -672,7 +678,7 @@
                         info.Metadata?.name ||
                         '';
                     
-                    console.log(`📋 Pin ${cid.substring(0, 12)}... - Name: "${displayName}", Metadata:`, metadata);
+                    console.log(`📋 Pin ${cid.substring(0, 12)}... - Name: "${displayName}", Full Metadata:`, metadata);
                     
                     return {
                         cid,

@@ -192,6 +192,8 @@ router.get("/system-hashes-map", async (req, res) => {
       systemHashesNode.once((systemHashesData) => {
         clearTimeout(timeoutId);
         
+        console.log('📦 Raw systemHashesData from Gun:', JSON.stringify(systemHashesData, null, 2));
+        
         if (!systemHashesData || typeof systemHashesData !== "object") {
           console.log('📋 No system hashes found, returning empty map');
           resolve({});
@@ -202,11 +204,19 @@ router.get("/system-hashes-map", async (req, res) => {
         const hashMap = {};
         Object.keys(systemHashesData).forEach(key => {
           if (key !== "_" && key !== "#" && key !== ">" && key !== "<") {
-            hashMap[key] = normalizeGunRecord(systemHashesData[key]);
+            const rawValue = systemHashesData[key];
+            const normalizedValue = normalizeGunRecord(rawValue);
+            
+            console.log(`📝 Processing hash ${key}:`);
+            console.log(`   Raw:`, JSON.stringify(rawValue, null, 2));
+            console.log(`   Normalized:`, JSON.stringify(normalizedValue, null, 2));
+            
+            hashMap[key] = normalizedValue;
           }
         });
 
         console.log(`📋 Found ${Object.keys(hashMap).length} system hashes in map`);
+        console.log(`📋 Final hashMap:`, JSON.stringify(hashMap, null, 2));
         resolve(hashMap);
       });
     });
