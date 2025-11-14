@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="night">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shogun Relay API Endpoints</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
+
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="lib/admin-auth.js"></script>
+    <script src="lib/admin-nav.js"></script>
+
+    <style>
+        .endpoint-card {
+            background: #282828;
+            border: 1px solid #404040;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .method-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            margin-right: 0.5rem;
+        }
+
+        .method-get { background: #4CAF50; color: white; }
+        .method-post { background: #2196F3; color: white; }
+        .method-put { background: #FF9800; color: white; }
+        .method-delete { background: #F44336; color: white; }
+
+        .auth-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            margin-left: 0.5rem;
+        }
+
+        .auth-required { background: #FFA500; color: #1A1A1A; }
+        .auth-optional { background: #42A5F5; color: white; }
+        .auth-public { background: #4CAF50; color: white; }
+
+        code {
+            background: #1A1A1A;
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #FF69B4;
+        }
+
+        pre {
+            background: #1A1A1A;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            border: 1px solid #404040;
+        }
+
+        pre code {
+            background: transparent;
+            padding: 0;
+            color: #E0E0E0;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            padding: 0.25rem 0.5rem;
+            background: #404040;
+            border: none;
+            border-radius: 4px;
+            color: #E0E0E0;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+
+        .copy-btn:hover {
+            background: #505050;
+        }
+
+        .code-block {
+            position: relative;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+
+<body class="antialiased bg-[#1A1A1A]">
+    <div class="container mx-auto p-4 max-w-7xl">
+        <div class="card bg-[#1A1A1A] border-0 rounded-2xl">
+            <div class="p-8">
+                <div class="flex flex-col items-center mb-8">
+                    <h1 class="text-4xl font-bold mb-4 text-[#FFFFFF]">🔌 Shogun Relay API Endpoints</h1>
+                    <p class="text-[#8B94FF] text-center max-w-2xl">
+                        Complete API reference with examples for all available endpoints. 
+                        Base URL: <code>http://localhost:8765</code>
+                    </p>
+                </div>
+
+                <!-- Authentication Info -->
+                <div class="endpoint-card bg-gradient-to-r from-[#404040] to-[#353535] mb-8">
+                    <h2 class="text-2xl font-bold mb-4 text-[#FF69B4]">🔐 Authentication</h2>
+                    <p class="text-[#E0E0E0] mb-4">
+                        Most admin endpoints require authentication. Include the admin token in your requests:
+                    </p>
+                    <div class="code-block">
+                        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                        <pre><code>Authorization: Bearer YOUR_ADMIN_PASSWORD
+# or
+token: YOUR_ADMIN_PASSWORD</code></pre>
+                    </div>
+                    <div class="flex gap-2 mt-4">
+                        <span class="auth-badge auth-required">🔒 Admin Required</span>
+                        <span class="auth-badge auth-optional">⚠️ Optional</span>
+                        <span class="auth-badge auth-public">🌐 Public</span>
+                    </div>
+                </div>
+
+                <!-- GunDB Core -->
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold mb-6 text-[#FF69B4] border-b border-[#404040] pb-2">GunDB Core</h2>
+                    
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/gun</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">WebSocket endpoint for Gun clients. Connect using Gun.js library.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>// JavaScript
+const gun = Gun('ws://localhost:8765/gun');
+
+// Or with multiple peers
+const gun = Gun({
+  peers: ['ws://localhost:8765/gun']
+});</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/system/node/*</code>
+                            <span class="auth-badge auth-optional">Optional</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Inspect GunDB nodes via REST API. Use wildcard path to navigate the graph.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>// Get a node
+curl http://localhost:8765/api/v1/system/node/users/alice
+
+// Response
+{
+  "success": true,
+  "data": {
+    "name": "Alice",
+    "age": 30
+  }
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-post">POST</span>
+                            <code class="text-lg">/api/v1/system/node/*</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Update or create GunDB nodes via REST API.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl -X POST http://localhost:8765/api/v1/system/node/users/alice \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Alice", "age": 30}'</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-delete">DELETE</span>
+                            <code class="text-lg">/api/v1/system/node/*</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Delete GunDB nodes via REST API.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl -X DELETE http://localhost:8765/api/v1/system/node/users/alice \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- IPFS Management -->
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold mb-6 text-[#FF69B4] border-b border-[#404040] pb-2">IPFS Management</h2>
+                    
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-post">POST</span>
+                            <code class="text-lg">/api/v1/ipfs/upload</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Upload files to IPFS. Supports multipart/form-data with optional encryption.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>// Using FormData
+const formData = new FormData();
+formData.append('file', fileBlob);
+formData.append('encrypt', 'true'); // Optional
+
+fetch('http://localhost:8765/api/v1/ipfs/upload', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_ADMIN_PASSWORD'
+  },
+  body: formData
+})
+.then(res => res.json())
+.then(data => console.log(data));
+
+// Response
+{
+  "success": true,
+  "data": {
+    "hash": "QmXxxx...",
+    "size": 12345,
+    "relayUrl": "http://localhost:8765/ipfs-content/QmXxxx..."
+  }
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/ipfs/content/:cid</code>
+                            <span class="auth-badge auth-optional">Optional</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Stream IPFS content. Supports encrypted content with token parameter.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>// Public content
+curl http://localhost:8765/api/v1/ipfs/content/QmXxxx...
+
+// Encrypted content
+curl "http://localhost:8765/api/v1/ipfs/content/QmXxxx...?token=YOUR_ADMIN_PASSWORD"</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/ipfs/content-json/:cid</code>
+                            <span class="auth-badge auth-optional">Optional</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Get IPFS content as JSON. Automatically parses JSON content.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/v1/ipfs/content-json/QmXxxx...
+
+// Response
+{
+  "success": true,
+  "data": {
+    "key": "value",
+    "nested": { "data": "here" }
+  }
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-post">POST</span>
+                            <code class="text-lg">/api/v1/ipfs/pins/add</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Pin content to IPFS to prevent garbage collection.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl -X POST http://localhost:8765/api/v1/ipfs/pins/add \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD" \
+  -H "Content-Type: application/json" \
+  -d '{"cid": "QmXxxx..."}'
+
+// Response
+{
+  "success": true,
+  "data": {
+    "Cid": "QmXxxx...",
+    "Type": "recursive"
+  }
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-post">POST</span>
+                            <code class="text-lg">/api/v1/ipfs/pins/rm</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Remove a pin from IPFS.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl -X POST http://localhost:8765/api/v1/ipfs/pins/rm \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD" \
+  -H "Content-Type: application/json" \
+  -d '{"cid": "QmXxxx..."}'</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-post">POST</span>
+                            <code class="text-lg">/api/v1/ipfs/pins/ls</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">List all pinned content in IPFS.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl -X POST http://localhost:8765/api/v1/ipfs/pins/ls \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+// Response
+{
+  "success": true,
+  "data": {
+    "Keys": {
+      "QmXxxx...": {
+        "Type": "recursive"
+      }
+    }
+  }
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/ipfs/status</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Check IPFS node connectivity and status.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/v1/ipfs/status
+
+// Response
+{
+  "success": true,
+  "data": {
+    "connected": true,
+    "version": "0.24.0",
+    "peers": 5
+  }
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/ipfs/repo/stat</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Get IPFS repository statistics (size, objects, etc.).</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/v1/ipfs/repo/stat \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-post">POST</span>
+                            <code class="text-lg">/api/v1/ipfs/repo/gc</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Run garbage collection to remove unpinned content from IPFS.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl -X POST http://localhost:8765/api/v1/ipfs/repo/gc \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD" \
+  -H "Content-Type: application/json" \
+  -d '{}'</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/ipfs/version</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Get IPFS version information.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/v1/ipfs/version</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-post">POST</span>
+                            <code class="text-lg">/api/v0/*</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Raw IPFS API proxy. Forwards requests to the IPFS node API.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>// Example: Get IPFS ID
+curl -X POST http://localhost:8765/api/v0/id \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"
+
+// Example: Add file
+curl -X POST http://localhost:8765/api/v0/add \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD" \
+  -F "file=@/path/to/file"</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System & Debug -->
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold mb-6 text-[#FF69B4] border-b border-[#404040] pb-2">System & Debug</h2>
+                    
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/health</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Simple health check endpoint.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/health
+
+// Response
+{
+  "success": true,
+  "message": "Shogun Relay API is running",
+  "data": {
+    "timestamp": "2024-01-01T00:00:00.000Z",
+    "version": "1.0.0",
+    "uptime": 3600
+  }
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/system/health</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Detailed health report with system information.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/v1/system/health</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/system/relay-info</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Get relay server information.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/v1/system/relay-info</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/system/stats</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Get system statistics and metrics.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/v1/system/stats</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/system/alldata</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Dump all data from the 'shogun' namespace in GunDB.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/v1/system/alldata \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/system/logs</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Get system logs.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/v1/system/logs \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-delete">DELETE</span>
+                            <code class="text-lg">/api/v1/system/logs</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Clear system logs.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl -X DELETE http://localhost:8765/api/v1/system/logs \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/system/peers</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">List all GunDB peers.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/v1/system/peers</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-post">POST</span>
+                            <code class="text-lg">/api/v1/system/peers/add</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Add a GunDB peer.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl -X POST http://localhost:8765/api/v1/system/peers/add \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD" \
+  -H "Content-Type: application/json" \
+  -d '{"peer": "wss://another-relay.example.com/gun"}'</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Services -->
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold mb-6 text-[#FF69B4] border-b border-[#404040] pb-2">Services</h2>
+                    
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/services/status</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Get status of all services (IPFS, Relay, etc.).</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/v1/services/status</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-post">POST</span>
+                            <code class="text-lg">/api/v1/services/:service/restart</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Restart a specific service (stub endpoint).</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl -X POST http://localhost:8765/api/v1/services/ipfs/restart \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Uploads -->
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold mb-6 text-[#FF69B4] border-b border-[#404040] pb-2">User Uploads</h2>
+                    
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/user-uploads/system-hashes</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Get system hash registry (protected hashes that won't be garbage collected).</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/v1/user-uploads/system-hashes</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/user-uploads/system-hashes-map</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Get system hash registry as a map for quick lookups.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/v1/user-uploads/system-hashes-map</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/user-uploads/:identifier</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Get all uploads for a specific user identifier.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/v1/user-uploads/user123</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/user-uploads/:identifier/:hash</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Get specific upload information for a user.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/v1/user-uploads/user123/QmXxxx...</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-post">POST</span>
+                            <code class="text-lg">/api/v1/user-uploads/save-system-hash</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Save a hash to the system registry to protect it from garbage collection.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl -X POST http://localhost:8765/api/v1/user-uploads/save-system-hash \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD" \
+  -H "Content-Type: application/json" \
+  -d '{"hash": "QmXxxx..."}'</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-delete">DELETE</span>
+                            <code class="text-lg">/api/v1/user-uploads/remove-system-hash/:hash</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Remove a hash from the system registry.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl -X DELETE http://localhost:8765/api/v1/user-uploads/remove-system-hash/QmXxxx... \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Debug -->
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold mb-6 text-[#FF69B4] border-b border-[#404040] pb-2">Debug</h2>
+                    
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/debug/mb-usage/:userAddress</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Get storage usage in MB for a specific user address.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/v1/debug/mb-usage/0x1234... \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/debug/user-mb-usage/:identifier</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Get storage usage for a user identifier.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/v1/debug/user-mb-usage/user123 \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/debug/user-uploads/:identifier</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Get detailed upload information for debugging.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/v1/debug/user-uploads/user123 \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-post">POST</span>
+                            <code class="text-lg">/api/v1/debug/user-mb-usage/:identifier/reset</code>
+                            <span class="auth-badge auth-required">Admin</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Reset storage usage counter for a user.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl -X POST http://localhost:8765/api/v1/debug/user-mb-usage/user123/reset \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="mt-12 text-center text-[#A0A0A0] text-sm">
+                    <p>repo build with ❤️ by <a href="https://github.com/scobru" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">scobru</a></p>
+                    <p class="mt-1">part of <a href="https://github.com/scobru/shogun" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">shogun project</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function copyCode(button) {
+            const codeBlock = button.nextElementSibling;
+            const text = codeBlock.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                button.style.background = '#4CAF50';
+                
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.style.background = '#404040';
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                alert('Failed to copy to clipboard');
+            });
+        }
+
+        // Initialize admin navigation
+        window.addEventListener('DOMContentLoaded', () => {
+            if (typeof ShogunAdmin !== 'undefined') {
+                ShogunAdmin.init();
+            }
+        });
+    </script>
+</body>
+
+</html>
+
