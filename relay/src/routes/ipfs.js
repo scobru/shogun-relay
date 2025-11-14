@@ -154,6 +154,7 @@ router.use(
     target: IPFS_API_URL,
     changeOrigin: true,
     ws: true,
+    followRedirects: false, // Don't follow redirects automatically
     pathRewrite: (path, req) => {
       // Handle root path
       if (!path || path === "/" || path === "/webui" || path === "/webui/") {
@@ -177,7 +178,7 @@ router.use(
 
       return rewritten.endsWith("//") ? rewritten.slice(0, -1) : rewritten;
     },
-    logLevel: "debug",
+    logLevel: "warn",
     onProxyReq: (proxyReq, req, res) => {
       // Set proper headers for IPFS API
       const targetUrl = new URL(IPFS_API_URL);
@@ -192,6 +193,22 @@ router.use(
     },
     onProxyRes: (proxyRes, req, res) => {
       console.log(`🔧 WebUI proxy response: ${proxyRes.statusCode} for ${req.url}`);
+      
+      // Handle redirects manually to prevent loops
+      if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400) {
+        const location = proxyRes.headers["location"];
+        console.log(`🔧 WebUI redirect detected: ${location}`);
+        
+        if (location) {
+          // If the redirect is to /webui/, rewrite it to our proxy path
+          if (location.startsWith("/webui")) {
+            proxyRes.headers["location"] = location;
+          } else if (location.startsWith("/")) {
+            proxyRes.headers["location"] = `/webui${location}`;
+          }
+          console.log(`🔧 WebUI redirect rewritten to: ${proxyRes.headers["location"]}`);
+        }
+      }
       
       // Remove restrictive CSP headers that prevent the WebUI from loading
       const csp = proxyRes.headers["content-security-policy"];
@@ -219,12 +236,14 @@ router.use(
     },
     onError: (err, req, res) => {
       console.error("❌ WebUI Proxy Error:", err.message);
-      res.status(500).json({
-        success: false,
-        error: "IPFS WebUI unavailable",
-        details: err.message,
-        message: "Assicurati che IPFS sia in esecuzione e che l'API sia accessibile"
-      });
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: "IPFS WebUI unavailable",
+          details: err.message,
+          message: "Assicurati che IPFS sia in esecuzione e che l'API sia accessibile"
+        });
+      }
     },
   })
 );
