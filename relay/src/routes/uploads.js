@@ -189,7 +189,7 @@ router.get("/system-hashes-map", async (req, res) => {
 
       const systemHashesNode = gun.get("shogun").get("systemhash");
       
-      systemHashesNode.once((systemHashesData) => {
+      systemHashesNode.once(async (systemHashesData) => {
         clearTimeout(timeoutId);
         
         console.log('📦 Raw systemHashesData from Gun:', JSON.stringify(systemHashesData, null, 2));
@@ -200,24 +200,47 @@ router.get("/system-hashes-map", async (req, res) => {
           return;
         }
 
-        // Filtra le chiavi che non sono metadati Gun
-        const hashMap = {};
-        Object.keys(systemHashesData).forEach(key => {
-          if (key !== "_" && key !== "#" && key !== ">" && key !== "<") {
-            const rawValue = systemHashesData[key];
-            const normalizedValue = normalizeGunRecord(rawValue);
-            
-            console.log(`📝 Processing hash ${key}:`);
-            console.log(`   Raw:`, JSON.stringify(rawValue, null, 2));
-            console.log(`   Normalized:`, JSON.stringify(normalizedValue, null, 2));
-            
-            hashMap[key] = normalizedValue;
-          }
-        });
+        // Ottieni le chiavi degli hash (escludi metadati Gun)
+        const hashKeys = Object.keys(systemHashesData).filter(
+          key => key !== "_" && key !== "#" && key !== ">" && key !== "<"
+        );
+        
+        console.log(`📝 Found ${hashKeys.length} hash keys:`, hashKeys);
+        
+        if (hashKeys.length === 0) {
+          console.log('📋 No hashes to process');
+          resolve({});
+          return;
+        }
 
-        console.log(`📋 Found ${Object.keys(hashMap).length} system hashes in map`);
-        console.log(`📋 Final hashMap:`, JSON.stringify(hashMap, null, 2));
-        resolve(hashMap);
+        // Per ogni hash, recupera i dati completi con un .once() separato
+        const hashMap = {};
+        let completed = 0;
+        
+        hashKeys.forEach(hashKey => {
+          systemHashesNode.get(hashKey).once((hashData) => {
+            completed++;
+            
+            console.log(`📝 Processing hash ${hashKey}:`);
+            console.log(`   Raw data:`, JSON.stringify(hashData, null, 2));
+            
+            if (hashData && typeof hashData === 'object') {
+              // Normalizza i dati rimuovendo i metadati Gun
+              const normalized = normalizeGunRecord(hashData);
+              console.log(`   Normalized:`, JSON.stringify(normalized, null, 2));
+              hashMap[hashKey] = normalized;
+            } else {
+              console.log(`   ⚠️ Invalid data for hash ${hashKey}`);
+            }
+            
+            // Se abbiamo processato tutti gli hash, risolvi la promise
+            if (completed === hashKeys.length) {
+              console.log(`📋 Found ${Object.keys(hashMap).length} system hashes in map`);
+              console.log(`📋 Final hashMap:`, JSON.stringify(hashMap, null, 2));
+              resolve(hashMap);
+            }
+          });
+        });
       });
     });
     

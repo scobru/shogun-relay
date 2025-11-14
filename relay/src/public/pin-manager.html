@@ -659,14 +659,29 @@
             systemHashMap = (systemHashesResult && systemHashesResult.systemHashes) || {};
             
             console.log('🗂️ System Hash Map retrieved:', systemHashMap);
+            console.log('🗂️ System Hash Map keys:', Object.keys(systemHashMap));
             console.log('🗂️ Number of system hashes:', Object.keys(systemHashMap).length);
+            
+            // Log each hash in the map
+            Object.keys(systemHashMap).forEach(hashKey => {
+                console.log(`🗂️ Hash ${hashKey}:`, systemHashMap[hashKey]);
+                console.log(`🗂️ Hash ${hashKey} JSON:`, JSON.stringify(systemHashMap[hashKey], null, 2));
+            });
             
             if (pinsResult && pinsResult.pins) {
                 allPins = Object.entries(pinsResult.pins).map(([cid, info]) => {
+                    console.log(`\n🔍 === Processing Pin: ${cid} ===`);
+                    console.log(`🔍 CID exists in systemHashMap:`, cid in systemHashMap);
+                    console.log(`🔍 systemHashMap[cid]:`, systemHashMap[cid]);
+                    
                     const metadata = systemHashMap[cid] || {};
                     
-                    console.log(`🔍 Looking up metadata for CID: ${cid}`);
-                    console.log(`🔍 Found metadata:`, JSON.stringify(metadata, null, 2));
+                    console.log(`🔍 Metadata type:`, typeof metadata);
+                    console.log(`🔍 Metadata keys:`, Object.keys(metadata));
+                    console.log(`🔍 Metadata JSON:`, JSON.stringify(metadata, null, 2));
+                    console.log(`🔍 Metadata.displayName:`, metadata.displayName);
+                    console.log(`🔍 Metadata.fileName:`, metadata.fileName);
+                    console.log(`🔍 Metadata.originalName:`, metadata.originalName);
                     
                     // Try multiple fields to get the display name
                     const displayName =
@@ -678,7 +693,7 @@
                         info.Metadata?.name ||
                         '';
                     
-                    console.log(`📋 Pin ${cid.substring(0, 12)}... - Name: "${displayName}", Full Metadata:`, metadata);
+                    console.log(`📋 Pin ${cid.substring(0, 12)}... - Final Name: "${displayName}"`);
                     
                     return {
                         cid,
