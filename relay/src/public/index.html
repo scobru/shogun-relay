@@ -94,16 +94,16 @@
                     <h1 id="relay-title" class="text-3xl font-medium mb-8 text-[#FFFFFF]">Shogun Relay Control Panel</h1>
                     <p class="text-[#8B94FF] mb-8">Select a tool to continue<span class="animate-pulse">_</span></p>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
-                        <!-- Monitoring & Analytics -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-4xl">
+                        <!-- Public Tools -->
                         <div class="card bg-[#282828] border-[#404040] rounded-2xl">
                             <div class="p-6">
-                                <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Monitoring & Analytics</h2>
+                                <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Public Tools</h2>
                                 <div class="space-y-3">
-                                    <a href="/stats" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="View live relay statistics, memory usage, request rates and system metrics">
-                                        <span class="text-[#4CAF50]">📊</span>
-                                        <span>Live Stats</span>
-                                        <span class="tooltiptext">View live relay statistics, memory usage, request rates and system metrics</span>
+                                    <a href="/chat" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Real-time public chat, encrypted messages, timestamps and decentralized conversation management">
+                                        <span class="text-[#4CAF50]">💬</span>
+                                        <span>Public Chat</span>
+                                        <span class="tooltiptext">Real-time public chat, encrypted messages, timestamps and decentralized conversation management</span>
                                     </a>
                                     <a href="/graph" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Explore GunDB data structure in real-time, view nodes, relationships and decentralized graph data">
                                         <span class="text-[#42A5F5]">🌐</span>
@@ -119,72 +119,15 @@
                             </div>
                         </div>
 
-                        <!-- Storage & Files -->
+                        <!-- Admin Access -->
                         <div class="card bg-[#282828] border-[#404040] rounded-2xl">
                             <div class="p-6">
-                                <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Storage & Files</h2>
+                                <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Admin Access</h2>
                                 <div class="space-y-3">
-                                    <a href="/ipfs-status" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Check IPFS node status, API version, peer connections and network health metrics">
-                                        <span class="text-[#64B5F6]">📊</span>
-                                        <span>IPFS Node Status</span>
-                                        <span class="tooltiptext">Check IPFS node status, API version, peer connections and network health metrics</span>
-                                    </a>
-                                    <a href="/pin-manager" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Manage IPFS pins, add/remove content pins and monitor pinned content status">
-                                        <span class="text-[#FF9800]">📌</span>
-                                        <span>Pin Manager</span>
-                                        <span class="tooltiptext">Manage IPFS pins, add/remove content pins and monitor pinned content status</span>
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Data Management -->
-                        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
-                            <div class="p-6">
-                                <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Data Management</h2>
-                                <div class="space-y-3">
-                                    <a href="/admin" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Admin panel for GunDB management, system monitoring and configuration">
+                                    <a href="/admin" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Access admin panel for full system management and monitoring">
                                         <span class="text-[#42A5F5]">⚙️</span>
                                         <span>Admin Panel</span>
-                                        <span class="tooltiptext">Admin panel for GunDB management, system monitoring and configuration</span>
-                                    </a>
-                                    <a href="/services-dashboard" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Monitor system services, check status and manage service configurations">
-                                        <span class="text-[#64B5F6]">📊</span>
-                                        <span>Services Dashboard</span>
-                                        <span class="tooltiptext">Monitor system services, check status and manage service configurations</span>
-                                    </a>
-                                    <a href="/charts" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="View system statistics, performance metrics and data visualization charts">
-                                        <span class="text-[#4CAF50]">📈</span>
-                                        <span>Charts & Stats</span>
-                                        <span class="tooltiptext">View system statistics, performance metrics and data visualization charts</span>
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Communication -->
-                        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
-                            <div class="p-6">
-                                <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Communication</h2>
-                                <div class="space-y-3">
-                                    <a href="/chat" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Real-time public chat, encrypted messages, timestamps and decentralized conversation management">
-                                        <span class="text-[#4CAF50]">💬</span>
-                                        <span>Public Chat</span>
-                                        <span class="tooltiptext">Real-time public chat, encrypted messages, timestamps and decentralized conversation management</span>
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Security & Tools -->
-                        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
-                            <div class="p-6">
-                                <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Security & Tools</h2>
-                                <div class="space-y-3">
-                                    <a href="/ipfs-status" class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl" data-tooltip="Check IPFS API version, verify compatibility and IPFS protocol status">
-                                        <span class="text-[#A0A0A0]">🔧</span>
-                                        <span>IPFS API Version</span>
-                                        <span class="tooltiptext">Check IPFS API version, verify compatibility and IPFS protocol status</span>
+                                        <span class="tooltiptext">Access admin panel for full system management and monitoring</span>
                                     </a>
                                 </div>
                             </div>
@@ -202,10 +145,12 @@
     </div>
 
     <script>
-        // Initialize admin authentication (for potential future use)
+        // Public page - no admin authentication required
         window.addEventListener('DOMContentLoaded', async () => {
-            // Initialize ShogunAdmin (for potential admin features)
-            ShogunAdmin.init();
+            // Initialize ShogunAdmin for potential admin features (optional)
+            if (typeof ShogunAdmin !== 'undefined') {
+                ShogunAdmin.init();
+            }
         });
     </script>
 </body>
