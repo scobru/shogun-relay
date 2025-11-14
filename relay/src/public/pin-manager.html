@@ -661,19 +661,24 @@
             if (pinsResult && pinsResult.pins) {
                 allPins = Object.entries(pinsResult.pins).map(([cid, info]) => {
                     const metadata = systemHashMap[cid] || {};
+                    
+                    // Try multiple fields to get the display name
                     const displayName =
                         metadata.displayName ||
                         metadata.fileName ||
                         metadata.originalName ||
                         metadata.name ||
                         info.Name ||
+                        info.Metadata?.name ||
                         '';
+                    
+                    console.log(`📋 Pin ${cid.substring(0, 12)}... - Name: "${displayName}", Metadata:`, metadata);
                     
                     return {
                         cid,
                         type: info.Type || 'recursive',
                         name: displayName,
-                        timestamp: metadata.timestamp || Date.now(),
+                        timestamp: metadata.timestamp || metadata.uploadedAt || Date.now(),
                         metadata,
                         rawInfo: info
                     };

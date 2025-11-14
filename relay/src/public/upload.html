@@ -341,23 +341,31 @@
           // Add file to system hashes (admin upload)
           try {
             console.log('💾 Adding file to system hashes...');
+            
+            // Prepare metadata for system hash
+            const systemHashData = {
+              hash: hash,
+              userAddress: 'admin-upload',
+              timestamp: Date.now(),
+              fileName: uploadFileName,
+              displayName: uploadFileName, // Add displayName for pin manager
+              originalName: file.name,
+              fileSize: fileToUpload.size ?? file.size,
+              isEncrypted: isEncrypted,
+              contentType: fileToUpload.type || file.type || 'application/octet-stream',
+              relayUrl: finalIpfsUrl,
+              uploadedAt: Date.now()
+            };
+            
+            console.log('💾 System hash data:', systemHashData);
+            
             const systemHashResponse = await fetch('/api/v1/user-uploads/save-system-hash', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
               },
-              body: JSON.stringify({
-                hash: hash,
-                userAddress: 'admin-upload',
-                timestamp: Date.now(),
-                fileName: uploadFileName,
-                fileSize: fileToUpload.size ?? file.size,
-                isEncrypted: isEncrypted,
-                contentType: fileToUpload.type || file.type || null,
-                relayUrl: finalIpfsUrl,
-                originalName: file.name
-              })
+              body: JSON.stringify(systemHashData)
             });
 
             if (systemHashResponse.ok) {

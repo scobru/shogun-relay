@@ -154,22 +154,46 @@ router.use(
     target: IPFS_API_URL,
     changeOrigin: true,
     ws: true,
-    pathRewrite: (path) => {
-      if (!path || path === "/" || path === "") {
+    pathRewrite: (path, req) => {
+      // Handle root path
+      if (!path || path === "/" || path === "/webui" || path === "/webui/") {
+        console.log('🔧 WebUI root path rewrite: /webui/ -> /webui/');
         return "/webui/";
       }
 
-      const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+      // Remove /webui prefix if present
+      let normalizedPath = path;
+      if (normalizedPath.startsWith("/webui")) {
+        normalizedPath = normalizedPath.substring(6);
+      }
+      
+      // Ensure path starts with /
+      if (!normalizedPath.startsWith("/")) {
+        normalizedPath = "/" + normalizedPath;
+      }
+
       const rewritten = `/webui${normalizedPath}`;
+      console.log(`🔧 WebUI path rewrite: ${path} -> ${rewritten}`);
 
       return rewritten.endsWith("//") ? rewritten.slice(0, -1) : rewritten;
     },
-    logLevel: "warn",
-    onProxyReq: (proxyReq) => {
-      // Assicurati che l'header Host corrisponda al target
-      proxyReq.setHeader("Host", new URL(IPFS_API_URL).host);
+    logLevel: "debug",
+    onProxyReq: (proxyReq, req, res) => {
+      // Set proper headers for IPFS API
+      const targetUrl = new URL(IPFS_API_URL);
+      proxyReq.setHeader("Host", targetUrl.host);
+      
+      // Add IPFS API authentication if available
+      if (IPFS_API_TOKEN) {
+        proxyReq.setHeader("Authorization", `Bearer ${IPFS_API_TOKEN}`);
+      }
+      
+      console.log(`🔧 WebUI proxy request: ${req.method} ${req.url} -> ${targetUrl.origin}${proxyReq.path}`);
     },
-    onProxyRes: (proxyRes) => {
+    onProxyRes: (proxyRes, req, res) => {
+      console.log(`🔧 WebUI proxy response: ${proxyRes.statusCode} for ${req.url}`);
+      
+      // Remove restrictive CSP headers that prevent the WebUI from loading
       const csp = proxyRes.headers["content-security-policy"];
       if (csp) {
         proxyRes.headers["content-security-policy"] = csp
@@ -184,8 +208,23 @@ router.use(
           .join("; ");
       }
 
+      // Remove headers that prevent embedding
       delete proxyRes.headers["x-frame-options"];
       delete proxyRes.headers["strict-transport-security"];
+      
+      // Fix CORS headers for external access
+      proxyRes.headers["Access-Control-Allow-Origin"] = "*";
+      proxyRes.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
+      proxyRes.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, token";
+    },
+    onError: (err, req, res) => {
+      console.error("❌ WebUI Proxy Error:", err.message);
+      res.status(500).json({
+        success: false,
+        error: "IPFS WebUI unavailable",
+        details: err.message,
+        message: "Assicurati che IPFS sia in esecuzione e che l'API sia accessibile"
+      });
     },
   })
 );

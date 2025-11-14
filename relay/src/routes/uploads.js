@@ -17,20 +17,24 @@ function normalizeGunRecord(record) {
 
   const normalized = {};
   Object.entries(record).forEach(([key, value]) => {
+    // Skip Gun metadata keys
     if (GUN_META_KEYS.includes(key)) {
       return;
     }
 
+    // Handle Gun references (objects with # property)
     if (value && typeof value === "object") {
       if (typeof value["#"] === "string") {
         normalized[key] = value["#"];
         return;
       }
 
+      // Recursively normalize nested objects
       normalized[key] = normalizeGunRecord(value);
       return;
     }
 
+    // Copy primitive values directly
     normalized[key] = value;
   });
 
@@ -276,10 +280,12 @@ router.post("/save-system-hash", (req, res, next) => {
     await new Promise((resolve, reject) => {
       const systemHashesNode = gun.get("shogun").get("systemhash");
       
+      const now = Date.now();
       const hashRecord = {
         hash: hash,
         userAddress: userAddress,
-        timestamp: timestamp || Date.now(),
+        timestamp: timestamp || now,
+        uploadedAt: timestamp || now,
         savedAt: new Date().toISOString(),
       };
 
@@ -308,12 +314,14 @@ router.post("/save-system-hash", (req, res, next) => {
         hashRecord.originalName = originalName;
       }
 
+      console.log(`💾 Saving hash record:`, JSON.stringify(hashRecord, null, 2));
+
       systemHashesNode.get(hash).put(hashRecord, (ack) => {
         if (ack && ack.err) {
           console.error('❌ Error saving hash to systemhash node:', ack.err);
           reject(new Error(ack.err));
         } else {
-          console.log(`✅ Hash ${hash} saved to systemhash node successfully`);
+          console.log(`✅ Hash ${hash} saved to systemhash node successfully with metadata`);
           resolve();
         }
       });
