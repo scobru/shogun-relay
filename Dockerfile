@@ -3,6 +3,14 @@
 
 FROM node:20-alpine
 
+# Build arguments (may be passed by CapRover or other deployment systems)
+# These are defined to avoid "not consumed" warnings, even if not used in build
+ARG ADMIN_PASSWORD
+ARG CAPROVER_GIT_COMMIT_SHA
+ARG IPFS_API_KEY
+ARG IPFS_API_TOKEN
+ARG RELAY_PEERS
+
 # Install required system packages
 RUN apk add --no-cache \
     git \
