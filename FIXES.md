@@ -2,43 +2,21 @@
 
 ## Data: 2025-11-14
 
-### Problemi Risolti
+### Modifiche Implementate
 
-#### 1. Tunnel WebUI di Kubo non funziona
+#### 1. Rimozione Proxy WebUI Kubo (Sicurezza)
 
-**Problema:** Il proxy per `/webui` non funzionava correttamente quando si usava un tunnel esterno (ngrok o simili) per accedere al relay da remoto.
+**Motivo:** Il proxy per `/webui` è stato rimosso per ragioni di sicurezza. Esporre la WebUI di Kubo attraverso il relay può creare vulnerabilità.
 
-**Causa:** 
-- Il proxy non gestiva correttamente i path di rewrite
-- Mancavano i log di debug per tracciare le richieste
-- Le intestazioni CORS non erano impostate correttamente per l'accesso esterno
-- Mancava la gestione degli errori del proxy
+**Soluzione:**
+- Rimosso completamente il proxy `/webui` da `relay/src/routes/ipfs.js`
+- Rimosso il link dalla pagina admin
+- Aggiunto commento nel codice per indicare la rimozione
 
-**Soluzione implementata in `relay/src/routes/ipfs.js`:**
-
-1. Migliorato il path rewrite per gestire correttamente tutti i casi:
-   - Root path (`/webui`, `/webui/`)
-   - Subpath (`/webui/ipfs/...`)
-   - Rimozione automatica del prefisso `/webui` per evitare duplicazioni
-
-2. Aggiunti log di debug dettagliati:
-   - Log delle richieste in ingresso
-   - Log delle richieste proxy verso IPFS
-   - Log delle risposte IPFS
-
-3. Migliorati gli header HTTP:
-   - Impostazione corretta dell'header `Host`
-   - Aggiunta autenticazione IPFS API se disponibile
-   - Impostazione header CORS per accesso esterno
-   - Rimozione header restrittivi (`X-Frame-Options`, `Strict-Transport-Security`)
-
-4. Gestione degli errori:
-   - Messaggio di errore user-friendly
-   - Log degli errori nel proxy
-   - Risposta JSON strutturata in caso di errore
-
-**Test:**
-Per testare il fix, accedi a: `https://your-tunnel.ngrok.io/webui?_auth_token=YOUR_ADMIN_PASSWORD`
+**Accesso alternativo:**
+Se necessario, è possibile accedere alla WebUI di Kubo direttamente:
+- Locale: `http://localhost:5001/webui`
+- Via SSH tunnel: `ssh -L 5001:localhost:5001 user@server`
 
 ---
 

@@ -1,11 +1,30 @@
-# 
+# Shogun Relay
 
 [![npm](https://img.shields.io/badge/npm-v1.9.4-blue)](https://www.npmjs.com/package/shogun-relay)
 [![License](https://img.shields.io/badge/license-MIT-yellow)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3.3-blue)](https://www.typescriptlang.org/)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/scobru/shogun-relay)
 
-Shogun Relay is a production-ready **GunDB relay** with a built-in IPFS control plane. It provides a single node that can relay Gun traffic, persist data with RADISK, manage IPFS storage, and expose rich admin dashboards.
+**Shogun Relay** is a production-ready connection hub that unifies **GunDB** and **IPFS** into a single solution. If you're building decentralized applications and need a centralized control point to manage your distributed data, this is the tool for you.
+
+## Why Shogun Relay?
+
+As an independent developer, you've likely faced these challenges:
+
+- **Complex management**: You need to configure and maintain separately a GunDB relay, IPFS node, monitoring dashboards, and management APIs
+- **Lack of visibility**: You don't have a simple way to see what's happening in your distributed data or IPFS storage
+- **Manual operations**: Managing IPFS pins, running garbage collection, monitoring system health requires too many manual commands
+- **Fragmented integration**: Your applications need to talk to different services, each with its own authentication and configuration
+
+**Shogun Relay solves all of this** by providing:
+
+✅ **A single access point** for GunDB relay, IPFS management, and administrative dashboards  
+✅ **Complete web interface** to monitor, manage, and inspect your data in real-time  
+✅ **Unified REST APIs** with centralized authentication (one token for everything)  
+✅ **Instant deployment** with Docker or manual setup in minutes  
+✅ **Production-ready** with RADISK persistence, rate limiting, and built-in security
+
+In practice, instead of orchestrating 3-4 different services, you start a single server and have everything you need to manage your decentralized infrastructure.
 
 ![Shogun Relay Admin Panel](image.png)
 
@@ -83,6 +102,8 @@ cd shogun-relay
 
 # verify the relay is alive
 curl http://localhost:8765/health
+# or
+curl http://localhost:8765/api/v1/health
 ```
 
 ### Manual Setup
@@ -143,6 +164,7 @@ The admin dashboards rely on `lib/admin-auth.js` to sync the token across tabs. 
 | `/upload`             | Direct IPFS uploads                        | ✅   |
 | `/visualGraph`        | GunDB visual explorer (public reads)       | ⚠️*  |
 | `/graph`              | Alternate Gun graph viewer                 | ⚠️*  |
+| `/charts`             | Charts and analytics dashboard             | ✅   |
 | `/chat`               | Demo public chat                           | ❌   |
 
 `⚠️` The explorers browse public coordinates without a token but prompt for the admin token when write access is required.
@@ -153,29 +175,39 @@ The admin dashboards rely on `lib/admin-auth.js` to sync the token across tabs. 
 
 ### GunDB Core
 - `GET /gun` – WebSocket endpoint for Gun clients.
-- `GET /gun.js` – Client library.
 - `GET|POST|DELETE /api/v1/system/node/*` – Inspect or update nodes via REST.
 
 ### IPFS Management
 - `POST /api/v1/ipfs/upload` – Upload streams (admin).
 - `GET /api/v1/ipfs/content/:cid` – Stream IPFS content (used by preview panel).
-- `POST /api/v1/ipfs/pins/{add|rm|ls}` – Pin operations.
+- `GET /api/v1/ipfs/content-json/:cid` – Get IPFS content as JSON.
+- `POST /api/v1/ipfs/pins/add` – Add pin.
+- `POST /api/v1/ipfs/pins/rm` – Remove pin.
+- `POST /api/v1/ipfs/pins/ls` – List pins.
 - `GET /api/v1/ipfs/status` – Connectivity check.
 - `GET /api/v1/ipfs/repo/stat` – Repository statistics.
 - `POST /api/v1/ipfs/repo/gc` – Garbage collection.
 - `POST /api/v0/*` – Raw IPFS API proxy (admin).
 
 ### System & Debug
+- `GET /health` – Simple health check.
 - `GET /api/v1/system/health` – Detailed health report.
+- `GET /api/v1/system/relay-info` – Relay information.
 - `GET /api/v1/system/alldata` – Dump `shogun` namespace (admin use).
+- `GET /api/v1/system/stats` – System statistics.
 - `GET /api/v1/system/logs` / `DELETE /api/v1/system/logs` – Log management.
+- `GET /api/v1/system/peers` – List Gun peers.
+- `POST /api/v1/system/peers/add` – Add Gun peer.
 - `GET /api/v1/services/status` – Service snapshot.
 - `POST /api/v1/services/:service/restart` – Restart stub.
-- `GET /api/v1/debug/...` – Helpers for storage usage, uploads, etc.
+- `GET /api/v1/debug/mb-usage/:userAddress` – Storage usage by user.
+- `GET /api/v1/debug/user-uploads/:identifier` – User uploads info.
 
-### Notes
-- `/api/v1/notes/*` – Encrypted admin notes (token required).
-- `/api/v1/notes/regular/*` – Public demo notes API.
+
+### User Uploads
+- `GET /api/v1/user-uploads/system-hashes` – System hash registry.
+- `GET /api/v1/user-uploads/:identifier` – Get user uploads.
+- `GET /api/v1/user-uploads/:identifier/:hash` – Get specific upload.
 
 ### Visual Graph
 - `/visualGraph/*` – Static assets backing the D3.js explorer.
