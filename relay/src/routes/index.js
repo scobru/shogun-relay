@@ -34,7 +34,6 @@ const tokenAuthMiddleware = (req, res, next) => {
   }
 };
 
-
 // Importa i moduli delle routes
 import uploadsRouter from "./uploads.js";
 import ipfsRouter from "./ipfs.js";
@@ -211,8 +210,7 @@ export default (app) => {
 
     if (token === process.env.ADMIN_PASSWORD) {
       res.redirect(
-        "/api/v1/ipfs/webui/?auth_token=" +
-          encodeURIComponent(token)
+        "/api/v1/ipfs/webui/?auth_token=" + encodeURIComponent(token)
       );
       return;
     }
@@ -222,35 +220,33 @@ export default (app) => {
     );
   });
 
-
   app.get("/admin", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     const adminPath = path.resolve(publicPath, "admin.html");
-    
+
     console.log(`🔍 Admin route requested`);
     console.log(`📁 Public path: ${publicPath}`);
     console.log(`📄 Admin file path: ${adminPath}`);
     console.log(`📄 Admin file exists: ${fs.existsSync(adminPath)}`);
-    
+
     if (!fs.existsSync(adminPath)) {
       console.error(`❌ Admin file not found: ${adminPath}`);
       return res.status(404).json({
         success: false,
         error: "Admin panel HTML file not found",
-        path: adminPath
+        path: adminPath,
       });
     }
-    
+
     // Aggiungi header per prevenire il caching
     res.set({
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache',
-      'Expires': '0'
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      Pragma: "no-cache",
+      Expires: "0",
     });
-    
+
     res.sendFile(adminPath);
   });
-
 
   app.get("/stats", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
@@ -277,7 +273,6 @@ export default (app) => {
     res.sendFile(path.resolve(publicPath, "upload.html"));
   });
 
-
   app.get("/graph", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "graph.html"));
@@ -298,27 +293,26 @@ export default (app) => {
     res.sendFile(path.resolve(publicPath, "endpoints.html"));
   });
 
-
   // Route per servire i file JavaScript dalla directory lib
   app.get("/lib/:filename", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     const filePath = path.resolve(publicPath, "lib", req.params.filename);
-    
+
     console.log(`🔍 Lib file requested: ${req.params.filename}`);
     console.log(`📄 File path: ${filePath}`);
     console.log(`📄 File exists: ${fs.existsSync(filePath)}`);
-    
+
     if (!fs.existsSync(filePath)) {
       console.error(`❌ Lib file not found: ${filePath}`);
       return res.status(404).json({
         success: false,
         error: "JavaScript file not found",
-        path: filePath
+        path: filePath,
       });
     }
-    
+
     // Set correct content type for JavaScript files
-    res.setHeader('Content-Type', 'application/javascript');
+    res.setHeader("Content-Type", "application/javascript");
     res.sendFile(filePath);
   });
 
@@ -326,22 +320,22 @@ export default (app) => {
   app.get("/styles/:filename", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     const filePath = path.resolve(publicPath, "styles", req.params.filename);
-    
+
     console.log(`🔍 Styles file requested: ${req.params.filename}`);
     console.log(`📄 File path: ${filePath}`);
     console.log(`📄 File exists: ${fs.existsSync(filePath)}`);
-    
+
     if (!fs.existsSync(filePath)) {
       console.error(`❌ Styles file not found: ${filePath}`);
       return res.status(404).json({
         success: false,
         error: "CSS file not found",
-        path: filePath
+        path: filePath,
       });
     }
-    
+
     // Set correct content type for CSS files
-    res.setHeader('Content-Type', 'text/css');
+    res.setHeader("Content-Type", "text/css");
     res.sendFile(filePath);
   });
 
@@ -349,7 +343,6 @@ export default (app) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "drive.html"));
   });
-
 
   // Route per IPFS content
   app.get("/ipfs-content/:cid", async (req, res) => {
@@ -466,7 +459,6 @@ export default (app) => {
               details: decryptError.message,
             });
           }
-          res.end(chunk);
         });
       });
 
@@ -611,13 +603,11 @@ export default (app) => {
   // Route di debug
   app.use(`${baseRoute}/debug`, debugRouter);
 
-
   // Route per i servizi
   app.use(`${baseRoute}/services`, servicesRouter);
 
   // Route per il grafico visivo
   app.use(`${baseRoute}/visualGraph`, visualGraphRouter);
-
 
   // Route di test per verificare se le route sono registrate correttamente
   app.get(`${baseRoute}/test`, (req, res) => {
@@ -633,15 +623,22 @@ export default (app) => {
   app.get(`${baseRoute}/debug/admin-config`, (req, res) => {
     res.json({
       success: true,
-      adminPassword: process.env.ADMIN_PASSWORD ? "CONFIGURED" : "NOT_CONFIGURED",
-      adminPasswordLength: process.env.ADMIN_PASSWORD ? process.env.ADMIN_PASSWORD.length : 0,
-      adminPasswordPreview: process.env.ADMIN_PASSWORD ? 
-        process.env.ADMIN_PASSWORD.substring(0, 4) + "..." + process.env.ADMIN_PASSWORD.substring(process.env.ADMIN_PASSWORD.length - 4) : 
-        "N/A",
+      adminPassword: process.env.ADMIN_PASSWORD
+        ? "CONFIGURED"
+        : "NOT_CONFIGURED",
+      adminPasswordLength: process.env.ADMIN_PASSWORD
+        ? process.env.ADMIN_PASSWORD.length
+        : 0,
+      adminPasswordPreview: process.env.ADMIN_PASSWORD
+        ? process.env.ADMIN_PASSWORD.substring(0, 4) +
+          "..." +
+          process.env.ADMIN_PASSWORD.substring(
+            process.env.ADMIN_PASSWORD.length - 4
+          )
+        : "N/A",
       timestamp: Date.now(),
     });
   });
-
 
   // Route principale per il visual graph
   app.use("/visualGraph", visualGraphRouter);
@@ -726,16 +723,6 @@ export default (app) => {
     })
   );
 
-
-
-
-
-
-
-
-
-
-
   // --- FINE ROUTE LEGACY ---
 
   // Route di health check
@@ -787,7 +774,6 @@ export default (app) => {
     });
   });
 
-
   // Fallback to index.html per tutte le altre route
   app.get("/*", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
@@ -814,7 +800,7 @@ export default (app) => {
 
   app.use((req, res, next) => {
     const path = req.path;
-    
+
     // Controlla se la route richiede autenticazione admin
     if (protectedStaticRoutes.includes(path)) {
       // Verifica autenticazione admin
@@ -828,11 +814,14 @@ export default (app) => {
       if (token === process.env.ADMIN_PASSWORD) {
         next();
       } else {
-        console.log(`❌ Accesso negato a ${path} - Token mancante o non valido`);
-        return res.status(401).json({ 
-          success: false, 
+        console.log(
+          `❌ Accesso negato a ${path} - Token mancante o non valido`
+        );
+        return res.status(401).json({
+          success: false,
           error: "Unauthorized - Admin authentication required",
-          message: "Questa pagina richiede autenticazione admin. Inserisci la password admin nella pagina principale."
+          message:
+            "Questa pagina richiede autenticazione admin. Inserisci la password admin nella pagina principale.",
         });
       }
     } else {
