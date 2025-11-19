@@ -22,7 +22,9 @@ RUN apk add --no-cache \
     libc6-compat \
     libstdc++ \
     dos2unix \
-    && rm -rf /var/cache/apk/*
+    py3-setuptools \
+    && rm -rf /var/cache/apk/* \
+    && pip3 install --upgrade "setuptools<81" 2>/dev/null || true
 
 # Install IPFS (Kubo) with architecture detection and verification
 ENV IPFS_VERSION=0.24.0
