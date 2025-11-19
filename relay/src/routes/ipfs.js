@@ -559,6 +559,17 @@ router.get("/status", async (req, res) => {
         success: false,
         status: "disconnected",
         error: err.message,
+        message: "IPFS daemon may still be starting up",
+      });
+    });
+
+    ipfsReq.setTimeout(5000); // 5 second timeout
+    ipfsReq.on("timeout", () => {
+      ipfsReq.destroy();
+      res.json({
+        success: false,
+        status: "timeout",
+        error: "Connection timeout - IPFS daemon may still be starting",
       });
     });
 

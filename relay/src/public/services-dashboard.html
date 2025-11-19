@@ -375,9 +375,14 @@
             try {
                 // Use the relay's IPFS status endpoint instead of direct connection
                 const response = await fetch('/api/v1/ipfs/status');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
                 const data = await response.json();
 
-                if (data.success) {
+                if (data.success && data.status === 'connected') {
                     document.getElementById('ipfs-status').textContent = 'Online';
                     document.getElementById('ipfs-version').textContent = data.version || '--';
                     document.getElementById('ipfs-type').textContent = 'IPFS';
@@ -430,18 +435,40 @@
                     updateStatusIndicator('ipfs', 'online');
                     return true;
                 } else {
-                    throw new Error(data.error || 'IPFS offline');
+                    // IPFS might be starting up
+                    const status = data.status === 'timeout' || data.error?.includes('ECONNREFUSED') ? 'Starting...' : 'Offline';
+                    document.getElementById('ipfs-status').textContent = status;
+                    document.getElementById('ipfs-version').textContent = '--';
+                    document.getElementById('ipfs-type').textContent = '--';
+                    document.getElementById('ipfs-storage').textContent = '--';
+                    document.getElementById('ipfs-storage-max').textContent = '--';
+                    document.getElementById('ipfs-usage-percent').textContent = '--';
+                    document.getElementById('ipfs-objects').textContent = '--';
+                    updateStatusIndicator('ipfs', status === 'Starting...' ? 'warning' : 'offline');
+                    if (status === 'Starting...') {
+                        log(`IPFS is starting up: ${data.error || data.message}`, 'info');
+                    } else {
+                        log(`IPFS check failed: ${data.error || 'IPFS offline'}`, 'error');
+                    }
+                    return false;
                 }
             } catch (error) {
-                document.getElementById('ipfs-status').textContent = 'Offline';
+                // Network error - might be starting up
+                const isConnectionError = error.message.includes('ECONNREFUSED') || error.message.includes('Failed to fetch');
+                const status = isConnectionError ? 'Starting...' : 'Offline';
+                document.getElementById('ipfs-status').textContent = status;
                 document.getElementById('ipfs-version').textContent = '--';
                 document.getElementById('ipfs-type').textContent = '--';
                 document.getElementById('ipfs-storage').textContent = '--';
                 document.getElementById('ipfs-storage-max').textContent = '--';
                 document.getElementById('ipfs-usage-percent').textContent = '--';
                 document.getElementById('ipfs-objects').textContent = '--';
-                updateStatusIndicator('ipfs', 'offline');
-                log(`IPFS check failed: ${error.message}`, 'error');
+                updateStatusIndicator('ipfs', isConnectionError ? 'warning' : 'offline');
+                if (isConnectionError) {
+                    log(`IPFS may be starting up: ${error.message}`, 'info');
+                } else {
+                    log(`IPFS check failed: ${error.message}`, 'error');
+                }
                 return false;
             }
         }
@@ -510,6 +537,16 @@
                 const response = await fetch('/nexasdk-status');
                 const data = await response.json();
 
+                if (data.status === 'not_configured') {
+                    document.getElementById('nexasdk-status').textContent = 'Not Configured';
+                    document.getElementById('nexasdk-http-status').textContent = '--';
+                    document.getElementById('nexasdk-http-status-value').textContent = '--';
+                    document.getElementById('nexasdk-api-url').textContent = 'Not set';
+                    updateStatusIndicator('nexasdk', 'unknown');
+                    log('Nexasdk not configured - set NEXASDK_API_URL to enable', 'info');
+                    return false;
+                }
+
                 if (data.success && data.status === 'active') {
                     document.getElementById('nexasdk-status').textContent = 'Online';
                     document.getElementById('nexasdk-http-status').textContent = data.httpStatus ? `HTTP ${data.httpStatus}` : '--';
@@ -519,7 +556,20 @@
                     updateStatusIndicator('nexasdk', 'online');
                     return true;
                 } else {
-                    throw new Error(data.error || 'Nexasdk offline');
+                    // Might be starting up or offline
+                    const isConnectionError = data.error?.includes('ECONNREFUSED') || data.status === 'timeout';
+                    const status = isConnectionError ? 'Starting...' : 'Offline';
+                    document.getElementById('nexasdk-status').textContent = status;
+                    document.getElementById('nexasdk-http-status').textContent = '--';
+                    document.getElementById('nexasdk-http-status-value').textContent = '--';
+                    document.getElementById('nexasdk-api-url').textContent = data.config?.apiUrl || '--';
+                    updateStatusIndicator('nexasdk', isConnectionError ? 'warning' : 'offline');
+                    if (isConnectionError) {
+                        log(`Nexasdk may be starting up: ${data.error}`, 'info');
+                    } else {
+                        log(`Nexasdk check failed: ${data.error || 'Nexasdk offline'}`, 'error');
+                    }
+                    return false;
                 }
             } catch (error) {
                 document.getElementById('nexasdk-status').textContent = 'Offline';
