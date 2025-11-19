@@ -276,6 +276,24 @@ async function initializeServer() {
   const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
   console.log("📁 Data directory:", dataDir);
   
+  const gunConfig = {
+    super: true,
+    file: dataDir,
+    radisk: process.env.DISABLE_RADISK !== "true", // Allow disabling radisk via env var
+    web: server,
+    isValid: hasValidToken,
+    uuid: process.env.RELAY_NAME,
+    localStorage: false, // Abilita localStorage per persistenza
+    wire: true,
+    axe: false,
+    rfs: true,
+    wait: 500,
+    webrtc: true,
+    peers: peers,
+    chunk: 1000,
+    pack: 1000,
+    jsonify: true, // Disable automatic JSON parsing to prevent errors
+  };
 
   if (process.env.DISABLE_RADISK === "true") {
     console.log("📁 Radisk disabled via environment variable");
