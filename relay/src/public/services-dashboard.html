@@ -166,6 +166,80 @@
                 </div>
             </div>
 
+            <!-- Holster Service -->
+            <div class="service-card card shadow-xl">
+                <div class="card-body p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="card-title text-lg text-[#FF69B4]">
+                            <span class="status-indicator status-unknown pulse" id="holster-status-indicator"></span>
+                            Holster Relay
+                        </h2>
+                        <div class="badge badge-outline bg-[#282828] border-[#606060] text-[#E0E0E0]" id="holster-port">--</div>
+                    </div>
+
+                    <div class="space-y-3 text-base">
+                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Status:</span><span id="holster-status" class="font-semibold text-[#FFFFFF]">Checking...</span></div>
+                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Port:</span><span id="holster-port-value" class="text-[#FFFFFF]">--</span></div>
+                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Host:</span><span id="holster-host" class="text-[#FFFFFF]">--</span></div>
+                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Storage:</span><span id="holster-storage" class="text-[#FFFFFF]">--</span></div>
+                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Max Connections:</span><span id="holster-max-connections" class="text-[#FFFFFF]">--</span></div>
+                    </div>
+
+                    <div class="card-actions justify-end mt-6 service-actions">
+                        <button onclick="refreshService('holster')" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">🔄 Refresh</button>
+                        <button onclick="restartService('holster')" class="btn bg-[#FFA500] hover:bg-[#FF8C00] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium restart-btn">🔄 Restart</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ollama Service -->
+            <div class="service-card card shadow-xl">
+                <div class="card-body p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="card-title text-lg text-[#FF69B4]">
+                            <span class="status-indicator status-unknown pulse" id="ollama-status-indicator"></span>
+                            Ollama
+                        </h2>
+                        <div class="badge badge-outline bg-[#282828] border-[#606060] text-[#E0E0E0]" id="ollama-models">--</div>
+                    </div>
+
+                    <div class="space-y-3 text-base">
+                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Status:</span><span id="ollama-status" class="font-semibold text-[#FFFFFF]">Checking...</span></div>
+                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Models:</span><span id="ollama-models-count" class="text-[#FFFFFF]">--</span></div>
+                        <div class="flex justify-between"><span class="text-[#E0E0E0]">API URL:</span><span id="ollama-api-url" class="text-[#FFFFFF] text-xs truncate">--</span></div>
+                    </div>
+
+                    <div class="card-actions justify-end mt-6 service-actions">
+                        <button onclick="refreshService('ollama')" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">🔄 Refresh</button>
+                        <button onclick="restartService('ollama')" class="btn bg-[#FFA500] hover:bg-[#FF8C00] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium restart-btn">🔄 Restart</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nexasdk Service -->
+            <div class="service-card card shadow-xl">
+                <div class="card-body p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="card-title text-lg text-[#FF69B4]">
+                            <span class="status-indicator status-unknown pulse" id="nexasdk-status-indicator"></span>
+                            Nexasdk
+                        </h2>
+                        <div class="badge badge-outline bg-[#282828] border-[#606060] text-[#E0E0E0]" id="nexasdk-http-status">--</div>
+                    </div>
+
+                    <div class="space-y-3 text-base">
+                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Status:</span><span id="nexasdk-status" class="font-semibold text-[#FFFFFF]">Checking...</span></div>
+                        <div class="flex justify-between"><span class="text-[#E0E0E0]">HTTP Status:</span><span id="nexasdk-http-status-value" class="text-[#FFFFFF]">--</span></div>
+                        <div class="flex justify-between"><span class="text-[#E0E0E0]">API URL:</span><span id="nexasdk-api-url" class="text-[#FFFFFF] text-xs truncate">--</span></div>
+                    </div>
+
+                    <div class="card-actions justify-end mt-6 service-actions">
+                        <button onclick="refreshService('nexasdk')" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">🔄 Refresh</button>
+                        <button onclick="restartService('nexasdk')" class="btn bg-[#FFA500] hover:bg-[#FF8C00] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium restart-btn">🔄 Restart</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Quick Actions -->
             <div class="service-card card shadow-xl">
                 <div class="card-body p-6">
@@ -372,37 +446,88 @@
             }
         }
 
-        async function checkS3Status() {
-            const password = getAdminPassword();
-            if (!password) {
-                document.getElementById('s3-status').textContent = 'No Auth';
-                updateStatusIndicator('s3', 'warning');
-                return false;
-            }
-
+        async function checkHolsterStatus() {
             try {
-                const response = await fetch('/api/v1/services/s3-stats', {
-                    headers: { 'Authorization': `Bearer ${password}` }
-                });
+                const response = await fetch('/holster-status');
+                const data = await response.json();
 
-                if (response.ok) {
-                    const data = await response.json();
-                    document.getElementById('s3-status').textContent = 'Online';
-                    document.getElementById('s3-buckets').textContent = `${data.stats.totalBuckets} buckets`;
-                    document.getElementById('s3-objects').textContent = data.stats.totalObjects;
-                    document.getElementById('s3-size').textContent = formatBytes(data.stats.totalSize);
-                    updateStatusIndicator('s3', 'online');
+                if (data.success) {
+                    const status = data.status === 'active' ? 'Online' : 'Offline';
+                    document.getElementById('holster-status').textContent = status;
+                    document.getElementById('holster-port').textContent = `Port ${data.config.port}`;
+                    document.getElementById('holster-port-value').textContent = data.config.port;
+                    document.getElementById('holster-host').textContent = data.config.host;
+                    document.getElementById('holster-storage').textContent = data.config.storageEnabled ? 'Enabled' : 'Disabled';
+                    document.getElementById('holster-max-connections').textContent = data.config.maxConnections;
+
+                    updateStatusIndicator('holster', data.status === 'active' ? 'online' : 'offline');
                     return true;
                 } else {
-                    throw new Error(`HTTP ${response.status}`);
+                    throw new Error(data.error || 'Holster offline');
                 }
             } catch (error) {
-                document.getElementById('s3-status').textContent = 'Offline';
-                document.getElementById('s3-buckets').textContent = '--';
-                document.getElementById('s3-objects').textContent = '--';
-                document.getElementById('s3-size').textContent = '--';
-                updateStatusIndicator('s3', 'offline');
-                log(`S3 check failed: ${error.message}`, 'error');
+                document.getElementById('holster-status').textContent = 'Offline';
+                document.getElementById('holster-port').textContent = '--';
+                document.getElementById('holster-port-value').textContent = '--';
+                document.getElementById('holster-host').textContent = '--';
+                document.getElementById('holster-storage').textContent = '--';
+                document.getElementById('holster-max-connections').textContent = '--';
+                updateStatusIndicator('holster', 'offline');
+                log(`Holster check failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function checkOllamaStatus() {
+            try {
+                const response = await fetch('/ollama-status');
+                const data = await response.json();
+
+                if (data.success && data.status === 'active') {
+                    document.getElementById('ollama-status').textContent = 'Online';
+                    document.getElementById('ollama-models').textContent = data.models ? `${data.models} models` : '--';
+                    document.getElementById('ollama-models-count').textContent = data.models || 0;
+                    document.getElementById('ollama-api-url').textContent = data.config?.apiUrl || '--';
+
+                    updateStatusIndicator('ollama', 'online');
+                    return true;
+                } else {
+                    throw new Error(data.error || 'Ollama offline');
+                }
+            } catch (error) {
+                document.getElementById('ollama-status').textContent = 'Offline';
+                document.getElementById('ollama-models').textContent = '--';
+                document.getElementById('ollama-models-count').textContent = '--';
+                document.getElementById('ollama-api-url').textContent = '--';
+                updateStatusIndicator('ollama', 'offline');
+                log(`Ollama check failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function checkNexasdkStatus() {
+            try {
+                const response = await fetch('/nexasdk-status');
+                const data = await response.json();
+
+                if (data.success && data.status === 'active') {
+                    document.getElementById('nexasdk-status').textContent = 'Online';
+                    document.getElementById('nexasdk-http-status').textContent = data.httpStatus ? `HTTP ${data.httpStatus}` : '--';
+                    document.getElementById('nexasdk-http-status-value').textContent = data.httpStatus || '--';
+                    document.getElementById('nexasdk-api-url').textContent = data.config?.apiUrl || '--';
+
+                    updateStatusIndicator('nexasdk', 'online');
+                    return true;
+                } else {
+                    throw new Error(data.error || 'Nexasdk offline');
+                }
+            } catch (error) {
+                document.getElementById('nexasdk-status').textContent = 'Offline';
+                document.getElementById('nexasdk-http-status').textContent = '--';
+                document.getElementById('nexasdk-http-status-value').textContent = '--';
+                document.getElementById('nexasdk-api-url').textContent = '--';
+                updateStatusIndicator('nexasdk', 'offline');
+                log(`Nexasdk check failed: ${error.message}`, 'error');
                 return false;
             }
         }
@@ -413,7 +538,9 @@
             switch (service) {
                 case 'gun': await checkGunStatus(); break;
                 case 'ipfs': await checkIPFSStatus(); break;
-                case 's3': await checkS3Status(); break;
+                case 'holster': await checkHolsterStatus(); break;
+                case 'ollama': await checkOllamaStatus(); break;
+                case 'nexasdk': await checkNexasdkStatus(); break;
             }
 
             document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
@@ -422,7 +549,13 @@
         async function refreshAllServices() {
             log('Refreshing all services...', 'info');
 
-            await Promise.all([checkGunStatus(), checkIPFSStatus(), checkS3Status()]);
+            await Promise.all([
+                checkGunStatus(), 
+                checkIPFSStatus(), 
+                checkHolsterStatus(),
+                checkOllamaStatus(),
+                checkNexasdkStatus()
+            ]);
             document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
             log('All services refreshed', 'success');
         }
@@ -495,7 +628,7 @@
 
             log('🔄 Restarting all services...', 'info');
 
-            const services = ['gun', 'ipfs', 's3'];
+            const services = ['gun', 'ipfs', 'holster', 'ollama', 'nexasdk'];
             for (const service of services) {
                 try {
                     await restartService(service);

@@ -2,97 +2,15 @@
 // MUST be required after Gun to work
 
 import express from "express";
-
-// Helper function to sanitize data for GunDB storage
-function sanitizeForGunDB(data) {
-  if (data === null || data === undefined) {
-    return null;
-  }
-
-  // Handle primitive types directly
-  if (
-    typeof data === "string" ||
-    typeof data === "number" ||
-    typeof data === "boolean"
-  ) {
-    return data;
-  }
-
-  // Handle Date objects
-  if (data instanceof Date) {
-    return data.toISOString();
-  }
-
-  // Handle Buffer objects
-  if (Buffer.isBuffer(data)) {
-    return data.toString("base64");
-  }
-
-  // Handle arrays
-  if (Array.isArray(data)) {
-    try {
-      return data.map((item) => sanitizeForGunDB(item));
-    } catch (error) {
-      console.warn("⚠️ Error sanitizing array:", error);
-      return [];
-    }
-  }
-
-  // Handle objects
-  if (typeof data === "object") {
-    try {
-      // First, try to serialize to test if it's valid JSON
-      JSON.stringify(data);
-
-      // If successful, recursively sanitize all properties
-      const sanitized = {};
-      for (const [key, value] of Object.entries(data)) {
-        // Skip functions and symbols
-        if (typeof value === "function" || typeof value === "symbol") {
-          continue;
-        }
-        sanitized[key] = sanitizeForGunDB(value);
-      }
-      return sanitized;
-    } catch (error) {
-      // If JSON serialization fails, create a safe representation
-      console.warn(
-        "⚠️ Object could not be serialized, creating safe representation:",
-        error
-      );
-      return {
-        _error: "Object could not be serialized",
-        _type: typeof data,
-        _constructor: data.constructor?.name || "Unknown",
-        _stringified: String(data),
-        _timestamp: Date.now(),
-      };
-    }
-  }
-
-  // For any other type, convert to string
-  try {
-    return String(data);
-  } catch (error) {
-    console.warn("⚠️ Error converting data to string:", error);
-    return "[Unserializable Data]";
-  }
-}
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import cors from "cors";
 import dotenv from "dotenv";
 import ip from "ip";
-
 import setSelfAdjustingInterval from "self-adjusting-interval";
 
-import "./utils/bullet-catcher.js";
-
-dotenv.config();
-
 import Gun from "gun";
-
 import "gun/sea.js";
 import "gun/lib/stats.js";
 import "gun/lib/webrtc.js";
@@ -103,10 +21,13 @@ import "gun/lib/radix.js";
 import "gun/lib/radisk.js";
 import "gun/lib/wire.js";
 import "gun/lib/axe.js";
+import "./utils/bullet-catcher.js";
+
+import Holster from "@mblaney/holster/src/holster.js";
 
 import multer from "multer";
 
-const namespace = "shogun";
+dotenv.config();
 
 const CLEANUP_CORRUPTED_DATA = process.env.CLEANUP_CORRUPTED_DATA || true;
 
@@ -135,6 +56,16 @@ if (isNaN(port) || port <= 0 || port >= 65536) {
   port = 8765;
 }
 let path_public = process.env.RELAY_PATH || "public";
+
+// --- Holster Configuration ---
+const holsterConfig = {
+  host: process.env.HOLSTER_RELAY_HOST || "0.0.0.0",
+  port: parseInt(process.env.HOLSTER_RELAY_PORT) || port + 1, // Default to main port + 1
+  storageEnabled: process.env.HOLSTER_RELAY_STORAGE === "true" || true,
+  storagePath: process.env.HOLSTER_RELAY_STORAGE_PATH || path.join(process.cwd(), "holster-data"),
+  maxConnections: parseInt(process.env.HOLSTER_MAX_CONNECTIONS) || 100,
+};
+
 
 // Main server initialization function
 async function initializeServer() {
@@ -321,6 +252,22 @@ async function initializeServer() {
 
   const server = await startServer();
 
+  // Initialize Holster Relay with built-in WebSocket server and connection management
+  let holster;
+  try {
+    holster = Holster({
+      port: holsterConfig.port,
+      secure: true,
+      peers: [], // No peers by default
+      maxConnections: holsterConfig.maxConnections,
+      file: holsterConfig.storageEnabled ? holsterConfig.storagePath : undefined,
+    });
+    console.log(`✅ Holster Relay initialized on port ${holsterConfig.port}`);
+    console.log(`📁 Holster storage: ${holsterConfig.storageEnabled ? holsterConfig.storagePath : "disabled"}`);
+  } catch (error) {
+    console.error("❌ Error initializing Holster:", error);
+  }
+
   const peersString = process.env.RELAY_PEERS;
   const peers = peersString ? peersString.split(",") : [];
   console.log("🔍 Peers:", peers);
@@ -329,24 +276,6 @@ async function initializeServer() {
   const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
   console.log("📁 Data directory:", dataDir);
   
-  const gunConfig = {
-    super: true,
-    file: dataDir,
-    radisk: process.env.DISABLE_RADISK !== "true", // Allow disabling radisk via env var
-    web: server,
-    isValid: hasValidToken,
-    uuid: process.env.RELAY_NAME,
-    localStorage: false, // Abilita localStorage per persistenza
-    wire: true,
-    axe: false,
-    rfs: true,
-    wait: 500,
-    webrtc: true,
-    peers: peers,
-    chunk: 1000,
-    pack: 1000,
-    jsonify: true, // Disable automatic JSON parsing to prevent errors
-  };
 
   if (process.env.DISABLE_RADISK === "true") {
     console.log("📁 Radisk disabled via environment variable");
@@ -396,6 +325,23 @@ async function initializeServer() {
     };
 
     res.json(healthData);
+  });
+
+  // Holster status endpoint
+  app.get("/holster-status", (req, res) => {
+    res.json({
+      success: true,
+      status: holster ? "active" : "inactive",
+      service: "holster-relay",
+      config: {
+        port: holsterConfig.port,
+        host: holsterConfig.host,
+        storageEnabled: holsterConfig.storageEnabled,
+        storagePath: holsterConfig.storagePath,
+        maxConnections: holsterConfig.maxConnections,
+      },
+      timestamp: Date.now(),
+    });
   });
 
   // IPFS status endpoint
@@ -475,7 +421,7 @@ async function initializeServer() {
   app.use(express.static(publicPath));
 
   // Set up relay stats database
-  const db = gun.get(namespace).get("relays").get(host);
+  const db = gun.get("relays").get(host);
 
   let totalConnections = 0;
   let activeWires = 0;
@@ -508,8 +454,7 @@ async function initializeServer() {
       },
       relay: {
         host,
-        port,
-        namespace,
+        port
       },
     };
 
@@ -539,43 +484,11 @@ async function initializeServer() {
 
   console.log(`🚀 Shogun Relay Server running on http://${host}:${port}`);
 
-  // Function to clean up corrupted GunDB data
-  function cleanupCorruptedData() {
-    console.log("🧹 Starting GunDB data cleanup...");
-
-    try {
-      // Clean up any corrupted logs
-      gun
-        .get("shogun")
-        .get("logs")
-        .map()
-        .once((data, key) => {
-          if (data && typeof data === "object") {
-            try {
-              // Test if the data is valid JSON
-              JSON.stringify(data);
-            } catch (error) {
-              console.log(`🧹 Removing corrupted log entry: ${key}`);
-              gun.get("shogun").get("logs").get(key).put(null);
-            }
-          }
-        });
-
-      console.log("✅ GunDB data cleanup completed");
-    } catch (error) {
-      console.error("❌ Error during GunDB data cleanup:", error);
-    }
-  }
-
-  // Run cleanup on startup if enabled
-  if (CLEANUP_CORRUPTED_DATA) {
-    console.log("🧹 Cleanup of corrupted data enabled");
-    setTimeout(cleanupCorruptedData, 5000); // Run after 5 seconds to allow GunDB to initialize
-  }
 
   return {
     server,
     gun,
+    holster,
     db,
     addSystemLog,
     addTimeSeriesPoint,

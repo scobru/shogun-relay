@@ -41,6 +41,7 @@ import systemRouter from "./system.js";
 import debugRouter from "./debug.js";
 import servicesRouter from "./services.js";
 import visualGraphRouter from "./visualGraph.js";
+import aiRouter from "./ai.js";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -608,6 +609,9 @@ export default (app) => {
 
   // Route per il grafico visivo
   app.use(`${baseRoute}/visualGraph`, visualGraphRouter);
+
+  // Route per AI services (Ollama, Nexasdk) - mounted at root level
+  app.use("/", aiRouter);
 
   // Route di test per verificare se le route sono registrate correttamente
   app.get(`${baseRoute}/test`, (req, res) => {
