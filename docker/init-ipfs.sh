@@ -75,30 +75,70 @@ fi
 if [ ! -f "$IPFS_PATH/config" ]; then
     echo "📦 IPFS not initialized. Initializing now..."
     
+    # Wait for lock file to be released if it exists
+    if [ -f "$IPFS_PATH/repo.lock" ]; then
+        echo "⏳ Waiting for IPFS lock to be released..."
+        for i in {1..10}; do
+            if [ ! -f "$IPFS_PATH/repo.lock" ]; then
+                break
+            fi
+            sleep 1
+        done
+        # Force remove lock if still exists (daemon might have crashed)
+        if [ -f "$IPFS_PATH/repo.lock" ]; then
+            echo "⚠️ Removing stale lock file..."
+            rm -f "$IPFS_PATH/repo.lock"
+        fi
+    fi
+    
     # Initialize IPFS with minimal profile for containers
-    if ! /usr/local/bin/ipfs init --profile=server,lowpower; then
-        echo "❌ IPFS initialization failed"
-        exit 1
+    set +e  # Temporarily disable exit on error
+    /usr/local/bin/ipfs init --profile=server,lowpower 2>&1
+    INIT_RESULT=$?
+    set -e  # Re-enable exit on error
+    
+    if [ $INIT_RESULT -ne 0 ]; then
+        # Check if error is about lock
+        if /usr/local/bin/ipfs init --profile=server,lowpower 2>&1 | grep -q "lock"; then
+            echo "⚠️ IPFS lock detected, waiting and retrying..."
+            sleep 2
+            rm -f "$IPFS_PATH/repo.lock"
+            if ! /usr/local/bin/ipfs init --profile=server,lowpower; then
+                echo "❌ IPFS initialization failed after retry"
+                exit 1
+            fi
+        else
+            echo "❌ IPFS initialization failed"
+            exit 1
+        fi
     fi
     
     echo "⚙️ Configuring IPFS..."
     
+    # Wait a moment to ensure no daemon is running
+    sleep 1
+    
+    # Remove lock if exists before configuring
+    rm -f "$IPFS_PATH/repo.lock"
+    
     # Configure IPFS settings with error checking
-    /usr/local/bin/ipfs config Addresses.API /ip4/0.0.0.0/tcp/5001
-    /usr/local/bin/ipfs config Addresses.Gateway /ip4/0.0.0.0/tcp/8080
+    set +e  # Temporarily disable exit on error for config commands
+    /usr/local/bin/ipfs config Addresses.API /ip4/0.0.0.0/tcp/5001 2>/dev/null
+    /usr/local/bin/ipfs config Addresses.Gateway /ip4/0.0.0.0/tcp/8080 2>/dev/null
     /usr/local/bin/ipfs config --json Addresses.Swarm '[
         "/ip4/0.0.0.0/tcp/4001",
         "/ip6/::/tcp/4001",
         "/ip4/0.0.0.0/udp/4001/quic",
         "/ip6/::/udp/4001/quic"
-    ]'
-    /usr/local/bin/ipfs config --json Routing.AcceleratedDHTClient true
-    /usr/local/bin/ipfs config --json Routing.OptimisticProvide true
-    /usr/local/bin/ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '["*"]'
-    /usr/local/bin/ipfs config --json API.HTTPHeaders.Access-Control-Allow-Methods '["PUT", "POST", "GET"]'
-    /usr/local/bin/ipfs config --json API.HTTPHeaders.Access-Control-Allow-Headers '["Authorization"]'
-    /usr/local/bin/ipfs config Datastore.GCPeriod '"1h"'
-    /usr/local/bin/ipfs config Datastore.StorageMax '"10GB"'
+    ]' 2>/dev/null
+    /usr/local/bin/ipfs config --json Routing.AcceleratedDHTClient true 2>/dev/null
+    /usr/local/bin/ipfs config --json Routing.OptimisticProvide true 2>/dev/null
+    /usr/local/bin/ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '["*"]' 2>/dev/null
+    /usr/local/bin/ipfs config --json API.HTTPHeaders.Access-Control-Allow-Methods '["PUT", "POST", "GET"]' 2>/dev/null
+    /usr/local/bin/ipfs config --json API.HTTPHeaders.Access-Control-Allow-Headers '["Authorization"]' 2>/dev/null
+    /usr/local/bin/ipfs config Datastore.GCPeriod '"1h"' 2>/dev/null
+    /usr/local/bin/ipfs config Datastore.StorageMax '"10GB"' 2>/dev/null
+    set -e  # Re-enable exit on error
     
     # Configure API authentication using custom token
     echo "🔐 Configuring IPFS API authentication..."
