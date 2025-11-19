@@ -22,6 +22,7 @@ RUN apk add --no-cache \
     libc6-compat \
     libstdc++ \
     dos2unix \
+    py3-pip \
     py3-setuptools \
     && rm -rf /var/cache/apk/* \
     && pip3 install --upgrade "setuptools<81" 2>/dev/null || true

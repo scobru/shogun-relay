@@ -3,6 +3,9 @@
 # IPFS Initialization Script for Docker Container
 set -e  # Exit on error
 
+# Allow script to continue even if some non-critical operations fail
+set +e  # Temporarily disable exit on error for permission checks
+
 export IPFS_PATH=/data/ipfs
 
 # Clean up any previous lock files
@@ -19,6 +22,9 @@ echo "- IPFS binary location: $(which ipfs 2>/dev/null || echo 'not found')"
 echo "- IPFS binary permissions: $(ls -l $(which ipfs 2>/dev/null) 2>/dev/null || echo 'not accessible')"
 echo "- Library dependencies: $(ldd $(which ipfs 2>/dev/null) 2>/dev/null || echo 'unable to check')"
 
+# Re-enable exit on error for critical operations
+set -e
+
 # Create and set proper permissions for IPFS directory
 echo "📁 Setting up IPFS directory..."
 if ! mkdir -p "$IPFS_PATH"; then
@@ -26,14 +32,18 @@ if ! mkdir -p "$IPFS_PATH"; then
     exit 1
 fi
 
-if ! chown -R ipfs:ipfs "$IPFS_PATH" 2>/dev/null; then
-    echo "⚠️ Warning: Could not set IPFS directory ownership"
+# Try to set ownership, but don't fail if we don't have permission (running as ipfs user)
+set +e
+chown -R ipfs:ipfs "$IPFS_PATH" 2>/dev/null
+if [ $? -ne 0 ]; then
+    echo "⚠️ Warning: Could not set IPFS directory ownership (may be running as ipfs user)"
 fi
+set -e
 
-if ! chmod -R 755 "$IPFS_PATH"; then
-    echo "❌ Failed to set IPFS directory permissions"
-    exit 1
-fi
+# Set permissions (this should work even as ipfs user)
+chmod -R 755 "$IPFS_PATH" 2>/dev/null || {
+    echo "⚠️ Warning: Could not set all IPFS directory permissions"
+}
 
 # Verify IPFS binary
 echo "🔍 Verifying IPFS binary..."
@@ -120,11 +130,10 @@ else
     else
         # Update critical configuration only if no lock exists
         echo "🔄 Updating critical configuration..."
-        if ! /usr/local/bin/ipfs config Addresses.API /ip4/0.0.0.0/tcp/5001 || \
-           ! /usr/local/bin/ipfs config Addresses.Gateway /ip4/0.0.0.0/tcp/8080; then
-            echo "❌ Failed to update critical configuration"
-            exit 1
-        fi
+        set +e  # Temporarily disable exit on error
+        /usr/local/bin/ipfs config Addresses.API /ip4/0.0.0.0/tcp/5001 2>/dev/null
+        /usr/local/bin/ipfs config Addresses.Gateway /ip4/0.0.0.0/tcp/8080 2>/dev/null
+        set -e  # Re-enable exit on error
         
         # Update API authentication headers
         echo "🔐 Updating API authentication configuration..."
