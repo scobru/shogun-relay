@@ -537,16 +537,6 @@
                 const response = await fetch('/nexasdk-status');
                 const data = await response.json();
 
-                if (data.status === 'not_configured') {
-                    document.getElementById('nexasdk-status').textContent = 'Not Configured';
-                    document.getElementById('nexasdk-http-status').textContent = '--';
-                    document.getElementById('nexasdk-http-status-value').textContent = '--';
-                    document.getElementById('nexasdk-api-url').textContent = 'Not set';
-                    updateStatusIndicator('nexasdk', 'unknown');
-                    log('Nexasdk not configured - set NEXASDK_API_URL to enable', 'info');
-                    return false;
-                }
-
                 if (data.success && data.status === 'active') {
                     document.getElementById('nexasdk-status').textContent = 'Online';
                     document.getElementById('nexasdk-http-status').textContent = data.httpStatus ? `HTTP ${data.httpStatus}` : '--';
