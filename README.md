@@ -53,6 +53,10 @@ In practice, instead of orchestrating 3-4 different services, you start a single
   - WebSocket relay with RADISK persistence and WebRTC support.
   - Drop-in peer for any Gun client.
 
+- **Holster Relay Integration**
+  - Built-in Holster relay with WebSocket server and connection management.
+  - Persistent storage support and configurable connection limits.
+
 - **Integrated IPFS Control**
   - Authenticated API proxy (JWT support) and content preview.
   - Upload files, manage pins, run garbage collection.
@@ -134,8 +138,69 @@ Create a `.env` file or export the variables below:
 | `RELAY_HOST`       | Advertised host                                          | auto-detected          |
 | `DATA_DIR`         | RADISK data directory                                    | `./data`               |
 | `RELAY_PROTECTED`  | Require admin token for Gun writes                       | `true`                 |
+| `HOLSTER_RELAY_HOST` | Holster relay host address                              | `0.0.0.0`              |
+| `HOLSTER_RELAY_PORT` | Holster relay port                                      | `RELAY_PORT + 1` (8766)|
+| `HOLSTER_RELAY_STORAGE` | Enable Holster persistent storage                      | `true`                 |
+| `HOLSTER_RELAY_STORAGE_PATH` | Path for Holster data storage                         | `./holster-data`       |
+| `HOLSTER_MAX_CONNECTIONS` | Maximum connections for Holster relay                  | `100`                  |
+| `NEXASDK_API_URL`  | Nexasdk API endpoint (for AI services proxy)             | `http://127.0.0.1:18181`|
+| `OLLAMA_API_URL`   | Ollama API endpoint (for AI services proxy)              | `http://127.0.0.1:11434`|
 
 Additional switches (Radisk toggle, cleanup, peers, etc.) are documented inside `index.js`.
+
+### Configuring External Services (Nexasdk, Ollama)
+
+When running Shogun Relay in Docker, external services like Nexasdk or Ollama running on the host machine need special configuration to be accessible from within the container.
+
+#### Nexasdk Configuration
+
+To keep Nexasdk secure (listening only on localhost) while allowing access from Docker containers:
+
+1. **Start Nexasdk on localhost:**
+   ```bash
+   nexa serve --host 127.0.0.1 --port 18181
+   ```
+
+2. **Configure port forwarding on the host (iptables):**
+   ```bash
+   # Forward port 18181 from Docker gateway to VM host
+   sudo iptables -t nat -A PREROUTING -p tcp -d 172.18.0.1 --dport 18181 -j DNAT --to-destination 127.0.0.1:18181
+   sudo iptables -A FORWARD -p tcp -d 127.0.0.1 --dport 18181 -j ACCEPT
+   ```
+
+   **Note:** Replace `172.18.0.1` with your Docker gateway IP. Find it with:
+   ```bash
+   docker exec <container-id> ip route | grep default
+   ```
+
+3. **Configure the relay to use the Docker gateway:**
+   ```bash
+   NEXASDK_API_URL=http://172.18.0.1:18181
+   ```
+
+   Or set it in your `.env` file or Docker environment variables.
+
+#### Ollama Configuration
+
+Similar configuration applies to Ollama if running on the host:
+
+1. **Start Ollama on localhost:**
+   ```bash
+   ollama serve
+   ```
+
+2. **Configure port forwarding (if needed):**
+   ```bash
+   sudo iptables -t nat -A PREROUTING -p tcp -d 172.18.0.1 --dport 11434 -j DNAT --to-destination 127.0.0.1:11434
+   sudo iptables -A FORWARD -p tcp -d 127.0.0.1 --dport 11434 -j ACCEPT
+   ```
+
+3. **Configure the relay:**
+   ```bash
+   OLLAMA_API_URL=http://172.18.0.1:11434
+   ```
+
+**Alternative:** If you prefer to expose services publicly (less secure), you can start them on `0.0.0.0` and use the host's public IP, but ensure proper firewall rules are in place.
 
 ---
 
@@ -177,6 +242,9 @@ The admin dashboards rely on `lib/admin-auth.js` to sync the token across tabs. 
 - `GET /gun` – WebSocket endpoint for Gun clients.
 - `GET|POST|DELETE /api/v1/system/node/*` – Inspect or update nodes via REST.
 
+### Holster Relay
+- `GET /holster-status` – Check Holster relay status and configuration.
+
 ### IPFS Management
 - `POST /api/v1/ipfs/upload` – Upload streams (admin).
 - `GET /api/v1/ipfs/content/:cid` – Stream IPFS content (used by preview panel).
@@ -188,6 +256,12 @@ The admin dashboards rely on `lib/admin-auth.js` to sync the token across tabs. 
 - `GET /api/v1/ipfs/repo/stat` – Repository statistics.
 - `POST /api/v1/ipfs/repo/gc` – Garbage collection.
 - `POST /api/v0/*` – Raw IPFS API proxy (admin).
+
+### AI Services Proxy
+- `GET /ollama-status` – Check Ollama service status.
+- `GET /nexasdk-status` – Check Nexasdk service status.
+- `POST /ollama/*` – Proxy endpoint for Ollama API (admin auth required).
+- `POST /nexasdk/*` – Proxy endpoint for Nexasdk API (admin auth required).
 
 ### System & Debug
 - `GET /health` – Simple health check.

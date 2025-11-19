@@ -615,6 +615,31 @@ curl -X POST http://localhost:8765/api/v0/add \
                     <div class="endpoint-card">
                         <div class="flex items-center mb-3">
                             <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/ollama-status</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Check Ollama service status and configuration.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/ollama-status
+
+// Response
+{
+  "success": true,
+  "status": "active",
+  "service": "ollama",
+  "config": {
+    "apiUrl": "http://127.0.0.1:11434"
+  },
+  "models": 3,
+  "timestamp": 1704067200000
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
                             <span class="method-badge method-post">POST</span>
                             <code class="text-lg">/ollama/*</code>
                             <span class="auth-badge auth-required">Admin</span>
@@ -635,6 +660,31 @@ curl -X POST http://localhost:8765/ollama/api/generate \
     "prompt": "Why is the sky blue?",
     "stream": false
   }'</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/nexasdk-status</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Check Nexasdk service status and configuration.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/nexasdk-status
+
+// Response
+{
+  "success": true,
+  "status": "active",
+  "service": "nexasdk",
+  "config": {
+    "apiUrl": "http://127.0.0.1:18181"
+  },
+  "httpStatus": 200,
+  "timestamp": 1704067200000
+}</code></pre>
                         </div>
                     </div>
 
