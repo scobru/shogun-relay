@@ -7,9 +7,9 @@ const router = express.Router();
 const OLLAMA_API_URL = process.env.OLLAMA_API_URL || "http://127.0.0.1:11434";
 
 // --- Nexasdk Configuration ---
-// Note: Set NEXASDK_API_URL environment variable to configure Nexasdk endpoint
-// If not set, Nexasdk monitoring will be disabled
-const NEXASDK_API_URL = process.env.NEXASDK_API_URL;
+// Default port is 18181 (Nexasdk default)
+// Set NEXASDK_API_URL environment variable to override
+const NEXASDK_API_URL = process.env.NEXASDK_API_URL || "http://127.0.0.1:18181";
 
 // Middleware di autenticazione
 const tokenAuthMiddleware = (req, res, next) => {
@@ -63,47 +63,35 @@ router.use(
 );
 
 // Nexasdk API Proxy - requires admin authentication
-// Only enable if NEXASDK_API_URL is configured
-if (NEXASDK_API_URL) {
-  router.use(
-    "/nexasdk",
-    tokenAuthMiddleware,
-    createProxyMiddleware({
-      target: NEXASDK_API_URL,
-      changeOrigin: true,
-      pathRewrite: {
-        "^/nexasdk": "", // Remove /nexasdk prefix when forwarding
-      },
-      onProxyReq: (proxyReq, req, res) => {
-        console.log(
-          `🔧 Nexasdk API Request: ${req.method} ${req.url} -> ${NEXASDK_API_URL}${req.url.replace("/nexasdk", "")}`
-        );
-      },
-      onProxyRes: (proxyRes, req, res) => {
-        console.log(
-          `✅ Nexasdk API Response: ${req.method} ${req.url} -> Status: ${proxyRes.statusCode}`
-        );
-      },
-      onError: (err, req, res) => {
-        console.error("❌ Nexasdk Proxy Error:", err);
-        res.status(500).json({
-          success: false,
-          error: "Proxy error",
-          message: err.message,
-        });
-      },
-    })
-  );
-} else {
-  // If Nexasdk is not configured, return error
-  router.use("/nexasdk", (req, res) => {
-    res.status(503).json({
-      success: false,
-      error: "Nexasdk not configured",
-      message: "Set NEXASDK_API_URL environment variable to enable Nexasdk proxy",
-    });
-  });
-}
+router.use(
+  "/nexasdk",
+  tokenAuthMiddleware,
+  createProxyMiddleware({
+    target: NEXASDK_API_URL,
+    changeOrigin: true,
+    pathRewrite: {
+      "^/nexasdk": "", // Remove /nexasdk prefix when forwarding
+    },
+    onProxyReq: (proxyReq, req, res) => {
+      console.log(
+        `🔧 Nexasdk API Request: ${req.method} ${req.url} -> ${NEXASDK_API_URL}${req.url.replace("/nexasdk", "")}`
+      );
+    },
+    onProxyRes: (proxyRes, req, res) => {
+      console.log(
+        `✅ Nexasdk API Response: ${req.method} ${req.url} -> Status: ${proxyRes.statusCode}`
+      );
+    },
+    onError: (err, req, res) => {
+      console.error("❌ Nexasdk Proxy Error:", err);
+      res.status(500).json({
+        success: false,
+        error: "Proxy error",
+        message: err.message,
+      });
+    },
+  })
+);
 
 // Ollama status endpoint
 router.get("/ollama-status", async (req, res) => {
@@ -196,18 +184,6 @@ router.get("/ollama-status", async (req, res) => {
 
 // Nexasdk status endpoint
 router.get("/nexasdk-status", async (req, res) => {
-  // If Nexasdk is not configured, return not configured status
-  if (!NEXASDK_API_URL) {
-    return res.json({
-      success: false,
-      status: "not_configured",
-      service: "nexasdk",
-      error: "NEXASDK_API_URL not configured",
-      message: "Set NEXASDK_API_URL environment variable to enable Nexasdk monitoring",
-      timestamp: Date.now(),
-    });
-  }
-
   try {
     const http = await import("http");
     const https = await import("https");
