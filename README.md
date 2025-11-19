@@ -150,6 +150,8 @@ Additional switches (Radisk toggle, cleanup, peers, etc.) are documented inside 
 
 ### Configuring External Services (Nexasdk, Ollama)
 
+**Important:** Ollama and Nexasdk are **not included** in the Shogun Relay Docker container. These services must be installed and running separately on the host machine or in separate containers. The Shogun Relay container only provides proxy endpoints to access these external services.
+
 When running Shogun Relay in Docker, external services like Nexasdk or Ollama running on the host machine need special configuration to be accessible from within the container.
 
 #### Nexasdk Configuration

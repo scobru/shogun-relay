@@ -41,10 +41,14 @@ router.use(
     pathRewrite: {
       "^/ollama": "", // Remove /ollama prefix when forwarding
     },
+    timeout: 300000, // 5 minutes timeout for AI requests
+    proxyTimeout: 300000, // 5 minutes proxy timeout
     onProxyReq: (proxyReq, req, res) => {
       console.log(
         `🔧 Ollama API Request: ${req.method} ${req.url} -> ${OLLAMA_API_URL}${req.url.replace("/ollama", "")}`
       );
+      // Set longer timeout on the proxy request
+      proxyReq.setTimeout(300000);
     },
     onProxyRes: (proxyRes, req, res) => {
       console.log(
@@ -53,11 +57,23 @@ router.use(
     },
     onError: (err, req, res) => {
       console.error("❌ Ollama Proxy Error:", err);
-      res.status(500).json({
-        success: false,
-        error: "Proxy error",
-        message: err.message,
-      });
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: "Proxy error",
+          message: err.message,
+        });
+      }
+    },
+    onTimeout: (req, res) => {
+      console.error("❌ Ollama Proxy Timeout:", req.url);
+      if (!res.headersSent) {
+        res.status(504).json({
+          success: false,
+          error: "Gateway timeout",
+          message: "The request took too long to complete. AI generation may require more time.",
+        });
+      }
     },
   })
 );
@@ -72,10 +88,14 @@ router.use(
     pathRewrite: {
       "^/nexasdk": "", // Remove /nexasdk prefix when forwarding
     },
+    timeout: 300000, // 5 minutes timeout for AI requests
+    proxyTimeout: 300000, // 5 minutes proxy timeout
     onProxyReq: (proxyReq, req, res) => {
       console.log(
         `🔧 Nexasdk API Request: ${req.method} ${req.url} -> ${NEXASDK_API_URL}${req.url.replace("/nexasdk", "")}`
       );
+      // Set longer timeout on the proxy request
+      proxyReq.setTimeout(300000);
     },
     onProxyRes: (proxyRes, req, res) => {
       console.log(
@@ -84,11 +104,23 @@ router.use(
     },
     onError: (err, req, res) => {
       console.error("❌ Nexasdk Proxy Error:", err);
-      res.status(500).json({
-        success: false,
-        error: "Proxy error",
-        message: err.message,
-      });
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: "Proxy error",
+          message: err.message,
+        });
+      }
+    },
+    onTimeout: (req, res) => {
+      console.error("❌ Nexasdk Proxy Timeout:", req.url);
+      if (!res.headersSent) {
+        res.status(504).json({
+          success: false,
+          error: "Gateway timeout",
+          message: "The request took too long to complete. AI generation may require more time.",
+        });
+      }
     },
   })
 );
