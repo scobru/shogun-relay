@@ -1,19 +1,4 @@
 # Shogun Relay Full Stack Container
-# Includes: IPFS, Relay Server
-
-FROM node:20-alpine
-
-# Build arguments (may be passed by CapRover or other deployment systems)
-# These are defined to avoid "not consumed" warnings, even if not used in build
-    x86_64) ARCH_NAME="amd64" ;; \
-    aarch64) ARCH_NAME="arm64" ;; \
-    *) echo "Unsupported architecture: $ARCH"; exit 1 ;; \
-    esac; \
-    wget https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
-    && wget https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
-    && sha512sum -c kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
-    && tar -xzf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
-    && chmod +x kubo/ipfs \
     && mv kubo/ipfs /usr/local/bin/ \
     && rm -rf kubo kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz* \
     && echo "Testing IPFS binary..." \
