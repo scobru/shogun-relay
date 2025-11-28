@@ -8,17 +8,21 @@ ARG ADMIN_PASSWORD
 ARG CAPROVER_GIT_COMMIT_SHA
 ARG IPFS_API_KEY
 ARG IPFS_API_TOKEN
+ARG IPFS_VERSION=0.29.0
 ARG RELAY_PEERS
 
 # Install required system packages
 RUN apk add --no-cache \
     git \
     curl \
+    wget \
+    && ARCH=$(uname -m) \
+    && case $ARCH in \
     x86_64) ARCH_NAME="amd64" ;; \
     aarch64) ARCH_NAME="arm64" ;; \
     *) echo "Unsupported architecture: $ARCH"; exit 1 ;; \
-    esac; \
-    wget https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
+    esac \
+    && wget https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
     && wget https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
     && sha512sum -c kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
     && tar -xzf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
