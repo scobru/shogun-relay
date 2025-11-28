@@ -11,27 +11,40 @@ ARG IPFS_API_TOKEN
 ARG IPFS_VERSION=0.29.0
 ARG RELAY_PEERS
 
-# Install required system packages
+# Install required system packages and IPFS
 RUN apk add --no-cache \
     git \
     curl \
     wget \
+    dos2unix \
+    supervisor \
     && ARCH=$(uname -m) \
     && case $ARCH in \
     x86_64) ARCH_NAME="amd64" ;; \
     aarch64) ARCH_NAME="arm64" ;; \
     *) echo "Unsupported architecture: $ARCH"; exit 1 ;; \
     esac \
-    && wget https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
-    && wget https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
+    && echo "Downloading IPFS Kubo v${IPFS_VERSION} for ${ARCH_NAME}..." \
+    && wget -q https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
+    && wget -q https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
+    && echo "Verifying checksum..." \
     && sha512sum -c kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
+    && echo "Extracting IPFS..." \
     && tar -xzf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
+    && echo "Checking extracted files..." \
+    && ls -la kubo/ || (echo "ERROR: kubo directory not found after extraction" && exit 1) \
+    && test -f kubo/ipfs || (echo "ERROR: kubo/ipfs binary not found" && exit 1) \
+    && echo "Setting permissions..." \
     && chmod +x kubo/ipfs \
-    && mv kubo/ipfs /usr/local/bin/ \
+    && echo "Installing IPFS to /usr/local/bin..." \
+    && cp kubo/ipfs /usr/local/bin/ipfs \
+    && chmod 755 /usr/local/bin/ipfs \
+    && echo "Verifying installation..." \
+    && test -f /usr/local/bin/ipfs || (echo "ERROR: IPFS binary not found in /usr/local/bin" && exit 1) \
+    && /usr/local/bin/ipfs version || (echo "ERROR: IPFS binary is not executable" && exit 1) \
+    && echo "Cleaning up..." \
     && rm -rf kubo kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz* \
-    && echo "Testing IPFS binary..." \
-    && /usr/local/bin/ipfs version \
-    && echo "IPFS binary test successful"
+    && echo "IPFS installation successful!"
 
 # Create symlink for Node.js (supervisord expects it in /usr/bin)
 RUN ln -sf /usr/local/bin/node /usr/bin/node
@@ -44,8 +57,7 @@ RUN adduser -D -s /bin/sh ipfs \
     && mkdir -p /home/ipfs/.config/ipfs/denylists \
     && mkdir -p /root/.config/ipfs/denylists \
     && chown -R ipfs:ipfs /data/ipfs /home/ipfs/.config \
-    && chmod -R 755 /home/ipfs/.config /root/.config \
-    && chmod 755 /usr/local/bin/ipfs
+    && chmod -R 755 /home/ipfs/.config /root/.config
 
 # Set up relay application
 WORKDIR /app
