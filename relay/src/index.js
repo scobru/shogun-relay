@@ -11,6 +11,7 @@ import ip from "ip";
 import setSelfAdjustingInterval from "self-adjusting-interval";
 
 import Gun from "gun";
+
 import "gun/sea.js";
 import "gun/lib/stats.js";
 import "gun/lib/webrtc.js";
@@ -250,6 +251,7 @@ async function initializeServer() {
     return server;
   }
 
+  // Avvia il server
   const server = await startServer();
 
   // Initialize Holster Relay with built-in WebSocket server and connection management
@@ -304,6 +306,14 @@ async function initializeServer() {
   Gun.serve(app);
 
   const gun = Gun(gunConfig);
+
+  // Initialize Generic Services (Linda functionality)
+  try {
+    const { initServices } = await import("./services/manager.js");
+    await initServices(app, server, gun);
+  } catch (error) {
+    console.error("❌ Failed to load Generic Services:", error);
+  }
 
   // Configura l'istanza Gun per le route di autenticazione
   app.set("gunInstance", gun);
