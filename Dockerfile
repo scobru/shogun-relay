@@ -5,32 +5,6 @@ FROM node:20-alpine
 
 # Build arguments (may be passed by CapRover or other deployment systems)
 # These are defined to avoid "not consumed" warnings, even if not used in build
-ARG ADMIN_PASSWORD
-ARG CAPROVER_GIT_COMMIT_SHA
-ARG IPFS_API_KEY
-ARG IPFS_API_TOKEN
-ARG RELAY_PEERS
-
-# Install required system packages
-RUN apk add --no-cache \
-    git \
-    curl \
-    wget \
-    bash \
-    supervisor \
-    ca-certificates \
-    libc6-compat \
-    libstdc++ \
-    dos2unix \
-    py3-pip \
-    py3-setuptools \
-    && rm -rf /var/cache/apk/* \
-    && pip3 install --upgrade "setuptools<81" 2>/dev/null || true
-
-# Install IPFS (Kubo) with architecture detection and verification
-ENV IPFS_VERSION=0.24.0
-RUN ARCH=$(uname -m); \
-    case "$ARCH" in \
     x86_64) ARCH_NAME="amd64" ;; \
     aarch64) ARCH_NAME="arm64" ;; \
     *) echo "Unsupported architecture: $ARCH"; exit 1 ;; \

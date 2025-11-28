@@ -13,12 +13,13 @@ services:
       # Persist IPFS data
       - ipfs-data:/data/ipfs
       # Persist relay data
-      - relay-data:/app/relay/radata
+      - relay-data:/app/relay/data
       # Mount logs for debugging
       - ./logs:/var/log/supervisor
     environment:
       - NODE_ENV=production
       - IPFS_PATH=/data/ipfs
+      - DATA_DIR=/app/relay/data
       - ADMIN_PASSWORD=shogun2025
       - RELAY_HOST=localhost
       - RELAY_PORT=8765
