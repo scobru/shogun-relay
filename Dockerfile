@@ -12,12 +12,15 @@ ARG IPFS_VERSION=0.29.0
 ARG RELAY_PEERS
 
 # Install required system packages and IPFS
+# Note: IPFS Kubo binaries are compiled for glibc, Alpine uses musl libc
+# We need gcompat for glibc compatibility
 RUN apk add --no-cache \
     git \
     curl \
     wget \
     dos2unix \
     supervisor \
+    gcompat \
     && ARCH=$(uname -m) \
     && case $ARCH in \
     x86_64) ARCH_NAME="amd64" ;; \
@@ -37,11 +40,13 @@ RUN apk add --no-cache \
     && echo "Setting permissions..." \
     && chmod +x kubo/ipfs \
     && echo "Installing IPFS to /usr/local/bin..." \
-    && cp kubo/ipfs /usr/local/bin/ipfs \
-    && chmod 755 /usr/local/bin/ipfs \
-    && echo "Verifying installation..." \
-    && test -f /usr/local/bin/ipfs || (echo "ERROR: IPFS binary not found in /usr/local/bin" && exit 1) \
-    && /usr/local/bin/ipfs version || (echo "ERROR: IPFS binary is not executable" && exit 1) \
+    && install -D -m 755 kubo/ipfs /usr/local/bin/ipfs \
+    && echo "Verifying file exists..." \
+    && ls -lh /usr/local/bin/ipfs || (echo "ERROR: IPFS binary not found after install" && exit 1) \
+    && echo "Checking binary dependencies..." \
+    && (ldd /usr/local/bin/ipfs 2>/dev/null || true) \
+    && echo "Testing IPFS binary..." \
+    && /usr/local/bin/ipfs version || (echo "ERROR: IPFS binary execution failed - may need additional libraries" && ldd /usr/local/bin/ipfs 2>/dev/null || true && exit 1) \
     && echo "Cleaning up..." \
     && rm -rf kubo kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz* \
     && echo "IPFS installation successful!"
