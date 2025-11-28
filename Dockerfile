@@ -1,4 +1,46 @@
 # Shogun Relay Full Stack Container
+# Includes: IPFS, Relay Server
+
+FROM node:20-alpine
+
+# Build arguments (may be passed by CapRover or other deployment systems)
+ARG ADMIN_PASSWORD
+ARG CAPROVER_GIT_COMMIT_SHA
+ARG IPFS_API_KEY
+ARG IPFS_API_TOKEN
+ARG RELAY_PEERS
+
+# Install required system packages
+RUN apk add --no-cache \
+    git \
+    curl \
+    wget \
+    bash \
+    supervisor \
+    ca-certificates \
+    libc6-compat \
+    libstdc++ \
+    dos2unix \
+    py3-pip \
+    py3-setuptools \
+    build-base \
+    python3 \
+    && rm -rf /var/cache/apk/* \
+    && pip3 install --upgrade "setuptools<81" 2>/dev/null || true
+
+# Install IPFS (Kubo) with architecture detection and verification
+ENV IPFS_VERSION=0.24.0
+RUN ARCH=$(uname -m); \
+    case "$ARCH" in \
+    x86_64) ARCH_NAME="amd64" ;; \
+    aarch64) ARCH_NAME="arm64" ;; \
+    *) echo "Unsupported architecture: $ARCH"; exit 1 ;; \
+    esac; \
+    wget https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
+    && wget https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
+    && sha512sum -c kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
+    && tar -xzf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
+    && chmod +x kubo/ipfs \
     && mv kubo/ipfs /usr/local/bin/ \
     && rm -rf kubo kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz* \
     && echo "Testing IPFS binary..." \
@@ -68,4 +110,4 @@ ENV NODE_ENV=production
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # Start all services with supervisor
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"] 
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
