@@ -40,7 +40,7 @@ RUN apk add --no-cache \
     && echo "Setting permissions..." \
     && chmod +x kubo/ipfs \
     && echo "Installing IPFS to /usr/local/bin..." \
-    && install -D -m 755 kubo/ipfs /usr/local/bin/ipfs \
+    && install -m 755 kubo/ipfs /usr/local/bin/ipfs \
     && echo "Verifying file exists..." \
     && ls -lh /usr/local/bin/ipfs || (echo "ERROR: IPFS binary not found after install" && exit 1) \
     && echo "Checking binary dependencies..." \
