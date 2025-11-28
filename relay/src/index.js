@@ -308,12 +308,15 @@ async function initializeServer() {
   const gun = Gun(gunConfig);
 
   // Initialize Generic Services (Linda functionality)
+  // DISABLED: Services removed as client migrated to pure GunDB
+  /*
   try {
     const { initServices } = await import("./services/manager.js");
     await initServices(app, server, gun);
   } catch (error) {
     console.error("❌ Failed to load Generic Services:", error);
   }
+  */
 
   // Configura l'istanza Gun per le route di autenticazione
   app.set("gunInstance", gun);

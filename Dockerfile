@@ -14,24 +14,6 @@ ARG RELAY_PEERS
 RUN apk add --no-cache \
     git \
     curl \
-    wget \
-    bash \
-    supervisor \
-    ca-certificates \
-    libc6-compat \
-    libstdc++ \
-    dos2unix \
-    py3-pip \
-    py3-setuptools \
-    build-base \
-    python3 \
-    && rm -rf /var/cache/apk/* \
-    && pip3 install --upgrade "setuptools<81" 2>/dev/null || true
-
-# Install IPFS (Kubo) with architecture detection and verification
-ENV IPFS_VERSION=0.24.0
-RUN ARCH=$(uname -m); \
-    case "$ARCH" in \
     x86_64) ARCH_NAME="amd64" ;; \
     aarch64) ARCH_NAME="arm64" ;; \
     *) echo "Unsupported architecture: $ARCH"; exit 1 ;; \

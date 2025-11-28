@@ -34,10 +34,25 @@
             margin-right: 0.5rem;
         }
 
-        .method-get { background: #4CAF50; color: white; }
-        .method-post { background: #2196F3; color: white; }
-        .method-put { background: #FF9800; color: white; }
-        .method-delete { background: #F44336; color: white; }
+        .method-get {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .method-post {
+            background: #2196F3;
+            color: white;
+        }
+
+        .method-put {
+            background: #FF9800;
+            color: white;
+        }
+
+        .method-delete {
+            background: #F44336;
+            color: white;
+        }
 
         .auth-badge {
             display: inline-block;
@@ -47,9 +62,20 @@
             margin-left: 0.5rem;
         }
 
-        .auth-required { background: #FFA500; color: #1A1A1A; }
-        .auth-optional { background: #42A5F5; color: white; }
-        .auth-public { background: #4CAF50; color: white; }
+        .auth-required {
+            background: #FFA500;
+            color: #1A1A1A;
+        }
+
+        .auth-optional {
+            background: #42A5F5;
+            color: white;
+        }
+
+        .auth-public {
+            background: #4CAF50;
+            color: white;
+        }
 
         code {
             background: #1A1A1A;
@@ -105,7 +131,7 @@
                 <div class="flex flex-col items-center mb-8">
                     <h1 class="text-4xl font-bold mb-4 text-[#FFFFFF]">🔌 Shogun Relay API Endpoints</h1>
                     <p class="text-[#8B94FF] text-center max-w-2xl">
-                        Complete API reference with examples for all available endpoints. 
+                        Complete API reference with examples for all available endpoints.
                         Base URL: <code>http://localhost:8765</code>
                     </p>
                 </div>
@@ -132,14 +158,15 @@ token: YOUR_ADMIN_PASSWORD</code></pre>
                 <!-- GunDB Core -->
                 <div class="mb-8">
                     <h2 class="text-3xl font-bold mb-6 text-[#FF69B4] border-b border-[#404040] pb-2">GunDB Core</h2>
-                    
+
                     <div class="endpoint-card">
                         <div class="flex items-center mb-3">
                             <span class="method-badge method-get">GET</span>
                             <code class="text-lg">/gun</code>
                             <span class="auth-badge auth-public">Public</span>
                         </div>
-                        <p class="text-[#E0E0E0] mb-4">WebSocket endpoint for Gun clients. Connect using Gun.js library.</p>
+                        <p class="text-[#E0E0E0] mb-4">WebSocket endpoint for Gun clients. Connect using Gun.js library.
+                        </p>
                         <div class="code-block">
                             <button class="copy-btn" onclick="copyCode(this)">Copy</button>
                             <pre><code>// JavaScript
@@ -158,7 +185,8 @@ const gun = Gun({
                             <code class="text-lg">/api/v1/system/node/*</code>
                             <span class="auth-badge auth-optional">Optional</span>
                         </div>
-                        <p class="text-[#E0E0E0] mb-4">Inspect GunDB nodes via REST API. Use wildcard path to navigate the graph.</p>
+                        <p class="text-[#E0E0E0] mb-4">Inspect GunDB nodes via REST API. Use wildcard path to navigate
+                            the graph.</p>
                         <div class="code-block">
                             <button class="copy-btn" onclick="copyCode(this)">Copy</button>
                             <pre><code>// Get a node
@@ -208,15 +236,17 @@ curl http://localhost:8765/api/v1/system/node/users/alice
 
                 <!-- IPFS Management -->
                 <div class="mb-8">
-                    <h2 class="text-3xl font-bold mb-6 text-[#FF69B4] border-b border-[#404040] pb-2">IPFS Management</h2>
-                    
+                    <h2 class="text-3xl font-bold mb-6 text-[#FF69B4] border-b border-[#404040] pb-2">IPFS Management
+                    </h2>
+
                     <div class="endpoint-card">
                         <div class="flex items-center mb-3">
                             <span class="method-badge method-post">POST</span>
                             <code class="text-lg">/api/v1/ipfs/upload</code>
                             <span class="auth-badge auth-required">Admin</span>
                         </div>
-                        <p class="text-[#E0E0E0] mb-4">Upload files to IPFS. Supports multipart/form-data with optional encryption.</p>
+                        <p class="text-[#E0E0E0] mb-4">Upload files to IPFS. Supports multipart/form-data with optional
+                            encryption.</p>
                         <div class="code-block">
                             <button class="copy-btn" onclick="copyCode(this)">Copy</button>
                             <pre><code>// Using FormData
@@ -252,7 +282,8 @@ fetch('http://localhost:8765/api/v1/ipfs/upload', {
                             <code class="text-lg">/api/v1/ipfs/content/:cid</code>
                             <span class="auth-badge auth-optional">Optional</span>
                         </div>
-                        <p class="text-[#E0E0E0] mb-4">Stream IPFS content. Supports encrypted content with token parameter.</p>
+                        <p class="text-[#E0E0E0] mb-4">Stream IPFS content. Supports encrypted content with token
+                            parameter.</p>
                         <div class="code-block">
                             <button class="copy-btn" onclick="copyCode(this)">Copy</button>
                             <pre><code>// Public content
@@ -443,8 +474,9 @@ curl -X POST http://localhost:8765/api/v0/add \
 
                 <!-- System & Debug -->
                 <div class="mb-8">
-                    <h2 class="text-3xl font-bold mb-6 text-[#FF69B4] border-b border-[#404040] pb-2">System & Debug</h2>
-                    
+                    <h2 class="text-3xl font-bold mb-6 text-[#FF69B4] border-b border-[#404040] pb-2">System & Debug
+                    </h2>
+
                     <div class="endpoint-card">
                         <div class="flex items-center mb-3">
                             <span class="method-badge method-get">GET</span>
@@ -608,10 +640,68 @@ curl -X POST http://localhost:8765/api/v0/add \
                     </div>
                 </div>
 
+                <!-- User & Presence -->
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold mb-6 text-[#FF69B4] border-b border-[#404040] pb-2">User & Presence
+                    </h2>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/users/search</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Search for users by username or public key.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl "http://localhost:8765/api/users/search?q=alice"</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/users/:pub/profile</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Get user profile by public key.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/users/YOUR_PUB_KEY/profile</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/presence/:pub</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Check if a user is online.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/presence/YOUR_PUB_KEY</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/stats/protocol</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Get protocol statistics (users, messages, etc.).</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/api/stats/protocol</code></pre>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Services -->
                 <div class="mb-8">
                     <h2 class="text-3xl font-bold mb-6 text-[#FF69B4] border-b border-[#404040] pb-2">Services</h2>
-                    
+
                     <div class="endpoint-card">
                         <div class="flex items-center mb-3">
                             <span class="method-badge method-get">GET</span>
@@ -643,14 +733,15 @@ curl -X POST http://localhost:8765/api/v0/add \
                 <!-- User Uploads -->
                 <div class="mb-8">
                     <h2 class="text-3xl font-bold mb-6 text-[#FF69B4] border-b border-[#404040] pb-2">User Uploads</h2>
-                    
+
                     <div class="endpoint-card">
                         <div class="flex items-center mb-3">
                             <span class="method-badge method-get">GET</span>
                             <code class="text-lg">/api/v1/user-uploads/system-hashes</code>
                             <span class="auth-badge auth-public">Public</span>
                         </div>
-                        <p class="text-[#E0E0E0] mb-4">Get system hash registry (protected hashes that won't be garbage collected).</p>
+                        <p class="text-[#E0E0E0] mb-4">Get system hash registry (protected hashes that won't be garbage
+                            collected).</p>
                         <div class="code-block">
                             <button class="copy-btn" onclick="copyCode(this)">Copy</button>
                             <pre><code>curl http://localhost:8765/api/v1/user-uploads/system-hashes</code></pre>
@@ -702,7 +793,8 @@ curl -X POST http://localhost:8765/api/v0/add \
                             <code class="text-lg">/api/v1/user-uploads/save-system-hash</code>
                             <span class="auth-badge auth-required">Admin</span>
                         </div>
-                        <p class="text-[#E0E0E0] mb-4">Save a hash to the system registry to protect it from garbage collection.</p>
+                        <p class="text-[#E0E0E0] mb-4">Save a hash to the system registry to protect it from garbage
+                            collection.</p>
                         <div class="code-block">
                             <button class="copy-btn" onclick="copyCode(this)">Copy</button>
                             <pre><code>curl -X POST http://localhost:8765/api/v1/user-uploads/save-system-hash \
@@ -730,7 +822,7 @@ curl -X POST http://localhost:8765/api/v0/add \
                 <!-- Debug -->
                 <div class="mb-8">
                     <h2 class="text-3xl font-bold mb-6 text-[#FF69B4] border-b border-[#404040] pb-2">Debug</h2>
-                    
+
                     <div class="endpoint-card">
                         <div class="flex items-center mb-3">
                             <span class="method-badge method-get">GET</span>
@@ -790,8 +882,10 @@ curl -X POST http://localhost:8765/api/v0/add \
 
                 <!-- Footer -->
                 <div class="mt-12 text-center text-[#A0A0A0] text-sm">
-                    <p>repo build with ❤️ by <a href="https://github.com/scobru" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">scobru</a></p>
-                    <p class="mt-1">part of <a href="https://github.com/scobru/shogun" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">shogun project</a></p>
+                    <p>repo build with ❤️ by <a href="https://github.com/scobru"
+                            class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">scobru</a></p>
+                    <p class="mt-1">part of <a href="https://github.com/scobru/shogun"
+                            class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">shogun project</a></p>
                 </div>
             </div>
         </div>
@@ -801,12 +895,12 @@ curl -X POST http://localhost:8765/api/v0/add \
         function copyCode(button) {
             const codeBlock = button.nextElementSibling;
             const text = codeBlock.textContent;
-            
+
             navigator.clipboard.writeText(text).then(() => {
                 const originalText = button.textContent;
                 button.textContent = 'Copied!';
                 button.style.background = '#4CAF50';
-                
+
                 setTimeout(() => {
                     button.textContent = originalText;
                     button.style.background = '#404040';
@@ -827,4 +921,3 @@ curl -X POST http://localhost:8765/api/v0/add \
 </body>
 
 </html>
-
