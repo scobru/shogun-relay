@@ -173,71 +173,57 @@
             logsDiv.scrollTop = logsDiv.scrollHeight;
         }
 
-        // Helper function to create x402 payment header using ethers.js
-        // This replaces x402-fetch and works entirely client-side
-        async function createX402PaymentHeader(paymentRequirements, signer) {
+        // Helper function to sign payment authorization and get payment header from server
+        async function createX402PaymentHeader(signer) {
             try {
-                // Get payment requirement (use first one)
-                const requirement = paymentRequirements[0];
+                // Get signer address
+                const signerAddress = await signer.getAddress();
                 
-                // Create EIP-712 domain
-                const domain = {
-                    name: requirement.extra.name,
-                    version: requirement.extra.version,
-                    chainId: 84532, // Base Sepolia
-                    verifyingContract: requirement.asset
+                // Get payment preparation data from server
+                addLog('Preparing payment data from server...', 'info');
+                const prepareResponse = await fetch(`${API_BASE}/prepare-payment`);
+                if (!prepareResponse.ok) {
+                    throw new Error('Failed to prepare payment');
+                }
+                
+                const prepareData = await prepareResponse.json();
+                const { paymentRequirements, authorization, domain, types } = prepareData;
+                
+                // Set the 'from' address in authorization
+                const authorizationMessage = {
+                    ...authorization,
+                    from: signerAddress
                 };
                 
-                // Create EIP-712 types
-                const types = {
-                    Payment: [
-                        { name: 'scheme', type: 'string' },
-                        { name: 'network', type: 'string' },
-                        { name: 'maxAmountRequired', type: 'uint256' },
-                        { name: 'resource', type: 'string' },
-                        { name: 'description', type: 'string' },
-                        { name: 'mimeType', type: 'string' },
-                        { name: 'payTo', type: 'address' },
-                        { name: 'maxTimeoutSeconds', type: 'uint256' },
-                        { name: 'asset', type: 'address' }
-                    ]
-                };
+                addLog('Requesting signature from MetaMask for authorization...', 'info');
+                // Sign the authorization message
+                const signature = await signer.signTypedData(domain, types, authorizationMessage);
+                addLog('Signature received from MetaMask', 'success');
                 
-                // Create message
-                const message = {
-                    scheme: requirement.scheme,
-                    network: requirement.network,
-                    maxAmountRequired: requirement.maxAmountRequired,
-                    resource: requirement.resource,
-                    description: requirement.description,
-                    mimeType: requirement.mimeType || '',
-                    payTo: requirement.payTo,
-                    maxTimeoutSeconds: requirement.maxTimeoutSeconds,
-                    asset: requirement.asset
-                };
+                // Send signature to server to create properly encoded payment header
+                addLog('Sending signature to server for payment header encoding...', 'info');
+                const headerResponse = await fetch(`${API_BASE}/create-payment-header`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        paymentRequirements: paymentRequirements,
+                        authorization: authorizationMessage,
+                        signature: signature,
+                        from: signerAddress
+                    })
+                });
                 
-                // Sign the message
-                const signature = await signer.signTypedData(domain, types, message);
+                if (!headerResponse.ok) {
+                    const error = await headerResponse.json().catch(() => ({ error: 'Unknown error' }));
+                    throw new Error('Failed to create payment header: ' + (error.error || error.message));
+                }
                 
-                // Create payment header (base64 encoded JSON)
-                const payment = {
-                    scheme: requirement.scheme,
-                    network: requirement.network,
-                    maxAmountRequired: requirement.maxAmountRequired.toString(),
-                    resource: requirement.resource,
-                    description: requirement.description,
-                    mimeType: requirement.mimeType || '',
-                    payTo: requirement.payTo,
-                    maxTimeoutSeconds: requirement.maxTimeoutSeconds,
-                    asset: requirement.asset,
-                    signature: signature
-                };
+                const headerData = await headerResponse.json();
+                addLog('Payment header created by server', 'success');
                 
-                // Encode as base64
-                const paymentJson = JSON.stringify(payment);
-                const paymentHeader = btoa(unescape(encodeURIComponent(paymentJson)));
-                
-                return paymentHeader;
+                return headerData.paymentHeader;
             } catch (error) {
                 throw new Error('Failed to create payment header: ' + error.message);
             }
@@ -395,22 +381,10 @@
             }
 
             try {
-                addLog('Fetching payment requirements...', 'info');
-                
-                // First, get payment requirements from server
-                const requirementsResponse = await fetch(`${API_BASE}/payment-requirements`);
-                if (!requirementsResponse.ok) {
-                    throw new Error('Failed to get payment requirements');
-                }
-                
-                const requirementsData = await requirementsResponse.json();
-                const paymentRequirements = requirementsData.paymentRequirements;
-                
-                addLog('Payment requirements received', 'success');
                 addLog('Creating payment header with MetaMask...', 'info');
                 
-                // Create payment header using ethers.js
-                const paymentHeader = await createX402PaymentHeader(paymentRequirements, walletSigner);
+                // Create payment header using x402 flow (prepare -> sign -> encode)
+                const paymentHeader = await createX402PaymentHeader(walletSigner);
                 
                 addLog('Payment header created, making subscription request...', 'info');
                 

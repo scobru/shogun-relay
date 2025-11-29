@@ -3,7 +3,7 @@
 
 FROM node:20-alpine
 
-ENV CACHE_BUST=12345
+# ENV CACHE_BUST=12345
 
 # Build arguments (may be passed by CapRover or other deployment systems)
 ARG ADMIN_PASSWORD

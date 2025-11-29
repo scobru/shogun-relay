@@ -1,6 +1,7 @@
 import express from 'express';
 import { x402Middleware, createPaymentRequirements } from '../utils/x402.js';
 import { subscriptionManager } from '../utils/subscriptionManager.js';
+import { exact } from 'x402/schemes';
 
 const router = express.Router();
 
@@ -145,10 +146,130 @@ router.get('/payment-requirements', (req, res) => {
 });
 
 /**
+ * GET /api/v1/subscription/prepare-payment
+ * Prepare payment data for signing (returns authorization data to sign)
+ * Returns the authorization object that needs to be signed
+ */
+router.get('/prepare-payment', (req, res) => {
+  try {
+    const resource = `${req.protocol}://${req.get('host')}${req.baseUrl}/subscribe`;
+    const paymentRequirements = [createPaymentRequirements(
+      SUBSCRIPTION_PRICE,
+      NETWORK,
+      resource,
+      "Subscription service access (Sepolia)"
+    )];
+
+    // Prepare payment header data using x402
+    // This returns the authorization object that needs to be signed
+    const prepared = exact.evm.preparePaymentHeader(
+      null, // from address (will be set by client)
+      1, // x402Version
+      paymentRequirements
+    );
+
+    res.json({
+      success: true,
+      paymentRequirements: paymentRequirements,
+      authorization: prepared.authorization,
+      // Include the domain and types for EIP-712 signing
+      domain: {
+        name: paymentRequirements[0].extra.name,
+        version: paymentRequirements[0].extra.version,
+        chainId: 84532, // Base Sepolia
+        verifyingContract: paymentRequirements[0].asset
+      },
+      types: {
+        Authorization: [
+          { name: 'from', type: 'address' },
+          { name: 'to', type: 'address' },
+          { name: 'value', type: 'uint256' },
+          { name: 'validAfter', type: 'uint256' },
+          { name: 'validBefore', type: 'uint256' },
+          { name: 'nonce', type: 'bytes32' }
+        ]
+      }
+    });
+  } catch (error) {
+    console.error("Error preparing payment:", error);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to prepare payment",
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * POST /api/v1/subscription/create-payment-header
+ * Create payment header using x402 client (server-side)
+ * Request body: { paymentRequirements: array, authorization: object, signature: string, from: string }
+ * Returns the properly encoded payment header
+ */
+router.post('/create-payment-header', async (req, res) => {
+  try {
+    const { paymentRequirements, authorization, signature, from } = req.body;
+    
+    if (!paymentRequirements || !Array.isArray(paymentRequirements) || paymentRequirements.length === 0) {
+      return res.status(400).json({ error: "paymentRequirements array is required" });
+    }
+    
+    if (!authorization) {
+      return res.status(400).json({ error: "authorization object is required" });
+    }
+    
+    if (!signature) {
+      return res.status(400).json({ error: "signature is required" });
+    }
+    
+    if (!from) {
+      return res.status(400).json({ error: "from address is required" });
+    }
+
+    const requirement = paymentRequirements[0];
+    
+    // Create the exact EVM payload structure
+    const payload = {
+      signature: signature,
+      authorization: {
+        from: from,
+        to: authorization.to,
+        value: authorization.value,
+        validAfter: authorization.validAfter,
+        validBefore: authorization.validBefore,
+        nonce: authorization.nonce
+      }
+    };
+
+    // Create payment object in the format expected by x402
+    const payment = {
+      x402Version: 1,
+      scheme: requirement.scheme,
+      network: requirement.network,
+      payload: payload
+    };
+
+    // Encode the payment header
+    const paymentHeader = exact.evm.encodePayment(payment);
+    
+    res.json({
+      success: true,
+      paymentHeader: paymentHeader
+    });
+  } catch (error) {
+    console.error("Error creating payment header:", error);
+    res.status(500).json({ 
+      error: "Failed to create payment header",
+      message: error.message 
+    });
+  }
+});
+
+/**
  * POST /api/v1/subscription/subscribe-with-payment-header
  * Subscribe using a pre-created payment header
  * Request body: { serviceId: string, paymentHeader: string, duration?: number }
- * This endpoint accepts a payment header created client-side using ethers.js
+ * This endpoint accepts a payment header created using x402 client
  */
 router.post('/subscribe-with-payment-header', 
   async (req, res, next) => {
