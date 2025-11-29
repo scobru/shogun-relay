@@ -370,9 +370,18 @@ export default (app) => {
       });
     }
 
-    // Set correct content type for JavaScript files
-    res.setHeader("Content-Type", "application/javascript");
+    // Set correct content type for ESM modules
+    const isMJS = filePath.endsWith('.mjs');
+    res.setHeader("Content-Type", isMJS ? "application/javascript" : "application/javascript");
     res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    
+    // For ESM files, we need to handle CORS preflight
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    
     res.sendFile(filePath);
   });
 
