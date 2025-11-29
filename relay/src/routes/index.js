@@ -41,6 +41,7 @@ import systemRouter from "./system.js";
 import debugRouter from "./debug.js";
 import servicesRouter from "./services.js";
 import visualGraphRouter from "./visualGraph.js";
+import ipfsRentRouter from "./ipfsRent.js";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -608,6 +609,9 @@ export default (app) => {
 
   // Route per il grafico visivo
   app.use(`${baseRoute}/visualGraph`, visualGraphRouter);
+
+  // Route per IPFS Rent (x402)
+  app.use(`${baseRoute}/ipfs-rent`, ipfsRentRouter);
 
 
   // Route di test per verificare se le route sono registrate correttamente

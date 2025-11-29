@@ -307,6 +307,32 @@ async function initializeServer() {
 
   const gun = Gun(gunConfig);
 
+  // Authenticate Relay User
+  const relayUser = process.env.RELAY_USER || "relay_admin";
+  const relayPass = process.env.RELAY_PASSWORD || process.env.ADMIN_PASSWORD || "change_me_please";
+  
+  console.log(`🔐 Authenticating relay user: ${relayUser}`);
+  const user = gun.user();
+  
+  user.auth(relayUser, relayPass, (ack) => {
+    if (ack.err) {
+      console.log(`⚠️ Auth failed, attempting to create user: ${relayUser}`);
+      user.create(relayUser, relayPass, (createAck) => {
+        if (createAck.err) {
+          console.error(`❌ Failed to create relay user: ${createAck.err}`);
+        } else {
+          console.log(`✅ Relay user created, authenticating...`);
+          user.auth(relayUser, relayPass, (authAck) => {
+             if (authAck.err) console.error(`❌ Failed to auth after creation: ${authAck.err}`);
+             else console.log(`✅ Relay user authenticated successfully`);
+          });
+        }
+      });
+    } else {
+      console.log(`✅ Relay user authenticated successfully`);
+    }
+  });
+
   // Initialize Generic Services (Linda functionality)
   // DISABLED: Services removed as client migrated to pure GunDB
   /*

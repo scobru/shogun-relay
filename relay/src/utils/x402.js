@@ -1,0 +1,133 @@
+import { exact } from "x402/schemes";
+import {
+  processPriceToAtomicAmount,
+  findMatchingPaymentRequirements
+} from "x402/shared";
+import { useFacilitator } from "x402/verify";
+
+// Configuration
+const FACILITATOR_URL = process.env.FACILITATOR_URL || "https://facilitator.x402.org";
+const WALLET_ADDRESS = process.env.WALLET_ADDRESS; // Must be set in .env
+const X402_VERSION = 1;
+
+if (!WALLET_ADDRESS) {
+  console.warn("WARNING: WALLET_ADDRESS not set in .env. x402 payments will fail.");
+}
+
+const { verify, settle } = useFacilitator({ url: FACILITATOR_URL });
+
+/**
+ * Creates payment requirements for a given price and network
+ * @param {string} price - Price string (e.g. "$0.01")
+ * @param {string} network - Network identifier (e.g. "base", "base-sepolia")
+ * @param {string} resource - Resource URL or identifier
+ * @param {string} description - Description of the charge
+ */
+export function createPaymentRequirements(price, network, resource, description = "") {
+  if (!WALLET_ADDRESS) throw new Error("WALLET_ADDRESS not configured");
+
+  const atomicAmountForAsset = processPriceToAtomicAmount(price, network);
+  if ("error" in atomicAmountForAsset) {
+    throw new Error(atomicAmountForAsset.error);
+  }
+  const { maxAmountRequired, asset } = atomicAmountForAsset;
+
+  return {
+    scheme: "exact",
+    network,
+    maxAmountRequired,
+    resource,
+    description,
+    mimeType: "",
+    payTo: WALLET_ADDRESS,
+    maxTimeoutSeconds: 60,
+    asset: asset.address,
+    outputSchema: undefined,
+    extra: {
+      name: asset.eip712.name,
+      version: asset.eip712.version,
+    },
+  };
+}
+
+/**
+ * Express middleware to verify x402 payment
+ * @param {object} options - Options { price, network, description }
+ */
+export const x402Middleware = (options) => {
+  return async (req, res, next) => {
+    const { price, network = "base-sepolia", description = "Access to resource" } = options;
+    
+    // Construct resource ID from request
+    const resource = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+    
+    let paymentRequirements;
+    try {
+      paymentRequirements = [
+        createPaymentRequirements(price, network, resource, description)
+      ];
+    } catch (err) {
+      console.error("Error creating payment requirements:", err);
+      return res.status(500).json({ error: "Server configuration error" });
+    }
+
+    const paymentHeader = req.header("X-PAYMENT");
+    
+    // If no payment header, return 402 with requirements
+    if (!paymentHeader) {
+      return res.status(402).json({
+        x402Version: X402_VERSION,
+        error: "X-PAYMENT header is required",
+        accepts: paymentRequirements,
+      });
+    }
+
+    // Decode payment
+    let decodedPayment;
+    try {
+      decodedPayment = exact.evm.decodePayment(paymentHeader);
+      decodedPayment.x402Version = X402_VERSION;
+    } catch (error) {
+      return res.status(402).json({
+        x402Version: X402_VERSION,
+        error: "Invalid or malformed payment header",
+        accepts: paymentRequirements,
+      });
+    }
+
+    // Verify payment
+    try {
+      const selectedPaymentRequirement =
+        findMatchingPaymentRequirements(paymentRequirements, decodedPayment) ||
+        paymentRequirements[0];
+        
+      const response = await verify(decodedPayment, selectedPaymentRequirement);
+      
+      if (!response.isValid) {
+        return res.status(402).json({
+          x402Version: X402_VERSION,
+          error: response.invalidReason,
+          accepts: paymentRequirements,
+          payer: response.payer,
+        });
+      }
+      
+      // Attach payment info to request for downstream use
+      req.payment = {
+        payer: response.payer,
+        amount: selectedPaymentRequirement.maxAmountRequired,
+        token: selectedPaymentRequirement.asset
+      };
+      
+      next();
+      
+    } catch (error) {
+      console.error("Payment verification failed:", error);
+      return res.status(402).json({
+        x402Version: X402_VERSION,
+        error: "Payment verification failed",
+        accepts: paymentRequirements,
+      });
+    }
+  };
+};
