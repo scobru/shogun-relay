@@ -56,7 +56,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
                     <h1 class="text-2xl sm:text-3xl font-semibold mb-2 text-center text-[#FFFFFF]">X402 Subscription Demo</h1>
-                    <p class="text-[#8B94FF] text-center">Base Sepolia Testnet</p>
+                    <p class="text-[#8B94FF] text-center">Sepolia Testnet</p>
                 </div>
 
                 <div class="mb-6">
@@ -65,9 +65,9 @@
                             <h3 class="font-bold text-[#FFFFFF]">Setup Instructions</h3>
                             <div class="text-sm text-[#D1D5DB] mt-2">
                                 <p>1. Install x402-fetch: <code class="bg-[#111827] px-2 py-1 rounded">npm install x402-fetch</code></p>
-                                <p>2. Connect your MetaMask wallet (Base Sepolia testnet)</p>
+                                <p>2. Connect your MetaMask wallet (Sepolia testnet)</p>
                                 <p>3. Enter a service ID and click "Subscribe"</p>
-                                <p class="mt-2 text-yellow-400">Note: This demo uses Base Sepolia testnet. Make sure you have testnet ETH.</p>
+                                <p class="mt-2 text-yellow-400">Note: This demo uses Sepolia testnet. Make sure you have testnet ETH.</p>
                             </div>
                         </div>
                     </div>
@@ -283,16 +283,16 @@
                 // Check network
                 const network = await provider.getNetwork();
                 const chainId = Number(network.chainId);
-                const baseSepoliaChainId = 84532; // Base Sepolia testnet
+                const sepoliaChainId = 11155111; // Sepolia testnet
                 
-                if (chainId !== baseSepoliaChainId) {
-                    addLog(`Warning: Connected to chain ${chainId}. Please switch to Base Sepolia (${baseSepoliaChainId})`, 'error');
+                if (chainId !== sepoliaChainId) {
+                    addLog(`Warning: Connected to chain ${chainId}. Please switch to Sepolia (${sepoliaChainId})`, 'error');
                     try {
                         await window.ethereum.request({
                             method: 'wallet_switchEthereumChain',
-                            params: [{ chainId: `0x${baseSepoliaChainId.toString(16)}` }],
+                            params: [{ chainId: `0x${sepoliaChainId.toString(16)}` }],
                         });
-                        addLog('Switched to Base Sepolia network', 'success');
+                        addLog('Switched to Sepolia network', 'success');
                     } catch (switchError) {
                         addLog('Failed to switch network. Please switch manually in MetaMask.', 'error');
                     }
@@ -481,7 +481,7 @@
 
         // Load service info on page load
         loadServiceInfo();
-        addLog('Page loaded. Ready to test x402 subscriptions on Base Sepolia.', 'success');
+        addLog('Page loaded. Ready to test x402 subscriptions on Sepolia.', 'success');
         addLog('Note: Connect your MetaMask wallet to proceed.', 'info');
         
         // Check if already connected on page load

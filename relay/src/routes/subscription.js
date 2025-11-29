@@ -8,7 +8,7 @@ const router = express.Router();
 // Configuration
 const SUBSCRIPTION_PRICE = "$0.001"; // Price for subscription demo
 const SUBSCRIPTION_DURATION = 7 * 24 * 60 * 60; // 7 days in seconds
-const NETWORK = "base-sepolia"; // Using Sepolia testnet
+const NETWORK = "sepolia"; // Using Sepolia testnet
 
 router.use((req, res, next) => {
   const gun = req.app.get('gunInstance');
@@ -110,7 +110,7 @@ router.get('/info', (req, res) => {
       network: NETWORK,
       price: SUBSCRIPTION_PRICE,
       defaultDuration: SUBSCRIPTION_DURATION,
-      description: "Demo subscription service using x402 payments on Base Sepolia testnet"
+      description: "Demo subscription service using x402 payments on Sepolia testnet"
     }
   });
 });
@@ -191,7 +191,7 @@ router.get('/prepare-payment', async (req, res) => {
       domain: {
         name: requirement.extra.name,
         version: requirement.extra.version,
-        chainId: 84532, // Base Sepolia
+        chainId: 11155111, // Sepolia
         verifyingContract: requirement.asset
       },
       types: {

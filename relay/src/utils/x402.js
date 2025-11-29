@@ -19,7 +19,7 @@ const { verify, settle } = useFacilitator({ url: FACILITATOR_URL });
 /**
  * Creates payment requirements for a given price and network
  * @param {string} price - Price string (e.g. "$0.01")
- * @param {string} network - Network identifier (e.g. "base", "base-sepolia")
+ * @param {string} network - Network identifier (e.g. "base", "sepolia")
  * @param {string} resource - Resource URL or identifier
  * @param {string} description - Description of the charge
  */
@@ -56,7 +56,7 @@ export function createPaymentRequirements(price, network, resource, description 
  */
 export const x402Middleware = (options) => {
   return async (req, res, next) => {
-    const { price, network = "base-sepolia", description = "Access to resource" } = options;
+    const { price, network = "sepolia", description = "Access to resource" } = options;
     
     // Construct resource ID from request
     const resource = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
