@@ -346,22 +346,27 @@ export default (app) => {
     res.sendFile(filePath);
   });
 
-  // Route per servire x402-fetch da node_modules (supporta anche subdirectory)
-  app.get("/node_modules/x402-fetch/dist/*", (req, res) => {
+  // Route per servire x402-fetch da node_modules
+  app.get("/node_modules/x402-fetch/dist/index.js", (req, res) => {
     const relayPath = path.resolve(__dirname, "../../");
-    const filePath = path.resolve(relayPath, "node_modules", "x402-fetch", "dist", req.params[0]);
+    const filePath = path.resolve(relayPath, "node_modules", "x402-fetch", "dist", "index.js");
+
+    console.log(`🔍 x402-fetch requested`);
+    console.log(`📄 File path: ${filePath}`);
+    console.log(`📄 File exists: ${fs.existsSync(filePath)}`);
 
     if (!fs.existsSync(filePath)) {
       console.error(`❌ x402-fetch file not found: ${filePath}`);
       return res.status(404).json({
         success: false,
-        error: "x402-fetch file not found",
+        error: "x402-fetch file not found. Please install: yarn add x402-fetch",
         path: filePath,
       });
     }
 
     // Set correct content type for JavaScript files
     res.setHeader("Content-Type", "application/javascript");
+    res.setHeader("Access-Control-Allow-Origin", "*");
     res.sendFile(filePath);
   });
 
