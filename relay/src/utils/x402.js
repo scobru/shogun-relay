@@ -26,22 +26,25 @@ const { verify, settle } = useFacilitator({ url: FACILITATOR_URL });
 export function createPaymentRequirements(price, network, resource, description = "", useETH = true) {
   if (!WALLET_ADDRESS) throw new Error("WALLET_ADDRESS not configured");
 
-  let atomicAmountForAsset;
+  let maxAmountRequired;
   let asset;
   
   if (useETH) {
     // Force ETH (native token) instead of USDC
     // For ETH, we need to convert price to wei
     // $0.001 at current ETH price (approximate) - for demo purposes, use a fixed conversion
-    // In production, you'd want to fetch current ETH price
+    // In production, you'd want to fetch current ETH price from an oracle
     const priceInUSD = parseFloat(price.replace('$', ''));
-    // Approximate: 1 ETH = $3000 (adjust as needed)
+    // Approximate: 1 ETH = $3000 (adjust as needed or fetch from oracle)
     const ethPriceUSD = 3000;
     const ethAmount = priceInUSD / ethPriceUSD;
     const weiAmount = BigInt(Math.floor(ethAmount * 1e18));
     
-    // For native ETH, use zero address
-    // x402 handles native ETH with zero address
+    maxAmountRequired = weiAmount;
+    
+    // For native ETH payments, x402 uses the zero address
+    // The EIP-712 domain will use this address as verifyingContract
+    // Note: Some implementations might require WETH instead, but zero address should work for native ETH
     asset = {
       address: "0x0000000000000000000000000000000000000000",
       eip712: {
@@ -49,20 +52,15 @@ export function createPaymentRequirements(price, network, resource, description 
         version: "1"
       }
     };
-    
-    atomicAmountForAsset = {
-      maxAmountRequired: weiAmount,
-      asset: asset
-    };
   } else {
-    atomicAmountForAsset = processPriceToAtomicAmount(price, network);
+    // Use standard x402 processPriceToAtomicAmount for ERC20 tokens (e.g., USDC)
+    const atomicAmountForAsset = processPriceToAtomicAmount(price, network);
     if ("error" in atomicAmountForAsset) {
       throw new Error(atomicAmountForAsset.error);
     }
+    maxAmountRequired = atomicAmountForAsset.maxAmountRequired;
     asset = atomicAmountForAsset.asset;
   }
-
-  const { maxAmountRequired } = atomicAmountForAsset;
 
   return {
     scheme: "exact",
@@ -70,7 +68,7 @@ export function createPaymentRequirements(price, network, resource, description 
     maxAmountRequired,
     resource,
     description,
-    mimeType: "",
+    mimeType: "application/json",
     payTo: WALLET_ADDRESS,
     maxTimeoutSeconds: 60,
     asset: asset.address,

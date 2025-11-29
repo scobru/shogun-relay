@@ -180,12 +180,10 @@ router.get('/prepare-payment', async (req, res) => {
     const validAfter = BigInt(now);
     const validBefore = BigInt(now + requirement.maxTimeoutSeconds);
     
-    // For ETH native token, verifyingContract should be zero address
-    // But EIP-712 requires a valid address, so we use a special address for ETH
-    // In x402, for native ETH, the verifyingContract is typically the zero address
-    const verifyingContract = requirement.asset === "0x0000000000000000000000000000000000000000" 
-      ? "0x0000000000000000000000000000000000000000" 
-      : requirement.asset;
+    // For ETH native token, EIP-712 domain requires a valid contract address
+    // x402 uses the zero address for native ETH, but EIP-712 might need a different approach
+    // For now, use the asset address as verifyingContract (zero address for ETH)
+    const verifyingContract = requirement.asset;
     
     // Create authorization object (from will be set by client)
     const authorization = {
