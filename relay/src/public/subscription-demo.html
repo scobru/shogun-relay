@@ -12,17 +12,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="lib/admin-nav.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/ethers@6/dist/ethers.umd.min.js"></script>
-    <script type="importmap">
-    {
-        "imports": {
-            "x402-fetch": "/node_modules/x402-fetch/dist/index.js",
-            "x402/": "https://cdn.jsdelivr.net/npm/x402@latest/",
-            "x402": "https://cdn.jsdelivr.net/npm/x402@latest/dist/esm/index.mjs",
-            "viem": "https://cdn.jsdelivr.net/npm/viem@latest/dist/esm/index.mjs",
-            "zod": "https://cdn.jsdelivr.net/npm/zod@latest/lib/index.mjs"
-        }
-    }
-    </script>
     <style>
         .status-badge {
             display: inline-block;
@@ -184,39 +173,73 @@
             logsDiv.scrollTop = logsDiv.scrollHeight;
         }
 
-        // Import x402-fetch (try server first, then CDN fallbacks)
-        let x402Fetch;
-        try {
-            // Try server route first
-            x402Fetch = await import('/node_modules/x402-fetch/dist/index.js');
-            addLog('x402-fetch loaded from server', 'success');
-        } catch (e) {
-            addLog('Server route failed: ' + e.message, 'info');
-            addLog('Trying CDN alternatives...', 'info');
-            // Try multiple CDNs in sequence
-            const cdns = [
-                { name: 'unpkg', url: 'https://unpkg.com/x402-fetch@latest/dist/esm/index.mjs' },
-                { name: 'jsdelivr', url: 'https://cdn.jsdelivr.net/npm/x402-fetch@latest/dist/esm/index.mjs' },
-                { name: 'skypack', url: 'https://cdn.skypack.dev/x402-fetch@latest' }
-            ];
-            
-            let lastError = null;
-            for (const cdn of cdns) {
-                try {
-                    addLog(`Trying ${cdn.name}...`, 'info');
-                    x402Fetch = await import(cdn.url);
-                    addLog(`x402-fetch loaded from ${cdn.name} CDN`, 'success');
-                    break;
-                } catch (cdnError) {
-                    lastError = cdnError;
-                    addLog(`${cdn.name} failed: ${cdnError.message}`, 'info');
-                }
-            }
-            
-            if (!x402Fetch) {
-                addLog('All CDN attempts failed. Last error: ' + (lastError?.message || 'Unknown'), 'error');
-                addLog('Please ensure x402-fetch is installed: yarn add x402-fetch', 'error');
-                addLog('Note: The server route may need to be configured to serve ESM modules with proper dependency resolution.', 'error');
+        // Helper function to create x402 payment header using ethers.js
+        // This replaces x402-fetch and works entirely client-side
+        async function createX402PaymentHeader(paymentRequirements, signer) {
+            try {
+                // Get payment requirement (use first one)
+                const requirement = paymentRequirements[0];
+                
+                // Create EIP-712 domain
+                const domain = {
+                    name: requirement.extra.name,
+                    version: requirement.extra.version,
+                    chainId: 84532, // Base Sepolia
+                    verifyingContract: requirement.asset
+                };
+                
+                // Create EIP-712 types
+                const types = {
+                    Payment: [
+                        { name: 'scheme', type: 'string' },
+                        { name: 'network', type: 'string' },
+                        { name: 'maxAmountRequired', type: 'uint256' },
+                        { name: 'resource', type: 'string' },
+                        { name: 'description', type: 'string' },
+                        { name: 'mimeType', type: 'string' },
+                        { name: 'payTo', type: 'address' },
+                        { name: 'maxTimeoutSeconds', type: 'uint256' },
+                        { name: 'asset', type: 'address' }
+                    ]
+                };
+                
+                // Create message
+                const message = {
+                    scheme: requirement.scheme,
+                    network: requirement.network,
+                    maxAmountRequired: requirement.maxAmountRequired,
+                    resource: requirement.resource,
+                    description: requirement.description,
+                    mimeType: requirement.mimeType || '',
+                    payTo: requirement.payTo,
+                    maxTimeoutSeconds: requirement.maxTimeoutSeconds,
+                    asset: requirement.asset
+                };
+                
+                // Sign the message
+                const signature = await signer.signTypedData(domain, types, message);
+                
+                // Create payment header (base64 encoded JSON)
+                const payment = {
+                    scheme: requirement.scheme,
+                    network: requirement.network,
+                    maxAmountRequired: requirement.maxAmountRequired.toString(),
+                    resource: requirement.resource,
+                    description: requirement.description,
+                    mimeType: requirement.mimeType || '',
+                    payTo: requirement.payTo,
+                    maxTimeoutSeconds: requirement.maxTimeoutSeconds,
+                    asset: requirement.asset,
+                    signature: signature
+                };
+                
+                // Encode as base64
+                const paymentJson = JSON.stringify(payment);
+                const paymentHeader = btoa(unescape(encodeURIComponent(paymentJson)));
+                
+                return paymentHeader;
+            } catch (error) {
+                throw new Error('Failed to create payment header: ' + error.message);
             }
         }
 
@@ -372,28 +395,34 @@
             }
 
             try {
-                if (!x402Fetch) {
-                    addLog('x402-fetch not available. Please install: yarn add x402-fetch', 'error');
-                    statusDisplay.innerHTML = '<p class="text-red-400">x402-fetch is required. Please install it and restart the server.</p>';
-                    return;
+                addLog('Fetching payment requirements...', 'info');
+                
+                // First, get payment requirements from server
+                const requirementsResponse = await fetch(`${API_BASE}/payment-requirements`);
+                if (!requirementsResponse.ok) {
+                    throw new Error('Failed to get payment requirements');
                 }
-
-                addLog('Initializing x402 payment...');
-                const { wrapFetchWithPayment, decodeXPaymentResponse } = x402Fetch;
                 
-                addLog('Using MetaMask signer for base-sepolia...');
-                addLog('Wrapping fetch with payment handler...');
-                const fetchWithPayment = wrapFetchWithPayment(fetch, walletSigner);
+                const requirementsData = await requirementsResponse.json();
+                const paymentRequirements = requirementsData.paymentRequirements;
                 
-                addLog('Making subscription request with payment...');
-                const url = `${API_BASE}/subscribe`;
-                const response = await fetchWithPayment(url, {
+                addLog('Payment requirements received', 'success');
+                addLog('Creating payment header with MetaMask...', 'info');
+                
+                // Create payment header using ethers.js
+                const paymentHeader = await createX402PaymentHeader(paymentRequirements, walletSigner);
+                
+                addLog('Payment header created, making subscription request...', 'info');
+                
+                // Make subscription request with payment header
+                const response = await fetch(`${API_BASE}/subscribe-with-payment-header`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        serviceId: serviceId
+                        serviceId: serviceId,
+                        paymentHeader: paymentHeader
                     })
                 });
 
@@ -406,7 +435,7 @@
                     const paymentResponseHeader = response.headers.get('x-payment-response');
                     if (paymentResponseHeader) {
                         try {
-                            const paymentResponse = decodeXPaymentResponse(paymentResponseHeader);
+                            const paymentResponse = JSON.parse(atob(paymentResponseHeader));
                             addLog('Payment response: ' + JSON.stringify(paymentResponse, null, 2), 'success');
                         } catch (e) {
                             addLog('Could not decode payment response: ' + e.message, 'info');
