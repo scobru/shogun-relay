@@ -160,24 +160,39 @@ router.get('/prepare-payment', (req, res) => {
       "Subscription service access (Sepolia)"
     )];
 
-    // Prepare payment header data using x402
-    // This returns the authorization object that needs to be signed
-    const prepared = exact.evm.preparePaymentHeader(
-      null, // from address (will be set by client)
-      1, // x402Version
-      paymentRequirements
-    );
+    const requirement = paymentRequirements[0];
+    
+    // Create authorization object manually (similar to what preparePaymentHeader does)
+    // Generate a random nonce (32 bytes)
+    const crypto = await import('crypto');
+    const nonceBytes = crypto.randomBytes(32);
+    const nonce = '0x' + nonceBytes.toString('hex');
+    
+    // Calculate validAfter (current time) and validBefore (current time + maxTimeoutSeconds)
+    const now = Math.floor(Date.now() / 1000);
+    const validAfter = BigInt(now);
+    const validBefore = BigInt(now + requirement.maxTimeoutSeconds);
+    
+    // Create authorization object (from will be set by client)
+    const authorization = {
+      from: '0x0000000000000000000000000000000000000000', // Placeholder, will be set by client
+      to: requirement.payTo,
+      value: requirement.maxAmountRequired.toString(),
+      validAfter: validAfter.toString(),
+      validBefore: validBefore.toString(),
+      nonce: nonce
+    };
 
     res.json({
       success: true,
       paymentRequirements: paymentRequirements,
-      authorization: prepared.authorization,
+      authorization: authorization,
       // Include the domain and types for EIP-712 signing
       domain: {
-        name: paymentRequirements[0].extra.name,
-        version: paymentRequirements[0].extra.version,
+        name: requirement.extra.name,
+        version: requirement.extra.version,
         chainId: 84532, // Base Sepolia
-        verifyingContract: paymentRequirements[0].asset
+        verifyingContract: requirement.asset
       },
       types: {
         Authorization: [
@@ -195,7 +210,8 @@ router.get('/prepare-payment', (req, res) => {
     res.status(500).json({ 
       success: false,
       error: "Failed to prepare payment",
-      message: error.message 
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
