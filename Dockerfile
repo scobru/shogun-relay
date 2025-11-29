@@ -24,6 +24,7 @@ RUN apk add --no-cache \
     dos2unix \
     supervisor \
     gcompat \
+    bash \
     && ARCH=$(uname -m) \
     && case $ARCH in \
     x86_64) ARCH_NAME="amd64" ;; \
@@ -83,7 +84,9 @@ RUN chmod +x /app/docker/entrypoint.sh
 
 # Copy entrypoint to final location and ensure it's executable
 RUN cp /app/docker/entrypoint.sh /usr/local/bin/entrypoint.sh && \
-    chmod +x /usr/local/bin/entrypoint.sh
+    chmod +x /usr/local/bin/entrypoint.sh && \
+    ls -lh /usr/local/bin/entrypoint.sh && \
+    head -1 /usr/local/bin/entrypoint.sh
 
 # Create environment files with Docker-optimized settings
 RUN cp /app/docker/relay.env /app/relay/.env
