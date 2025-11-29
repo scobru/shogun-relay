@@ -38,7 +38,8 @@
     "self-adjusting-interval": "^1.0.0",
     "shogun-theme": "^1.0.0",
     "viem": "^2.40.3",
-    "x402": "^0.7.3"
+    "x402": "^0.7.3",
+    "x402-fetch": "^0.1.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

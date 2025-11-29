@@ -146,16 +146,6 @@
     <script type="module">
         // ethers.js is loaded via script tag above, available as global window.ethers
 
-        // Try to import x402-fetch
-        let x402Fetch = null;
-        try {
-            // Try to import from node_modules if available (requires build step)
-            x402Fetch = await import('/node_modules/x402-fetch/dist/index.js').catch(() => null);
-        } catch (e) {
-            // If import fails, we'll use a manual implementation
-            addLog('x402-fetch not found in node_modules. Using manual payment flow.', 'info');
-        }
-
         const API_BASE = '/api/v1/subscription';
         
         // Get DOM elements
@@ -183,6 +173,35 @@
             logsDiv.appendChild(logEntry);
             logsDiv.scrollTop = logsDiv.scrollHeight;
         }
+
+        // Try to import x402-fetch
+        let x402Fetch = null;
+        
+        // Function to load x402-fetch
+        async function loadX402Fetch() {
+            // Try multiple sources
+            const sources = [
+                '/node_modules/x402-fetch/dist/index.js', // Served by Express route
+                'https://esm.sh/x402-fetch@latest', // ESM CDN
+                'https://cdn.jsdelivr.net/npm/x402-fetch@latest/dist/index.js', // jsDelivr CDN
+            ];
+
+            for (const source of sources) {
+                try {
+                    addLog(`Trying to load x402-fetch from: ${source}...`, 'info');
+                    x402Fetch = await import(source);
+                    addLog(`x402-fetch loaded successfully from: ${source}`, 'success');
+                    return true;
+                } catch (e) {
+                    addLog(`Failed to load from ${source}: ${e.message}`, 'info');
+                    continue;
+                }
+            }
+            return false;
+        }
+
+        // Try to load x402-fetch on page load
+        await loadX402Fetch();
 
         // Load service info on page load
         async function loadServiceInfo() {
@@ -341,14 +360,11 @@
                 // Check if x402-fetch is available
                 if (!x402Fetch) {
                     addLog('x402-fetch not available. Attempting to load...', 'info');
+                    const loaded = await loadX402Fetch();
                     
-                    // Try to use dynamic import
-                    try {
-                        x402Fetch = await import('https://cdn.jsdelivr.net/npm/x402-fetch@latest/dist/index.js');
-                        addLog('x402-fetch loaded from CDN', 'success');
-                    } catch (importError) {
-                        addLog('Could not load x402-fetch. Please install it: npm install x402-fetch', 'error');
-                        addLog('For local development, you need to build the project with x402-fetch installed.', 'info');
+                    if (!loaded) {
+                        addLog('Could not load x402-fetch from any source.', 'error');
+                        addLog('Please ensure x402-fetch is installed: yarn add x402-fetch', 'info');
                         
                         // Show manual instructions
                         statusDisplay.innerHTML = `
@@ -357,9 +373,8 @@
                                     <h3 class="font-bold">x402-fetch Required</h3>
                                     <p class="text-sm mt-2">To use this demo, you need to:</p>
                                     <ol class="list-decimal list-inside text-sm mt-2 space-y-1">
-                                        <li>Install x402-fetch: <code class="bg-[#111827] px-2 py-1 rounded">npm install x402-fetch</code></li>
-                                        <li>Build your project or use a bundler</li>
-                                        <li>Import it in your code: <code class="bg-[#111827] px-2 py-1 rounded">import { wrapFetchWithPayment } from 'x402-fetch'</code></li>
+                                        <li>Install x402-fetch: <code class="bg-[#111827] px-2 py-1 rounded">yarn add x402-fetch</code></li>
+                                        <li>Restart the server</li>
                                     </ol>
                                     <div class="mt-4">
                                         <p class="text-xs">Example code:</p>

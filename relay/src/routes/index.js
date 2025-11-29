@@ -346,6 +346,25 @@ export default (app) => {
     res.sendFile(filePath);
   });
 
+  // Route per servire x402-fetch da node_modules
+  app.get("/node_modules/x402-fetch/dist/:filename", (req, res) => {
+    const relayPath = path.resolve(__dirname, "../../");
+    const filePath = path.resolve(relayPath, "node_modules", "x402-fetch", "dist", req.params.filename);
+
+    if (!fs.existsSync(filePath)) {
+      console.error(`❌ x402-fetch file not found: ${filePath}`);
+      return res.status(404).json({
+        success: false,
+        error: "x402-fetch file not found",
+        path: filePath,
+      });
+    }
+
+    // Set correct content type for JavaScript files
+    res.setHeader("Content-Type", "application/javascript");
+    res.sendFile(filePath);
+  });
+
   app.get("/drive", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "drive.html"));
