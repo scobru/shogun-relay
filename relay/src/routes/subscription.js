@@ -64,20 +64,37 @@ router.post('/subscribe',
  * Check subscription status
  */
 router.get('/status/:serviceId', async (req, res) => {
-  const { serviceId } = req.params;
-  const status = await subscriptionManager.checkSubscription(serviceId);
-  
-  if (!status) {
-    return res.status(404).json({ 
-      status: 'not_found', 
-      message: 'No subscription found for this service' 
+  try {
+    const { serviceId } = req.params;
+    
+    if (!serviceId) {
+      return res.status(400).json({ 
+        status: 'error',
+        error: 'serviceId is required' 
+      });
+    }
+    
+    const status = await subscriptionManager.checkSubscription(serviceId);
+    
+    if (!status) {
+      return res.status(404).json({ 
+        status: 'not_found', 
+        message: 'No subscription found for this service' 
+      });
+    }
+
+    res.json({
+      ...status,
+      network: NETWORK
+    });
+  } catch (error) {
+    console.error("Error checking subscription status:", error);
+    res.status(500).json({ 
+      status: 'error',
+      error: 'Failed to check subscription status',
+      message: error.message 
     });
   }
-
-  res.json({
-    ...status,
-    network: NETWORK
-  });
 });
 
 /**

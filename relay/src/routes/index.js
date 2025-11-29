@@ -346,10 +346,16 @@ export default (app) => {
     res.sendFile(filePath);
   });
 
-  // Route per servire x402-fetch da node_modules
+  // Route per servire x402-fetch da node_modules (ESM version)
   app.get("/node_modules/x402-fetch/dist/index.js", (req, res) => {
     const relayPath = path.resolve(__dirname, "../../");
-    const filePath = path.resolve(relayPath, "node_modules", "x402-fetch", "dist", "index.js");
+    // Try ESM version first (for browser imports)
+    let filePath = path.resolve(relayPath, "node_modules", "x402-fetch", "dist", "esm", "index.mjs");
+    
+    // Fallback to CJS if ESM doesn't exist
+    if (!fs.existsSync(filePath)) {
+      filePath = path.resolve(relayPath, "node_modules", "x402-fetch", "dist", "cjs", "index.js");
+    }
 
     console.log(`🔍 x402-fetch requested`);
     console.log(`📄 File path: ${filePath}`);
