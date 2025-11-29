@@ -113,17 +113,35 @@ export const x402Middleware = (options) => {
       const selectedPaymentRequirement =
         findMatchingPaymentRequirements(paymentRequirements, decodedPayment) ||
         paymentRequirements[0];
-        
+      
+      console.log('🔍 x402Middleware - Selected payment requirement:', {
+        scheme: selectedPaymentRequirement.scheme,
+        network: selectedPaymentRequirement.network,
+        maxAmountRequired: selectedPaymentRequirement.maxAmountRequired,
+        payTo: selectedPaymentRequirement.payTo,
+        asset: selectedPaymentRequirement.asset
+      });
+      
+      console.log('🔍 x402Middleware - Calling facilitator verify...');
       const response = await verify(decodedPayment, selectedPaymentRequirement);
       
+      console.log('🔍 x402Middleware - Verification response:', {
+        isValid: response.isValid,
+        invalidReason: response.invalidReason,
+        payer: response.payer
+      });
+      
       if (!response.isValid) {
+        console.error('❌ x402Middleware - Payment verification failed:', response.invalidReason);
         return res.status(402).json({
           x402Version: X402_VERSION,
-          error: response.invalidReason,
+          error: response.invalidReason || "Payment verification failed",
           accepts: paymentRequirements,
           payer: response.payer,
         });
       }
+      
+      console.log('✅ x402Middleware - Payment verified successfully, payer:', response.payer);
       
       // Attach payment info to request for downstream use
       req.payment = {

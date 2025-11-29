@@ -427,8 +427,27 @@
                     `;
                 } else {
                     const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-                    addLog('Error: ' + (error.error || error.message || 'Unknown error'), 'error');
-                    statusDisplay.innerHTML = `<p class="text-red-400">Error: ${error.error || error.message}</p>`;
+                    const errorMessage = error.error || error.message || 'Unknown error';
+                    addLog('Error: ' + errorMessage, 'error');
+                    
+                    // Show more details if available
+                    if (error.invalidReason) {
+                        addLog('Invalid reason: ' + error.invalidReason, 'error');
+                    }
+                    if (error.payer) {
+                        addLog('Payer address: ' + error.payer, 'info');
+                    }
+                    if (error.accepts) {
+                        addLog('Payment requirements: ' + JSON.stringify(error.accepts, null, 2), 'info');
+                    }
+                    
+                    statusDisplay.innerHTML = `
+                        <div class="text-red-400">
+                            <p><strong>Error:</strong> ${errorMessage}</p>
+                            ${error.invalidReason ? `<p><strong>Reason:</strong> ${error.invalidReason}</p>` : ''}
+                            ${error.payer ? `<p><strong>Payer:</strong> ${error.payer}</p>` : ''}
+                        </div>
+                    `;
                 }
             } catch (error) {
                 addLog('Error during subscription: ' + error.message, 'error');
