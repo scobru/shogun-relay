@@ -173,13 +173,13 @@
             logsDiv.scrollTop = logsDiv.scrollHeight;
         }
 
-        // Import x402-fetch
+        // Import x402-fetch from CDN
         let x402Fetch;
         try {
-            x402Fetch = await import('/node_modules/x402-fetch/dist/index.js');
-            addLog('x402-fetch loaded', 'success');
+            x402Fetch = await import('https://esm.sh/x402-fetch@latest');
+            addLog('x402-fetch loaded from CDN', 'success');
         } catch (e) {
-            addLog('x402-fetch not found. Please install: yarn add x402-fetch', 'error');
+            addLog('Failed to load x402-fetch from CDN: ' + e.message, 'error');
         }
 
         // Load service info on page load
