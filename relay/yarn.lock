@@ -5024,6 +5024,15 @@ ws@~8.17.1:
   resolved "https://registry.npmjs.org/ws/-/ws-8.17.1.tgz"
   integrity sha512-6XQFvXTkbfUOZOKKILFG1PDK2NDQs4azKQl26T0YS5CxqWLgXajbPZ+h4gZekJyRqFU8pvnbAbbs/3TgRPy+GQ==
 
+x402-fetch@^0.7.3:
+  version "0.7.3"
+  resolved "https://registry.yarnpkg.com/x402-fetch/-/x402-fetch-0.7.3.tgz#95c9478e5a35d6f3894b0da034c6277ec0cb21bd"
+  integrity sha512-LuMRN/cdWwWXvRTJq8PJkX5JOPyEKLPzehUsR3/VcZuINEYg/Nzd8Dhbcy64cmmLaIY9vDnx+J0/k4P+Zkz+Nw==
+  dependencies:
+    viem "^2.21.26"
+    x402 "^0.7.3"
+    zod "^3.24.2"
+
 x402@^0.7.3:
   version "0.7.3"
   resolved "https://registry.yarnpkg.com/x402/-/x402-0.7.3.tgz#ab583c5d35eb58afbc5fe5818682e27aa88b4f2e"

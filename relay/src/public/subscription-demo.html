@@ -12,7 +12,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="lib/admin-nav.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/ethers@6/dist/ethers.umd.min.js"></script>
-    <!-- x402-fetch will be loaded via import in the script below -->
     <style>
         .status-badge {
             display: inline-block;
@@ -174,34 +173,14 @@
             logsDiv.scrollTop = logsDiv.scrollHeight;
         }
 
-        // Try to import x402-fetch
-        let x402Fetch = null;
-        
-        // Function to load x402-fetch
-        async function loadX402Fetch() {
-            // Try multiple sources
-            const sources = [
-                '/node_modules/x402-fetch/dist/index.js', // Served by Express route
-                'https://esm.sh/x402-fetch@latest', // ESM CDN
-                'https://cdn.jsdelivr.net/npm/x402-fetch@latest/dist/index.js', // jsDelivr CDN
-            ];
-
-            for (const source of sources) {
-                try {
-                    addLog(`Trying to load x402-fetch from: ${source}...`, 'info');
-                    x402Fetch = await import(source);
-                    addLog(`x402-fetch loaded successfully from: ${source}`, 'success');
-                    return true;
-                } catch (e) {
-                    addLog(`Failed to load from ${source}: ${e.message}`, 'info');
-                    continue;
-                }
-            }
-            return false;
+        // Import x402-fetch
+        let x402Fetch;
+        try {
+            x402Fetch = await import('/node_modules/x402-fetch/dist/index.js');
+            addLog('x402-fetch loaded', 'success');
+        } catch (e) {
+            addLog('x402-fetch not found. Please install: yarn add x402-fetch', 'error');
         }
-
-        // Try to load x402-fetch on page load
-        await loadX402Fetch();
 
         // Load service info on page load
         async function loadServiceInfo() {
@@ -355,44 +334,13 @@
             }
 
             try {
-                addLog('Initializing x402 payment...');
-                
-                // Check if x402-fetch is available
                 if (!x402Fetch) {
-                    addLog('x402-fetch not available. Attempting to load...', 'info');
-                    const loaded = await loadX402Fetch();
-                    
-                    if (!loaded) {
-                        addLog('Could not load x402-fetch from any source.', 'error');
-                        addLog('Please ensure x402-fetch is installed: yarn add x402-fetch', 'info');
-                        
-                        // Show manual instructions
-                        statusDisplay.innerHTML = `
-                            <div class="alert bg-yellow-900 border-yellow-700">
-                                <div>
-                                    <h3 class="font-bold">x402-fetch Required</h3>
-                                    <p class="text-sm mt-2">To use this demo, you need to:</p>
-                                    <ol class="list-decimal list-inside text-sm mt-2 space-y-1">
-                                        <li>Install x402-fetch: <code class="bg-[#111827] px-2 py-1 rounded">yarn add x402-fetch</code></li>
-                                        <li>Restart the server</li>
-                                    </ol>
-                                    <div class="mt-4">
-                                        <p class="text-xs">Example code:</p>
-                                        <pre class="text-xs bg-[#111827] p-2 rounded mt-2 overflow-x-auto">const provider = new ethers.BrowserProvider(window.ethereum);
-const signer = await provider.getSigner();
-const fetchWithPayment = wrapFetchWithPayment(fetch, signer);
-const response = await fetchWithPayment(url, { 
-  method: 'POST', 
-  body: JSON.stringify({ serviceId }) 
-});</pre>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                        return;
-                    }
+                    addLog('x402-fetch not available. Please install: yarn add x402-fetch', 'error');
+                    statusDisplay.innerHTML = '<p class="text-red-400">x402-fetch is required. Please install it and restart the server.</p>';
+                    return;
                 }
 
+                addLog('Initializing x402 payment...');
                 const { wrapFetchWithPayment, decodeXPaymentResponse } = x402Fetch;
                 
                 addLog('Using MetaMask signer for base-sepolia...');
