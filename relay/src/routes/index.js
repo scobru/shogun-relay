@@ -346,10 +346,10 @@ export default (app) => {
     res.sendFile(filePath);
   });
 
-  // Route per servire x402-fetch da node_modules
-  app.get("/node_modules/x402-fetch/dist/:filename", (req, res) => {
+  // Route per servire x402-fetch da node_modules (supporta anche subdirectory)
+  app.get("/node_modules/x402-fetch/dist/*", (req, res) => {
     const relayPath = path.resolve(__dirname, "../../");
-    const filePath = path.resolve(relayPath, "node_modules", "x402-fetch", "dist", req.params.filename);
+    const filePath = path.resolve(relayPath, "node_modules", "x402-fetch", "dist", req.params[0]);
 
     if (!fs.existsSync(filePath)) {
       console.error(`❌ x402-fetch file not found: ${filePath}`);
