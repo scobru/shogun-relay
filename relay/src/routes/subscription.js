@@ -150,7 +150,7 @@ router.get('/payment-requirements', (req, res) => {
  * Prepare payment data for signing (returns authorization data to sign)
  * Returns the authorization object that needs to be signed
  */
-router.get('/prepare-payment', (req, res) => {
+router.get('/prepare-payment', async (req, res) => {
   try {
     const resource = `${req.protocol}://${req.get('host')}${req.baseUrl}/subscribe`;
     const paymentRequirements = [createPaymentRequirements(
