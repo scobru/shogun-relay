@@ -11,6 +11,7 @@
     <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="lib/admin-nav.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6/dist/ethers.umd.min.js"></script>
     <!-- x402-fetch will be loaded via import in the script below -->
     <style>
         .status-badge {
@@ -65,7 +66,7 @@
                             <h3 class="font-bold text-[#FFFFFF]">Setup Instructions</h3>
                             <div class="text-sm text-[#D1D5DB] mt-2">
                                 <p>1. Install x402-fetch: <code class="bg-[#111827] px-2 py-1 rounded">npm install x402-fetch</code></p>
-                                <p>2. Set your private key in the input below (Base Sepolia testnet)</p>
+                                <p>2. Connect your MetaMask wallet (Base Sepolia testnet)</p>
                                 <p>3. Enter a service ID and click "Subscribe"</p>
                                 <p class="mt-2 text-yellow-400">Note: This demo uses Base Sepolia testnet. Make sure you have testnet ETH.</p>
                             </div>
@@ -85,14 +86,17 @@
                         <h2 class="text-xl font-semibold mb-4 text-[#FF69B4]">Configuration</h2>
                         <div class="space-y-4">
                             <div>
-                                <label class="block text-sm font-medium text-[#D1D5DB] mb-2">Private Key (Base Sepolia)</label>
-                                <input 
-                                    type="password" 
-                                    id="privateKey" 
-                                    placeholder="0x..." 
-                                    class="input input-bordered w-full bg-[#111827] border-[#374151] text-[#FFFFFF]"
-                                />
-                                <p class="text-xs text-[#9CA3AF] mt-1">Your EVM private key for signing payments</p>
+                                <label class="block text-sm font-medium text-[#D1D5DB] mb-2">Wallet Connection</label>
+                                <button 
+                                    id="connectWalletBtn" 
+                                    class="btn bg-[#42A5F5] hover:bg-[#2196F3] text-white border-0 w-full mb-2"
+                                >
+                                    Connect MetaMask
+                                </button>
+                                <div id="walletInfo" class="text-xs text-[#9CA3AF] mt-1 hidden">
+                                    <p>Connected: <span id="walletAddress" class="text-[#10b981]"></span></p>
+                                </div>
+                                <p class="text-xs text-[#9CA3AF] mt-1">Connect your MetaMask wallet to sign payments</p>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-[#D1D5DB] mb-2">Service ID</label>
@@ -140,6 +144,8 @@
     </div>
 
     <script type="module">
+        // ethers.js is loaded via script tag above, available as global window.ethers
+
         // Try to import x402-fetch
         let x402Fetch = null;
         try {
@@ -153,7 +159,9 @@
         const API_BASE = '/api/v1/subscription';
         
         // Get DOM elements
-        const privateKeyInput = document.getElementById('privateKey');
+        const connectWalletBtn = document.getElementById('connectWalletBtn');
+        const walletInfo = document.getElementById('walletInfo');
+        const walletAddress = document.getElementById('walletAddress');
         const serviceIdInput = document.getElementById('serviceId');
         const subscribeBtn = document.getElementById('subscribeBtn');
         const checkStatusBtn = document.getElementById('checkStatusBtn');
@@ -161,6 +169,10 @@
         const logsDiv = document.getElementById('logs');
         const statusDisplay = document.getElementById('statusDisplay');
         const serviceInfoDiv = document.getElementById('serviceInfo');
+
+        // Wallet state
+        let walletSigner = null;
+        let connectedAddress = null;
 
         // Add log message
         function addLog(message, type = 'info') {
@@ -192,6 +204,68 @@
                 addLog('Error loading service info: ' + error.message, 'error');
             }
         }
+
+        // Check if MetaMask is available
+        function isMetaMaskAvailable() {
+            return typeof window !== 'undefined' && 
+                   (window.ethereum && window.ethereum.isMetaMask);
+        }
+
+        // Connect to MetaMask
+        connectWalletBtn.addEventListener('click', async () => {
+            if (!isMetaMaskAvailable()) {
+                addLog('MetaMask not found. Please install MetaMask extension.', 'error');
+                statusDisplay.innerHTML = '<p class="text-red-400">MetaMask not found. Please install MetaMask extension.</p>';
+                return;
+            }
+
+            if (typeof window.ethers === 'undefined') {
+                addLog('ethers.js not loaded. Please refresh the page.', 'error');
+                return;
+            }
+
+            try {
+                addLog('Requesting MetaMask connection...');
+                const provider = new window.ethers.BrowserProvider(window.ethereum);
+                
+                // Request account access
+                await provider.send("eth_requestAccounts", []);
+                
+                // Get signer
+                walletSigner = await provider.getSigner();
+                connectedAddress = await walletSigner.getAddress();
+                
+                // Check network
+                const network = await provider.getNetwork();
+                const chainId = Number(network.chainId);
+                const baseSepoliaChainId = 84532; // Base Sepolia testnet
+                
+                if (chainId !== baseSepoliaChainId) {
+                    addLog(`Warning: Connected to chain ${chainId}. Please switch to Base Sepolia (${baseSepoliaChainId})`, 'error');
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: `0x${baseSepoliaChainId.toString(16)}` }],
+                        });
+                        addLog('Switched to Base Sepolia network', 'success');
+                    } catch (switchError) {
+                        addLog('Failed to switch network. Please switch manually in MetaMask.', 'error');
+                    }
+                }
+                
+                // Update UI
+                walletAddress.textContent = `${connectedAddress.substring(0, 6)}...${connectedAddress.substring(38)}`;
+                walletInfo.classList.remove('hidden');
+                connectWalletBtn.textContent = 'Connected';
+                connectWalletBtn.classList.remove('bg-[#42A5F5]', 'hover:bg-[#2196F3]');
+                connectWalletBtn.classList.add('bg-[#10b981]', 'hover:bg-[#059669]');
+                
+                addLog(`Connected to MetaMask: ${connectedAddress}`, 'success');
+            } catch (error) {
+                addLog('Error connecting to MetaMask: ' + error.message, 'error');
+                statusDisplay.innerHTML = `<p class="text-red-400">Error: ${error.message}</p>`;
+            }
+        });
 
         // Clear logs
         clearBtn.addEventListener('click', () => {
@@ -248,11 +322,11 @@
 
         // Subscribe to service with x402 payment
         subscribeBtn.addEventListener('click', async () => {
-            const privateKey = privateKeyInput.value.trim();
             const serviceId = serviceIdInput.value.trim();
             
-            if (!privateKey) {
-                addLog('Please enter your private key', 'error');
+            if (!walletSigner) {
+                addLog('Please connect your MetaMask wallet first', 'error');
+                statusDisplay.innerHTML = '<p class="text-red-400">Please connect your MetaMask wallet first</p>';
                 return;
             }
             
@@ -285,13 +359,17 @@
                                     <ol class="list-decimal list-inside text-sm mt-2 space-y-1">
                                         <li>Install x402-fetch: <code class="bg-[#111827] px-2 py-1 rounded">npm install x402-fetch</code></li>
                                         <li>Build your project or use a bundler</li>
-                                        <li>Import it in your code: <code class="bg-[#111827] px-2 py-1 rounded">import { wrapFetchWithPayment, createSigner } from 'x402-fetch'</code></li>
+                                        <li>Import it in your code: <code class="bg-[#111827] px-2 py-1 rounded">import { wrapFetchWithPayment } from 'x402-fetch'</code></li>
                                     </ol>
                                     <div class="mt-4">
                                         <p class="text-xs">Example code:</p>
-                                        <pre class="text-xs bg-[#111827] p-2 rounded mt-2 overflow-x-auto">const signer = await createSigner('base-sepolia', privateKey);
+                                        <pre class="text-xs bg-[#111827] p-2 rounded mt-2 overflow-x-auto">const provider = new ethers.BrowserProvider(window.ethereum);
+const signer = await provider.getSigner();
 const fetchWithPayment = wrapFetchWithPayment(fetch, signer);
-const response = await fetchWithPayment(url, { method: 'POST', body: JSON.stringify({ serviceId }) });</pre>
+const response = await fetchWithPayment(url, { 
+  method: 'POST', 
+  body: JSON.stringify({ serviceId }) 
+});</pre>
                                     </div>
                                 </div>
                             </div>
@@ -300,14 +378,11 @@ const response = await fetchWithPayment(url, { method: 'POST', body: JSON.string
                     }
                 }
 
-                const { wrapFetchWithPayment, createSigner, decodeXPaymentResponse } = x402Fetch;
+                const { wrapFetchWithPayment, decodeXPaymentResponse } = x402Fetch;
                 
-                addLog('Creating signer for base-sepolia...');
-                const signer = await createSigner('base-sepolia', privateKey);
-                addLog('Signer created successfully', 'success');
-                
+                addLog('Using MetaMask signer for base-sepolia...');
                 addLog('Wrapping fetch with payment handler...');
-                const fetchWithPayment = wrapFetchWithPayment(fetch, signer);
+                const fetchWithPayment = wrapFetchWithPayment(fetch, walletSigner);
                 
                 addLog('Making subscription request with payment...');
                 const url = `${API_BASE}/subscribe`;
@@ -357,10 +432,42 @@ const response = await fetchWithPayment(url, { method: 'POST', body: JSON.string
             }
         });
 
+        // Listen for account changes
+        if (isMetaMaskAvailable()) {
+            window.ethereum.on('accountsChanged', (accounts) => {
+                if (accounts.length === 0) {
+                    // User disconnected
+                    walletSigner = null;
+                    connectedAddress = null;
+                    walletInfo.classList.add('hidden');
+                    connectWalletBtn.textContent = 'Connect MetaMask';
+                    connectWalletBtn.classList.remove('bg-[#10b981]', 'hover:bg-[#059669]');
+                    connectWalletBtn.classList.add('bg-[#42A5F5]', 'hover:bg-[#2196F3]');
+                    addLog('Wallet disconnected', 'info');
+                } else {
+                    // Account changed, reconnect
+                    connectWalletBtn.click();
+                }
+            });
+
+            window.ethereum.on('chainChanged', () => {
+                // Reload page on chain change
+                window.location.reload();
+            });
+        }
+
         // Load service info on page load
         loadServiceInfo();
         addLog('Page loaded. Ready to test x402 subscriptions on Base Sepolia.', 'success');
-        addLog('Note: Make sure x402-fetch is installed and available for full functionality.', 'info');
+        addLog('Note: Connect your MetaMask wallet to proceed.', 'info');
+        
+        // Check if already connected on page load
+        if (isMetaMaskAvailable() && window.ethereum.selectedAddress) {
+            // Small delay to ensure ethers is loaded
+            setTimeout(() => {
+                connectWalletBtn.click();
+            }, 100);
+        }
     </script>
 </body>
 </html>
