@@ -71,10 +71,17 @@ export const x402Middleware = (options) => {
       return res.status(500).json({ error: "Server configuration error" });
     }
 
-    const paymentHeader = req.header("X-PAYMENT");
+    const paymentHeader = req.header("X-PAYMENT") || req.header("x-payment");
+    
+    console.log('🔍 x402Middleware - Payment header present:', !!paymentHeader);
+    if (paymentHeader) {
+      console.log('🔍 x402Middleware - Payment header length:', paymentHeader.length);
+      console.log('🔍 x402Middleware - Payment header preview:', paymentHeader.substring(0, 100));
+    }
     
     // If no payment header, return 402 with requirements
     if (!paymentHeader) {
+      console.log('⚠️ x402Middleware - No payment header found');
       return res.status(402).json({
         x402Version: X402_VERSION,
         error: "X-PAYMENT header is required",
@@ -85,12 +92,18 @@ export const x402Middleware = (options) => {
     // Decode payment
     let decodedPayment;
     try {
+      console.log('🔍 x402Middleware - Attempting to decode payment header...');
       decodedPayment = exact.evm.decodePayment(paymentHeader);
       decodedPayment.x402Version = X402_VERSION;
+      console.log('✅ x402Middleware - Payment decoded successfully');
+      console.log('🔍 x402Middleware - Decoded payment scheme:', decodedPayment.scheme);
+      console.log('🔍 x402Middleware - Decoded payment network:', decodedPayment.network);
     } catch (error) {
+      console.error('❌ x402Middleware - Payment decode error:', error.message);
+      console.error('❌ x402Middleware - Payment decode stack:', error.stack);
       return res.status(402).json({
         x402Version: X402_VERSION,
-        error: "Invalid or malformed payment header",
+        error: "Invalid or malformed payment header: " + error.message,
         accepts: paymentRequirements,
       });
     }

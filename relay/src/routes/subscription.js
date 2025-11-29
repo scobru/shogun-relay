@@ -244,18 +244,30 @@ router.post('/create-payment-header', async (req, res) => {
 
     const requirement = paymentRequirements[0];
     
+    // Ensure nonce is in the correct format (bytes32 as hex string)
+    let nonce = authorization.nonce;
+    if (!nonce.startsWith('0x')) {
+      nonce = '0x' + nonce;
+    }
+    // Ensure nonce is exactly 66 characters (0x + 64 hex chars = 32 bytes)
+    if (nonce.length !== 66) {
+      throw new Error(`Invalid nonce length: ${nonce.length}, expected 66 (0x + 64 hex chars)`);
+    }
+    
     // Create the exact EVM payload structure
     const payload = {
       signature: signature,
       authorization: {
-        from: from,
-        to: authorization.to,
-        value: authorization.value,
-        validAfter: authorization.validAfter,
-        validBefore: authorization.validBefore,
-        nonce: authorization.nonce
+        from: from.toLowerCase(), // Ensure lowercase
+        to: authorization.to.toLowerCase(), // Ensure lowercase
+        value: authorization.value.toString(), // Ensure string
+        validAfter: authorization.validAfter.toString(), // Ensure string
+        validBefore: authorization.validBefore.toString(), // Ensure string
+        nonce: nonce
       }
     };
+
+    console.log('🔍 Creating payment with payload:', JSON.stringify(payload, null, 2));
 
     // Create payment object in the format expected by x402
     const payment = {
@@ -265,8 +277,17 @@ router.post('/create-payment-header', async (req, res) => {
       payload: payload
     };
 
+    console.log('🔍 Payment object:', JSON.stringify(payment, null, 2));
+
     // Encode the payment header
-    const paymentHeader = exact.evm.encodePayment(payment);
+    let paymentHeader;
+    try {
+      paymentHeader = exact.evm.encodePayment(payment);
+      console.log('✅ Payment header encoded successfully, length:', paymentHeader.length);
+    } catch (error) {
+      console.error('❌ Error encoding payment:', error);
+      throw error;
+    }
     
     res.json({
       success: true,
@@ -292,6 +313,9 @@ router.post('/subscribe-with-payment-header',
     // Manually set the X-PAYMENT header from request body
     if (req.body.paymentHeader) {
       req.headers['x-payment'] = req.body.paymentHeader;
+      console.log('🔍 Payment header set from body:', req.body.paymentHeader.substring(0, 50) + '...');
+    } else {
+      console.log('⚠️ No payment header in request body');
     }
     next();
   },
