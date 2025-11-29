@@ -119,6 +119,21 @@ export const x402Middleware = (options) => {
         token: selectedPaymentRequirement.asset
       };
       
+      // Settle payment and add response header
+      try {
+        const settlement = await settle(decodedPayment, selectedPaymentRequirement);
+        if (settlement && settlement.success !== false) {
+          // Add settlement response header
+          const settlementHeader = Buffer.from(JSON.stringify(settlement)).toString('base64');
+          res.setHeader('X-PAYMENT-RESPONSE', settlementHeader);
+          res.setHeader('Access-Control-Expose-Headers', 'X-PAYMENT-RESPONSE');
+        }
+      } catch (settleError) {
+        // Log settlement error but don't block the request
+        // Payment is already verified, settlement is best-effort
+        console.error("Payment settlement failed (non-blocking):", settleError);
+      }
+      
       next();
       
     } catch (error) {
