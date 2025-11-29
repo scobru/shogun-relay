@@ -10,6 +10,9 @@ ARG IPFS_API_KEY
 ARG IPFS_API_TOKEN
 ARG IPFS_VERSION=0.29.0
 ARG RELAY_PEERS
+ARG RELAY_USER
+ARG RELAY_PASSWORD
+ARG WALLET_ADDRESS
 
 # Install required system packages and IPFS
 # Note: IPFS Kubo binaries are compiled for glibc, Alpine uses musl libc
