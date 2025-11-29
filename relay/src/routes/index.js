@@ -42,6 +42,7 @@ import debugRouter from "./debug.js";
 import servicesRouter from "./services.js";
 import visualGraphRouter from "./visualGraph.js";
 import ipfsRentRouter from "./ipfsRent.js";
+import subscriptionRouter from "./subscription.js";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -292,6 +293,11 @@ export default (app) => {
   app.get("/endpoints", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "endpoints.html"));
+  });
+
+  app.get("/subscription-demo", (req, res) => {
+    const publicPath = path.resolve(__dirname, "../public");
+    res.sendFile(path.resolve(publicPath, "subscription-demo.html"));
   });
 
   // Route per servire i file JavaScript dalla directory lib
@@ -612,6 +618,9 @@ export default (app) => {
 
   // Route per IPFS Rent (x402)
   app.use(`${baseRoute}/ipfs-rent`, ipfsRentRouter);
+
+  // Route per Subscription Demo (x402 Sepolia)
+  app.use(`${baseRoute}/subscription`, subscriptionRouter);
 
 
   // Route di test per verificare se le route sono registrate correttamente

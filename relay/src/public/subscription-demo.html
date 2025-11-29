@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="shogun-dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X402 Subscription Demo - Sepolia</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/variables.css" rel="stylesheet" type="text/css" />
+    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/base.css" rel="stylesheet" type="text/css" />
+    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/daisyui-overrides.css" rel="stylesheet" type="text/css" />
+    <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="lib/admin-nav.js"></script>
+    <!-- x402-fetch will be loaded via import in the script below -->
+    <style>
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        .status-active {
+            background-color: #10b981;
+            color: white;
+        }
+        .status-expired {
+            background-color: #ef4444;
+            color: white;
+        }
+        .status-not-found {
+            background-color: #6b7280;
+            color: white;
+        }
+        .code-block {
+            background-color: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body class="antialiased bg-[#1A1A1A]">
+    <div class="container mx-auto px-6 py-4 sm:py-6">
+        <div class="flex items-center mb-6">
+            <a href="/" class="text-[#42A5F5] hover:text-[#64B5F6] transition-colors text-lg">&larr; Back to Control Panel</a>
+        </div>
+        
+        <div class="card bg-[#282828] border-[#404040] rounded-2xl shadow-xl">
+            <div class="p-6 sm:p-8 md:p-10">
+                <div class="flex flex-col items-center mb-8">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-4 text-[#FF69B4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                    <h1 class="text-2xl sm:text-3xl font-semibold mb-2 text-center text-[#FFFFFF]">X402 Subscription Demo</h1>
+                    <p class="text-[#8B94FF] text-center">Base Sepolia Testnet</p>
+                </div>
+
+                <div class="mb-6">
+                    <div class="alert bg-[#1f2937] border-[#374151] mb-4">
+                        <div>
+                            <h3 class="font-bold text-[#FFFFFF]">Setup Instructions</h3>
+                            <div class="text-sm text-[#D1D5DB] mt-2">
+                                <p>1. Install x402-fetch: <code class="bg-[#111827] px-2 py-1 rounded">npm install x402-fetch</code></p>
+                                <p>2. Set your private key in the input below (Base Sepolia testnet)</p>
+                                <p>3. Enter a service ID and click "Subscribe"</p>
+                                <p class="mt-2 text-yellow-400">Note: This demo uses Base Sepolia testnet. Make sure you have testnet ETH.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="card bg-[#1f2937] border-[#374151] rounded-xl p-6">
+                        <h2 class="text-xl font-semibold mb-4 text-[#FF69B4]">Subscription Info</h2>
+                        <div id="serviceInfo" class="text-[#D1D5DB]">
+                            <p>Loading...</p>
+                        </div>
+                    </div>
+
+                    <div class="card bg-[#1f2937] border-[#374151] rounded-xl p-6">
+                        <h2 class="text-xl font-semibold mb-4 text-[#FF69B4]">Configuration</h2>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-[#D1D5DB] mb-2">Private Key (Base Sepolia)</label>
+                                <input 
+                                    type="password" 
+                                    id="privateKey" 
+                                    placeholder="0x..." 
+                                    class="input input-bordered w-full bg-[#111827] border-[#374151] text-[#FFFFFF]"
+                                />
+                                <p class="text-xs text-[#9CA3AF] mt-1">Your EVM private key for signing payments</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-[#D1D5DB] mb-2">Service ID</label>
+                                <input 
+                                    type="text" 
+                                    id="serviceId" 
+                                    placeholder="my-service-123" 
+                                    class="input input-bordered w-full bg-[#111827] border-[#374151] text-[#FFFFFF]"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card bg-[#1f2937] border-[#374151] rounded-xl p-6 mb-6">
+                    <h2 class="text-xl font-semibold mb-4 text-[#FF69B4]">Actions</h2>
+                    <div class="flex flex-wrap gap-4">
+                        <button id="subscribeBtn" class="btn bg-[#FF69B4] hover:bg-[#FF1493] text-white border-0">
+                            Subscribe
+                        </button>
+                        <button id="checkStatusBtn" class="btn bg-[#42A5F5] hover:bg-[#2196F3] text-white border-0">
+                            Check Status
+                        </button>
+                        <button id="clearBtn" class="btn bg-[#6B7280] hover:bg-[#4B5563] text-white border-0">
+                            Clear Logs
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card bg-[#1f2937] border-[#374151] rounded-xl p-6 mb-6">
+                    <h2 class="text-xl font-semibold mb-4 text-[#FF69B4]">Status</h2>
+                    <div id="statusDisplay" class="text-[#D1D5DB]">
+                        <p>No status checked yet.</p>
+                    </div>
+                </div>
+
+                <div class="card bg-[#1f2937] border-[#374151] rounded-xl p-6">
+                    <h2 class="text-xl font-semibold mb-4 text-[#FF69B4]">Logs</h2>
+                    <div id="logs" class="code-block text-[#D1D5DB] min-h-[200px] max-h-[400px] overflow-y-auto">
+                        <p class="text-[#9CA3AF]">Logs will appear here...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Try to import x402-fetch
+        let x402Fetch = null;
+        try {
+            // Try to import from node_modules if available (requires build step)
+            x402Fetch = await import('/node_modules/x402-fetch/dist/index.js').catch(() => null);
+        } catch (e) {
+            // If import fails, we'll use a manual implementation
+            addLog('x402-fetch not found in node_modules. Using manual payment flow.', 'info');
+        }
+
+        const API_BASE = '/api/v1/subscription';
+        
+        // Get DOM elements
+        const privateKeyInput = document.getElementById('privateKey');
+        const serviceIdInput = document.getElementById('serviceId');
+        const subscribeBtn = document.getElementById('subscribeBtn');
+        const checkStatusBtn = document.getElementById('checkStatusBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const logsDiv = document.getElementById('logs');
+        const statusDisplay = document.getElementById('statusDisplay');
+        const serviceInfoDiv = document.getElementById('serviceInfo');
+
+        // Add log message
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `mb-2 ${type === 'error' ? 'text-red-400' : type === 'success' ? 'text-green-400' : 'text-[#D1D5DB]'}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logsDiv.appendChild(logEntry);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+
+        // Load service info on page load
+        async function loadServiceInfo() {
+            try {
+                const response = await fetch(`${API_BASE}/info`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const service = data.service;
+                    serviceInfoDiv.innerHTML = `
+                        <p class="mb-2"><strong>Name:</strong> ${service.name}</p>
+                        <p class="mb-2"><strong>Network:</strong> ${service.network}</p>
+                        <p class="mb-2"><strong>Price:</strong> ${service.price}</p>
+                        <p class="mb-2"><strong>Default Duration:</strong> ${Math.floor(service.defaultDuration / 86400)} days</p>
+                        <p><strong>Description:</strong> ${service.description}</p>
+                    `;
+                }
+            } catch (error) {
+                addLog('Error loading service info: ' + error.message, 'error');
+            }
+        }
+
+        // Clear logs
+        clearBtn.addEventListener('click', () => {
+            logsDiv.innerHTML = '<p class="text-[#9CA3AF]">Logs cleared.</p>';
+        });
+
+        // Check subscription status
+        checkStatusBtn.addEventListener('click', async () => {
+            const serviceId = serviceIdInput.value.trim();
+            
+            if (!serviceId) {
+                addLog('Please enter a service ID', 'error');
+                return;
+            }
+
+            try {
+                addLog(`Checking status for service: ${serviceId}...`);
+                const response = await fetch(`${API_BASE}/status/${serviceId}`);
+                const data = await response.json();
+                
+                if (data.status === 'not_found') {
+                    statusDisplay.innerHTML = `
+                        <div class="status-badge status-not-found">Not Found</div>
+                        <p class="mt-2">${data.message}</p>
+                    `;
+                    addLog(`No subscription found for ${serviceId}`, 'info');
+                } else {
+                    const isActive = data.active;
+                    const expiresAt = new Date(data.expiresAt);
+                    const now = new Date();
+                    const timeLeft = expiresAt - now;
+                    
+                    statusDisplay.innerHTML = `
+                        <div class="mb-4">
+                            <span class="status-badge ${isActive ? 'status-active' : 'status-expired'}">
+                                ${isActive ? 'Active' : 'Expired'}
+                            </span>
+                        </div>
+                        <div class="space-y-2 text-sm">
+                            <p><strong>Service ID:</strong> ${data.cid}</p>
+                            <p><strong>Owner:</strong> ${data.owner}</p>
+                            <p><strong>Expires:</strong> ${expiresAt.toLocaleString()}</p>
+                            <p><strong>Time Left:</strong> ${timeLeft > 0 ? Math.floor(timeLeft / 86400000) + ' days' : 'Expired'}</p>
+                            <p><strong>Network:</strong> ${data.network || 'N/A'}</p>
+                        </div>
+                    `;
+                    addLog(`Status checked: ${isActive ? 'Active' : 'Expired'}`, isActive ? 'success' : 'info');
+                }
+            } catch (error) {
+                addLog('Error checking status: ' + error.message, 'error');
+                statusDisplay.innerHTML = `<p class="text-red-400">Error: ${error.message}</p>`;
+            }
+        });
+
+        // Subscribe to service with x402 payment
+        subscribeBtn.addEventListener('click', async () => {
+            const privateKey = privateKeyInput.value.trim();
+            const serviceId = serviceIdInput.value.trim();
+            
+            if (!privateKey) {
+                addLog('Please enter your private key', 'error');
+                return;
+            }
+            
+            if (!serviceId) {
+                addLog('Please enter a service ID', 'error');
+                return;
+            }
+
+            try {
+                addLog('Initializing x402 payment...');
+                
+                // Check if x402-fetch is available
+                if (!x402Fetch) {
+                    addLog('x402-fetch not available. Attempting to load...', 'info');
+                    
+                    // Try to use dynamic import
+                    try {
+                        x402Fetch = await import('https://cdn.jsdelivr.net/npm/x402-fetch@latest/dist/index.js');
+                        addLog('x402-fetch loaded from CDN', 'success');
+                    } catch (importError) {
+                        addLog('Could not load x402-fetch. Please install it: npm install x402-fetch', 'error');
+                        addLog('For local development, you need to build the project with x402-fetch installed.', 'info');
+                        
+                        // Show manual instructions
+                        statusDisplay.innerHTML = `
+                            <div class="alert bg-yellow-900 border-yellow-700">
+                                <div>
+                                    <h3 class="font-bold">x402-fetch Required</h3>
+                                    <p class="text-sm mt-2">To use this demo, you need to:</p>
+                                    <ol class="list-decimal list-inside text-sm mt-2 space-y-1">
+                                        <li>Install x402-fetch: <code class="bg-[#111827] px-2 py-1 rounded">npm install x402-fetch</code></li>
+                                        <li>Build your project or use a bundler</li>
+                                        <li>Import it in your code: <code class="bg-[#111827] px-2 py-1 rounded">import { wrapFetchWithPayment, createSigner } from 'x402-fetch'</code></li>
+                                    </ol>
+                                    <div class="mt-4">
+                                        <p class="text-xs">Example code:</p>
+                                        <pre class="text-xs bg-[#111827] p-2 rounded mt-2 overflow-x-auto">const signer = await createSigner('base-sepolia', privateKey);
+const fetchWithPayment = wrapFetchWithPayment(fetch, signer);
+const response = await fetchWithPayment(url, { method: 'POST', body: JSON.stringify({ serviceId }) });</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        return;
+                    }
+                }
+
+                const { wrapFetchWithPayment, createSigner, decodeXPaymentResponse } = x402Fetch;
+                
+                addLog('Creating signer for base-sepolia...');
+                const signer = await createSigner('base-sepolia', privateKey);
+                addLog('Signer created successfully', 'success');
+                
+                addLog('Wrapping fetch with payment handler...');
+                const fetchWithPayment = wrapFetchWithPayment(fetch, signer);
+                
+                addLog('Making subscription request with payment...');
+                const url = `${API_BASE}/subscribe`;
+                const response = await fetchWithPayment(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        serviceId: serviceId
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    addLog('Subscription successful!', 'success');
+                    addLog('Response: ' + JSON.stringify(data, null, 2), 'success');
+                    
+                    // Check for payment response header
+                    const paymentResponseHeader = response.headers.get('x-payment-response');
+                    if (paymentResponseHeader) {
+                        try {
+                            const paymentResponse = decodeXPaymentResponse(paymentResponseHeader);
+                            addLog('Payment response: ' + JSON.stringify(paymentResponse, null, 2), 'success');
+                        } catch (e) {
+                            addLog('Could not decode payment response: ' + e.message, 'info');
+                        }
+                    }
+                    
+                    statusDisplay.innerHTML = `
+                        <div class="status-badge status-active">Active</div>
+                        <div class="mt-4 space-y-2 text-sm">
+                            <p><strong>Service ID:</strong> ${data.subscription.cid}</p>
+                            <p><strong>Expires:</strong> ${new Date(data.subscription.expiresAt).toLocaleString()}</p>
+                            <p><strong>Network:</strong> ${data.subscription.network}</p>
+                            <p><strong>Price Paid:</strong> ${data.subscription.price}</p>
+                        </div>
+                    `;
+                } else {
+                    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    addLog('Error: ' + (error.error || error.message || 'Unknown error'), 'error');
+                    statusDisplay.innerHTML = `<p class="text-red-400">Error: ${error.error || error.message}</p>`;
+                }
+            } catch (error) {
+                addLog('Error during subscription: ' + error.message, 'error');
+                statusDisplay.innerHTML = `<p class="text-red-400">Error: ${error.message}</p>`;
+            }
+        });
+
+        // Load service info on page load
+        loadServiceInfo();
+        addLog('Page loaded. Ready to test x402 subscriptions on Base Sepolia.', 'success');
+        addLog('Note: Make sure x402-fetch is installed and available for full functionality.', 'info');
+    </script>
+</body>
+</html>
+
