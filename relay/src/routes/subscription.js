@@ -122,12 +122,13 @@ router.get('/info', (req, res) => {
 router.get('/payment-requirements', (req, res) => {
   try {
     const resource = `${req.protocol}://${req.get('host')}${req.baseUrl}/subscribe`;
-    const paymentRequirements = createPaymentRequirements(
+    const paymentRequirements = [createPaymentRequirements(
       SUBSCRIPTION_PRICE,
       NETWORK,
       resource,
-      "Subscription service access (Sepolia)"
-    );
+      "Subscription service access (Sepolia)",
+      true // useETH = true
+    )];
 
     res.json({
       success: true,
@@ -157,10 +158,16 @@ router.get('/prepare-payment', async (req, res) => {
       SUBSCRIPTION_PRICE,
       NETWORK,
       resource,
-      "Subscription service access (Sepolia)"
+      "Subscription service access (Sepolia)",
+      true // useETH = true
     )];
 
     const requirement = paymentRequirements[0];
+    
+    // Validate requirement has extra field
+    if (!requirement.extra) {
+      throw new Error("Payment requirement missing extra field with EIP-712 metadata");
+    }
     
     // Create authorization object manually (similar to what preparePaymentHeader does)
     // Generate a random nonce (32 bytes)
@@ -172,6 +179,13 @@ router.get('/prepare-payment', async (req, res) => {
     const now = Math.floor(Date.now() / 1000);
     const validAfter = BigInt(now);
     const validBefore = BigInt(now + requirement.maxTimeoutSeconds);
+    
+    // For ETH native token, verifyingContract should be zero address
+    // But EIP-712 requires a valid address, so we use a special address for ETH
+    // In x402, for native ETH, the verifyingContract is typically the zero address
+    const verifyingContract = requirement.asset === "0x0000000000000000000000000000000000000000" 
+      ? "0x0000000000000000000000000000000000000000" 
+      : requirement.asset;
     
     // Create authorization object (from will be set by client)
     const authorization = {
@@ -189,10 +203,10 @@ router.get('/prepare-payment', async (req, res) => {
       authorization: authorization,
       // Include the domain and types for EIP-712 signing
       domain: {
-        name: requirement.extra.name,
-        version: requirement.extra.version,
+        name: requirement.extra.name || "Ether",
+        version: requirement.extra.version || "1",
         chainId: 11155111, // Sepolia
-        verifyingContract: requirement.asset
+        verifyingContract: verifyingContract
       },
       types: {
         Authorization: [

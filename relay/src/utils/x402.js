@@ -23,14 +23,46 @@ const { verify, settle } = useFacilitator({ url: FACILITATOR_URL });
  * @param {string} resource - Resource URL or identifier
  * @param {string} description - Description of the charge
  */
-export function createPaymentRequirements(price, network, resource, description = "") {
+export function createPaymentRequirements(price, network, resource, description = "", useETH = true) {
   if (!WALLET_ADDRESS) throw new Error("WALLET_ADDRESS not configured");
 
-  const atomicAmountForAsset = processPriceToAtomicAmount(price, network);
-  if ("error" in atomicAmountForAsset) {
-    throw new Error(atomicAmountForAsset.error);
+  let atomicAmountForAsset;
+  let asset;
+  
+  if (useETH) {
+    // Force ETH (native token) instead of USDC
+    // For ETH, we need to convert price to wei
+    // $0.001 at current ETH price (approximate) - for demo purposes, use a fixed conversion
+    // In production, you'd want to fetch current ETH price
+    const priceInUSD = parseFloat(price.replace('$', ''));
+    // Approximate: 1 ETH = $3000 (adjust as needed)
+    const ethPriceUSD = 3000;
+    const ethAmount = priceInUSD / ethPriceUSD;
+    const weiAmount = BigInt(Math.floor(ethAmount * 1e18));
+    
+    // For native ETH, use zero address
+    // x402 handles native ETH with zero address
+    asset = {
+      address: "0x0000000000000000000000000000000000000000",
+      eip712: {
+        name: "Ether",
+        version: "1"
+      }
+    };
+    
+    atomicAmountForAsset = {
+      maxAmountRequired: weiAmount,
+      asset: asset
+    };
+  } else {
+    atomicAmountForAsset = processPriceToAtomicAmount(price, network);
+    if ("error" in atomicAmountForAsset) {
+      throw new Error(atomicAmountForAsset.error);
+    }
+    asset = atomicAmountForAsset.asset;
   }
-  const { maxAmountRequired, asset } = atomicAmountForAsset;
+
+  const { maxAmountRequired } = atomicAmountForAsset;
 
   return {
     scheme: "exact",
@@ -64,7 +96,7 @@ export const x402Middleware = (options) => {
     let paymentRequirements;
     try {
       paymentRequirements = [
-        createPaymentRequirements(price, network, resource, description)
+        createPaymentRequirements(price, network, resource, description, true) // useETH = true for native ETH payments
       ];
     } catch (err) {
       console.error("Error creating payment requirements:", err);
