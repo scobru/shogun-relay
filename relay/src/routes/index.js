@@ -297,7 +297,22 @@ export default (app) => {
 
   app.get("/subscription-demo", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "subscription-demo.html"));
+    const filePath = path.resolve(publicPath, "subscription-demo.html");
+    
+    console.log(`🔍 Subscription demo requested`);
+    console.log(`📄 File path: ${filePath}`);
+    console.log(`📄 File exists: ${fs.existsSync(filePath)}`);
+    
+    if (!fs.existsSync(filePath)) {
+      console.error(`❌ Subscription demo file not found: ${filePath}`);
+      return res.status(404).json({
+        success: false,
+        error: "Subscription demo file not found",
+        path: filePath,
+      });
+    }
+    
+    res.sendFile(filePath);
   });
 
   // Route per servire i file JavaScript dalla directory lib
