@@ -7,7 +7,7 @@
 
 **Shogun Relay** is a production-ready connection hub that unifies **GunDB** and **IPFS** into a single solution. If you're building decentralized applications and need a centralized control point to manage your distributed data, this is the tool for you.
 
-## Why Shogun Relay?
+## Why Shogun Relay??
 
 As an independent developer, you've likely faced these challenges:
 
