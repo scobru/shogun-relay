@@ -36,6 +36,9 @@ services:
       - DISABLE_RADISK=false
       # x402 Payment Configuration
       - WALLET_ADDRESS=0xYourWalletAddressHere
+      # x402 Network: "base", "base-sepolia", "ethereum", etc.
+      # Default: "base-sepolia" (testnet, compatible with local facilitator)
+      - X402_NETWORK=base-sepolia
       # Facilitator URL: leave empty to use local facilitator, or set to external URL
       # Local facilitator will be available at http://localhost:8765/api/v1/x402-facilitator
       - FACILITATOR_URL=

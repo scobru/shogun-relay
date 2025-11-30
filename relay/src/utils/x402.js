@@ -115,9 +115,10 @@ export function createPaymentRequirements(price, network, resource, description 
   let networkIdentifier = network;
   if (network === "sepolia" || network === "11155111") {
     // Ethereum Sepolia is not supported by x402
-    // Map to "base" which is supported
-    networkIdentifier = "base";
-    console.warn('⚠️ x402 does not support Ethereum Sepolia. Using "base" network instead.');
+    // Map to default network from env or "base-sepolia"
+    const defaultNetwork = process.env.X402_NETWORK || "base-sepolia";
+    networkIdentifier = defaultNetwork;
+    console.warn(`⚠️ x402 does not support Ethereum Sepolia. Using "${defaultNetwork}" network instead.`);
   }
   
   return {

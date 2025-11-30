@@ -8,9 +8,10 @@ const router = express.Router();
 // Configuration
 const SUBSCRIPTION_PRICE = "$0.001"; // Price for subscription demo
 const SUBSCRIPTION_DURATION = 7 * 24 * 60 * 60; // 7 days in seconds
-// x402 supports "base" network, not "sepolia" (Ethereum Sepolia)
-// Use "base" for x402 payments (Base mainnet)
-const NETWORK = "base"; // Using Base network (supported by x402)
+// x402 network configuration - can be set via X402_NETWORK env var
+// Supported networks: "base", "base-sepolia", "ethereum", etc.
+// Default to "base-sepolia" for testnet compatibility with local facilitator
+const NETWORK = process.env.X402_NETWORK || "base-sepolia";
 
 /**
  * Helper function to serialize BigInt values to strings for JSON
@@ -246,6 +247,20 @@ router.get('/prepare-payment', async (req, res) => {
     };
 
     // Serialize payment requirements: convert all BigInt to string for JSON
+    // Get chain ID based on network
+    const getChainId = (network) => {
+      switch (network) {
+        case "base":
+          return 8453; // Base mainnet
+        case "base-sepolia":
+          return 84532; // Base Sepolia testnet
+        case "ethereum":
+          return 1; // Ethereum mainnet
+        default:
+          return 84532; // Default to Base Sepolia
+      }
+    };
+
     const serializedPaymentRequirements = serializeBigInts(paymentRequirements);
 
     const response = {
@@ -256,7 +271,7 @@ router.get('/prepare-payment', async (req, res) => {
       domain: {
         name: requirement.extra.name || "Ether",
         version: requirement.extra.version || "1",
-        chainId: 8453, // Base mainnet chain ID (x402 supports Base, not Ethereum Sepolia)
+        chainId: getChainId(requirement.network),
         verifyingContract: verifyingContract
       },
       types: {
