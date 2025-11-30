@@ -6,7 +6,8 @@ import {
 import { useFacilitator } from "x402/verify";
 
 // Configuration
-const FACILITATOR_URL = process.env.FACILITATOR_URL || "https://facilitator.x402.org";
+// Use the correct facilitator URL from x402 documentation
+const FACILITATOR_URL = process.env.FACILITATOR_URL || "https://x402.org/facilitator";
 const WALLET_ADDRESS = process.env.WALLET_ADDRESS; // Must be set in .env
 const X402_VERSION = 1;
 
