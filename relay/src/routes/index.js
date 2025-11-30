@@ -43,6 +43,7 @@ import servicesRouter from "./services.js";
 import visualGraphRouter from "./visualGraph.js";
 import ipfsRentRouter from "./ipfsRent.js";
 import subscriptionRouter from "./subscription.js";
+import x402FacilitatorRouter from "./x402Facilitator.js";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -675,6 +676,9 @@ export default (app) => {
 
   // Route per Subscription Demo (x402 Sepolia)
   app.use(`${baseRoute}/subscription`, subscriptionRouter);
+
+  // Route per x402 Facilitator (local facilitator implementation)
+  app.use(`${baseRoute}/x402-facilitator`, x402FacilitatorRouter);
 
 
   // Route di test per verificare se le route sono registrate correttamente

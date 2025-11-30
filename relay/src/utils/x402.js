@@ -6,7 +6,33 @@ import {
 import { useFacilitator } from "x402/verify";
 
 // Configuration
-// Use the correct facilitator URL from x402 documentation
+// Use local facilitator if available, otherwise fallback to public facilitator
+// Local facilitator runs at /api/v1/x402-facilitator
+// We construct the local URL dynamically based on request context
+function getFacilitatorUrl(req = null) {
+  if (process.env.FACILITATOR_URL) {
+    return process.env.FACILITATOR_URL;
+  }
+  
+  // Try to use local facilitator
+  // If we have request context, use it to construct the URL
+  if (req) {
+    const protocol = req.protocol || 'http';
+    const host = req.get('host') || `${process.env.RELAY_HOST || 'localhost'}:${process.env.RELAY_PORT || 8765}`;
+    return `${protocol}://${host}/api/v1/x402-facilitator`;
+  }
+  
+  // Fallback: try to construct from env vars
+  if (process.env.RELAY_HOST) {
+    const port = process.env.RELAY_PORT || 8765;
+    return `http://${process.env.RELAY_HOST}:${port}/api/v1/x402-facilitator`;
+  }
+  
+  // Last resort: use public facilitator
+  return "https://x402.org/facilitator";
+}
+
+// Default facilitator URL (will be overridden in middleware if request is available)
 const FACILITATOR_URL = process.env.FACILITATOR_URL || "https://x402.org/facilitator";
 const WALLET_ADDRESS = process.env.WALLET_ADDRESS; // Must be set in .env
 const X402_VERSION = 1;
@@ -15,7 +41,17 @@ if (!WALLET_ADDRESS) {
   console.warn("WARNING: WALLET_ADDRESS not set in .env. x402 payments will fail.");
 }
 
-const { verify, settle } = useFacilitator({ url: FACILITATOR_URL });
+// Create facilitator instance - URL will be set per-request
+let facilitatorInstance = null;
+
+function getFacilitator(req = null) {
+  const url = getFacilitatorUrl(req);
+  // Create new instance if URL changed or doesn't exist
+  if (!facilitatorInstance || facilitatorInstance.url !== url) {
+    facilitatorInstance = useFacilitator({ url });
+  }
+  return facilitatorInstance;
+}
 
 /**
  * Helper function to serialize BigInt values to strings for JSON
@@ -194,11 +230,16 @@ export const x402Middleware = (options) => {
         asset: selectedPaymentRequirement.asset
       });
       
+      // Get facilitator instance with request context for local facilitator
+      const facilitator = getFacilitator(req);
+      const facilitatorUrl = getFacilitatorUrl(req);
+      
       console.log('🔍 x402Middleware - Calling facilitator verify...');
-      console.log('🔍 x402Middleware - Facilitator URL:', FACILITATOR_URL);
+      console.log('🔍 x402Middleware - Facilitator URL:', facilitatorUrl);
+      
       let response;
       try {
-        response = await verify(decodedPayment, selectedPaymentRequirement);
+        response = await facilitator.verify(decodedPayment, selectedPaymentRequirement);
       } catch (verifyError) {
         console.error('❌ x402Middleware - Facilitator verification error:', verifyError.message);
         console.error('❌ x402Middleware - Error code:', verifyError.code);
@@ -213,7 +254,7 @@ export const x402Middleware = (options) => {
         // Return 402 with serialized payment requirements
         const serializedRequirements = serializeBigInts(paymentRequirements);
         const errorMessage = isNetworkError 
-          ? `Facilitator unavailable (${FACILITATOR_URL}). Network error: ${verifyError.message}. Please check your network connection or facilitator URL.`
+          ? `Facilitator unavailable (${facilitatorUrl}). Network error: ${verifyError.message}. Please check your network connection or facilitator URL.`
           : `Facilitator verification failed: ${verifyError.message}`;
         
         return res.status(402).json({
@@ -252,7 +293,7 @@ export const x402Middleware = (options) => {
       
       // Settle payment and add response header
       try {
-        const settlement = await settle(decodedPayment, selectedPaymentRequirement);
+        const settlement = await facilitator.settle(decodedPayment, selectedPaymentRequirement);
         if (settlement && settlement.success !== false) {
           // Add settlement response header
           const settlementHeader = Buffer.from(JSON.stringify(settlement)).toString('base64');

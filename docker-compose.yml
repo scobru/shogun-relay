@@ -36,7 +36,17 @@ services:
       - DISABLE_RADISK=false
       # x402 Payment Configuration
       - WALLET_ADDRESS=0xYourWalletAddressHere
-      - FACILITATOR_URL=https://facilitator.x402.org
+      # Facilitator URL: leave empty to use local facilitator, or set to external URL
+      # Local facilitator will be available at http://localhost:8765/api/v1/x402-facilitator
+      - FACILITATOR_URL=
+      # Private key for EVM networks (Base, Base Sepolia, Ethereum)
+      # Required for local facilitator to settle payments
+      # Use EVM_PRIVATE_KEY or WALLET_PRIVATE_KEY (both work)
+      - EVM_PRIVATE_KEY=
+      # Optional: Private key for Solana networks (for SVM support)
+      - SVM_PRIVATE_KEY=
+      # Optional: Custom RPC URL for Solana
+      - SVM_RPC_URL=
       # Relay User Authentication
       - RELAY_USER=relay_admin
       - RELAY_PASSWORD=shogun2025
