@@ -46,9 +46,18 @@ export function createPaymentRequirements(price, network, resource, description 
     }
   };
 
+  // x402 network identifier mapping
+  // x402 may not support "sepolia" directly, so we map it to chainId
+  let networkIdentifier = network;
+  if (network === "sepolia") {
+    // x402 might expect chainId as the network identifier for testnets
+    // Try using chainId as string
+    networkIdentifier = "11155111";
+  }
+  
   return {
     scheme: "exact",
-    network, // "sepolia" - will be used as-is
+    network: networkIdentifier, // Use mapped network identifier
     maxAmountRequired: weiAmount,
     resource,
     description,
@@ -124,9 +133,26 @@ export const x402Middleware = (options) => {
 
     // Verify payment
     try {
-      const selectedPaymentRequirement =
-        findMatchingPaymentRequirements(paymentRequirements, decodedPayment) ||
-        paymentRequirements[0];
+      // Normalize network identifiers for matching
+      // x402 might return chainId while we use "sepolia" in requirements
+      const normalizedDecodedPayment = {
+        ...decodedPayment,
+        network: decodedPayment.network === "11155111" ? "sepolia" : decodedPayment.network
+      };
+      
+      // Try to find matching requirement with normalized network
+      let selectedPaymentRequirement = findMatchingPaymentRequirements(
+        paymentRequirements, 
+        normalizedDecodedPayment
+      );
+      
+      // If no match, try with original decoded payment
+      if (!selectedPaymentRequirement) {
+        selectedPaymentRequirement = findMatchingPaymentRequirements(
+          paymentRequirements, 
+          decodedPayment
+        ) || paymentRequirements[0];
+      }
       
       console.log('🔍 x402Middleware - Selected payment requirement:', {
         scheme: selectedPaymentRequirement.scheme,

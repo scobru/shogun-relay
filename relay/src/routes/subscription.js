@@ -402,11 +402,29 @@ router.post('/create-payment-header', async (req, res) => {
       }
     });
 
+    // x402 requires specific network identifiers
+    // Map "sepolia" to a supported format - x402 may not support Sepolia directly
+    // Try different formats: chainId as string, "base-sepolia", or check x402 docs
+    let networkIdentifier = requirement.network;
+    
+    // If network is "sepolia", x402 might not support it directly
+    // Try different formats based on x402's expected format
+    if (networkIdentifier === "sepolia" || networkIdentifier === "11155111") {
+      // x402 might expect:
+      // 1. ChainId as string: "11155111"
+      // 2. Network name: "base-sepolia" (if supported)
+      // 3. Or Sepolia might not be supported at all
+      // Try chainId as string first
+      networkIdentifier = "11155111";
+      console.log('⚠️ Mapping "sepolia" to chainId "11155111" for x402 compatibility');
+      console.log('⚠️ Note: If this fails, x402 may not support Sepolia testnet');
+    }
+    
     // Create payment object in the format expected by x402
     const payment = {
       x402Version: 1,
       scheme: requirement.scheme,
-      network: requirement.network,
+      network: networkIdentifier,
       payload: payload
     };
 
