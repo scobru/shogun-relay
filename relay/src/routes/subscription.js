@@ -89,10 +89,25 @@ router.post('/subscribe',
 /**
  * GET /api/v1/subscription/status/:serviceId
  * Check subscription status
+ * Note: serviceId can contain special characters like colons
+ * We use a catch-all route pattern to handle serviceIds with special characters
  */
-router.get('/status/:serviceId', async (req, res) => {
+router.get('/status/*', async (req, res) => {
   try {
-    const { serviceId } = req.params;
+    // Extract serviceId from the path after /status/
+    const pathParts = req.path.split('/status/');
+    if (pathParts.length < 2) {
+      return res.status(400).json({ 
+        status: 'error',
+        error: 'serviceId is required' 
+      });
+    }
+    
+    // Get the serviceId (everything after /status/)
+    let serviceId = pathParts[1];
+    
+    // Decode the serviceId in case it was URL encoded
+    serviceId = decodeURIComponent(serviceId);
     
     if (!serviceId) {
       return res.status(400).json({ 
@@ -100,6 +115,8 @@ router.get('/status/:serviceId', async (req, res) => {
         error: 'serviceId is required' 
       });
     }
+    
+    console.log('🔍 Checking subscription status for serviceId:', serviceId);
     
     const status = await subscriptionManager.checkSubscription(serviceId);
     
@@ -181,7 +198,9 @@ router.get('/payment-requirements', (req, res) => {
  */
 router.get('/prepare-payment', async (req, res) => {
   try {
-    const resource = `${req.protocol}://${req.get('host')}${req.baseUrl}/subscribe`;
+    // Use the subscribe-with-payment-header endpoint as the resource
+    // This is the endpoint that will actually accept the payment
+    const resource = `${req.protocol}://${req.get('host')}${req.baseUrl}/subscribe-with-payment-header`;
     const paymentRequirements = [createPaymentRequirements(
       SUBSCRIPTION_PRICE,
       NETWORK,
@@ -207,10 +226,12 @@ router.get('/prepare-payment', async (req, res) => {
     const validAfter = BigInt(now);
     const validBefore = BigInt(now + requirement.maxTimeoutSeconds);
     
-    // For ETH native token, EIP-712 domain requires a valid contract address
-    // x402 uses the zero address for native ETH, but EIP-712 might need a different approach
-    // For now, use the asset address as verifyingContract (zero address for ETH)
-    const verifyingContract = requirement.asset;
+    // For ETH native token on Sepolia, we need to use a valid contract address for EIP-712
+    // The x402 protocol uses the zero address for native ETH in payment requirements,
+    // but EIP-712 domain requires a valid contract address
+    // For Sepolia, we can use the zero address, but some wallets might require a different approach
+    // According to x402 spec, for native ETH we use zero address
+    const verifyingContract = requirement.asset || "0x0000000000000000000000000000000000000000";
     
     // Create authorization object (from will be set by client)
     const authorization = {
@@ -233,7 +254,7 @@ router.get('/prepare-payment', async (req, res) => {
       domain: {
         name: requirement.extra.name || "Ether",
         version: requirement.extra.version || "1",
-        chainId: 11155111, // Sepolia
+        chainId: 11155111, // Sepolia testnet chain ID
         verifyingContract: verifyingContract
       },
       types: {
@@ -248,9 +269,21 @@ router.get('/prepare-payment', async (req, res) => {
       }
     };
 
+    console.log('✅ Prepared payment data:', {
+      resource: resource,
+      network: NETWORK,
+      price: SUBSCRIPTION_PRICE,
+      domain: response.domain,
+      authorization: {
+        ...response.authorization,
+        value: response.authorization.value // Already a string
+      }
+    });
+
     res.json(response);
   } catch (error) {
-    console.error("Error preparing payment:", error);
+    console.error("❌ Error preparing payment:", error);
+    console.error("❌ Error stack:", error.stack);
     res.status(500).json({ 
       success: false,
       error: "Failed to prepare payment",
@@ -271,22 +304,50 @@ router.post('/create-payment-header', async (req, res) => {
     const { paymentRequirements, authorization, signature, from } = req.body;
     
     if (!paymentRequirements || !Array.isArray(paymentRequirements) || paymentRequirements.length === 0) {
-      return res.status(400).json({ error: "paymentRequirements array is required" });
+      return res.status(400).json({ 
+        success: false,
+        error: "paymentRequirements array is required" 
+      });
     }
     
     if (!authorization) {
-      return res.status(400).json({ error: "authorization object is required" });
+      return res.status(400).json({ 
+        success: false,
+        error: "authorization object is required" 
+      });
     }
     
     if (!signature) {
-      return res.status(400).json({ error: "signature is required" });
+      return res.status(400).json({ 
+        success: false,
+        error: "signature is required" 
+      });
     }
     
     if (!from) {
-      return res.status(400).json({ error: "from address is required" });
+      return res.status(400).json({ 
+        success: false,
+        error: "from address is required" 
+      });
     }
 
     const requirement = paymentRequirements[0];
+    
+    // Validate requirement structure
+    if (!requirement.scheme || !requirement.network) {
+      return res.status(400).json({ 
+        success: false,
+        error: "Invalid payment requirement: missing scheme or network" 
+      });
+    }
+    
+    console.log('🔍 Received payment requirement:', {
+      scheme: requirement.scheme,
+      network: requirement.network,
+      maxAmountRequired: requirement.maxAmountRequired,
+      payTo: requirement.payTo,
+      asset: requirement.asset
+    });
     
     // Ensure nonce is in the correct format (bytes32 as hex string)
     let nonce = authorization.nonce;
@@ -298,20 +359,48 @@ router.post('/create-payment-header', async (req, res) => {
       throw new Error(`Invalid nonce length: ${nonce.length}, expected 66 (0x + 64 hex chars)`);
     }
     
+    // Convert string values to BigInt for numeric fields (x402 expects BigInt)
+    // Ensure all addresses are lowercase and checksummed correctly
+    const fromAddress = from.toLowerCase();
+    const toAddress = authorization.to.toLowerCase();
+    
+    // Convert value, validAfter, and validBefore to BigInt
+    // They might come as strings from JSON, so we need to handle both cases
+    const value = typeof authorization.value === 'string' 
+      ? BigInt(authorization.value) 
+      : BigInt(authorization.value);
+    const validAfter = typeof authorization.validAfter === 'string'
+      ? BigInt(authorization.validAfter)
+      : BigInt(authorization.validAfter);
+    const validBefore = typeof authorization.validBefore === 'string'
+      ? BigInt(authorization.validBefore)
+      : BigInt(authorization.validBefore);
+    
     // Create the exact EVM payload structure
+    // x402 expects BigInt for numeric values in the authorization
     const payload = {
       signature: signature,
       authorization: {
-        from: from.toLowerCase(), // Ensure lowercase
-        to: authorization.to.toLowerCase(), // Ensure lowercase
-        value: authorization.value.toString(), // Ensure string
-        validAfter: authorization.validAfter.toString(), // Ensure string
-        validBefore: authorization.validBefore.toString(), // Ensure string
+        from: fromAddress,
+        to: toAddress,
+        value: value,
+        validAfter: validAfter,
+        validBefore: validBefore,
         nonce: nonce
       }
     };
 
-    console.log('🔍 Creating payment with payload:', JSON.stringify(payload, null, 2));
+    console.log('🔍 Creating payment with payload:', {
+      signature: signature.substring(0, 20) + '...',
+      authorization: {
+        from: payload.authorization.from,
+        to: payload.authorization.to,
+        value: payload.authorization.value.toString(),
+        validAfter: payload.authorization.validAfter.toString(),
+        validBefore: payload.authorization.validBefore.toString(),
+        nonce: payload.authorization.nonce
+      }
+    });
 
     // Create payment object in the format expected by x402
     const payment = {
@@ -321,7 +410,22 @@ router.post('/create-payment-header', async (req, res) => {
       payload: payload
     };
 
-    console.log('🔍 Payment object:', JSON.stringify(payment, null, 2));
+    console.log('🔍 Payment object:', {
+      x402Version: payment.x402Version,
+      scheme: payment.scheme,
+      network: payment.network,
+      payload: {
+        signature: payment.payload.signature.substring(0, 20) + '...',
+        authorization: {
+          from: payment.payload.authorization.from,
+          to: payment.payload.authorization.to,
+          value: payment.payload.authorization.value.toString(),
+          validAfter: payment.payload.authorization.validAfter.toString(),
+          validBefore: payment.payload.authorization.validBefore.toString(),
+          nonce: payment.payload.authorization.nonce
+        }
+      }
+    });
 
     // Encode the payment header
     let paymentHeader;
@@ -330,7 +434,9 @@ router.post('/create-payment-header', async (req, res) => {
       console.log('✅ Payment header encoded successfully, length:', paymentHeader.length);
     } catch (error) {
       console.error('❌ Error encoding payment:', error);
-      throw error;
+      console.error('❌ Error stack:', error.stack);
+      // Provide more detailed error information
+      throw new Error(`Failed to encode payment: ${error.message}. Check that all fields are in the correct format.`);
     }
     
     res.json({
@@ -338,10 +444,13 @@ router.post('/create-payment-header', async (req, res) => {
       paymentHeader: paymentHeader
     });
   } catch (error) {
-    console.error("Error creating payment header:", error);
+    console.error("❌ Error creating payment header:", error);
+    console.error("❌ Error stack:", error.stack);
     res.status(500).json({ 
+      success: false,
       error: "Failed to create payment header",
-      message: error.message 
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
@@ -357,7 +466,8 @@ router.post('/subscribe-with-payment-header',
     // Manually set the X-PAYMENT header from request body
     if (req.body.paymentHeader) {
       req.headers['x-payment'] = req.body.paymentHeader;
-      console.log('🔍 Payment header set from body:', req.body.paymentHeader.substring(0, 50) + '...');
+      console.log('🔍 Payment header set from body, length:', req.body.paymentHeader.length);
+      console.log('🔍 Payment header preview:', req.body.paymentHeader.substring(0, 100) + '...');
     } else {
       console.log('⚠️ No payment header in request body');
     }
@@ -366,7 +476,7 @@ router.post('/subscribe-with-payment-header',
   x402Middleware({ 
     price: SUBSCRIPTION_PRICE, 
     network: NETWORK,
-    description: "Subscription service access (Sepolia)" 
+    description: "Subscription service access (Sepolia)"
   }), 
   async (req, res) => {
     const { serviceId, duration } = req.body;
