@@ -17,6 +17,32 @@ if (!WALLET_ADDRESS) {
 const { verify, settle } = useFacilitator({ url: FACILITATOR_URL });
 
 /**
+ * Helper function to serialize BigInt values to strings for JSON
+ * Recursively converts all BigInt values in an object/array to strings
+ */
+function serializeBigInts(obj) {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  if (typeof obj === 'bigint') {
+    return obj.toString();
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => serializeBigInts(item));
+  }
+  if (typeof obj === 'object') {
+    const serialized = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        serialized[key] = serializeBigInts(obj[key]);
+      }
+    }
+    return serialized;
+  }
+  return obj;
+}
+
+/**
  * Creates payment requirements for a given price and network
  * @param {string} price - Price string (e.g. "$0.01")
  * @param {string} network - Network identifier (e.g. "base", "sepolia")
@@ -107,10 +133,11 @@ export const x402Middleware = (options) => {
     // If no payment header, return 402 with requirements
     if (!paymentHeader) {
       console.log('⚠️ x402Middleware - No payment header found');
+      const serializedRequirements = serializeBigInts(paymentRequirements);
       return res.status(402).json({
         x402Version: X402_VERSION,
         error: "X-PAYMENT header is required",
-        accepts: paymentRequirements,
+        accepts: serializedRequirements,
       });
     }
 
@@ -126,10 +153,12 @@ export const x402Middleware = (options) => {
     } catch (error) {
       console.error('❌ x402Middleware - Payment decode error:', error.message);
       console.error('❌ x402Middleware - Payment decode stack:', error.stack);
+      // Serialize BigInt values before sending JSON response
+      const serializedRequirements = serializeBigInts(paymentRequirements);
       return res.status(402).json({
         x402Version: X402_VERSION,
         error: "Invalid or malformed payment header: " + error.message,
-        accepts: paymentRequirements,
+        accepts: serializedRequirements,
       });
     }
 
@@ -165,7 +194,33 @@ export const x402Middleware = (options) => {
       });
       
       console.log('🔍 x402Middleware - Calling facilitator verify...');
-      const response = await verify(decodedPayment, selectedPaymentRequirement);
+      console.log('🔍 x402Middleware - Facilitator URL:', FACILITATOR_URL);
+      let response;
+      try {
+        response = await verify(decodedPayment, selectedPaymentRequirement);
+      } catch (verifyError) {
+        console.error('❌ x402Middleware - Facilitator verification error:', verifyError.message);
+        console.error('❌ x402Middleware - Error code:', verifyError.code);
+        console.error('❌ x402Middleware - Error cause:', verifyError.cause);
+        
+        // Check if it's a network/DNS error
+        const isNetworkError = verifyError.code === 'ENOTFOUND' || 
+                              verifyError.cause?.code === 'ENOTFOUND' ||
+                              verifyError.message?.includes('fetch failed');
+        
+        // If facilitator is unreachable, we can't verify the payment
+        // Return 402 with serialized payment requirements
+        const serializedRequirements = serializeBigInts(paymentRequirements);
+        const errorMessage = isNetworkError 
+          ? `Facilitator unavailable (${FACILITATOR_URL}). Network error: ${verifyError.message}. Please check your network connection or facilitator URL.`
+          : `Facilitator verification failed: ${verifyError.message}`;
+        
+        return res.status(402).json({
+          x402Version: X402_VERSION,
+          error: errorMessage,
+          accepts: serializedRequirements,
+        });
+      }
       
       console.log('🔍 x402Middleware - Verification response:', {
         isValid: response.isValid,
@@ -175,10 +230,12 @@ export const x402Middleware = (options) => {
       
       if (!response.isValid) {
         console.error('❌ x402Middleware - Payment verification failed:', response.invalidReason);
+        // Serialize BigInt values in payment requirements before sending JSON response
+        const serializedRequirements = serializeBigInts(paymentRequirements);
         return res.status(402).json({
           x402Version: X402_VERSION,
           error: response.invalidReason || "Payment verification failed",
-          accepts: paymentRequirements,
+          accepts: serializedRequirements,
           payer: response.payer,
         });
       }
@@ -211,10 +268,12 @@ export const x402Middleware = (options) => {
       
     } catch (error) {
       console.error("Payment verification failed:", error);
+      // Serialize BigInt values before sending JSON response
+      const serializedRequirements = serializeBigInts(paymentRequirements);
       return res.status(402).json({
         x402Version: X402_VERSION,
-        error: "Payment verification failed",
-        accepts: paymentRequirements,
+        error: "Payment verification failed: " + error.message,
+        accepts: serializedRequirements,
       });
     }
   };
