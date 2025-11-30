@@ -126,8 +126,7 @@ router.get('/payment-requirements', (req, res) => {
       SUBSCRIPTION_PRICE,
       NETWORK,
       resource,
-      "Subscription service access (Sepolia)",
-      true // useETH = true
+      "Subscription service access (Sepolia)"
     )];
 
     res.json({
@@ -158,8 +157,7 @@ router.get('/prepare-payment', async (req, res) => {
       SUBSCRIPTION_PRICE,
       NETWORK,
       resource,
-      "Subscription service access (Sepolia)",
-      true // useETH = true
+      "Subscription service access (Sepolia)"
     )];
 
     const requirement = paymentRequirements[0];

@@ -23,49 +23,33 @@ const { verify, settle } = useFacilitator({ url: FACILITATOR_URL });
  * @param {string} resource - Resource URL or identifier
  * @param {string} description - Description of the charge
  */
-export function createPaymentRequirements(price, network, resource, description = "", useETH = true) {
+export function createPaymentRequirements(price, network, resource, description = "") {
   if (!WALLET_ADDRESS) throw new Error("WALLET_ADDRESS not configured");
 
-  let maxAmountRequired;
-  let asset;
+  // For Sepolia, x402 doesn't support "sepolia" network identifier
+  // We create payment requirements manually for ETH native token
+  // Price is in USD format (e.g., "$0.001") - convert to ETH wei
+  // Using approximate ETH price: 1 ETH = $3000
+  // In production, fetch current ETH price from an oracle
   
-  if (useETH) {
-    // Force ETH (native token) instead of USDC
-    // For ETH, we need to convert price to wei
-    // $0.001 at current ETH price (approximate) - for demo purposes, use a fixed conversion
-    // In production, you'd want to fetch current ETH price from an oracle
-    const priceInUSD = parseFloat(price.replace('$', ''));
-    // Approximate: 1 ETH = $3000 (adjust as needed or fetch from oracle)
-    const ethPriceUSD = 3000;
-    const ethAmount = priceInUSD / ethPriceUSD;
-    const weiAmount = BigInt(Math.floor(ethAmount * 1e18));
-    
-    maxAmountRequired = weiAmount;
-    
-    // For native ETH payments, x402 uses the zero address
-    // The EIP-712 domain will use this address as verifyingContract
-    // Note: Some implementations might require WETH instead, but zero address should work for native ETH
-    asset = {
-      address: "0x0000000000000000000000000000000000000000",
-      eip712: {
-        name: "Ether",
-        version: "1"
-      }
-    };
-  } else {
-    // Use standard x402 processPriceToAtomicAmount for ERC20 tokens (e.g., USDC)
-    const atomicAmountForAsset = processPriceToAtomicAmount(price, network);
-    if ("error" in atomicAmountForAsset) {
-      throw new Error(atomicAmountForAsset.error);
+  const priceInUSD = parseFloat(price.replace('$', '').replace(',', ''));
+  const ethPriceUSD = 3000; // Approximate - should be fetched from oracle in production
+  const ethAmount = priceInUSD / ethPriceUSD;
+  const weiAmount = BigInt(Math.floor(ethAmount * 1e18));
+  
+  // For native ETH on Sepolia, use zero address
+  const asset = {
+    address: "0x0000000000000000000000000000000000000000",
+    eip712: {
+      name: "Ether",
+      version: "1"
     }
-    maxAmountRequired = atomicAmountForAsset.maxAmountRequired;
-    asset = atomicAmountForAsset.asset;
-  }
+  };
 
   return {
     scheme: "exact",
-    network,
-    maxAmountRequired,
+    network, // "sepolia" - will be used as-is
+    maxAmountRequired: weiAmount,
     resource,
     description,
     mimeType: "application/json",
@@ -94,7 +78,7 @@ export const x402Middleware = (options) => {
     let paymentRequirements;
     try {
       paymentRequirements = [
-        createPaymentRequirements(price, network, resource, description, true) // useETH = true for native ETH payments
+        createPaymentRequirements(price, network, resource, description)
       ];
     } catch (err) {
       console.error("Error creating payment requirements:", err);
