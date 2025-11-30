@@ -47,12 +47,14 @@ export function createPaymentRequirements(price, network, resource, description 
   };
 
   // x402 network identifier mapping
-  // x402 may not support "sepolia" directly, so we map it to chainId
+  // x402 supports: "base", "base-sepolia", "ethereum", etc.
+  // It does NOT support Ethereum Sepolia (chainId 11155111)
   let networkIdentifier = network;
-  if (network === "sepolia") {
-    // x402 might expect chainId as the network identifier for testnets
-    // Try using chainId as string
-    networkIdentifier = "11155111";
+  if (network === "sepolia" || network === "11155111") {
+    // Ethereum Sepolia is not supported by x402
+    // Map to "base" which is supported
+    networkIdentifier = "base";
+    console.warn('⚠️ x402 does not support Ethereum Sepolia. Using "base" network instead.');
   }
   
   return {

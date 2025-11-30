@@ -8,7 +8,9 @@ const router = express.Router();
 // Configuration
 const SUBSCRIPTION_PRICE = "$0.001"; // Price for subscription demo
 const SUBSCRIPTION_DURATION = 7 * 24 * 60 * 60; // 7 days in seconds
-const NETWORK = "sepolia"; // Using Sepolia testnet
+// x402 supports "base" network, not "sepolia" (Ethereum Sepolia)
+// Use "base" for x402 payments (Base mainnet)
+const NETWORK = "base"; // Using Base network (supported by x402)
 
 /**
  * Helper function to serialize BigInt values to strings for JSON
@@ -153,7 +155,7 @@ router.get('/info', (req, res) => {
       network: NETWORK,
       price: SUBSCRIPTION_PRICE,
       defaultDuration: SUBSCRIPTION_DURATION,
-      description: "Demo subscription service using x402 payments on Sepolia testnet"
+      description: "Demo subscription service using x402 payments on Base network"
     }
   });
 });
@@ -254,7 +256,7 @@ router.get('/prepare-payment', async (req, res) => {
       domain: {
         name: requirement.extra.name || "Ether",
         version: requirement.extra.version || "1",
-        chainId: 11155111, // Sepolia testnet chain ID
+        chainId: 8453, // Base mainnet chain ID (x402 supports Base, not Ethereum Sepolia)
         verifyingContract: verifyingContract
       },
       types: {
@@ -403,21 +405,18 @@ router.post('/create-payment-header', async (req, res) => {
     });
 
     // x402 requires specific network identifiers
-    // Map "sepolia" to a supported format - x402 may not support Sepolia directly
-    // Try different formats: chainId as string, "base-sepolia", or check x402 docs
+    // x402 supports: "base", "base-sepolia", "ethereum", etc.
+    // It does NOT support Ethereum Sepolia (chainId 11155111)
+    // Use the network identifier as-is if it's already a supported one
     let networkIdentifier = requirement.network;
     
-    // If network is "sepolia", x402 might not support it directly
-    // Try different formats based on x402's expected format
+    // Map unsupported networks to supported ones
     if (networkIdentifier === "sepolia" || networkIdentifier === "11155111") {
-      // x402 might expect:
-      // 1. ChainId as string: "11155111"
-      // 2. Network name: "base-sepolia" (if supported)
-      // 3. Or Sepolia might not be supported at all
-      // Try chainId as string first
-      networkIdentifier = "11155111";
-      console.log('⚠️ Mapping "sepolia" to chainId "11155111" for x402 compatibility');
-      console.log('⚠️ Note: If this fails, x402 may not support Sepolia testnet');
+      // Ethereum Sepolia is not supported by x402
+      // Map to "base" which is supported, or use "base-sepolia" for Base Sepolia (chainId 84532)
+      networkIdentifier = "base";
+      console.log('⚠️ Mapping "sepolia" to "base" - x402 does not support Ethereum Sepolia');
+      console.log('⚠️ Note: Using Base network instead. Update wallet to Base network.');
     }
     
     // Create payment object in the format expected by x402
