@@ -129,9 +129,15 @@ router.get('/payment-requirements', (req, res) => {
       "Subscription service access (Sepolia)"
     )];
 
+    // Serialize payment requirements: convert BigInt to string for JSON
+    const serializedPaymentRequirements = paymentRequirements.map(req => ({
+      ...req,
+      maxAmountRequired: req.maxAmountRequired.toString()
+    }));
+
     res.json({
       success: true,
-      paymentRequirements: [paymentRequirements],
+      paymentRequirements: serializedPaymentRequirements,
       network: NETWORK,
       price: SUBSCRIPTION_PRICE
     });
@@ -193,9 +199,15 @@ router.get('/prepare-payment', async (req, res) => {
       nonce: nonce
     };
 
+    // Serialize payment requirements: convert BigInt to string for JSON
+    const serializedPaymentRequirements = paymentRequirements.map(req => ({
+      ...req,
+      maxAmountRequired: req.maxAmountRequired.toString()
+    }));
+
     res.json({
       success: true,
-      paymentRequirements: paymentRequirements,
+      paymentRequirements: serializedPaymentRequirements,
       authorization: authorization,
       // Include the domain and types for EIP-712 signing
       domain: {
