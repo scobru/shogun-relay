@@ -10,6 +10,32 @@ const SUBSCRIPTION_PRICE = "$0.001"; // Price for subscription demo
 const SUBSCRIPTION_DURATION = 7 * 24 * 60 * 60; // 7 days in seconds
 const NETWORK = "sepolia"; // Using Sepolia testnet
 
+/**
+ * Helper function to serialize BigInt values to strings for JSON
+ * Recursively converts all BigInt values in an object/array to strings
+ */
+function serializeBigInts(obj) {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  if (typeof obj === 'bigint') {
+    return obj.toString();
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => serializeBigInts(item));
+  }
+  if (typeof obj === 'object') {
+    const serialized = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        serialized[key] = serializeBigInts(obj[key]);
+      }
+    }
+    return serialized;
+  }
+  return obj;
+}
+
 router.use((req, res, next) => {
   const gun = req.app.get('gunInstance');
   if (gun) {
@@ -129,11 +155,8 @@ router.get('/payment-requirements', (req, res) => {
       "Subscription service access (Sepolia)"
     )];
 
-    // Serialize payment requirements: convert BigInt to string for JSON
-    const serializedPaymentRequirements = paymentRequirements.map(req => ({
-      ...req,
-      maxAmountRequired: req.maxAmountRequired.toString()
-    }));
+    // Serialize payment requirements: convert all BigInt to string for JSON
+    const serializedPaymentRequirements = serializeBigInts(paymentRequirements);
 
     res.json({
       success: true,
@@ -199,13 +222,10 @@ router.get('/prepare-payment', async (req, res) => {
       nonce: nonce
     };
 
-    // Serialize payment requirements: convert BigInt to string for JSON
-    const serializedPaymentRequirements = paymentRequirements.map(req => ({
-      ...req,
-      maxAmountRequired: req.maxAmountRequired.toString()
-    }));
+    // Serialize payment requirements: convert all BigInt to string for JSON
+    const serializedPaymentRequirements = serializeBigInts(paymentRequirements);
 
-    res.json({
+    const response = {
       success: true,
       paymentRequirements: serializedPaymentRequirements,
       authorization: authorization,
@@ -226,7 +246,9 @@ router.get('/prepare-payment', async (req, res) => {
           { name: 'nonce', type: 'bytes32' }
         ]
       }
-    });
+    };
+
+    res.json(response);
   } catch (error) {
     console.error("Error preparing payment:", error);
     res.status(500).json({ 
