@@ -67,8 +67,14 @@ RUN adduser -D -s /bin/sh ipfs \
 # Set up relay application
 WORKDIR /app
 
-# Copy configuration files first
-COPY docker/ /app/docker/
+# Create docker directory first
+RUN mkdir -p /app/docker
+
+# Copy configuration files first (copy individually to ensure they're found)
+COPY docker/entrypoint.sh /app/docker/entrypoint.sh
+COPY docker/init-ipfs.sh /app/docker/init-ipfs.sh
+COPY docker/relay.env /app/docker/relay.env
+COPY docker/supervisord.conf /app/docker/supervisord.conf
 
 # Convert script line endings from CRLF to LF
 RUN dos2unix /app/docker/init-ipfs.sh
