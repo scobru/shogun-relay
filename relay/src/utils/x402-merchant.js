@@ -902,6 +902,305 @@ export class X402Merchant {
 
     await RelayUser.deleteUpload(userAddress, hash);
   }
+
+  /**
+   * Get IPFS repository statistics (total storage used by all pins)
+   * This uses the IPFS repo/stat API to get actual disk usage
+   */
+  static async getIpfsRepoStats(ipfsApiUrl = 'http://127.0.0.1:5001', ipfsApiToken = null) {
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        console.log('Timeout getting IPFS repo stats');
+        resolve(null);
+      }, 30000);
+
+      const url = new URL(ipfsApiUrl);
+      
+      const requestOptions = {
+        hostname: url.hostname,
+        port: url.port || 5001,
+        path: '/api/v0/repo/stat?size-only=true',
+        method: 'POST',
+        headers: {
+          'Content-Length': '0',
+        },
+      };
+
+      if (ipfsApiToken) {
+        requestOptions.headers['Authorization'] = `Bearer ${ipfsApiToken}`;
+      }
+
+      const req = httpModule.request(requestOptions, (res) => {
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', () => {
+          clearTimeout(timeout);
+          try {
+            const result = JSON.parse(data);
+            resolve({
+              repoSize: result.RepoSize || 0,
+              storageMax: result.StorageMax || 0,
+              numObjects: result.NumObjects || 0,
+              repoPath: result.RepoPath || '',
+              version: result.Version || '',
+            });
+          } catch (error) {
+            console.error('Error parsing IPFS repo stats:', error.message);
+            resolve(null);
+          }
+        });
+      });
+
+      req.on('error', (err) => {
+        clearTimeout(timeout);
+        console.error('Error getting IPFS repo stats:', err.message);
+        resolve(null);
+      });
+
+      req.end();
+    });
+  }
+
+  /**
+   * Get all pinned content from IPFS with their sizes
+   * Returns total size of all pins
+   */
+  static async getAllPinsSize(ipfsApiUrl = 'http://127.0.0.1:5001', ipfsApiToken = null) {
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        console.log('Timeout getting IPFS pins');
+        resolve({ totalBytes: 0, pinCount: 0, pins: [] });
+      }, 60000);
+
+      const url = new URL(ipfsApiUrl);
+      
+      const requestOptions = {
+        hostname: url.hostname,
+        port: url.port || 5001,
+        path: '/api/v0/pin/ls?type=recursive',
+        method: 'POST',
+        headers: {
+          'Content-Length': '0',
+        },
+      };
+
+      if (ipfsApiToken) {
+        requestOptions.headers['Authorization'] = `Bearer ${ipfsApiToken}`;
+      }
+
+      const req = httpModule.request(requestOptions, (res) => {
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', async () => {
+          clearTimeout(timeout);
+          try {
+            const result = JSON.parse(data);
+            const pins = result.Keys ? Object.keys(result.Keys) : [];
+            
+            if (pins.length === 0) {
+              resolve({ totalBytes: 0, pinCount: 0, pins: [] });
+              return;
+            }
+
+            // Get sizes for each pin (batch processing)
+            let totalBytes = 0;
+            const pinsWithSizes = [];
+
+            for (const cid of pins) {
+              const stats = await X402Merchant.getIpfsObjectSize(cid, ipfsApiUrl, ipfsApiToken);
+              if (stats) {
+                pinsWithSizes.push({
+                  cid,
+                  size: stats.size,
+                  sizeMB: stats.size / (1024 * 1024),
+                });
+                totalBytes += stats.size;
+              }
+            }
+
+            resolve({
+              totalBytes,
+              totalMB: totalBytes / (1024 * 1024),
+              totalGB: totalBytes / (1024 * 1024 * 1024),
+              pinCount: pins.length,
+              pins: pinsWithSizes,
+            });
+          } catch (error) {
+            console.error('Error parsing IPFS pins:', error.message);
+            resolve({ totalBytes: 0, pinCount: 0, pins: [] });
+          }
+        });
+      });
+
+      req.on('error', (err) => {
+        clearTimeout(timeout);
+        console.error('Error getting IPFS pins:', err.message);
+        resolve({ totalBytes: 0, pinCount: 0, pins: [] });
+      });
+
+      req.end();
+    });
+  }
+
+  /**
+   * Get relay's global storage status
+   * Combines IPFS repo stats with configured limits
+   */
+  static async getRelayStorageStatus(ipfsApiUrl, ipfsApiToken) {
+    const maxStorageGB = parseFloat(process.env.RELAY_MAX_STORAGE_GB) || 0;
+    const warningThreshold = parseFloat(process.env.RELAY_STORAGE_WARNING_THRESHOLD) || 80;
+
+    // Get IPFS repo stats (faster, gives total repo size)
+    const repoStats = await this.getIpfsRepoStats(ipfsApiUrl, ipfsApiToken);
+    
+    if (!repoStats) {
+      return {
+        available: false,
+        error: 'Could not get IPFS repository stats',
+      };
+    }
+
+    const usedBytes = repoStats.repoSize;
+    const usedGB = usedBytes / (1024 * 1024 * 1024);
+    const usedMB = usedBytes / (1024 * 1024);
+
+    // If no limit is configured, return just usage info
+    if (maxStorageGB <= 0) {
+      return {
+        available: true,
+        unlimited: true,
+        usedBytes,
+        usedMB: parseFloat(usedMB.toFixed(2)),
+        usedGB: parseFloat(usedGB.toFixed(2)),
+        maxStorageGB: null,
+        remainingGB: null,
+        percentUsed: null,
+        warning: false,
+        numObjects: repoStats.numObjects,
+      };
+    }
+
+    const maxStorageBytes = maxStorageGB * 1024 * 1024 * 1024;
+    const remainingBytes = Math.max(0, maxStorageBytes - usedBytes);
+    const remainingGB = remainingBytes / (1024 * 1024 * 1024);
+    const remainingMB = remainingBytes / (1024 * 1024);
+    const percentUsed = (usedBytes / maxStorageBytes) * 100;
+
+    return {
+      available: true,
+      unlimited: false,
+      usedBytes,
+      usedMB: parseFloat(usedMB.toFixed(2)),
+      usedGB: parseFloat(usedGB.toFixed(2)),
+      maxStorageGB,
+      maxStorageMB: maxStorageGB * 1024,
+      remainingBytes,
+      remainingMB: parseFloat(remainingMB.toFixed(2)),
+      remainingGB: parseFloat(remainingGB.toFixed(2)),
+      percentUsed: parseFloat(percentUsed.toFixed(1)),
+      warning: percentUsed >= warningThreshold,
+      warningThreshold,
+      full: percentUsed >= 100,
+      numObjects: repoStats.numObjects,
+    };
+  }
+
+  /**
+   * Check if relay has enough space for a new subscription tier
+   * Returns availability status and any warnings
+   */
+  static async canAcceptSubscription(tier, ipfsApiUrl, ipfsApiToken) {
+    const tierConfig = SUBSCRIPTION_TIERS[tier];
+    if (!tierConfig) {
+      return {
+        allowed: false,
+        reason: `Invalid tier: ${tier}`,
+      };
+    }
+
+    const relayStorage = await this.getRelayStorageStatus(ipfsApiUrl, ipfsApiToken);
+    
+    if (!relayStorage.available) {
+      return {
+        allowed: false,
+        reason: 'Could not verify relay storage status',
+        error: relayStorage.error,
+      };
+    }
+
+    // If unlimited, always allow
+    if (relayStorage.unlimited) {
+      return {
+        allowed: true,
+        relayStorage,
+      };
+    }
+
+    const requiredMB = tierConfig.storageMB;
+    const availableMB = relayStorage.remainingMB;
+
+    // Check if there's enough space for the subscription tier
+    if (availableMB < requiredMB) {
+      return {
+        allowed: false,
+        reason: `Relay storage insufficient. Available: ${availableMB.toFixed(2)}MB, Required for ${tierConfig.name}: ${requiredMB}MB`,
+        relayFull: true,
+        relayStorage,
+      };
+    }
+
+    // Warning if relay is getting full
+    if (relayStorage.warning) {
+      return {
+        allowed: true,
+        warning: `Relay storage is at ${relayStorage.percentUsed.toFixed(1)}% capacity`,
+        relayStorage,
+      };
+    }
+
+    return {
+      allowed: true,
+      relayStorage,
+    };
+  }
+
+  /**
+   * Check if relay has enough space for a file upload (global check)
+   */
+  static async canAcceptUpload(fileSizeMB, ipfsApiUrl, ipfsApiToken) {
+    const relayStorage = await this.getRelayStorageStatus(ipfsApiUrl, ipfsApiToken);
+    
+    if (!relayStorage.available) {
+      return {
+        allowed: false,
+        reason: 'Could not verify relay storage status',
+        error: relayStorage.error,
+      };
+    }
+
+    // If unlimited, always allow
+    if (relayStorage.unlimited) {
+      return {
+        allowed: true,
+        relayStorage,
+      };
+    }
+
+    if (relayStorage.remainingMB < fileSizeMB) {
+      return {
+        allowed: false,
+        reason: `Relay storage full. Available: ${relayStorage.remainingMB.toFixed(2)}MB, File size: ${fileSizeMB.toFixed(2)}MB`,
+        relayFull: true,
+        relayStorage,
+      };
+    }
+
+    return {
+      allowed: true,
+      warning: relayStorage.warning ? `Relay storage at ${relayStorage.percentUsed.toFixed(1)}%` : null,
+      relayStorage,
+    };
+  }
 }
 
 export default X402Merchant;

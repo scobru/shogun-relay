@@ -44,20 +44,62 @@ function getGunInstance(req) {
 /**
  * GET /tiers
  * List all available subscription tiers
+ * Includes relay storage status to show availability
  */
-router.get('/tiers', (req, res) => {
+router.get('/tiers', async (req, res) => {
   try {
-    const tiers = Object.entries(SUBSCRIPTION_TIERS).map(([key, tier]) => ({
-      id: key,
-      ...tier,
-      priceDisplay: `${tier.priceUSDC} USDC`,
-    }));
+    const ipfsApiUrl = req.app.get('IPFS_API_URL') || process.env.IPFS_API_URL || 'http://127.0.0.1:5001';
+    const ipfsApiToken = req.app.get('IPFS_API_TOKEN') || process.env.IPFS_API_TOKEN;
 
-    res.json({
+    // Get relay storage status
+    const relayStorage = await X402Merchant.getRelayStorageStatus(ipfsApiUrl, ipfsApiToken);
+
+    const tiers = Object.entries(SUBSCRIPTION_TIERS).map(([key, tier]) => {
+      const tierInfo = {
+        id: key,
+        ...tier,
+        priceDisplay: `${tier.priceUSDC} USDC`,
+      };
+
+      // Check if this tier can be purchased based on relay storage
+      if (relayStorage.available && !relayStorage.unlimited) {
+        tierInfo.available = relayStorage.remainingMB >= tier.storageMB;
+        if (!tierInfo.available) {
+          tierInfo.unavailableReason = 'Relay storage insufficient';
+        }
+      } else {
+        tierInfo.available = true;
+      }
+
+      return tierInfo;
+    });
+
+    const response = {
       success: true,
       tiers,
       network: process.env.X402_NETWORK || 'base-sepolia',
-    });
+    };
+
+    // Include relay storage info if available
+    if (relayStorage.available) {
+      response.relayStorage = {
+        unlimited: relayStorage.unlimited,
+        usedGB: relayStorage.usedGB,
+        maxStorageGB: relayStorage.maxStorageGB,
+        remainingGB: relayStorage.remainingGB,
+        percentUsed: relayStorage.percentUsed,
+        warning: relayStorage.warning,
+        full: relayStorage.full,
+      };
+
+      if (relayStorage.full) {
+        response.relayWarning = 'Relay storage is FULL - subscriptions temporarily unavailable';
+      } else if (relayStorage.warning) {
+        response.relayWarning = `Relay storage at ${relayStorage.percentUsed}% capacity`;
+      }
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('Error getting tiers:', error);
     res.status(500).json({
@@ -192,18 +234,52 @@ router.post('/subscribe', async (req, res) => {
       });
     }
 
+    // Check if relay has enough global storage for this subscription tier
+    const ipfsApiUrl = req.app.get('IPFS_API_URL') || process.env.IPFS_API_URL || 'http://127.0.0.1:5001';
+    const ipfsApiToken = req.app.get('IPFS_API_TOKEN') || process.env.IPFS_API_TOKEN;
+    
+    const relayCapacity = await X402Merchant.canAcceptSubscription(tier, ipfsApiUrl, ipfsApiToken);
+    
+    if (!relayCapacity.allowed) {
+      console.log(`Relay storage check failed: ${relayCapacity.reason}`);
+      return res.status(503).json({
+        success: false,
+        error: 'Relay storage unavailable',
+        reason: relayCapacity.reason,
+        relayFull: relayCapacity.relayFull || false,
+        relayStorage: relayCapacity.relayStorage ? {
+          usedGB: relayCapacity.relayStorage.usedGB,
+          maxStorageGB: relayCapacity.relayStorage.maxStorageGB,
+          remainingGB: relayCapacity.relayStorage.remainingGB,
+          percentUsed: relayCapacity.relayStorage.percentUsed,
+        } : null,
+      });
+    }
+
+    // Log warning if relay is getting full
+    if (relayCapacity.warning) {
+      console.warn(`Relay storage warning: ${relayCapacity.warning}`);
+    }
+
     // If no payment provided, return payment requirements
     if (!payment) {
       console.log('No payment provided, returning requirements');
       const requirements = merchantInstance.createPaymentRequiredResponse(tier);
       
-      return res.status(402).json({
+      // Include relay storage warning if applicable
+      const response = {
         success: false,
         error: 'Payment required',
         x402: requirements,
         tier,
         tierInfo: SUBSCRIPTION_TIERS[tier],
-      });
+      };
+
+      if (relayCapacity.warning) {
+        response.relayWarning = relayCapacity.warning;
+      }
+      
+      return res.status(402).json(response);
     }
 
     // Verify the payment
@@ -591,6 +667,119 @@ router.get('/can-upload-verified/:userAddress', async (req, res) => {
     });
   } catch (error) {
     console.error('Can upload verified check error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /relay-storage
+ * Get relay's global storage status (all IPFS pins)
+ * Shows total used storage vs configured maximum
+ */
+router.get('/relay-storage', async (req, res) => {
+  try {
+    const ipfsApiUrl = req.app.get('IPFS_API_URL') || process.env.IPFS_API_URL || 'http://127.0.0.1:5001';
+    const ipfsApiToken = req.app.get('IPFS_API_TOKEN') || process.env.IPFS_API_TOKEN;
+
+    const relayStorage = await X402Merchant.getRelayStorageStatus(ipfsApiUrl, ipfsApiToken);
+
+    if (!relayStorage.available) {
+      return res.status(503).json({
+        success: false,
+        error: relayStorage.error || 'Could not get relay storage status',
+      });
+    }
+
+    res.json({
+      success: true,
+      storage: {
+        unlimited: relayStorage.unlimited,
+        usedMB: relayStorage.usedMB,
+        usedGB: relayStorage.usedGB,
+        maxStorageGB: relayStorage.maxStorageGB,
+        maxStorageMB: relayStorage.maxStorageMB,
+        remainingMB: relayStorage.remainingMB,
+        remainingGB: relayStorage.remainingGB,
+        percentUsed: relayStorage.percentUsed,
+        warning: relayStorage.warning,
+        warningThreshold: relayStorage.warningThreshold,
+        full: relayStorage.full,
+        numObjects: relayStorage.numObjects,
+      },
+      message: relayStorage.full 
+        ? 'Relay storage is FULL - no new subscriptions can be accepted'
+        : relayStorage.warning 
+          ? `Warning: Relay storage is at ${relayStorage.percentUsed}% capacity`
+          : relayStorage.unlimited 
+            ? 'No storage limit configured'
+            : 'Relay storage OK',
+    });
+  } catch (error) {
+    console.error('Relay storage check error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /relay-storage/detailed
+ * Get detailed relay storage with all pins info (admin only)
+ */
+router.get('/relay-storage/detailed', async (req, res) => {
+  try {
+    // Check admin auth
+    const authHeader = req.headers['authorization'];
+    const bearerToken = authHeader && authHeader.split(' ')[1];
+    const customToken = req.headers['token'];
+    const token = bearerToken || customToken;
+
+    if (token !== process.env.ADMIN_PASSWORD) {
+      return res.status(401).json({
+        success: false,
+        error: 'Admin authentication required',
+      });
+    }
+
+    const ipfsApiUrl = req.app.get('IPFS_API_URL') || process.env.IPFS_API_URL || 'http://127.0.0.1:5001';
+    const ipfsApiToken = req.app.get('IPFS_API_TOKEN') || process.env.IPFS_API_TOKEN;
+
+    console.log('Fetching detailed relay storage (this may take a while)...');
+
+    // Get relay storage status
+    const relayStorage = await X402Merchant.getRelayStorageStatus(ipfsApiUrl, ipfsApiToken);
+    
+    // Get all pins with sizes
+    const pinsInfo = await X402Merchant.getAllPinsSize(ipfsApiUrl, ipfsApiToken);
+
+    res.json({
+      success: true,
+      storage: {
+        unlimited: relayStorage.unlimited,
+        usedMB: relayStorage.usedMB,
+        usedGB: relayStorage.usedGB,
+        maxStorageGB: relayStorage.maxStorageGB,
+        remainingGB: relayStorage.remainingGB,
+        percentUsed: relayStorage.percentUsed,
+        warning: relayStorage.warning,
+        full: relayStorage.full,
+      },
+      pins: {
+        count: pinsInfo.pinCount,
+        totalMB: parseFloat(pinsInfo.totalMB?.toFixed(2) || 0),
+        totalGB: parseFloat(pinsInfo.totalGB?.toFixed(2) || 0),
+        items: pinsInfo.pins.map(p => ({
+          cid: p.cid,
+          sizeMB: parseFloat(p.sizeMB.toFixed(4)),
+        })).sort((a, b) => b.sizeMB - a.sizeMB), // Sort by size desc
+      },
+    });
+  } catch (error) {
+    console.error('Detailed relay storage check error:', error);
     res.status(500).json({
       success: false,
       error: error.message,

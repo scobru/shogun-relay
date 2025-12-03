@@ -42,6 +42,9 @@ import debugRouter from "./debug.js";
 import servicesRouter from "./services.js";
 import visualGraphRouter from "./visualGraph.js";
 import x402Router from "./x402.js";
+import networkRouter from "./network.js";
+import dealsRouter from "./deals.js";
+import registryRouter from "./registry.js";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -294,6 +297,16 @@ export default (app) => {
     res.sendFile(path.resolve(publicPath, "subscription.html"));
   });
 
+  app.get("/deals", (req, res) => {
+    const publicPath = path.resolve(__dirname, "../public");
+    res.sendFile(path.resolve(publicPath, "deals-dashboard.html"));
+  });
+
+  app.get("/registry-dashboard", (req, res) => {
+    const publicPath = path.resolve(__dirname, "../public");
+    res.sendFile(path.resolve(publicPath, "registry-dashboard.html"));
+  });
+
   app.get("/endpoints", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "endpoints.html"));
@@ -369,6 +382,15 @@ export default (app) => {
 
   // Route per x402 payments e subscriptions
   app.use(`${baseRoute}/x402`, x402Router);
+
+  // Route per network federation, discovery e storage proofs
+  app.use(`${baseRoute}/network`, networkRouter);
+
+  // Route per storage deals (per-file contracts)
+  app.use(`${baseRoute}/deals`, dealsRouter);
+
+  // Route per on-chain registry management (staking, registration)
+  app.use(`${baseRoute}/registry`, registryRouter);
 
   // Route di test per verificare se le route sono registrate correttamente
   app.get(`${baseRoute}/test`, (req, res) => {
@@ -553,6 +575,37 @@ export default (app) => {
           `${baseRoute}/x402/storage/:userAddress`,
           `${baseRoute}/x402/storage/sync/:userAddress`,
           `${baseRoute}/x402/config`,
+          // Network Federation & Storage Proofs
+          `${baseRoute}/network/relays`,
+          `${baseRoute}/network/relay/:host`,
+          `${baseRoute}/network/stats`,
+          `${baseRoute}/network/proof/:cid`,
+          `${baseRoute}/network/verify-proof`,
+          `${baseRoute}/network/pin-request`,
+          `${baseRoute}/network/pin-requests`,
+          `${baseRoute}/network/pin-response`,
+          // Reputation System
+          `${baseRoute}/network/reputation`,
+          `${baseRoute}/network/reputation/:host`,
+          `${baseRoute}/network/reputation/record-proof`,
+          `${baseRoute}/network/best-relays`,
+          // Verified (Frozen/Immutable) Data
+          `${baseRoute}/network/verified/relays`,
+          `${baseRoute}/network/verified/relay/:host`,
+          `${baseRoute}/network/verified/observation`,
+          `${baseRoute}/network/verified/observations/:host`,
+          `${baseRoute}/network/verified/entry/:namespace/:hash`,
+          // Storage Deals (per-file contracts)
+          `${baseRoute}/deals/pricing`,
+          `${baseRoute}/deals/overhead`,
+          `${baseRoute}/deals/create`,
+          `${baseRoute}/deals/:dealId`,
+          `${baseRoute}/deals/:dealId/activate`,
+          `${baseRoute}/deals/:dealId/renew`,
+          `${baseRoute}/deals/:dealId/terminate`,
+          `${baseRoute}/deals/by-cid/:cid`,
+          `${baseRoute}/deals/by-client/:address`,
+          `${baseRoute}/deals/relay/active`,
         ],
       },
     });

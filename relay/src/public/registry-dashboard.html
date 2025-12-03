@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relay Registry - On-Chain Management</title>
+  <style>
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-card: #1a1a24;
+      --border: #2a2a3a;
+      --text-primary: #e8e8f0;
+      --text-secondary: #8888a0;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --purple: #8b5cf6;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    h1::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .chain-badge {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .status-badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    .status-active { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+    .status-inactive { background: rgba(136, 136, 160, 0.15); color: var(--text-secondary); }
+    .status-unstaking { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+    .status-slashed { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+    .status-not-configured { background: rgba(139, 92, 246, 0.15); color: var(--purple); }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+
+    .stat {
+      background: var(--bg-secondary);
+      padding: 1rem;
+      border-radius: 8px;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.25rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .stat-value.accent { color: var(--accent); }
+    .stat-value.success { color: var(--success); }
+    .stat-value.warning { color: var(--warning); }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 0.9rem;
+      transition: border-color 0.2s;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    input::placeholder {
+      color: var(--text-secondary);
+    }
+
+    button {
+      padding: 0.75rem 1.5rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+      width: 100%;
+    }
+
+    button:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    button.secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+    }
+
+    button.secondary:hover:not(:disabled) {
+      background: var(--bg-secondary);
+    }
+
+    button.danger {
+      background: var(--danger);
+    }
+
+    button.danger:hover:not(:disabled) {
+      background: #dc2626;
+    }
+
+    button.success {
+      background: var(--success);
+    }
+
+    .button-group {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .button-group button {
+      flex: 1;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+
+    .info-row:last-child {
+      border-bottom: none;
+    }
+
+    .info-label {
+      color: var(--text-secondary);
+    }
+
+    .info-value {
+      color: var(--text-primary);
+      font-weight: 500;
+      text-align: right;
+      word-break: break-all;
+    }
+
+    .info-value a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .info-value a:hover {
+      text-decoration: underline;
+    }
+
+    .alert {
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+    }
+
+    .alert-info {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: var(--accent);
+    }
+
+    .alert-warning {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: var(--warning);
+    }
+
+    .alert-success {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--success);
+    }
+
+    .alert-error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: var(--danger);
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-secondary);
+    }
+
+    .loading.active {
+      display: block;
+    }
+
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 1rem;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .address {
+      font-family: 'SF Mono', monospace;
+      font-size: 0.85rem;
+    }
+
+    .full-width {
+      grid-column: 1 / -1;
+    }
+
+    .deals-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      font-size: 0.85rem;
+    }
+
+    .deals-table th,
+    .deals-table td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .deals-table th {
+      color: var(--text-secondary);
+      font-weight: 500;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      letter-spacing: 0.5px;
+    }
+
+    .deals-table tr:hover {
+      background: var(--bg-secondary);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-secondary);
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 1rem;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .stat-grid {
+        grid-template-columns: 1fr;
+      }
+
+      header {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Relay Registry</h1>
+      <div class="chain-badge" id="chainBadge">Loading...</div>
+    </header>
+
+    <div id="alerts"></div>
+
+    <div class="grid">
+      <!-- Status Card -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Registration Status</span>
+          <span class="status-badge status-inactive" id="statusBadge">Loading</span>
+        </div>
+        <div id="statusContent">
+          <div class="loading active">
+            <div class="spinner"></div>
+            <p>Loading status...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Balances Card -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Wallet Balances</span>
+        </div>
+        <div id="balancesContent">
+          <div class="loading active">
+            <div class="spinner"></div>
+            <p>Loading balances...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Registration Card -->
+      <div class="card" id="registerCard">
+        <div class="card-header">
+          <span class="card-title">Register Relay</span>
+        </div>
+        <div id="registerForm">
+          <div class="form-group">
+            <label>Endpoint URL</label>
+            <input type="text" id="endpoint" placeholder="https://your-relay.com">
+          </div>
+          <div class="form-group">
+            <label>GunDB Public Key</label>
+            <input type="text" id="gunPubKey" placeholder="Your GunDB public key">
+          </div>
+          <div class="form-group">
+            <label>Stake Amount (USDC)</label>
+            <input type="number" id="stakeAmount" value="100" min="0.001" step="0.001">
+          </div>
+          <button id="registerBtn" onclick="registerRelay()">Register On-Chain</button>
+        </div>
+      </div>
+
+      <!-- Staking Card -->
+      <div class="card" id="stakingCard">
+        <div class="card-header">
+          <span class="card-title">Stake Management</span>
+        </div>
+        <div id="stakingContent">
+          <div class="stat-grid">
+            <div class="stat">
+              <div class="stat-label">Current Stake</div>
+              <div class="stat-value accent" id="currentStake">-</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Total Slashed</div>
+              <div class="stat-value warning" id="totalSlashed">-</div>
+            </div>
+          </div>
+          
+          <div class="form-group" style="margin-top: 1rem;">
+            <label>Increase Stake (USDC)</label>
+            <input type="number" id="increaseAmount" placeholder="100" min="0.001" step="0.001">
+          </div>
+          
+          <div class="button-group">
+            <button onclick="increaseStake()">Increase Stake</button>
+            <button class="danger" onclick="requestUnstake()">Request Unstake</button>
+          </div>
+
+          <div id="unstakeInfo" class="alert alert-warning hidden" style="margin-top: 1rem;">
+            Unstaking in progress. Withdraw available after delay period.
+            <button class="success" onclick="withdrawStake()" style="margin-top: 0.5rem;">Withdraw Stake</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Update Card -->
+      <div class="card" id="updateCard">
+        <div class="card-header">
+          <span class="card-title">Update Relay Info</span>
+        </div>
+        <div class="form-group">
+          <label>New Endpoint (optional)</label>
+          <input type="text" id="newEndpoint" placeholder="https://new-endpoint.com">
+        </div>
+        <div class="form-group">
+          <label>New GunDB Public Key (optional)</label>
+          <input type="text" id="newGunPubKey" placeholder="Leave empty to keep current">
+        </div>
+        <button onclick="updateRelay()">Update On-Chain</button>
+      </div>
+
+      <!-- Registry Params Card -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Registry Parameters</span>
+        </div>
+        <div id="paramsContent">
+          <div class="loading active">
+            <div class="spinner"></div>
+            <p>Loading params...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Deals Card -->
+      <div class="card full-width" id="dealsCard">
+        <div class="card-header">
+          <span class="card-title">On-Chain Deals</span>
+          <button class="secondary" onclick="loadDeals()" style="width: auto; padding: 0.5rem 1rem;">Refresh</button>
+        </div>
+        <div id="dealsContent">
+          <div class="loading active">
+            <div class="spinner"></div>
+            <p>Loading deals...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = '/api/v1/registry';
+    let relayStatus = null;
+    let config = null;
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadConfig();
+      await Promise.all([
+        loadStatus(),
+        loadBalances(),
+        loadParams(),
+        loadDeals()
+      ]);
+    });
+
+    async function loadConfig() {
+      try {
+        const res = await fetch(`${API_BASE}/config`);
+        config = await res.json();
+        
+        document.getElementById('chainBadge').textContent = 
+          `${config.chainName} (${config.chainId})`;
+      } catch (e) {
+        console.error('Failed to load config:', e);
+      }
+    }
+
+    async function loadStatus() {
+      try {
+        const res = await fetch(`${API_BASE}/status`);
+        relayStatus = await res.json();
+        
+        const badge = document.getElementById('statusBadge');
+        const content = document.getElementById('statusContent');
+        
+        if (!relayStatus.configured) {
+          badge.textContent = 'Not Configured';
+          badge.className = 'status-badge status-not-configured';
+          content.innerHTML = `
+            <div class="alert alert-warning">
+              RELAY_PRIVATE_KEY not configured. Set it in your .env file to enable on-chain features.
+            </div>
+          `;
+          // Hide management cards
+          document.getElementById('registerCard').classList.add('hidden');
+          document.getElementById('stakingCard').classList.add('hidden');
+          document.getElementById('updateCard').classList.add('hidden');
+          document.getElementById('dealsCard').classList.add('hidden');
+          return;
+        }
+        
+        if (!relayStatus.registered) {
+          badge.textContent = 'Not Registered';
+          badge.className = 'status-badge status-inactive';
+          content.innerHTML = `
+            <div class="info-row">
+              <span class="info-label">Wallet Address</span>
+              <span class="info-value address">${truncateAddress(relayStatus.relayAddress)}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Registry</span>
+              <span class="info-value">
+                <a href="${config.explorerUrl}/address/${relayStatus.registryAddress}" target="_blank">
+                  ${truncateAddress(relayStatus.registryAddress)}
+                </a>
+              </span>
+            </div>
+          `;
+          // Hide staking and update cards
+          document.getElementById('stakingCard').classList.add('hidden');
+          document.getElementById('updateCard').classList.add('hidden');
+          document.getElementById('dealsCard').classList.add('hidden');
+          return;
+        }
+        
+        // Registered
+        const relay = relayStatus.relay;
+        badge.textContent = relay.status;
+        badge.className = `status-badge status-${relay.status.toLowerCase()}`;
+        
+        content.innerHTML = `
+          <div class="info-row">
+            <span class="info-label">Address</span>
+            <span class="info-value">
+              <a href="${config.explorerUrl}/address/${relayStatus.relayAddress}" target="_blank" class="address">
+                ${truncateAddress(relayStatus.relayAddress)}
+              </a>
+            </span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Endpoint</span>
+            <span class="info-value">${relay.endpoint}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Registered</span>
+            <span class="info-value">${new Date(relay.registeredAt).toLocaleDateString()}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Total Deals</span>
+            <span class="info-value">${relay.totalDeals}</span>
+          </div>
+        `;
+        
+        // Update staking card
+        document.getElementById('currentStake').textContent = `${relay.stakedAmount} USDC`;
+        document.getElementById('totalSlashed').textContent = `${relay.totalSlashed} USDC`;
+        
+        // Hide register card, show management cards
+        document.getElementById('registerCard').classList.add('hidden');
+        document.getElementById('stakingCard').classList.remove('hidden');
+        document.getElementById('updateCard').classList.remove('hidden');
+        document.getElementById('dealsCard').classList.remove('hidden');
+        
+        // Show unstake info if unstaking
+        if (relay.status === 'Unstaking') {
+          document.getElementById('unstakeInfo').classList.remove('hidden');
+        }
+        
+      } catch (e) {
+        console.error('Failed to load status:', e);
+        document.getElementById('statusContent').innerHTML = `
+          <div class="alert alert-error">Failed to load status: ${e.message}</div>
+        `;
+      }
+    }
+
+    async function loadBalances() {
+      const content = document.getElementById('balancesContent');
+      try {
+        const res = await fetch(`${API_BASE}/balance`);
+        const data = await res.json();
+        
+        if (!data.success) {
+          content.innerHTML = `
+            <div class="alert alert-warning">${data.error}</div>
+          `;
+          return;
+        }
+        
+        content.innerHTML = `
+          <div class="stat-grid">
+            <div class="stat">
+              <div class="stat-label">ETH (Gas)</div>
+              <div class="stat-value ${parseFloat(data.balances.eth) < 0.01 ? 'warning' : 'success'}">
+                ${parseFloat(data.balances.eth).toFixed(4)}
+              </div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">USDC (Stake)</div>
+              <div class="stat-value accent">${parseFloat(data.balances.usdc).toFixed(2)}</div>
+            </div>
+          </div>
+          <div class="info-row" style="margin-top: 1rem;">
+            <span class="info-label">Wallet</span>
+            <span class="info-value">
+              <a href="${config?.explorerUrl}/address/${data.relayAddress}" target="_blank" class="address">
+                ${truncateAddress(data.relayAddress)}
+              </a>
+            </span>
+          </div>
+        `;
+      } catch (e) {
+        content.innerHTML = `<div class="alert alert-error">Failed to load balances</div>`;
+      }
+    }
+
+    async function loadParams() {
+      const content = document.getElementById('paramsContent');
+      try {
+        const res = await fetch(`${API_BASE}/params`);
+        const data = await res.json();
+        
+        content.innerHTML = `
+          <div class="info-row">
+            <span class="info-label">Minimum Stake</span>
+            <span class="info-value">${data.params.minStake} USDC</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Unstaking Delay</span>
+            <span class="info-value">${data.params.unstakingDelayDays} days</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Registry</span>
+            <span class="info-value">
+              <a href="${config?.explorerUrl}/address/${data.registryAddress}" target="_blank" class="address">
+                ${truncateAddress(data.registryAddress)}
+              </a>
+            </span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">USDC Token</span>
+            <span class="info-value">
+              <a href="${config?.explorerUrl}/address/${data.usdcAddress}" target="_blank" class="address">
+                ${truncateAddress(data.usdcAddress)}
+              </a>
+            </span>
+          </div>
+        `;
+      } catch (e) {
+        content.innerHTML = `<div class="alert alert-error">Failed to load params</div>`;
+      }
+    }
+
+    async function loadDeals() {
+      const content = document.getElementById('dealsContent');
+      try {
+        const res = await fetch(`${API_BASE}/deals`);
+        const data = await res.json();
+        
+        if (!data.success) {
+          content.innerHTML = `<div class="alert alert-warning">${data.error}</div>`;
+          return;
+        }
+        
+        if (data.deals.length === 0) {
+          content.innerHTML = `<div class="empty-state">No on-chain deals yet</div>`;
+          return;
+        }
+        
+        content.innerHTML = `
+          <table class="deals-table">
+            <thead>
+              <tr>
+                <th>CID</th>
+                <th>Client</th>
+                <th>Size</th>
+                <th>Price</th>
+                <th>Expires</th>
+                <th>Active</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.deals.map(d => `
+                <tr>
+                  <td class="address">${truncateCid(d.cid)}</td>
+                  <td class="address">${truncateAddress(d.client)}</td>
+                  <td>${d.sizeMB} MB</td>
+                  <td>${d.priceUSDC} USDC</td>
+                  <td>${new Date(d.expiresAt).toLocaleDateString()}</td>
+                  <td>${d.active ? 'Yes' : 'No'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      } catch (e) {
+        content.innerHTML = `<div class="alert alert-error">Failed to load deals</div>`;
+      }
+    }
+
+    async function registerRelay() {
+      const btn = document.getElementById('registerBtn');
+      btn.disabled = true;
+      btn.textContent = 'Registering...';
+      
+      try {
+        const res = await fetch(`${API_BASE}/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            endpoint: document.getElementById('endpoint').value,
+            gunPubKey: document.getElementById('gunPubKey').value,
+            stakeAmount: document.getElementById('stakeAmount').value,
+          }),
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          showAlert('success', `Relay registered! TX: ${truncateAddress(data.txHash)}`);
+          await loadStatus();
+          await loadBalances();
+        } else {
+          showAlert('error', data.error);
+        }
+      } catch (e) {
+        showAlert('error', e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Register On-Chain';
+      }
+    }
+
+    async function updateRelay() {
+      try {
+        const res = await fetch(`${API_BASE}/update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            newEndpoint: document.getElementById('newEndpoint').value,
+            newGunPubKey: document.getElementById('newGunPubKey').value,
+          }),
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          showAlert('success', 'Relay updated successfully!');
+          await loadStatus();
+        } else {
+          showAlert('error', data.error);
+        }
+      } catch (e) {
+        showAlert('error', e.message);
+      }
+    }
+
+    async function increaseStake() {
+      const amount = document.getElementById('increaseAmount').value;
+      if (!amount) {
+        showAlert('error', 'Please enter an amount');
+        return;
+      }
+      
+      try {
+        const res = await fetch(`${API_BASE}/stake/increase`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount }),
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          showAlert('success', `Stake increased by ${amount} USDC`);
+          await loadStatus();
+          await loadBalances();
+        } else {
+          showAlert('error', data.error);
+        }
+      } catch (e) {
+        showAlert('error', e.message);
+      }
+    }
+
+    async function requestUnstake() {
+      if (!confirm('Are you sure you want to unstake? This will deactivate your relay.')) {
+        return;
+      }
+      
+      try {
+        const res = await fetch(`${API_BASE}/stake/unstake`, {
+          method: 'POST',
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          showAlert('warning', `Unstake requested. Withdraw available in ${data.unstakingDelayDays} days.`);
+          await loadStatus();
+        } else {
+          showAlert('error', data.error);
+        }
+      } catch (e) {
+        showAlert('error', e.message);
+      }
+    }
+
+    async function withdrawStake() {
+      try {
+        const res = await fetch(`${API_BASE}/stake/withdraw`, {
+          method: 'POST',
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          showAlert('success', `Stake withdrawn: ${data.withdrawnAmount} USDC`);
+          await loadStatus();
+          await loadBalances();
+        } else {
+          showAlert('error', data.error);
+        }
+      } catch (e) {
+        showAlert('error', e.message);
+      }
+    }
+
+    function showAlert(type, message) {
+      const alerts = document.getElementById('alerts');
+      const alert = document.createElement('div');
+      alert.className = `alert alert-${type}`;
+      alert.textContent = message;
+      alerts.appendChild(alert);
+      
+      setTimeout(() => alert.remove(), 5000);
+    }
+
+    function truncateAddress(addr) {
+      if (!addr) return '-';
+      return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+    }
+
+    function truncateCid(cid) {
+      if (!cid) return '-';
+      return cid.length > 20 ? `${cid.slice(0, 10)}...${cid.slice(-6)}` : cid;
+    }
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="shogun-dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Storage Deals - Per-File Contracts</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+  <link href="https://unpkg.com/shogun-theme@1.0.0/styles/variables.css" rel="stylesheet" type="text/css" />
+  <link href="https://unpkg.com/shogun-theme@1.0.0/styles/base.css" rel="stylesheet" type="text/css" />
+  <link href="https://unpkg.com/shogun-theme@1.0.0/styles/daisyui-overrides.css" rel="stylesheet" type="text/css" />
+  <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
+  <style>
+    body {
+      line-height: 1.6;
+      background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
+      min-height: 100vh;
+    }
+
+    .hero-gradient {
+      background: radial-gradient(ellipse at top, rgba(66, 165, 245, 0.08) 0%, transparent 60%);
+    }
+
+    .tier-card {
+      border: 2px solid #404040;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      transition: all 0.3s ease;
+      background-color: rgba(40, 40, 40, 0.5);
+      cursor: pointer;
+    }
+
+    .tier-card:hover {
+      border-color: #606060;
+      background-color: rgba(40, 40, 40, 0.8);
+    }
+
+    .tier-card.selected {
+      border-color: #42A5F5;
+      background-color: rgba(66, 165, 245, 0.1);
+    }
+
+    .tier-price {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #42A5F5;
+    }
+
+    .deal-card {
+      background-color: rgba(40, 40, 40, 0.5);
+      border: 1px solid #404040;
+      border-radius: 1rem;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      transition: all 0.3s ease;
+    }
+
+    .deal-card:hover {
+      border-color: #606060;
+    }
+
+    .deal-card.active {
+      border-left: 4px solid #4CAF50;
+    }
+
+    .deal-card.pending {
+      border-left: 4px solid #FF9800;
+    }
+
+    .deal-card.expired {
+      border-left: 4px solid #F44336;
+      opacity: 0.7;
+    }
+
+    .status-badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .status-active { background-color: rgba(76, 175, 80, 0.2); color: #4CAF50; }
+    .status-pending { background-color: rgba(255, 152, 0, 0.2); color: #FF9800; }
+    .status-expired { background-color: rgba(244, 67, 54, 0.2); color: #F44336; }
+
+    .badge-standard { background-color: #607D8B; color: white; }
+    .badge-premium { background-color: #2196F3; color: white; }
+    .badge-enterprise { background-color: #9C27B0; color: white; }
+
+    .stat-card {
+      background-color: rgba(40, 40, 40, 0.5);
+      border: 1px solid #404040;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #42A5F5;
+    }
+
+    .stat-label {
+      font-size: 0.875rem;
+      color: #A0A0A0;
+    }
+
+    .message {
+      padding: 1.5rem;
+      border-radius: 1rem;
+      margin-top: 1.5rem;
+      display: none;
+    }
+
+    .message.success {
+      background-color: rgba(76, 175, 80, 0.2);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+      color: #4CAF50;
+    }
+
+    .message.error {
+      background-color: rgba(244, 67, 54, 0.2);
+      border: 1px solid rgba(244, 67, 54, 0.3);
+      color: #F44336;
+    }
+
+    .message.info {
+      background-color: rgba(66, 165, 245, 0.2);
+      border: 1px solid rgba(66, 165, 245, 0.3);
+      color: #42A5F5;
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 1.5rem;
+      height: 1.5rem;
+      border: 2px solid #404040;
+      border-radius: 50%;
+      border-top-color: #42A5F5;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .input-field {
+      background-color: #1A1A1A;
+      border: 1px solid #404040;
+      border-radius: 0.75rem;
+      padding: 0.75rem 1rem;
+      color: #FFFFFF;
+      width: 100%;
+      transition: all 0.3s ease;
+    }
+
+    .input-field:focus {
+      outline: none;
+      border-color: #42A5F5;
+    }
+
+    .section-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #FFFFFF;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .tab-button {
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.75rem;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      background-color: transparent;
+      color: #A0A0A0;
+      border: 1px solid transparent;
+    }
+
+    .tab-button:hover {
+      background-color: rgba(66, 165, 245, 0.1);
+    }
+
+    .tab-button.active {
+      background-color: rgba(66, 165, 245, 0.2);
+      color: #42A5F5;
+      border-color: #42A5F5;
+    }
+
+    .erasure-visual {
+      display: flex;
+      gap: 0.25rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+
+    .chunk-block {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 0.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.625rem;
+      font-weight: bold;
+    }
+
+    .chunk-data { background-color: #4CAF50; color: white; }
+    .chunk-parity { background-color: #FF9800; color: white; }
+  </style>
+</head>
+
+<body class="antialiased">
+  <div class="hero-gradient min-h-screen">
+    <div class="container mx-auto p-6 max-w-5xl">
+      <!-- Header Navigation -->
+      <div class="flex items-center justify-between mb-8">
+        <a href="/" class="flex items-center gap-2 text-[#A0A0A0] hover:text-[#42A5F5] transition-colors group">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          <span>Back to Control Panel</span>
+        </a>
+        <div class="flex items-center gap-2 px-3 py-1.5 bg-[#282828] rounded-full border border-[#404040]">
+          <span class="text-[#42A5F5] text-sm font-medium">Storage Deals</span>
+          <span class="text-[#606060]">|</span>
+          <span class="text-[#A0A0A0] text-sm">Per-File Contracts</span>
+        </div>
+      </div>
+
+      <!-- Main Card -->
+      <div class="card bg-[#282828] border border-[#404040] rounded-2xl mb-6 shadow-xl">
+        <div class="p-8 sm:p-10">
+          <div class="flex flex-col items-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#42A5F5] to-[#1976D2] mb-6 shadow-lg">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <h1 class="text-3xl font-bold mb-3 text-[#FFFFFF]">Storage Deals</h1>
+            <p class="text-[#A0A0A0] text-center">Per-file contracts with erasure coding and multi-relay replication</p>
+          </div>
+
+          <!-- Tabs -->
+          <div class="flex gap-2 mb-8 justify-center flex-wrap">
+            <button class="tab-button active" onclick="showTab('pricing')">Pricing</button>
+            <button class="tab-button" onclick="showTab('create')">Create Deal</button>
+            <button class="tab-button" onclick="showTab('mydeals')">My Deals</button>
+            <button class="tab-button" onclick="showTab('erasure')">Erasure Calculator</button>
+          </div>
+
+          <!-- Tab: Pricing -->
+          <div id="tab-pricing" class="tab-content">
+            <h2 class="section-title">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#42A5F5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Pricing Tiers
+            </h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="pricingTiers">
+              <div class="tier-card" data-tier="standard">
+                <div class="flex justify-between items-start mb-4">
+                  <h3 class="text-lg font-semibold text-[#FFFFFF]">Standard</h3>
+                  <span class="badge-standard status-badge">Basic</span>
+                </div>
+                <div class="tier-price mb-2">$0.0001</div>
+                <div class="text-[#A0A0A0] text-sm mb-4">per MB / month</div>
+                <ul class="text-[#A0A0A0] text-sm space-y-2">
+                  <li>1-1000 MB files</li>
+                  <li>7-365 days duration</li>
+                  <li>Basic storage</li>
+                </ul>
+              </div>
+
+              <div class="tier-card selected" data-tier="premium">
+                <div class="flex justify-between items-start mb-4">
+                  <h3 class="text-lg font-semibold text-[#FFFFFF]">Premium</h3>
+                  <span class="badge-premium status-badge">Recommended</span>
+                </div>
+                <div class="tier-price mb-2">$0.0002</div>
+                <div class="text-[#A0A0A0] text-sm mb-4">per MB / month</div>
+                <ul class="text-[#A0A0A0] text-sm space-y-2">
+                  <li>1-10,000 MB files</li>
+                  <li>30-730 days duration</li>
+                  <li>Erasure coding included</li>
+                  <li>3x replication</li>
+                </ul>
+              </div>
+
+              <div class="tier-card" data-tier="enterprise">
+                <div class="flex justify-between items-start mb-4">
+                  <h3 class="text-lg font-semibold text-[#FFFFFF]">Enterprise</h3>
+                  <span class="badge-enterprise status-badge">Pro</span>
+                </div>
+                <div class="tier-price mb-2">$0.0005</div>
+                <div class="text-[#A0A0A0] text-sm mb-4">per MB / month</div>
+                <ul class="text-[#A0A0A0] text-sm space-y-2">
+                  <li>Up to 100 GB files</li>
+                  <li>Up to 5 years duration</li>
+                  <li>Erasure coding included</li>
+                  <li>5x replication</li>
+                  <li>SLA guarantee</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Price Calculator -->
+            <div class="mt-8 p-6 bg-[#1A1A1A] rounded-xl border border-[#404040]">
+              <h3 class="text-lg font-semibold text-[#FFFFFF] mb-4">Price Calculator</h3>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label class="text-[#A0A0A0] text-sm mb-2 block">File Size (MB)</label>
+                  <input type="number" id="calcSizeMB" class="input-field" value="100" min="1" onchange="calculatePrice()">
+                </div>
+                <div>
+                  <label class="text-[#A0A0A0] text-sm mb-2 block">Duration (Days)</label>
+                  <input type="number" id="calcDuration" class="input-field" value="30" min="7" onchange="calculatePrice()">
+                </div>
+                <div>
+                  <label class="text-[#A0A0A0] text-sm mb-2 block">Tier</label>
+                  <select id="calcTier" class="input-field" onchange="calculatePrice()">
+                    <option value="standard">Standard</option>
+                    <option value="premium" selected>Premium</option>
+                    <option value="enterprise">Enterprise</option>
+                  </select>
+                </div>
+              </div>
+              <div id="priceResult" class="text-center p-4 bg-[#282828] rounded-lg">
+                <div class="text-[#A0A0A0] text-sm">Estimated Price</div>
+                <div class="text-2xl font-bold text-[#42A5F5]" id="calculatedPrice">--</div>
+                <div class="text-[#606060] text-sm" id="priceBreakdown"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab: Create Deal -->
+          <div id="tab-create" class="tab-content" style="display: none;">
+            <h2 class="section-title">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#42A5F5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Create New Deal
+            </h2>
+
+            <!-- Wallet Connection -->
+            <div id="walletSection" class="mb-6">
+              <button id="connectWalletBtn" class="btn bg-[#42A5F5] hover:bg-[#1976D2] border-0 text-white w-full rounded-xl px-8 py-4 font-medium">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                Connect Wallet
+              </button>
+            </div>
+
+            <div id="connectedSection" style="display: none;">
+              <div class="flex items-center justify-between p-4 bg-[#1A1A1A] rounded-xl border border-[#404040] mb-6">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-full bg-[#4CAF50] flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="text-[#FFFFFF] font-medium">Wallet Connected</div>
+                    <div class="text-[#A0A0A0] text-sm" id="walletAddress">0x...</div>
+                  </div>
+                </div>
+                <button onclick="disconnectWallet()" class="text-[#F44336] hover:text-[#FF5722]">Disconnect</button>
+              </div>
+
+              <!-- Deal Form -->
+              <div class="space-y-4">
+                <div>
+                  <label class="text-[#A0A0A0] text-sm mb-2 block">IPFS CID *</label>
+                  <input type="text" id="dealCid" class="input-field" placeholder="Qm... or bafy...">
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="text-[#A0A0A0] text-sm mb-2 block">File Size (MB) *</label>
+                    <input type="number" id="dealSizeMB" class="input-field" placeholder="100" min="1">
+                  </div>
+                  <div>
+                    <label class="text-[#A0A0A0] text-sm mb-2 block">Duration (Days) *</label>
+                    <input type="number" id="dealDuration" class="input-field" placeholder="30" min="7">
+                  </div>
+                </div>
+                <div>
+                  <label class="text-[#A0A0A0] text-sm mb-2 block">Tier</label>
+                  <select id="dealTier" class="input-field">
+                    <option value="standard">Standard - Basic storage</option>
+                    <option value="premium" selected>Premium - Erasure coding + 3x replication</option>
+                    <option value="enterprise">Enterprise - 5x replication + SLA</option>
+                  </select>
+                </div>
+
+                <div id="dealPreview" class="p-4 bg-[#1A1A1A] rounded-lg border border-[#404040]" style="display: none;">
+                  <div class="flex justify-between mb-2">
+                    <span class="text-[#A0A0A0]">Estimated Price:</span>
+                    <span class="text-[#42A5F5] font-bold" id="dealPrice">--</span>
+                  </div>
+                  <div class="flex justify-between text-sm">
+                    <span class="text-[#606060]">Expires:</span>
+                    <span class="text-[#A0A0A0]" id="dealExpiry">--</span>
+                  </div>
+                </div>
+
+                <button id="createDealBtn" class="btn bg-[#42A5F5] hover:bg-[#1976D2] border-0 text-white w-full rounded-xl px-8 py-4 font-medium" onclick="createDeal()">
+                  Create Deal
+                </button>
+              </div>
+            </div>
+
+            <div id="createMessage" class="message"></div>
+          </div>
+
+          <!-- Tab: My Deals -->
+          <div id="tab-mydeals" class="tab-content" style="display: none;">
+            <h2 class="section-title">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#42A5F5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              My Deals
+            </h2>
+
+            <div id="myDealsWallet" class="mb-6">
+              <button id="connectForDealsBtn" class="btn bg-[#42A5F5] hover:bg-[#1976D2] border-0 text-white w-full rounded-xl px-8 py-4 font-medium">
+                Connect Wallet to View Deals
+              </button>
+            </div>
+
+            <div id="myDealsContent" style="display: none;">
+              <!-- Stats -->
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="stat-card">
+                  <div class="stat-value" id="statTotal">0</div>
+                  <div class="stat-label">Total Deals</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-value" id="statActive">0</div>
+                  <div class="stat-label">Active</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-value" id="statStorage">0</div>
+                  <div class="stat-label">MB Stored</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-value" id="statSpent">$0</div>
+                  <div class="stat-label">Total Spent</div>
+                </div>
+              </div>
+
+              <!-- Deals List -->
+              <div id="dealsList" class="space-y-4">
+                <div class="text-center text-[#A0A0A0] py-8">
+                  <div class="loading-spinner mb-4"></div>
+                  <p>Loading deals...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab: Erasure Calculator -->
+          <div id="tab-erasure" class="tab-content" style="display: none;">
+            <h2 class="section-title">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#42A5F5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              Erasure Coding Calculator
+            </h2>
+
+            <p class="text-[#A0A0A0] mb-6">
+              Erasure coding provides data redundancy by splitting files into data chunks and generating parity chunks.
+              You can recover data even if some chunks are lost.
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label class="text-[#A0A0A0] text-sm mb-2 block">File Size (MB)</label>
+                <input type="number" id="erasureSizeMB" class="input-field" value="10" min="1" onchange="calculateErasure()">
+              </div>
+            </div>
+
+            <div id="erasureResult" class="mt-6 p-6 bg-[#1A1A1A] rounded-xl border border-[#404040]">
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="text-center">
+                  <div class="text-2xl font-bold text-[#4CAF50]" id="erasureDataChunks">--</div>
+                  <div class="text-[#A0A0A0] text-sm">Data Chunks</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-2xl font-bold text-[#FF9800]" id="erasureParityChunks">--</div>
+                  <div class="text-[#A0A0A0] text-sm">Parity Chunks</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-2xl font-bold text-[#42A5F5]" id="erasureOverhead">--</div>
+                  <div class="text-[#A0A0A0] text-sm">Overhead %</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-2xl font-bold text-[#9C27B0]" id="erasureRedundancy">--</div>
+                  <div class="text-[#A0A0A0] text-sm">Redundancy %</div>
+                </div>
+              </div>
+
+              <div class="text-[#A0A0A0] text-sm mb-4">
+                <strong>Recovery:</strong> You can lose up to <span id="erasureCanLose" class="text-[#FF9800]">--</span> chunks and still recover all data.
+              </div>
+
+              <div class="erasure-visual" id="erasureVisual"></div>
+
+              <div class="mt-4 flex gap-4 text-sm">
+                <div class="flex items-center gap-2">
+                  <div class="chunk-block chunk-data" style="width: 1rem; height: 1rem;"></div>
+                  <span class="text-[#A0A0A0]">Data Chunk</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <div class="chunk-block chunk-parity" style="width: 1rem; height: 1rem;"></div>
+                  <span class="text-[#A0A0A0]">Parity Chunk</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State
+    let connectedAddress = null;
+    let provider = null;
+    let signer = null;
+
+    // Tab switching
+    function showTab(tabName) {
+      document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
+      document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+      
+      document.getElementById(`tab-${tabName}`).style.display = 'block';
+      event.target.classList.add('active');
+      
+      if (tabName === 'mydeals' && connectedAddress) {
+        loadMyDeals();
+      }
+    }
+
+    // Wallet connection
+    document.getElementById('connectWalletBtn').addEventListener('click', connectWallet);
+    document.getElementById('connectForDealsBtn').addEventListener('click', connectWallet);
+
+    async function connectWallet() {
+      if (!window.ethereum) {
+        showMessage('createMessage', 'error', 'MetaMask not detected. Please install MetaMask.');
+        return;
+      }
+
+      try {
+        provider = new ethers.BrowserProvider(window.ethereum);
+        const accounts = await provider.send('eth_requestAccounts', []);
+        connectedAddress = accounts[0];
+        signer = await provider.getSigner();
+
+        document.getElementById('walletSection').style.display = 'none';
+        document.getElementById('connectedSection').style.display = 'block';
+        document.getElementById('walletAddress').textContent = `${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)}`;
+        
+        document.getElementById('myDealsWallet').style.display = 'none';
+        document.getElementById('myDealsContent').style.display = 'block';
+        
+        loadMyDeals();
+      } catch (error) {
+        console.error('Wallet connection error:', error);
+        showMessage('createMessage', 'error', 'Failed to connect wallet: ' + error.message);
+      }
+    }
+
+    function disconnectWallet() {
+      connectedAddress = null;
+      provider = null;
+      signer = null;
+      
+      document.getElementById('walletSection').style.display = 'block';
+      document.getElementById('connectedSection').style.display = 'none';
+      document.getElementById('myDealsWallet').style.display = 'block';
+      document.getElementById('myDealsContent').style.display = 'none';
+    }
+
+    // Price calculation
+    async function calculatePrice() {
+      const sizeMB = document.getElementById('calcSizeMB').value;
+      const duration = document.getElementById('calcDuration').value;
+      const tier = document.getElementById('calcTier').value;
+
+      try {
+        const response = await fetch(`/api/v1/deals/pricing?sizeMB=${sizeMB}&durationDays=${duration}&tier=${tier}`);
+        const data = await response.json();
+
+        if (data.success) {
+          document.getElementById('calculatedPrice').textContent = `$${data.pricing.totalPriceUSDC.toFixed(6)} USDC`;
+          document.getElementById('priceBreakdown').textContent = 
+            `${data.pricing.replicationFactor}x replication | ${data.pricing.storageOverheadPercent}% erasure overhead`;
+        }
+      } catch (error) {
+        console.error('Price calculation error:', error);
+      }
+    }
+
+    // Erasure calculation
+    async function calculateErasure() {
+      const sizeMB = document.getElementById('erasureSizeMB').value;
+
+      try {
+        const response = await fetch(`/api/v1/deals/overhead?sizeMB=${sizeMB}`);
+        const data = await response.json();
+
+        if (data.success) {
+          const o = data.overhead;
+          document.getElementById('erasureDataChunks').textContent = o.dataChunks;
+          document.getElementById('erasureParityChunks').textContent = o.parityChunks;
+          document.getElementById('erasureOverhead').textContent = o.overheadPercent + '%';
+          document.getElementById('erasureRedundancy').textContent = o.redundancyPercent + '%';
+          document.getElementById('erasureCanLose').textContent = o.parityChunks;
+
+          // Visual representation (limit to 20 for display)
+          const visual = document.getElementById('erasureVisual');
+          visual.innerHTML = '';
+          const maxDisplay = Math.min(o.dataChunks, 16);
+          const parityDisplay = Math.min(o.parityChunks, 4);
+
+          for (let i = 0; i < maxDisplay; i++) {
+            const block = document.createElement('div');
+            block.className = 'chunk-block chunk-data';
+            block.textContent = `D${i}`;
+            visual.appendChild(block);
+          }
+          if (o.dataChunks > maxDisplay) {
+            const dots = document.createElement('div');
+            dots.className = 'chunk-block';
+            dots.style.backgroundColor = '#606060';
+            dots.textContent = '...';
+            visual.appendChild(dots);
+          }
+          for (let i = 0; i < parityDisplay; i++) {
+            const block = document.createElement('div');
+            block.className = 'chunk-block chunk-parity';
+            block.textContent = `P${i}`;
+            visual.appendChild(block);
+          }
+        }
+      } catch (error) {
+        console.error('Erasure calculation error:', error);
+      }
+    }
+
+    // Create deal
+    async function createDeal() {
+      if (!connectedAddress) {
+        showMessage('createMessage', 'error', 'Please connect your wallet first');
+        return;
+      }
+
+      const cid = document.getElementById('dealCid').value;
+      const sizeMB = document.getElementById('dealSizeMB').value;
+      const duration = document.getElementById('dealDuration').value;
+      const tier = document.getElementById('dealTier').value;
+
+      if (!cid || !sizeMB || !duration) {
+        showMessage('createMessage', 'error', 'Please fill in all required fields');
+        return;
+      }
+
+      try {
+        document.getElementById('createDealBtn').disabled = true;
+        document.getElementById('createDealBtn').innerHTML = '<div class="loading-spinner mr-2"></div> Creating...';
+
+        const response = await fetch('/api/v1/deals/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cid,
+            clientAddress: connectedAddress,
+            sizeMB: parseFloat(sizeMB),
+            durationDays: parseInt(duration),
+            tier
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.status === 402 && data.deal) {
+          // Deal created, payment required
+          showMessage('createMessage', 'info', 
+            `Deal ${data.deal.id} created! Price: $${data.deal.pricing.totalPriceUSDC.toFixed(6)} USDC. Payment integration coming soon.`);
+        } else if (data.success) {
+          showMessage('createMessage', 'success', 'Deal created successfully!');
+        } else {
+          showMessage('createMessage', 'error', data.error || 'Failed to create deal');
+        }
+      } catch (error) {
+        console.error('Create deal error:', error);
+        showMessage('createMessage', 'error', 'Error creating deal: ' + error.message);
+      } finally {
+        document.getElementById('createDealBtn').disabled = false;
+        document.getElementById('createDealBtn').innerHTML = 'Create Deal';
+      }
+    }
+
+    // Load my deals
+    async function loadMyDeals() {
+      if (!connectedAddress) return;
+
+      try {
+        const response = await fetch(`/api/v1/deals/by-client/${connectedAddress}`);
+        const data = await response.json();
+
+        if (data.success) {
+          // Update stats
+          document.getElementById('statTotal').textContent = data.stats.total;
+          document.getElementById('statActive').textContent = data.stats.active;
+          document.getElementById('statStorage').textContent = data.stats.totalSizeMB;
+          document.getElementById('statSpent').textContent = `$${data.stats.totalRevenue.toFixed(4)}`;
+
+          // Render deals
+          const dealsList = document.getElementById('dealsList');
+          
+          if (data.deals.length === 0) {
+            dealsList.innerHTML = `
+              <div class="text-center text-[#A0A0A0] py-8">
+                <p>No deals found</p>
+                <p class="text-sm mt-2">Create your first storage deal to get started</p>
+              </div>
+            `;
+            return;
+          }
+
+          dealsList.innerHTML = data.deals.map(deal => `
+            <div class="deal-card ${deal.status}">
+              <div class="flex justify-between items-start mb-3">
+                <div>
+                  <div class="text-[#FFFFFF] font-medium">${deal.id}</div>
+                  <div class="text-[#A0A0A0] text-sm">${deal.cid.slice(0, 20)}...</div>
+                </div>
+                <span class="status-badge status-${deal.status}">${deal.status}</span>
+              </div>
+              <div class="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <div class="text-[#606060]">Size</div>
+                  <div class="text-[#A0A0A0]">${deal.sizeMB} MB</div>
+                </div>
+                <div>
+                  <div class="text-[#606060]">Duration</div>
+                  <div class="text-[#A0A0A0]">${deal.durationDays} days</div>
+                </div>
+                <div>
+                  <div class="text-[#606060]">Tier</div>
+                  <div class="text-[#A0A0A0]">${deal.tier}</div>
+                </div>
+              </div>
+              ${deal.expiresAt ? `
+                <div class="mt-3 text-sm">
+                  <span class="text-[#606060]">Expires:</span>
+                  <span class="text-[#A0A0A0]">${new Date(deal.expiresAt).toLocaleDateString()}</span>
+                </div>
+              ` : ''}
+            </div>
+          `).join('');
+        }
+      } catch (error) {
+        console.error('Load deals error:', error);
+        document.getElementById('dealsList').innerHTML = `
+          <div class="text-center text-[#F44336] py-8">
+            Error loading deals: ${error.message}
+          </div>
+        `;
+      }
+    }
+
+    // Show message
+    function showMessage(elementId, type, message) {
+      const el = document.getElementById(elementId);
+      el.className = `message ${type}`;
+      el.textContent = message;
+      el.style.display = 'block';
+      
+      setTimeout(() => {
+        el.style.display = 'none';
+      }, 10000);
+    }
+
+    // Initialize
+    calculatePrice();
+    calculateErasure();
+
+    // Tier card selection
+    document.querySelectorAll('.tier-card').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.tier-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        document.getElementById('calcTier').value = card.dataset.tier;
+        document.getElementById('dealTier').value = card.dataset.tier;
+        calculatePrice();
+      });
+    });
+
+    // Update deal preview on input change
+    ['dealCid', 'dealSizeMB', 'dealDuration', 'dealTier'].forEach(id => {
+      document.getElementById(id)?.addEventListener('change', updateDealPreview);
+    });
+
+    async function updateDealPreview() {
+      const sizeMB = document.getElementById('dealSizeMB').value;
+      const duration = document.getElementById('dealDuration').value;
+      const tier = document.getElementById('dealTier').value;
+
+      if (sizeMB && duration) {
+        try {
+          const response = await fetch(`/api/v1/deals/pricing?sizeMB=${sizeMB}&durationDays=${duration}&tier=${tier}`);
+          const data = await response.json();
+
+          if (data.success) {
+            document.getElementById('dealPreview').style.display = 'block';
+            document.getElementById('dealPrice').textContent = `$${data.pricing.totalPriceUSDC.toFixed(6)} USDC`;
+            
+            const expiry = new Date();
+            expiry.setDate(expiry.getDate() + parseInt(duration));
+            document.getElementById('dealExpiry').textContent = expiry.toLocaleDateString();
+          }
+        } catch (error) {
+          console.error('Preview update error:', error);
+        }
+      }
+    }
+  </script>
+</body>
+</html>
+

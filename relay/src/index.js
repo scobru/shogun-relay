@@ -27,7 +27,9 @@ import "./utils/bullet-catcher.js";
 import Holster from "@mblaney/holster/src/holster.js";
 
 import multer from "multer";
-import { initRelayUser, isRelayUserInitialized, getRelayPub } from "./utils/relay-user.js";
+import { initRelayUser, isRelayUserInitialized, getRelayPub, getRelayUser } from "./utils/relay-user.js";
+import * as Reputation from "./utils/relay-reputation.js";
+import * as FrozenData from "./utils/frozen-data.js";
 
 dotenv.config();
 
@@ -327,6 +329,117 @@ async function initializeServer() {
     console.warn('⚠️ RELAY_GUN_PASSWORD not set, x402 subscriptions disabled');
   }
 
+  // Initialize reputation tracking for this relay
+  try {
+    Reputation.initReputationTracking(gun, host);
+    console.log(`📊 Reputation tracking initialized for ${host}`);
+  } catch (e) {
+    console.warn('⚠️ Failed to initialize reputation tracking:', e.message);
+  }
+
+  // Initialize Network Pin Request Listener (auto-replication)
+  const autoReplication = process.env.AUTO_REPLICATION !== 'false';
+  if (autoReplication) {
+    console.log('🔄 Auto-replication enabled - listening for pin requests');
+    
+    gun.get('shogun-network').get('pin-requests').map().on(async (data, requestId) => {
+      if (!data || typeof data !== 'object' || !data.cid) return;
+      if (data.status !== 'pending') return;
+      
+      // Don't process old requests (older than 1 hour)
+      if (data.timestamp && Date.now() - data.timestamp > 3600000) return;
+      
+      // Don't process own requests
+      const relayPub = app.get('relayUserPub');
+      if (data.requester === relayPub) return;
+      
+      console.log(`📥 Received pin request: ${data.cid} from ${data.requester?.substring(0, 20)}...`);
+      
+      try {
+        // Check if we already have this pinned
+        const http = await import('http');
+        const alreadyPinned = await new Promise((resolve) => {
+          const timeout = setTimeout(() => resolve(false), 5000);
+          const options = {
+            hostname: '127.0.0.1',
+            port: 5001,
+            path: `/api/v0/pin/ls?arg=${data.cid}&type=all`,
+            method: 'POST',
+            headers: { 'Content-Length': '0' },
+          };
+          if (IPFS_API_TOKEN) {
+            options.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
+          }
+          const req = http.request(options, (res) => {
+            let body = '';
+            res.on('data', chunk => body += chunk);
+            res.on('end', () => {
+              clearTimeout(timeout);
+              try {
+                const result = JSON.parse(body);
+                resolve(result.Keys && Object.keys(result.Keys).length > 0);
+              } catch { resolve(false); }
+            });
+          });
+          req.on('error', () => { clearTimeout(timeout); resolve(false); });
+          req.end();
+        });
+        
+        if (alreadyPinned) {
+          console.log(`✅ CID ${data.cid} already pinned locally`);
+          return;
+        }
+        
+        // Pin the content
+        console.log(`📌 Pinning ${data.cid}...`);
+        const pinResult = await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Pin timeout')), 60000);
+          const options = {
+            hostname: '127.0.0.1',
+            port: 5001,
+            path: `/api/v0/pin/add?arg=${data.cid}`,
+            method: 'POST',
+            headers: { 'Content-Length': '0' },
+          };
+          if (IPFS_API_TOKEN) {
+            options.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
+          }
+          const req = http.request(options, (res) => {
+            let body = '';
+            res.on('data', chunk => body += chunk);
+            res.on('end', () => {
+              clearTimeout(timeout);
+              try { resolve(JSON.parse(body)); } catch { resolve({ raw: body }); }
+            });
+          });
+          req.on('error', (e) => { clearTimeout(timeout); reject(e); });
+          req.end();
+        });
+        
+        if (pinResult.Pins || pinResult.raw?.includes('Pins')) {
+          console.log(`✅ Successfully pinned ${data.cid}`);
+          
+          // Publish response
+          const crypto = await import('crypto');
+          const responseId = crypto.randomBytes(8).toString('hex');
+          gun.get('shogun-network').get('pin-responses').get(responseId).put({
+            id: responseId,
+            requestId,
+            responder: relayPub,
+            status: 'completed',
+            timestamp: Date.now(),
+          });
+        } else {
+          console.log(`⚠️ Pin result unclear for ${data.cid}:`, pinResult);
+        }
+      } catch (error) {
+        console.error(`❌ Failed to pin ${data.cid}:`, error.message);
+      }
+    });
+  } else {
+    console.log('🔄 Auto-replication disabled');
+  }
+
   // Initialize Generic Services (Linda functionality)
   // DISABLED: Services removed as client migrated to pure GunDB
   /*
@@ -493,8 +606,8 @@ async function initializeServer() {
 
   gun.on("out", { get: { "#": { "*": "" } } });
 
-  // Set up pulse interval for health monitoring
-  setSelfAdjustingInterval(() => {
+  // Set up pulse interval for health monitoring (extended with IPFS stats)
+  setSelfAdjustingInterval(async () => {
     const pulse = {
       timestamp: Date.now(),
       uptime: process.uptime(),
@@ -505,13 +618,128 @@ async function initializeServer() {
       },
       relay: {
         host,
-        port
+        port,
+        name: process.env.RELAY_NAME || 'shogun-relay',
+        version: process.env.npm_package_version || '1.0.0',
       },
     };
 
+    // Extend pulse with IPFS stats (non-blocking)
+    try {
+      const http = await import('http');
+      const ipfsStats = await new Promise((resolve) => {
+        const timeout = setTimeout(() => resolve(null), 3000);
+        const options = {
+          hostname: '127.0.0.1',
+          port: 5001,
+          path: '/api/v0/repo/stat?size-only=true',
+          method: 'POST',
+          headers: { 'Content-Length': '0' },
+        };
+        if (IPFS_API_TOKEN) {
+          options.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
+        }
+        const req = http.request(options, (res) => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            clearTimeout(timeout);
+            try { resolve(JSON.parse(data)); } catch { resolve(null); }
+          });
+        });
+        req.on('error', () => { clearTimeout(timeout); resolve(null); });
+        req.end();
+      });
+
+      if (ipfsStats && ipfsStats.RepoSize !== undefined) {
+        pulse.ipfs = {
+          connected: true,
+          repoSize: ipfsStats.RepoSize,
+          repoSizeMB: Math.round(ipfsStats.RepoSize / (1024 * 1024)),
+          numObjects: ipfsStats.NumObjects || 0,
+        };
+        
+        // Also get pin count (quick query)
+        const pinCount = await new Promise((resolve) => {
+          const timeout = setTimeout(() => resolve(0), 2000);
+          const options = {
+            hostname: '127.0.0.1',
+            port: 5001,
+            path: '/api/v0/pin/ls?type=recursive',
+            method: 'POST',
+            headers: { 'Content-Length': '0' },
+          };
+          if (IPFS_API_TOKEN) {
+            options.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
+          }
+          const req = http.request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+              clearTimeout(timeout);
+              try {
+                const pins = JSON.parse(data);
+                resolve(pins.Keys ? Object.keys(pins.Keys).length : 0);
+              } catch { resolve(0); }
+            });
+          });
+          req.on('error', () => { clearTimeout(timeout); resolve(0); });
+          req.end();
+        });
+        
+        pulse.ipfs.numPins = pinCount;
+      } else {
+        pulse.ipfs = { connected: false };
+      }
+    } catch (e) {
+      pulse.ipfs = { connected: false, error: e.message };
+    }
+
+    // Legacy pulse (for backward compatibility)
     db?.get("pulse").put(pulse);
     addTimeSeriesPoint("connections.active", activeWires);
     addTimeSeriesPoint("memory.heapUsed", process.memoryUsage().heapUsed);
+
+    // Record pulse for reputation tracking (own uptime)
+    try {
+      await Reputation.recordPulse(gun, host);
+      // Periodically update stored score (every 10 minutes = 20 pulses)
+      if (Math.random() < 0.05) { // ~5% chance each pulse
+        await Reputation.updateStoredScore(gun, host);
+      }
+    } catch (e) {
+      // Non-critical, don't log every time
+    }
+
+    // Create frozen (immutable, signed) announcement every ~5 minutes
+    // Only if relay user is initialized (has keypair for signing)
+    try {
+      const relayUser = getRelayUser();
+      if (relayUser && relayUser.is && Math.random() < 0.1) { // ~10% chance = every ~5 min
+        const announcement = {
+          type: 'relay-announcement',
+          host,
+          port,
+          name: process.env.RELAY_NAME || 'shogun-relay',
+          version: process.env.npm_package_version || '1.0.0',
+          uptime: process.uptime(),
+          connections: pulse.connections,
+          ipfs: pulse.ipfs,
+          capabilities: ['ipfs-pin', 'storage-proof', 'x402-subscription'],
+        };
+
+        await FrozenData.createFrozenEntry(
+          gun,
+          announcement,
+          relayUser._.sea, // SEA keypair
+          'relay-announcements',
+          host
+        );
+      }
+    } catch (e) {
+      // Non-critical, frozen announcements are optional
+      if (process.env.DEBUG) console.log('Frozen announcement skipped:', e.message);
+    }
   }, 30000); // 30 seconds
 
   // Shutdown function
