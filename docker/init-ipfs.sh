@@ -78,11 +78,13 @@ if [ ! -f "$IPFS_PATH/config" ]; then
     # Wait for lock file to be released if it exists
     if [ -f "$IPFS_PATH/repo.lock" ]; then
         echo "⏳ Waiting for IPFS lock to be released..."
-        for i in {1..10}; do
+        i=1
+        while [ $i -le 10 ]; do
             if [ ! -f "$IPFS_PATH/repo.lock" ]; then
                 break
             fi
             sleep 1
+            i=$((i + 1))
         done
         # Force remove lock if still exists (daemon might have crashed)
         if [ -f "$IPFS_PATH/repo.lock" ]; then
