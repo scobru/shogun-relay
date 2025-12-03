@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # IPFS Initialization Script for Docker Container
 set -e  # Exit on error

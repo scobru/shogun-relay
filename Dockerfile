@@ -35,10 +35,20 @@ RUN apk add --no-cache \
     && echo "Downloading IPFS Kubo v${IPFS_VERSION} for ${ARCH_NAME}..." \
     && mkdir -p /tmp/ipfs-install \
     && cd /tmp/ipfs-install \
-    && echo "Downloading tarball..." \
-    && curl -L --fail --retry 3 --retry-delay 2 -o kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz || (echo "ERROR: curl failed to download tarball" && exit 1) \
+    && echo "Downloading tarball (with extended retries for server issues)..." \
+    && for i in 1 2 3 4 5; do \
+        echo "Attempt $i of 5..." && \
+        curl -L --fail --retry 2 --retry-delay 5 --max-time 300 -o kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz && \
+        break || \
+        (echo "Download attempt $i failed, waiting 10 seconds..." && sleep 10); \
+    done || (echo "ERROR: All download attempts failed" && exit 1) \
     && echo "Downloading checksum..." \
-    && curl -L --fail --retry 3 --retry-delay 2 -o kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 || (echo "ERROR: curl failed to download checksum" && exit 1) \
+    && for i in 1 2 3 4 5; do \
+        echo "Checksum attempt $i of 5..." && \
+        curl -L --fail --retry 2 --retry-delay 5 --max-time 60 -o kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 && \
+        break || \
+        (echo "Checksum download attempt $i failed, waiting 10 seconds..." && sleep 10); \
+    done || (echo "ERROR: All checksum download attempts failed" && exit 1) \
     && echo "Verifying tarball downloaded..." \
     && test -f kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz || (echo "ERROR: tarball not found after download" && ls -la && exit 1) \
     && ls -lh kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
@@ -89,11 +99,10 @@ WORKDIR /app
 # Create docker directory first
 RUN mkdir -p /app/docker
 
-# Copy configuration files first (copy individually to ensure they're found)
-COPY docker/entrypoint.sh /app/docker/entrypoint.sh
-COPY docker/init-ipfs.sh /app/docker/init-ipfs.sh
-COPY docker/relay.env /app/docker/relay.env
-COPY docker/supervisord.conf /app/docker/supervisord.conf
+# Copy configuration files
+# Note: If CapRover build context is repository root, use: shogun-relay/docker/
+# If build context is shogun-relay/, use: docker/
+COPY docker /app/docker
 
 # Convert script line endings from CRLF to LF
 RUN dos2unix /app/docker/init-ipfs.sh
@@ -133,7 +142,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8765/health || exit 1
 
 # Use supervisor to manage multiple services
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+# File should already be copied above, just move it to final location
+RUN cp /app/docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Set environment variables
 ENV NODE_ENV=production
