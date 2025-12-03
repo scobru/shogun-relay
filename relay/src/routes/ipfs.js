@@ -1163,6 +1163,113 @@ router.post("/pin/rm", (req, res, next) => {
   }
 });
 
+// Alias endpoint for shogun-ipfs compatibility: /pins/rm -> /pin/rm
+router.post("/pins/rm", (req, res, next) => {
+  // Usa il middleware di autenticazione esistente
+  const tokenAuthMiddleware = req.app.get('tokenAuthMiddleware');
+  if (tokenAuthMiddleware) {
+    tokenAuthMiddleware(req, res, next);
+  } else {
+    // Fallback se il middleware non è disponibile
+    const authHeader = req.headers["authorization"];
+    const bearerToken = authHeader && authHeader.split(" ")[1];
+    const customToken = req.headers["token"];
+    const token = bearerToken || customToken;
+
+    if (token === process.env.ADMIN_PASSWORD) {
+      next();
+    } else {
+      console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+  }
+}, async (req, res) => {
+  try {
+    console.log("🔍 IPFS Pin rm (alias /pins/rm) request body:", req.body);
+    const { cid } = req.body;
+    console.log(`🔍 IPFS Pin rm (alias /pins/rm) request for CID: ${cid}`);
+    
+    if (!cid) {
+      console.log("❌ IPFS Pin rm (alias /pins/rm) error: CID is required");
+      return res.status(400).json({
+        success: false,
+        error: "CID is required",
+      });
+    }
+
+    const requestOptions = {
+      hostname: "127.0.0.1",
+      port: 5001,
+      path: `/api/v0/pin/rm?arg=${cid}`,
+      method: "POST",
+      headers: {
+        "Content-Length": "0",
+      },
+    };
+
+    if (IPFS_API_TOKEN) {
+      requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+      console.log("🔐 IPFS API token found, adding authorization header");
+    } else {
+      console.log("⚠️ No IPFS API token configured");
+    }
+
+    const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+      let data = "";
+      ipfsRes.on("data", (chunk) => (data += chunk));
+      ipfsRes.on("end", () => {
+        if (ipfsRes.statusCode === 200) {
+          try {
+            const result = JSON.parse(data);
+            console.log(`✅ IPFS Pin rm (alias /pins/rm) success for CID: ${cid}`, result);
+            res.json({
+              success: true,
+              message: `Pin removed successfully for CID: ${cid}`,
+              data: result,
+            });
+          } catch (parseError) {
+            console.error(`❌ IPFS Pin rm (alias /pins/rm) parse error for CID: ${cid}`, parseError);
+            res.json({
+              success: true,
+              message: `Pin removed successfully for CID: ${cid}`,
+              rawResponse: data,
+            });
+          }
+        } else {
+          console.error(`❌ IPFS Pin rm (alias /pins/rm) failed for CID: ${cid} - Status: ${ipfsRes.statusCode}`);
+          res.status(ipfsRes.statusCode).json({
+            success: false,
+            error: `IPFS pin removal failed: ${ipfsRes.statusCode}`,
+            details: data,
+          });
+        }
+      });
+    });
+
+    ipfsReq.on("error", (err) => {
+      console.error(`❌ IPFS Pin rm (alias /pins/rm) network error for CID: ${cid}`, err);
+      res.status(500).json({
+        success: false,
+        error: "Network error",
+        details: err.message,
+      });
+    });
+
+    // Set timeout to 30 seconds
+    ipfsReq.setTimeout(30000);
+    
+    console.log(`📡 Sending IPFS API request for CID: ${cid}`);
+    ipfsReq.end();
+  } catch (error) {
+    console.error(`❌ IPFS Pin rm (alias /pins/rm) unexpected error for CID: ${req.body?.cid}`, error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      details: "Unexpected error in pin removal"
+    });
+  }
+});
+
 router.get("/pin/ls", (req, res, next) => {
   // Usa il middleware di autenticazione esistente
   const tokenAuthMiddleware = req.app.get('tokenAuthMiddleware');

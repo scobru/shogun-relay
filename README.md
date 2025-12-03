@@ -26,8 +26,6 @@ As an independent developer, you've likely faced these challenges:
 
 In practice, instead of orchestrating 3-4 different services, you start a single server and have everything you need to manage your decentralized infrastructure.
 
-![Shogun Relay Admin Panel](image.png)
-
 ---
 
 ## Table of Contents
@@ -136,6 +134,8 @@ Create a `.env` file or export the variables below:
 | `IPFS_GATEWAY_URL` | Gateway used for content preview / proxy                 | `http://127.0.0.1:8080`|
 | `RELAY_PORT`       | HTTP port for Shogun Relay                               | `8765`                 |
 | `RELAY_HOST`       | Advertised host                                          | auto-detected          |
+| `RELAY_PEERS`      | Comma-separated list of upstream GunDB peers to sync with| _(optional)_           |
+| `RELAY_NAME`       | Name of the relay node (visible in logs/status)          | `shogun-relay`         |
 | `DATA_DIR`         | RADISK data directory                                    | `./data`               |
 | `RELAY_PROTECTED`  | Require admin token for Gun writes                       | `true`                 |
 | `HOLSTER_RELAY_HOST` | Holster relay host address                              | `0.0.0.0`              |
