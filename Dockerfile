@@ -92,7 +92,9 @@ RUN chmod +x /app/docker/entrypoint.sh
 
 # Copy entrypoint to final location and ensure it's executable
 RUN cp /app/docker/entrypoint.sh /usr/local/bin/entrypoint.sh && \
-    chmod +x /usr/local/bin/entrypoint.sh
+    chmod +x /usr/local/bin/entrypoint.sh && \
+    test -f /usr/local/bin/entrypoint.sh || (echo "ERROR: entrypoint.sh not found after copy" && exit 1) && \
+    head -n 1 /usr/local/bin/entrypoint.sh | grep -q "^#!/bin/sh" || (echo "ERROR: entrypoint.sh has wrong shebang" && exit 1)
 
 # Create environment files with Docker-optimized settings
 RUN cp /app/docker/relay.env /app/relay/.env
