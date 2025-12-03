@@ -15,7 +15,12 @@
   <style>
     body {
       line-height: 1.6;
-      background-color: #1A1A1A;
+      background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
+      min-height: 100vh;
+    }
+
+    .hero-gradient {
+      background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.08) 0%, transparent 60%);
     }
 
     .tier-card {
@@ -183,21 +188,35 @@
   </style>
 </head>
 
-<body class="antialiased bg-[#1A1A1A]">
-  <div class="container mx-auto p-6 max-w-4xl">
-    <div class="flex items-center mb-6">
-      <a href="/" class="text-[#42A5F5] hover:text-[#64B5F6] transition-colors text-lg">&larr; Back to Control Panel</a>
-    </div>
-
-    <div class="card bg-[#282828] border-[#404040] rounded-2xl mb-6">
-      <div class="p-8 sm:p-10">
-        <div class="flex flex-col items-center">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-6 text-[#FF69B4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+<body class="antialiased">
+  <div class="hero-gradient min-h-screen">
+    <div class="container mx-auto p-6 max-w-4xl">
+      <!-- Header Navigation -->
+      <div class="flex items-center justify-between mb-8">
+        <a href="/" class="flex items-center gap-2 text-[#A0A0A0] hover:text-[#FF69B4] transition-colors group">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
+          <span>Back to Control Panel</span>
+        </a>
+        <div class="flex items-center gap-2 px-3 py-1.5 bg-[#282828] rounded-full border border-[#404040]">
+          <span class="text-[#FF69B4] text-sm font-medium">x402</span>
+          <span class="text-[#606060]">|</span>
+          <span class="text-[#A0A0A0] text-sm">USDC Payments</span>
+        </div>
+      </div>
 
-          <h1 class="text-3xl font-semibold mb-4 text-[#FFFFFF]">IPFS Storage Subscription</h1>
-          <p class="text-[#A0A0A0] text-center mb-8">Purchase storage space for your IPFS files using x402 payments</p>
+      <div class="card bg-[#282828] border border-[#404040] rounded-2xl mb-6 shadow-xl">
+        <div class="p-8 sm:p-10">
+          <div class="flex flex-col items-center">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#FF69B4] to-[#FF1493] mb-6 shadow-lg">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+            </div>
+
+            <h1 class="text-3xl font-bold mb-3 text-[#FFFFFF]">IPFS Storage Subscription</h1>
+            <p class="text-[#8B94FF] text-center mb-8">Purchase decentralized storage with USDC payments</p>
 
           <!-- Configuration Status -->
           <div id="configStatus" class="w-full mb-6">
@@ -347,43 +366,51 @@
           <div id="message" class="message w-full"></div>
         </div>
       </div>
-    </div>
 
     <!-- How It Works -->
-    <div class="card bg-[#282828] border-[#404040] rounded-2xl">
-      <div class="p-6">
-        <h2 class="text-xl font-semibold mb-4 text-[#FFFFFF]">How It Works</h2>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div class="flex items-start gap-3">
-            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[#FF69B4] text-white flex items-center justify-center font-bold">1</div>
-            <div>
-              <h3 class="font-medium text-[#FFFFFF]">Connect Wallet</h3>
-              <p class="text-sm text-[#A0A0A0]">Connect MetaMask</p>
+    <div class="card bg-[#282828] border border-[#404040] rounded-2xl shadow-lg">
+        <div class="p-6">
+          <h2 class="text-xl font-semibold mb-6 text-[#FFFFFF]">How It Works</h2>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div class="flex items-start gap-4">
+              <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF69B4] to-[#FF1493] text-white flex items-center justify-center font-bold shadow-md">1</div>
+              <div>
+                <h3 class="font-semibold text-[#FFFFFF]">Connect Wallet</h3>
+                <p class="text-sm text-[#A0A0A0]">Link your MetaMask wallet</p>
+              </div>
             </div>
-          </div>
-          <div class="flex items-start gap-3">
-            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[#FF69B4] text-white flex items-center justify-center font-bold">2</div>
-            <div>
-              <h3 class="font-medium text-[#FFFFFF]">Choose Plan</h3>
-              <p class="text-sm text-[#A0A0A0]">Select storage tier</p>
+            <div class="flex items-start gap-4">
+              <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF69B4] to-[#FF1493] text-white flex items-center justify-center font-bold shadow-md">2</div>
+              <div>
+                <h3 class="font-semibold text-[#FFFFFF]">Choose Plan</h3>
+                <p class="text-sm text-[#A0A0A0]">Select your storage tier</p>
+              </div>
             </div>
-          </div>
-          <div class="flex items-start gap-3">
-            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[#FF69B4] text-white flex items-center justify-center font-bold">3</div>
-            <div>
-              <h3 class="font-medium text-[#FFFFFF]">Pay with USDC</h3>
-              <p class="text-sm text-[#A0A0A0]">Sign EIP-3009</p>
+            <div class="flex items-start gap-4">
+              <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF69B4] to-[#FF1493] text-white flex items-center justify-center font-bold shadow-md">3</div>
+              <div>
+                <h3 class="font-semibold text-[#FFFFFF]">Pay with USDC</h3>
+                <p class="text-sm text-[#A0A0A0]">Sign EIP-3009 authorization</p>
+              </div>
             </div>
-          </div>
-          <div class="flex items-start gap-3">
-            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[#4CAF50] text-white flex items-center justify-center font-bold">4</div>
-            <div>
-              <h3 class="font-medium text-[#FFFFFF]">Upload Files</h3>
-              <p class="text-sm text-[#A0A0A0]">Store on IPFS</p>
+            <div class="flex items-start gap-4">
+              <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-[#4CAF50] to-[#43A047] text-white flex items-center justify-center font-bold shadow-md">4</div>
+              <div>
+                <h3 class="font-semibold text-[#FFFFFF]">Upload Files</h3>
+                <p class="text-sm text-[#A0A0A0]">Store securely on IPFS</p>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      <!-- Footer -->
+      <footer class="mt-12 text-center pb-8">
+        <div class="h-px bg-gradient-to-r from-transparent via-[#404040] to-transparent mb-6"></div>
+        <p class="text-[#606060] text-sm">
+          Powered by <a href="https://x402.org" target="_blank" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">x402 Protocol</a>
+        </p>
+      </footer>
     </div>
   </div>
 

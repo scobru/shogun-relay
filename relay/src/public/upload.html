@@ -335,8 +335,8 @@
           // Build relay URL (always go through relay viewer)
           const baseUrl = window.location.origin;
           const finalIpfsUrl = isEncrypted
-            ? `${baseUrl}/ipfs-content/${hash}?token=${encodeURIComponent(token)}`
-            : `${baseUrl}/ipfs-content/${hash}`;
+            ? `${baseUrl}/api/v1/ipfs/cat/${hash}/decrypt?token=${encodeURIComponent(token)}`
+            : `${baseUrl}/api/v1/ipfs/cat/${hash}`;
           
           console.log(`🔗 Relay URL: ${finalIpfsUrl}`);
           console.log(`🔒 Is encrypted: ${isEncrypted}`);
@@ -357,6 +357,7 @@
               isEncrypted: isEncrypted,
               contentType: fileToUpload.type || file.type || 'application/octet-stream',
               relayUrl: finalIpfsUrl,
+              gatewayUrl: `${baseUrl}/ipfs/${hash}`,
               uploadedAt: Date.now()
             };
             

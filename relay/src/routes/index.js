@@ -345,255 +345,7 @@ export default (app) => {
     res.sendFile(filePath);
   });
 
-  app.get("/drive", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "drive.html"));
-  });
 
-  // Route per IPFS content
-  app.get("/ipfs-content/:cid", async (req, res) => {
-    const { cid } = req.params;
-    const { token } = req.query;
-    const IPFS_GATEWAY_URL =
-      process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
-
-    console.log(
-      `🔍 IPFS Content Request - CID: ${cid}, Token: ${
-        token ? "present" : "missing"
-      }`
-    );
-
-    if (!cid) {
-      return res.status(400).json({
-        success: false,
-        error: "CID is required",
-      });
-    }
-
-    try {
-      const gatewayUrl = new URL(IPFS_GATEWAY_URL);
-      const protocolModule =
-        gatewayUrl.protocol === "https:"
-          ? await import("https")
-          : await import("http");
-
-      const requestOptions = {
-        hostname: gatewayUrl.hostname,
-        port: gatewayUrl.port
-          ? Number(gatewayUrl.port)
-          : gatewayUrl.protocol === "https:"
-          ? 443
-          : 80,
-        path: `/ipfs/${cid}`,
-        method: "GET",
-        headers: {
-          Host: gatewayUrl.host,
-        },
-      };
-
-      const ipfsReq = protocolModule.request(requestOptions, (ipfsRes) => {
-        // If no token, just stream the response
-        if (!token) {
-          console.log(
-            `📤 Streaming content without decryption for CID: ${cid}`
-          );
-          res.setHeader(
-            "Content-Type",
-            ipfsRes.headers["content-type"] || "application/octet-stream"
-          );
-          ipfsRes.pipe(res);
-          return;
-        }
-
-        // If token is provided, buffer the response to decrypt it
-        console.log(`🔓 Attempting decryption for CID: ${cid}`);
-        let body = "";
-        ipfsRes.on("data", (chunk) => (body += chunk));
-        ipfsRes.on("end", async () => {
-          try {
-            const SEA = await import("gun/sea.js");
-            const decrypted = await SEA.default.decrypt(body, token);
-
-            if (decrypted) {
-              console.log(`🧪 Decryption successful!`);
-
-              // Controlla se i dati decrittati sono un data URL
-              if (decrypted.startsWith("data:")) {
-                console.log(
-                  `📁 Detected data URL, extracting content type and data`
-                );
-
-                // Estrai il content type e i dati dal data URL
-                const matches = decrypted.match(/^data:([^;]+);base64,(.+)$/);
-                if (matches) {
-                  const contentType = matches[1];
-                  const base64Data = matches[2];
-
-                  // Decodifica il base64 e restituisci direttamente
-                  const buffer = Buffer.from(base64Data, "base64");
-
-                  res.setHeader("Content-Type", contentType);
-                  res.setHeader("Content-Length", buffer.length);
-                  res.setHeader("Cache-Control", "public, max-age=3600");
-                  res.send(buffer);
-                } else {
-                  // Fallback: restituisci come JSON
-                  res.json({
-                    success: true,
-                    message:
-                      "Decryption successful but could not parse data URL",
-                    decryptedData: decrypted,
-                    originalLength: body.length,
-                  });
-                }
-              } else {
-                // Se non è un data URL, restituisci come testo
-                res.setHeader("Content-Type", "text/plain");
-                res.send(decrypted);
-              }
-            } else {
-              res.status(400).json({
-                success: false,
-                error: "Decryption failed",
-              });
-            }
-          } catch (decryptError) {
-            console.error("❌ Decryption error:", decryptError);
-            res.status(500).json({
-              success: false,
-              error: "Decryption error",
-              details: decryptError.message,
-            });
-          }
-        });
-      });
-
-      ipfsReq.on("error", (error) => {
-        console.error("❌ IPFS Gateway error:", error);
-        res.status(500).json({
-          success: false,
-          error: "IPFS Gateway error",
-          details: error.message,
-        });
-      });
-
-      ipfsReq.end();
-    } catch (error) {
-      console.error("❌ IPFS Content error:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  });
-
-  app.get("/ipfs-content-json/:cid", async (req, res) => {
-    const { cid } = req.params;
-    const { token } = req.query;
-    const IPFS_GATEWAY_URL =
-      process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
-
-    if (!cid) {
-      return res.status(400).json({
-        success: false,
-        error: "CID is required",
-      });
-    }
-
-    try {
-      const gatewayUrl = new URL(IPFS_GATEWAY_URL);
-      const protocolModule =
-        gatewayUrl.protocol === "https:"
-          ? await import("https")
-          : await import("http");
-
-      const requestOptions = {
-        hostname: gatewayUrl.hostname,
-        port: gatewayUrl.port
-          ? Number(gatewayUrl.port)
-          : gatewayUrl.protocol === "https:"
-          ? 443
-          : 80,
-        path: `/ipfs/${cid}`,
-        method: "GET",
-        headers: {
-          Host: gatewayUrl.host,
-        },
-      };
-
-      const ipfsReq = protocolModule.request(requestOptions, (ipfsRes) => {
-        if (!token) {
-          let body = "";
-          ipfsRes.on("data", (chunk) => (body += chunk));
-          ipfsRes.on("end", () => {
-            try {
-              const jsonData = JSON.parse(body);
-              res.json({
-                success: true,
-                data: jsonData,
-              });
-            } catch (parseError) {
-              res.status(400).json({
-                success: false,
-                error: "Invalid JSON content",
-              });
-            }
-          });
-          return;
-        }
-
-        let body = "";
-        ipfsRes.on("data", (chunk) => (body += chunk));
-        ipfsRes.on("end", async () => {
-          try {
-            const SEA = await import("gun/sea.js");
-            const decrypted = await SEA.default.decrypt(body, token);
-
-            if (decrypted) {
-              try {
-                const jsonData = JSON.parse(decrypted);
-                res.json({
-                  success: true,
-                  data: jsonData,
-                });
-              } catch (parseError) {
-                res.status(400).json({
-                  success: false,
-                  error: "Invalid JSON content after decryption",
-                });
-              }
-            } else {
-              res.status(400).json({
-                success: false,
-                error: "Decryption failed",
-              });
-            }
-          } catch (decryptError) {
-            res.status(500).json({
-              success: false,
-              error: "Decryption error",
-              details: decryptError.message,
-            });
-          }
-        });
-      });
-
-      ipfsReq.on("error", (error) => {
-        res.status(500).json({
-          success: false,
-          error: "IPFS Gateway error",
-          details: error.message,
-        });
-      });
-
-      ipfsReq.end();
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  });
 
   // Route di autenticazione
 
@@ -756,28 +508,47 @@ export default (app) => {
         path: req.path,
         method: req.method,
         availableEndpoints: [
+          // Health & System
           `${baseRoute}/health`,
+          `${baseRoute}/system/health`,
+          `${baseRoute}/system/stats`,
+          `${baseRoute}/system/alldata`,
+          // Users
           `${baseRoute}/users`,
           `${baseRoute}/users/profile`,
           `${baseRoute}/users/:pubkey`,
           `${baseRoute}/users/search/:query`,
+          // User Uploads
           `${baseRoute}/user-uploads/system-hashes`,
           `${baseRoute}/user-uploads/:identifier`,
           `${baseRoute}/user-uploads/:identifier/:hash`,
+          // IPFS (aligned with Kubo API)
           `${baseRoute}/ipfs/upload`,
           `${baseRoute}/ipfs/status`,
-          `${baseRoute}/ipfs/content/:cid`,
-          `${baseRoute}/ipfs/content-json/:cid`,
-          `${baseRoute}/ipfs/pins/add`,
-          `${baseRoute}/system/health`,
-          `${baseRoute}/system/stats`,
-          `${baseRoute}/system/alldata`,
+          `${baseRoute}/ipfs/cat/:cid`,
+          `${baseRoute}/ipfs/cat/:cid/json`,
+          `${baseRoute}/ipfs/cat/:cid/decrypt`,
+          `${baseRoute}/ipfs/pin/add`,
+          `${baseRoute}/ipfs/pin/rm`,
+          `${baseRoute}/ipfs/pin/ls`,
+          `${baseRoute}/ipfs/repo/gc`,
+          `${baseRoute}/ipfs/repo/stat`,
+          `${baseRoute}/ipfs/version`,
+          `${baseRoute}/ipfs/user-uploads/:userAddress`,
+          // Gateway proxy
+          `/ipfs/:cid`,
+          `/ipns/:name`,
+          // Notes
           `${baseRoute}/notes`,
           `${baseRoute}/notes/regular`,
+          // Debug
           `${baseRoute}/debug/mb-usage/:userAddress`,
+          // Services
           `${baseRoute}/services/status`,
           `${baseRoute}/services/:service/restart`,
+          // Visual Graph
           `${baseRoute}/visualGraph`,
+          // x402 Subscriptions
           `${baseRoute}/x402/tiers`,
           `${baseRoute}/x402/subscription/:userAddress`,
           `${baseRoute}/x402/subscribe`,

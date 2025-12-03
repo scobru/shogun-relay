@@ -270,7 +270,7 @@ fetch('http://localhost:8765/api/v1/ipfs/upload', {
   "data": {
     "hash": "QmXxxx...",
     "size": 12345,
-    "relayUrl": "http://localhost:8765/ipfs-content/QmXxxx..."
+    "relayUrl": "http://localhost:8765/api/v1/ipfs/cat/QmXxxx..."
   }
 }</code></pre>
                         </div>
@@ -279,53 +279,60 @@ fetch('http://localhost:8765/api/v1/ipfs/upload', {
                     <div class="endpoint-card">
                         <div class="flex items-center mb-3">
                             <span class="method-badge method-get">GET</span>
-                            <code class="text-lg">/api/v1/ipfs/content/:cid</code>
+                            <code class="text-lg">/api/v1/ipfs/cat/:cid</code>
                             <span class="auth-badge auth-optional">Optional</span>
                         </div>
-                        <p class="text-[#E0E0E0] mb-4">Stream IPFS content. Supports encrypted content with token
-                            parameter.</p>
+                        <p class="text-[#E0E0E0] mb-4">Stream IPFS content (aligned with Kubo's <code>/api/v0/cat</code>).</p>
                         <div class="code-block">
                             <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-                            <pre><code>// Public content
-curl http://localhost:8765/api/v1/ipfs/content/QmXxxx...
-
-// Encrypted content
-curl "http://localhost:8765/api/v1/ipfs/content/QmXxxx...?token=YOUR_ADMIN_PASSWORD"</code></pre>
+                            <pre><code>curl http://localhost:8765/api/v1/ipfs/cat/QmXxxx...</code></pre>
                         </div>
                     </div>
 
                     <div class="endpoint-card">
                         <div class="flex items-center mb-3">
                             <span class="method-badge method-get">GET</span>
-                            <code class="text-lg">/api/v1/ipfs/content-json/:cid</code>
+                            <code class="text-lg">/api/v1/ipfs/cat/:cid/json</code>
                             <span class="auth-badge auth-optional">Optional</span>
                         </div>
                         <p class="text-[#E0E0E0] mb-4">Get IPFS content as JSON. Automatically parses JSON content.</p>
                         <div class="code-block">
                             <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-                            <pre><code>curl http://localhost:8765/api/v1/ipfs/content-json/QmXxxx...
+                            <pre><code>curl http://localhost:8765/api/v1/ipfs/cat/QmXxxx.../json
 
 // Response
 {
   "success": true,
-  "data": {
-    "key": "value",
-    "nested": { "data": "here" }
-  }
+  "cid": "QmXxxx...",
+  "data": { "key": "value" }
 }</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/ipfs/cat/:cid/decrypt</code>
+                            <span class="auth-badge auth-optional">Optional</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">Get and decrypt SEA-encrypted IPFS content.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>// Encrypted content with decryption token
+curl "http://localhost:8765/api/v1/ipfs/cat/QmXxxx.../decrypt?token=YOUR_ENCRYPTION_KEY"</code></pre>
                         </div>
                     </div>
 
                     <div class="endpoint-card">
                         <div class="flex items-center mb-3">
                             <span class="method-badge method-post">POST</span>
-                            <code class="text-lg">/api/v1/ipfs/pins/add</code>
+                            <code class="text-lg">/api/v1/ipfs/pin/add</code>
                             <span class="auth-badge auth-required">Admin</span>
                         </div>
-                        <p class="text-[#E0E0E0] mb-4">Pin content to IPFS to prevent garbage collection.</p>
+                        <p class="text-[#E0E0E0] mb-4">Pin content to IPFS (aligned with Kubo's <code>/api/v0/pin/add</code>).</p>
                         <div class="code-block">
                             <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-                            <pre><code>curl -X POST http://localhost:8765/api/v1/ipfs/pins/add \
+                            <pre><code>curl -X POST http://localhost:8765/api/v1/ipfs/pin/add \
   -H "Authorization: Bearer YOUR_ADMIN_PASSWORD" \
   -H "Content-Type: application/json" \
   -d '{"cid": "QmXxxx..."}'
@@ -333,10 +340,8 @@ curl "http://localhost:8765/api/v1/ipfs/content/QmXxxx...?token=YOUR_ADMIN_PASSW
 // Response
 {
   "success": true,
-  "data": {
-    "Cid": "QmXxxx...",
-    "Type": "recursive"
-  }
+  "message": "CID pinned successfully",
+  "result": { "Pins": ["QmXxxx..."] }
 }</code></pre>
                         </div>
                     </div>
@@ -344,13 +349,13 @@ curl "http://localhost:8765/api/v1/ipfs/content/QmXxxx...?token=YOUR_ADMIN_PASSW
                     <div class="endpoint-card">
                         <div class="flex items-center mb-3">
                             <span class="method-badge method-post">POST</span>
-                            <code class="text-lg">/api/v1/ipfs/pins/rm</code>
+                            <code class="text-lg">/api/v1/ipfs/pin/rm</code>
                             <span class="auth-badge auth-required">Admin</span>
                         </div>
-                        <p class="text-[#E0E0E0] mb-4">Remove a pin from IPFS.</p>
+                        <p class="text-[#E0E0E0] mb-4">Remove a pin from IPFS (aligned with Kubo's <code>/api/v0/pin/rm</code>).</p>
                         <div class="code-block">
                             <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-                            <pre><code>curl -X POST http://localhost:8765/api/v1/ipfs/pins/rm \
+                            <pre><code>curl -X POST http://localhost:8765/api/v1/ipfs/pin/rm \
   -H "Authorization: Bearer YOUR_ADMIN_PASSWORD" \
   -H "Content-Type: application/json" \
   -d '{"cid": "QmXxxx..."}'</code></pre>
@@ -359,28 +364,21 @@ curl "http://localhost:8765/api/v1/ipfs/content/QmXxxx...?token=YOUR_ADMIN_PASSW
 
                     <div class="endpoint-card">
                         <div class="flex items-center mb-3">
-                            <span class="method-badge method-post">POST</span>
-                            <code class="text-lg">/api/v1/ipfs/pins/ls</code>
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/api/v1/ipfs/pin/ls</code>
                             <span class="auth-badge auth-required">Admin</span>
                         </div>
-                        <p class="text-[#E0E0E0] mb-4">List all pinned content in IPFS.</p>
+                        <p class="text-[#E0E0E0] mb-4">List all pinned content (aligned with Kubo's <code>/api/v0/pin/ls</code>).</p>
                         <div class="code-block">
                             <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-                            <pre><code>curl -X POST http://localhost:8765/api/v1/ipfs/pins/ls \
-  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD" \
-  -H "Content-Type: application/json" \
-  -d '{}'
+                            <pre><code>curl http://localhost:8765/api/v1/ipfs/pin/ls \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"
 
 // Response
 {
   "success": true,
-  "data": {
-    "Keys": {
-      "QmXxxx...": {
-        "Type": "recursive"
-      }
-    }
-  }
+  "pins": { "QmXxxx...": { "Type": "recursive" } },
+  "count": 1
 }</code></pre>
                         </div>
                     </div>
@@ -453,11 +451,41 @@ curl "http://localhost:8765/api/v1/ipfs/content/QmXxxx...?token=YOUR_ADMIN_PASSW
 
                     <div class="endpoint-card">
                         <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/ipfs/:cid</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">IPFS Gateway proxy. Access content directly via CID.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>// Direct gateway access
+curl http://localhost:8765/ipfs/QmXxxx...
+
+// Or open in browser
+open http://localhost:8765/ipfs/QmXxxx...</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
+                            <span class="method-badge method-get">GET</span>
+                            <code class="text-lg">/ipns/:name</code>
+                            <span class="auth-badge auth-public">Public</span>
+                        </div>
+                        <p class="text-[#E0E0E0] mb-4">IPNS Gateway proxy. Resolve IPNS names.</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            <pre><code>curl http://localhost:8765/ipns/k51qzi5uqu5...</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="endpoint-card">
+                        <div class="flex items-center mb-3">
                             <span class="method-badge method-post">POST</span>
                             <code class="text-lg">/api/v0/*</code>
                             <span class="auth-badge auth-required">Admin</span>
                         </div>
-                        <p class="text-[#E0E0E0] mb-4">Raw IPFS API proxy. Forwards requests to the IPFS node API.</p>
+                        <p class="text-[#E0E0E0] mb-4">Raw Kubo IPFS API proxy. Forwards requests to the IPFS node API.</p>
                         <div class="code-block">
                             <button class="copy-btn" onclick="copyCode(this)">Copy</button>
                             <pre><code>// Example: Get IPFS ID

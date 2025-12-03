@@ -10,7 +10,6 @@ const router = express.Router();
 // Configurazione IPFS
 const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
 const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN;
-const IPFS_GATEWAY_URL = process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
 
 // Configurazione multer per upload
 const upload = multer({
@@ -700,8 +699,8 @@ router.get("/status", async (req, res) => {
   }
 });
 
-// IPFS Content endpoint
-router.get("/content/:cid", async (req, res) => {
+// IPFS Cat endpoint (aligned with Kubo's /api/v0/cat)
+router.get("/cat/:cid", async (req, res) => {
   try {
     const { cid } = req.params;
     console.log(`📄 IPFS Content request for CID: ${cid}`);
@@ -770,8 +769,125 @@ router.get("/content/:cid", async (req, res) => {
   }
 });
 
-// IPFS Content JSON endpoint
-router.get("/content-json/:cid", async (req, res) => {
+// IPFS Cat with decryption (for SEA encrypted content)
+router.get("/cat/:cid/decrypt", async (req, res) => {
+  try {
+    const { cid } = req.params;
+    const { token } = req.query;
+    const IPFS_GATEWAY_URL = process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
+
+    console.log(`🔓 IPFS Decrypt request for CID: ${cid}, Token: ${token ? "present" : "missing"}`);
+
+    if (!cid) {
+      return res.status(400).json({
+        success: false,
+        error: "CID is required",
+      });
+    }
+
+    const gatewayUrl = new URL(IPFS_GATEWAY_URL);
+    const protocolModule = gatewayUrl.protocol === "https:"
+      ? await import("https")
+      : await import("http");
+
+    const requestOptions = {
+      hostname: gatewayUrl.hostname,
+      port: gatewayUrl.port
+        ? Number(gatewayUrl.port)
+        : gatewayUrl.protocol === "https:" ? 443 : 80,
+      path: `/ipfs/${cid}`,
+      method: "GET",
+      headers: {
+        Host: gatewayUrl.host,
+      },
+    };
+
+    const ipfsReq = protocolModule.request(requestOptions, (ipfsRes) => {
+      // If no token, just stream the response
+      if (!token) {
+        console.log(`📤 Streaming content without decryption for CID: ${cid}`);
+        res.setHeader("Content-Type", ipfsRes.headers["content-type"] || "application/octet-stream");
+        ipfsRes.pipe(res);
+        return;
+      }
+
+      // If token is provided, buffer the response to decrypt it
+      console.log(`🔓 Attempting decryption for CID: ${cid}`);
+      let body = "";
+      ipfsRes.on("data", (chunk) => (body += chunk));
+      ipfsRes.on("end", async () => {
+        try {
+          const SEA = await import("gun/sea.js");
+          const decrypted = await SEA.default.decrypt(body, token);
+
+          if (decrypted) {
+            console.log(`✅ Decryption successful!`);
+
+            // Check if decrypted data is a data URL
+            if (typeof decrypted === 'string' && decrypted.startsWith("data:")) {
+              console.log(`📁 Detected data URL, extracting content type and data`);
+
+              const matches = decrypted.match(/^data:([^;]+);base64,(.+)$/);
+              if (matches) {
+                const contentType = matches[1];
+                const base64Data = matches[2];
+                const buffer = Buffer.from(base64Data, "base64");
+
+                res.setHeader("Content-Type", contentType);
+                res.setHeader("Content-Length", buffer.length);
+                res.setHeader("Cache-Control", "public, max-age=3600");
+                res.send(buffer);
+              } else {
+                res.json({
+                  success: true,
+                  message: "Decryption successful but could not parse data URL",
+                  decryptedData: decrypted,
+                  originalLength: body.length,
+                });
+              }
+            } else {
+              // Return as text/plain
+              res.setHeader("Content-Type", "text/plain");
+              res.send(decrypted);
+            }
+          } else {
+            res.status(400).json({
+              success: false,
+              error: "Decryption failed - invalid token or corrupted data",
+            });
+          }
+        } catch (decryptError) {
+          console.error("❌ Decryption error:", decryptError);
+          res.status(500).json({
+            success: false,
+            error: "Decryption error",
+            details: decryptError.message,
+          });
+        }
+      });
+    });
+
+    ipfsReq.on("error", (error) => {
+      console.error("❌ IPFS Gateway error:", error);
+      res.status(500).json({
+        success: false,
+        error: "IPFS Gateway error",
+        details: error.message,
+      });
+    });
+
+    ipfsReq.end();
+  } catch (error) {
+    console.error(`❌ IPFS Decrypt error for ${req.params.cid}:`, error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// IPFS Cat JSON endpoint (content parsed as JSON)
+router.get("/cat/:cid/json", async (req, res) => {
   try {
     const { cid } = req.params;
     console.log(`📄 IPFS Content JSON request for CID: ${cid}`);
@@ -842,8 +958,8 @@ router.get("/content-json/:cid", async (req, res) => {
   }
 });
 
-// IPFS Pins endpoints
-router.post("/pins/add", (req, res, next) => {
+// IPFS Pin endpoints (aligned with Kubo's /api/v0/pin/*)
+router.post("/pin/add", (req, res, next) => {
   // Usa il middleware di autenticazione esistente
   const tokenAuthMiddleware = req.app.get('tokenAuthMiddleware');
   if (tokenAuthMiddleware) {
@@ -928,7 +1044,7 @@ router.post("/pins/add", (req, res, next) => {
   }
 });
 
-router.post("/pins/rm", (req, res, next) => {
+router.post("/pin/rm", (req, res, next) => {
   // Usa il middleware di autenticazione esistente
   const tokenAuthMiddleware = req.app.get('tokenAuthMiddleware');
   if (tokenAuthMiddleware) {
@@ -1047,7 +1163,7 @@ router.post("/pins/rm", (req, res, next) => {
   }
 });
 
-router.post("/pins/ls", (req, res, next) => {
+router.get("/pin/ls", (req, res, next) => {
   // Usa il middleware di autenticazione esistente
   const tokenAuthMiddleware = req.app.get('tokenAuthMiddleware');
   if (tokenAuthMiddleware) {
@@ -1493,27 +1609,8 @@ router.get("/repo/stat", (req, res, next) => {
   }
 });
 
-// IPFS Version endpoint for connectivity testing
-router.get("/version", (req, res, next) => {
-  // Usa il middleware di autenticazione esistente
-  const tokenAuthMiddleware = req.app.get('tokenAuthMiddleware');
-  if (tokenAuthMiddleware) {
-    tokenAuthMiddleware(req, res, next);
-  } else {
-    // Fallback se il middleware non è disponibile
-    const authHeader = req.headers["authorization"];
-    const bearerToken = authHeader && authHeader.split(" ")[1];
-    const customToken = req.headers["token"];
-    const token = bearerToken || customToken;
-
-    if (token === process.env.ADMIN_PASSWORD) {
-      next();
-    } else {
-      console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
-      return res.status(401).json({ success: false, error: "Unauthorized" });
-    }
-  }
-}, async (req, res) => {
+// IPFS Version endpoint for connectivity testing (public)
+router.get("/version", async (req, res) => {
   try {
     console.log("🔍 Testing IPFS API connectivity via /version endpoint...");
     
@@ -1582,6 +1679,10 @@ router.get("/version", (req, res, next) => {
     });
   }
 });
+
+// ============================================
+// USER UPLOADS ROUTES
+// ============================================
 
 // Get user uploads list (for x402 subscription users)
 router.get("/user-uploads/:userAddress", async (req, res) => {

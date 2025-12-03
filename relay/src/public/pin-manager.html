@@ -656,7 +656,7 @@
             showLoading('Loading pins...');
             
             const [pinsResult, systemHashesResult] = await Promise.all([
-                apiCall('/api/v1/ipfs/pins/ls', 'POST', {}, { manageVisibility: false }),
+                apiCall('/api/v1/ipfs/pin/ls', 'GET', undefined, { manageVisibility: false }),
                 apiCall('/api/v1/user-uploads/system-hashes-map', 'GET', undefined, { manageVisibility: false })
             ]);
             
@@ -791,7 +791,7 @@
                 return;
             }
 
-            const result = await apiCall('/api/v1/ipfs/pins/add', 'POST', { cid }, { manageVisibility: false });
+            const result = await apiCall('/api/v1/ipfs/pin/add', 'POST', { cid }, { manageVisibility: false });
             if (result) {
                 showNotification('Pin added successfully', 'success');
                 document.getElementById('quickCidInput').value = '';
@@ -809,7 +809,7 @@
         }
 
         async function repinCid(cid) {
-            const result = await apiCall('/api/v1/ipfs/pins/add', 'POST', { cid }, { manageVisibility: false });
+            const result = await apiCall('/api/v1/ipfs/pin/add', 'POST', { cid }, { manageVisibility: false });
             if (result) {
                 showNotification('Pin reapplied successfully', 'success');
             }
@@ -884,7 +884,7 @@
             resetPreviewState();
 
             try {
-                const response = await fetch(`/api/v1/ipfs/content/${cid}`, {
+                const response = await fetch(`/api/v1/ipfs/cat/${cid}`, {
                     headers: {
                         ...authHeaders,
                         'Accept': '*/*'
@@ -984,7 +984,7 @@
             }
             
             const metadata = currentPreviewMetadata || systemHashMap[currentPreviewCid] || {};
-            let url = metadata.relayUrl || `${window.location.origin}/ipfs-content/${currentPreviewCid}`;
+            let url = metadata.relayUrl || `${window.location.origin}/api/v1/ipfs/cat/${currentPreviewCid}/decrypt`;
             const password = ShogunAdmin.getPassword();
 
             if (metadata.isEncrypted && !url.includes("token=")) {
@@ -1029,7 +1029,7 @@
         async function unpinCid(cid) {
             if (!confirm('Are you sure you want to remove this pin?')) return;
             
-            const result = await apiCall('/api/v1/ipfs/pins/rm', 'POST', { cid }, { manageVisibility: false });
+            const result = await apiCall('/api/v1/ipfs/pin/rm', 'POST', { cid }, { manageVisibility: false });
             if (result) {
                 showNotification('Pin removed successfully', 'success');
                 await loadPins();
@@ -1043,7 +1043,7 @@
             
             try {
                 // Unpin first
-                const unpinResult = await apiCall('/api/v1/ipfs/pins/rm', 'POST', { cid }, { manageVisibility: false });
+                const unpinResult = await apiCall('/api/v1/ipfs/pin/rm', 'POST', { cid }, { manageVisibility: false });
                 if (unpinResult) {
                     showNotification('Pin removed, running garbage collection...', 'info');
                     
@@ -1102,7 +1102,7 @@
 
             try {
                 // Get all pins using relay API
-                const listResult = await apiCall('/api/v1/ipfs/pins/ls', 'POST', {}, { manageVisibility: false });
+                const listResult = await apiCall('/api/v1/ipfs/pin/ls', 'GET', undefined, { manageVisibility: false });
                 
                 if (!listResult || !listResult.pins) {
                     showNotification('Impossibile ottenere la lista dei pin', 'error');
@@ -1135,7 +1135,7 @@
                     showLoading(`Removing ${i + 1}/${pinsToRemove.length}: ${cid.substring(0, 12)}...`);
 
                     try {
-                        const result = await apiCall('/api/v1/ipfs/pins/rm', 'POST', { cid }, { manageVisibility: false });
+                        const result = await apiCall('/api/v1/ipfs/pin/rm', 'POST', { cid }, { manageVisibility: false });
                         if (result) {
                             successCount++;
                         } else {
