@@ -41,6 +41,7 @@ import systemRouter from "./system.js";
 import debugRouter from "./debug.js";
 import servicesRouter from "./services.js";
 import visualGraphRouter from "./visualGraph.js";
+import x402Router from "./x402.js";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -286,6 +287,11 @@ export default (app) => {
   app.get("/charts", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "charts.html"));
+  });
+
+  app.get("/subscription", (req, res) => {
+    const publicPath = path.resolve(__dirname, "../public");
+    res.sendFile(path.resolve(publicPath, "subscription.html"));
   });
 
   app.get("/endpoints", (req, res) => {
@@ -609,6 +615,8 @@ export default (app) => {
   // Route per il grafico visivo
   app.use(`${baseRoute}/visualGraph`, visualGraphRouter);
 
+  // Route per x402 payments e subscriptions
+  app.use(`${baseRoute}/x402`, x402Router);
 
   // Route di test per verificare se le route sono registrate correttamente
   app.get(`${baseRoute}/test`, (req, res) => {
@@ -770,6 +778,15 @@ export default (app) => {
           `${baseRoute}/services/status`,
           `${baseRoute}/services/:service/restart`,
           `${baseRoute}/visualGraph`,
+          `${baseRoute}/x402/tiers`,
+          `${baseRoute}/x402/subscription/:userAddress`,
+          `${baseRoute}/x402/subscribe`,
+          `${baseRoute}/x402/payment-requirements/:tier`,
+          `${baseRoute}/x402/can-upload/:userAddress`,
+          `${baseRoute}/x402/can-upload-verified/:userAddress`,
+          `${baseRoute}/x402/storage/:userAddress`,
+          `${baseRoute}/x402/storage/sync/:userAddress`,
+          `${baseRoute}/x402/config`,
         ],
       },
     });

@@ -27,6 +27,7 @@ import "./utils/bullet-catcher.js";
 import Holster from "@mblaney/holster/src/holster.js";
 
 import multer from "multer";
+import { initRelayUser, isRelayUserInitialized, getRelayPub } from "./utils/relay-user.js";
 
 dotenv.config();
 
@@ -306,6 +307,25 @@ async function initializeServer() {
   Gun.serve(app);
 
   const gun = Gun(gunConfig);
+
+  // Initialize Relay User for x402 subscriptions
+  // This user owns the subscription data in GunDB
+  const relayUsername = process.env.RELAY_GUN_USERNAME || process.env.RELAY_NAME || 'shogun-relay';
+  const relayPassword = process.env.RELAY_GUN_PASSWORD || process.env.ADMIN_PASSWORD;
+  
+  if (relayPassword) {
+    try {
+      const { pub } = await initRelayUser(gun, relayUsername, relayPassword);
+      app.set('relayUserPub', pub);
+      console.log(`🔐 Relay GunDB user initialized: ${relayUsername}`);
+      console.log(`🔑 Relay public key: ${pub?.substring(0, 30)}...`);
+    } catch (error) {
+      console.error('❌ Failed to initialize relay GunDB user:', error.message);
+      console.warn('⚠️ x402 subscriptions will not work without relay user');
+    }
+  } else {
+    console.warn('⚠️ RELAY_GUN_PASSWORD not set, x402 subscriptions disabled');
+  }
 
   // Initialize Generic Services (Linda functionality)
   // DISABLED: Services removed as client migrated to pure GunDB

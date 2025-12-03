@@ -36,7 +36,8 @@
     "multer": "^2.0.1",
     "node-fetch": "^3.3.2",
     "self-adjusting-interval": "^1.0.0",
-    "shogun-theme": "^1.0.0"
+    "shogun-theme": "^1.0.0",
+    "viem": "^2.21.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

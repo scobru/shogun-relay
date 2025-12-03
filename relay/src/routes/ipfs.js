@@ -3,6 +3,7 @@ import http from 'http';
 import FormData from 'form-data';
 import multer from 'multer';
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import { X402Merchant } from '../utils/x402-merchant.js';
 
 const router = express.Router();
 
@@ -243,9 +244,9 @@ router.post("/api/:endpoint(*)", async (req, res) => {
   }
 });
 
-// IPFS File Upload endpoint with dual authentication
+// IPFS File Upload endpoint with dual authentication and x402 subscription check
 router.post("/upload", 
-  (req, res, next) => {
+  async (req, res, next) => {
     // Check both admin and user authentication
     const authHeader = req.headers["authorization"];
     const bearerToken = authHeader && authHeader.split(" ")[1];
@@ -253,12 +254,52 @@ router.post("/upload",
     const adminToken = bearerToken || customToken;
     const isAdmin = adminToken === process.env.ADMIN_PASSWORD;
     
+    // Check for user address header (for x402 subscription-based uploads)
+    const userAddress = req.headers["x-user-address"];
+    
     if (isAdmin) {
       req.authType = 'admin';
       next();
+    } else if (userAddress && process.env.X402_PAY_TO_ADDRESS) {
+      // User-based upload with x402 subscription
+      req.authType = 'user';
+      req.userAddress = userAddress;
+      
+      // Check subscription status
+      const gun = req.app.get('gunInstance');
+      if (!gun) {
+        return res.status(500).json({ success: false, error: "Server error - Gun instance not available" });
+      }
+      
+      try {
+        const subscription = await X402Merchant.getSubscriptionStatus(gun, userAddress);
+        
+        if (!subscription.active) {
+          console.log(`Upload denied - No active subscription for ${userAddress}: ${subscription.reason}`);
+          return res.status(402).json({
+            success: false,
+            error: "Payment required - No active subscription",
+            reason: subscription.reason,
+            subscriptionRequired: true,
+            endpoint: "/api/v1/x402/subscribe",
+            tiers: "/api/v1/x402/tiers",
+          });
+        }
+        
+        req.subscription = subscription;
+        console.log(`User ${userAddress} has active ${subscription.tier} subscription with ${subscription.storageRemainingMB}MB remaining`);
+        next();
+      } catch (error) {
+        console.error("Subscription check error:", error);
+        return res.status(500).json({ success: false, error: "Error checking subscription status" });
+      }
     } else {
-      console.log("Auth failed - Admin token:", adminToken ? "provided" : "missing");
-      res.status(401).json({ success: false, error: "Unauthorized - Admin token required" });
+      console.log("Auth failed - Admin token:", adminToken ? "provided" : "missing", "User address:", userAddress ? "provided" : "missing");
+      res.status(401).json({ 
+        success: false, 
+        error: "Unauthorized - Admin token or x402 subscription required",
+        hint: "Provide Authorization header with admin token, or X-User-Address header with a valid x402 subscription"
+      });
     }
   },
   upload.single("file"),
@@ -269,6 +310,50 @@ router.post("/upload",
           success: false,
           error: "No file provided",
         });
+      }
+
+      // For user uploads with x402 subscription, verify real IPFS storage before allowing upload
+      if (req.authType === 'user' && req.subscription) {
+        const fileSizeMB = req.file.size / (1024 * 1024);
+        
+        // Get IPFS config
+        const ipfsApiUrl = req.app.get('IPFS_API_URL') || process.env.IPFS_API_URL || 'http://127.0.0.1:5001';
+        const ipfsApiToken = req.app.get('IPFS_API_TOKEN') || process.env.IPFS_API_TOKEN;
+        const gun = req.app.get('gunInstance');
+        
+        // Verify real storage usage from IPFS
+        console.log(`Verifying real IPFS storage for ${req.userAddress} before upload...`);
+        const canUploadResult = await X402Merchant.canUploadVerified(
+          gun, 
+          req.userAddress, 
+          fileSizeMB, 
+          ipfsApiUrl, 
+          ipfsApiToken
+        );
+        
+        if (!canUploadResult.allowed) {
+          console.log(`Upload denied for ${req.userAddress}: ${canUploadResult.reason}`);
+          return res.status(402).json({
+            success: false,
+            error: "Storage limit exceeded",
+            details: {
+              fileSizeMB: fileSizeMB.toFixed(2),
+              storageUsedMB: canUploadResult.storageUsedMB?.toFixed(2) || '0',
+              storageRemainingMB: canUploadResult.storageRemainingMB?.toFixed(2) || '0',
+              storageTotalMB: canUploadResult.storageTotalMB || req.subscription.storageMB,
+              tier: canUploadResult.currentTier || req.subscription.tier,
+              verified: canUploadResult.verified,
+            },
+            reason: canUploadResult.reason,
+            upgradeRequired: canUploadResult.requiresUpgrade,
+            endpoint: "/api/v1/x402/subscribe",
+            tiers: "/api/v1/x402/tiers",
+          });
+        }
+        
+        // Update subscription info with verified data
+        req.verifiedStorage = canUploadResult;
+        console.log(`Upload allowed. Storage: ${canUploadResult.storageUsedMB?.toFixed(2)}MB / ${canUploadResult.storageTotalMB}MB`);
       }
 
       const formData = new FormData();
@@ -433,9 +518,37 @@ router.post("/upload",
                 httpReq.end();
               });
 
+              // Update x402 subscription storage if applicable
+              let subscriptionUpdatePromise = Promise.resolve();
+              if (req.subscription) {
+                // Save upload record to relay user space
+                const uploadRecordPromise = X402Merchant.saveUploadRecord(req.userAddress, fileResult.Hash, {
+                  name: req.file.originalname,
+                  size: req.file.size,
+                  sizeMB: fileSizeMB,
+                  mimetype: req.file.mimetype,
+                  uploadedAt: Date.now(),
+                }).catch((err) => {
+                  console.warn(`⚠️ Failed to save upload record to relay space:`, err.message);
+                });
+
+                subscriptionUpdatePromise = Promise.all([
+                  uploadRecordPromise,
+                  X402Merchant.updateStorageUsage(gun, req.userAddress, fileSizeMB)
+                ])
+                  .then(([, result]) => {
+                    console.log(`📊 Subscription storage updated: ${result.storageUsedMB}MB used, ${result.storageRemainingMB}MB remaining`);
+                    return result;
+                  })
+                  .catch((err) => {
+                    console.warn(`⚠️ Subscription storage update failed:`, err.message);
+                    return null;
+                  });
+              }
+
               // Wait for critical operations to complete (upload and MB usage)
-              Promise.all([saveUploadPromise, updateMBPromise])
-                .then(() => {
+              Promise.all([saveUploadPromise, updateMBPromise, subscriptionUpdatePromise])
+                .then(([, , subscriptionResult]) => {
                   console.log(`📊 User upload saved: ${req.userAddress} - ${fileSizeMB} MB`);
                   
                   // Try to save system hash but don't block the response
@@ -458,7 +571,11 @@ router.post("/upload",
                       actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
                       sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
                       verified: true
-                    } : undefined
+                    } : undefined,
+                    subscription: subscriptionResult ? {
+                      storageUsedMB: subscriptionResult.storageUsedMB,
+                      storageRemainingMB: subscriptionResult.storageRemainingMB,
+                    } : undefined,
                   });
                 })
                 .catch((error) => {

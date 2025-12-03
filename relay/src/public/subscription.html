@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="shogun-dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IPFS Storage Subscription - x402</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+  <link href="https://unpkg.com/shogun-theme@1.0.0/styles/variables.css" rel="stylesheet" type="text/css" />
+  <link href="https://unpkg.com/shogun-theme@1.0.0/styles/base.css" rel="stylesheet" type="text/css" />
+  <link href="https://unpkg.com/shogun-theme@1.0.0/styles/daisyui-overrides.css" rel="stylesheet" type="text/css" />
+  <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    body {
+      line-height: 1.6;
+      background-color: #1A1A1A;
+    }
+
+    .tier-card {
+      border: 2px solid #404040;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      transition: all 0.3s ease;
+      background-color: rgba(40, 40, 40, 0.5);
+    }
+
+    .tier-card:hover {
+      border-color: #606060;
+      background-color: rgba(40, 40, 40, 0.8);
+    }
+
+    .tier-card.selected {
+      border-color: #FF69B4;
+      background-color: rgba(255, 105, 180, 0.1);
+    }
+
+    .tier-card.recommended {
+      border-color: #4CAF50;
+    }
+
+    .tier-price {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #FF69B4;
+    }
+
+    .subscription-status {
+      padding: 1.5rem;
+      border-radius: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .subscription-status.active {
+      background-color: rgba(76, 175, 80, 0.15);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+    }
+
+    .subscription-status.expired {
+      background-color: rgba(244, 67, 54, 0.15);
+      border: 1px solid rgba(244, 67, 54, 0.3);
+    }
+
+    .subscription-status.none {
+      background-color: rgba(255, 152, 0, 0.15);
+      border: 1px solid rgba(255, 152, 0, 0.3);
+    }
+
+    .storage-bar {
+      height: 1.5rem;
+      background-color: #404040;
+      border-radius: 0.75rem;
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+
+    .storage-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4CAF50, #8BC34A);
+      transition: width 0.5s ease;
+    }
+
+    .storage-bar-fill.warning {
+      background: linear-gradient(90deg, #FF9800, #FFC107);
+    }
+
+    .storage-bar-fill.critical {
+      background: linear-gradient(90deg, #F44336, #FF5722);
+    }
+
+    .message {
+      padding: 1.5rem;
+      border-radius: 1rem;
+      margin-top: 1.5rem;
+      display: none;
+    }
+
+    .message.success {
+      background-color: rgba(76, 175, 80, 0.2);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+      color: #4CAF50;
+    }
+
+    .message.error {
+      background-color: rgba(244, 67, 54, 0.2);
+      border: 1px solid rgba(244, 67, 54, 0.3);
+      color: #F44336;
+    }
+
+    .message.info {
+      background-color: rgba(66, 165, 245, 0.2);
+      border: 1px solid rgba(66, 165, 245, 0.3);
+      color: #42A5F5;
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 1.5rem;
+      height: 1.5rem;
+      border: 2px solid #404040;
+      border-radius: 50%;
+      border-top-color: #FF69B4;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .badge-tier {
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .badge-basic { background-color: #607D8B; color: white; }
+    .badge-standard { background-color: #2196F3; color: white; }
+    .badge-premium { background-color: #9C27B0; color: white; }
+  </style>
+</head>
+
+<body class="antialiased bg-[#1A1A1A]">
+  <div class="container mx-auto p-6 max-w-4xl">
+    <div class="flex items-center mb-6">
+      <a href="/" class="text-[#42A5F5] hover:text-[#64B5F6] transition-colors text-lg">&larr; Back to Control Panel</a>
+    </div>
+
+    <div class="card bg-[#282828] border-[#404040] rounded-2xl mb-6">
+      <div class="p-8 sm:p-10">
+        <div class="flex flex-col items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-6 text-[#FF69B4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+          </svg>
+
+          <h1 class="text-3xl font-semibold mb-4 text-[#FFFFFF]">IPFS Storage Subscription</h1>
+          <p class="text-[#A0A0A0] text-center mb-8">Purchase storage space for your IPFS files using x402 payments</p>
+
+          <!-- Configuration Status -->
+          <div id="configStatus" class="w-full mb-6">
+            <div class="flex items-center justify-center gap-2 text-[#A0A0A0]">
+              <div class="loading-spinner"></div>
+              <span>Checking x402 configuration...</span>
+            </div>
+          </div>
+
+          <!-- User Address Input -->
+          <div class="w-full mb-8" id="userSection" style="display: none;">
+            <label class="block text-lg font-medium mb-3 text-[#FFFFFF]">Your Wallet Address:</label>
+            <input type="text" id="userAddress" 
+              class="input input-bordered w-full bg-[#1A1A1A] border-[#404040] text-[#E0E0E0] font-mono"
+              placeholder="0x..." />
+            <button class="btn bg-[#42A5F5] hover:bg-[#64B5F6] border-0 text-white mt-3 rounded-xl" id="checkStatusBtn">
+              Check Subscription Status
+            </button>
+          </div>
+
+          <!-- Subscription Status -->
+          <div id="subscriptionStatus" class="w-full" style="display: none;"></div>
+
+          <!-- Tier Selection -->
+          <div id="tierSelection" class="w-full" style="display: none;">
+            <h2 class="text-xl font-semibold mb-4 text-[#FFFFFF]">Select a Plan</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="tierCards"></div>
+
+            <div class="mt-6">
+              <button class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] w-full rounded-xl px-8 py-4 font-medium disabled:opacity-50" 
+                id="subscribeBtn" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
+                </svg>
+                Subscribe with USDC
+              </button>
+              <p class="text-[#A0A0A0] text-sm text-center mt-3">
+                Payment powered by x402 protocol on <span id="networkName">Base Sepolia</span>
+              </p>
+            </div>
+          </div>
+
+          <!-- Message Area -->
+          <div id="message" class="message w-full"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- How It Works -->
+    <div class="card bg-[#282828] border-[#404040] rounded-2xl">
+      <div class="p-6">
+        <h2 class="text-xl font-semibold mb-4 text-[#FFFFFF]">How It Works</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[#FF69B4] text-white flex items-center justify-center font-bold">1</div>
+            <div>
+              <h3 class="font-medium text-[#FFFFFF]">Connect Wallet</h3>
+              <p class="text-sm text-[#A0A0A0]">Enter your wallet address to check subscription status</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[#FF69B4] text-white flex items-center justify-center font-bold">2</div>
+            <div>
+              <h3 class="font-medium text-[#FFFFFF]">Choose Plan</h3>
+              <p class="text-sm text-[#A0A0A0]">Select a storage tier that fits your needs</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[#FF69B4] text-white flex items-center justify-center font-bold">3</div>
+            <div>
+              <h3 class="font-medium text-[#FFFFFF]">Pay with USDC</h3>
+              <p class="text-sm text-[#A0A0A0]">Sign an EIP-3009 authorization to complete payment</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let selectedTier = null;
+    let tiers = [];
+    let x402Config = null;
+
+    const userAddressInput = document.getElementById('userAddress');
+    const checkStatusBtn = document.getElementById('checkStatusBtn');
+    const subscribeBtn = document.getElementById('subscribeBtn');
+    const messageEl = document.getElementById('message');
+    const configStatusEl = document.getElementById('configStatus');
+    const userSectionEl = document.getElementById('userSection');
+    const subscriptionStatusEl = document.getElementById('subscriptionStatus');
+    const tierSelectionEl = document.getElementById('tierSelection');
+    const tierCardsEl = document.getElementById('tierCards');
+    const networkNameEl = document.getElementById('networkName');
+
+    const showMessage = (text, type = 'error') => {
+      messageEl.innerHTML = text;
+      messageEl.className = `message ${type}`;
+      messageEl.style.display = 'block';
+    };
+
+    const hideMessage = () => {
+      messageEl.style.display = 'none';
+    };
+
+    const formatDate = (dateStr) => {
+      return new Date(dateStr).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    };
+
+    // Check x402 configuration
+    async function checkConfig() {
+      try {
+        const response = await fetch('/api/v1/x402/config');
+        const data = await response.json();
+
+        if (!data.success || !data.configured) {
+          configStatusEl.innerHTML = `
+            <div class="text-center p-4 bg-[#404040] rounded-xl">
+              <p class="text-[#FF9800] font-medium">x402 payments not configured</p>
+              <p class="text-sm text-[#A0A0A0] mt-2">
+                Set X402_PAY_TO_ADDRESS in your environment to enable subscriptions
+              </p>
+            </div>
+          `;
+          return;
+        }
+
+        x402Config = data;
+        networkNameEl.textContent = data.network.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+        
+        configStatusEl.innerHTML = `
+          <div class="text-center text-[#4CAF50]">
+            x402 payments enabled on ${networkNameEl.textContent}
+          </div>
+        `;
+
+        userSectionEl.style.display = 'block';
+        
+        // Load tiers
+        await loadTiers();
+      } catch (error) {
+        configStatusEl.innerHTML = `
+          <div class="text-center p-4 bg-[#404040] rounded-xl">
+            <p class="text-[#F44336] font-medium">Error loading configuration</p>
+            <p class="text-sm text-[#A0A0A0] mt-2">${error.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    // Load available tiers
+    async function loadTiers() {
+      try {
+        const response = await fetch('/api/v1/x402/tiers');
+        const data = await response.json();
+
+        if (!data.success) throw new Error(data.error);
+
+        tiers = data.tiers;
+        renderTierCards();
+      } catch (error) {
+        console.error('Error loading tiers:', error);
+      }
+    }
+
+    // Render tier cards
+    function renderTierCards() {
+      tierCardsEl.innerHTML = tiers.map((tier, index) => `
+        <div class="tier-card cursor-pointer ${index === 1 ? 'recommended' : ''}" data-tier="${tier.id}" onclick="selectTier('${tier.id}')">
+          ${index === 1 ? '<div class="text-[#4CAF50] text-xs font-semibold mb-2">RECOMMENDED</div>' : ''}
+          <h3 class="text-lg font-semibold text-[#FFFFFF] mb-2">${tier.name}</h3>
+          <div class="tier-price mb-2">${tier.priceDisplay}</div>
+          <p class="text-[#A0A0A0] text-sm mb-4">${tier.storageMB}MB for ${tier.durationDays} days</p>
+          <ul class="text-sm text-[#E0E0E0] space-y-1">
+            <li>Storage: ${tier.storageMB}MB</li>
+            <li>Duration: ${tier.durationDays} days</li>
+            <li>IPFS pinning included</li>
+          </ul>
+        </div>
+      `).join('');
+    }
+
+    // Select a tier
+    function selectTier(tierId) {
+      selectedTier = tierId;
+      
+      document.querySelectorAll('.tier-card').forEach(card => {
+        card.classList.remove('selected');
+        if (card.dataset.tier === tierId) {
+          card.classList.add('selected');
+        }
+      });
+
+      subscribeBtn.disabled = !userAddressInput.value.trim();
+    }
+
+    // Check subscription status
+    async function checkSubscriptionStatus() {
+      const userAddress = userAddressInput.value.trim();
+      if (!userAddress) {
+        showMessage('Please enter your wallet address', 'error');
+        return;
+      }
+
+      hideMessage();
+      subscriptionStatusEl.innerHTML = `
+        <div class="flex items-center justify-center gap-2 text-[#A0A0A0] mb-6">
+          <div class="loading-spinner"></div>
+          <span>Checking subscription...</span>
+        </div>
+      `;
+      subscriptionStatusEl.style.display = 'block';
+
+      try {
+        const response = await fetch(`/api/v1/x402/subscription/${encodeURIComponent(userAddress)}`);
+        const data = await response.json();
+
+        if (!data.success) throw new Error(data.error);
+
+        renderSubscriptionStatus(data.subscription);
+        tierSelectionEl.style.display = 'block';
+      } catch (error) {
+        subscriptionStatusEl.innerHTML = `
+          <div class="subscription-status none">
+            <p class="text-[#FF9800] font-medium">Error checking subscription</p>
+            <p class="text-sm text-[#A0A0A0] mt-2">${error.message}</p>
+          </div>
+        `;
+        tierSelectionEl.style.display = 'block';
+      }
+    }
+
+    // Render subscription status
+    function renderSubscriptionStatus(subscription) {
+      if (subscription.active) {
+        const usagePercent = (subscription.storageUsedMB / subscription.storageMB * 100).toFixed(1);
+        let barClass = '';
+        if (usagePercent > 90) barClass = 'critical';
+        else if (usagePercent > 70) barClass = 'warning';
+
+        subscriptionStatusEl.innerHTML = `
+          <div class="subscription-status active">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <span class="badge-tier badge-${subscription.tier}">${subscription.tier}</span>
+                <span class="text-[#4CAF50] font-medium ml-2">Active</span>
+              </div>
+              <div class="text-sm text-[#A0A0A0]">
+                Expires: ${formatDate(subscription.expiresAt)}
+              </div>
+            </div>
+            <div class="mb-2">
+              <div class="flex justify-between text-sm text-[#E0E0E0]">
+                <span>Storage Used (recorded)</span>
+                <span>${subscription.storageUsedMB.toFixed(1)}MB / ${subscription.storageMB}MB (${usagePercent}%)</span>
+              </div>
+              <div class="storage-bar">
+                <div class="storage-bar-fill ${barClass}" style="width: ${usagePercent}%"></div>
+              </div>
+            </div>
+            <p class="text-sm text-[#A0A0A0] mt-3">
+              Remaining storage: <strong class="text-[#4CAF50]">${subscription.storageRemainingMB.toFixed(1)}MB</strong>
+            </p>
+            <button class="btn btn-sm bg-[#404040] hover:bg-[#505050] border-0 text-white mt-3 rounded-lg" onclick="verifyStorage()">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Verify IPFS Storage
+            </button>
+            <div id="verifiedStorageInfo" class="mt-3" style="display: none;"></div>
+          </div>
+        `;
+      } else {
+        subscriptionStatusEl.innerHTML = `
+          <div class="subscription-status none">
+            <div class="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#FF9800]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span class="text-[#FF9800] font-medium">No Active Subscription</span>
+            </div>
+            <p class="text-sm text-[#A0A0A0] mt-2">${subscription.reason || 'Purchase a subscription to start uploading files'}</p>
+          </div>
+        `;
+      }
+    }
+
+    // Verify storage by checking actual IPFS pins
+    async function verifyStorage() {
+      const userAddress = userAddressInput.value.trim();
+      if (!userAddress) return;
+
+      const verifiedInfoEl = document.getElementById('verifiedStorageInfo');
+      verifiedInfoEl.style.display = 'block';
+      verifiedInfoEl.innerHTML = `
+        <div class="flex items-center gap-2 text-[#A0A0A0]">
+          <div class="loading-spinner"></div>
+          <span>Verifying storage on IPFS...</span>
+        </div>
+      `;
+
+      try {
+        const response = await fetch(`/api/v1/x402/storage/${encodeURIComponent(userAddress)}`);
+        const data = await response.json();
+
+        if (!data.success) throw new Error(data.error);
+
+        const storage = data.storage;
+        const sub = data.subscription;
+
+        let discrepancyHtml = '';
+        if (sub && sub.discrepancy > 0.1) {
+          discrepancyHtml = `
+            <div class="text-[#FF9800] text-sm mt-2">
+              Discrepancy detected: ${sub.discrepancy.toFixed(2)}MB difference between recorded and actual
+            </div>
+          `;
+        }
+
+        let filesHtml = '';
+        if (data.files && data.files.length > 0) {
+          filesHtml = `
+            <details class="mt-3">
+              <summary class="text-sm text-[#42A5F5] cursor-pointer">View ${data.files.length} pinned files</summary>
+              <div class="mt-2 max-h-40 overflow-y-auto bg-[#1A1A1A] rounded-lg p-2">
+                ${data.files.map(f => `
+                  <div class="text-xs text-[#A0A0A0] py-1 border-b border-[#404040] last:border-0">
+                    <span class="font-mono">${f.hash.substring(0, 12)}...</span>
+                    <span class="ml-2">${f.name || 'unnamed'}</span>
+                    <span class="ml-2 text-[#4CAF50]">${f.sizeMB.toFixed(2)}MB</span>
+                    ${f.warning ? `<span class="ml-2 text-[#FF9800]">(${f.warning})</span>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            </details>
+          `;
+        }
+
+        verifiedInfoEl.innerHTML = `
+          <div class="bg-[#1A1A1A] rounded-lg p-3">
+            <div class="flex items-center gap-2 text-[#4CAF50] mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span class="font-medium">Verified from IPFS</span>
+            </div>
+            <div class="text-sm text-[#E0E0E0]">
+              <div>Actual storage used: <strong>${storage.usedMB.toFixed(2)}MB</strong></div>
+              <div>Files pinned: <strong>${storage.fileCount}</strong></div>
+              ${sub ? `<div>Remaining: <strong class="text-[#4CAF50]">${sub.remainingMB.toFixed(2)}MB</strong></div>` : ''}
+            </div>
+            ${discrepancyHtml}
+            ${filesHtml}
+          </div>
+        `;
+      } catch (error) {
+        verifiedInfoEl.innerHTML = `
+          <div class="text-[#F44336] text-sm">
+            Error verifying storage: ${error.message}
+          </div>
+        `;
+      }
+    }
+
+    // Subscribe
+    async function subscribe() {
+      const userAddress = userAddressInput.value.trim();
+      
+      if (!userAddress || !selectedTier) {
+        showMessage('Please enter your wallet address and select a tier', 'error');
+        return;
+      }
+
+      hideMessage();
+      subscribeBtn.disabled = true;
+      subscribeBtn.innerHTML = '<div class="loading-spinner mr-2"></div> Processing...';
+
+      try {
+        // First, get payment requirements
+        const reqResponse = await fetch(`/api/v1/x402/payment-requirements/${selectedTier}`);
+        const reqData = await reqResponse.json();
+
+        if (!reqData.success) throw new Error(reqData.error);
+
+        // Show payment info
+        showMessage(`
+          <div class="text-[#42A5F5]">
+            <p class="font-medium mb-2">Payment Required</p>
+            <p class="text-sm">Amount: ${reqData.tierInfo.priceUSDC} USDC</p>
+            <p class="text-sm">Network: ${x402Config.network}</p>
+            <p class="text-sm mt-3">
+              To complete this payment, you need to sign an EIP-3009 authorization 
+              using a compatible wallet or the x402 client library.
+            </p>
+            <p class="text-sm mt-2 text-[#A0A0A0]">
+              Payment address: <code class="bg-[#1A1A1A] px-2 py-1 rounded">${x402Config.payToAddress}</code>
+            </p>
+          </div>
+        `, 'info');
+
+        // In a real implementation, you would:
+        // 1. Connect to user's wallet (MetaMask, WalletConnect, etc.)
+        // 2. Have them sign an EIP-3009 authorization
+        // 3. Send the signed payload to /api/v1/x402/subscribe
+
+        // For now, show instructions
+        console.log('Payment requirements:', reqData.x402);
+
+      } catch (error) {
+        showMessage(`Error: ${error.message}`, 'error');
+      } finally {
+        subscribeBtn.disabled = false;
+        subscribeBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
+          </svg>
+          Subscribe with USDC
+        `;
+      }
+    }
+
+    // Event listeners
+    checkStatusBtn.addEventListener('click', checkSubscriptionStatus);
+    subscribeBtn.addEventListener('click', subscribe);
+    userAddressInput.addEventListener('input', () => {
+      subscribeBtn.disabled = !userAddressInput.value.trim() || !selectedTier;
+    });
+
+    // Initialize
+    checkConfig();
+  </script>
+</body>
+
+</html>
+

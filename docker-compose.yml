@@ -34,6 +34,13 @@ services:
       - IPFS_API_TOKEN=shogun2025
       - IPFS_API_KEY=shogun2025
       - DISABLE_RADISK=false
+      # Relay GunDB User (owns subscription data)
+      - RELAY_GUN_USERNAME=shogun-relay
+      - RELAY_GUN_PASSWORD=shogun2025
+      # x402 Payment Configuration
+      - X402_PAY_TO_ADDRESS=0xYourWalletAddressHere
+      - X402_NETWORK=base-sepolia
+      - X402_SETTLEMENT_MODE=facilitator
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
