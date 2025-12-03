@@ -10,7 +10,6 @@ yarn-error.log*
 *.seed
 *.pid.lock
 radata/
-buckets/
 
 # Coverage directory used by tools like istanbul
 coverage/

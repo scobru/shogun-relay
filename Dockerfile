@@ -79,7 +79,8 @@ RUN adduser -D -s /bin/sh ipfs \
 WORKDIR /app
 
 # Copy configuration files first
-COPY docker/ /app/docker/
+# CapRover builds from repository root, so use shogun-relay/ prefix
+COPY shogun-relay/docker/ /app/docker/
 
 # Convert script line endings from CRLF to LF
 RUN dos2unix /app/docker/init-ipfs.sh
@@ -97,12 +98,12 @@ RUN cp /app/docker/entrypoint.sh /usr/local/bin/entrypoint.sh && \
 RUN cp /app/docker/relay.env /app/relay/.env
 
 # Copy package files and install dependencies
-COPY relay/package*.json /app/relay/
+COPY shogun-relay/relay/package*.json /app/relay/
 WORKDIR /app/relay
 RUN npm install --omit=dev
 
 # Copy the rest of the application
-COPY relay/ /app/relay/
+COPY shogun-relay/relay/ /app/relay/
 
 # Set proper permissions
 RUN chown -R node:node /app \
@@ -118,7 +119,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 # Use supervisor to manage multiple services
 RUN mkdir -p /etc/supervisor/conf.d
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY shogun-relay/docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Set environment variables
 ENV NODE_ENV=production
