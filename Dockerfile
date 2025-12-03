@@ -40,10 +40,14 @@ RUN apk add --no-cache \
     && echo "Checking extracted files..." \
     && ls -la \
     && if [ ! -d "kubo" ]; then echo "ERROR: kubo directory missing"; ls -R; exit 1; fi \
+    && echo "Verifying IPFS binary exists before install..." \
+    && test -f kubo/ipfs || (echo "ERROR: kubo/ipfs binary not found in extracted archive" && ls -la kubo/ && exit 1) \
     && echo "Installing IPFS to /usr/local/bin..." \
-    && install -m 755 kubo/ipfs /usr/local/bin/ipfs \
-    && echo "Verifying file exists..." \
-    && ls -lh /usr/local/bin/ipfs || (echo "ERROR: IPFS binary not found after install" && exit 1) \
+    && cp kubo/ipfs /usr/local/bin/ipfs || (echo "ERROR: cp command failed" && exit 1) \
+    && chmod +x /usr/local/bin/ipfs || (echo "ERROR: chmod command failed" && exit 1) \
+    && echo "Verifying file exists after install..." \
+    && test -f /usr/local/bin/ipfs || (echo "ERROR: IPFS binary not found after install" && ls -lh /usr/local/bin/ && exit 1) \
+    && ls -lh /usr/local/bin/ipfs \
     && echo "Checking binary dependencies..." \
     && (ldd /usr/local/bin/ipfs 2>/dev/null || true) \
     && echo "Testing IPFS binary..." \
