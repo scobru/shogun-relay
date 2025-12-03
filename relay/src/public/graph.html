@@ -33,8 +33,28 @@
 
       body {
         font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-        background-color: var(--relay-bg);
+        background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
         color: var(--relay-text-secondary);
+        min-height: 100vh;
+      }
+
+      .hero-gradient {
+        background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
+      }
+
+      @keyframes pulse-glow {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4); }
+        50% { box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2); }
+      }
+
+      .pulse-glow {
+        animation: pulse-glow 2s infinite;
+      }
+
+      .section-divider {
+        height: 1px;
+        background: linear-gradient(90deg, transparent, #404040, transparent);
+        margin: 2rem 0;
       }
 
       a {
@@ -271,18 +291,29 @@
     </style>
   </head>
   <body>
-    <div class="page-container">
-      <div class="page-card">
-        <div class="text-center">
-          <a href="/" class="inline-flex items-center gap-2 text-sm text-[#8B94FF] mb-6">
-            <span>&larr;</span>
-            <span>Back to Control Panel</span>
-          </a>
-          <h1 class="page-title">Shogun Relay Graph Explorer</h1>
-          <p class="page-subtitle">
-            Inspect GunDB data, traverse linked nodes, and export relay snapshots using the shared Shogun palette.
-          </p>
-        </div>
+    <div class="hero-gradient min-h-screen">
+      <div class="page-container">
+        <div class="page-card">
+          <div class="text-center">
+            <a href="/" class="inline-flex items-center gap-2 text-sm text-[#A0A0A0] hover:text-[#FF69B4] transition-colors group mb-6">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              <span>Back to Control Panel</span>
+            </a>
+            
+            <!-- Header Icon -->
+            <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-[#42A5F5] to-[#1976D2] mb-6 pulse-glow mx-auto">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+              </svg>
+            </div>
+            
+            <h1 class="page-title">Shogun Relay Graph Explorer</h1>
+            <p class="page-subtitle">
+              Inspect GunDB data, traverse linked nodes, and export relay snapshots.
+            </p>
+          </div>
 
         <section id="authSection" class="section-card mt-10">
           <div class="section-header">
@@ -396,6 +427,15 @@
             </p>
           </div>
         </section>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-12 text-center">
+          <div class="section-divider"></div>
+          <p class="text-[#606060] text-sm">
+            Shogun Relay Graph - Part of the <a href="https://github.com/scobru/shogun" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">Shogun Project</a>
+          </p>
+        </footer>
       </div>
     </div>
 

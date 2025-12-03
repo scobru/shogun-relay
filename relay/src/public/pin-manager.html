@@ -16,13 +16,32 @@
         /* Page Styles */
         .pin-manager-page {
             min-height: 100vh;
-            background: #1A1A1A;
+            background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
             color: #E0E0E0;
+        }
+
+        .hero-gradient {
+            background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4); }
+            50% { box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2); }
+        }
+
+        .pulse-glow {
+            animation: pulse-glow 2s infinite;
+        }
+
+        .section-divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #404040, transparent);
+            margin: 2rem 0;
         }
         
         .pin-manager-header {
-            background: linear-gradient(135deg, #404040, #353535);
-            border-bottom: 1px solid rgba(96, 96, 96, 0.4);
+            background: linear-gradient(135deg, #282828, #1A1A1A);
+            border-bottom: 1px solid rgba(64, 64, 64, 0.4);
             padding: 1.5rem 2rem;
             display: flex;
             justify-content: space-between;
@@ -44,19 +63,18 @@
         }
         
         .pin-card {
-            background: linear-gradient(135deg, #404040 0%, #353535 100%);
-            border: 1px solid rgba(96, 96, 96, 0.4);
+            background: #282828;
+            border: 1px solid #404040;
             border-radius: 16px;
             padding: 1.5rem;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(10px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
             overflow: hidden;
         }
         
         .pin-card:hover {
             transform: translateY(-4px);
-            box-shadow: 0 12px 40px rgba(255, 105, 180, 0.15);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
             border-color: rgba(255, 105, 180, 0.3);
         }
         
@@ -196,9 +214,9 @@
         }
         
         .stats-bar {
-            background: linear-gradient(135deg, #404040, #353535);
-            border: 1px solid rgba(96, 96, 96, 0.4);
-            border-radius: 12px;
+            background: #282828;
+            border: 1px solid #404040;
+            border-radius: 16px;
             padding: 1rem;
             margin-bottom: 1.5rem;
             display: flex;
@@ -340,17 +358,29 @@
         }
     </style>
 </head>
-<body class="antialiased bg-[#1A1A1A]">
+<body class="antialiased">
     <!-- Pin Manager Page -->
-    <div class="pin-manager-page">
+    <div class="pin-manager-page hero-gradient">
         <!-- Header -->
         <div class="pin-manager-header">
-            <div>
-                <h1 class="text-2xl font-bold text-[#FFFFFF]">IPFS Pin Manager</h1>
-                <p class="text-[#A0A0A0] text-sm">Gestisci i tuoi pin IPFS con facilità</p>
+            <div class="flex items-center gap-4">
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-[#F44336] to-[#D32F2F] pulse-glow">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-[#FFFFFF]">IPFS Pin Manager</h1>
+                    <p class="text-[#8B94FF] text-sm">Manage your IPFS pins with ease</p>
+                </div>
             </div>
             <div class="flex items-center gap-4">
-                <a href="/" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Back</a>
+                <a href="/" class="flex items-center gap-2 text-[#A0A0A0] hover:text-[#FF69B4] transition-colors group">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    <span>Back</span>
+                </a>
             </div>
         </div>
 
@@ -368,12 +398,14 @@
                 </div>
 
                 <!-- Quick Add Section -->
-                <div class="card bg-gradient-to-br from-[#404040] to-[#353535] border border-[#606060]/50 rounded-2xl shadow-2xl backdrop-blur-sm mb-8">
+                <div class="card bg-[#282828] border border-[#404040] rounded-2xl mb-8">
                     <div class="card-body p-6">
                         <h3 class="card-title text-xl font-bold mb-6 text-[#FF69B4] flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                            </svg>
+                            <div class="feature-icon bg-[#4CAF50]/20 mr-3" style="width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#4CAF50]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                </svg>
+                            </div>
                             Quick Add Pin
                         </h3>
                         
@@ -392,12 +424,14 @@
                 </div>
                 
                 <!-- Batch Operations Section -->
-                <div class="card bg-gradient-to-br from-[#404040] to-[#353535] border border-[#606060]/50 rounded-2xl shadow-2xl backdrop-blur-sm mb-8">
+                <div class="card bg-[#282828] border border-[#404040] rounded-2xl mb-8">
                     <div class="card-body p-6">
                         <h3 class="card-title text-xl font-bold mb-6 text-[#FF69B4] flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
+                            <div class="feature-icon bg-[#F44336]/20 mr-3" style="width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#F44336]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </div>
                             Batch Operations
                         </h3>
                         

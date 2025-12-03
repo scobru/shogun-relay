@@ -7,7 +7,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Shogun Relay Admin Panel - Authentication Required</title>
+    <title>Shogun Relay Admin Panel</title>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
     <link href="https://unpkg.com/shogun-theme@1.0.0/styles/variables.css" rel="stylesheet" type="text/css" />
     <link href="https://unpkg.com/shogun-theme@1.0.0/styles/base.css" rel="stylesheet" type="text/css" />
@@ -18,68 +18,79 @@
     <script src="lib/admin-auth.js"></script>
 
     <style>
-        /* Custom tooltip for dark theme */
-        .tooltip {
+        body {
+            background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
+            min-height: 100vh;
+        }
+
+        .hero-gradient {
+            background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
+        }
+
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .nav-link {
             position: relative;
-            display: inline-block;
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            transition: all 0.2s ease;
         }
 
-        .tooltip .tooltiptext {
-            visibility: hidden;
-            width: 280px;
-            background-color: #404040;
-            color: #E0E0E0;
-            text-align: center;
+        .nav-link:hover {
+            background-color: rgba(64, 64, 64, 0.5);
+        }
+
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #FF69B4, #8B94FF);
+            transition: all 0.3s ease;
+            transform: translateX(-50%);
+        }
+
+        .nav-link:hover::after {
+            width: 80%;
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
             border-radius: 12px;
-            padding: 12px 16px;
-            position: absolute;
-            z-index: 1000;
-            bottom: 125%;
-            left: 50%;
-            margin-left: -140px;
-            opacity: 0;
-            transition: opacity 0.3s, visibility 0.3s;
-            font-size: 14px;
-            line-height: 1.4;
-            border: 1px solid #606060;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            transition: transform 0.2s ease;
         }
 
-        .tooltip .tooltiptext::after {
-            content: "";
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            margin-left: -5px;
-            border-width: 5px;
-            border-style: solid;
-            border-color: #404040 transparent transparent transparent;
+        .nav-link:hover .feature-icon {
+            transform: scale(1.1);
         }
 
-        .tooltip:hover .tooltiptext {
-            visibility: visible;
-            opacity: 1;
+        .section-divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #404040, transparent);
+            margin: 2rem 0;
         }
 
-        /* Tooltip entrance animation */
-        .tooltip .tooltiptext {
-            transform: translateY(10px);
-            transition: opacity 0.3s, visibility 0.3s, transform 0.3s;
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4); }
+            50% { box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2); }
         }
 
-        .tooltip:hover .tooltiptext {
-            transform: translateY(0);
-        }
-
-        /* Mobile responsive */
-        @media (max-width: 768px) {
-            .tooltip .tooltiptext {
-                width: 240px;
-                margin-left: -120px;
-                font-size: 13px;
-                padding: 10px 14px;
-            }
+        .pulse-glow {
+            animation: pulse-glow 2s infinite;
         }
 
         /* Hide protected applications by default */
@@ -94,246 +105,313 @@
     </style>
 </head>
 
-<body class="antialiased bg-[#1A1A1A]">
-    <div class="container mx-auto p-4">
-        <div class="card bg-[#1A1A1A] border-0 rounded-2xl">
-            <div class="p-8">
-                <div class="flex flex-col items-center">
-                    <!-- Top Arrow Icon -->
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-4 text-[#FF69B4]" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                            d="M5 12h14M12 5l7 7-7 7" />
+<body class="antialiased">
+    <div class="hero-gradient min-h-screen">
+        <div class="container mx-auto px-4 py-8 max-w-6xl">
+            <!-- Header -->
+            <header class="text-center mb-12">
+                <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-[#FF69B4] to-[#FF1493] mb-6 pulse-glow">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
+                </div>
+                <h1 class="text-4xl md:text-5xl font-bold text-white mb-4">Shogun Relay Admin Panel</h1>
+                <p class="text-[#8B94FF] text-lg">Admin authentication required<span class="animate-pulse">_</span></p>
+            </header>
 
-                    <h1 id="relay-title" class="text-3xl font-medium mb-8 text-[#FFFFFF]">🔐 Shogun Relay Admin Panel
-                    </h1>
-                    <p class="text-[#8B94FF] mb-8">Admin authentication required<span class="animate-pulse">_</span></p>
-
-                    <!-- Admin Password Section -->
-                    <div id="adminPasswordSection"
-                        class="w-full max-w-md mb-8 p-6 bg-[#282828] rounded-2xl border border-[#404040] shadow-lg">
-                        <div class="flex items-center gap-3 mb-4">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#FF69B4]" fill="none"
-                                viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+            <!-- Admin Password Section -->
+            <div id="adminPasswordSection" class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover max-w-md mx-auto mb-8">
+                <div class="p-6">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="feature-icon bg-gradient-to-br from-[#FF69B4] to-[#FF1493]">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                             </svg>
-                            <h3 class="text-lg font-medium text-[#FF69B4]">Centralized Admin Authentication</h3>
                         </div>
-                        <div class="flex items-start gap-2 mb-4">
-                            <span class="text-[#FFA500] text-sm mt-0.5">🔒</span>
-                            <p class="text-sm text-[#E0E0E0] leading-relaxed">
-                                Enter the admin password to access all applications. If the password is incorrect, only public applications will be visible.
-                            </p>
-                        </div>
-                        <div class="space-y-4">
-                            <div class="form-control">
-                                <input type="password" id="adminPassword"
-                                    class="input w-full bg-[#404040] border-0 text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:ring-opacity-50"
-                                    placeholder="Enter Admin Password" />
-                            </div>
-                            <div class="flex gap-3">
-                                <button
-                                    class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] flex-1 rounded-xl px-4 py-3 font-medium transition-all duration-200 shadow-sm hover:shadow-md"
-                                    onclick="saveAdminPassword()">
-                                    <span class="mr-2">💾</span>
-                                    Save Password
-                                </button>
-                                <button
-                                    class="btn bg-transparent border-0 text-[#E0E0E0] hover:text-[#FFFFFF] hover:bg-[#404040] flex-1 rounded-xl px-4 py-3 font-medium transition-all duration-200"
-                                    onclick="clearAdminPassword()">
-                                    <span class="mr-2">🗑️</span>
-                                    Clear
-                                </button>
-                            </div>
-                            <div class="flex gap-3 mt-2">
-                                <button
-                                    class="btn bg-[#FF9800] hover:bg-[#F57C00] border-0 text-[#FFFFFF] w-full rounded-xl px-4 py-2 font-medium transition-all duration-200"
-                                    onclick="cleanupDuplicateKeys()" title="Remove duplicate adminToken key">
-                                    <span class="mr-2">🧹</span>
-                                    Clean Duplicate Keys
-                                </button>
-                            </div>
-                            <div id="passwordStatus"
-                                class="flex items-center gap-2 text-sm text-center text-[#E0E0E0] opacity-90 min-h-[20px]">
-                                <span class="text-[#FFA500]">🔒</span>
-                                <span>Limited Access - Only public applications visible</span>
-                            </div>
-                        </div>
+                        <h3 class="text-lg font-medium text-[#FF69B4]">Centralized Admin Authentication</h3>
                     </div>
-
-                    <!-- Link to return to home -->
-                    <div class="w-full max-w-md mb-8 p-4 bg-[#282828] rounded-2xl border border-[#404040] shadow-lg">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-3">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#42A5F5]" fill="none"
-                                    viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    <p class="text-sm text-[#E0E0E0] leading-relaxed mb-4">
+                        Enter the admin password to access all applications. If the password is incorrect, only public applications will be visible.
+                    </p>
+                    <div class="space-y-4">
+                        <input type="password" id="adminPassword"
+                            class="input w-full bg-[#404040] border-0 text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:ring-opacity-50"
+                            placeholder="Enter Admin Password" />
+                        <div class="flex gap-3">
+                            <button class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] flex-1 rounded-xl px-4 py-3 font-medium transition-all duration-200"
+                                onclick="saveAdminPassword()">
+                                Save Password
+                            </button>
+                            <button class="btn bg-transparent border border-[#404040] text-[#E0E0E0] hover:bg-[#404040] flex-1 rounded-xl px-4 py-3 font-medium transition-all duration-200"
+                                onclick="clearAdminPassword()">
+                                Clear
+                            </button>
+                        </div>
+                        <div id="passwordStatus" class="flex items-center gap-2 text-sm text-center text-[#E0E0E0] opacity-90 min-h-[20px]">
+                            <span class="text-[#FFA500]">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                 </svg>
-                                <span class="text-[#E0E0E0] text-sm">Back to public interface</span>
-                            </div>
-                            <a href="/"
-                                class="btn bg-[#42A5F5] hover:bg-[#2196F3] border-0 text-[#FFFFFF] text-sm px-4 py-2 rounded-xl font-medium transition-all duration-200 shadow-sm hover:shadow-md">
-                                🏠 Home
-                            </a>
+                            </span>
+                            <span>Limited Access - Only public applications visible</span>
                         </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
-                        <!-- Monitoring & Analytics -->
-                        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
-                            <div class="p-6">
-                                <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Monitoring & Analytics</h2>
-                                <div class="space-y-3">
-                                    <a href="/stats"
-                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected"
-                                        data-tooltip="View live relay statistics, memory usage, request rates, system metrics and admin controls">
-                                        <span class="text-[#4CAF50]">📊</span>
-                                        <span>Live Stats</span>
-                                        <span class="tooltiptext">View live relay statistics, memory usage, request rates, system metrics and admin controls</span>
-                                        <span class="absolute right-3 text-[#FFA500] text-sm">🔒</span>
-                                    </a>
-                                    <a href="/graph"
-                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl"
-                                        data-tooltip="Explore GunDB data structure in real-time, view nodes, relationships and decentralized graph data">
-                                        <span class="text-[#42A5F5]">🌐</span>
-                                        <span>Live Graph Explorer</span>
-                                        <span class="tooltiptext">Explore GunDB data structure in real-time, view nodes,
-                                            relationships and decentralized graph data</span>
-                                    </a>
-                                    <a href="/visualGraph"
-                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl"
-                                        data-tooltip="Interactive graphical visualization of GunDB data with drag-and-drop interface to explore data structure">
-                                        <span class="text-[#A0A0A0]">🕸️</span>
-                                        <span>Visual Graph Data</span>
-                                        <span class="tooltiptext">Interactive graphical visualization of GunDB data with
-                                            drag-and-drop interface to explore data structure</span>
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Storage & Files -->
-                        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
-                            <div class="p-6">
-                                <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Storage & Files</h2>
-                                <div class="space-y-3">
-                                    <a href="/upload"
-                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected"
-                                        data-tooltip="Direct file upload to IPFS with optional encryption, admin management and upload status monitoring">
-                                        <span class="text-[#42A5F5]">📤</span>
-                                        <span>Upload to IPFS</span>
-                                        <span class="tooltiptext">Direct file upload to IPFS with optional encryption,
-                                            admin management and upload status monitoring</span>
-                                        <span class="absolute right-3 text-[#FFA500] text-sm">🔒</span>
-                                    </a>
-                                    <a href="/pin-manager"
-                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected"
-                                        data-tooltip="Manage IPFS pins, view saved files, remove pins, garbage collection and debug system hashes">
-                                        <span class="text-[#42A5F5]">📌</span>
-                                        <span>IPFS Pin Manager</span>
-                                        <span class="tooltiptext">Manage IPFS pins, view saved files, remove pins,
-                                            garbage collection and debug system hashes</span>
-                                        <span class="absolute right-3 text-[#FFA500] text-sm">🔒</span>
-                                    </a>
-                                    <a href="/ipfs-status"
-                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl"
-                                        data-tooltip="Check IPFS node status, API version, peer connections and network health metrics">
-                                        <span class="text-[#64B5F6]">📊</span>
-                                        <span>IPFS Node Status</span>
-                                        <span class="tooltiptext">Check IPFS node status, API version, peer connections
-                                            and network health metrics</span>
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Data Management -->
-                        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
-                            <div class="p-6">
-                                <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Data Management</h2>
-                                <div class="space-y-3">
-                                    <a href="/admin"
-                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl"
-                                        data-tooltip="Admin panel for GunDB management, system monitoring and configuration">
-                                        <span class="text-[#42A5F5]">⚙️</span>
-                                        <span>Admin Panel</span>
-                                        <span class="tooltiptext">Admin panel for GunDB management, system monitoring
-                                            and configuration</span>
-                                    </a>
-                                    <a href="/services-dashboard"
-                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected"
-                                        data-tooltip="Monitor system services, check status and manage service configurations">
-                                        <span class="text-[#64B5F6]">📊</span>
-                                        <span>Services Dashboard</span>
-                                        <span class="tooltiptext">Monitor system services, check status and manage
-                                            service configurations</span>
-                                    </a>
-                                    <a href="/charts"
-                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl admin-protected"
-                                        data-tooltip="View system statistics, performance metrics and data visualization charts ">
-                                        <span class="text-[#4CAF50]">📈</span>
-                                        <span>Charts & Stats</span>
-                                        <span class="tooltiptext">View system statistics, performance metrics and data
-                                            visualization charts</span>
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Communication -->
-                        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
-                            <div class="p-6">
-                                <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Communication</h2>
-                                <div class="space-y-3">
-                                    <a href="/chat"
-                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl"
-                                        data-tooltip="Real-time public chat, encrypted messages, timestamps and decentralized conversation management">
-                                        <span class="text-[#4CAF50]">💬</span>
-                                        <span>Public Chat</span>
-                                        <span class="tooltiptext">Real-time public chat, encrypted messages, timestamps
-                                            and decentralized conversation management</span>
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Security & Tools -->
-                        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
-                            <div class="p-6">
-                                <h2 class="text-xl font-medium mb-4 text-[#FF69B4]">Security & Tools</h2>
-                                <div class="space-y-3">
-                                    <a href="/ipfs-status"
-                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl"
-                                        data-tooltip="Check IPFS API version, verify compatibility and IPFS protocol status">
-                                        <span class="text-[#A0A0A0]">🔧</span>
-                                        <span>IPFS API Version</span>
-                                        <span class="tooltiptext">Check IPFS API version, verify compatibility and IPFS
-                                            protocol status</span>
-                                    </a>
-                                    <a href="/endpoints"
-                                        class="tooltip btn-custom flex items-center gap-3 text-[#FFFFFF] hover:bg-[#404040] p-2 rounded-xl"
-                                        data-tooltip="Complete API reference with examples for all available endpoints">
-                                        <span class="text-[#64B5F6]">🔌</span>
-                                        <span>API Endpoints</span>
-                                        <span class="tooltiptext">Complete API reference with examples for all available endpoints</span>
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Footer -->
-                    <div class="mt-12 text-center text-[#A0A0A0] text-sm">
-                        <p>repo build with ❤️ by <a href="https://github.com/scobru"
-                                class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">scobru</a></p>
-                        <p class="mt-1">part of <a href="https://github.com/scobru/shogun"
-                                class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">shogun project</a></p>
                     </div>
                 </div>
             </div>
+
+            <!-- Quick Stats Bar -->
+            <div class="flex flex-wrap justify-center gap-4 mb-12">
+                <a href="/" class="flex items-center gap-2 px-4 py-2 bg-[#282828] rounded-full border border-[#404040] hover:border-[#FF69B4] transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#42A5F5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                    <span class="text-[#E0E0E0] text-sm">Back to Public Interface</span>
+                </a>
+                <div class="flex items-center gap-2 px-4 py-2 bg-[#282828] rounded-full border border-[#404040]">
+                    <span class="text-[#FFA500]">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                    </span>
+                    <span class="text-[#E0E0E0] text-sm">Protected Area</span>
+                </div>
+            </div>
+
+            <!-- Main Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                <!-- Monitoring & Analytics Card -->
+                <div class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover">
+                    <div class="p-6">
+                        <h2 class="text-xl font-semibold text-[#FF69B4] mb-4">Monitoring & Analytics</h2>
+                        <p class="text-[#A0A0A0] text-sm mb-5">Real-time system monitoring and data visualization</p>
+                        <div class="space-y-2">
+                            <a href="/stats" class="nav-link flex items-center gap-3 text-white admin-protected">
+                                <div class="feature-icon bg-[#4CAF50]/20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#4CAF50]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                    </svg>
+                                </div>
+                                <div class="flex-1">
+                                    <span class="font-medium">Live Stats</span>
+                                    <p class="text-xs text-[#A0A0A0]">Real-time metrics and monitoring</p>
+                                </div>
+                                <span class="text-[#FFA500]">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                </span>
+                            </a>
+                            <a href="/graph" class="nav-link flex items-center gap-3 text-white">
+                                <div class="feature-icon bg-[#42A5F5]/20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#42A5F5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <span class="font-medium">Live Graph Explorer</span>
+                                    <p class="text-xs text-[#A0A0A0]">Real-time GunDB browser</p>
+                                </div>
+                            </a>
+                            <a href="/visualGraph" class="nav-link flex items-center gap-3 text-white">
+                                <div class="feature-icon bg-[#9C27B0]/20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#9C27B0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <span class="font-medium">Visual Graph Data</span>
+                                    <p class="text-xs text-[#A0A0A0]">Interactive 3D visualization</p>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Storage & Files Card -->
+                <div class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover">
+                    <div class="p-6">
+                        <h2 class="text-xl font-semibold text-[#FF69B4] mb-4">Storage & Files</h2>
+                        <p class="text-[#A0A0A0] text-sm mb-5">IPFS storage management and file operations</p>
+                        <div class="space-y-2">
+                            <a href="/upload" class="nav-link flex items-center gap-3 text-white admin-protected">
+                                <div class="feature-icon bg-[#42A5F5]/20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#42A5F5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                    </svg>
+                                </div>
+                                <div class="flex-1">
+                                    <span class="font-medium">Upload to IPFS</span>
+                                    <p class="text-xs text-[#A0A0A0]">Direct file upload with encryption</p>
+                                </div>
+                                <span class="text-[#FFA500]">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                </span>
+                            </a>
+                            <a href="/pin-manager" class="nav-link flex items-center gap-3 text-white admin-protected">
+                                <div class="feature-icon bg-[#F44336]/20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#F44336]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                                    </svg>
+                                </div>
+                                <div class="flex-1">
+                                    <span class="font-medium">IPFS Pin Manager</span>
+                                    <p class="text-xs text-[#A0A0A0]">Manage pins and garbage collection</p>
+                                </div>
+                                <span class="text-[#FFA500]">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                </span>
+                            </a>
+                            <a href="/ipfs-status" class="nav-link flex items-center gap-3 text-white">
+                                <div class="feature-icon bg-[#00BCD4]/20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#00BCD4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <span class="font-medium">IPFS Node Status</span>
+                                    <p class="text-xs text-[#A0A0A0]">Node health & metrics</p>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Management Card -->
+                <div class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover">
+                    <div class="p-6">
+                        <h2 class="text-xl font-semibold text-[#FF69B4] mb-4">Data Management</h2>
+                        <p class="text-[#A0A0A0] text-sm mb-5">System administration and configuration</p>
+                        <div class="space-y-2">
+                            <a href="/admin" class="nav-link flex items-center gap-3 text-white">
+                                <div class="feature-icon bg-[#FFB74D]/20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#FFB74D]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <span class="font-medium">Admin Panel</span>
+                                    <p class="text-xs text-[#A0A0A0]">GunDB management & config</p>
+                                </div>
+                            </a>
+                            <a href="/services-dashboard" class="nav-link flex items-center gap-3 text-white admin-protected">
+                                <div class="feature-icon bg-[#64B5F6]/20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#64B5F6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                                    </svg>
+                                </div>
+                                <div class="flex-1">
+                                    <span class="font-medium">Services Dashboard</span>
+                                    <p class="text-xs text-[#A0A0A0]">Monitor system services</p>
+                                </div>
+                                <span class="text-[#FFA500]">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                </span>
+                            </a>
+                            <a href="/charts" class="nav-link flex items-center gap-3 text-white admin-protected">
+                                <div class="feature-icon bg-[#4CAF50]/20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#4CAF50]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                                    </svg>
+                                </div>
+                                <div class="flex-1">
+                                    <span class="font-medium">Charts & Stats</span>
+                                    <p class="text-xs text-[#A0A0A0]">Performance visualization</p>
+                                </div>
+                                <span class="text-[#FFA500]">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                </span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Communication Card -->
+                <div class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover">
+                    <div class="p-6">
+                        <h2 class="text-xl font-semibold text-[#FF69B4] mb-4">Communication</h2>
+                        <p class="text-[#A0A0A0] text-sm mb-5">Real-time decentralized messaging</p>
+                        <div class="space-y-2">
+                            <a href="/chat" class="nav-link flex items-center gap-3 text-white">
+                                <div class="feature-icon bg-[#4CAF50]/20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#4CAF50]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <span class="font-medium">Public Chat</span>
+                                    <p class="text-xs text-[#A0A0A0]">Encrypted P2P messaging</p>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security & Tools Card -->
+                <div class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover">
+                    <div class="p-6">
+                        <h2 class="text-xl font-semibold text-[#FF69B4] mb-4">Security & Tools</h2>
+                        <p class="text-[#A0A0A0] text-sm mb-5">API documentation and system tools</p>
+                        <div class="space-y-2">
+                            <a href="/ipfs-status" class="nav-link flex items-center gap-3 text-white">
+                                <div class="feature-icon bg-[#A0A0A0]/20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#A0A0A0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <span class="font-medium">IPFS API Version</span>
+                                    <p class="text-xs text-[#A0A0A0]">Check compatibility status</p>
+                                </div>
+                            </a>
+                            <a href="/endpoints" class="nav-link flex items-center gap-3 text-white">
+                                <div class="feature-icon bg-[#64B5F6]/20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#64B5F6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <span class="font-medium">API Endpoints</span>
+                                    <p class="text-xs text-[#A0A0A0]">Complete API reference</p>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <footer class="mt-16 text-center">
+                <div class="section-divider"></div>
+                <div class="flex flex-col items-center gap-4">
+                    <div class="flex items-center gap-6">
+                        <a href="https://github.com/scobru/shogun" target="_blank" rel="noopener" 
+                           class="text-[#A0A0A0] hover:text-[#FF69B4] transition-colors flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                            </svg>
+                            GitHub
+                        </a>
+                        <a href="/endpoints" class="text-[#A0A0A0] hover:text-[#FF69B4] transition-colors">Docs</a>
+                    </div>
+                    <p class="text-[#606060] text-sm">
+                        Shogun Relay Admin Panel - Built with GunDB & IPFS
+                    </p>
+                    <p class="text-[#606060] text-xs">
+                        Part of the <a href="https://github.com/scobru/shogun" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">Shogun Project</a>
+                    </p>
+                </div>
+            </footer>
         </div>
     </div>
 
@@ -354,45 +432,20 @@
             forceCorrectVisibility();
         }
 
-        function cleanupDuplicateKeys() {
-            ShogunAdmin.cleanupDuplicateKeys();
-            alert('🧹 Duplicate keys cleaned up! Check browser console for details.');
-        }
-
         function updateAuthSectionsVisibility() {
             const statusElement = document.getElementById('passwordStatus');
             const passwordSection = document.getElementById('adminPasswordSection');
 
             if (ShogunAdmin.hasPassword()) {
-                statusElement.innerHTML = '<span class="text-[#4CAF50]">✅</span><span>Admin Access - All applications available</span>';
-                // Hide password box when token is present
+                statusElement.innerHTML = '<span class="text-[#4CAF50]"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg></span><span>Admin Access - All applications available</span>';
                 if (passwordSection) {
                     passwordSection.style.display = 'none';
                 }
             } else {
-                statusElement.innerHTML = '<span class="text-[#FFA500]">🔒</span><span>Limited Access - Only public applications visible</span>';
-                // Show password box when there's no token
+                statusElement.innerHTML = '<span class="text-[#FFA500]"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg></span><span>Limited Access - Only public applications visible</span>';
                 if (passwordSection) {
                     passwordSection.style.display = 'block';
                 }
-            }
-        }
-
-        function showAllApplications() {
-            document.body.classList.add('admin-authenticated');
-            updateAuthSectionsVisibility();
-        }
-
-        function showPublicApplicationsOnly() {
-            document.body.classList.remove('admin-authenticated');
-            updateAuthSectionsVisibility();
-        }
-
-        function handleProtectedPageError() {
-            // Handle errors accessing protected pages
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('error') === 'unauthorized') {
-                alert('❌ Access denied: This page requires admin authentication.');
             }
         }
 
@@ -411,26 +464,27 @@
             }
         }
 
+        function handleProtectedPageError() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('error') === 'unauthorized') {
+                alert('Access denied: This page requires admin authentication.');
+            }
+        }
+
         // Initialize admin authentication
         window.addEventListener('DOMContentLoaded', async () => {
-            // Initialize ShogunAdmin
             ShogunAdmin.init();
-
-            // Update visibility based on stored password
             updateAuthSectionsVisibility();
             handleProtectedPageError();
             forceCorrectVisibility();
 
-            // Listen for password changes
             ShogunAdmin.onPasswordChange(() => {
                 updateAuthSectionsVisibility();
                 forceCorrectVisibility();
             });
 
-            // Auto-focus password field
             document.getElementById('adminPassword').focus();
 
-            // Intercept clicks on admin-protected links and add authorization
             document.addEventListener('click', function (e) {
                 const link = e.target.closest('a');
                 if (link && link.classList.contains('admin-protected')) {
@@ -438,15 +492,13 @@
 
                     const password = ShogunAdmin.getPassword();
                     if (!password) {
-                        alert('⚠️ Admin password required. Please save your admin password first.');
+                        alert('Admin password required. Please save your admin password first.');
                         return;
                     }
 
                     const url = new URL(link.getAttribute('href'), window.location.origin);
                     url.searchParams.set('auth_token', password);
                     url.searchParams.set('_auth_token', password);
-
-                    console.log(`🔐 Navigating to protected page: ${url.toString()}`);
 
                     if (link.target === '_blank') {
                         window.open(url.toString(), '_blank', 'noopener');

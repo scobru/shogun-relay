@@ -14,16 +14,40 @@
     <script src="lib/admin-nav.js"></script>
     <script src="lib/admin-auth.js"></script>
     <style>
+        body {
+            background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
+            min-height: 100vh;
+        }
+
+        .hero-gradient {
+            background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4); }
+            50% { box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2); }
+        }
+
+        .pulse-glow {
+            animation: pulse-glow 2s infinite;
+        }
+
+        .section-divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #404040, transparent);
+            margin: 2rem 0;
+        }
+
         .service-card {
-            transition: all 0.3s ease;
-            border: 1px solid #606060;
-            background-color: #404040;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid #404040;
+            background-color: #282828;
             border-radius: 1rem;
         }
 
         .service-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 32px rgba(255, 105, 180, 0.2);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
             border-color: rgba(255, 105, 180, 0.3);
         }
 
@@ -88,20 +112,39 @@
     </style>
 </head>
 
-<body class="antialiased bg-[#1A1A1A]">
-    <div class="container mx-auto p-6">
-        <div class="flex justify-between items-center mb-8">
-            <div>
-                <h1 class="text-3xl font-bold text-[#FFFFFF]">Services Dashboard</h1>
-                <p class="text-[#A0A0A0] text-lg">Monitor and control Shogun Relay services</p>
-            </div>
-            <div class="flex gap-3">
-                <button onclick="refreshAllServices()" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Refresh All</button>
-                <button onclick="clearAdminPassword()" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium" title="Clear stored admin password">Clear Auth</button>
-                <a href="/pin-manager" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Pin Manager</a>
-                <a href="/" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Back</a>
-            </div>
-        </div>
+<body class="antialiased">
+    <div class="hero-gradient min-h-screen">
+        <div class="container mx-auto px-4 py-8 max-w-7xl">
+            <!-- Header -->
+            <header class="mb-12">
+                <div class="flex items-center mb-6">
+                    <a href="/" class="flex items-center gap-2 text-[#A0A0A0] hover:text-[#FF69B4] transition-colors group">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                        <span>Back to Control Panel</span>
+                    </a>
+                </div>
+                
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <div class="flex items-center gap-4">
+                        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#64B5F6] to-[#1976D2] pulse-glow">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 class="text-3xl md:text-4xl font-bold text-[#FFFFFF]">Services Dashboard</h1>
+                            <p class="text-[#8B94FF]">Monitor and control Shogun Relay services</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="refreshAllServices()" class="btn bg-transparent border border-[#404040] text-[#E0E0E0] hover:bg-[#404040] hover:border-[#FF69B4] rounded-xl px-4 py-2 font-medium transition-all">Refresh All</button>
+                        <button onclick="clearAdminPassword()" class="btn bg-transparent border border-[#404040] text-[#E0E0E0] hover:bg-[#404040] hover:border-[#FF69B4] rounded-xl px-4 py-2 font-medium transition-all" title="Clear stored admin password">Clear Auth</button>
+                        <a href="/pin-manager" class="btn bg-transparent border border-[#404040] text-[#E0E0E0] hover:bg-[#404040] hover:border-[#FF69B4] rounded-xl px-4 py-2 font-medium transition-all">Pin Manager</a>
+                    </div>
+                </div>
+            </header>
 
         <div id="alertPanel" class="alert alert-warning mb-8 bg-[#FFA500]/20 border-[#FFA500]/30 text-[#FFA500] rounded-xl p-4" style="display: none;">
             <div>
@@ -208,19 +251,27 @@
 
         </div>
 
-        <!-- Logs Section -->
-        <div class="card bg-[#404040] border-[#606060] rounded-xl mt-8">
-            <div class="card-body p-6">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="card-title text-[#FF69B4] text-xl">Service Logs</h2>
-                    <button onclick="clearLogs()" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Clear</button>
-                </div>
-                <div id="service-logs" class="bg-[#282828] rounded-xl p-4 font-mono text-base h-40 overflow-y-auto text-[#E0E0E0]">
-                    <div class="text-[#A0A0A0]">Service monitoring initialized...</div>
+            <!-- Logs Section -->
+            <div class="card bg-[#282828] border border-[#404040] rounded-2xl mt-8">
+                <div class="card-body p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="card-title text-[#FF69B4] text-xl">Service Logs</h2>
+                        <button onclick="clearLogs()" class="btn bg-transparent border border-[#404040] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Clear</button>
+                    </div>
+                    <div id="service-logs" class="bg-[#1A1A1A] rounded-xl p-4 font-mono text-base h-40 overflow-y-auto text-[#E0E0E0] border border-[#404040]">
+                        <div class="text-[#A0A0A0]">Service monitoring initialized...</div>
+                    </div>
                 </div>
             </div>
-        </div>
 
+            <!-- Footer -->
+            <footer class="mt-12 text-center">
+                <div class="section-divider"></div>
+                <p class="text-[#606060] text-sm">
+                    Shogun Relay Services - Part of the <a href="https://github.com/scobru/shogun" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">Shogun Project</a>
+                </p>
+            </footer>
+        </div>
     </div>
 
     <script>

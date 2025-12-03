@@ -14,6 +14,39 @@
     <script src="lib/admin-auth.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
     <style>
+        body {
+            background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
+            min-height: 100vh;
+        }
+
+        .hero-gradient {
+            background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4); }
+            50% { box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2); }
+        }
+
+        .pulse-glow {
+            animation: pulse-glow 2s infinite;
+        }
+
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .section-divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #404040, transparent);
+            margin: 2rem 0;
+        }
+
         .message-timestamp {
             font-size: 0.75rem;
             opacity: 0.7;
@@ -32,19 +65,30 @@
         }
     </style>
 </head>
-<body class="antialiased bg-[#1A1A1A]">
-    <div class="container mx-auto px-6 py-4 sm:py-6">
-        <div class="flex items-center mb-6">
-            <a href="/" class="text-[#42A5F5] hover:text-[#64B5F6] transition-colors text-lg">&larr; Back to Control Panel</a>
-        </div>
-        
-        <div class="card bg-[#282828] border-[#404040] rounded-2xl shadow-xl">
-            <div class="p-6 sm:p-8 md:p-10 flex flex-col items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 sm:h-14 sm:w-14 mb-6 text-[#FF69B4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-                
-                <h1 class="text-2xl sm:text-3xl font-semibold mb-8 sm:mb-10 text-center text-[#FFFFFF]">Public Relay Chat</h1>
+<body class="antialiased">
+    <div class="hero-gradient min-h-screen">
+        <div class="container mx-auto px-4 py-8 max-w-4xl">
+            <!-- Back Navigation -->
+            <div class="flex items-center mb-8">
+                <a href="/" class="flex items-center gap-2 text-[#A0A0A0] hover:text-[#FF69B4] transition-colors group">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    <span>Back to Control Panel</span>
+                </a>
+            </div>
+            
+            <div class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover">
+                <div class="p-6 sm:p-8 md:p-10 flex flex-col items-center">
+                    <!-- Header Icon -->
+                    <div class="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-[#4CAF50] to-[#43A047] mb-6 pulse-glow">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 sm:h-10 sm:w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                    </div>
+                    
+                    <h1 class="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 text-center text-[#FFFFFF]">Public Relay Chat</h1>
+                    <p class="text-[#8B94FF] mb-8 sm:mb-10">Real-time decentralized messaging</p>
                 
                 <div id="messages" class="w-full h-80 sm:h-96 md:h-[28rem] overflow-y-auto bg-[#404040] rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8"></div>
                 
@@ -55,7 +99,16 @@
                         <button type="submit" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] w-full sm:w-auto rounded-xl px-8 py-4 text-lg font-medium">Send</button>
                     </div>
                 </form>
+                </div>
             </div>
+
+            <!-- Footer -->
+            <footer class="mt-12 text-center">
+                <div class="section-divider"></div>
+                <p class="text-[#606060] text-sm">
+                    Shogun Relay Chat - Part of the <a href="https://github.com/scobru/shogun" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">Shogun Project</a>
+                </p>
+            </footer>
         </div>
     </div>
 

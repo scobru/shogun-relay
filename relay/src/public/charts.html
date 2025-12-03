@@ -13,11 +13,16 @@
 <script src="lib/admin-auth.js"></script>
 <style>
 	body {
-		background-color: #1A1A1A;
+		background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
 		color: #E0E0E0 !important;
 		margin: 0;
 		padding: 1em;
 		line-height: 1.6;
+		min-height: 100vh;
+	}
+
+	.hero-gradient {
+		background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
 	}
 
 	h1 {
@@ -40,6 +45,30 @@
 		h1 {
 			font-size: 2rem;
 		}
+	}
+
+	@keyframes pulse-glow {
+		0%, 100% { box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4); }
+		50% { box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2); }
+	}
+
+	.pulse-glow {
+		animation: pulse-glow 2s infinite;
+	}
+
+	.card-hover {
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	.card-hover:hover {
+		transform: translateY(-4px);
+		box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+	}
+
+	.section-divider {
+		height: 1px;
+		background: linear-gradient(90deg, transparent, #404040, transparent);
+		margin: 2rem 0;
 	}
 
 	a {
@@ -176,19 +205,30 @@
 </style>
 </head>
 <body class="antialiased">
-<div class="container mx-auto p-2 sm:p-4">
-	<div class="flex items-center mb-4">
-		<a href="/" class="text-[#42A5F5] hover:text-[#64B5F6] transition-colors">&larr; Back to Control Panel</a>
-	</div>
-
-	<div class="card bg-[#282828] border-[#404040] rounded-2xl">
-		<div class="p-4 sm:p-6 md:p-8">
-			<div class="flex flex-col items-center">
-				<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 sm:h-12 sm:w-12 mb-4 text-[#FF69B4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+<div class="hero-gradient min-h-screen">
+	<div class="container mx-auto px-4 py-8 max-w-6xl">
+		<!-- Back Navigation -->
+		<div class="flex items-center mb-8">
+			<a href="/" class="flex items-center gap-2 text-[#A0A0A0] hover:text-[#FF69B4] transition-colors group">
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
 				</svg>
-				
-				<h1 class="text-center mb-6 sm:mb-8">📊 Gun Relay Advanced Stats Dashboard</h1>
+				<span>Back to Control Panel</span>
+			</a>
+		</div>
+
+		<div class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover">
+			<div class="p-4 sm:p-6 md:p-8">
+				<div class="flex flex-col items-center">
+					<!-- Header Icon -->
+					<div class="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-[#FF69B4] to-[#FF1493] mb-6 pulse-glow">
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 sm:h-10 sm:w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+						</svg>
+					</div>
+					
+					<h1 class="text-center mb-2 sm:mb-4 text-2xl sm:text-3xl font-bold">Gun Relay Advanced Stats</h1>
+					<p class="text-[#8B94FF] mb-6 sm:mb-8">Real-time performance charts and metrics</p>
 
 				<div class="center">
 					<div class="stat-pair"><span class="shout" id="peers">0</span> peers</div>
@@ -215,6 +255,15 @@
 			</div>
 		</div>
 	</div>
+
+	<!-- Footer -->
+	<footer class="mt-12 text-center pb-8">
+		<div class="section-divider"></div>
+		<p class="text-[#606060] text-sm">
+			Shogun Relay Charts - Part of the <a href="https://github.com/scobru/shogun" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">Shogun Project</a>
+		</p>
+	</footer>
+</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>

@@ -17,7 +17,36 @@
   <style>
     body {
       line-height: 1.6;
-      background-color: #1A1A1A;
+      background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
+      min-height: 100vh;
+    }
+
+    .hero-gradient {
+      background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4); }
+      50% { box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2); }
+    }
+
+    .pulse-glow {
+      animation: pulse-glow 2s infinite;
+    }
+
+    .card-hover {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .card-hover:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .section-divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #404040, transparent);
+      margin: 2rem 0;
     }
 
     .drag-drop-area {
@@ -92,22 +121,31 @@
   </style>
 </head>
 
-<body class="antialiased bg-[#1A1A1A]">
-  <div class="container mx-auto p-6">
-    <div class="flex items-center mb-6">
-      <a href="/" class="text-[#42A5F5] hover:text-[#64B5F6] transition-colors text-lg">&larr; Back to Control Panel</a>
-    </div>
-
-    <div class="card bg-[#282828] border-[#404040] rounded-2xl">
-      <div class="p-8 sm:p-10">
-        <div class="flex flex-col items-center">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-6 text-[#FF69B4]" fill="none" viewBox="0 0 24 24"
-            stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+<body class="antialiased">
+  <div class="hero-gradient min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+      <!-- Back Navigation -->
+      <div class="flex items-center mb-8">
+        <a href="/" class="flex items-center gap-2 text-[#A0A0A0] hover:text-[#FF69B4] transition-colors group">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
+          <span>Back to Control Panel</span>
+        </a>
+      </div>
 
-          <h1 class="text-3xl font-semibold mb-8 text-[#FFFFFF]">IPFS File Uploader</h1>
+      <div class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover">
+        <div class="p-8 sm:p-10">
+          <div class="flex flex-col items-center">
+            <!-- Header Icon -->
+            <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-[#42A5F5] to-[#1976D2] mb-6 pulse-glow">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            </div>
+
+            <h1 class="text-3xl md:text-4xl font-bold mb-4 text-[#FFFFFF]">IPFS File Uploader</h1>
+            <p class="text-[#8B94FF] mb-8">Direct file upload with optional encryption</p>
 
           <div class="w-full space-y-8">
             <div class="form-group">
@@ -165,6 +203,14 @@
           </div>
         </div>
       </div>
+
+      <!-- Footer -->
+      <footer class="mt-12 text-center">
+        <div class="section-divider"></div>
+        <p class="text-[#606060] text-sm">
+          Shogun Relay Upload - Part of the <a href="https://github.com/scobru/shogun" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">Shogun Project</a>
+        </p>
+      </footer>
     </div>
   </div>
 
