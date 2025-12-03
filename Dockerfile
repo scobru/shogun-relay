@@ -33,13 +33,20 @@ RUN apk add --no-cache \
     && cd /tmp/ipfs-install \
     && wget -q https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
     && wget -q https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
+    && echo "Verifying tarball downloaded..." \
+    && test -f kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz || (echo "ERROR: tarball not downloaded" && exit 1) \
+    && ls -lh kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
     && echo "Verifying checksum..." \
     && sha512sum -c kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
+    && echo "Listing tarball contents..." \
+    && tar -tzf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz | head -n 10 \
     && echo "Extracting IPFS..." \
-    && tar -xf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
+    && tar -xzf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz || (echo "ERROR: tar extraction failed" && exit 1) \
     && echo "Checking extracted files..." \
+    && pwd \
     && ls -la \
-    && if [ ! -d "kubo" ]; then echo "ERROR: kubo directory missing"; ls -R; exit 1; fi \
+    && echo "Checking for kubo directory..." \
+    && if [ ! -d "kubo" ]; then echo "ERROR: kubo directory missing"; echo "Current directory contents:"; ls -la; echo "Recursive listing:"; find . -type f -o -type d | head -n 20; exit 1; fi \
     && echo "Verifying IPFS binary exists before install..." \
     && test -f kubo/ipfs || (echo "ERROR: kubo/ipfs binary not found in extracted archive" && ls -la kubo/ && exit 1) \
     && echo "Installing IPFS to /usr/local/bin..." \
