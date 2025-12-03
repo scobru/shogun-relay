@@ -143,6 +143,15 @@ Create a `.env` file or export the variables below:
 | `HOLSTER_RELAY_STORAGE` | Enable Holster persistent storage                      | `true`                 |
 | `HOLSTER_RELAY_STORAGE_PATH` | Path for Holster data storage                         | `./holster-data`       |
 | `HOLSTER_MAX_CONNECTIONS` | Maximum connections for Holster relay                  | `100`                  |
+| `X402_PAY_TO_ADDRESS` | Ethereum address for receiving x402 subscription payments | _(optional)_ |
+| `X402_NETWORK` | Blockchain network for x402 (e.g., 'base-sepolia') | `base-sepolia` |
+| `X402_FACILITATOR_URL` | x402 facilitator service URL | _(optional)_ |
+| `X402_FACILITATOR_API_KEY` | API key for x402 facilitator | _(optional)_ |
+| `X402_SETTLEMENT_MODE` | x402 settlement mode ('facilitator' or 'direct') | `facilitator` |
+| `X402_PRIVATE_KEY` | Private key for x402 transactions | _(optional)_ |
+| `X402_RPC_URL` | RPC URL for blockchain access | _(optional)_ |
+| `RELAY_GUN_USERNAME` | GunDB username for relay user (x402 subscriptions) | `shogun-relay` |
+| `RELAY_GUN_PASSWORD` | GunDB password for relay user (x402 subscriptions) | `ADMIN_PASSWORD` |
 
 Additional switches (Radisk toggle, cleanup, peers, etc.) are documented inside `index.js`.
 
@@ -171,10 +180,13 @@ The admin dashboards rely on `lib/admin-auth.js` to sync the token across tabs. 
 | `/services-dashboard` | Service health overview                    | ✅   |
 | `/pin-manager`        | IPFS pin manager with preview & batch ops  | ✅   |
 | `/upload`             | Direct IPFS uploads                        | ✅   |
+| `/endpoints`           | Complete API endpoints documentation       | ❌   |
 | `/visualGraph`        | GunDB visual explorer (public reads)       | ⚠️*  |
 | `/graph`              | Alternate Gun graph viewer                 | ⚠️*  |
 | `/charts`             | Charts and analytics dashboard             | ✅   |
 | `/chat`               | Demo public chat                           | ❌   |
+| `/notes`              | Notes interface                            | ✅   |
+| `/subscription`       | x402 subscription management               | ❌   |
 
 `⚠️` The explorers browse public coordinates without a token but prompt for the admin token when write access is required.
 
@@ -190,41 +202,79 @@ The admin dashboards rely on `lib/admin-auth.js` to sync the token across tabs. 
 - `GET /holster-status` – Check Holster relay status and configuration.
 
 ### IPFS Management
-- `POST /api/v1/ipfs/upload` – Upload streams (admin).
-- `GET /api/v1/ipfs/content/:cid` – Stream IPFS content (used by preview panel).
-- `GET /api/v1/ipfs/content-json/:cid` – Get IPFS content as JSON.
-- `POST /api/v1/ipfs/pins/add` – Add pin.
-- `POST /api/v1/ipfs/pins/rm` – Remove pin.
-- `POST /api/v1/ipfs/pins/ls` – List pins.
-- `GET /api/v1/ipfs/status` – Connectivity check.
-- `GET /api/v1/ipfs/repo/stat` – Repository statistics.
-- `POST /api/v1/ipfs/repo/gc` – Garbage collection.
-- `POST /api/v0/*` – Raw IPFS API proxy (admin).
+- `POST /api/v1/ipfs/upload` – Upload files to IPFS (admin, supports multipart/form-data with optional encryption).
+- `GET /api/v1/ipfs/cat/:cid` – Stream IPFS content (aligned with Kubo's `/api/v0/cat`).
+- `GET /api/v1/ipfs/cat/:cid/json` – Get IPFS content as JSON (automatically parses JSON).
+- `GET /api/v1/ipfs/cat/:cid/decrypt` – Get and decrypt SEA-encrypted IPFS content (requires token query param).
+- `POST /api/v1/ipfs/pin/add` – Pin content to IPFS (admin, aligned with Kubo's `/api/v0/pin/add`).
+- `POST /api/v1/ipfs/pin/rm` – Remove a pin from IPFS (admin, aligned with Kubo's `/api/v0/pin/rm`).
+- `GET /api/v1/ipfs/pin/ls` – List all pinned content (admin, aligned with Kubo's `/api/v0/pin/ls`).
+- `GET /api/v1/ipfs/status` – Check IPFS node connectivity and status (public).
+- `GET /api/v1/ipfs/version` – Get IPFS version information (public).
+- `GET /api/v1/ipfs/repo/stat` – Get IPFS repository statistics (admin).
+- `POST /api/v1/ipfs/repo/gc` – Run garbage collection to remove unpinned content (admin).
+- `GET /api/v1/ipfs/user-uploads/:userAddress` – Get user uploads list for x402 subscription users.
+- `DELETE /api/v1/ipfs/user-uploads/:userAddress/:hash` – Delete/unpin user file (for x402 subscription users).
+- `GET /ipfs/:cid` – IPFS Gateway proxy (public, direct access via CID).
+- `GET /ipns/:name` – IPNS Gateway proxy (public, resolve IPNS names).
+- `POST /api/v0/*` – Raw Kubo IPFS API proxy (admin, forwards requests to IPFS node API).
 
 ### System & Debug
-- `GET /health` – Simple health check.
-- `GET /api/v1/system/health` – Detailed health report.
-- `GET /api/v1/system/relay-info` – Relay information.
-- `GET /api/v1/system/alldata` – Dump `shogun` namespace (admin use).
-- `GET /api/v1/system/stats` – System statistics.
-- `GET /api/v1/system/logs` / `DELETE /api/v1/system/logs` – Log management.
-- `GET /api/v1/system/peers` – List Gun peers.
-- `POST /api/v1/system/peers/add` – Add Gun peer.
-- `GET /api/v1/services/status` – Service snapshot.
-- `POST /api/v1/services/:service/restart` – Restart stub.
-- `GET /api/v1/debug/mb-usage/:userAddress` – Storage usage by user.
-- `GET /api/v1/debug/user-uploads/:identifier` – User uploads info.
+- `GET /health` – Simple health check (public).
+- `GET /api/v1/system/health` – Detailed health report with system information (public).
+- `GET /api/v1/system/relay-info` – Get relay server information (public).
+- `GET /api/v1/system/stats` – Get system statistics and metrics (public).
+- `POST /api/v1/system/stats/update` – Update system statistics (admin).
+- `GET /api/v1/system/stats.json` – Get system statistics as JSON (public).
+- `GET /api/v1/system/alldata` – Dump all data from the 'shogun' namespace in GunDB (admin).
+- `GET /api/v1/system/node/*` – Inspect GunDB nodes via REST API (optional auth, wildcard path).
+- `POST /api/v1/system/node/*` – Update or create GunDB nodes via REST API (admin).
+- `DELETE /api/v1/system/node/*` – Delete GunDB nodes via REST API (admin).
+- `GET /api/v1/system/logs` – Get system logs (admin).
+- `DELETE /api/v1/system/logs` – Clear system logs (admin).
+- `GET /api/v1/system/peers` – List all GunDB peers (public).
+- `POST /api/v1/system/peers/add` – Add a GunDB peer (admin).
+- `GET /api/v1/services/status` – Get status of all services (IPFS, Relay, etc.) (public).
+- `POST /api/v1/services/:service/restart` – Restart a specific service (stub endpoint, admin).
+- `GET /api/v1/debug/mb-usage/:userAddress` – Get storage usage in MB for a specific user address (admin).
+- `GET /api/v1/debug/user-mb-usage/:identifier` – Get storage usage for a user identifier (admin).
+- `POST /api/v1/debug/user-mb-usage/:identifier/reset` – Reset storage usage counter for a user (admin).
+- `GET /api/v1/debug/user-uploads/:identifier` – Get detailed upload information for debugging (admin).
 
 
 ### User Uploads
-- `GET /api/v1/user-uploads/system-hashes` – System hash registry.
-- `GET /api/v1/user-uploads/:identifier` – Get user uploads.
-- `GET /api/v1/user-uploads/:identifier/:hash` – Get specific upload.
+- `GET /api/v1/user-uploads/system-hashes` – Get system hash registry (protected hashes that won't be garbage collected) (public).
+- `GET /api/v1/user-uploads/system-hashes-map` – Get system hash registry as a map for quick lookups (public).
+- `POST /api/v1/user-uploads/save-system-hash` – Save a hash to the system registry to protect it from garbage collection (admin).
+- `DELETE /api/v1/user-uploads/remove-system-hash/:hash` – Remove a hash from the system registry (admin).
+- `GET /api/v1/user-uploads/:identifier` – Get all uploads for a specific user identifier (public).
+- `GET /api/v1/user-uploads/:identifier/:hash` – Get specific upload information for a user (public).
+- `DELETE /api/v1/user-uploads/:identifier/:hash` – Delete a specific upload for a user (admin).
+
+### x402 Subscriptions
+- `GET /api/v1/x402/tiers` – List all available subscription tiers (public).
+- `GET /api/v1/x402/subscription/:userAddress` – Get subscription status for a user (public).
+- `POST /api/v1/x402/subscribe` – Purchase or renew subscription with x402 payment (public).
+- `GET /api/v1/x402/payment-requirements/:tier` – Get x402 payment requirements for a specific tier (public).
+- `GET /api/v1/x402/can-upload/:userAddress` – Check if user can upload based on subscription (public).
+- `GET /api/v1/x402/can-upload-verified/:userAddress` – Check if user can upload with verified subscription status (public).
+- `POST /api/v1/x402/update-usage/:userAddress` – Update storage usage for a user (admin).
+- `GET /api/v1/x402/storage/:userAddress` – Get storage information for a user (public).
+- `POST /api/v1/x402/storage/sync/:userAddress` – Sync storage usage from actual uploads (admin).
+- `GET /api/v1/x402/config` – Get x402 configuration (public).
 
 ### Visual Graph
+- `GET /api/v1/visualGraph` – Visual graph explorer endpoint.
 - `/visualGraph/*` – Static assets backing the D3.js explorer.
 
-Full endpoint definitions live in `relay/src/routes/`.
+### Notes
+- `GET /api/v1/notes` – Notes endpoint.
+- `GET /api/v1/notes/regular` – Regular notes endpoint.
+
+### Admin Pages
+- `GET /endpoints` – API endpoints documentation page (public).
+
+Full endpoint definitions live in `relay/src/routes/`. See `/endpoints` for interactive API documentation.
 
 ---
 
