@@ -1,9 +1,5 @@
 # Shogun Relay Full Stack Container
 # Includes: IPFS, Relay Server
-#
-# Build Context: This Dockerfile must be built with the build context set to
-# the directory containing this Dockerfile (shogun-relay/)
-# All COPY commands use relative paths from this directory
 
 FROM node:20-alpine
 
@@ -25,7 +21,6 @@ RUN apk add --no-cache \
     dos2unix \
     supervisor \
     gcompat \
-    tar \
     && ARCH=$(uname -m) \
     && case $ARCH in \
     x86_64) ARCH_NAME="amd64" ;; \
@@ -33,51 +28,27 @@ RUN apk add --no-cache \
     *) echo "Unsupported architecture: $ARCH"; exit 1 ;; \
     esac \
     && echo "Downloading IPFS Kubo v${IPFS_VERSION} for ${ARCH_NAME}..." \
-    && mkdir -p /tmp/ipfs-install \
-    && cd /tmp/ipfs-install \
-    && echo "Downloading tarball (with extended retries for server issues)..." \
-    && for i in 1 2 3 4 5; do \
-        echo "Attempt $i of 5..." && \
-        curl -L --fail --retry 2 --retry-delay 5 --max-time 300 -o kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz && \
-        break || \
-        (echo "Download attempt $i failed, waiting 10 seconds..." && sleep 10); \
-    done || (echo "ERROR: All download attempts failed" && exit 1) \
-    && echo "Downloading checksum..." \
-    && for i in 1 2 3 4 5; do \
-        echo "Checksum attempt $i of 5..." && \
-        curl -L --fail --retry 2 --retry-delay 5 --max-time 60 -o kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 && \
-        break || \
-        (echo "Checksum download attempt $i failed, waiting 10 seconds..." && sleep 10); \
-    done || (echo "ERROR: All checksum download attempts failed" && exit 1) \
-    && echo "Verifying tarball downloaded..." \
-    && test -f kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz || (echo "ERROR: tarball not found after download" && ls -la && exit 1) \
-    && ls -lh kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
+    && wget -q https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
+    && wget -q https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
     && echo "Verifying checksum..." \
-    && sha512sum -c kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 || (echo "ERROR: checksum verification failed" && cat kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 && exit 1) \
-    && echo "Listing tarball contents..." \
-    && tar -tzf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz | head -n 10 \
+    && sha512sum -c kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
     && echo "Extracting IPFS..." \
-    && tar -xzf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz || (echo "ERROR: tar extraction failed" && exit 1) \
+    && tar -xzf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
     && echo "Checking extracted files..." \
-    && pwd \
-    && ls -la \
-    && echo "Checking for kubo directory..." \
-    && if [ ! -d "kubo" ]; then echo "ERROR: kubo directory missing"; echo "Current directory contents:"; ls -la; echo "Recursive listing:"; find . -type f -o -type d | head -n 20; exit 1; fi \
-    && echo "Verifying IPFS binary exists before install..." \
-    && test -f kubo/ipfs || (echo "ERROR: kubo/ipfs binary not found in extracted archive" && ls -la kubo/ && exit 1) \
+    && ls -la kubo/ || (echo "ERROR: kubo directory not found after extraction" && exit 1) \
+    && test -f kubo/ipfs || (echo "ERROR: kubo/ipfs binary not found" && exit 1) \
+    && echo "Setting permissions..." \
+    && chmod +x kubo/ipfs \
     && echo "Installing IPFS to /usr/local/bin..." \
-    && cp kubo/ipfs /usr/local/bin/ipfs || (echo "ERROR: cp command failed" && exit 1) \
-    && chmod +x /usr/local/bin/ipfs || (echo "ERROR: chmod command failed" && exit 1) \
-    && echo "Verifying file exists after install..." \
-    && test -f /usr/local/bin/ipfs || (echo "ERROR: IPFS binary not found after install" && ls -lh /usr/local/bin/ && exit 1) \
-    && ls -lh /usr/local/bin/ipfs \
+    && install -m 755 kubo/ipfs /usr/local/bin/ipfs \
+    && echo "Verifying file exists..." \
+    && ls -lh /usr/local/bin/ipfs || (echo "ERROR: IPFS binary not found after install" && exit 1) \
     && echo "Checking binary dependencies..." \
     && (ldd /usr/local/bin/ipfs 2>/dev/null || true) \
     && echo "Testing IPFS binary..." \
     && /usr/local/bin/ipfs version || (echo "ERROR: IPFS binary execution failed - may need additional libraries" && ldd /usr/local/bin/ipfs 2>/dev/null || true && exit 1) \
     && echo "Cleaning up..." \
-    && cd / \
-    && rm -rf /tmp/ipfs-install \
+    && rm -rf kubo kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz* \
     && echo "IPFS installation successful!"
 
 # Create symlink for Node.js (supervisord expects it in /usr/bin)
@@ -96,13 +67,8 @@ RUN adduser -D -s /bin/sh ipfs \
 # Set up relay application
 WORKDIR /app
 
-# Create docker directory first
-RUN mkdir -p /app/docker
-
-# Copy configuration files
-# Note: If CapRover build context is repository root, use: shogun-relay/docker/
-# If build context is shogun-relay/, use: docker/
-COPY docker /app/docker
+# Copy configuration files first
+COPY docker/ /app/docker/
 
 # Convert script line endings from CRLF to LF
 RUN dos2unix /app/docker/init-ipfs.sh
@@ -114,9 +80,7 @@ RUN chmod +x /app/docker/entrypoint.sh
 
 # Copy entrypoint to final location and ensure it's executable
 RUN cp /app/docker/entrypoint.sh /usr/local/bin/entrypoint.sh && \
-    chmod +x /usr/local/bin/entrypoint.sh && \
-    test -f /usr/local/bin/entrypoint.sh || (echo "ERROR: entrypoint.sh not found after copy" && exit 1) && \
-    head -n 1 /usr/local/bin/entrypoint.sh | grep -q "^#!/bin/sh" || (echo "ERROR: entrypoint.sh has wrong shebang" && exit 1)
+    chmod +x /usr/local/bin/entrypoint.sh
 
 # Create environment files with Docker-optimized settings
 RUN cp /app/docker/relay.env /app/relay/.env
@@ -142,13 +106,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8765/health || exit 1
 
 # Use supervisor to manage multiple services
-# File should already be copied above, just move it to final location
-RUN mkdir -p /etc/supervisor/conf.d && \
-    cp /app/docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Set environment variables
 ENV NODE_ENV=production
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-
-# Start all services with supervisor
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
