@@ -21,6 +21,7 @@ RUN apk add --no-cache \
     dos2unix \
     supervisor \
     gcompat \
+    tar \
     && ARCH=$(uname -m) \
     && case $ARCH in \
     x86_64) ARCH_NAME="amd64" ;; \
@@ -33,8 +34,9 @@ RUN apk add --no-cache \
     && echo "Verifying checksum..." \
     && sha512sum -c kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
     && echo "Extracting IPFS..." \
-    && tar -xzf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
+    && tar -xvf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
     && echo "Checking extracted files..." \
+    && ls -la || echo "Listing current directory failed" \
     && ls -la kubo/ || (echo "ERROR: kubo directory not found after extraction" && exit 1) \
     && test -f kubo/ipfs || (echo "ERROR: kubo/ipfs binary not found" && exit 1) \
     && echo "Setting permissions..." \
