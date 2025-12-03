@@ -31,13 +31,15 @@ RUN apk add --no-cache \
     && echo "Downloading IPFS Kubo v${IPFS_VERSION} for ${ARCH_NAME}..." \
     && mkdir -p /tmp/ipfs-install \
     && cd /tmp/ipfs-install \
-    && wget -q https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
-    && wget -q https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
+    && echo "Downloading tarball..." \
+    && curl -L --fail --retry 3 --retry-delay 2 -o kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz || (echo "ERROR: curl failed to download tarball" && exit 1) \
+    && echo "Downloading checksum..." \
+    && curl -L --fail --retry 3 --retry-delay 2 -o kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 || (echo "ERROR: curl failed to download checksum" && exit 1) \
     && echo "Verifying tarball downloaded..." \
-    && test -f kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz || (echo "ERROR: tarball not downloaded" && exit 1) \
+    && test -f kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz || (echo "ERROR: tarball not found after download" && ls -la && exit 1) \
     && ls -lh kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
     && echo "Verifying checksum..." \
-    && sha512sum -c kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
+    && sha512sum -c kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 || (echo "ERROR: checksum verification failed" && cat kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 && exit 1) \
     && echo "Listing tarball contents..." \
     && tar -tzf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz | head -n 10 \
     && echo "Extracting IPFS..." \
