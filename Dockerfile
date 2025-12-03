@@ -30,14 +30,22 @@ RUN apk add --no-cache \
     && echo "Downloading IPFS Kubo v${IPFS_VERSION} for ${ARCH_NAME}..." \
     && mkdir -p /tmp/ipfs-install \
     && cd /tmp/ipfs-install \
-    && wget -q https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
-    && wget -q https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
+    && echo "Downloading tarball..." \
+    && wget -q https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz || (echo "ERROR: wget failed to download tarball" && exit 1) \
+    && echo "Downloading checksum..." \
+    && wget -q https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 || (echo "ERROR: wget failed to download checksum" && exit 1) \
+    && echo "Verifying files downloaded..." \
+    && test -f kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz || (echo "ERROR: tarball not found" && exit 1) \
+    && test -f kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 || (echo "ERROR: checksum file not found" && exit 1) \
+    && ls -lh kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
     && echo "Verifying checksum..." \
-    && sha512sum -c kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
+    && sha512sum -c kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 || (echo "ERROR: checksum verification failed" && exit 1) \
     && echo "Extracting IPFS..." \
-    && tar -xzf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
+    && tar -xzf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz || (echo "ERROR: tar extraction failed" && exit 1) \
     && echo "Checking extracted files..." \
-    && ls -la kubo/ || (echo "ERROR: kubo directory not found after extraction" && exit 1) \
+    && pwd \
+    && ls -la \
+    && test -d kubo || (echo "ERROR: kubo directory not found after extraction" && ls -la && exit 1) \
     && test -f kubo/ipfs || (echo "ERROR: kubo/ipfs binary not found" && exit 1) \
     && echo "Setting permissions..." \
     && chmod +x kubo/ipfs \
