@@ -15,6 +15,8 @@ ARG RELAY_GUN_PASSWORD
 ARG X402_PAY_TO_ADDRESS
 ARG X402_NETWORK
 ARG X402_SETTLEMENT_MODE
+ARG X402_PRIVATE_KEY
+ARG X402_RPC_URL
 
 # Install required system packages and IPFS
 # Note: IPFS Kubo binaries are compiled for glibc, Alpine uses musl libc

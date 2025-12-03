@@ -158,6 +158,14 @@ router.post('/subscribe', async (req, res) => {
     console.log(`User: ${userAddress}`);
     console.log(`Tier: ${tier}`);
     console.log(`Payment provided: ${!!payment}`);
+    if (payment) {
+      console.log(`Payment x402Version: ${payment.x402Version}`);
+      console.log(`Payment scheme: ${payment.scheme}`);
+      console.log(`Payment network: ${payment.network}`);
+      console.log(`Payment from: ${payment.payload?.authorization?.from}`);
+      console.log(`Payment value: ${payment.payload?.authorization?.value}`);
+      console.log(`Payment signature: ${payment.payload?.signature ? 'present' : 'missing'}`);
+    }
 
     // Validate request
     if (!userAddress) {

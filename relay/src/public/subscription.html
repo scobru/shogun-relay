@@ -676,17 +676,21 @@
           throw new Error('Wrong network - please try again after switching');
         }
 
+        // Get USDC info from payment requirements
+        const paymentReq = reqData.x402.accepts[0];
+        const usdcName = paymentReq.extra?.name || 'USDC';
+        const usdcVersion = paymentReq.extra?.version || '2';
+
         // Create EIP-3009 authorization
-        const usdc = new ethers.Contract(networkConfig.usdc, USDC_ABI, provider);
         const amount = ethers.parseUnits(reqData.tierInfo.priceUSDC.toString(), 6);
-        const validAfter = 0;
-        const validBefore = Math.floor(Date.now() / 1000) + 3600; // 1 hour
+        const validAfter = Math.floor(Date.now() / 1000) - 600; // 10 minutes ago for safety
+        const validBefore = Math.floor(Date.now() / 1000) + paymentReq.maxTimeoutSeconds;
         const nonce = ethers.hexlify(ethers.randomBytes(32));
 
-        // EIP-712 domain
+        // EIP-712 domain - use values from payment requirements
         const domain = {
-          name: await usdc.name(),
-          version: '2', // USDC version
+          name: usdcName,
+          version: usdcVersion,
           chainId: networkConfig.chainId,
           verifyingContract: networkConfig.usdc,
         };
@@ -702,24 +706,27 @@
           ],
         };
 
-        const value = {
+        const message = {
           from: connectedAddress,
           to: x402Config.payToAddress,
           value: amount,
-          validAfter: validAfter,
-          validBefore: validBefore,
+          validAfter: BigInt(validAfter),
+          validBefore: BigInt(validBefore),
           nonce: nonce,
         };
 
         showMessage('Please sign the USDC authorization in your wallet...', 'info');
 
         // Sign EIP-712 message
-        const signature = await signer.signTypedData(domain, types, value);
+        const signature = await signer.signTypedData(domain, types, message);
 
         showMessage('Submitting payment...', 'info');
 
-        // Create payment payload
+        // Create x402-compliant payment payload
         const paymentPayload = {
+          x402Version: 1,
+          scheme: 'exact',
+          network: x402Config.network,
           payload: {
             authorization: {
               from: connectedAddress,
@@ -732,6 +739,8 @@
             signature: signature,
           },
         };
+
+        console.log('Payment payload:', JSON.stringify(paymentPayload, null, 2));
 
         // Submit to backend
         const subscribeResponse = await fetch('/api/v1/x402/subscribe', {
@@ -747,6 +756,8 @@
         const subscribeData = await subscribeResponse.json();
 
         if (!subscribeData.success) {
+          // Show detailed error for debugging
+          console.error('Subscription failed:', subscribeData);
           throw new Error(subscribeData.error || subscribeData.reason || 'Subscription failed');
         }
 
