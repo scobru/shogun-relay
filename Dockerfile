@@ -118,7 +118,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 # Use supervisor to manage multiple services
 RUN mkdir -p /etc/supervisor/conf.d
-COPY shogun-relay/docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Set environment variables
 ENV NODE_ENV=production
