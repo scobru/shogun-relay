@@ -11,6 +11,7 @@
   <link href="https://unpkg.com/shogun-theme@1.0.0/styles/daisyui-overrides.css" rel="stylesheet" type="text/css" />
   <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
   <style>
     body {
       line-height: 1.6;
@@ -23,6 +24,7 @@
       padding: 1.5rem;
       transition: all 0.3s ease;
       background-color: rgba(40, 40, 40, 0.5);
+      cursor: pointer;
     }
 
     .tier-card:hover {
@@ -54,11 +56,6 @@
     .subscription-status.active {
       background-color: rgba(76, 175, 80, 0.15);
       border: 1px solid rgba(76, 175, 80, 0.3);
-    }
-
-    .subscription-status.expired {
-      background-color: rgba(244, 67, 54, 0.15);
-      border: 1px solid rgba(244, 67, 54, 0.3);
     }
 
     .subscription-status.none {
@@ -138,6 +135,38 @@
     .badge-basic { background-color: #607D8B; color: white; }
     .badge-standard { background-color: #2196F3; color: white; }
     .badge-premium { background-color: #9C27B0; color: white; }
+
+    .drag-drop-area {
+      border: 2px dashed #606060;
+      border-radius: 1rem;
+      padding: 2rem;
+      text-align: center;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      background-color: rgba(64, 64, 64, 0.3);
+    }
+
+    .drag-drop-area.drag-over {
+      border-color: #FF69B4;
+      background-color: rgba(255, 105, 180, 0.1);
+    }
+
+    .upload-progress {
+      background-color: #404040;
+      border-radius: 1rem;
+      overflow: hidden;
+      margin-top: 1rem;
+    }
+
+    .progress-bar {
+      height: 1.5rem;
+      background-color: #4CAF50;
+      color: #FFFFFF;
+      text-align: center;
+      font-size: 0.875rem;
+      line-height: 1.5rem;
+      transition: all 0.3s ease;
+    }
   </style>
 </head>
 
@@ -165,21 +194,56 @@
             </div>
           </div>
 
-          <!-- User Address Input -->
+          <!-- Wallet Connection -->
           <div class="w-full mb-8" id="userSection" style="display: none;">
-            <label class="block text-lg font-medium mb-3 text-[#FFFFFF]">Your Wallet Address:</label>
-            <input type="text" id="userAddress" 
-              class="input input-bordered w-full bg-[#1A1A1A] border-[#404040] text-[#E0E0E0] font-mono"
-              placeholder="0x..." />
-            <button class="btn bg-[#42A5F5] hover:bg-[#64B5F6] border-0 text-white mt-3 rounded-xl" id="checkStatusBtn">
-              Check Subscription Status
-            </button>
+            <!-- Connect Wallet Button -->
+            <div id="connectWalletSection">
+              <button class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-white w-full rounded-xl px-8 py-4 font-medium" id="connectWalletBtn">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                Connect Wallet
+              </button>
+              <p class="text-[#A0A0A0] text-sm text-center mt-3">Connect MetaMask to check subscription and make payments</p>
+            </div>
+
+            <!-- Connected Wallet Info -->
+            <div id="connectedWalletSection" style="display: none;">
+              <div class="flex items-center justify-between p-4 bg-[#1A1A1A] rounded-xl border border-[#404040]">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-full bg-[#4CAF50] flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p class="text-[#4CAF50] text-sm font-medium">Wallet Connected</p>
+                    <p class="text-[#E0E0E0] font-mono text-sm" id="connectedAddress">0x...</p>
+                  </div>
+                </div>
+                <button class="btn btn-sm bg-[#404040] hover:bg-[#505050] border-0 text-white rounded-lg" id="disconnectBtn">
+                  Disconnect
+                </button>
+              </div>
+              
+              <!-- USDC Balance -->
+              <div class="mt-4 p-3 bg-[#1A1A1A] rounded-lg border border-[#404040]">
+                <div class="flex items-center justify-between">
+                  <span class="text-[#A0A0A0] text-sm">USDC Balance:</span>
+                  <span class="text-[#E0E0E0] font-mono" id="usdcBalance">Loading...</span>
+                </div>
+                <div class="flex items-center justify-between mt-2">
+                  <span class="text-[#A0A0A0] text-sm">Network:</span>
+                  <span class="text-[#E0E0E0]" id="currentNetwork">-</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Subscription Status -->
           <div id="subscriptionStatus" class="w-full" style="display: none;"></div>
 
-          <!-- Tier Selection -->
+          <!-- Tier Selection (for new subscriptions) -->
           <div id="tierSelection" class="w-full" style="display: none;">
             <h2 class="text-xl font-semibold mb-4 text-[#FFFFFF]">Select a Plan</h2>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="tierCards"></div>
@@ -198,6 +262,46 @@
             </div>
           </div>
 
+          <!-- File Upload Section (for active subscriptions) -->
+          <div id="uploadSection" class="w-full" style="display: none;">
+            <h2 class="text-xl font-semibold mb-4 text-[#FFFFFF]">Upload Files to IPFS</h2>
+            
+            <div class="drag-drop-area" id="dropArea">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto mb-4 text-[#FF69B4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <p class="text-[#E0E0E0] text-lg mb-2">Drag & drop files here</p>
+              <p class="text-[#A0A0A0] text-sm">or click to select</p>
+              <input type="file" id="fileInput" class="hidden" />
+            </div>
+
+            <div id="selectedFileInfo" class="mt-4 p-3 bg-[#1A1A1A] rounded-lg border border-[#404040]" style="display: none;">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-[#E0E0E0] font-medium" id="selectedFileName">-</p>
+                  <p class="text-[#A0A0A0] text-sm" id="selectedFileSize">-</p>
+                </div>
+                <button class="btn btn-sm bg-[#F44336] hover:bg-[#D32F2F] border-0 text-white rounded-lg" id="clearFileBtn">
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <div id="uploadProgress" class="upload-progress" style="display: none;">
+              <div class="progress-bar" id="progressBar" style="width: 0%;">0%</div>
+            </div>
+
+            <button class="btn bg-[#4CAF50] hover:bg-[#43A047] border-0 text-white w-full mt-4 rounded-xl px-8 py-4 font-medium disabled:opacity-50" 
+              id="uploadBtn" disabled>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Upload to IPFS
+            </button>
+
+            <div id="uploadResult" class="mt-4" style="display: none;"></div>
+          </div>
+
           <!-- Message Area -->
           <div id="message" class="message w-full"></div>
         </div>
@@ -208,26 +312,33 @@
     <div class="card bg-[#282828] border-[#404040] rounded-2xl">
       <div class="p-6">
         <h2 class="text-xl font-semibold mb-4 text-[#FFFFFF]">How It Works</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div class="flex items-start gap-3">
             <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[#FF69B4] text-white flex items-center justify-center font-bold">1</div>
             <div>
               <h3 class="font-medium text-[#FFFFFF]">Connect Wallet</h3>
-              <p class="text-sm text-[#A0A0A0]">Enter your wallet address to check subscription status</p>
+              <p class="text-sm text-[#A0A0A0]">Connect MetaMask</p>
             </div>
           </div>
           <div class="flex items-start gap-3">
             <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[#FF69B4] text-white flex items-center justify-center font-bold">2</div>
             <div>
               <h3 class="font-medium text-[#FFFFFF]">Choose Plan</h3>
-              <p class="text-sm text-[#A0A0A0]">Select a storage tier that fits your needs</p>
+              <p class="text-sm text-[#A0A0A0]">Select storage tier</p>
             </div>
           </div>
           <div class="flex items-start gap-3">
             <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[#FF69B4] text-white flex items-center justify-center font-bold">3</div>
             <div>
               <h3 class="font-medium text-[#FFFFFF]">Pay with USDC</h3>
-              <p class="text-sm text-[#A0A0A0]">Sign an EIP-3009 authorization to complete payment</p>
+              <p class="text-sm text-[#A0A0A0]">Sign EIP-3009</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[#4CAF50] text-white flex items-center justify-center font-bold">4</div>
+            <div>
+              <h3 class="font-medium text-[#FFFFFF]">Upload Files</h3>
+              <p class="text-sm text-[#A0A0A0]">Store on IPFS</p>
             </div>
           </div>
         </div>
@@ -236,39 +347,77 @@
   </div>
 
   <script>
+    // State
     let selectedTier = null;
     let tiers = [];
     let x402Config = null;
+    let provider = null;
+    let signer = null;
+    let connectedAddress = null;
+    let currentSubscription = null;
+    let selectedFile = null;
 
-    const userAddressInput = document.getElementById('userAddress');
-    const checkStatusBtn = document.getElementById('checkStatusBtn');
-    const subscribeBtn = document.getElementById('subscribeBtn');
-    const messageEl = document.getElementById('message');
+    // Network configurations
+    const NETWORK_CONFIG = {
+      'base': { chainId: 8453, chainIdHex: '0x2105', name: 'Base', usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' },
+      'base-sepolia': { chainId: 84532, chainIdHex: '0x14a34', name: 'Base Sepolia', usdc: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' },
+      'polygon': { chainId: 137, chainIdHex: '0x89', name: 'Polygon', usdc: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359' },
+      'polygon-amoy': { chainId: 80002, chainIdHex: '0x13882', name: 'Polygon Amoy', usdc: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582' },
+    };
+
+    const USDC_ABI = [
+      'function balanceOf(address) view returns (uint256)',
+      'function decimals() view returns (uint8)',
+      'function name() view returns (string)',
+      'function version() view returns (string)',
+      'function nonces(address) view returns (uint256)',
+    ];
+
+    // DOM Elements
     const configStatusEl = document.getElementById('configStatus');
     const userSectionEl = document.getElementById('userSection');
+    const connectWalletSection = document.getElementById('connectWalletSection');
+    const connectedWalletSection = document.getElementById('connectedWalletSection');
+    const connectedAddressEl = document.getElementById('connectedAddress');
+    const usdcBalanceEl = document.getElementById('usdcBalance');
+    const currentNetworkEl = document.getElementById('currentNetwork');
     const subscriptionStatusEl = document.getElementById('subscriptionStatus');
     const tierSelectionEl = document.getElementById('tierSelection');
     const tierCardsEl = document.getElementById('tierCards');
     const networkNameEl = document.getElementById('networkName');
+    const subscribeBtn = document.getElementById('subscribeBtn');
+    const uploadSection = document.getElementById('uploadSection');
+    const dropArea = document.getElementById('dropArea');
+    const fileInput = document.getElementById('fileInput');
+    const selectedFileInfo = document.getElementById('selectedFileInfo');
+    const selectedFileName = document.getElementById('selectedFileName');
+    const selectedFileSize = document.getElementById('selectedFileSize');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const progressBar = document.getElementById('progressBar');
+    const uploadResult = document.getElementById('uploadResult');
+    const messageEl = document.getElementById('message');
 
+    // Utility functions
     const showMessage = (text, type = 'error') => {
       messageEl.innerHTML = text;
       messageEl.className = `message ${type}`;
       messageEl.style.display = 'block';
+      messageEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
 
-    const hideMessage = () => {
-      messageEl.style.display = 'none';
-    };
+    const hideMessage = () => { messageEl.style.display = 'none'; };
 
-    const formatDate = (dateStr) => {
-      return new Date(dateStr).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+    const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+
+    const shortenAddress = (addr) => `${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}`;
+
+    const formatFileSize = (bytes) => {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
     };
 
     // Check x402 configuration
@@ -281,47 +430,37 @@
           configStatusEl.innerHTML = `
             <div class="text-center p-4 bg-[#404040] rounded-xl">
               <p class="text-[#FF9800] font-medium">x402 payments not configured</p>
-              <p class="text-sm text-[#A0A0A0] mt-2">
-                Set X402_PAY_TO_ADDRESS in your environment to enable subscriptions
-              </p>
-            </div>
-          `;
+              <p class="text-sm text-[#A0A0A0] mt-2">Set X402_PAY_TO_ADDRESS in environment</p>
+            </div>`;
           return;
         }
 
         x402Config = data;
-        networkNameEl.textContent = data.network.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+        networkNameEl.textContent = NETWORK_CONFIG[data.network]?.name || data.network;
         
         configStatusEl.innerHTML = `
-          <div class="text-center text-[#4CAF50]">
-            x402 payments enabled on ${networkNameEl.textContent}
-          </div>
-        `;
+          <div class="text-center text-[#4CAF50]">x402 payments enabled on ${networkNameEl.textContent}</div>`;
 
         userSectionEl.style.display = 'block';
-        
-        // Load tiers
         await loadTiers();
       } catch (error) {
         configStatusEl.innerHTML = `
           <div class="text-center p-4 bg-[#404040] rounded-xl">
             <p class="text-[#F44336] font-medium">Error loading configuration</p>
             <p class="text-sm text-[#A0A0A0] mt-2">${error.message}</p>
-          </div>
-        `;
+          </div>`;
       }
     }
 
-    // Load available tiers
+    // Load tiers
     async function loadTiers() {
       try {
         const response = await fetch('/api/v1/x402/tiers');
         const data = await response.json();
-
-        if (!data.success) throw new Error(data.error);
-
-        tiers = data.tiers;
-        renderTierCards();
+        if (data.success) {
+          tiers = data.tiers;
+          renderTierCards();
+        }
       } catch (error) {
         console.error('Error loading tiers:', error);
       }
@@ -330,7 +469,7 @@
     // Render tier cards
     function renderTierCards() {
       tierCardsEl.innerHTML = tiers.map((tier, index) => `
-        <div class="tier-card cursor-pointer ${index === 1 ? 'recommended' : ''}" data-tier="${tier.id}" onclick="selectTier('${tier.id}')">
+        <div class="tier-card ${index === 1 ? 'recommended' : ''}" data-tier="${tier.id}" onclick="selectTier('${tier.id}')">
           ${index === 1 ? '<div class="text-[#4CAF50] text-xs font-semibold mb-2">RECOMMENDED</div>' : ''}
           <h3 class="text-lg font-semibold text-[#FFFFFF] mb-2">${tier.name}</h3>
           <div class="tier-price mb-2">${tier.priceDisplay}</div>
@@ -344,52 +483,125 @@
       `).join('');
     }
 
-    // Select a tier
+    // Select tier
     function selectTier(tierId) {
       selectedTier = tierId;
-      
       document.querySelectorAll('.tier-card').forEach(card => {
-        card.classList.remove('selected');
-        if (card.dataset.tier === tierId) {
-          card.classList.add('selected');
-        }
+        card.classList.toggle('selected', card.dataset.tier === tierId);
       });
+      subscribeBtn.disabled = !connectedAddress;
+    }
 
-      subscribeBtn.disabled = !userAddressInput.value.trim();
+    // Connect wallet
+    async function connectWallet() {
+      if (typeof window.ethereum === 'undefined') {
+        showMessage('MetaMask not found. Please install MetaMask to continue.', 'error');
+        return;
+      }
+
+      try {
+        provider = new ethers.BrowserProvider(window.ethereum);
+        const accounts = await provider.send('eth_requestAccounts', []);
+        signer = await provider.getSigner();
+        connectedAddress = await signer.getAddress();
+
+        // Update UI
+        connectWalletSection.style.display = 'none';
+        connectedWalletSection.style.display = 'block';
+        connectedAddressEl.textContent = shortenAddress(connectedAddress);
+
+        // Check network and get balance
+        await updateNetworkInfo();
+        await checkSubscriptionStatus();
+
+      } catch (error) {
+        console.error('Wallet connection error:', error);
+        showMessage(`Failed to connect wallet: ${error.message}`, 'error');
+      }
+    }
+
+    // Update network info and USDC balance
+    async function updateNetworkInfo() {
+      try {
+        const network = await provider.getNetwork();
+        const chainId = Number(network.chainId);
+        
+        const networkConfig = NETWORK_CONFIG[x402Config.network];
+        currentNetworkEl.textContent = networkConfig?.name || `Chain ${chainId}`;
+
+        // Check if on correct network
+        if (networkConfig && chainId !== networkConfig.chainId) {
+          currentNetworkEl.innerHTML = `<span class="text-[#FF9800]">Wrong network - switch to ${networkConfig.name}</span>`;
+          usdcBalanceEl.textContent = '-';
+          return;
+        }
+
+        // Get USDC balance
+        if (networkConfig) {
+          const usdc = new ethers.Contract(networkConfig.usdc, USDC_ABI, provider);
+          const balance = await usdc.balanceOf(connectedAddress);
+          const decimals = await usdc.decimals();
+          usdcBalanceEl.textContent = `${ethers.formatUnits(balance, decimals)} USDC`;
+        }
+      } catch (error) {
+        console.error('Error updating network info:', error);
+        usdcBalanceEl.textContent = 'Error';
+      }
+    }
+
+    // Switch network
+    async function switchNetwork() {
+      const networkConfig = NETWORK_CONFIG[x402Config.network];
+      if (!networkConfig) return;
+
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: networkConfig.chainIdHex }],
+        });
+        await updateNetworkInfo();
+      } catch (error) {
+        if (error.code === 4902) {
+          showMessage(`Please add ${networkConfig.name} network to MetaMask`, 'error');
+        } else {
+          showMessage(`Failed to switch network: ${error.message}`, 'error');
+        }
+      }
     }
 
     // Check subscription status
     async function checkSubscriptionStatus() {
-      const userAddress = userAddressInput.value.trim();
-      if (!userAddress) {
-        showMessage('Please enter your wallet address', 'error');
-        return;
-      }
+      if (!connectedAddress) return;
 
-      hideMessage();
       subscriptionStatusEl.innerHTML = `
         <div class="flex items-center justify-center gap-2 text-[#A0A0A0] mb-6">
           <div class="loading-spinner"></div>
           <span>Checking subscription...</span>
-        </div>
-      `;
+        </div>`;
       subscriptionStatusEl.style.display = 'block';
 
       try {
-        const response = await fetch(`/api/v1/x402/subscription/${encodeURIComponent(userAddress)}`);
+        const response = await fetch(`/api/v1/x402/subscription/${encodeURIComponent(connectedAddress)}`);
         const data = await response.json();
 
         if (!data.success) throw new Error(data.error);
 
+        currentSubscription = data.subscription;
         renderSubscriptionStatus(data.subscription);
-        tierSelectionEl.style.display = 'block';
+
+        if (data.subscription.active) {
+          tierSelectionEl.style.display = 'none';
+          uploadSection.style.display = 'block';
+        } else {
+          tierSelectionEl.style.display = 'block';
+          uploadSection.style.display = 'none';
+        }
       } catch (error) {
         subscriptionStatusEl.innerHTML = `
           <div class="subscription-status none">
             <p class="text-[#FF9800] font-medium">Error checking subscription</p>
             <p class="text-sm text-[#A0A0A0] mt-2">${error.message}</p>
-          </div>
-        `;
+          </div>`;
         tierSelectionEl.style.display = 'block';
       }
     }
@@ -398,9 +610,7 @@
     function renderSubscriptionStatus(subscription) {
       if (subscription.active) {
         const usagePercent = (subscription.storageUsedMB / subscription.storageMB * 100).toFixed(1);
-        let barClass = '';
-        if (usagePercent > 90) barClass = 'critical';
-        else if (usagePercent > 70) barClass = 'warning';
+        let barClass = usagePercent > 90 ? 'critical' : usagePercent > 70 ? 'warning' : '';
 
         subscriptionStatusEl.innerHTML = `
           <div class="subscription-status active">
@@ -409,31 +619,21 @@
                 <span class="badge-tier badge-${subscription.tier}">${subscription.tier}</span>
                 <span class="text-[#4CAF50] font-medium ml-2">Active</span>
               </div>
-              <div class="text-sm text-[#A0A0A0]">
-                Expires: ${formatDate(subscription.expiresAt)}
-              </div>
+              <div class="text-sm text-[#A0A0A0]">Expires: ${formatDate(subscription.expiresAt)}</div>
             </div>
             <div class="mb-2">
               <div class="flex justify-between text-sm text-[#E0E0E0]">
-                <span>Storage Used (recorded)</span>
+                <span>Storage Used</span>
                 <span>${subscription.storageUsedMB.toFixed(1)}MB / ${subscription.storageMB}MB (${usagePercent}%)</span>
               </div>
               <div class="storage-bar">
-                <div class="storage-bar-fill ${barClass}" style="width: ${usagePercent}%"></div>
+                <div class="storage-bar-fill ${barClass}" style="width: ${Math.min(100, usagePercent)}%"></div>
               </div>
             </div>
             <p class="text-sm text-[#A0A0A0] mt-3">
-              Remaining storage: <strong class="text-[#4CAF50]">${subscription.storageRemainingMB.toFixed(1)}MB</strong>
+              Remaining: <strong class="text-[#4CAF50]">${subscription.storageRemainingMB.toFixed(1)}MB</strong>
             </p>
-            <button class="btn btn-sm bg-[#404040] hover:bg-[#505050] border-0 text-white mt-3 rounded-lg" onclick="verifyStorage()">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Verify IPFS Storage
-            </button>
-            <div id="verifiedStorageInfo" class="mt-3" style="display: none;"></div>
-          </div>
-        `;
+          </div>`;
       } else {
         subscriptionStatusEl.innerHTML = `
           <div class="subscription-status none">
@@ -444,94 +644,14 @@
               <span class="text-[#FF9800] font-medium">No Active Subscription</span>
             </div>
             <p class="text-sm text-[#A0A0A0] mt-2">${subscription.reason || 'Purchase a subscription to start uploading files'}</p>
-          </div>
-        `;
+          </div>`;
       }
     }
 
-    // Verify storage by checking actual IPFS pins
-    async function verifyStorage() {
-      const userAddress = userAddressInput.value.trim();
-      if (!userAddress) return;
-
-      const verifiedInfoEl = document.getElementById('verifiedStorageInfo');
-      verifiedInfoEl.style.display = 'block';
-      verifiedInfoEl.innerHTML = `
-        <div class="flex items-center gap-2 text-[#A0A0A0]">
-          <div class="loading-spinner"></div>
-          <span>Verifying storage on IPFS...</span>
-        </div>
-      `;
-
-      try {
-        const response = await fetch(`/api/v1/x402/storage/${encodeURIComponent(userAddress)}`);
-        const data = await response.json();
-
-        if (!data.success) throw new Error(data.error);
-
-        const storage = data.storage;
-        const sub = data.subscription;
-
-        let discrepancyHtml = '';
-        if (sub && sub.discrepancy > 0.1) {
-          discrepancyHtml = `
-            <div class="text-[#FF9800] text-sm mt-2">
-              Discrepancy detected: ${sub.discrepancy.toFixed(2)}MB difference between recorded and actual
-            </div>
-          `;
-        }
-
-        let filesHtml = '';
-        if (data.files && data.files.length > 0) {
-          filesHtml = `
-            <details class="mt-3">
-              <summary class="text-sm text-[#42A5F5] cursor-pointer">View ${data.files.length} pinned files</summary>
-              <div class="mt-2 max-h-40 overflow-y-auto bg-[#1A1A1A] rounded-lg p-2">
-                ${data.files.map(f => `
-                  <div class="text-xs text-[#A0A0A0] py-1 border-b border-[#404040] last:border-0">
-                    <span class="font-mono">${f.hash.substring(0, 12)}...</span>
-                    <span class="ml-2">${f.name || 'unnamed'}</span>
-                    <span class="ml-2 text-[#4CAF50]">${f.sizeMB.toFixed(2)}MB</span>
-                    ${f.warning ? `<span class="ml-2 text-[#FF9800]">(${f.warning})</span>` : ''}
-                  </div>
-                `).join('')}
-              </div>
-            </details>
-          `;
-        }
-
-        verifiedInfoEl.innerHTML = `
-          <div class="bg-[#1A1A1A] rounded-lg p-3">
-            <div class="flex items-center gap-2 text-[#4CAF50] mb-2">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span class="font-medium">Verified from IPFS</span>
-            </div>
-            <div class="text-sm text-[#E0E0E0]">
-              <div>Actual storage used: <strong>${storage.usedMB.toFixed(2)}MB</strong></div>
-              <div>Files pinned: <strong>${storage.fileCount}</strong></div>
-              ${sub ? `<div>Remaining: <strong class="text-[#4CAF50]">${sub.remainingMB.toFixed(2)}MB</strong></div>` : ''}
-            </div>
-            ${discrepancyHtml}
-            ${filesHtml}
-          </div>
-        `;
-      } catch (error) {
-        verifiedInfoEl.innerHTML = `
-          <div class="text-[#F44336] text-sm">
-            Error verifying storage: ${error.message}
-          </div>
-        `;
-      }
-    }
-
-    // Subscribe
+    // Subscribe with EIP-3009
     async function subscribe() {
-      const userAddress = userAddressInput.value.trim();
-      
-      if (!userAddress || !selectedTier) {
-        showMessage('Please enter your wallet address and select a tier', 'error');
+      if (!connectedAddress || !selectedTier || !signer) {
+        showMessage('Please connect wallet and select a tier', 'error');
         return;
       }
 
@@ -540,37 +660,111 @@
       subscribeBtn.innerHTML = '<div class="loading-spinner mr-2"></div> Processing...';
 
       try {
-        // First, get payment requirements
+        // Get payment requirements
         const reqResponse = await fetch(`/api/v1/x402/payment-requirements/${selectedTier}`);
         const reqData = await reqResponse.json();
-
         if (!reqData.success) throw new Error(reqData.error);
 
-        // Show payment info
+        const networkConfig = NETWORK_CONFIG[x402Config.network];
+        if (!networkConfig) throw new Error('Network not supported');
+
+        // Check network
+        const network = await provider.getNetwork();
+        if (Number(network.chainId) !== networkConfig.chainId) {
+          showMessage(`Please switch to ${networkConfig.name} network`, 'info');
+          await switchNetwork();
+          throw new Error('Wrong network - please try again after switching');
+        }
+
+        // Create EIP-3009 authorization
+        const usdc = new ethers.Contract(networkConfig.usdc, USDC_ABI, provider);
+        const amount = ethers.parseUnits(reqData.tierInfo.priceUSDC.toString(), 6);
+        const validAfter = 0;
+        const validBefore = Math.floor(Date.now() / 1000) + 3600; // 1 hour
+        const nonce = ethers.hexlify(ethers.randomBytes(32));
+
+        // EIP-712 domain
+        const domain = {
+          name: await usdc.name(),
+          version: '2', // USDC version
+          chainId: networkConfig.chainId,
+          verifyingContract: networkConfig.usdc,
+        };
+
+        const types = {
+          TransferWithAuthorization: [
+            { name: 'from', type: 'address' },
+            { name: 'to', type: 'address' },
+            { name: 'value', type: 'uint256' },
+            { name: 'validAfter', type: 'uint256' },
+            { name: 'validBefore', type: 'uint256' },
+            { name: 'nonce', type: 'bytes32' },
+          ],
+        };
+
+        const value = {
+          from: connectedAddress,
+          to: x402Config.payToAddress,
+          value: amount,
+          validAfter: validAfter,
+          validBefore: validBefore,
+          nonce: nonce,
+        };
+
+        showMessage('Please sign the USDC authorization in your wallet...', 'info');
+
+        // Sign EIP-712 message
+        const signature = await signer.signTypedData(domain, types, value);
+
+        showMessage('Submitting payment...', 'info');
+
+        // Create payment payload
+        const paymentPayload = {
+          payload: {
+            authorization: {
+              from: connectedAddress,
+              to: x402Config.payToAddress,
+              value: amount.toString(),
+              validAfter: validAfter.toString(),
+              validBefore: validBefore.toString(),
+              nonce: nonce,
+            },
+            signature: signature,
+          },
+        };
+
+        // Submit to backend
+        const subscribeResponse = await fetch('/api/v1/x402/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userAddress: connectedAddress,
+            tier: selectedTier,
+            payment: paymentPayload,
+          }),
+        });
+
+        const subscribeData = await subscribeResponse.json();
+
+        if (!subscribeData.success) {
+          throw new Error(subscribeData.error || subscribeData.reason || 'Subscription failed');
+        }
+
         showMessage(`
-          <div class="text-[#42A5F5]">
-            <p class="font-medium mb-2">Payment Required</p>
-            <p class="text-sm">Amount: ${reqData.tierInfo.priceUSDC} USDC</p>
-            <p class="text-sm">Network: ${x402Config.network}</p>
-            <p class="text-sm mt-3">
-              To complete this payment, you need to sign an EIP-3009 authorization 
-              using a compatible wallet or the x402 client library.
-            </p>
-            <p class="text-sm mt-2 text-[#A0A0A0]">
-              Payment address: <code class="bg-[#1A1A1A] px-2 py-1 rounded">${x402Config.payToAddress}</code>
-            </p>
+          <div>
+            <p class="font-medium text-[#4CAF50] mb-2">Subscription activated!</p>
+            <p class="text-sm">Tier: ${subscribeData.subscription.tier}</p>
+            <p class="text-sm">Storage: ${subscribeData.subscription.storageMB}MB</p>
+            <p class="text-sm">Expires: ${formatDate(subscribeData.subscription.expiresAt)}</p>
+            ${subscribeData.payment?.transaction ? `<p class="text-sm mt-2"><a href="${subscribeData.payment.explorer}" target="_blank" class="text-[#42A5F5] underline">View transaction</a></p>` : ''}
           </div>
-        `, 'info');
+        `, 'success');
 
-        // In a real implementation, you would:
-        // 1. Connect to user's wallet (MetaMask, WalletConnect, etc.)
-        // 2. Have them sign an EIP-3009 authorization
-        // 3. Send the signed payload to /api/v1/x402/subscribe
-
-        // For now, show instructions
-        console.log('Payment requirements:', reqData.x402);
+        // Refresh subscription status
+        await checkSubscriptionStatus();
 
       } catch (error) {
+        console.error('Subscribe error:', error);
         showMessage(`Error: ${error.message}`, 'error');
       } finally {
         subscribeBtn.disabled = false;
@@ -578,17 +772,161 @@
           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
           </svg>
-          Subscribe with USDC
-        `;
+          Subscribe with USDC`;
       }
     }
 
-    // Event listeners
-    checkStatusBtn.addEventListener('click', checkSubscriptionStatus);
-    subscribeBtn.addEventListener('click', subscribe);
-    userAddressInput.addEventListener('input', () => {
-      subscribeBtn.disabled = !userAddressInput.value.trim() || !selectedTier;
+    // Disconnect wallet
+    function disconnectWallet() {
+      provider = null;
+      signer = null;
+      connectedAddress = null;
+      currentSubscription = null;
+      
+      connectWalletSection.style.display = 'block';
+      connectedWalletSection.style.display = 'none';
+      subscriptionStatusEl.style.display = 'none';
+      tierSelectionEl.style.display = 'none';
+      uploadSection.style.display = 'none';
+      hideMessage();
+    }
+
+    // File upload handlers
+    function handleFileSelect(file) {
+      if (!file) return;
+      
+      selectedFile = file;
+      selectedFileName.textContent = file.name;
+      selectedFileSize.textContent = formatFileSize(file.size);
+      selectedFileInfo.style.display = 'block';
+      uploadBtn.disabled = false;
+      uploadResult.style.display = 'none';
+    }
+
+    function clearFile() {
+      selectedFile = null;
+      fileInput.value = '';
+      selectedFileInfo.style.display = 'none';
+      uploadBtn.disabled = true;
+    }
+
+    async function uploadFile() {
+      if (!selectedFile || !connectedAddress || !currentSubscription?.active) {
+        showMessage('Please select a file and ensure you have an active subscription', 'error');
+        return;
+      }
+
+      const fileSizeMB = selectedFile.size / (1024 * 1024);
+      if (fileSizeMB > currentSubscription.storageRemainingMB) {
+        showMessage(`File too large. Remaining storage: ${currentSubscription.storageRemainingMB.toFixed(2)}MB`, 'error');
+        return;
+      }
+
+      uploadBtn.disabled = true;
+      uploadProgress.style.display = 'block';
+      progressBar.style.width = '0%';
+      progressBar.textContent = 'Uploading...';
+
+      try {
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+
+        const response = await fetch('/api/v1/ipfs/upload', {
+          method: 'POST',
+          headers: {
+            'X-User-Address': connectedAddress,
+          },
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || data.reason || 'Upload failed');
+        }
+
+        progressBar.style.width = '100%';
+        progressBar.textContent = 'Complete!';
+
+        const ipfsUrl = `${window.location.origin}/ipfs/${data.file.hash}`;
+        
+        uploadResult.innerHTML = `
+          <div class="p-4 bg-[#1A1A1A] rounded-xl border border-[#4CAF50]">
+            <p class="text-[#4CAF50] font-medium mb-2">Upload successful!</p>
+            <p class="text-sm text-[#E0E0E0] mb-1">Hash: <code class="bg-[#404040] px-2 py-1 rounded">${data.file.hash}</code></p>
+            <p class="text-sm text-[#A0A0A0] mb-3">Size: ${formatFileSize(data.file.size)}</p>
+            <a href="${ipfsUrl}" target="_blank" class="text-[#42A5F5] text-sm underline">View on IPFS Gateway</a>
+            ${data.subscription ? `
+              <p class="text-sm text-[#A0A0A0] mt-3">Storage remaining: ${data.subscription.storageRemainingMB.toFixed(2)}MB</p>
+            ` : ''}
+          </div>`;
+        uploadResult.style.display = 'block';
+
+        // Refresh subscription status
+        await checkSubscriptionStatus();
+        clearFile();
+
+      } catch (error) {
+        console.error('Upload error:', error);
+        progressBar.style.width = '100%';
+        progressBar.style.backgroundColor = '#F44336';
+        progressBar.textContent = 'Failed';
+        showMessage(`Upload failed: ${error.message}`, 'error');
+      } finally {
+        uploadBtn.disabled = false;
+        setTimeout(() => {
+          uploadProgress.style.display = 'none';
+          progressBar.style.backgroundColor = '#4CAF50';
+        }, 3000);
+      }
+    }
+
+    // Drag and drop handlers
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
     });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropArea.addEventListener(eventName, () => dropArea.classList.add('drag-over'));
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, () => dropArea.classList.remove('drag-over'));
+    });
+
+    dropArea.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      if (files.length > 0) handleFileSelect(files[0]);
+    });
+
+    dropArea.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length > 0) handleFileSelect(fileInput.files[0]);
+    });
+
+    // Event listeners
+    document.getElementById('connectWalletBtn').addEventListener('click', connectWallet);
+    document.getElementById('disconnectBtn').addEventListener('click', disconnectWallet);
+    subscribeBtn.addEventListener('click', subscribe);
+    document.getElementById('clearFileBtn').addEventListener('click', clearFile);
+    uploadBtn.addEventListener('click', uploadFile);
+
+    // Listen for account/network changes
+    if (window.ethereum) {
+      window.ethereum.on('accountsChanged', (accounts) => {
+        if (accounts.length === 0) {
+          disconnectWallet();
+        } else {
+          connectWallet();
+        }
+      });
+      window.ethereum.on('chainChanged', () => {
+        if (connectedAddress) updateNetworkInfo();
+      });
+    }
 
     // Initialize
     checkConfig();
@@ -596,4 +934,3 @@
 </body>
 
 </html>
-
