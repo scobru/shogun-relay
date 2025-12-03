@@ -716,64 +716,6 @@ curl -X POST http://localhost:8765/api/v0/add \
                     </div>
                 </div>
 
-                <!-- User & Presence -->
-                <div class="mb-8">
-                    <h2 class="text-3xl font-bold mb-6 text-[#FF69B4] border-b border-[#404040] pb-2">User & Presence
-                    </h2>
-
-                    <div class="endpoint-card">
-                        <div class="flex items-center mb-3">
-                            <span class="method-badge method-get">GET</span>
-                            <code class="text-lg">/api/users/search</code>
-                            <span class="auth-badge auth-public">Public</span>
-                        </div>
-                        <p class="text-[#E0E0E0] mb-4">Search for users by username or public key.</p>
-                        <div class="code-block">
-                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-                            <pre><code>curl "http://localhost:8765/api/users/search?q=alice"</code></pre>
-                        </div>
-                    </div>
-
-                    <div class="endpoint-card">
-                        <div class="flex items-center mb-3">
-                            <span class="method-badge method-get">GET</span>
-                            <code class="text-lg">/api/users/:pub/profile</code>
-                            <span class="auth-badge auth-public">Public</span>
-                        </div>
-                        <p class="text-[#E0E0E0] mb-4">Get user profile by public key.</p>
-                        <div class="code-block">
-                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-                            <pre><code>curl http://localhost:8765/api/users/YOUR_PUB_KEY/profile</code></pre>
-                        </div>
-                    </div>
-
-                    <div class="endpoint-card">
-                        <div class="flex items-center mb-3">
-                            <span class="method-badge method-get">GET</span>
-                            <code class="text-lg">/api/presence/:pub</code>
-                            <span class="auth-badge auth-public">Public</span>
-                        </div>
-                        <p class="text-[#E0E0E0] mb-4">Check if a user is online.</p>
-                        <div class="code-block">
-                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-                            <pre><code>curl http://localhost:8765/api/presence/YOUR_PUB_KEY</code></pre>
-                        </div>
-                    </div>
-
-                    <div class="endpoint-card">
-                        <div class="flex items-center mb-3">
-                            <span class="method-badge method-get">GET</span>
-                            <code class="text-lg">/api/stats/protocol</code>
-                            <span class="auth-badge auth-public">Public</span>
-                        </div>
-                        <p class="text-[#E0E0E0] mb-4">Get protocol statistics (users, messages, etc.).</p>
-                        <div class="code-block">
-                            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-                            <pre><code>curl http://localhost:8765/api/stats/protocol</code></pre>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Services -->
                 <div class="mb-8">
                     <h2 class="text-3xl font-bold mb-6 text-[#FF69B4] border-b border-[#404040] pb-2">Services</h2>

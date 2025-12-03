@@ -513,11 +513,6 @@ export default (app) => {
           `${baseRoute}/system/health`,
           `${baseRoute}/system/stats`,
           `${baseRoute}/system/alldata`,
-          // Users
-          `${baseRoute}/users`,
-          `${baseRoute}/users/profile`,
-          `${baseRoute}/users/:pubkey`,
-          `${baseRoute}/users/search/:query`,
           // User Uploads
           `${baseRoute}/user-uploads/system-hashes`,
           `${baseRoute}/user-uploads/:identifier`,
