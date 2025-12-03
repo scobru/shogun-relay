@@ -1,5 +1,9 @@
 # Shogun Relay Full Stack Container
 # Includes: IPFS, Relay Server
+#
+# Build Context: This Dockerfile must be built with the build context set to
+# the directory containing this Dockerfile (shogun-relay/)
+# All COPY commands use relative paths from this directory
 
 FROM node:20-alpine
 
