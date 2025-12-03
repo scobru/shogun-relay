@@ -143,7 +143,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 # Use supervisor to manage multiple services
 # File should already be copied above, just move it to final location
-RUN cp /app/docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+RUN mkdir -p /etc/supervisor/conf.d && \
+    cp /app/docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Set environment variables
 ENV NODE_ENV=production
