@@ -79,8 +79,7 @@ RUN adduser -D -s /bin/sh ipfs \
 WORKDIR /app
 
 # Copy configuration files first
-# CapRover builds from repository root, so use shogun-relay/ prefix
-COPY shogun-relay/docker/ /app/docker/
+COPY docker/ /app/docker/
 
 # Convert script line endings from CRLF to LF
 RUN dos2unix /app/docker/init-ipfs.sh
