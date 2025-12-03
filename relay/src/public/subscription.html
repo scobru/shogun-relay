@@ -167,6 +167,19 @@
       line-height: 1.5rem;
       transition: all 0.3s ease;
     }
+
+    .file-item {
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .file-item:hover {
+      transform: translateX(2px);
+    }
   </style>
 </head>
 
@@ -302,6 +315,34 @@
             <div id="uploadResult" class="mt-4" style="display: none;"></div>
           </div>
 
+          <!-- User Files Section -->
+          <div id="filesSection" class="w-full mt-8" style="display: none;">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-xl font-semibold text-[#FFFFFF]">Your Files</h2>
+              <button class="btn btn-sm bg-[#404040] hover:bg-[#505050] border-0 text-white rounded-lg" id="refreshFilesBtn">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
+              </button>
+            </div>
+            
+            <div id="filesLoading" class="flex items-center justify-center gap-2 text-[#A0A0A0] py-8">
+              <div class="loading-spinner"></div>
+              <span>Loading files...</span>
+            </div>
+
+            <div id="filesEmpty" class="text-center py-8 text-[#A0A0A0]" style="display: none;">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
+              </svg>
+              <p>No files uploaded yet</p>
+              <p class="text-sm mt-1">Upload your first file above</p>
+            </div>
+
+            <div id="filesList" class="space-y-3"></div>
+          </div>
+
           <!-- Message Area -->
           <div id="message" class="message w-full"></div>
         </div>
@@ -397,6 +438,11 @@
     const progressBar = document.getElementById('progressBar');
     const uploadResult = document.getElementById('uploadResult');
     const messageEl = document.getElementById('message');
+    const filesSection = document.getElementById('filesSection');
+    const filesLoading = document.getElementById('filesLoading');
+    const filesEmpty = document.getElementById('filesEmpty');
+    const filesList = document.getElementById('filesList');
+    const refreshFilesBtn = document.getElementById('refreshFilesBtn');
 
     // Utility functions
     const showMessage = (text, type = 'error') => {
@@ -592,9 +638,12 @@
         if (data.subscription.active) {
           tierSelectionEl.style.display = 'none';
           uploadSection.style.display = 'block';
+          // Load user files
+          loadUserFiles();
         } else {
           tierSelectionEl.style.display = 'block';
           uploadSection.style.display = 'none';
+          filesSection.style.display = 'none';
         }
       } catch (error) {
         subscriptionStatusEl.innerHTML = `
@@ -799,6 +848,7 @@
       subscriptionStatusEl.style.display = 'none';
       tierSelectionEl.style.display = 'none';
       uploadSection.style.display = 'none';
+      filesSection.style.display = 'none';
       hideMessage();
     }
 
@@ -873,8 +923,9 @@
           </div>`;
         uploadResult.style.display = 'block';
 
-        // Refresh subscription status
+        // Refresh subscription status and files list
         await checkSubscriptionStatus();
+        await loadUserFiles();
         clearFile();
 
       } catch (error) {
@@ -918,12 +969,149 @@
       if (fileInput.files.length > 0) handleFileSelect(fileInput.files[0]);
     });
 
+    // Load user files (global for onclick)
+    window.loadUserFiles = async function() {
+      if (!connectedAddress) return;
+
+      filesSection.style.display = 'block';
+      filesLoading.style.display = 'flex';
+      filesEmpty.style.display = 'none';
+      filesList.innerHTML = '';
+
+      try {
+        const response = await fetch(`/api/v1/ipfs/user-uploads/${encodeURIComponent(connectedAddress)}`);
+        const data = await response.json();
+
+        filesLoading.style.display = 'none';
+
+        if (!data.success) {
+          throw new Error(data.error);
+        }
+
+        if (data.uploads.length === 0) {
+          filesEmpty.style.display = 'block';
+          return;
+        }
+
+        filesList.innerHTML = data.uploads.map(file => `
+          <div class="file-item p-4 bg-[#1A1A1A] rounded-xl border border-[#404040] hover:border-[#606060] transition-all" data-hash="${file.hash}">
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#42A5F5] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <p class="text-[#E0E0E0] font-medium truncate" title="${file.name}">${file.name}</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 text-sm text-[#A0A0A0]">
+                  <span>${formatFileSize(file.size)}</span>
+                  <span>|</span>
+                  <span class="font-mono text-xs bg-[#404040] px-2 py-0.5 rounded cursor-pointer hover:bg-[#505050]" 
+                        onclick="copyToClipboard('${file.hash}')" title="Click to copy">
+                    ${file.hash.substring(0, 8)}...${file.hash.substring(file.hash.length - 6)}
+                  </span>
+                  ${file.uploadedAt ? `<span>| ${new Date(file.uploadedAt).toLocaleDateString()}</span>` : ''}
+                </div>
+              </div>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <a href="/ipfs/${file.hash}" target="_blank" 
+                   class="btn btn-sm bg-[#42A5F5] hover:bg-[#1E88E5] border-0 text-white rounded-lg"
+                   title="View file">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+                <button class="btn btn-sm bg-[#F44336] hover:bg-[#D32F2F] border-0 text-white rounded-lg delete-file-btn"
+                        data-hash="${file.hash}" data-name="${file.name}"
+                        title="Delete file">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        `).join('');
+
+        // Attach delete event listeners
+        document.querySelectorAll('.delete-file-btn').forEach(btn => {
+          btn.addEventListener('click', () => deleteFile(btn.dataset.hash, btn.dataset.name));
+        });
+
+      } catch (error) {
+        console.error('Error loading files:', error);
+        filesLoading.style.display = 'none';
+        filesList.innerHTML = `
+          <div class="text-center py-4 text-[#F44336]">
+            <p>Error loading files: ${error.message}</p>
+            <button class="btn btn-sm bg-[#404040] hover:bg-[#505050] border-0 text-white rounded-lg mt-2" onclick="loadUserFiles()">
+              Retry
+            </button>
+          </div>
+        `;
+      }
+    }
+
+    // Delete file
+    async function deleteFile(hash, name) {
+      if (!confirm(`Are you sure you want to delete "${name}"?\n\nThis will unpin the file from IPFS and free up storage space.`)) {
+        return;
+      }
+
+      const fileItem = document.querySelector(`.file-item[data-hash="${hash}"]`);
+      if (fileItem) {
+        fileItem.style.opacity = '0.5';
+        fileItem.style.pointerEvents = 'none';
+      }
+
+      try {
+        const response = await fetch(`/api/v1/ipfs/user-uploads/${encodeURIComponent(connectedAddress)}/${hash}`, {
+          method: 'DELETE',
+          headers: {
+            'X-User-Address': connectedAddress,
+          },
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error);
+        }
+
+        showMessage(`File "${name}" deleted successfully. Storage freed: ${data.subscription?.storageRemainingMB?.toFixed(2) || '?'}MB remaining.`, 'success');
+
+        // Reload files and subscription status
+        await loadUserFiles();
+        await checkSubscriptionStatus();
+
+      } catch (error) {
+        console.error('Delete file error:', error);
+        showMessage(`Error deleting file: ${error.message}`, 'error');
+        
+        if (fileItem) {
+          fileItem.style.opacity = '1';
+          fileItem.style.pointerEvents = 'auto';
+        }
+      }
+    }
+
+    // Copy to clipboard (global for onclick)
+    window.copyToClipboard = function(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        showMessage('Hash copied to clipboard!', 'info');
+        setTimeout(hideMessage, 2000);
+      }).catch(err => {
+        console.error('Copy failed:', err);
+      });
+    };
+
     // Event listeners
     document.getElementById('connectWalletBtn').addEventListener('click', connectWallet);
     document.getElementById('disconnectBtn').addEventListener('click', disconnectWallet);
     subscribeBtn.addEventListener('click', subscribe);
     document.getElementById('clearFileBtn').addEventListener('click', clearFile);
     uploadBtn.addEventListener('click', uploadFile);
+    refreshFilesBtn.addEventListener('click', window.loadUserFiles);
 
     // Listen for account/network changes
     if (window.ethereum) {

@@ -1583,4 +1583,205 @@ router.get("/version", (req, res, next) => {
   }
 });
 
+// Get user uploads list (for x402 subscription users)
+router.get("/user-uploads/:userAddress", async (req, res) => {
+  try {
+    const { userAddress } = req.params;
+    
+    if (!userAddress) {
+      return res.status(400).json({
+        success: false,
+        error: "User address is required",
+      });
+    }
+
+    const gun = req.app.get('gunInstance');
+    if (!gun) {
+      return res.status(500).json({
+        success: false,
+        error: "Server error - Gun instance not available",
+      });
+    }
+
+    // Get uploads from relay user space
+    const uploads = await X402Merchant.getUserUploads(gun, userAddress);
+    
+    // Get subscription status
+    const subscription = await X402Merchant.getSubscriptionStatus(gun, userAddress);
+
+    res.json({
+      success: true,
+      userAddress,
+      uploads: uploads.map(upload => ({
+        hash: upload.hash,
+        name: upload.name,
+        size: upload.size,
+        sizeMB: upload.sizeMB || (upload.size ? upload.size / (1024 * 1024) : 0),
+        mimetype: upload.mimetype,
+        uploadedAt: upload.uploadedAt,
+      })),
+      count: uploads.length,
+      subscription: subscription.active ? {
+        tier: subscription.tier,
+        storageMB: subscription.storageMB,
+        storageUsedMB: subscription.storageUsedMB,
+        storageRemainingMB: subscription.storageRemainingMB,
+      } : null,
+    });
+
+  } catch (error) {
+    console.error("❌ Get user uploads error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Delete/unpin user file (for x402 subscription users)
+router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
+  try {
+    const { userAddress, hash } = req.params;
+    
+    // Verify user address header matches
+    const headerUserAddress = req.headers["x-user-address"];
+    
+    if (!headerUserAddress || headerUserAddress.toLowerCase() !== userAddress.toLowerCase()) {
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized - User address mismatch",
+      });
+    }
+
+    if (!hash) {
+      return res.status(400).json({
+        success: false,
+        error: "File hash is required",
+      });
+    }
+
+    const gun = req.app.get('gunInstance');
+    if (!gun) {
+      return res.status(500).json({
+        success: false,
+        error: "Server error - Gun instance not available",
+      });
+    }
+
+    // Get subscription status to verify user has active subscription
+    const subscription = await X402Merchant.getSubscriptionStatus(gun, userAddress);
+    if (!subscription.active) {
+      return res.status(403).json({
+        success: false,
+        error: "No active subscription",
+      });
+    }
+
+    // Get the upload record to get file size
+    const uploads = await X402Merchant.getUserUploads(gun, userAddress);
+    const uploadRecord = uploads.find(u => u.hash === hash);
+    
+    if (!uploadRecord) {
+      return res.status(404).json({
+        success: false,
+        error: "Upload not found",
+      });
+    }
+
+    const fileSizeMB = uploadRecord.sizeMB || (uploadRecord.size ? uploadRecord.size / (1024 * 1024) : 0);
+
+    // Step 1: Unpin from IPFS
+    console.log(`📌 Unpinning ${hash} from IPFS...`);
+    
+    const unpinResult = await new Promise((resolve) => {
+      const requestOptions = {
+        hostname: "127.0.0.1",
+        port: 5001,
+        path: `/api/v0/pin/rm?arg=${hash}`,
+        method: "POST",
+        headers: {
+          "Content-Length": "0",
+        },
+      };
+
+      if (IPFS_API_TOKEN) {
+        requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+      }
+
+      const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+        let data = "";
+        ipfsRes.on("data", (chunk) => (data += chunk));
+        ipfsRes.on("end", () => {
+          try {
+            const result = JSON.parse(data);
+            resolve({ success: true, result });
+          } catch (parseError) {
+            // Even if we can't parse, consider it a warning not an error
+            resolve({ success: true, warning: "Could not parse IPFS response", raw: data });
+          }
+        });
+      });
+
+      ipfsReq.on("error", (err) => {
+        console.error(`❌ IPFS unpin error for ${hash}:`, err);
+        resolve({ success: false, error: err.message });
+      });
+
+      ipfsReq.setTimeout(30000, () => {
+        ipfsReq.destroy();
+        resolve({ success: false, error: "Timeout" });
+      });
+
+      ipfsReq.end();
+    });
+
+    // Step 2: Delete upload record from relay user space
+    console.log(`🗑️ Deleting upload record for ${hash}...`);
+    
+    try {
+      await X402Merchant.deleteUploadRecord(userAddress, hash);
+      console.log(`✅ Upload record deleted`);
+    } catch (deleteError) {
+      console.warn(`⚠️ Failed to delete upload record:`, deleteError.message);
+    }
+
+    // Step 3: Update storage usage (subtract file size)
+    console.log(`📊 Updating storage usage (-${fileSizeMB.toFixed(2)}MB)...`);
+    
+    try {
+      // Get current subscription and update storage
+      const currentSub = await X402Merchant.getSubscriptionStatus(gun, userAddress);
+      const newUsage = Math.max(0, (currentSub.storageUsedMB || 0) - fileSizeMB);
+      
+      const RelayUser = await import('../utils/relay-user.js');
+      await RelayUser.updateSubscriptionField(userAddress, 'storageUsedMB', newUsage);
+      
+      console.log(`✅ Storage updated: ${newUsage.toFixed(2)}MB`);
+    } catch (updateError) {
+      console.warn(`⚠️ Failed to update storage:`, updateError.message);
+    }
+
+    // Get updated subscription status
+    const updatedSubscription = await X402Merchant.getSubscriptionStatus(gun, userAddress);
+
+    res.json({
+      success: true,
+      message: "File unpinned and removed successfully",
+      hash,
+      unpin: unpinResult,
+      subscription: updatedSubscription.active ? {
+        storageUsedMB: updatedSubscription.storageUsedMB,
+        storageRemainingMB: updatedSubscription.storageRemainingMB,
+      } : null,
+    });
+
+  } catch (error) {
+    console.error("❌ Delete user file error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 export default router; 
