@@ -18,53 +18,44 @@ ARG X402_SETTLEMENT_MODE
 ARG X402_PRIVATE_KEY
 ARG X402_RPC_URL
 
-# Install required system packages and IPFS
-# Note: IPFS Kubo binaries are compiled for glibc, Alpine uses musl libc
-# We need gcompat for glibc compatibility
+# Install required system packages
 RUN apk add --no-cache \
     git \
     curl \
     wget \
     dos2unix \
     supervisor \
-    gcompat \
+    gcompat
+
+# Download and install IPFS Kubo (separate step for better caching and retry)
+# Note: IPFS Kubo binaries are compiled for glibc, Alpine uses musl libc - gcompat provides compatibility
+RUN set -ex \
     && ARCH=$(uname -m) \
     && case $ARCH in \
-    x86_64) ARCH_NAME="amd64" ;; \
-    aarch64) ARCH_NAME="arm64" ;; \
-    *) echo "Unsupported architecture: $ARCH"; exit 1 ;; \
-    esac \
+       x86_64) ARCH_NAME="amd64" ;; \
+       aarch64) ARCH_NAME="arm64" ;; \
+       *) echo "Unsupported architecture: $ARCH"; exit 1 ;; \
+       esac \
+    && IPFS_URL="https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz" \
     && echo "Downloading IPFS Kubo v${IPFS_VERSION} for ${ARCH_NAME}..." \
+    && echo "URL: ${IPFS_URL}" \
     && mkdir -p /tmp/ipfs-install \
     && cd /tmp/ipfs-install \
-    && echo "Downloading tarball..." \
-    && wget -q https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz || (echo "ERROR: wget failed to download tarball" && exit 1) \
-    && echo "Verifying tarball downloaded..." \
-    && test -f kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz || (echo "ERROR: tarball not found" && exit 1) \
-    && ls -lh kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
-    && echo "Downloading checksum (optional)..." \
-    && wget -q https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 && \
-    (echo "Verifying checksum..." && sha512sum -c kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 || echo "WARNING: checksum verification failed, continuing anyway...") || echo "WARNING: checksum file not available, skipping verification..." \
+    # Use curl with retry and better error handling
+    && for i in 1 2 3 4 5; do \
+         echo "Download attempt $i..." && \
+         curl -fsSL --retry 3 --retry-delay 5 -o kubo.tar.gz "${IPFS_URL}" && break || \
+         (echo "Attempt $i failed, waiting..." && sleep 10); \
+       done \
+    && test -f kubo.tar.gz || (echo "ERROR: Failed to download IPFS after 5 attempts" && exit 1) \
+    && ls -lh kubo.tar.gz \
     && echo "Extracting IPFS..." \
-    && tar -xzf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz 2>&1 || (echo "ERROR: tar extraction failed" && exit 1) \
-    && echo "Checking extracted files..." \
-    && pwd \
-    && ls -la \
-    && echo "Listing tarball contents..." \
-    && tar -tzf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz | head -5 \
-    && test -d kubo || (echo "ERROR: kubo directory not found after extraction" && echo "Current directory contents:" && ls -la && echo "Trying to find kubo..." && find . -name "kubo" -o -name "ipfs" 2>/dev/null | head -10 && exit 1) \
-    && test -f kubo/ipfs || (echo "ERROR: kubo/ipfs binary not found" && exit 1) \
-    && echo "Setting permissions..." \
+    && tar -xzf kubo.tar.gz \
+    && test -d kubo && test -f kubo/ipfs || (echo "ERROR: Extraction failed" && ls -la && exit 1) \
     && chmod +x kubo/ipfs \
-    && echo "Installing IPFS to /usr/local/bin..." \
     && install -m 755 kubo/ipfs /usr/local/bin/ipfs \
-    && echo "Verifying file exists..." \
-    && ls -lh /usr/local/bin/ipfs || (echo "ERROR: IPFS binary not found after install" && exit 1) \
-    && echo "Checking binary dependencies..." \
-    && (ldd /usr/local/bin/ipfs 2>/dev/null || true) \
     && echo "Testing IPFS binary..." \
-    && /usr/local/bin/ipfs version || (echo "ERROR: IPFS binary execution failed - may need additional libraries" && ldd /usr/local/bin/ipfs 2>/dev/null || true && exit 1) \
-    && echo "Cleaning up..." \
+    && /usr/local/bin/ipfs version \
     && cd / \
     && rm -rf /tmp/ipfs-install \
     && echo "IPFS installation successful!"
