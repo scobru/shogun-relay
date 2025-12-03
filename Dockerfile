@@ -39,11 +39,13 @@ RUN apk add --no-cache \
     && wget -q https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 && \
     (echo "Verifying checksum..." && sha512sum -c kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 || echo "WARNING: checksum verification failed, continuing anyway...") || echo "WARNING: checksum file not available, skipping verification..." \
     && echo "Extracting IPFS..." \
-    && tar -xzf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz || (echo "ERROR: tar extraction failed" && exit 1) \
+    && tar -xzf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz 2>&1 || (echo "ERROR: tar extraction failed" && exit 1) \
     && echo "Checking extracted files..." \
     && pwd \
     && ls -la \
-    && test -d kubo || (echo "ERROR: kubo directory not found after extraction" && ls -la && exit 1) \
+    && echo "Listing tarball contents..." \
+    && tar -tzf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz | head -5 \
+    && test -d kubo || (echo "ERROR: kubo directory not found after extraction" && echo "Current directory contents:" && ls -la && echo "Trying to find kubo..." && find . -name "kubo" -o -name "ipfs" 2>/dev/null | head -10 && exit 1) \
     && test -f kubo/ipfs || (echo "ERROR: kubo/ipfs binary not found" && exit 1) \
     && echo "Setting permissions..." \
     && chmod +x kubo/ipfs \
