@@ -97,12 +97,12 @@ RUN cp /app/docker/entrypoint.sh /usr/local/bin/entrypoint.sh && \
 RUN cp /app/docker/relay.env /app/relay/.env
 
 # Copy package files and install dependencies
-COPY shogun-relay/relay/package*.json /app/relay/
+COPY relay/package*.json /app/relay/
 WORKDIR /app/relay
 RUN npm install --omit=dev
 
 # Copy the rest of the application
-COPY shogun-relay/relay/ /app/relay/
+COPY relay/ /app/relay/
 
 # Set proper permissions
 RUN chown -R node:node /app \
