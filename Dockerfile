@@ -29,18 +29,17 @@ RUN apk add --no-cache \
     *) echo "Unsupported architecture: $ARCH"; exit 1 ;; \
     esac \
     && echo "Downloading IPFS Kubo v${IPFS_VERSION} for ${ARCH_NAME}..." \
+    && mkdir -p /tmp/ipfs-install \
+    && cd /tmp/ipfs-install \
     && wget -q https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
     && wget -q https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
     && echo "Verifying checksum..." \
     && sha512sum -c kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz.sha512 \
     && echo "Extracting IPFS..." \
-    && tar -xvf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
+    && tar -xf kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz \
     && echo "Checking extracted files..." \
-    && ls -la || echo "Listing current directory failed" \
-    && ls -la kubo/ || (echo "ERROR: kubo directory not found after extraction" && exit 1) \
-    && test -f kubo/ipfs || (echo "ERROR: kubo/ipfs binary not found" && exit 1) \
-    && echo "Setting permissions..." \
-    && chmod +x kubo/ipfs \
+    && ls -la \
+    && if [ ! -d "kubo" ]; then echo "ERROR: kubo directory missing"; ls -R; exit 1; fi \
     && echo "Installing IPFS to /usr/local/bin..." \
     && install -m 755 kubo/ipfs /usr/local/bin/ipfs \
     && echo "Verifying file exists..." \
@@ -50,7 +49,8 @@ RUN apk add --no-cache \
     && echo "Testing IPFS binary..." \
     && /usr/local/bin/ipfs version || (echo "ERROR: IPFS binary execution failed - may need additional libraries" && ldd /usr/local/bin/ipfs 2>/dev/null || true && exit 1) \
     && echo "Cleaning up..." \
-    && rm -rf kubo kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz* \
+    && cd / \
+    && rm -rf /tmp/ipfs-install \
     && echo "IPFS installation successful!"
 
 # Create symlink for Node.js (supervisord expects it in /usr/bin)
