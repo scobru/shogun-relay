@@ -309,7 +309,8 @@ router.post('/create', express.json(), async (req, res) => {
       domainVersion: networkConfig.usdcVersion,
     };
     
-    res.status(402).json({
+    // Return 200 OK - deal created successfully, payment needed to activate
+    res.json({
       success: true,
       deal: {
         id: deal.id,

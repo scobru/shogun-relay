@@ -762,12 +762,15 @@
 
         const data = await response.json();
 
-        if (response.status === 402 && data.deal) {
-          // Deal created, payment required - show payment modal
-          showPaymentModal(data);
-        } else if (data.success) {
-          showMessage('createMessage', 'success', 'Deal created and activated!');
-          loadMyDeals();
+        if (data.success && data.deal) {
+          if (data.paymentRequired) {
+            // Deal created, payment required - show payment modal
+            showPaymentModal(data);
+          } else {
+            // Deal already activated (shouldn't happen but handle it)
+            showMessage('createMessage', 'success', 'Deal created and activated!');
+            loadMyDeals();
+          }
         } else {
           showMessage('createMessage', 'error', data.error || 'Failed to create deal');
         }
