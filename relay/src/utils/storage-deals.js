@@ -170,7 +170,8 @@ export function createDeal(params) {
     erasureCoding: pricing.features.erasureCoding,
     erasureMetadata,
     replicationFactor: pricing.replicationFactor,
-    replicas: [],
+    replicas: {},  // Object instead of array for GunDB compatibility
+    replicaCount: 0,
     // Status
     status: DEAL_STATUS.PENDING,
     statusHistory: [
@@ -212,18 +213,21 @@ export function activateDeal(deal, paymentTx) {
  * @returns {object} - Updated deal
  */
 export function addReplica(deal, replica) {
-  const existingIndex = deal.replicas.findIndex(r => r.relayPub === replica.relayPub);
+  const replicas = { ...(deal.replicas || {}) };
+  const replicaKey = replica.relayPub;
   
-  const replicas = [...deal.replicas];
-  if (existingIndex >= 0) {
-    replicas[existingIndex] = { ...replicas[existingIndex], ...replica, updatedAt: Date.now() };
+  if (replicas[replicaKey]) {
+    // Update existing replica
+    replicas[replicaKey] = { ...replicas[replicaKey], ...replica, updatedAt: Date.now() };
   } else {
-    replicas.push({ ...replica, addedAt: Date.now() });
+    // Add new replica
+    replicas[replicaKey] = { ...replica, addedAt: Date.now() };
   }
   
   return {
     ...deal,
     replicas,
+    replicaCount: Object.keys(replicas).length,
   };
 }
 

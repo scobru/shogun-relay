@@ -763,11 +763,11 @@
         const data = await response.json();
 
         if (response.status === 402 && data.deal) {
-          // Deal created, payment required
-          showMessage('createMessage', 'info', 
-            `Deal ${data.deal.id} created! Price: $${data.deal.pricing.totalPriceUSDC.toFixed(6)} USDC. Payment integration coming soon.`);
+          // Deal created, payment required - show payment modal
+          showPaymentModal(data);
         } else if (data.success) {
-          showMessage('createMessage', 'success', 'Deal created successfully!');
+          showMessage('createMessage', 'success', 'Deal created and activated!');
+          loadMyDeals();
         } else {
           showMessage('createMessage', 'error', data.error || 'Failed to create deal');
         }
@@ -860,6 +860,118 @@
       setTimeout(() => {
         el.style.display = 'none';
       }, 10000);
+    }
+
+    // Show payment modal
+    function showPaymentModal(data) {
+      const { deal, paymentRequired } = data;
+      const price = deal.pricing.totalPriceUSDC;
+      
+      // Create modal if it doesn't exist
+      let modal = document.getElementById('paymentModal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'paymentModal';
+        modal.style.cssText = `
+          position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+          background: rgba(0,0,0,0.8); display: flex;
+          align-items: center; justify-content: center; z-index: 1000;
+        `;
+        document.body.appendChild(modal);
+      }
+      
+      modal.innerHTML = `
+        <div style="background: #282828; border: 1px solid #404040; border-radius: 1rem; padding: 2rem; max-width: 500px; width: 90%;">
+          <div style="text-align: center; margin-bottom: 1.5rem;">
+            <svg xmlns="http://www.w3.org/2000/svg" style="width: 4rem; height: 4rem; color: #4CAF50; margin: 0 auto 1rem;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h2 style="font-size: 1.5rem; font-weight: bold; color: #FFFFFF; margin-bottom: 0.5rem;">Deal Created!</h2>
+            <p style="color: #A0A0A0;">Complete payment to activate your storage deal</p>
+          </div>
+          
+          <div style="background: #1A1A1A; border-radius: 0.75rem; padding: 1rem; margin-bottom: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span style="color: #A0A0A0;">Deal ID</span>
+              <span style="color: #FFFFFF; font-family: monospace; font-size: 0.85rem;">${deal.id}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span style="color: #A0A0A0;">Size</span>
+              <span style="color: #FFFFFF;">${deal.pricing.sizeMB} MB</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span style="color: #A0A0A0;">Duration</span>
+              <span style="color: #FFFFFF;">${deal.pricing.durationDays} days</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span style="color: #A0A0A0;">Tier</span>
+              <span style="color: #FFFFFF; text-transform: capitalize;">${deal.pricing.tier}</span>
+            </div>
+            <div style="border-top: 1px solid #404040; margin-top: 0.75rem; padding-top: 0.75rem; display: flex; justify-content: space-between;">
+              <span style="color: #FFFFFF; font-weight: bold;">Total Price</span>
+              <span style="color: #42A5F5; font-weight: bold; font-size: 1.25rem;">$${price.toFixed(6)} USDC</span>
+            </div>
+          </div>
+          
+          <div style="background: rgba(66, 165, 245, 0.1); border: 1px solid rgba(66, 165, 245, 0.3); border-radius: 0.75rem; padding: 1rem; margin-bottom: 1.5rem;">
+            <p style="color: #42A5F5; font-size: 0.9rem; margin-bottom: 0.5rem;">
+              <strong>Payment Address (${paymentRequired.network}):</strong>
+            </p>
+            <p style="color: #FFFFFF; font-family: monospace; font-size: 0.8rem; word-break: break-all;">
+              ${paymentRequired.payTo}
+            </p>
+            <button onclick="navigator.clipboard.writeText('${paymentRequired.payTo}')" 
+                    style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: #42A5F5; color: white; border: none; border-radius: 0.5rem; cursor: pointer; font-size: 0.85rem;">
+              Copy Address
+            </button>
+          </div>
+          
+          <p style="color: #A0A0A0; font-size: 0.85rem; text-align: center; margin-bottom: 1rem;">
+            Send exactly <strong style="color: #42A5F5;">$${price.toFixed(6)} USDC</strong> to the address above on <strong>${paymentRequired.network}</strong> to activate your deal.
+          </p>
+          
+          <div style="display: flex; gap: 1rem;">
+            <button onclick="closePaymentModal()" 
+                    style="flex: 1; padding: 1rem; background: #404040; color: white; border: none; border-radius: 0.75rem; cursor: pointer; font-weight: 500;">
+              Close
+            </button>
+            <button onclick="checkDealStatus('${deal.id}')" 
+                    style="flex: 1; padding: 1rem; background: #4CAF50; color: white; border: none; border-radius: 0.75rem; cursor: pointer; font-weight: 500;">
+              Check Status
+            </button>
+          </div>
+        </div>
+      `;
+      
+      modal.style.display = 'flex';
+    }
+
+    function closePaymentModal() {
+      const modal = document.getElementById('paymentModal');
+      if (modal) {
+        modal.style.display = 'none';
+      }
+    }
+
+    async function checkDealStatus(dealId) {
+      try {
+        const response = await fetch(`/api/v1/deals/${dealId}`);
+        const data = await response.json();
+        
+        if (data.success && data.deal) {
+          if (data.deal.status === 'active') {
+            showMessage('createMessage', 'success', 'Deal is now active!');
+            closePaymentModal();
+            loadMyDeals();
+          } else {
+            showMessage('createMessage', 'info', `Deal status: ${data.deal.status}. Payment not yet confirmed.`);
+          }
+        } else {
+          showMessage('createMessage', 'error', 'Could not check deal status');
+        }
+      } catch (error) {
+        showMessage('createMessage', 'error', 'Error checking status: ' + error.message);
+      }
     }
 
     // File upload handling

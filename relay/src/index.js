@@ -731,7 +731,13 @@ async function initializeServer() {
           uptime: process.uptime(),
           connections: pulse.connections,
           ipfs: pulse.ipfs,
-          capabilities: ['ipfs-pin', 'storage-proof', 'x402-subscription'],
+          // Use object instead of array for GunDB compatibility
+          capabilities: {
+            'ipfs-pin': true,
+            'storage-proof': true,
+            'x402-subscription': true,
+            'storage-deals': true,
+          },
         };
 
         await FrozenData.createFrozenEntry(
