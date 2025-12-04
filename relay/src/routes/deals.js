@@ -392,15 +392,20 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
     });
     
     // Verify the payment amount
-    const requiredAmount = Math.ceil(deal.pricing.totalPriceUSDC * 1000000);
-    const verification = await merchant.verifyPaymentAmount(payment, requiredAmount);
+    const requiredAmountAtomic = Math.ceil(deal.pricing.totalPriceUSDC * 1000000);
+    console.log(`Verifying deal payment: required ${requiredAmountAtomic} atomic units (${deal.pricing.totalPriceUSDC} USDC)`);
+    
+    const verification = await merchant.verifyDealPayment(payment, requiredAmountAtomic);
     
     if (!verification.isValid) {
+      console.log(`❌ Payment verification failed: ${verification.invalidReason}`);
       return res.status(402).json({
         success: false,
         error: `Payment verification failed: ${verification.invalidReason}`,
       });
     }
+    
+    console.log(`✅ Payment verified: ${verification.amount} USDC from ${verification.payer}`);
     
     // Settle payment
     const settlement = await merchant.settlePayment(payment);

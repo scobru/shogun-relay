@@ -279,6 +279,77 @@ export class X402Merchant {
   }
 
   /**
+   * Verify payment for a deal (custom amount instead of tier)
+   * @param {object} paymentPayload - The x402 payment payload
+   * @param {number} requiredAmountAtomic - Required amount in atomic units (6 decimals for USDC)
+   */
+  async verifyDealPayment(paymentPayload, requiredAmountAtomic) {
+    if (!paymentPayload) {
+      return { isValid: false, invalidReason: 'No payment payload provided' };
+    }
+
+    try {
+      // Basic validation
+      if (!paymentPayload.payload) {
+        return { isValid: false, invalidReason: 'Missing payload in payment' };
+      }
+
+      const { authorization, signature } = paymentPayload.payload;
+      if (!authorization) {
+        return { isValid: false, invalidReason: 'Missing authorization in payload' };
+      }
+
+      if (!signature) {
+        return { isValid: false, invalidReason: 'Missing signature in payload' };
+      }
+
+      // Verify recipient
+      if (authorization.to?.toLowerCase() !== this.payToAddress.toLowerCase()) {
+        return { 
+          isValid: false, 
+          invalidReason: `Invalid recipient. Expected ${this.payToAddress}, got ${authorization.to}` 
+        };
+      }
+
+      // Verify amount
+      const paymentAmount = BigInt(authorization.value || '0');
+      const requiredAmount = BigInt(requiredAmountAtomic);
+      
+      if (paymentAmount < requiredAmount) {
+        return { 
+          isValid: false, 
+          invalidReason: `Insufficient payment. Required: ${requiredAmount}, got: ${paymentAmount}` 
+        };
+      }
+
+      // Verify validity period
+      const now = Math.floor(Date.now() / 1000);
+      const validAfter = parseInt(authorization.validAfter || '0');
+      const validBefore = parseInt(authorization.validBefore || '0');
+
+      if (now < validAfter) {
+        return { isValid: false, invalidReason: 'Payment not yet valid' };
+      }
+
+      if (now > validBefore) {
+        return { isValid: false, invalidReason: 'Payment expired' };
+      }
+
+      console.log(`Deal payment verified: ${formatUnits(paymentAmount, 6)} USDC from ${authorization.from}`);
+
+      return { 
+        isValid: true, 
+        payer: authorization.from,
+        amount: formatUnits(paymentAmount, 6),
+        amountAtomic: paymentAmount.toString(),
+      };
+    } catch (error) {
+      console.error('Deal payment verification error:', error);
+      return { isValid: false, invalidReason: error.message };
+    }
+  }
+
+  /**
    * Verify payment with facilitator
    */
   async verifyWithFacilitator(paymentPayload) {
