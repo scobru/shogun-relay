@@ -1084,12 +1084,15 @@
         });
 
         const result = await response.json();
+        
+        console.log('Activate deal response:', result);
 
         if (result.success) {
           statusEl.innerHTML = `
             <div style="text-align: center; padding: 1rem; background: rgba(76, 175, 80, 0.2); border-radius: 0.5rem;">
               <p style="color: #4CAF50; font-weight: bold;">Payment Successful!</p>
               <p style="color: #A0A0A0; font-size: 0.85rem; margin-top: 0.5rem;">Deal activated until ${new Date(result.deal.expiresAt).toLocaleDateString()}</p>
+              ${result.warning ? `<p style="color: #FF9800; font-size: 0.85rem; margin-top: 0.5rem;">⚠️ ${result.warning}</p>` : ''}
             </div>
           `;
           payBtn.style.display = 'none';
@@ -1098,10 +1101,13 @@
           setTimeout(() => {
             closePaymentModal();
             loadMyDeals();
-            showMessage('createMessage', 'success', 'Deal activated successfully!');
+            showMessage('createMessage', 'success', result.warning || 'Deal activated successfully!');
           }, 2000);
         } else {
-          throw new Error(result.error || 'Payment failed');
+          // Show detailed error
+          const errorMsg = result.error || 'Payment failed';
+          console.error('Payment failed:', errorMsg);
+          throw new Error(errorMsg);
         }
 
       } catch (error) {

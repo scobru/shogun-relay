@@ -426,6 +426,7 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
     console.log(`✅ Payment verified: ${verification.amount} USDC from ${verification.payer}`);
     
     // Settle payment
+    console.log('Attempting to settle payment...');
     const settlement = await merchant.settlePayment(payment);
     
     if (!settlement.success) {
@@ -433,8 +434,13 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
       return res.status(402).json({
         success: false,
         error: `Payment settlement failed: ${settlement.errorReason}`,
+        hint: settlement.errorReason?.includes('not configured') 
+          ? 'Configure X402_PRIVATE_KEY for direct settlement or ensure facilitator is available'
+          : 'Check server logs for details',
       });
     }
+    
+    console.log(`✅ Payment settled successfully. TX: ${settlement.transaction}`);
     
     // Activate deal
     const txHash = settlement.transaction;
