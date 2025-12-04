@@ -650,21 +650,32 @@
 
     // Price calculation
     async function calculatePrice() {
-      const sizeMB = document.getElementById('calcSizeMB').value;
-      const duration = document.getElementById('calcDuration').value;
+      const sizeMB = parseFloat(document.getElementById('calcSizeMB').value) || 0;
+      const duration = parseInt(document.getElementById('calcDuration').value) || 0;
       const tier = document.getElementById('calcTier').value;
+
+      if (sizeMB <= 0 || duration <= 0) {
+        document.getElementById('calculatedPrice').textContent = '--';
+        document.getElementById('priceBreakdown').textContent = 'Enter valid size and duration';
+        return;
+      }
 
       try {
         const response = await fetch(`/api/v1/deals/pricing?sizeMB=${sizeMB}&durationDays=${duration}&tier=${tier}`);
         const data = await response.json();
 
-        if (data.success) {
+        if (data.success && data.pricing) {
           document.getElementById('calculatedPrice').textContent = `$${data.pricing.totalPriceUSDC.toFixed(6)} USDC`;
           document.getElementById('priceBreakdown').textContent = 
             `${data.pricing.replicationFactor}x replication | ${data.pricing.storageOverheadPercent}% erasure overhead`;
+        } else {
+          document.getElementById('calculatedPrice').textContent = '--';
+          document.getElementById('priceBreakdown').textContent = data.error || 'Could not calculate price';
         }
       } catch (error) {
         console.error('Price calculation error:', error);
+        document.getElementById('calculatedPrice').textContent = '--';
+        document.getElementById('priceBreakdown').textContent = 'Error calculating price';
       }
     }
 
@@ -891,6 +902,11 @@
 
     // Handle file upload
     async function handleFile(file) {
+      if (!connectedAddress) {
+        showMessage('createMessage', 'error', 'Please connect your wallet first to upload');
+        return;
+      }
+
       // Show progress
       document.getElementById('dropZoneContent').classList.add('hidden');
       document.getElementById('uploadProgress').classList.remove('hidden');
@@ -901,8 +917,12 @@
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await fetch('/api/v1/ipfs/upload', {
+        // Use the deals-specific upload endpoint
+        const response = await fetch('/api/v1/deals/upload', {
           method: 'POST',
+          headers: {
+            'x-wallet-address': connectedAddress
+          },
           body: formData
         });
 
@@ -1012,26 +1032,31 @@
     });
 
     async function updateDealPreview() {
-      const sizeMB = document.getElementById('dealSizeMB').value;
-      const duration = document.getElementById('dealDuration').value;
+      const sizeMB = parseFloat(document.getElementById('dealSizeMB').value) || 0;
+      const duration = parseInt(document.getElementById('dealDuration').value) || 0;
       const tier = document.getElementById('dealTier').value;
 
-      if (sizeMB && duration) {
+      if (sizeMB > 0 && duration > 0) {
         try {
           const response = await fetch(`/api/v1/deals/pricing?sizeMB=${sizeMB}&durationDays=${duration}&tier=${tier}`);
           const data = await response.json();
 
-          if (data.success) {
+          if (data.success && data.pricing) {
             document.getElementById('dealPreview').style.display = 'block';
             document.getElementById('dealPrice').textContent = `$${data.pricing.totalPriceUSDC.toFixed(6)} USDC`;
             
             const expiry = new Date();
-            expiry.setDate(expiry.getDate() + parseInt(duration));
+            expiry.setDate(expiry.getDate() + duration);
             document.getElementById('dealExpiry').textContent = expiry.toLocaleDateString();
+          } else {
+            document.getElementById('dealPreview').style.display = 'none';
           }
         } catch (error) {
           console.error('Preview update error:', error);
+          document.getElementById('dealPreview').style.display = 'none';
         }
+      } else {
+        document.getElementById('dealPreview').style.display = 'none';
       }
     }
   </script>
