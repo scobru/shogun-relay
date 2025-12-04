@@ -335,29 +335,115 @@ async function initializeServer() {
   } else if (process.env.RELAY_SEA_KEYPAIR_PATH) {
     try {
       const fs = await import('fs');
-      const keyPairContent = fs.readFileSync(process.env.RELAY_SEA_KEYPAIR_PATH, 'utf8');
-      relayKeyPair = JSON.parse(keyPairContent);
-      console.log(`🔑 Loaded SEA keypair from ${process.env.RELAY_SEA_KEYPAIR_PATH}`);
+      const path = await import('path');
+      
+      // Check if file exists
+      if (!fs.existsSync(process.env.RELAY_SEA_KEYPAIR_PATH)) {
+        console.log(`⚠️ Keypair file not found at ${process.env.RELAY_SEA_KEYPAIR_PATH}`);
+        console.log(`🔑 Generating new keypair automatically...`);
+        
+        // Generate new keypair
+        const Gun = (await import('gun')).default;
+        await import('gun/sea.js');
+        const newKeyPair = await Gun.SEA.pair();
+        
+        // Ensure directory exists
+        const keyPairDir = path.dirname(process.env.RELAY_SEA_KEYPAIR_PATH);
+        if (keyPairDir && keyPairDir !== '.') {
+          if (!fs.existsSync(keyPairDir)) {
+            fs.mkdirSync(keyPairDir, { recursive: true });
+          }
+        }
+        
+        // Save to file
+        fs.writeFileSync(process.env.RELAY_SEA_KEYPAIR_PATH, JSON.stringify(newKeyPair, null, 2), 'utf8');
+        relayKeyPair = newKeyPair;
+        
+        console.log(`✅ Generated and saved new keypair to ${process.env.RELAY_SEA_KEYPAIR_PATH}`);
+        console.log(`🔑 Public key: ${newKeyPair.pub.substring(0, 30)}...`);
+        console.log(`⚠️ IMPORTANT: Save this keypair file securely!`);
+      } else {
+        // File exists, load it
+        const keyPairContent = fs.readFileSync(process.env.RELAY_SEA_KEYPAIR_PATH, 'utf8');
+        relayKeyPair = JSON.parse(keyPairContent);
+        console.log(`🔑 Loaded SEA keypair from ${process.env.RELAY_SEA_KEYPAIR_PATH}`);
+      }
     } catch (error) {
-      console.error(`❌ Failed to load keypair from ${process.env.RELAY_SEA_KEYPAIR_PATH}:`, error.message);
-      throw new Error(`Failed to load keypair from ${process.env.RELAY_SEA_KEYPAIR_PATH}`);
+      console.error(`❌ Failed to load/generate keypair from ${process.env.RELAY_SEA_KEYPAIR_PATH}:`, error.message);
+      throw new Error(`Failed to load/generate keypair: ${error.message}`);
     }
   } else {
-    const errorMsg = `
-❌ RELAY_SEA_KEYPAIR or RELAY_SEA_KEYPAIR_PATH is REQUIRED!
+    // No keypair configured - try to auto-generate in default location
+    console.log(`⚠️ No keypair configured. Attempting to auto-generate...`);
+    
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      // Try default locations
+      const defaultPaths = [
+        '/app/keys/relay-keypair.json',
+        path.join(process.cwd(), 'relay-keypair.json'),
+        path.join(process.cwd(), 'keys', 'relay-keypair.json'),
+      ];
+      
+      let keyPairPath = null;
+      for (const defaultPath of defaultPaths) {
+        if (fs.existsSync(defaultPath)) {
+          keyPairPath = defaultPath;
+          console.log(`📁 Found existing keypair at ${defaultPath}`);
+          break;
+        }
+      }
+      
+      // If no existing keypair found, generate new one in first default location
+      if (!keyPairPath) {
+        keyPairPath = defaultPaths[0]; // Use /app/keys/relay-keypair.json as default
+        
+        console.log(`🔑 Generating new keypair at ${keyPairPath}...`);
+        
+        // Generate new keypair
+        const Gun = (await import('gun')).default;
+        await import('gun/sea.js');
+        const newKeyPair = await Gun.SEA.pair();
+        
+        // Ensure directory exists
+        const keyPairDir = path.dirname(keyPairPath);
+        if (keyPairDir && keyPairDir !== '.') {
+          if (!fs.existsSync(keyPairDir)) {
+            fs.mkdirSync(keyPairDir, { recursive: true });
+          }
+        }
+        
+        // Save to file
+        fs.writeFileSync(keyPairPath, JSON.stringify(newKeyPair, null, 2), 'utf8');
+        relayKeyPair = newKeyPair;
+        
+        console.log(`✅ Generated new keypair at ${keyPairPath}`);
+        console.log(`🔑 Public key: ${newKeyPair.pub.substring(0, 30)}...`);
+        console.log(`⚠️ IMPORTANT: Save this keypair file securely or set RELAY_SEA_KEYPAIR_PATH!`);
+      } else {
+        // Load existing keypair
+        const keyPairContent = fs.readFileSync(keyPairPath, 'utf8');
+        relayKeyPair = JSON.parse(keyPairContent);
+        console.log(`🔑 Loaded existing keypair from ${keyPairPath}`);
+      }
+    } catch (autoGenError) {
+      // Auto-generation failed - provide helpful error
+      const errorMsg = `
+❌ Failed to auto-generate keypair: ${autoGenError.message}
 
-The relay MUST be configured with a SEA keypair to prevent "Signature did not match" errors.
-
-To generate a keypair:
+To configure a keypair manually:
   1. Run: node scripts/generate-relay-keys.js
   2. Copy the JSON output
   3. Add to your .env file as: RELAY_SEA_KEYPAIR='{"pub":"...","priv":"...","epub":"...","epriv":"..."}'
   OR save to a file and set: RELAY_SEA_KEYPAIR_PATH=/path/to/relay-keypair.json
 
 See docs/RELAY_KEYS.md for more information.
-    `.trim();
-    console.error(errorMsg);
-    throw new Error('RELAY_SEA_KEYPAIR or RELAY_SEA_KEYPAIR_PATH is required');
+      `.trim();
+      console.error(errorMsg);
+      throw new Error(`Keypair auto-generation failed: ${autoGenError.message}`);
+    }
   }
   
   // Validate and initialize with keypair
