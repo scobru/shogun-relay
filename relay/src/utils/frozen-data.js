@@ -106,6 +106,24 @@ export async function readFrozenEntry(gun, namespace, hash) {
         const dataString = JSON.stringify(entry.data);
         const pub = entry.data._meta?.pub;
         
+        // Check if pub is available before verification
+        if (!pub) {
+          console.warn(`⚠️ Frozen entry ${hash.substring(0, 16)}... missing pub in _meta, skipping signature verification`);
+          resolve({
+            data: entry.data,
+            verified: false,
+            verificationDetails: {
+              signatureValid: false,
+              hashValid: false,
+              reason: 'Missing pub in _meta',
+            },
+            pub: null,
+            timestamp: entry.data._meta?.timestamp || null,
+            hash,
+          });
+          return;
+        }
+        
         // SEA.verify returns the original data if valid, or undefined/false if invalid
         const verifyResult = await SEA.verify(entry.sig, pub);
         const signatureValid = verifyResult !== undefined && verifyResult !== false;

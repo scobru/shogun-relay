@@ -16,6 +16,7 @@ import http from 'http';
 import crypto from 'crypto';
 import multer from 'multer';
 import FormData from 'form-data';
+import { ethers } from 'ethers';
 import * as StorageDeals from '../utils/storage-deals.js';
 import * as ErasureCoding from '../utils/erasure-coding.js';
 import * as FrozenData from '../utils/frozen-data.js';
@@ -467,11 +468,15 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
         const priceUSDCAtomic = Math.ceil(activatedDeal.pricing.totalPriceUSDC * 1000000);
         const priceUSDCString = (priceUSDCAtomic / 1000000).toString();
         
+        // Convert sizeMB to integer (contract expects uint256)
+        // For small files (< 1 MB), round up to 1 MB minimum
+        const sizeMBInt = Math.max(1, Math.ceil(activatedDeal.sizeMB));
+        
         const onChainResult = await registryClient.registerDeal(
           activatedDeal.id,
           activatedDeal.clientAddress,
           activatedDeal.cid,
-          activatedDeal.sizeMB,
+          sizeMBInt, // Pass as integer
           priceUSDCString,
           activatedDeal.durationDays
         );
@@ -482,7 +487,15 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
         activatedDeal.onChainDealId = onChainResult.dealIdBytes32;
         activatedDeal.onChainTx = onChainResult.txHash;
         
-        console.log(`✅ Deal registered on-chain. TX: ${onChainResult.txHash}, Deal ID: ${onChainResult.dealIdBytes32}`);
+        // Verify the hash matches
+        const expectedHash = ethers.id(activatedDeal.id);
+        const hashMatches = expectedHash.toLowerCase() === onChainResult.dealIdBytes32.toLowerCase();
+        
+        console.log(`✅ Deal registered on-chain. TX: ${onChainResult.txHash}`);
+        console.log(`   Original Deal ID: ${activatedDeal.id}`);
+        console.log(`   On-Chain Deal ID (bytes32): ${onChainResult.dealIdBytes32}`);
+        console.log(`   Expected Hash: ${expectedHash}`);
+        console.log(`   Hash Match: ${hashMatches ? '✅' : '❌'}`);
         
         // Re-save deal with on-chain info
         try {
@@ -636,7 +649,11 @@ router.get('/by-client/:address', async (req, res) => {
       if (!gunDeal) {
         for (const deal of gunDealsByClient) {
           const dealIdHash = ethers.id(deal.id); // keccak256 hash
-          if (dealIdHash === onChainDeal.dealId) {
+          // Normalize both to lowercase for comparison (bytes32 hex strings)
+          const normalizedOnChainId = onChainDeal.dealId?.toLowerCase();
+          const normalizedHash = dealIdHash?.toLowerCase();
+          if (normalizedHash === normalizedOnChainId) {
+            console.log(`✅ Matched deal ${deal.id} to on-chain deal ${onChainDeal.dealId.substring(0, 16)}... via hash`);
             gunDeal = deal;
             break;
           }
@@ -656,7 +673,10 @@ router.get('/by-client/:address', async (req, res) => {
           
           // Match by hash
           const dealIdHash = ethers.id(dealId);
-          if (dealIdHash === onChainDeal.dealId) {
+          const normalizedOnChainId = onChainDeal.dealId?.toLowerCase();
+          const normalizedHash = dealIdHash?.toLowerCase();
+          if (normalizedHash === normalizedOnChainId) {
+            console.log(`✅ Matched cached deal ${dealId} to on-chain deal ${onChainDeal.dealId.substring(0, 16)}... via hash`);
             gunDeal = cachedDeal;
             break;
           }
