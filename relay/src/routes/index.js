@@ -508,6 +508,11 @@ export default (app) => {
     res.sendFile(path.resolve(publicPath, "deals-dashboard.html"));
   });
 
+  app.get("/storage", (req, res) => {
+    const publicPath = path.resolve(__dirname, "../public");
+    res.sendFile(path.resolve(publicPath, "storage.html"));
+  });
+
   app.get("/registry-dashboard", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "registry-dashboard.html"));

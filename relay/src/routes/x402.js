@@ -10,6 +10,7 @@
 
 import express from 'express';
 import { X402Merchant, SUBSCRIPTION_TIERS } from '../utils/x402-merchant.js';
+import * as StorageDeals from '../utils/storage-deals.js';
 
 const router = express.Router();
 
@@ -780,6 +781,223 @@ router.get('/relay-storage/detailed', async (req, res) => {
     });
   } catch (error) {
     console.error('Detailed relay storage check error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/v1/x402/recommend
+ * 
+ * Get storage recommendation (subscription vs deal) based on file size and duration.
+ * This endpoint provides intelligent suggestions to help users choose the right storage model.
+ */
+router.get('/recommend', async (req, res) => {
+  try {
+    const { fileSizeMB, durationDays, userAddress } = req.query;
+    
+    if (!fileSizeMB || !durationDays) {
+      return res.status(400).json({
+        success: false,
+        error: 'fileSizeMB and durationDays are required',
+      });
+    }
+
+    const sizeMB = parseFloat(fileSizeMB);
+    const duration = parseInt(durationDays);
+
+    if (isNaN(sizeMB) || sizeMB <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid fileSizeMB',
+      });
+    }
+
+    if (isNaN(duration) || duration <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid durationDays',
+      });
+    }
+
+    // Recommendation logic
+    const recommendation = {
+      recommended: 'subscription', // default
+      reasons: [],
+      alternatives: [],
+      comparison: {},
+    };
+
+    // Thresholds for recommendations
+    const LARGE_FILE_THRESHOLD_MB = 100; // Files > 100MB
+    const LONG_DURATION_THRESHOLD_DAYS = 365; // Duration > 1 year
+    const VERY_LARGE_FILE_THRESHOLD_MB = 500; // Files > 500MB
+    const MEDIUM_FILE_THRESHOLD_MB = 50; // Files > 50MB
+
+    // Check user subscription status if address provided
+    let hasActiveSubscription = false;
+    let subscriptionRemainingMB = 0;
+    
+    if (userAddress) {
+      try {
+        const gun = req.app.get('gunInstance');
+        if (gun) {
+          const subStatus = await X402Merchant.getSubscriptionStatus(gun, userAddress);
+          if (subStatus.active) {
+            hasActiveSubscription = true;
+            subscriptionRemainingMB = subStatus.storageRemainingMB || 0;
+            
+            // If user has subscription with enough space, recommend using it
+            if (subscriptionRemainingMB >= sizeMB && sizeMB < LARGE_FILE_THRESHOLD_MB && duration <= 30) {
+              recommendation.recommended = 'subscription';
+              recommendation.reasons.push(`You have ${subscriptionRemainingMB.toFixed(1)}MB available in your subscription`);
+              recommendation.reasons.push(`File fits within your subscription quota`);
+              recommendation.reasons.push(`Duration is within subscription period (30 days)`);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Could not check subscription status:', error.message);
+      }
+    }
+
+    // Decision tree for recommendations
+    if (sizeMB > VERY_LARGE_FILE_THRESHOLD_MB) {
+      // Very large files (>500MB) -> Deal
+      recommendation.recommended = 'deal';
+      recommendation.reasons.push(`File is very large (${sizeMB.toFixed(1)}MB) - deals handle large files better`);
+      recommendation.reasons.push(`Deals support erasure coding for large files`);
+      recommendation.reasons.push(`More cost-effective for large single files`);
+      
+      if (hasActiveSubscription) {
+        recommendation.alternatives.push({
+          type: 'subscription',
+          note: 'You could upgrade your subscription, but deals are more suitable for single large files',
+        });
+      }
+    } else if (sizeMB > LARGE_FILE_THRESHOLD_MB) {
+      // Large files (>100MB) -> Deal
+      recommendation.recommended = 'deal';
+      recommendation.reasons.push(`File is large (${sizeMB.toFixed(1)}MB) - deals offer better pricing for large files`);
+      recommendation.reasons.push(`Deals provide per-file guarantees and on-chain verification`);
+      
+      if (hasActiveSubscription && subscriptionRemainingMB >= sizeMB) {
+        recommendation.alternatives.push({
+          type: 'subscription',
+          note: 'You could use your subscription, but deals are more cost-effective for files >100MB',
+        });
+      }
+    } else if (duration > LONG_DURATION_THRESHOLD_DAYS) {
+      // Long duration (>1 year) -> Deal
+      recommendation.recommended = 'deal';
+      recommendation.reasons.push(`Long duration (${duration} days) - deals support flexible durations up to 5 years`);
+      recommendation.reasons.push(`Deals can be renewed without losing data`);
+      recommendation.reasons.push(`On-chain verification provides permanent record`);
+      
+      if (hasActiveSubscription) {
+        recommendation.alternatives.push({
+          type: 'subscription',
+          note: 'Subscriptions are 30-day only - deals are better for long-term storage',
+        });
+      }
+    } else if (sizeMB > MEDIUM_FILE_THRESHOLD_MB && duration > 90) {
+      // Medium-large files with medium-long duration -> Deal
+      recommendation.recommended = 'deal';
+      recommendation.reasons.push(`Combination of file size (${sizeMB.toFixed(1)}MB) and duration (${duration} days) makes deals more suitable`);
+      recommendation.reasons.push(`Deals provide better guarantees for important files`);
+    } else if (hasActiveSubscription && subscriptionRemainingMB >= sizeMB && duration <= 30) {
+      // Small file, short duration, has subscription -> Subscription
+      recommendation.recommended = 'subscription';
+      recommendation.reasons.push(`File fits in your subscription quota (${subscriptionRemainingMB.toFixed(1)}MB remaining)`);
+      recommendation.reasons.push(`Duration (${duration} days) fits within subscription period`);
+      recommendation.reasons.push(`No additional payment needed`);
+      
+      recommendation.alternatives.push({
+        type: 'deal',
+        note: 'You could use a deal for on-chain verification, but subscription is more convenient',
+      });
+    } else {
+      // Default: Subscription for small/medium files with short duration
+      recommendation.recommended = 'subscription';
+      recommendation.reasons.push(`File size (${sizeMB.toFixed(1)}MB) fits subscription tiers`);
+      recommendation.reasons.push(`Duration (${duration} days) fits subscription model`);
+      recommendation.reasons.push(`Subscription is simpler and more cost-effective for regular use`);
+      
+      if (sizeMB > MEDIUM_FILE_THRESHOLD_MB) {
+        recommendation.alternatives.push({
+          type: 'deal',
+          note: 'Consider a deal if you need on-chain verification or longer duration',
+        });
+      }
+    }
+
+    // Calculate comparison costs
+    try {
+      // Subscription cost (monthly, but prorated for duration)
+      const subscriptionTiers = SUBSCRIPTION_TIERS;
+      let subscriptionCost = null;
+      let subscriptionTier = null;
+      
+      for (const [tierKey, tier] of Object.entries(subscriptionTiers)) {
+        if (tier.storageMB >= sizeMB) {
+          subscriptionTier = tierKey;
+          // Calculate cost for duration (subscriptions are monthly)
+          const monthsNeeded = Math.ceil(duration / 30);
+          subscriptionCost = tier.priceUSDC * monthsNeeded;
+          break;
+        }
+      }
+      
+      // Deal cost
+      const dealTier = sizeMB > VERY_LARGE_FILE_THRESHOLD_MB ? 'premium' : 'standard';
+      const dealPricing = StorageDeals.calculateDealPrice(sizeMB, duration, dealTier);
+      const dealCost = dealPricing.totalPriceUSDC;
+      
+      recommendation.comparison = {
+        subscription: subscriptionCost !== null ? {
+          tier: subscriptionTier,
+          totalCostUSDC: subscriptionCost,
+          note: subscriptionTier ? `${subscriptionTiers[subscriptionTier].storageMB}MB for ${Math.ceil(duration / 30)} month(s)` : 'No suitable tier',
+        } : {
+          tier: null,
+          totalCostUSDC: null,
+          note: 'File too large for subscription tiers',
+        },
+        deal: {
+          tier: dealTier,
+          totalCostUSDC: dealCost,
+          note: `${sizeMB.toFixed(1)}MB for ${duration} days`,
+        },
+      };
+
+      // Add cost comparison to reasons
+      if (recommendation.comparison.subscription.totalCostUSDC && recommendation.comparison.deal.totalCostUSDC) {
+        const cheaper = recommendation.comparison.subscription.totalCostUSDC < recommendation.comparison.deal.totalCostUSDC
+          ? 'subscription'
+          : 'deal';
+        const savings = Math.abs(recommendation.comparison.subscription.totalCostUSDC - recommendation.comparison.deal.totalCostUSDC);
+        
+        if (cheaper === recommendation.recommended) {
+          recommendation.reasons.push(`More cost-effective: $${savings.toFixed(6)} cheaper than alternative`);
+        }
+      }
+    } catch (error) {
+      console.warn('Could not calculate cost comparison:', error.message);
+    }
+
+    res.json({
+      success: true,
+      recommendation,
+      input: {
+        fileSizeMB: sizeMB,
+        durationDays: duration,
+        userAddress: userAddress || null,
+      },
+    });
+  } catch (error) {
+    console.error('Recommendation error:', error);
     res.status(500).json({
       success: false,
       error: error.message,
