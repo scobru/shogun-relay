@@ -529,8 +529,37 @@ router.get('/by-client/:address', async (req, res) => {
     }
     
     const { address } = req.params;
-    const deals = await StorageDeals.getDealsByClient(gun, address);
+    const normalizedAddress = address.toLowerCase();
+    
+    // Get deals from GunDB
+    const gunDeals = await StorageDeals.getDealsByClient(gun, address);
+    
+    // Also check cache for deals matching this client
+    const cachedDeals = [];
+    for (const [dealId, entry] of pendingDealsCache) {
+      const deal = entry.deal;
+      if (deal.clientAddress && deal.clientAddress.toLowerCase() === normalizedAddress) {
+        cachedDeals.push(deal);
+      }
+    }
+    
+    // Merge and deduplicate (cache takes precedence for same deal ID)
+    const dealMap = new Map();
+    
+    // Add GunDB deals first
+    for (const deal of gunDeals) {
+      dealMap.set(deal.id, deal);
+    }
+    
+    // Override with cached deals (they're more recent)
+    for (const deal of cachedDeals) {
+      dealMap.set(deal.id, deal);
+    }
+    
+    const deals = Array.from(dealMap.values());
     const stats = StorageDeals.getDealStats(deals);
+    
+    console.log(`Found ${deals.length} deals for client ${address} (${gunDeals.length} from GunDB, ${cachedDeals.length} from cache)`);
     
     res.json({
       success: true,
