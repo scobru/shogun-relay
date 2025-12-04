@@ -1525,6 +1525,124 @@ router.get("/test", (req, res, next) => {
   }
 });
 
+// IPFS object/block stat endpoint - get info about a CID
+router.get("/stat/:cid", async (req, res) => {
+  const { cid } = req.params;
+  
+  if (!cid) {
+    return res.status(400).json({ success: false, error: 'CID is required' });
+  }
+
+  try {
+    // Try object/stat first (works for most CIDs)
+    const objectStatOptions = {
+      hostname: "127.0.0.1",
+      port: 5001,
+      path: `/api/v0/object/stat?arg=${encodeURIComponent(cid)}`,
+      method: "POST",
+      headers: { "Content-Length": "0" },
+    };
+
+    if (IPFS_API_TOKEN) {
+      objectStatOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+    }
+
+    const stat = await new Promise((resolve, reject) => {
+      const statReq = http.request(objectStatOptions, (statRes) => {
+        let data = "";
+        statRes.on("data", (chunk) => (data += chunk));
+        statRes.on("end", () => {
+          if (statRes.statusCode === 200) {
+            try {
+              resolve(JSON.parse(data));
+            } catch (e) {
+              reject(new Error("Failed to parse stat response"));
+            }
+          } else {
+            reject(new Error(`IPFS returned status ${statRes.statusCode}`));
+          }
+        });
+      });
+
+      statReq.on("error", reject);
+      statReq.setTimeout(15000, () => {
+        statReq.destroy();
+        reject(new Error("Stat request timeout"));
+      });
+      statReq.end();
+    });
+
+    res.json({
+      success: true,
+      cid,
+      stat: {
+        Hash: stat.Hash,
+        NumLinks: stat.NumLinks,
+        BlockSize: stat.BlockSize,
+        LinksSize: stat.LinksSize,
+        DataSize: stat.DataSize,
+        CumulativeSize: stat.CumulativeSize,
+      }
+    });
+  } catch (error) {
+    // Fallback to block/stat
+    try {
+      const blockStatOptions = {
+        hostname: "127.0.0.1",
+        port: 5001,
+        path: `/api/v0/block/stat?arg=${encodeURIComponent(cid)}`,
+        method: "POST",
+        headers: { "Content-Length": "0" },
+      };
+
+      if (IPFS_API_TOKEN) {
+        blockStatOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+      }
+
+      const blockStat = await new Promise((resolve, reject) => {
+        const blockReq = http.request(blockStatOptions, (blockRes) => {
+          let data = "";
+          blockRes.on("data", (chunk) => (data += chunk));
+          blockRes.on("end", () => {
+            if (blockRes.statusCode === 200) {
+              try {
+                resolve(JSON.parse(data));
+              } catch (e) {
+                reject(new Error("Failed to parse block stat"));
+              }
+            } else {
+              reject(new Error(`Block stat returned ${blockRes.statusCode}`));
+            }
+          });
+        });
+
+        blockReq.on("error", reject);
+        blockReq.setTimeout(15000, () => {
+          blockReq.destroy();
+          reject(new Error("Block stat timeout"));
+        });
+        blockReq.end();
+      });
+
+      res.json({
+        success: true,
+        cid,
+        stat: {
+          Hash: blockStat.Key,
+          CumulativeSize: blockStat.Size,
+          BlockSize: blockStat.Size,
+        }
+      });
+    } catch (blockError) {
+      res.status(404).json({
+        success: false,
+        error: 'CID not found or not accessible',
+        cid
+      });
+    }
+  }
+});
+
 // IPFS Repo Stats endpoint
 router.get("/repo/stat", (req, res, next) => {
   // Usa il middleware di autenticazione esistente

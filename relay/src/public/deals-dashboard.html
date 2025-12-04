@@ -213,6 +213,23 @@
 
     .chunk-data { background-color: #4CAF50; color: white; }
     .chunk-parity { background-color: #FF9800; color: white; }
+
+    /* Upload drop zone */
+    .drop-zone-active {
+      border-color: #42A5F5 !important;
+      background-color: rgba(66, 165, 245, 0.1) !important;
+    }
+
+    #dropZone.dragging {
+      transform: scale(1.02);
+      border-color: #42A5F5;
+      background-color: rgba(66, 165, 245, 0.15);
+    }
+
+    #uploadProgress .loading-spinner {
+      width: 3rem;
+      height: 3rem;
+    }
   </style>
 </head>
 
@@ -377,18 +394,58 @@
 
               <!-- Deal Form -->
               <div class="space-y-4">
+                <!-- File Upload Section -->
                 <div>
-                  <label class="text-[#A0A0A0] text-sm mb-2 block">IPFS CID *</label>
-                  <input type="text" id="dealCid" class="input-field" placeholder="Qm... or bafy...">
+                  <label class="text-[#A0A0A0] text-sm mb-2 block">Upload File *</label>
+                  <div id="dropZone" class="border-2 border-dashed border-[#404040] rounded-xl p-8 text-center transition-all cursor-pointer hover:border-[#42A5F5] hover:bg-[#42A5F5]/5">
+                    <input type="file" id="fileInput" class="hidden">
+                    <div id="dropZoneContent">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-4 text-[#606060]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      <p class="text-[#A0A0A0] mb-2">Drag & drop your file here</p>
+                      <p class="text-[#606060] text-sm">or click to browse</p>
+                    </div>
+                    <div id="uploadProgress" class="hidden">
+                      <div class="loading-spinner mx-auto mb-4"></div>
+                      <p class="text-[#42A5F5]">Uploading to IPFS...</p>
+                      <p class="text-[#606060] text-sm" id="uploadFileName"></p>
+                    </div>
+                    <div id="uploadSuccess" class="hidden">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-4 text-[#4CAF50]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p class="text-[#4CAF50] font-medium mb-1">File Uploaded!</p>
+                      <p class="text-[#A0A0A0] text-sm" id="uploadedFileName"></p>
+                      <p class="text-[#606060] text-xs mt-2" id="uploadedCidPreview"></p>
+                      <button onclick="resetUpload()" class="mt-3 text-[#42A5F5] text-sm hover:underline">Upload different file</button>
+                    </div>
+                  </div>
                 </div>
+
+                <!-- CID (auto-filled, but can be manually entered) -->
+                <div>
+                  <label class="text-[#A0A0A0] text-sm mb-2 block">IPFS CID</label>
+                  <div class="flex gap-2">
+                    <input type="text" id="dealCid" class="input-field flex-1" placeholder="Auto-filled after upload or enter manually">
+                    <button onclick="verifyCid()" class="btn bg-[#404040] hover:bg-[#505050] border-0 text-white rounded-xl px-4" title="Verify CID exists">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </button>
+                  </div>
+                  <p class="text-[#606060] text-xs mt-1" id="cidVerification"></p>
+                </div>
+
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label class="text-[#A0A0A0] text-sm mb-2 block">File Size (MB) *</label>
-                    <input type="number" id="dealSizeMB" class="input-field" placeholder="100" min="1">
+                    <input type="number" id="dealSizeMB" class="input-field" placeholder="Auto-detected" min="1" readonly>
+                    <p class="text-[#606060] text-xs mt-1">Auto-detected from upload</p>
                   </div>
                   <div>
                     <label class="text-[#A0A0A0] text-sm mb-2 block">Duration (Days) *</label>
-                    <input type="number" id="dealDuration" class="input-field" placeholder="30" min="7">
+                    <input type="number" id="dealDuration" class="input-field" placeholder="30" min="7" value="30">
                   </div>
                 </div>
                 <div>
@@ -793,6 +850,146 @@
       }, 10000);
     }
 
+    // File upload handling
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    let uploadedFileData = null;
+
+    // Drop zone click
+    dropZone.addEventListener('click', () => {
+      if (!uploadedFileData) {
+        fileInput.click();
+      }
+    });
+
+    // File input change
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        handleFile(e.target.files[0]);
+      }
+    });
+
+    // Drag and drop events
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('border-[#42A5F5]', 'bg-[#42A5F5]/10');
+    });
+
+    dropZone.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-[#42A5F5]', 'bg-[#42A5F5]/10');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-[#42A5F5]', 'bg-[#42A5F5]/10');
+      
+      if (e.dataTransfer.files.length > 0) {
+        handleFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    // Handle file upload
+    async function handleFile(file) {
+      // Show progress
+      document.getElementById('dropZoneContent').classList.add('hidden');
+      document.getElementById('uploadProgress').classList.remove('hidden');
+      document.getElementById('uploadSuccess').classList.add('hidden');
+      document.getElementById('uploadFileName').textContent = file.name;
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('/api/v1/ipfs/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.success && data.cid) {
+          // Success!
+          uploadedFileData = {
+            cid: data.cid,
+            name: file.name,
+            size: file.size,
+            sizeMB: (file.size / (1024 * 1024)).toFixed(2)
+          };
+
+          // Update UI
+          document.getElementById('uploadProgress').classList.add('hidden');
+          document.getElementById('uploadSuccess').classList.remove('hidden');
+          document.getElementById('uploadedFileName').textContent = file.name;
+          document.getElementById('uploadedCidPreview').textContent = `CID: ${data.cid.slice(0, 20)}...`;
+
+          // Fill form fields
+          document.getElementById('dealCid').value = data.cid;
+          document.getElementById('dealSizeMB').value = uploadedFileData.sizeMB;
+          document.getElementById('dealSizeMB').removeAttribute('readonly');
+
+          // Update preview
+          updateDealPreview();
+
+          showMessage('createMessage', 'success', `File uploaded to IPFS! CID: ${data.cid}`);
+        } else {
+          throw new Error(data.error || 'Upload failed');
+        }
+      } catch (error) {
+        console.error('Upload error:', error);
+        showMessage('createMessage', 'error', 'Upload failed: ' + error.message);
+        resetUpload();
+      }
+    }
+
+    // Reset upload state
+    function resetUpload() {
+      uploadedFileData = null;
+      fileInput.value = '';
+      document.getElementById('dropZoneContent').classList.remove('hidden');
+      document.getElementById('uploadProgress').classList.add('hidden');
+      document.getElementById('uploadSuccess').classList.add('hidden');
+      document.getElementById('dealCid').value = '';
+      document.getElementById('dealSizeMB').value = '';
+      document.getElementById('dealPreview').style.display = 'none';
+    }
+
+    // Verify CID exists
+    async function verifyCid() {
+      const cid = document.getElementById('dealCid').value;
+      if (!cid) {
+        showMessage('createMessage', 'error', 'Please enter a CID first');
+        return;
+      }
+
+      const verificationEl = document.getElementById('cidVerification');
+      verificationEl.textContent = 'Verifying...';
+      verificationEl.className = 'text-[#42A5F5] text-xs mt-1';
+
+      try {
+        // Try to get stats from IPFS
+        const response = await fetch(`/api/v1/ipfs/stat/${cid}`);
+        const data = await response.json();
+
+        if (data.success && data.stat) {
+          verificationEl.textContent = `Verified! Size: ${(data.stat.CumulativeSize / (1024 * 1024)).toFixed(2)} MB`;
+          verificationEl.className = 'text-[#4CAF50] text-xs mt-1';
+          
+          // Auto-fill size if not already set
+          if (!document.getElementById('dealSizeMB').value) {
+            document.getElementById('dealSizeMB').value = (data.stat.CumulativeSize / (1024 * 1024)).toFixed(2);
+            updateDealPreview();
+          }
+        } else {
+          verificationEl.textContent = 'CID not found or not accessible';
+          verificationEl.className = 'text-[#F44336] text-xs mt-1';
+        }
+      } catch (error) {
+        verificationEl.textContent = 'Verification failed: ' + error.message;
+        verificationEl.className = 'text-[#F44336] text-xs mt-1';
+      }
+    }
+
     // Initialize
     calculatePrice();
     calculateErasure();
@@ -811,6 +1008,7 @@
     // Update deal preview on input change
     ['dealCid', 'dealSizeMB', 'dealDuration', 'dealTier'].forEach(id => {
       document.getElementById(id)?.addEventListener('change', updateDealPreview);
+      document.getElementById(id)?.addEventListener('input', updateDealPreview);
     });
 
     async function updateDealPreview() {
