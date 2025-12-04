@@ -12,6 +12,9 @@
  */
 
 import express from 'express';
+import http from 'http';
+import multer from 'multer';
+import FormData from 'form-data';
 import * as StorageDeals from '../utils/storage-deals.js';
 import * as ErasureCoding from '../utils/erasure-coding.js';
 import * as FrozenData from '../utils/frozen-data.js';
@@ -19,6 +22,15 @@ import { getRelayUser, getRelayPub } from '../utils/relay-user.js';
 import { X402Merchant } from '../utils/x402-merchant.js';
 
 const router = express.Router();
+const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN;
+
+// Configure multer for deal uploads
+const dealUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100MB max for deal uploads
+  }
+});
 
 /**
  * GET /api/v1/deals/pricing
@@ -30,10 +42,13 @@ router.get('/pricing', (req, res) => {
     const { sizeMB, durationDays, tier } = req.query;
     
     // If parameters provided, calculate specific price
-    if (sizeMB && durationDays) {
+    const size = parseFloat(sizeMB);
+    const duration = parseInt(durationDays);
+    
+    if (size > 0 && duration > 0) {
       const pricing = StorageDeals.calculateDealPrice(
-        parseFloat(sizeMB),
-        parseInt(durationDays),
+        size,
+        duration,
         tier || 'standard'
       );
       
@@ -43,7 +58,7 @@ router.get('/pricing', (req, res) => {
       });
     }
     
-    // Return general pricing info
+    // Return general pricing info (when params missing or invalid)
     res.json({
       success: true,
       tiers: StorageDeals.PRICING,
@@ -51,6 +66,95 @@ router.get('/pricing', (req, res) => {
     });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/v1/deals/upload
+ * 
+ * Upload a file to IPFS for deal creation.
+ * This endpoint allows uploads without subscription - payment is via deal.
+ * Requires wallet address for tracking.
+ */
+router.post('/upload', dealUpload.single('file'), async (req, res) => {
+  try {
+    const walletAddress = req.headers['x-wallet-address'] || req.body.walletAddress;
+    
+    if (!walletAddress) {
+      return res.status(400).json({
+        success: false,
+        error: 'Wallet address required (x-wallet-address header or walletAddress body param)'
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No file provided' });
+    }
+
+    console.log(`📤 Deal upload: ${req.file.originalname} (${(req.file.size / 1024 / 1024).toFixed(2)} MB) from ${walletAddress}`);
+
+    // Upload to IPFS
+    const form = new FormData();
+    form.append('file', req.file.buffer, {
+      filename: req.file.originalname,
+      contentType: req.file.mimetype,
+    });
+
+    const uploadOptions = {
+      hostname: '127.0.0.1',
+      port: 5001,
+      path: '/api/v0/add?pin=true',
+      method: 'POST',
+      headers: form.getHeaders(),
+    };
+
+    if (IPFS_API_TOKEN) {
+      uploadOptions.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
+    }
+
+    const ipfsResult = await new Promise((resolve, reject) => {
+      const ipfsReq = http.request(uploadOptions, (ipfsRes) => {
+        let data = '';
+        ipfsRes.on('data', chunk => data += chunk);
+        ipfsRes.on('end', () => {
+          if (ipfsRes.statusCode === 200) {
+            try {
+              resolve(JSON.parse(data));
+            } catch (e) {
+              reject(new Error('Failed to parse IPFS response'));
+            }
+          } else {
+            reject(new Error(`IPFS returned ${ipfsRes.statusCode}`));
+          }
+        });
+      });
+
+      ipfsReq.on('error', reject);
+      ipfsReq.setTimeout(60000, () => {
+        ipfsReq.destroy();
+        reject(new Error('Upload timeout'));
+      });
+
+      form.pipe(ipfsReq);
+    });
+
+    const cid = ipfsResult.Hash;
+    const sizeMB = (req.file.size / (1024 * 1024)).toFixed(2);
+
+    console.log(`✅ Deal upload success: ${cid} (${sizeMB} MB)`);
+
+    res.json({
+      success: true,
+      cid,
+      name: req.file.originalname,
+      sizeMB: parseFloat(sizeMB),
+      sizeBytes: req.file.size,
+      walletAddress,
+      note: 'File uploaded. Create a deal to ensure long-term storage.',
+    });
+  } catch (error) {
+    console.error('❌ Deal upload error:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
