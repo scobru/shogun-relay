@@ -128,7 +128,7 @@ COPY relay/ /app/relay/
 RUN if [ "$GENERATE_RELAY_KEYS" = "true" ] && [ -z "$RELAY_SEA_KEYPAIR" ] && [ -z "$RELAY_SEA_KEYPAIR_PATH" ]; then \
       echo "🔑 Generating relay SEA keypair..." && \
       mkdir -p /app/keys && \
-      node /app/relay/scripts/generate-relay-keys-standalone.js /app/keys/relay-keypair.json && \
+      node /app/relay/scripts/generate-relay-keys-standalone.cjs /app/keys/relay-keypair.json && \
       echo "✅ Keypair generated at /app/keys/relay-keypair.json" && \
       echo "⚠️  IMPORTANT: Mount this file or copy it to a secure location!"; \
     else \
