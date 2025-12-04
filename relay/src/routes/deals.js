@@ -24,6 +24,38 @@ import { X402Merchant } from '../utils/x402-merchant.js';
 const router = express.Router();
 const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN;
 
+// In-memory cache for recently created deals (GunDB sync can be slow)
+// Deals are cached for 10 minutes to allow time for payment
+const pendingDealsCache = new Map();
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+function cacheDeal(deal) {
+  pendingDealsCache.set(deal.id, {
+    deal,
+    cachedAt: Date.now()
+  });
+  
+  // Clean expired entries
+  for (const [id, entry] of pendingDealsCache) {
+    if (Date.now() - entry.cachedAt > CACHE_TTL) {
+      pendingDealsCache.delete(id);
+    }
+  }
+}
+
+function getCachedDeal(dealId) {
+  const entry = pendingDealsCache.get(dealId);
+  if (entry && Date.now() - entry.cachedAt < CACHE_TTL) {
+    return entry.deal;
+  }
+  pendingDealsCache.delete(dealId);
+  return null;
+}
+
+function removeCachedDeal(dealId) {
+  pendingDealsCache.delete(dealId);
+}
+
 // Configure multer for deal uploads
 const dealUpload = multer({
   storage: multer.memoryStorage(),
@@ -250,6 +282,10 @@ router.post('/create', express.json(), async (req, res) => {
     // Save to GunDB (frozen)
     await StorageDeals.saveDeal(gun, deal, keyPair);
     
+    // Cache deal for quick activation (GunDB sync can be slow)
+    cacheDeal(deal);
+    console.log(`📝 Deal ${deal.id} created and cached for ${deal.cid}`);
+    
     // Create x402 payment requirements
     const paymentRequirements = {
       x402Version: 1,
@@ -311,15 +347,23 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
       });
     }
     
-    // Get existing deal
-    const deal = await StorageDeals.getDeal(gun, dealId);
+    // Get existing deal (check cache first, then GunDB)
+    let deal = getCachedDeal(dealId);
     
     if (!deal) {
+      // Try GunDB if not in cache
+      deal = await StorageDeals.getDeal(gun, dealId);
+    }
+    
+    if (!deal) {
+      console.log(`❌ Deal not found: ${dealId}`);
       return res.status(404).json({
         success: false,
-        error: 'Deal not found',
+        error: 'Deal not found. It may have expired or was never created.',
       });
     }
+    
+    console.log(`✅ Deal found: ${dealId} (status: ${deal.status})`)
     
     if (deal.status !== StorageDeals.DEAL_STATUS.PENDING) {
       return res.status(400).json({
@@ -374,7 +418,10 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
     // Save updated deal
     await StorageDeals.saveDeal(gun, activatedDeal, relayUser._.sea);
     
-    console.log(`✅ Deal ${dealId} activated. CID: ${deal.cid}`);
+    // Remove from pending cache since it's now activated
+    removeCachedDeal(dealId);
+    
+    console.log(`✅ Deal ${dealId} activated. CID: ${deal.cid}, TX: ${settlement.txHash}`);
     
     res.json({
       success: true,
@@ -500,7 +547,12 @@ router.get('/:dealId', async (req, res) => {
     }
     
     const { dealId } = req.params;
-    const deal = await StorageDeals.getDeal(gun, dealId);
+    
+    // Check cache first, then GunDB
+    let deal = getCachedDeal(dealId);
+    if (!deal) {
+      deal = await StorageDeals.getDeal(gun, dealId);
+    }
     
     if (!deal) {
       return res.status(404).json({
