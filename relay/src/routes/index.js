@@ -74,6 +74,68 @@ export default (app) => {
   console.log(`🌐 IPFS Gateway Proxy: ${IPFS_GATEWAY_URL}`);
   console.log(`🔐 IPFS Auth: ${IPFS_API_TOKEN ? "configured" : "not set"}`);
 
+  // IPFS Gateway handler with direct IPFS API fallback
+  app.get("/ipfs/:cid", async (req, res, next) => {
+    const { cid } = req.params;
+    const ipfs = app.get('ipfs');
+    
+    // If IPFS instance is available, try to serve file directly
+    if (ipfs) {
+      try {
+        console.log(`📁 Direct IPFS retrieval attempt for CID: ${cid}`);
+        
+        // Try to get file from IPFS directly
+        const chunks = [];
+        for await (const chunk of ipfs.cat(cid)) {
+          chunks.push(chunk);
+        }
+        
+        if (chunks.length > 0) {
+          const fileBuffer = Buffer.concat(chunks);
+          
+          // Try to detect content type from CID or first bytes
+          let contentType = 'application/octet-stream';
+          const firstBytes = fileBuffer.slice(0, 512);
+          
+          // Basic content type detection
+          if (firstBytes[0] === 0x89 && firstBytes[1] === 0x50 && firstBytes[2] === 0x4E && firstBytes[3] === 0x47) {
+            contentType = 'image/png';
+          } else if (firstBytes[0] === 0xFF && firstBytes[1] === 0xD8) {
+            contentType = 'image/jpeg';
+          } else if (firstBytes[0] === 0x47 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46) {
+            contentType = 'image/gif';
+          } else if (firstBytes[0] === 0x25 && firstBytes[1] === 0x50 && firstBytes[2] === 0x44 && firstBytes[3] === 0x46) {
+            contentType = 'application/pdf';
+          } else if (fileBuffer.slice(0, 5).toString() === '<html' || fileBuffer.slice(0, 9).toString() === '<!DOCTYPE') {
+            contentType = 'text/html';
+          } else {
+            // Try to detect JSON
+            try {
+              JSON.parse(fileBuffer.toString());
+              contentType = 'application/json';
+            } catch (e) {
+              // Not JSON, keep default
+            }
+          }
+          
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Content-Length', fileBuffer.length);
+          res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year
+          res.setHeader('X-Content-Source', 'ipfs-direct');
+          
+          console.log(`✅ Served CID ${cid} directly from IPFS (${fileBuffer.length} bytes, ${contentType})`);
+          return res.send(fileBuffer);
+        }
+      } catch (error) {
+        console.log(`⚠️ Direct IPFS retrieval failed for ${cid}:`, error.message);
+        // Fall through to proxy gateway
+      }
+    }
+    
+    // If direct retrieval fails or IPFS not available, pass to proxy
+    next();
+  });
+
   // IPFS Gateway Proxy with fallback - for accessing files via IPFS hash
   app.use(
     "/ipfs",
@@ -88,25 +150,70 @@ export default (app) => {
           `📁 IPFS Gateway Request: ${req.method} ${req.url} -> ${IPFS_GATEWAY_URL}${proxyReq.path}`
         );
       },
-      onProxyRes: (proxyRes, req, res) => {
+      onProxyRes: async (proxyRes, req, res) => {
         console.log(
           `📁 IPFS Gateway Response: ${proxyRes.statusCode} for ${req.url}`
         );
 
-        // If local gateway fails with 404, try to add fallback headers
+        // If local gateway fails with 404, try to retrieve from IPFS directly
         if (proxyRes.statusCode === 404) {
-          const hash = req.url.split("/ipfs/")[1];
+          const hash = req.url.split("/ipfs/")[1]?.split('?')[0]?.split('#')[0]; // Get CID, remove query/hash
           if (hash) {
             console.log(
-              `⚠️ Local gateway 404 for hash: ${hash}, adding fallback headers`
+              `⚠️ Local gateway 404 for hash: ${hash}, trying direct IPFS retrieval`
             );
-            proxyRes.headers[
-              "X-IPFS-Fallback"
-            ] = `https://ipfs.io/ipfs/${hash}`;
-            // Add CORS headers
+            
+            const ipfs = app.get('ipfs');
+            if (ipfs) {
+              try {
+                const chunks = [];
+                for await (const chunk of ipfs.cat(hash)) {
+                  chunks.push(chunk);
+                }
+                
+                if (chunks.length > 0) {
+                  const fileBuffer = Buffer.concat(chunks);
+                  
+                  // Detect content type
+                  let contentType = 'application/octet-stream';
+                  const firstBytes = fileBuffer.slice(0, 512);
+                  
+                  if (firstBytes[0] === 0x89 && firstBytes[1] === 0x50 && firstBytes[2] === 0x4E && firstBytes[3] === 0x47) {
+                    contentType = 'image/png';
+                  } else if (firstBytes[0] === 0xFF && firstBytes[1] === 0xD8) {
+                    contentType = 'image/jpeg';
+                  } else if (firstBytes[0] === 0x47 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46) {
+                    contentType = 'image/gif';
+                  } else if (firstBytes[0] === 0x25 && firstBytes[1] === 0x50 && firstBytes[2] === 0x44 && firstBytes[3] === 0x46) {
+                    contentType = 'application/pdf';
+                  } else if (fileBuffer.slice(0, 5).toString() === '<html' || fileBuffer.slice(0, 9).toString() === '<!DOCTYPE') {
+                    contentType = 'text/html';
+                  } else {
+                    try {
+                      JSON.parse(fileBuffer.toString());
+                      contentType = 'application/json';
+                    } catch (e) {}
+                  }
+                  
+                  // Stop the proxy response and send our own
+                  res.status(200);
+                  res.setHeader('Content-Type', contentType);
+                  res.setHeader('Content-Length', fileBuffer.length);
+                  res.setHeader('Cache-Control', 'public, max-age=31536000');
+                  res.setHeader('X-Content-Source', 'ipfs-direct-fallback');
+                  
+                  console.log(`✅ Served CID ${hash} via direct IPFS fallback (${fileBuffer.length} bytes, ${contentType})`);
+                  return res.send(fileBuffer);
+                }
+              } catch (error) {
+                console.log(`⚠️ Direct IPFS fallback also failed for ${hash}:`, error.message);
+              }
+            }
+            
+            // If direct retrieval also fails, add fallback headers
+            proxyRes.headers["X-IPFS-Fallback"] = `https://ipfs.io/ipfs/${hash}`;
             proxyRes.headers["Access-Control-Allow-Origin"] = "*";
-            proxyRes.headers["Access-Control-Allow-Methods"] =
-              "GET, HEAD, OPTIONS";
+            proxyRes.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS";
           }
         }
       },

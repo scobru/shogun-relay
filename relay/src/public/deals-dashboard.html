@@ -822,11 +822,41 @@
               <div class="flex justify-between items-start mb-3">
                 <div>
                   <div class="text-[#FFFFFF] font-medium">${deal.id}</div>
-                  <div class="text-[#A0A0A0] text-sm">${deal.cid.slice(0, 20)}...</div>
+                  <span class="status-badge status-${deal.status}">${deal.status}</span>
                 </div>
-                <span class="status-badge status-${deal.status}">${deal.status}</span>
               </div>
-              <div class="grid grid-cols-3 gap-4 text-sm">
+              
+              <!-- CID Section -->
+              <div class="mb-3 p-2 bg-[#1A1A1A] rounded-lg border border-[#404040]">
+                <div class="flex justify-between items-center mb-2">
+                  <div class="text-[#606060] text-xs">IPFS CID</div>
+                  <button onclick="copyCid('${deal.cid}')" 
+                          class="btn btn-xs bg-[#404040] hover:bg-[#505050] border-0 text-white px-2"
+                          title="Copy CID">
+                    📋 Copy
+                  </button>
+                </div>
+                <code class="text-[#A0A0A0] text-xs font-mono break-all block mb-2">${deal.cid}</code>
+                <div class="flex gap-2 flex-wrap">
+                  <a href="/ipfs/${deal.cid}" target="_blank" 
+                     class="btn btn-xs bg-[#42A5F5] hover:bg-[#1976D2] border-0 text-white"
+                     title="View on relay gateway">
+                    🌐 Relay Gateway
+                  </a>
+                  <a href="https://ipfs.io/ipfs/${deal.cid}" target="_blank" 
+                     class="btn btn-xs bg-[#1976D2] hover:bg-[#1565C0] border-0 text-white"
+                     title="View on IPFS.io gateway">
+                    🔗 IPFS.io
+                  </a>
+                  <a href="https://cloudflare-ipfs.com/ipfs/${deal.cid}" target="_blank" 
+                     class="btn btn-xs bg-[#F57C00] hover:bg-[#E65100] border-0 text-white"
+                     title="View on Cloudflare gateway">
+                    ☁️ Cloudflare
+                  </a>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-3 gap-4 text-sm mb-3">
                 <div>
                   <div class="text-[#606060]">Size</div>
                   <div class="text-[#A0A0A0]">${deal.sizeMB} MB</div>
@@ -840,13 +870,39 @@
                   <div class="text-[#A0A0A0]">${deal.tier}</div>
                 </div>
               </div>
+              
               ${deal.expiresAt ? `
-                <div class="mt-3 text-sm">
+                <div class="mb-3 text-sm">
                   <span class="text-[#606060]">Expires:</span>
                   <span class="text-[#A0A0A0]">${new Date(deal.expiresAt).toLocaleDateString()}</span>
                 </div>
               ` : ''}
-              ${deal.status !== 'terminated' && deal.status !== 'expired' ? `
+              
+              <!-- Storage Verification Section -->
+              ${deal.status === 'active' ? `
+                <div class="mt-4 pt-3 border-t border-[#404040]">
+                  <div class="mb-3">
+                    <button onclick="verifyStorage('${deal.id}')" 
+                            class="btn btn-sm bg-[#4CAF50] hover:bg-[#388E3C] border-0 text-white rounded-lg w-full mb-2">
+                      🔍 Verify Storage
+                    </button>
+                    <div id="verification-${deal.id}" style="display: none;"></div>
+                  </div>
+                  
+                  <div class="grid grid-cols-2 gap-2">
+                    ${deal.status !== 'terminated' && deal.status !== 'expired' ? `
+                      <button onclick="cancelDeal('${deal.id}')" 
+                              class="btn btn-sm bg-[#F44336] hover:bg-[#D32F2F] border-0 text-white rounded-lg">
+                        Cancel Deal
+                      </button>
+                    ` : ''}
+                    <button onclick="reportIssue('${deal.id}', '${deal.clientAddress}')" 
+                            class="btn btn-sm bg-[#FF9800] hover:bg-[#F57C00] border-0 text-white rounded-lg">
+                      🚨 Report Issue
+                    </button>
+                  </div>
+                </div>
+              ` : deal.status !== 'terminated' && deal.status !== 'expired' ? `
                 <div class="mt-4 pt-3 border-t border-[#404040]">
                   <button onclick="cancelDeal('${deal.id}')" 
                           class="btn btn-sm bg-[#F44336] hover:bg-[#D32F2F] border-0 text-white rounded-lg w-full">
@@ -1231,6 +1287,172 @@
       }
     }
 
+    // Copy CID to clipboard
+    async function copyCid(cid) {
+      try {
+        await navigator.clipboard.writeText(cid);
+        showMessage('createMessage', 'success', `CID copied to clipboard: ${cid.substring(0, 20)}...`);
+      } catch (error) {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = cid;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+          document.execCommand('copy');
+          showMessage('createMessage', 'success', `CID copied to clipboard: ${cid.substring(0, 20)}...`);
+        } catch (e) {
+          showMessage('createMessage', 'error', 'Failed to copy CID');
+        }
+        document.body.removeChild(textArea);
+      }
+    }
+
+    // Verify storage
+    async function verifyStorage(dealId) {
+      const verificationDiv = document.getElementById(`verification-${dealId}`);
+      if (!verificationDiv) return;
+
+      verificationDiv.innerHTML = '<div class="text-[#A0A0A0] text-sm">⏳ Verifying storage...</div>';
+      verificationDiv.style.display = 'block';
+
+      try {
+        // First, verify basic storage
+        const verifyResponse = await fetch(`/api/v1/deals/${dealId}/verify`);
+        const verifyData = await verifyResponse.json();
+
+        if (verifyData.success) {
+          const { verified, details } = verifyData;
+          
+          if (verified) {
+            // Storage verified, also get cryptographic proof
+            const proofResponse = await fetch(`/api/v1/deals/${dealId}/verify-proof`);
+            const proofData = await proofResponse.json();
+
+            if (proofData.success) {
+              verificationDiv.innerHTML = `
+                <div class="p-3 bg-[#1A3A1A] border border-[#4CAF50] rounded-lg">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="text-[#4CAF50] text-lg">✅</span>
+                    <span class="text-[#4CAF50] font-medium">Storage Verified</span>
+                  </div>
+                  <div class="text-[#A0A0A0] text-xs space-y-1">
+                    <div>✓ File is pinned on relay</div>
+                    <div>✓ File exists and is retrievable</div>
+                    <div>✓ Size: ${(details.sizeBytes / (1024 * 1024)).toFixed(2)} MB (expected: ${details.expectedSizeMB} MB)</div>
+                    ${proofData.proof ? `
+                      <div class="mt-2 pt-2 border-t border-[#404040]">
+                        <div class="text-[#606060]">Proof Hash:</div>
+                        <code class="text-[#A0A0A0] text-xs break-all">${proofData.proof.proofHash.substring(0, 32)}...</code>
+                      </div>
+                    ` : ''}
+                  </div>
+                </div>
+              `;
+            } else {
+              verificationDiv.innerHTML = `
+                <div class="p-3 bg-[#3A2A1A] border border-[#FF9800] rounded-lg">
+                  <div class="text-[#FF9800] font-medium mb-2">⚠️ Storage Found but Proof Failed</div>
+                  <div class="text-[#A0A0A0] text-xs">File exists but cryptographic proof could not be generated.</div>
+                </div>
+              `;
+            }
+          } else {
+            // Storage NOT verified - show error and report option
+            verificationDiv.innerHTML = `
+              <div class="p-3 bg-[#3A1A1A] border border-[#F44336] rounded-lg">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-[#F44336] text-lg">❌</span>
+                  <span class="text-[#F44336] font-medium">Storage Verification Failed</span>
+                </div>
+                <div class="text-[#A0A0A0] text-xs space-y-1 mb-3">
+                  ${!details.isPinned ? '<div>✗ File is NOT pinned on relay</div>' : ''}
+                  ${!details.existsAndRetrievable ? '<div>✗ File does not exist or cannot be retrieved</div>' : ''}
+                  ${details.sizeBytes === 0 ? '<div>✗ File size is 0 bytes</div>' : ''}
+                </div>
+                <div class="text-[#F44336] text-xs font-medium">
+                  ⚠️ This indicates a storage failure. You can report this issue for slashing.
+                </div>
+              </div>
+            `;
+          }
+        } else {
+          verificationDiv.innerHTML = `
+            <div class="p-3 bg-[#3A1A1A] border border-[#F44336] rounded-lg">
+              <div class="text-[#F44336] font-medium mb-2">❌ Verification Error</div>
+              <div class="text-[#A0A0A0] text-xs">${verifyData.error || 'Failed to verify storage'}</div>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Verify storage error:', error);
+        verificationDiv.innerHTML = `
+          <div class="p-3 bg-[#3A1A1A] border border-[#F44336] rounded-lg">
+            <div class="text-[#F44336] font-medium mb-2">❌ Error</div>
+            <div class="text-[#A0A0A0] text-xs">${error.message}</div>
+          </div>
+        `;
+      }
+    }
+
+    // Report issue for slashing
+    async function reportIssue(dealId, clientAddress) {
+      if (!connectedAddress) {
+        showMessage('createMessage', 'error', 'Please connect your wallet first');
+        return;
+      }
+
+      if (connectedAddress.toLowerCase() !== clientAddress.toLowerCase()) {
+        showMessage('createMessage', 'error', 'You can only report issues for your own deals');
+        return;
+      }
+
+      // Ask for report type and reason
+      const reportType = prompt('Report Type:\n1. missedProof - Relay missed storage proof\n2. dataLoss - File cannot be retrieved\n\nEnter 1 or 2:');
+      
+      if (!reportType || (reportType !== '1' && reportType !== '2')) {
+        return;
+      }
+
+      const reason = prompt('Please describe the issue:');
+      if (!reason) {
+        return;
+      }
+
+      if (!confirm('Are you sure you want to report this issue? This will initiate slashing proceedings against the relay.')) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/v1/deals/${dealId}/report`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientAddress: connectedAddress,
+            reportType: reportType === '1' ? 'missedProof' : 'dataLoss',
+            reason: reason,
+            evidence: '' // Can be extended with additional evidence
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          showMessage('createMessage', 'success', 'Issue reported successfully. An authorized slasher will review this.');
+          
+          // Show report details
+          alert(`Report Submitted!\n\nDeal ID: ${dealId}\nReport Type: ${reportType === '1' ? 'Missed Proof' : 'Data Loss'}\nReason: ${reason}\n\nAn authorized slasher will review this report.`);
+        } else {
+          showMessage('createMessage', 'error', data.error || 'Failed to report issue');
+        }
+      } catch (error) {
+        console.error('Report issue error:', error);
+        showMessage('createMessage', 'error', 'Error reporting issue: ' + error.message);
+      }
+    }
+
     // File upload handling
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
@@ -1362,12 +1584,31 @@
         const data = await response.json();
 
         if (data.success && data.stat) {
-          verificationEl.textContent = `Verified! Size: ${(data.stat.CumulativeSize / (1024 * 1024)).toFixed(2)} MB`;
+          const sizeBytes = data.stat.CumulativeSize || data.stat.BlockSize || 0;
+          let sizeText;
+          let sizeMB;
+          
+          if (sizeBytes >= 1024 * 1024) {
+            // Show in MB
+            sizeMB = (sizeBytes / (1024 * 1024)).toFixed(2);
+            sizeText = `${sizeMB} MB`;
+          } else if (sizeBytes >= 1024) {
+            // Show in KB
+            const sizeKB = (sizeBytes / 1024).toFixed(2);
+            sizeMB = (sizeBytes / (1024 * 1024)).toFixed(4); // For form field
+            sizeText = `${sizeKB} KB (${sizeMB} MB)`;
+          } else {
+            // Show in bytes
+            sizeMB = (sizeBytes / (1024 * 1024)).toFixed(6); // For form field
+            sizeText = `${sizeBytes} bytes (${sizeMB} MB)`;
+          }
+          
+          verificationEl.textContent = `Verified! Size: ${sizeText}`;
           verificationEl.className = 'text-[#4CAF50] text-xs mt-1';
           
-          // Auto-fill size if not already set
+          // Auto-fill size if not already set (always in MB for form)
           if (!document.getElementById('dealSizeMB').value) {
-            document.getElementById('dealSizeMB').value = (data.stat.CumulativeSize / (1024 * 1024)).toFixed(2);
+            document.getElementById('dealSizeMB').value = sizeMB;
             updateDealPreview();
           }
         } else {
