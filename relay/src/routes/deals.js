@@ -201,6 +201,16 @@ router.post('/create', express.json(), async (req, res) => {
         error: 'Relay not fully initialized',
       });
     }
+
+    // Check if relay user has SEA keys
+    const keyPair = relayUser?._.sea;
+    if (!keyPair) {
+      console.error('Relay user SEA keys not available');
+      return res.status(503).json({
+        success: false,
+        error: 'Relay authentication not ready',
+      });
+    }
     
     const {
       cid,
@@ -238,7 +248,7 @@ router.post('/create', express.json(), async (req, res) => {
     });
     
     // Save to GunDB (frozen)
-    await StorageDeals.saveDeal(gun, deal, relayUser._.sea);
+    await StorageDeals.saveDeal(gun, deal, keyPair);
     
     // Create x402 payment requirements
     const paymentRequirements = {
@@ -264,8 +274,13 @@ router.post('/create', express.json(), async (req, res) => {
       message: 'Deal created. Complete payment to activate.',
     });
   } catch (error) {
-    console.error('Deal creation error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error('Deal creation error:', error.message);
+    console.error('Deal creation stack:', error.stack);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      hint: 'Check server logs for details'
+    });
   }
 });
 
