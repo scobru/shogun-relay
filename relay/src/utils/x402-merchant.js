@@ -503,12 +503,40 @@ export class X402Merchant {
     try {
       const { authorization, signature } = paymentPayload.payload;
 
-      // Parse signature components
-      const sig = signature.startsWith('0x') ? signature.slice(2) : signature;
+      // Parse signature components (EIP-712 returns 65-byte signature)
+      let sig = signature.startsWith('0x') ? signature.slice(2) : signature;
+      
+      // Ensure signature is 130 hex chars (65 bytes)
+      if (sig.length !== 130) {
+        throw new Error(`Invalid signature length: expected 130 hex chars, got ${sig.length}`);
+      }
+      
       const r = `0x${sig.slice(0, 64)}`;
       const s = `0x${sig.slice(64, 128)}`;
-      const v = parseInt(sig.slice(128, 130), 16);
+      let v = parseInt(sig.slice(128, 130), 16);
+      
+      // EIP-712 v is already 27 or 28, but some contracts expect 0/1
+      // For USDC, we need v as-is (27 or 28)
+      console.log(`Parsed signature: r=${r.substring(0, 10)}..., s=${s.substring(0, 10)}..., v=${v}`);
 
+      // Ensure nonce is bytes32 (64 hex chars)
+      let nonce = authorization.nonce;
+      if (nonce.startsWith('0x')) {
+        nonce = nonce.slice(2);
+      }
+      if (nonce.length !== 64) {
+        throw new Error(`Invalid nonce length: expected 64 hex chars, got ${nonce.length}`);
+      }
+      const nonceBytes32 = `0x${nonce}`;
+      
+      console.log('Executing transferWithAuthorization:', {
+        from: authorization.from,
+        to: authorization.to,
+        value: authorization.value,
+        nonce: nonceBytes32,
+        v, r: r.substring(0, 10) + '...', s: s.substring(0, 10) + '...'
+      });
+      
       // Execute transferWithAuthorization
       const hash = await this.walletClient.writeContract({
         address: this.networkConfig.usdc,
@@ -520,7 +548,7 @@ export class X402Merchant {
           BigInt(authorization.value),
           BigInt(authorization.validAfter),
           BigInt(authorization.validBefore),
-          authorization.nonce,
+          nonceBytes32,
           v,
           r,
           s,

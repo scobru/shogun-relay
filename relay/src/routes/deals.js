@@ -383,6 +383,13 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
       });
     }
     
+    console.log('Payment received:', {
+      from: payment?.payload?.authorization?.from,
+      to: payment?.payload?.authorization?.to,
+      amount: payment?.payload?.authorization?.value,
+      signature: payment?.payload?.signature ? `${payment.payload.signature.substring(0, 10)}...` : 'missing'
+    });
+    
     const merchant = new X402Merchant({
       payToAddress,
       network,

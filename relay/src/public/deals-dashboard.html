@@ -1004,7 +1004,18 @@
         const amount = BigInt(paymentRequired.maxAmountRequired);
         const validAfter = BigInt(0);
         const validBefore = BigInt(Math.floor(Date.now() / 1000) + 3600); // 1 hour
-        const nonce = ethers.hexlify(ethers.randomBytes(32));
+        
+        // Generate random nonce (must be bytes32 = 32 bytes = 64 hex chars)
+        const nonceBytes = ethers.randomBytes(32);
+        const nonce = ethers.hexlify(nonceBytes);
+        
+        console.log('Payment details:', {
+          from: connectedAddress,
+          to: paymentRequired.payTo,
+          amount: amount.toString(),
+          nonce: nonce,
+          usdcAddress: usdcAddress
+        });
 
         // EIP-712 domain for USDC
         const domain = {
