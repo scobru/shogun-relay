@@ -141,18 +141,18 @@ RELAY_GUN_PASSWORD=your_password
 - Output formattato con istruzioni
 - Salva automaticamente in `./keys/relay-keypair.json`
 
-### 2. `scripts/generate-relay-keys-standalone.js`
-- Versione CommonJS (compatibile con Dockerfile)
+### 2. `scripts/generate-relay-keys-standalone.cjs`
+- Versione CommonJS (compatibile con Dockerfile, usa estensione .cjs)
 - Output JSON pulito (perfetto per catturare in variabili)
 - Può salvare in un percorso personalizzato
 
 **Esempi:**
 ```bash
 # Genera e mostra JSON (per copiare in env var)
-node scripts/generate-relay-keys-standalone.js
+node scripts/generate-relay-keys-standalone.cjs
 
 # Genera e salva in file
-node scripts/generate-relay-keys-standalone.js /path/to/keys.json
+node scripts/generate-relay-keys-standalone.cjs /path/to/keys.json
 ```
 
 ---
