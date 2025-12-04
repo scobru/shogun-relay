@@ -148,7 +148,7 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    const { endpoint, gunPubKey, stakeAmount } = req.body;
+    const { endpoint, gunPubKey, stakeAmount, griefingRatio } = req.body;
 
     if (!endpoint || !gunPubKey || !stakeAmount) {
       return res.status(400).json({
@@ -169,8 +169,11 @@ router.post('/register', async (req, res) => {
       });
     }
 
+    // Use provided griefingRatio or default to 0 (contract will use default)
+    const finalGriefingRatio = griefingRatio !== undefined ? parseInt(griefingRatio) : 0;
+
     console.log(`📝 Registering relay on-chain: ${endpoint}`);
-    const result = await client.registerRelay(endpoint, gunPubKey, stakeAmount);
+    const result = await client.registerRelay(endpoint, gunPubKey, stakeAmount, finalGriefingRatio);
 
     res.json({
       success: true,
@@ -356,7 +359,7 @@ router.post('/deal/register', async (req, res) => {
       });
     }
 
-    const { dealId, clientAddress, cid, sizeMB, priceUSDC, durationDays } = req.body;
+    const { dealId, clientAddress, cid, sizeMB, priceUSDC, durationDays, clientStake } = req.body;
 
     if (!clientAddress || !cid || !sizeMB || !priceUSDC || !durationDays) {
       return res.status(400).json({
@@ -370,13 +373,17 @@ router.post('/deal/register', async (req, res) => {
     // Generate deal ID if not provided
     const finalDealId = dealId || generateDealId(cid, clientAddress);
     
+    // Use provided clientStake or default to '0'
+    const finalClientStake = clientStake || '0';
+    
     const result = await client.registerDeal(
       finalDealId,
       clientAddress,
       cid,
       sizeMB,
       priceUSDC,
-      durationDays
+      durationDays,
+      finalClientStake
     );
 
     res.json({

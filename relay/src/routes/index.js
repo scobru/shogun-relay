@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import multer from "multer";
 import FormData from "form-data";
+import http from "http";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -77,59 +78,102 @@ export default (app) => {
   // IPFS Gateway handler with direct IPFS API fallback
   app.get("/ipfs/:cid", async (req, res, next) => {
     const { cid } = req.params;
-    const ipfs = app.get('ipfs');
+    const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
+    const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN || process.env.IPFS_API_KEY;
     
-    // If IPFS instance is available, try to serve file directly
-    if (ipfs) {
-      try {
-        console.log(`📁 Direct IPFS retrieval attempt for CID: ${cid}`);
+    // Helper function to make IPFS API HTTP requests
+    const makeIpfsRequest = (path, method = 'POST', isBinary = false) => {
+      return new Promise((resolve, reject) => {
+        const url = new URL(IPFS_API_URL);
+        const options = {
+          hostname: url.hostname,
+          port: url.port || 5001,
+          path: `/api/v0${path}`,
+          method,
+          headers: { 
+            'Content-Type': 'application/json',
+            'Content-Length': '0'
+          },
+        };
         
-        // Try to get file from IPFS directly
-        const chunks = [];
-        for await (const chunk of ipfs.cat(cid)) {
-          chunks.push(chunk);
+        if (IPFS_API_TOKEN) {
+          options.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
         }
         
-        if (chunks.length > 0) {
-          const fileBuffer = Buffer.concat(chunks);
-          
-          // Try to detect content type from CID or first bytes
-          let contentType = 'application/octet-stream';
-          const firstBytes = fileBuffer.slice(0, 512);
-          
-          // Basic content type detection
-          if (firstBytes[0] === 0x89 && firstBytes[1] === 0x50 && firstBytes[2] === 0x4E && firstBytes[3] === 0x47) {
-            contentType = 'image/png';
-          } else if (firstBytes[0] === 0xFF && firstBytes[1] === 0xD8) {
-            contentType = 'image/jpeg';
-          } else if (firstBytes[0] === 0x47 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46) {
-            contentType = 'image/gif';
-          } else if (firstBytes[0] === 0x25 && firstBytes[1] === 0x50 && firstBytes[2] === 0x44 && firstBytes[3] === 0x46) {
-            contentType = 'application/pdf';
-          } else if (fileBuffer.slice(0, 5).toString() === '<html' || fileBuffer.slice(0, 9).toString() === '<!DOCTYPE') {
-            contentType = 'text/html';
-          } else {
-            // Try to detect JSON
-            try {
-              JSON.parse(fileBuffer.toString());
-              contentType = 'application/json';
-            } catch (e) {
-              // Not JSON, keep default
+        const req = http.request(options, (res) => {
+          const chunks = [];
+          res.on('data', chunk => chunks.push(chunk));
+          res.on('end', () => {
+            const buffer = Buffer.concat(chunks);
+            if (res.statusCode === 200) {
+              if (isBinary) {
+                resolve(buffer);
+              } else {
+                try {
+                  resolve(JSON.parse(buffer.toString()));
+                } catch (e) {
+                  resolve({ raw: buffer.toString() });
+                }
+              }
+            } else {
+              reject(new Error(`IPFS API returned ${res.statusCode}: ${buffer.toString().substring(0, 200)}`));
             }
+          });
+        });
+        
+        req.on('error', reject);
+        req.setTimeout(30000, () => {
+          req.destroy();
+          reject(new Error('IPFS request timeout'));
+        });
+        req.end();
+      });
+    };
+    
+    // Try to retrieve file directly from IPFS API
+    try {
+      console.log(`📁 Direct IPFS retrieval attempt for CID: ${cid}`);
+      
+      // Try to get file from IPFS directly using HTTP API
+      const fileBuffer = await makeIpfsRequest(`/cat?arg=${encodeURIComponent(cid)}`, 'POST', true);
+      
+      if (fileBuffer && fileBuffer.length > 0) {
+        // Try to detect content type from first bytes
+        let contentType = 'application/octet-stream';
+        const firstBytes = fileBuffer.slice(0, 512);
+        
+        // Basic content type detection
+        if (firstBytes[0] === 0x89 && firstBytes[1] === 0x50 && firstBytes[2] === 0x4E && firstBytes[3] === 0x47) {
+          contentType = 'image/png';
+        } else if (firstBytes[0] === 0xFF && firstBytes[1] === 0xD8) {
+          contentType = 'image/jpeg';
+        } else if (firstBytes[0] === 0x47 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46) {
+          contentType = 'image/gif';
+        } else if (firstBytes[0] === 0x25 && firstBytes[1] === 0x50 && firstBytes[2] === 0x44 && firstBytes[3] === 0x46) {
+          contentType = 'application/pdf';
+        } else if (fileBuffer.slice(0, 5).toString() === '<html' || fileBuffer.slice(0, 9).toString() === '<!DOCTYPE') {
+          contentType = 'text/html';
+        } else {
+          // Try to detect JSON
+          try {
+            JSON.parse(fileBuffer.toString());
+            contentType = 'application/json';
+          } catch (e) {
+            // Not JSON, keep default
           }
-          
-          res.setHeader('Content-Type', contentType);
-          res.setHeader('Content-Length', fileBuffer.length);
-          res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year
-          res.setHeader('X-Content-Source', 'ipfs-direct');
-          
-          console.log(`✅ Served CID ${cid} directly from IPFS (${fileBuffer.length} bytes, ${contentType})`);
-          return res.send(fileBuffer);
         }
-      } catch (error) {
-        console.log(`⚠️ Direct IPFS retrieval failed for ${cid}:`, error.message);
-        // Fall through to proxy gateway
+        
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Length', fileBuffer.length);
+        res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year
+        res.setHeader('X-Content-Source', 'ipfs-direct');
+        
+        console.log(`✅ Served CID ${cid} directly from IPFS API (${fileBuffer.length} bytes, ${contentType})`);
+        return res.send(fileBuffer);
       }
+    } catch (error) {
+      console.log(`⚠️ Direct IPFS retrieval failed for ${cid}:`, error.message);
+      // Fall through to proxy gateway
     }
     
     // If direct retrieval fails or IPFS not available, pass to proxy
@@ -155,65 +199,120 @@ export default (app) => {
           `📁 IPFS Gateway Response: ${proxyRes.statusCode} for ${req.url}`
         );
 
-        // If local gateway fails with 404, try to retrieve from IPFS directly
+        // If local gateway fails with 404, show user-friendly error page with fallback links
         if (proxyRes.statusCode === 404) {
           const hash = req.url.split("/ipfs/")[1]?.split('?')[0]?.split('#')[0]; // Get CID, remove query/hash
           if (hash) {
-            console.log(
-              `⚠️ Local gateway 404 for hash: ${hash}, trying direct IPFS retrieval`
-            );
+            console.log(`⚠️ Local gateway 404 for hash: ${hash}, showing fallback page`);
             
-            const ipfs = app.get('ipfs');
-            if (ipfs) {
-              try {
-                const chunks = [];
-                for await (const chunk of ipfs.cat(hash)) {
-                  chunks.push(chunk);
-                }
-                
-                if (chunks.length > 0) {
-                  const fileBuffer = Buffer.concat(chunks);
-                  
-                  // Detect content type
-                  let contentType = 'application/octet-stream';
-                  const firstBytes = fileBuffer.slice(0, 512);
-                  
-                  if (firstBytes[0] === 0x89 && firstBytes[1] === 0x50 && firstBytes[2] === 0x4E && firstBytes[3] === 0x47) {
-                    contentType = 'image/png';
-                  } else if (firstBytes[0] === 0xFF && firstBytes[1] === 0xD8) {
-                    contentType = 'image/jpeg';
-                  } else if (firstBytes[0] === 0x47 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46) {
-                    contentType = 'image/gif';
-                  } else if (firstBytes[0] === 0x25 && firstBytes[1] === 0x50 && firstBytes[2] === 0x44 && firstBytes[3] === 0x46) {
-                    contentType = 'application/pdf';
-                  } else if (fileBuffer.slice(0, 5).toString() === '<html' || fileBuffer.slice(0, 9).toString() === '<!DOCTYPE') {
-                    contentType = 'text/html';
-                  } else {
-                    try {
-                      JSON.parse(fileBuffer.toString());
-                      contentType = 'application/json';
-                    } catch (e) {}
-                  }
-                  
-                  // Stop the proxy response and send our own
-                  res.status(200);
-                  res.setHeader('Content-Type', contentType);
-                  res.setHeader('Content-Length', fileBuffer.length);
-                  res.setHeader('Cache-Control', 'public, max-age=31536000');
-                  res.setHeader('X-Content-Source', 'ipfs-direct-fallback');
-                  
-                  console.log(`✅ Served CID ${hash} via direct IPFS fallback (${fileBuffer.length} bytes, ${contentType})`);
-                  return res.send(fileBuffer);
-                }
-              } catch (error) {
-                console.log(`⚠️ Direct IPFS fallback also failed for ${hash}:`, error.message);
-              }
-            }
+            // Stop the proxy response and send our own HTML page
+            const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IPFS Content Not Found - Shogun Relay</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+      color: #ffffff;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      max-width: 600px;
+      padding: 40px;
+      text-align: center;
+    }
+    h1 {
+      font-size: 32px;
+      margin-bottom: 16px;
+      color: #ff6b6b;
+    }
+    p {
+      font-size: 18px;
+      line-height: 1.6;
+      color: #b0b0b0;
+      margin-bottom: 32px;
+    }
+    .cid {
+      font-family: 'Courier New', monospace;
+      background: #3a3a3a;
+      padding: 12px;
+      border-radius: 8px;
+      word-break: break-all;
+      margin: 20px 0;
+      color: #4fc3f7;
+    }
+    .fallback-links {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 32px;
+    }
+    .fallback-link {
+      display: block;
+      padding: 16px 24px;
+      background: #4a4a4a;
+      border: 2px solid #5a5a5a;
+      border-radius: 8px;
+      color: #ffffff;
+      text-decoration: none;
+      transition: all 0.3s ease;
+    }
+    .fallback-link:hover {
+      background: #5a5a5a;
+      border-color: #6a6a6a;
+      transform: translateY(-2px);
+    }
+    .fallback-link strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #4fc3f7;
+    }
+    .fallback-link span {
+      font-size: 14px;
+      color: #b0b0b0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📦 IPFS Content Not Found</h1>
+    <p>The requested content is not available on this relay's local IPFS node.</p>
+    <div class="cid">CID: ${hash}</div>
+    <p>Try accessing it via a public IPFS gateway:</p>
+    <div class="fallback-links">
+      <a href="https://ipfs.io/ipfs/${hash}" target="_blank" class="fallback-link">
+        <strong>🌐 IPFS.io Gateway</strong>
+        <span>ipfs.io/ipfs/${hash}</span>
+      </a>
+      <a href="https://cloudflare-ipfs.com/ipfs/${hash}" target="_blank" class="fallback-link">
+        <strong>☁️ Cloudflare Gateway</strong>
+        <span>cloudflare-ipfs.com/ipfs/${hash}</span>
+      </a>
+      <a href="https://dweb.link/ipfs/${hash}" target="_blank" class="fallback-link">
+        <strong>🔗 DWeb Link</strong>
+        <span>dweb.link/ipfs/${hash}</span>
+      </a>
+    </div>
+  </div>
+</body>
+</html>
+            `;
             
-            // If direct retrieval also fails, add fallback headers
-            proxyRes.headers["X-IPFS-Fallback"] = `https://ipfs.io/ipfs/${hash}`;
-            proxyRes.headers["Access-Control-Allow-Origin"] = "*";
-            proxyRes.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS";
+            res.status(404);
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Content-Length', Buffer.byteLength(html));
+            res.setHeader('X-IPFS-Fallback', `https://ipfs.io/ipfs/${hash}`);
+            res.end(html);
+            return;
           }
         }
       },

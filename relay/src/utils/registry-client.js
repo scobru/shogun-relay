@@ -11,7 +11,7 @@ import { ethers } from 'ethers';
 
 // Contract addresses
 export const REGISTRY_ADDRESSES = {
-  84532: '0xb1F0a1eb9722A924F521E264Fa75243344868c4D', // Base Sepolia
+  84532: '0x412D3Cf47907C231EE26D261714D2126eb3735e6', // Base Sepolia
   8453: null, // Base Mainnet - TBD
 };
 
@@ -31,24 +31,29 @@ const REGISTRY_ABI = [
   // View functions
   'function getActiveRelays() view returns (address[])',
   'function getActiveRelayCount() view returns (uint256)',
-  'function getRelayInfo(address relay) view returns (tuple(address owner, string endpoint, string gunPubKey, uint256 stakedAmount, uint256 registeredAt, uint256 unstakeRequestedAt, uint8 status, uint256 totalDeals, uint256 totalSlashed))',
+  'function getRelayInfo(address relay) view returns (tuple(address owner, string endpoint, string gunPubKey, uint256 stakedAmount, uint256 registeredAt, uint256 unstakeRequestedAt, uint8 status, uint256 totalDeals, uint256 totalSlashed, uint256 griefingRatio))',
   'function isActiveRelay(address relay) view returns (bool)',
-  'function deals(bytes32 dealId) view returns (tuple(bytes32 dealId, address relay, address client, string cid, uint256 sizeMB, uint256 priceUSDC, uint256 createdAt, uint256 expiresAt, bool active))',
+  'function deals(bytes32 dealId) view returns (tuple(bytes32 dealId, address relay, address client, string cid, uint256 sizeMB, uint256 priceUSDC, uint256 createdAt, uint256 expiresAt, bool active, uint256 clientStake))',
   'function getRelayDeals(address relay) view returns (bytes32[])',
   'function getClientDeals(address client) view returns (bytes32[])',
   'function minStake() view returns (uint256)',
   'function unstakingDelay() view returns (uint256)',
   // State-changing functions (require signer)
-  'function registerRelay(string endpoint, string gunPubKey, uint256 stakeAmount)',
+  'function registerRelay(string endpoint, string gunPubKey, uint256 stakeAmount, uint256 griefingRatio)',
   'function updateRelay(string newEndpoint, string newGunPubKey)',
   'function increaseStake(uint256 amount)',
   'function requestUnstake()',
   'function withdrawStake()',
-  'function registerDeal(bytes32 dealId, address client, string cid, uint256 sizeMB, uint256 priceUSDC, uint256 durationDays)',
+  'function registerDeal(bytes32 dealId, address client, string cid, uint256 sizeMB, uint256 priceUSDC, uint256 durationDays, uint256 clientStake)',
   'function completeDeal(bytes32 dealId)',
+  // Client griefing functions (called by clients, not relays)
+  'function griefMissedProof(address relay, bytes32 dealId, string evidence)',
+  'function griefDataLoss(address relay, bytes32 dealId, string evidence)',
+  'function calculateGriefingCost(address relay, uint256 slashBps, bytes32 dealId) view returns (uint256 slashAmount, uint256 cost)',
   // Events
   'event RelayRegistered(address indexed relay, address indexed owner, string endpoint, string gunPubKey, uint256 stakedAmount)',
-  'event StorageDealRegistered(bytes32 indexed dealId, address indexed relay, address indexed client, string cid, uint256 sizeMB, uint256 priceUSDC, uint256 expiresAt)',
+  'event StorageDealRegistered(bytes32 indexed dealId, address indexed relay, address indexed client, string cid, uint256 sizeMB, uint256 priceUSDC, uint256 expiresAt, uint256 clientStake)',
+  'event RelaySlashed(bytes32 indexed reportId, address indexed relay, address indexed reporter, uint256 amount, uint256 cost, string reason)',
 ];
 
 // USDC ABI (minimal)
@@ -112,6 +117,7 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
             status: RelayStatus[info.status] || 'Unknown',
             totalDeals: Number(info.totalDeals),
             totalSlashed: ethers.formatUnits(info.totalSlashed, 6),
+            griefingRatio: info.griefingRatio ? Number(info.griefingRatio) : null,
           });
         } catch (e) {
           console.error(`Error fetching relay info for ${addr}:`, e.message);
@@ -155,6 +161,7 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
           status: RelayStatus[info.status] || 'Unknown',
           totalDeals: Number(info.totalDeals),
           totalSlashed: ethers.formatUnits(info.totalSlashed, 6),
+          griefingRatio: info.griefingRatio ? Number(info.griefingRatio) : null,
         };
       } catch (e) {
         console.error(`Error fetching relay info:`, e.message);
@@ -204,6 +211,8 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
           createdAt: new Date(Number(deal.createdAt) * 1000).toISOString(),
           expiresAt: new Date(Number(deal.expiresAt) * 1000).toISOString(),
           active: deal.active,
+          clientStake: deal.clientStake ? ethers.formatUnits(deal.clientStake, 6) : '0',
+          clientStakeRaw: deal.clientStake ? deal.clientStake.toString() : '0',
         };
       } catch (e) {
         // Only log if it's not a "deal not found" type error
@@ -290,6 +299,40 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
         unstakingDelayDays: Number(unstakingDelay) / 86400,
       };
     },
+
+    /**
+     * Calculate griefing cost for slashing a relay
+     * @param {string} relayAddress - Relay address
+     * @param {number} slashBps - Slash percentage in basis points (100 = 1%, 1000 = 10%)
+     * @param {string} dealId - Deal ID (bytes32 or string to hash)
+     * @returns {Promise<Object>} { slashAmount, cost } in USDC
+     */
+    async calculateGriefingCost(relayAddress, slashBps, dealId) {
+      try {
+        let dealIdBytes32;
+        if (typeof dealId === 'string') {
+          dealIdBytes32 = dealId.startsWith('0x') ? dealId : ethers.id(dealId);
+        } else {
+          dealIdBytes32 = ethers.hexlify(dealId);
+        }
+
+        const [slashAmount, cost] = await registry.calculateGriefingCost(
+          relayAddress,
+          slashBps,
+          dealIdBytes32
+        );
+
+        return {
+          slashAmount: ethers.formatUnits(slashAmount, 6),
+          slashAmountRaw: slashAmount.toString(),
+          cost: ethers.formatUnits(cost, 6),
+          costRaw: cost.toString(),
+        };
+      } catch (error) {
+        console.error(`Error calculating griefing cost:`, error.message);
+        throw error;
+      }
+    },
   };
 }
 
@@ -317,9 +360,10 @@ export function createRegistryClientWithSigner(privateKey, chainId = 84532, rpcU
      * @param {string} endpoint - Relay endpoint URL
      * @param {string} gunPubKey - GunDB public key
      * @param {string} stakeAmount - Amount to stake in USDC (human readable, e.g., "100")
+     * @param {number} [griefingRatio] - Custom griefing ratio in basis points (0 = use default)
      * @returns {Promise<Object>} Transaction receipt
      */
-    async registerRelay(endpoint, gunPubKey, stakeAmount) {
+    async registerRelay(endpoint, gunPubKey, stakeAmount, griefingRatio = 0) {
       const stakeWei = ethers.parseUnits(stakeAmount, 6);
 
       // Check USDC balance
@@ -338,8 +382,8 @@ export function createRegistryClientWithSigner(privateKey, chainId = 84532, rpcU
       }
 
       // Register
-      console.log(`Registering relay: ${endpoint}`);
-      const tx = await registryWithSigner.registerRelay(endpoint, gunPubKey, stakeWei);
+      console.log(`Registering relay: ${endpoint}${griefingRatio > 0 ? ` with griefing ratio ${griefingRatio} bps` : ''}`);
+      const tx = await registryWithSigner.registerRelay(endpoint, gunPubKey, stakeWei, griefingRatio);
       const receipt = await tx.wait();
 
       return {
@@ -373,11 +417,13 @@ export function createRegistryClientWithSigner(privateKey, chainId = 84532, rpcU
      * @param {number} sizeMB - Size in MB
      * @param {string} priceUSDC - Price in USDC (human readable)
      * @param {number} durationDays - Duration in days
+     * @param {string} [clientStake] - Optional client stake in USDC (human readable, e.g., "10")
      * @returns {Promise<Object>}
      */
-    async registerDeal(dealId, clientAddress, cid, sizeMB, priceUSDC, durationDays) {
+    async registerDeal(dealId, clientAddress, cid, sizeMB, priceUSDC, durationDays, clientStake = '0') {
       const dealIdBytes32 = ethers.id(dealId); // keccak256 hash
       const priceWei = ethers.parseUnits(priceUSDC, 6);
+      const clientStakeWei = ethers.parseUnits(clientStake, 6);
 
       const tx = await registryWithSigner.registerDeal(
         dealIdBytes32,
@@ -385,7 +431,8 @@ export function createRegistryClientWithSigner(privateKey, chainId = 84532, rpcU
         cid,
         sizeMB,
         priceWei,
-        durationDays
+        durationDays,
+        clientStakeWei
       );
       const receipt = await tx.wait();
 

@@ -369,7 +369,7 @@ curl -X POST http://localhost:8765/api/v1/registry/register \
 ```javascript
 // Using ethers.js
 const registry = new ethers.Contract(
-  "0xb1F0a1eb9722A924F521E264Fa75243344868c4D", // Base Sepolia
+  "0x412D3Cf47907C231EE26D261714D2126eb3735e6", // Base Sepolia
   REGISTRY_ABI,
   wallet
 );
@@ -386,7 +386,7 @@ await registry.registerRelay(endpoint, gunPubKey, stakeAmount);
 
 | Network | Registry | USDC |
 |---------|----------|------|
-| Base Sepolia | `0xb1F0a1eb9722A924F521E264Fa75243344868c4D` | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+| Base Sepolia | `0x412D3Cf47907C231EE26D261714D2126eb3735e6` | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 | Base Mainnet | TBD | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
 
 ---

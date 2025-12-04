@@ -1044,7 +1044,7 @@ The ShogunRelayRegistry smart contract provides on-chain relay discovery, stakin
 
 | Network | Chain ID | Registry | USDC |
 |---------|----------|----------|------|
-| Base Sepolia | 84532 | `0xb1F0a1eb9722A924F521E264Fa75243344868c4D` | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+| Base Sepolia | 84532 | `0x412D3Cf47907C231EE26D261714D2126eb3735e6` | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 | Base Mainnet | 8453 | TBD | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
 
 ### Features
@@ -1083,7 +1083,7 @@ curl "http://localhost:8765/api/v1/network/onchain/deals/client/0xClientAddress"
 {
   "success": true,
   "chainId": 84532,
-  "registryAddress": "0xb1F0a1eb9722A924F521E264Fa75243344868c4D",
+  "registryAddress": "0x412D3Cf47907C231EE26D261714D2126eb3735e6",
   "relayCount": 3,
   "relays": [
     {

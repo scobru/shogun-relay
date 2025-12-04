@@ -1445,13 +1445,117 @@
 
         const data = await response.json();
 
-        if (data.success) {
-          showMessage('createMessage', 'success', 'Issue reported successfully. An authorized slasher will review this.');
+        if (data.success && data.report) {
+          const report = data.report;
           
-          // Show report details
-          alert(`Report Submitted!\n\nDeal ID: ${dealId}\nReport Type: ${reportType === '1' ? 'Missed Proof' : 'Data Loss'}\nReason: ${reason}\n\nAn authorized slasher will review this report.`);
+          // Show griefing cost information
+          let confirmMessage = `Report Type: ${reportType === '1' ? 'Missed Proof' : 'Data Loss'}\n`;
+          confirmMessage += `Reason: ${reason}\n\n`;
+          
+          if (report.griefingCost) {
+            confirmMessage += `⚠️ GRIEFING COST: ${report.griefingCost.amount} ${report.griefingCost.currency}\n`;
+            confirmMessage += `   (This will be deducted from your USDC balance)\n\n`;
+          }
+          
+          if (report.slashAmount) {
+            confirmMessage += `📉 RELAY SLASH: ${report.slashAmount.amount} ${report.slashAmount.currency}\n`;
+            confirmMessage += `   (Amount that will be slashed from relay stake)\n\n`;
+          }
+          
+          confirmMessage += `Do you want to proceed? You will need to:\n`;
+          confirmMessage += `1. Approve USDC spending for the griefing cost\n`;
+          confirmMessage += `2. Sign and send the transaction`;
+          
+          const proceed = confirm(confirmMessage);
+          if (!proceed) {
+            return;
+          }
+          
+          // Ask user to sign and send transaction
+          try {
+            if (!window.ethereum) {
+              throw new Error('Please install MetaMask or another Web3 wallet');
+            }
+            
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const signer = await provider.getSigner();
+            
+            // Get USDC contract address and ABI for approval
+            const USDC_ADDRESS = report.chainId === 84532 
+              ? '0x036CbD53842c5426634e7929541eC2318f3dCF7e' // Base Sepolia
+              : '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'; // Base Mainnet
+            
+            const USDC_ABI = [
+              'function approve(address spender, uint256 amount) returns (bool)',
+              'function allowance(address owner, address spender) view returns (uint256)',
+            ];
+            
+            // Approve USDC if griefing cost is required
+            if (report.griefingCost && parseFloat(report.griefingCost.amount) > 0) {
+              showMessage('createMessage', 'info', 'Approving USDC spending...');
+              
+              const usdc = new ethers.Contract(USDC_ADDRESS, USDC_ABI, signer);
+              const costWei = ethers.parseUnits(report.griefingCost.amount, 6);
+              
+              // Check current allowance
+              const registryAddress = report.registryAddress;
+              const currentAllowance = await usdc.allowance(await signer.getAddress(), registryAddress);
+              
+              if (currentAllowance < costWei) {
+                // Approve USDC
+                const approveTx = await usdc.approve(registryAddress, costWei);
+                showMessage('createMessage', 'info', 'Waiting for USDC approval confirmation...');
+                await approveTx.wait();
+                showMessage('createMessage', 'success', 'USDC approved!');
+              }
+            }
+            
+            // Estimate gas
+            showMessage('createMessage', 'info', 'Estimating gas...');
+            const gasEstimate = await provider.estimateGas(report.transaction);
+            
+            // Prepare transaction with gas estimate
+            const tx = {
+              ...report.transaction,
+              gasLimit: gasEstimate,
+            };
+            
+            showMessage('createMessage', 'info', 'Please confirm the transaction in your wallet...');
+            
+            // Send transaction
+            const txResponse = await signer.sendTransaction(tx);
+            
+            showMessage('createMessage', 'info', `Transaction sent! Waiting for confirmation...\nTX Hash: ${txResponse.hash}`);
+            
+            // Wait for confirmation
+            const receipt = await txResponse.wait();
+            
+            if (receipt.status === 1) {
+              showMessage('createMessage', 'success', `✅ Report submitted successfully!\n\nTransaction Hash: ${receipt.hash}\n\nThe slashing report has been recorded on-chain.`);
+              
+              // Show report details
+              alert(`Report Submitted Successfully!\n\nDeal ID: ${dealId}\nReport Type: ${reportType === '1' ? 'Missed Proof' : 'Data Loss'}\nReason: ${reason}\nTransaction: ${receipt.hash}\n\nView on BaseScan:\nhttps://sepolia.basescan.org/tx/${receipt.hash}`);
+            } else {
+              showMessage('createMessage', 'error', 'Transaction failed. Please check the transaction details.');
+            }
+          } catch (txError) {
+            console.error('Transaction error:', txError);
+            
+            let errorMessage = 'Failed to send transaction: ' + txError.message;
+            if (txError.message?.includes('user rejected') || txError.message?.includes('User rejected')) {
+              errorMessage = 'Transaction cancelled by user';
+            } else if (txError.message?.includes('NotDealParty')) {
+              errorMessage = 'You can only grief relays for your own active deals.';
+            } else if (txError.message?.includes('DealNotActive')) {
+              errorMessage = 'This deal is not active. You can only grief for active deals.';
+            } else if (txError.message?.includes('Insufficient') || txError.message?.includes('allowance')) {
+              errorMessage = 'Insufficient USDC balance or allowance. Please ensure you have approved USDC spending for the griefing cost.';
+            }
+            
+            showMessage('createMessage', 'error', errorMessage);
+          }
         } else {
-          showMessage('createMessage', 'error', data.error || 'Failed to report issue');
+          showMessage('createMessage', 'error', data.error || 'Failed to prepare report transaction');
         }
       } catch (error) {
         console.error('Report issue error:', error);

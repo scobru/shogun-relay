@@ -478,7 +478,8 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
           activatedDeal.cid,
           sizeMBInt, // Pass as integer
           priceUSDCString,
-          activatedDeal.durationDays
+          activatedDeal.durationDays,
+          '0' // clientStake - default to 0, can be added later via addClientStake
         );
         
         onChainRegistered = true;
@@ -1323,6 +1324,200 @@ router.get('/:dealId/verify-proof', async (req, res) => {
     });
   } catch (error) {
     console.error('Deal proof verification error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/v1/deals/:dealId/report
+ * 
+ * Report an issue with a deal (missed proof or data loss) for slashing.
+ * Prepares transaction data for on-chain reporting.
+ * Client must sign and send the transaction (pays gas).
+ */
+router.post('/:dealId/report', express.json(), async (req, res) => {
+  try {
+    console.log(`📋 Deal report request: ${req.params.dealId}`);
+    const gun = req.app.get('gunInstance');
+    const { dealId } = req.params;
+    const { clientAddress, reportType, reason, evidence = '' } = req.body;
+    
+    if (!gun) {
+      return res.status(503).json({ success: false, error: 'Gun not available' });
+    }
+    
+    if (!clientAddress) {
+      return res.status(400).json({ success: false, error: 'clientAddress is required' });
+    }
+    
+    if (!reportType || (reportType !== 'missedProof' && reportType !== 'dataLoss')) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'reportType must be "missedProof" or "dataLoss"' 
+      });
+    }
+    
+    if (!reason || reason.trim().length === 0) {
+      return res.status(400).json({ success: false, error: 'reason is required' });
+    }
+    
+    // Get deal (check cache first, then GunDB, then on-chain)
+    let deal = getCachedDeal(dealId);
+    if (!deal) {
+      deal = await StorageDeals.getDeal(gun, dealId);
+    }
+    
+    // If not found in GunDB, try on-chain registry
+    if (!deal && process.env.REGISTRY_CHAIN_ID) {
+      try {
+        const chainId = parseInt(process.env.REGISTRY_CHAIN_ID);
+        const registryClient = createRegistryClient(chainId);
+        
+        // Try to get deal from on-chain (using hash of deal ID)
+        const dealIdHash = ethers.id(dealId);
+        const onChainDeal = await registryClient.getDeal(dealIdHash);
+        
+        if (onChainDeal) {
+          deal = {
+            id: dealId,
+            clientAddress: onChainDeal.client,
+            providerPub: onChainDeal.relay,
+            cid: onChainDeal.cid,
+            onChainDealId: onChainDeal.dealId,
+            onChainRegistered: true,
+          };
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch deal from on-chain registry: ${error.message}`);
+      }
+    }
+    
+    if (!deal) {
+      return res.status(404).json({ success: false, error: 'Deal not found' });
+    }
+    
+    // Verify ownership - client can only report their own deals
+    const normalizedClient = clientAddress.toLowerCase();
+    const dealClient = deal.clientAddress?.toLowerCase() || deal.client?.toLowerCase();
+    
+    if (!dealClient || dealClient !== normalizedClient) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'You can only report issues for your own deals' 
+      });
+    }
+    
+    // Get relay address (prefer on-chain relay, fallback to providerPub)
+    let relayAddress = null;
+    if (deal.onChainRelay) {
+      relayAddress = deal.onChainRelay;
+    } else if (deal.providerPub && deal.providerPub.startsWith('0x')) {
+      relayAddress = deal.providerPub;
+    } else if (process.env.REGISTRY_CHAIN_ID && deal.onChainDealId) {
+      // Try to get relay from on-chain deal
+      try {
+        const chainId = parseInt(process.env.REGISTRY_CHAIN_ID);
+        const registryClient = createRegistryClient(chainId);
+        const onChainDeal = await registryClient.getDeal(deal.onChainDealId);
+        if (onChainDeal) {
+          relayAddress = onChainDeal.relay;
+        }
+      } catch (error) {
+        console.warn(`Failed to get relay address from on-chain deal: ${error.message}`);
+      }
+    }
+    
+    if (!relayAddress) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Could not determine relay address for this deal. Deal may not be registered on-chain.' 
+      });
+    }
+    
+    // Get on-chain deal ID (use hash of deal ID if not available)
+    let onChainDealId = deal.onChainDealId;
+    if (!onChainDealId) {
+      onChainDealId = ethers.id(dealId);
+    }
+    
+    // Prepare transaction data
+    const chainId = parseInt(process.env.REGISTRY_CHAIN_ID) || 84532;
+    const registryClient = createRegistryClient(chainId);
+    const registryAddress = registryClient.registryAddress;
+    
+    // Calculate griefing cost before preparing transaction
+    let griefingCost = null;
+    let slashAmount = null;
+    try {
+      const slashBps = reportType === 'missedProof' ? 100 : 1000; // 1% or 10%
+      const costInfo = await registryClient.calculateGriefingCost(
+        relayAddress,
+        slashBps,
+        onChainDealId
+      );
+      slashAmount = costInfo.slashAmount;
+      griefingCost = costInfo.cost;
+    } catch (error) {
+      console.warn(`Failed to calculate griefing cost: ${error.message}`);
+    }
+    
+    // Prepare function call data (now using grief functions)
+    const registryInterface = new ethers.Interface([
+      'function griefMissedProof(address relay, bytes32 dealId, string evidence)',
+      'function griefDataLoss(address relay, bytes32 dealId, string evidence)'
+    ]);
+    
+    const functionName = reportType === 'missedProof' ? 'griefMissedProof' : 'griefDataLoss';
+    const evidenceText = evidence || reason; // Use evidence if provided, otherwise use reason
+    
+    const callData = registryInterface.encodeFunctionData(functionName, [
+      relayAddress,
+      onChainDealId,
+      evidenceText
+    ]);
+    
+    // Prepare transaction request
+    const transaction = {
+      to: registryAddress,
+      data: callData,
+      value: '0x0', // No ETH value needed (but USDC approval needed for griefing cost)
+    };
+    
+    res.json({
+      success: true,
+      report: {
+        dealId,
+        onChainDealId,
+        relayAddress,
+        reportType,
+        reason,
+        evidence: evidenceText,
+        transaction,
+        chainId,
+        registryAddress,
+        functionName,
+        griefingCost: griefingCost ? {
+          amount: griefingCost,
+          currency: 'USDC',
+          note: 'You must approve and pay this amount to execute the grief. This cost will be burned or sent to treasury.',
+        } : null,
+        slashAmount: slashAmount ? {
+          amount: slashAmount,
+          currency: 'USDC',
+          note: 'Amount that will be slashed from relay stake',
+        } : null,
+        message: 'Transaction data prepared. Sign and send this transaction from your wallet to execute the griefing report.',
+        warning: 'NOTE: You must be the client of this deal to execute this transaction. You will need to approve USDC spending for the griefing cost before sending the transaction.',
+        instructions: [
+          '1. Approve USDC spending for the griefing cost amount',
+          '2. Send this transaction from your wallet (the deal client)',
+          '3. The griefing cost will be deducted from your USDC balance',
+          '4. The relay stake will be slashed by the calculated amount',
+        ],
+      },
+    });
+  } catch (error) {
+    console.error('Deal report error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

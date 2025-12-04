@@ -29,15 +29,21 @@ export async function createFrozenEntry(gun, data, keyPair, namespace, indexKey)
     throw new Error('gun, data, and keyPair are required');
   }
 
-  // Add metadata
+  // Add metadata - merge with existing _meta if present
   const entry = {
     ...data,
     _meta: {
+      ...(data._meta || {}),
       pub: keyPair.pub,
       timestamp: Date.now(),
       version: 1,
     },
   };
+  
+  // Ensure _meta.pub is always set (defensive check)
+  if (!entry._meta.pub) {
+    entry._meta.pub = keyPair.pub;
+  }
 
   // Create signature
   const dataString = JSON.stringify(entry);
@@ -104,9 +110,45 @@ export async function readFrozenEntry(gun, namespace, hash) {
       try {
         // Verify signature
         const dataString = JSON.stringify(entry.data);
-        const pub = entry.data._meta?.pub;
+        let pub = entry.data._meta?.pub;
         
-        // Check if pub is available before verification
+        // If pub is missing, try to get it from the index
+        if (!pub) {
+          // Try to find pub from index by searching for this hash
+          const indexNamespace = namespace.replace('frozen-', '');
+          const indexLookup = new Promise((resolveIndex) => {
+            let found = false;
+            const timeout = setTimeout(() => {
+              if (!found) resolveIndex(null);
+            }, 2000);
+            
+            gun.get('shogun-index').get(indexNamespace).map().once((index, key) => {
+              if (index && index.latestHash === hash && index.pub) {
+                found = true;
+                clearTimeout(timeout);
+                resolveIndex(index.pub);
+              }
+            });
+          });
+          
+          pub = await indexLookup;
+          
+          // If we found pub from index, update the entry data and re-store it
+          if (pub) {
+            console.log(`✅ Recovered pub for frozen entry ${hash.substring(0, 16)}... from index`);
+            if (!entry.data._meta) {
+              entry.data._meta = {};
+            }
+            entry.data._meta.pub = pub;
+            // Re-store with pub included
+            gun.get('frozen-' + namespace).get(hash).put({
+              ...entry,
+              data: entry.data
+            });
+          }
+        }
+        
+        // If still no pub after checking index, warn and skip verification
         if (!pub) {
           console.warn(`⚠️ Frozen entry ${hash.substring(0, 16)}... missing pub in _meta, skipping signature verification`);
           resolve({
