@@ -411,14 +411,16 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
     const settlement = await merchant.settlePayment(payment);
     
     if (!settlement.success) {
+      console.log(`❌ Settlement failed: ${settlement.errorReason}`);
       return res.status(402).json({
         success: false,
-        error: `Payment settlement failed: ${settlement.error}`,
+        error: `Payment settlement failed: ${settlement.errorReason}`,
       });
     }
     
     // Activate deal
-    const activatedDeal = StorageDeals.activateDeal(deal, settlement.txHash);
+    const txHash = settlement.transaction;
+    const activatedDeal = StorageDeals.activateDeal(deal, txHash);
     
     // Save updated deal
     await StorageDeals.saveDeal(gun, activatedDeal, relayUser._.sea);
@@ -426,7 +428,7 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
     // Remove from pending cache since it's now activated
     removeCachedDeal(dealId);
     
-    console.log(`✅ Deal ${dealId} activated. CID: ${deal.cid}, TX: ${settlement.txHash}`);
+    console.log(`✅ Deal ${dealId} activated. CID: ${deal.cid}, TX: ${txHash}`);
     
     res.json({
       success: true,
@@ -650,12 +652,12 @@ router.post('/:dealId/renew', express.json(), async (req, res) => {
     if (!settlement.success) {
       return res.status(402).json({
         success: false,
-        error: `Payment failed: ${settlement.error}`,
+        error: `Payment failed: ${settlement.errorReason}`,
       });
     }
     
     // Renew deal
-    const renewedDeal = StorageDeals.renewDeal(deal, parseInt(additionalDays), settlement.txHash);
+    const renewedDeal = StorageDeals.renewDeal(deal, parseInt(additionalDays), settlement.transaction);
     await StorageDeals.saveDeal(gun, renewedDeal, relayUser._.sea);
     
     res.json({

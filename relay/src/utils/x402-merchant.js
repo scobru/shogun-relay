@@ -403,18 +403,30 @@ export class X402Merchant {
     const facilitatorResult = await this.settleWithFacilitator(paymentPayload);
     
     if (facilitatorResult.success) {
+      console.log(`Facilitator settlement successful: ${facilitatorResult.transaction}`);
       return facilitatorResult;
     }
 
+    console.log(`Facilitator failed: ${facilitatorResult.errorReason}`);
+
     // If facilitator failed and we have direct settlement configured, try that
     if (this.walletClient && this.publicClient) {
-      console.log(`Facilitator failed: ${facilitatorResult.errorReason}`);
       console.log('Falling back to direct settlement...');
-      return this.settleDirectly(paymentPayload);
+      const directResult = await this.settleDirectly(paymentPayload);
+      if (directResult.success) {
+        console.log(`Direct settlement successful: ${directResult.transaction}`);
+      } else {
+        console.log(`Direct settlement also failed: ${directResult.errorReason}`);
+      }
+      return directResult;
     }
 
     // No fallback available
-    return facilitatorResult;
+    console.log('No direct settlement fallback available (X402_PRIVATE_KEY not configured)');
+    return {
+      success: false,
+      errorReason: facilitatorResult.errorReason || 'Settlement failed and no fallback available',
+    };
   }
 
   /**
@@ -430,6 +442,8 @@ export class X402Merchant {
         headers['X-API-Key'] = this.facilitatorApiKey;
       }
 
+      console.log(`Calling facilitator: ${this.facilitatorUrl}/settle`);
+      
       const response = await fetch(`${this.facilitatorUrl}/settle`, {
         method: 'POST',
         headers,
@@ -439,12 +453,30 @@ export class X402Merchant {
         }),
       });
 
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch (parseError) {
+        console.error('Failed to parse facilitator response:', parseError);
+        return {
+          success: false,
+          errorReason: `Facilitator returned invalid response (status ${response.status})`,
+        };
+      }
+
+      console.log(`Facilitator response: ${response.status}`, result);
 
       if (!response.ok) {
         return {
           success: false,
-          errorReason: result.error || `Settlement failed with status ${response.status}`,
+          errorReason: result.error || result.message || result.reason || `Facilitator returned status ${response.status}`,
+        };
+      }
+
+      if (!result.transactionHash) {
+        return {
+          success: false,
+          errorReason: 'Facilitator did not return transaction hash',
         };
       }
 
@@ -456,7 +488,7 @@ export class X402Merchant {
       };
     } catch (error) {
       console.error('Facilitator settlement error:', error);
-      return { success: false, errorReason: error.message };
+      return { success: false, errorReason: `Facilitator error: ${error.message}` };
     }
   }
 
