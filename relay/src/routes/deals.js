@@ -657,9 +657,11 @@ router.get('/by-client/:address', async (req, res) => {
     let onChainDeals = [];
     try {
       const registryClient = createRegistryClient(chainId);
-      onChainDeals = await registryClient.getClientDeals(address);
+      // Normalize address to checksum format for consistency with on-chain storage
+      const normalizedAddressForQuery = ethers.getAddress(address);
+      onChainDeals = await registryClient.getClientDeals(normalizedAddressForQuery);
       
-      console.log(`📋 Found ${onChainDeals.length} deals on-chain for client ${address}`);
+      console.log(`📋 Found ${onChainDeals.length} deals on-chain for client ${normalizedAddressForQuery}`);
     } catch (onChainError) {
       console.warn(`⚠️ Failed to fetch on-chain deals: ${onChainError.message}`);
       // Continue with GunDB fallback

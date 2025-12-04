@@ -245,7 +245,9 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
      */
     async getClientDeals(clientAddress) {
       try {
-        const dealIds = await registry.getClientDeals(clientAddress);
+        // Normalize address to checksum format for consistency
+        const normalizedAddress = ethers.getAddress(clientAddress);
+        const dealIds = await registry.getClientDeals(normalizedAddress);
         
         if (!dealIds || dealIds.length === 0) {
           return [];
@@ -424,10 +426,13 @@ export function createRegistryClientWithSigner(privateKey, chainId = 84532, rpcU
       const dealIdBytes32 = ethers.id(dealId); // keccak256 hash
       const priceWei = ethers.parseUnits(priceUSDC, 6);
       const clientStakeWei = ethers.parseUnits(clientStake, 6);
+      
+      // Normalize client address to checksum format for consistency
+      const normalizedClientAddress = ethers.getAddress(clientAddress);
 
       const tx = await registryWithSigner.registerDeal(
         dealIdBytes32,
-        clientAddress,
+        normalizedClientAddress,
         cid,
         sizeMB,
         priceWei,
