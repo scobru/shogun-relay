@@ -599,7 +599,10 @@ async function initializeServer() {
   });
 
   gun.on("bye", () => {
-    activeWires -= 1;
+    // Prevent negative counter (can happen on startup cleanup)
+    if (activeWires > 0) {
+      activeWires -= 1;
+    }
     db?.get("activeWires").put(activeWires);
     console.log(`Connection closed (active: ${activeWires})`);
   });
