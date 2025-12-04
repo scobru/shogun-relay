@@ -478,6 +478,7 @@ async function initializeServer() {
 
   // Health check endpoint
   app.get("/health", (req, res) => {
+    const relayPub = app.get('relayUserPub');
     const healthData = {
       success: true,
       status: "healthy",
@@ -486,6 +487,8 @@ async function initializeServer() {
       activeConnections: activeWires || 0,
       totalConnections: totalConnections || 0,
       memoryUsage: process.memoryUsage(),
+      relayPub: relayPub || null,
+      relayName: process.env.RELAY_NAME || 'shogun-relay',
     };
 
     res.json(healthData);
