@@ -1323,15 +1323,19 @@
         const verifyResponse = await fetch(`/api/v1/deals/${dealId}/verify`);
         const verifyData = await verifyResponse.json();
 
-        if (verifyData.success) {
-          const { verified, details } = verifyData;
+        if (verifyData.success && verifyData.verification) {
+          const verification = verifyData.verification;
+          const verified = verification.verified;
+          const checks = verification.checks || {};
           
           if (verified) {
             // Storage verified, also get cryptographic proof
             const proofResponse = await fetch(`/api/v1/deals/${dealId}/verify-proof`);
             const proofData = await proofResponse.json();
 
-            if (proofData.success) {
+            if (proofData.success && proofData.proof) {
+              const sizeBytes = checks.blockSize || 0;
+              const sizeMB = (sizeBytes / (1024 * 1024)).toFixed(2);
               verificationDiv.innerHTML = `
                 <div class="p-3 bg-[#1A3A1A] border border-[#4CAF50] rounded-lg">
                   <div class="flex items-center gap-2 mb-2">
@@ -1341,8 +1345,8 @@
                   <div class="text-[#A0A0A0] text-xs space-y-1">
                     <div>✓ File is pinned on relay</div>
                     <div>✓ File exists and is retrievable</div>
-                    <div>✓ Size: ${(details.sizeBytes / (1024 * 1024)).toFixed(2)} MB (expected: ${details.expectedSizeMB} MB)</div>
-                    ${proofData.proof ? `
+                    <div>✓ Size: ${sizeMB} MB</div>
+                    ${proofData.proof.proofHash ? `
                       <div class="mt-2 pt-2 border-t border-[#404040]">
                         <div class="text-[#606060]">Proof Hash:</div>
                         <code class="text-[#A0A0A0] text-xs break-all">${proofData.proof.proofHash.substring(0, 32)}...</code>
@@ -1361,6 +1365,7 @@
             }
           } else {
             // Storage NOT verified - show error and report option
+            const issues = verification.issues || [];
             verificationDiv.innerHTML = `
               <div class="p-3 bg-[#3A1A1A] border border-[#F44336] rounded-lg">
                 <div class="flex items-center gap-2 mb-2">
@@ -1368,9 +1373,10 @@
                   <span class="text-[#F44336] font-medium">Storage Verification Failed</span>
                 </div>
                 <div class="text-[#A0A0A0] text-xs space-y-1 mb-3">
-                  ${!details.isPinned ? '<div>✗ File is NOT pinned on relay</div>' : ''}
-                  ${!details.existsAndRetrievable ? '<div>✗ File does not exist or cannot be retrieved</div>' : ''}
-                  ${details.sizeBytes === 0 ? '<div>✗ File size is 0 bytes</div>' : ''}
+                  ${issues.length > 0 ? issues.map(issue => `<div>✗ ${issue}</div>`).join('') : ''}
+                  ${!checks.isPinned ? '<div>✗ File is NOT pinned on relay</div>' : ''}
+                  ${!checks.existsInIPFS ? '<div>✗ File does not exist in IPFS</div>' : ''}
+                  ${!checks.canRead ? '<div>✗ File cannot be read</div>' : ''}
                 </div>
                 <div class="text-[#F44336] text-xs font-medium">
                   ⚠️ This indicates a storage failure. You can report this issue for slashing.

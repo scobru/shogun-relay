@@ -47,7 +47,7 @@
     # Espone le porte
     EXPOSE 1633 1634 1635
     
-    # RUN bee db repair-reserve --data-dir=/home/bee/.bee
+    RUN bee db repair-reserve --data-dir=/home/bee/.bee
 
     ENTRYPOINT ["bee", "start"]
 
