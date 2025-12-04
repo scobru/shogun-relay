@@ -178,14 +178,26 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
      */
     async getDeal(dealId) {
       try {
-        const deal = await registry.deals(dealId);
-        if (deal.createdAt === 0n) {
+        // Normalize dealId to bytes32 format
+        let dealIdBytes32;
+        if (typeof dealId === 'string') {
+          // If it's already a hex string, use it; otherwise treat as bytes32
+          dealIdBytes32 = dealId.startsWith('0x') ? dealId : ethers.id(dealId);
+        } else {
+          dealIdBytes32 = ethers.hexlify(dealId);
+        }
+        
+        const deal = await registry.deals(dealIdBytes32);
+        
+        // Check if deal exists (createdAt will be 0 if not found)
+        if (!deal || deal.createdAt === 0n || deal.createdAt === 0) {
           return null;
         }
+        
         return {
-          dealId: deal.dealId,
-          relay: deal.relay,
-          client: deal.client,
+          dealId: typeof deal.dealId === 'string' ? deal.dealId : ethers.hexlify(deal.dealId),
+          relay: typeof deal.relay === 'string' ? deal.relay : deal.relay.toLowerCase(),
+          client: typeof deal.client === 'string' ? deal.client : deal.client.toLowerCase(),
           cid: deal.cid,
           sizeMB: Number(deal.sizeMB),
           priceUSDC: ethers.formatUnits(deal.priceUSDC, 6),
@@ -194,7 +206,10 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
           active: deal.active,
         };
       } catch (e) {
-        console.error(`Error fetching deal:`, e.message);
+        // Only log if it's not a "deal not found" type error
+        if (!e.message.includes('could not decode') && !e.message.includes('execution reverted')) {
+          console.error(`Error fetching deal ${dealId}:`, e.message);
+        }
         return null;
       }
     },
@@ -220,13 +235,43 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
      * @returns {Promise<Array>}
      */
     async getClientDeals(clientAddress) {
-      const dealIds = await registry.getClientDeals(clientAddress);
-      const deals = [];
-      for (const id of dealIds) {
-        const deal = await this.getDeal(id);
-        if (deal) deals.push(deal);
+      try {
+        const dealIds = await registry.getClientDeals(clientAddress);
+        
+        if (!dealIds || dealIds.length === 0) {
+          return [];
+        }
+        
+        const deals = [];
+        for (const id of dealIds) {
+          try {
+            // Convert to bytes32 format if needed
+            let dealIdBytes32;
+            if (typeof id === 'string') {
+              // If already a hex string with 0x, use it directly
+              dealIdBytes32 = id.startsWith('0x') ? id : ethers.id(id);
+            } else {
+              // Convert BigNumber or other types to hex string
+              dealIdBytes32 = ethers.hexlify(id);
+            }
+            
+            const deal = await this.getDeal(dealIdBytes32);
+            if (deal) {
+              deals.push(deal);
+            }
+          } catch (dealError) {
+            // Only log non-decode errors (decode errors are expected for non-existent deals)
+            if (!dealError.message.includes('could not decode')) {
+              console.warn(`⚠️ Error fetching deal:`, dealError.message.substring(0, 100));
+            }
+            // Continue with other deals
+          }
+        }
+        return deals;
+      } catch (error) {
+        console.error(`Error fetching client deals for ${clientAddress}:`, error.message);
+        return [];
       }
-      return deals;
     },
 
     /**
