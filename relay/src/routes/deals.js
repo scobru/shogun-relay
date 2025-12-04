@@ -934,14 +934,11 @@ router.get('/:dealId/verify', async (req, res) => {
   try {
     const { dealId } = req.params;
     const gun = req.app.get('gunInstance');
-    const ipfs = req.app.get('ipfs');
+    const IPFS_API_URL = req.app.get('IPFS_API_URL') || process.env.IPFS_API_URL || 'http://127.0.0.1:5001';
+    const IPFS_API_TOKEN = req.app.get('IPFS_API_TOKEN') || process.env.IPFS_API_TOKEN;
     
     if (!gun) {
       return res.status(503).json({ success: false, error: 'Gun not available' });
-    }
-    
-    if (!ipfs) {
-      return res.status(503).json({ success: false, error: 'IPFS client not available' });
     }
     
     // Get deal
@@ -964,44 +961,133 @@ router.get('/:dealId/verify', async (req, res) => {
     
     const cid = deal.cid;
     
-    // Verify CID exists in IPFS
-    let ipfsStat;
+    // Helper function to make IPFS API HTTP requests
+    const makeIpfsRequest = (path, method = 'POST') => {
+      return new Promise((resolve, reject) => {
+        const url = new URL(IPFS_API_URL);
+        const options = {
+          hostname: url.hostname,
+          port: url.port || 5001,
+          path: `/api/v0${path}`,
+          method,
+          headers: { 'Content-Length': '0' },
+        };
+        
+        if (IPFS_API_TOKEN) {
+          options.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
+        }
+        
+        const req = http.request(options, (res) => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            if (res.statusCode === 200) {
+              try {
+                resolve(JSON.parse(data));
+              } catch (e) {
+                resolve({ raw: data });
+              }
+            } else {
+              reject(new Error(`IPFS API returned ${res.statusCode}: ${data.substring(0, 200)}`));
+            }
+          });
+        });
+        
+        req.on('error', reject);
+        req.setTimeout(15000, () => {
+          req.destroy();
+          reject(new Error('IPFS request timeout'));
+        });
+        req.end();
+      });
+    };
+    
+    // 1. Verify CID exists in IPFS (try block/stat first)
+    let ipfsStat = null;
     let ipfsExists = false;
+    let blockSize = null;
+    
     try {
-      ipfsStat = await ipfs.block.stat(cid);
+      const blockStat = await makeIpfsRequest(`/block/stat?arg=${encodeURIComponent(cid)}`);
+      ipfsStat = blockStat;
+      blockSize = blockStat.Size || blockStat.size;
       ipfsExists = true;
     } catch (error) {
-      console.log(`❌ CID ${cid} not found in IPFS:`, error.message);
-      ipfsExists = false;
+      console.log(`⚠️ CID ${cid} block.stat failed: ${error.message}, trying object.stat`);
+      
+      // Try object/stat as fallback
+      try {
+        const objectStat = await makeIpfsRequest(`/object/stat?arg=${encodeURIComponent(cid)}`);
+        ipfsStat = objectStat;
+        blockSize = objectStat.CumulativeSize || objectStat.BlockSize;
+        ipfsExists = true;
+      } catch (objError) {
+        console.log(`❌ CID ${cid} not found in IPFS: ${objError.message}`);
+        ipfsExists = false;
+      }
     }
     
-    // Check if pinned
+    // 2. Check if pinned
     let isPinned = false;
     try {
-      const pins = await ipfs.pin.ls();
-      for await (const pin of pins) {
-        if (pin.cid.toString() === cid) {
-          isPinned = true;
-          break;
-        }
+      const pinResult = await makeIpfsRequest(`/pin/ls?arg=${encodeURIComponent(cid)}&type=all`);
+      // If pin/ls returns successfully, the CID is pinned
+      if (pinResult && (pinResult.Keys || pinResult.Type === 'recursive' || pinResult.Type === 'direct')) {
+        isPinned = true;
       }
     } catch (error) {
-      console.warn('Error checking pin status:', error.message);
+      // If pin/ls fails, it means the CID is not pinned
+      isPinned = false;
+      console.log(`ℹ️ CID ${cid} is not pinned: ${error.message}`);
     }
     
-    // Try to fetch a small sample of data
+    // 3. Try to fetch a small sample of data (first 256 bytes)
     let canRead = false;
     let readError = null;
+    let contentSample = null;
+    
     try {
-      const chunks = [];
-      for await (const chunk of ipfs.cat(cid, { length: 1024 })) {
-        chunks.push(chunk);
-        break; // Just check first chunk
+      const url = new URL(IPFS_API_URL);
+      const catOptions = {
+        hostname: url.hostname,
+        port: url.port || 5001,
+        path: `/api/v0/cat?arg=${encodeURIComponent(cid)}&length=256`,
+        method: 'POST',
+        headers: { 'Content-Length': '0' },
+      };
+      
+      if (IPFS_API_TOKEN) {
+        catOptions.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
       }
-      canRead = chunks.length > 0;
+      
+      const catData = await new Promise((resolve, reject) => {
+        const req = http.request(catOptions, (res) => {
+          const chunks = [];
+          res.on('data', chunk => chunks.push(chunk));
+          res.on('end', () => {
+            if (res.statusCode === 200) {
+              resolve(Buffer.concat(chunks));
+            } else {
+              reject(new Error(`cat returned ${res.statusCode}`));
+            }
+          });
+        });
+        req.on('error', reject);
+        req.setTimeout(10000, () => {
+          req.destroy();
+          reject(new Error('cat timeout'));
+        });
+        req.end();
+      });
+      
+      if (catData && catData.length > 0) {
+        canRead = true;
+        contentSample = catData.toString('base64').substring(0, 100); // First 100 chars as base64
+      }
     } catch (error) {
       readError = error.message;
       canRead = false;
+      console.log(`⚠️ Could not read content sample for CID ${cid}: ${error.message}`);
     }
     
     const verification = {
@@ -1013,7 +1099,7 @@ router.get('/:dealId/verify', async (req, res) => {
         existsInIPFS: ipfsExists,
         isPinned: isPinned,
         canRead: canRead,
-        blockSize: ipfsExists ? ipfsStat.size : null,
+        blockSize: blockSize,
       },
       issues: [],
     };
@@ -1050,6 +1136,9 @@ router.get('/:dealId/verify-proof', async (req, res) => {
     const challenge = req.query.challenge || crypto.randomBytes(16).toString('hex');
     
     const gun = req.app.get('gunInstance');
+    const IPFS_API_URL = req.app.get('IPFS_API_URL') || process.env.IPFS_API_URL || 'http://127.0.0.1:5001';
+    const IPFS_API_TOKEN = req.app.get('IPFS_API_TOKEN') || process.env.IPFS_API_TOKEN;
+    
     if (!gun) {
       return res.status(503).json({ success: false, error: 'Gun not available' });
     }
@@ -1064,68 +1153,129 @@ router.get('/:dealId/verify-proof', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Deal not found' });
     }
     
-    // Redirect to network proof endpoint
-    const proofUrl = `/api/v1/network/proof/${deal.cid}?challenge=${challenge}`;
-    
-    // Forward request internally
-    const http = req.app.get('httpServer');
-    if (!http) {
-      return res.status(503).json({ success: false, error: 'HTTP server not available' });
-    }
-    
-    // Use the existing proof endpoint logic
-    const ipfs = req.app.get('ipfs');
-    if (!ipfs) {
-      return res.status(503).json({ success: false, error: 'IPFS client not available' });
-    }
-    
     const cid = deal.cid;
     
-    // Verify CID exists
+    // Helper function to make IPFS API HTTP requests
+    const makeIpfsRequest = (path, method = 'POST') => {
+      return new Promise((resolve, reject) => {
+        const url = new URL(IPFS_API_URL);
+        const options = {
+          hostname: url.hostname,
+          port: url.port || 5001,
+          path: `/api/v0${path}`,
+          method,
+          headers: { 'Content-Length': '0' },
+        };
+        
+        if (IPFS_API_TOKEN) {
+          options.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
+        }
+        
+        const req = http.request(options, (res) => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            if (res.statusCode === 200) {
+              try {
+                resolve(JSON.parse(data));
+              } catch (e) {
+                resolve({ raw: data });
+              }
+            } else {
+              reject(new Error(`IPFS API returned ${res.statusCode}`));
+            }
+          });
+        });
+        
+        req.on('error', reject);
+        req.setTimeout(15000, () => {
+          req.destroy();
+          reject(new Error('IPFS request timeout'));
+        });
+        req.end();
+      });
+    };
+    
+    // 1. Verify CID exists via IPFS block/stat
     let blockStat;
     try {
-      blockStat = await ipfs.block.stat(cid);
+      blockStat = await makeIpfsRequest(`/block/stat?arg=${encodeURIComponent(cid)}`);
+      if (blockStat.Message || blockStat.Type === 'error') {
+        return res.status(404).json({
+          success: false,
+          error: 'CID not found on this relay for proof generation',
+          cid,
+          dealId,
+        });
+      }
     } catch (error) {
       return res.status(404).json({
         success: false,
         error: 'CID not found on this relay',
         cid,
         dealId,
+        details: error.message,
       });
     }
     
-    // Get content sample
+    // 2. Get content sample (first 256 bytes)
     let contentSample = null;
     try {
-      const chunks = [];
-      for await (const chunk of ipfs.cat(cid, { length: 256 })) {
-        chunks.push(chunk);
-        break;
+      const url = new URL(IPFS_API_URL);
+      const catOptions = {
+        hostname: url.hostname,
+        port: url.port || 5001,
+        path: `/api/v0/cat?arg=${encodeURIComponent(cid)}&length=256`,
+        method: 'POST',
+        headers: { 'Content-Length': '0' },
+      };
+      
+      if (IPFS_API_TOKEN) {
+        catOptions.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
       }
-      if (chunks.length > 0) {
-        contentSample = Buffer.concat(chunks).toString('base64');
+      
+      const catData = await new Promise((resolve, reject) => {
+        const req = http.request(catOptions, (res) => {
+          const chunks = [];
+          res.on('data', chunk => chunks.push(chunk));
+          res.on('end', () => {
+            if (res.statusCode === 200) {
+              resolve(Buffer.concat(chunks));
+            } else {
+              reject(new Error(`cat returned ${res.statusCode}`));
+            }
+          });
+        });
+        req.on('error', reject);
+        req.setTimeout(10000, () => {
+          req.destroy();
+          reject(new Error('cat timeout'));
+        });
+        req.end();
+      });
+      
+      if (catData && catData.length > 0) {
+        contentSample = catData.toString('base64');
       }
     } catch (error) {
-      console.warn('Could not read content sample:', error.message);
+      console.warn(`Could not get content sample for CID ${cid}:`, error.message);
+      contentSample = '';
     }
     
-    // Check if pinned
+    // 3. Check if pinned
     let isPinned = false;
     try {
-      const pins = await ipfs.pin.ls();
-      for await (const pin of pins) {
-        if (pin.cid.toString() === cid) {
-          isPinned = true;
-          break;
-        }
-      }
+      const pinLs = await makeIpfsRequest(`/pin/ls?arg=${encodeURIComponent(cid)}&type=all`);
+      isPinned = pinLs.Keys && Object.keys(pinLs.Keys).length > 0;
     } catch (error) {
-      console.warn('Error checking pin status:', error.message);
+      // Not pinned or error
+      isPinned = false;
     }
     
-    // Generate proof hash
+    // 4. Generate proof hash
     const timestamp = Date.now();
-    const proofData = `${cid}:${challenge}:${timestamp}:${blockStat.size}`;
+    const blockSize = blockStat.Size || blockStat.size;
+    const proofData = `${cid}:${challenge}:${timestamp}:${blockSize}:${contentSample}`;
     const proofHash = crypto.createHash('sha256').update(proofData).digest('hex');
     
     const relayPub = req.app.get('relayUserPub');
@@ -1140,12 +1290,12 @@ router.get('/:dealId/verify-proof', async (req, res) => {
         proofHash,
         relayPub: relayPub || null,
         block: {
-          size: blockStat.size,
+          size: blockSize,
         },
         contentSampleBase64: contentSample,
         isPinned,
         verification: {
-          method: 'sha256(cid:challenge:timestamp:size)',
+          method: 'sha256(cid:challenge:timestamp:size:contentSampleBase64)',
           validFor: 300000, // 5 minutes
           expiresAt: timestamp + 300000,
         },

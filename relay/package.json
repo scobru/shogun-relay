@@ -5,7 +5,11 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "start": "nodemon src/index.js"
+    "start": "nodemon src/index.js",
+    "test:routes": "node scripts/test-all-routes.js",
+    "test:routes:local": "node scripts/test-all-routes.js http://localhost:8765",
+    "test:ipfs": "node scripts/test-ipfs-routes.js",
+    "test:ipfs:local": "node scripts/test-ipfs-routes.js http://localhost:8765 shogun2025 0xA6591dCDff5C7616110b4f84207184aef7835048"
   },
   "keywords": [
     "gun",
