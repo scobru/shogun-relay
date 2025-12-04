@@ -862,10 +862,32 @@
       }, 10000);
     }
 
+    // Network configuration for x402
+    const NETWORK_CONFIG = {
+      'base-sepolia': {
+        chainId: 84532,
+        name: 'Base Sepolia',
+        usdc: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+        rpc: 'https://sepolia.base.org',
+      },
+      'base': {
+        chainId: 8453,
+        name: 'Base',
+        usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+        rpc: 'https://mainnet.base.org',
+      }
+    };
+
+    // Current pending deal for payment
+    let pendingDealPayment = null;
+
     // Show payment modal
     function showPaymentModal(data) {
       const { deal, paymentRequired } = data;
       const price = deal.pricing.totalPriceUSDC;
+      
+      // Store for payment processing
+      pendingDealPayment = { deal, paymentRequired };
       
       // Create modal if it doesn't exist
       let modal = document.getElementById('paymentModal');
@@ -887,7 +909,7 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <h2 style="font-size: 1.5rem; font-weight: bold; color: #FFFFFF; margin-bottom: 0.5rem;">Deal Created!</h2>
-            <p style="color: #A0A0A0;">Complete payment to activate your storage deal</p>
+            <p style="color: #A0A0A0;">Sign the payment to activate your storage deal</p>
           </div>
           
           <div style="background: #1A1A1A; border-radius: 0.75rem; padding: 1rem; margin-bottom: 1.5rem;">
@@ -914,30 +936,22 @@
           </div>
           
           <div style="background: rgba(66, 165, 245, 0.1); border: 1px solid rgba(66, 165, 245, 0.3); border-radius: 0.75rem; padding: 1rem; margin-bottom: 1.5rem;">
-            <p style="color: #42A5F5; font-size: 0.9rem; margin-bottom: 0.5rem;">
-              <strong>Payment Address (${paymentRequired.network}):</strong>
+            <p style="color: #42A5F5; font-size: 0.9rem; text-align: center;">
+              Click "Pay with Wallet" to sign a USDC transfer authorization.
+              <br><small style="color: #A0A0A0;">Network: ${paymentRequired.network}</small>
             </p>
-            <p style="color: #FFFFFF; font-family: monospace; font-size: 0.8rem; word-break: break-all;">
-              ${paymentRequired.payTo}
-            </p>
-            <button onclick="navigator.clipboard.writeText('${paymentRequired.payTo}')" 
-                    style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: #42A5F5; color: white; border: none; border-radius: 0.5rem; cursor: pointer; font-size: 0.85rem;">
-              Copy Address
-            </button>
           </div>
           
-          <p style="color: #A0A0A0; font-size: 0.85rem; text-align: center; margin-bottom: 1rem;">
-            Send exactly <strong style="color: #42A5F5;">$${price.toFixed(6)} USDC</strong> to the address above on <strong>${paymentRequired.network}</strong> to activate your deal.
-          </p>
+          <div id="paymentStatus" style="display: none; margin-bottom: 1rem;"></div>
           
           <div style="display: flex; gap: 1rem;">
             <button onclick="closePaymentModal()" 
                     style="flex: 1; padding: 1rem; background: #404040; color: white; border: none; border-radius: 0.75rem; cursor: pointer; font-weight: 500;">
-              Close
+              Cancel
             </button>
-            <button onclick="checkDealStatus('${deal.id}')" 
+            <button id="payDealBtn" onclick="payForDeal()" 
                     style="flex: 1; padding: 1rem; background: #4CAF50; color: white; border: none; border-radius: 0.75rem; cursor: pointer; font-weight: 500;">
-              Check Status
+              Pay with Wallet
             </button>
           </div>
         </div>
@@ -946,11 +960,152 @@
       modal.style.display = 'flex';
     }
 
+    // Pay for deal using x402 EIP-3009
+    async function payForDeal() {
+      if (!pendingDealPayment || !connectedAddress || !signer) {
+        showMessage('createMessage', 'error', 'Wallet not connected');
+        return;
+      }
+
+      const { deal, paymentRequired } = pendingDealPayment;
+      const statusEl = document.getElementById('paymentStatus');
+      const payBtn = document.getElementById('payDealBtn');
+      
+      try {
+        payBtn.disabled = true;
+        payBtn.innerHTML = '<div class="loading-spinner" style="width:1rem;height:1rem;display:inline-block;margin-right:0.5rem;"></div> Processing...';
+        
+        statusEl.style.display = 'block';
+        statusEl.innerHTML = '<p style="color: #42A5F5; text-align: center;">Checking network...</p>';
+
+        const networkConfig = NETWORK_CONFIG[paymentRequired.network];
+        if (!networkConfig) {
+          throw new Error(`Unsupported network: ${paymentRequired.network}`);
+        }
+
+        // Check and switch network if needed
+        const network = await provider.getNetwork();
+        if (Number(network.chainId) !== networkConfig.chainId) {
+          statusEl.innerHTML = `<p style="color: #FF9800; text-align: center;">Please switch to ${networkConfig.name}...</p>`;
+          try {
+            await window.ethereum.request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: '0x' + networkConfig.chainId.toString(16) }],
+            });
+          } catch (switchError) {
+            throw new Error(`Please switch to ${networkConfig.name} network manually`);
+          }
+        }
+
+        statusEl.innerHTML = '<p style="color: #42A5F5; text-align: center;">Preparing payment authorization...</p>';
+
+        // USDC contract for EIP-3009 transferWithAuthorization
+        const usdcAddress = networkConfig.usdc;
+        const amount = BigInt(paymentRequired.maxAmountRequired);
+        const validAfter = BigInt(0);
+        const validBefore = BigInt(Math.floor(Date.now() / 1000) + 3600); // 1 hour
+        const nonce = ethers.hexlify(ethers.randomBytes(32));
+
+        // EIP-712 domain for USDC
+        const domain = {
+          name: 'USD Coin',
+          version: '2',
+          chainId: networkConfig.chainId,
+          verifyingContract: usdcAddress,
+        };
+
+        // EIP-3009 TransferWithAuthorization types
+        const types = {
+          TransferWithAuthorization: [
+            { name: 'from', type: 'address' },
+            { name: 'to', type: 'address' },
+            { name: 'value', type: 'uint256' },
+            { name: 'validAfter', type: 'uint256' },
+            { name: 'validBefore', type: 'uint256' },
+            { name: 'nonce', type: 'bytes32' },
+          ],
+        };
+
+        const message = {
+          from: connectedAddress,
+          to: paymentRequired.payTo,
+          value: amount,
+          validAfter: validAfter,
+          validBefore: validBefore,
+          nonce: nonce,
+        };
+
+        statusEl.innerHTML = '<p style="color: #FF9800; text-align: center;">Please sign the payment in your wallet...</p>';
+
+        // Sign the EIP-712 message
+        const signature = await signer.signTypedData(domain, types, message);
+
+        statusEl.innerHTML = '<p style="color: #42A5F5; text-align: center;">Submitting payment...</p>';
+
+        // Create x402 payment payload
+        const paymentPayload = {
+          x402Version: 1,
+          scheme: 'exact',
+          network: paymentRequired.network,
+          payload: {
+            authorization: {
+              from: connectedAddress,
+              to: paymentRequired.payTo,
+              value: amount.toString(),
+              validAfter: validAfter.toString(),
+              validBefore: validBefore.toString(),
+              nonce: nonce,
+            },
+            signature: signature,
+          },
+        };
+
+        // Submit payment to activate deal
+        const response = await fetch(`/api/v1/deals/${deal.id}/activate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ payment: paymentPayload }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          statusEl.innerHTML = `
+            <div style="text-align: center; padding: 1rem; background: rgba(76, 175, 80, 0.2); border-radius: 0.5rem;">
+              <p style="color: #4CAF50; font-weight: bold;">Payment Successful!</p>
+              <p style="color: #A0A0A0; font-size: 0.85rem; margin-top: 0.5rem;">Deal activated until ${new Date(result.deal.expiresAt).toLocaleDateString()}</p>
+            </div>
+          `;
+          payBtn.style.display = 'none';
+          
+          // Refresh deals list
+          setTimeout(() => {
+            closePaymentModal();
+            loadMyDeals();
+            showMessage('createMessage', 'success', 'Deal activated successfully!');
+          }, 2000);
+        } else {
+          throw new Error(result.error || 'Payment failed');
+        }
+
+      } catch (error) {
+        console.error('Payment error:', error);
+        statusEl.innerHTML = `
+          <div style="text-align: center; padding: 1rem; background: rgba(244, 67, 54, 0.2); border-radius: 0.5rem;">
+            <p style="color: #F44336;">${error.message}</p>
+          </div>
+        `;
+        payBtn.disabled = false;
+        payBtn.textContent = 'Retry Payment';
+      }
+    }
+
     function closePaymentModal() {
       const modal = document.getElementById('paymentModal');
       if (modal) {
         modal.style.display = 'none';
       }
+      pendingDealPayment = null;
     }
 
     async function checkDealStatus(dealId) {
@@ -964,13 +1119,41 @@
             closePaymentModal();
             loadMyDeals();
           } else {
-            showMessage('createMessage', 'info', `Deal status: ${data.deal.status}. Payment not yet confirmed.`);
+            showMessage('createMessage', 'info', `Deal status: ${data.deal.status}. Complete payment to activate.`);
           }
         } else {
           showMessage('createMessage', 'error', 'Could not check deal status');
         }
       } catch (error) {
         showMessage('createMessage', 'error', 'Error checking status: ' + error.message);
+      }
+    }
+
+    // Check USDC balance
+    async function checkUsdcBalance() {
+      if (!provider || !connectedAddress) return null;
+      
+      try {
+        const network = await provider.getNetwork();
+        let usdcAddress;
+        
+        if (Number(network.chainId) === 84532) {
+          usdcAddress = '0x036CbD53842c5426634e7929541eC2318f3dCF7e';
+        } else if (Number(network.chainId) === 8453) {
+          usdcAddress = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+        } else {
+          return null;
+        }
+        
+        const usdc = new ethers.Contract(usdcAddress, [
+          'function balanceOf(address) view returns (uint256)'
+        ], provider);
+        
+        const balance = await usdc.balanceOf(connectedAddress);
+        return parseFloat(ethers.formatUnits(balance, 6));
+      } catch (e) {
+        console.error('Error checking USDC balance:', e);
+        return null;
       }
     }
 
