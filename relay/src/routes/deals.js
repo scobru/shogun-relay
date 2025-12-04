@@ -21,7 +21,7 @@ import * as ErasureCoding from '../utils/erasure-coding.js';
 import * as FrozenData from '../utils/frozen-data.js';
 import { getRelayUser, getRelayPub } from '../utils/relay-user.js';
 import { X402Merchant } from '../utils/x402-merchant.js';
-import { createRegistryClientWithSigner } from '../utils/registry-client.js';
+import { createRegistryClient, createRegistryClientWithSigner } from '../utils/registry-client.js';
 
 const router = express.Router();
 const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN;
@@ -452,15 +452,65 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
     const activatedDeal = StorageDeals.activateDeal(deal, txHash);
     console.log(`Deal activated object created, status: ${activatedDeal.status}`);
     
-    // Save updated deal
+    // Register deal on-chain (optional - only if relay is configured for on-chain registry)
+    let onChainRegistered = false;
+    let onChainWarning = null;
+    const RELAY_PRIVATE_KEY = process.env.RELAY_PRIVATE_KEY;
+    const REGISTRY_CHAIN_ID = process.env.REGISTRY_CHAIN_ID;
+    
+    if (RELAY_PRIVATE_KEY && REGISTRY_CHAIN_ID) {
+      try {
+        console.log(`📝 Registering deal ${dealId} on-chain...`);
+        const registryClient = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+        
+        // Convert price from USDC (6 decimals) to atomic units for on-chain registration
+        const priceUSDCAtomic = Math.ceil(activatedDeal.pricing.totalPriceUSDC * 1000000);
+        const priceUSDCString = (priceUSDCAtomic / 1000000).toString();
+        
+        const onChainResult = await registryClient.registerDeal(
+          activatedDeal.id,
+          activatedDeal.clientAddress,
+          activatedDeal.cid,
+          activatedDeal.sizeMB,
+          priceUSDCString,
+          activatedDeal.durationDays
+        );
+        
+        onChainRegistered = true;
+        
+        // Save on-chain deal ID to the deal object for future matching
+        activatedDeal.onChainDealId = onChainResult.dealIdBytes32;
+        activatedDeal.onChainTx = onChainResult.txHash;
+        
+        console.log(`✅ Deal registered on-chain. TX: ${onChainResult.txHash}, Deal ID: ${onChainResult.dealIdBytes32}`);
+        
+        // Re-save deal with on-chain info
+        try {
+          await StorageDeals.saveDeal(gun, activatedDeal, relayUser._.sea);
+          console.log(`✅ Deal updated with on-chain info`);
+        } catch (updateError) {
+          console.warn(`⚠️ Failed to update deal with on-chain info: ${updateError.message}`);
+        }
+      } catch (onChainError) {
+        console.warn(`⚠️ Failed to register deal on-chain: ${onChainError.message}`);
+        onChainWarning = 'Deal activated but on-chain registration failed. Deal is still functional.';
+        // Don't fail the activation if on-chain registration fails
+      }
+    } else {
+      console.log(`ℹ️ Skipping on-chain registration (RELAY_PRIVATE_KEY or REGISTRY_CHAIN_ID not configured)`);
+    }
+    
+    // Save updated deal to GunDB (if not already saved with on-chain info)
     let saveWarning = null;
-    try {
-      await StorageDeals.saveDeal(gun, activatedDeal, relayUser._.sea);
-      console.log(`✅ Deal saved to GunDB successfully`);
-    } catch (saveError) {
-      console.error(`⚠️ Error saving activated deal to GunDB:`, saveError.message);
-      saveWarning = 'Payment processed successfully, but there was a temporary issue saving the deal. It will be retried automatically.';
-      // Still continue - payment was successful
+    if (!onChainRegistered) {
+      try {
+        await StorageDeals.saveDeal(gun, activatedDeal, relayUser._.sea);
+        console.log(`✅ Deal saved to GunDB successfully`);
+      } catch (saveError) {
+        console.error(`⚠️ Error saving activated deal to GunDB:`, saveError.message);
+        saveWarning = 'Payment processed successfully, but there was a temporary issue saving the deal. It will be retried automatically.';
+        // Still continue - payment was successful
+      }
     }
     
     // Remove from pending cache since it's now activated
@@ -471,6 +521,11 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
     
     console.log(`✅ Deal ${dealId} activated. CID: ${deal.cid}, TX: ${txHash}`);
     
+    // Collect warnings
+    const warnings = [];
+    if (saveWarning) warnings.push(saveWarning);
+    if (onChainWarning) warnings.push(onChainWarning);
+    
     res.json({
       success: true,
       deal: {
@@ -480,9 +535,10 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
         activatedAt: activatedDeal.activatedAt,
         expiresAt: activatedDeal.expiresAt,
         paymentTx: activatedDeal.paymentTx,
+        onChainRegistered: onChainRegistered,
       },
-      message: saveWarning || 'Deal activated successfully',
-      warning: saveWarning || undefined,
+      message: warnings.length > 0 ? warnings.join(' ') : 'Deal activated successfully',
+      warning: warnings.length > 0 ? warnings.join(' ') : undefined,
     });
   } catch (error) {
     console.error('Deal activation error:', error);
@@ -521,6 +577,7 @@ router.get('/by-cid/:cid', async (req, res) => {
  * GET /api/v1/deals/by-client/:address
  * 
  * Get all deals for a client address.
+ * Uses on-chain registry as source of truth, enriches with GunDB details.
  * NOTE: Must be defined before /:dealId to avoid route conflict
  */
 router.get('/by-client/:address', async (req, res) => {
@@ -532,11 +589,125 @@ router.get('/by-client/:address', async (req, res) => {
     
     const { address } = req.params;
     const normalizedAddress = address.toLowerCase();
+    const chainId = parseInt(req.query.chainId) || parseInt(process.env.REGISTRY_CHAIN_ID) || 84532;
     
-    // Get deals from GunDB
+    const dealMap = new Map(); // Use map to deduplicate by deal ID
+    
+    // Import ethers for deal ID matching (needed for hashing)
+    const { ethers } = await import('ethers');
+    
+    // STEP 1: Fetch from on-chain registry (source of truth)
+    let onChainDeals = [];
+    try {
+      const registryClient = createRegistryClient(chainId);
+      onChainDeals = await registryClient.getClientDeals(address);
+      
+      console.log(`📋 Found ${onChainDeals.length} deals on-chain for client ${address}`);
+    } catch (onChainError) {
+      console.warn(`⚠️ Failed to fetch on-chain deals: ${onChainError.message}`);
+      // Continue with GunDB fallback
+    }
+    
+    // STEP 2: For each on-chain deal, get full details from GunDB
+    
+    for (const onChainDeal of onChainDeals) {
+      // Try multiple strategies to find the deal in GunDB:
+      // 1. Match by on-chain deal ID (if saved in GunDB)
+      // 2. Match by CID + client address
+      // 3. Try to match by hashing known deal IDs
+      
+      let gunDeal = null;
+      
+      // Strategy 1: Search all GunDB deals for this client and match by onChainDealId
+      const gunDealsByClient = await StorageDeals.getDealsByClient(gun, address);
+      gunDeal = gunDealsByClient.find(d => 
+        d.onChainDealId === onChainDeal.dealId
+      );
+      
+      // Strategy 2: If not found, try matching by CID + client address
+      if (!gunDeal) {
+        gunDeal = gunDealsByClient.find(d => 
+          d.clientAddress?.toLowerCase() === normalizedAddress &&
+          d.cid === onChainDeal.cid
+        );
+      }
+      
+      // Strategy 3: Try matching by hashing deal ID (on-chain stores hash of original ID)
+      if (!gunDeal) {
+        for (const deal of gunDealsByClient) {
+          const dealIdHash = ethers.id(deal.id); // keccak256 hash
+          if (dealIdHash === onChainDeal.dealId) {
+            gunDeal = deal;
+            break;
+          }
+        }
+      }
+      
+      // Strategy 4: Check cache
+      if (!gunDeal) {
+        for (const [dealId, entry] of pendingDealsCache) {
+          const cachedDeal = entry.deal;
+          
+          // Match by onChainDealId
+          if (cachedDeal.onChainDealId === onChainDeal.dealId) {
+            gunDeal = cachedDeal;
+            break;
+          }
+          
+          // Match by hash
+          const dealIdHash = ethers.id(dealId);
+          if (dealIdHash === onChainDeal.dealId) {
+            gunDeal = cachedDeal;
+            break;
+          }
+          
+          // Match by CID + client
+          if (cachedDeal.cid === onChainDeal.cid && 
+              cachedDeal.clientAddress?.toLowerCase() === normalizedAddress) {
+            gunDeal = cachedDeal;
+            break;
+          }
+        }
+      }
+      
+      // If found in GunDB, use it (has full details)
+      if (gunDeal) {
+        // Enrich with on-chain data
+        gunDeal.onChainRegistered = true;
+        gunDeal.onChainDealId = onChainDeal.dealId;
+        gunDeal.onChainRelay = onChainDeal.relay;
+        dealMap.set(gunDeal.id, gunDeal);
+      } else {
+        // Create stub from on-chain data (deal exists on-chain but not in GunDB yet)
+        // This can happen if GunDB sync is slow or if deal was created elsewhere
+        const stubDeal = {
+          id: `onchain_${onChainDeal.dealId.substring(0, 16)}`, // Use partial hash as ID
+          cid: onChainDeal.cid,
+          clientAddress: onChainDeal.client,
+          providerPub: null, // Not available from on-chain
+          sizeMB: onChainDeal.sizeMB,
+          durationDays: Math.ceil((new Date(onChainDeal.expiresAt) - new Date(onChainDeal.createdAt)) / (1000 * 60 * 60 * 24)),
+          tier: 'unknown', // Not stored on-chain
+          pricing: {
+            totalPriceUSDC: parseFloat(onChainDeal.priceUSDC),
+          },
+          status: onChainDeal.active ? StorageDeals.DEAL_STATUS.ACTIVE : StorageDeals.DEAL_STATUS.TERMINATED,
+          createdAt: new Date(onChainDeal.createdAt).getTime(),
+          expiresAt: new Date(onChainDeal.expiresAt).getTime(),
+          activatedAt: new Date(onChainDeal.createdAt).getTime(),
+          onChainRegistered: true,
+          onChainDealId: onChainDeal.dealId,
+          onChainRelay: onChainDeal.relay,
+          fromOnChainOnly: true, // Flag to indicate this is a stub
+        };
+        dealMap.set(stubDeal.id, stubDeal);
+        
+        console.log(`⚠️ Deal ${onChainDeal.dealId.substring(0, 16)}... found on-chain but not in GunDB - using stub`);
+      }
+    }
+    
+    // STEP 3: Also check GunDB and cache for deals not yet on-chain
     const gunDeals = await StorageDeals.getDealsByClient(gun, address);
-    
-    // Also check cache for deals matching this client
     const cachedDeals = [];
     for (const [dealId, entry] of pendingDealsCache) {
       const deal = entry.deal;
@@ -545,31 +716,38 @@ router.get('/by-client/:address', async (req, res) => {
       }
     }
     
-    // Merge and deduplicate (cache takes precedence for same deal ID)
-    const dealMap = new Map();
-    
-    // Add GunDB deals first
+    // Add GunDB deals (may include deals not yet registered on-chain)
     for (const deal of gunDeals) {
-      dealMap.set(deal.id, deal);
+      if (!dealMap.has(deal.id)) {
+        deal.onChainRegistered = false;
+        dealMap.set(deal.id, deal);
+      }
     }
     
-    // Override with cached deals (they're more recent)
+    // Add cached deals (override if exists, they're more recent)
     for (const deal of cachedDeals) {
+      deal.onChainRegistered = deal.onChainRegistered || false;
       dealMap.set(deal.id, deal);
     }
     
     const deals = Array.from(dealMap.values());
     const stats = StorageDeals.getDealStats(deals);
     
-    console.log(`Found ${deals.length} deals for client ${address} (${gunDeals.length} from GunDB, ${cachedDeals.length} from cache)`);
+    console.log(`✅ Found ${deals.length} total deals for client ${address} (${onChainDeals.length} on-chain, ${gunDeals.length} from GunDB, ${cachedDeals.length} from cache)`);
     
     res.json({
       success: true,
       clientAddress: address,
       stats,
       deals,
+      sources: {
+        onChain: onChainDeals.length,
+        gunDB: gunDeals.length,
+        cache: cachedDeals.length,
+      },
     });
   } catch (error) {
+    console.error('Error fetching deals by client:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
