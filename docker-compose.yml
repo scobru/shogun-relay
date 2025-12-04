@@ -34,9 +34,9 @@ services:
       - IPFS_API_TOKEN=shogun2025
       - IPFS_API_KEY=shogun2025
       - DISABLE_RADISK=false
-      # Relay GunDB User (owns subscription data)
-      - RELAY_GUN_USERNAME=shogun-relay
-      - RELAY_GUN_PASSWORD=shogun2025
+      # Relay GunDB User (owns subscription data) - REQUIRED: RELAY_SEA_KEYPAIR or RELAY_SEA_KEYPAIR_PATH
+      # Example: RELAY_SEA_KEYPAIR='{"pub":"...","priv":"...","epub":"...","epriv":"..."}'
+      # Or: RELAY_SEA_KEYPAIR_PATH=/app/keys/relay-keypair.json
       # x402 Payment Configuration
       - X402_PAY_TO_ADDRESS=0xYourWalletAddressHere
       - X402_NETWORK=base-sepolia

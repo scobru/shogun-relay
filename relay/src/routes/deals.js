@@ -13,6 +13,7 @@
 
 import express from 'express';
 import http from 'http';
+import crypto from 'crypto';
 import multer from 'multer';
 import FormData from 'form-data';
 import * as StorageDeals from '../utils/storage-deals.js';
@@ -20,6 +21,7 @@ import * as ErasureCoding from '../utils/erasure-coding.js';
 import * as FrozenData from '../utils/frozen-data.js';
 import { getRelayUser, getRelayPub } from '../utils/relay-user.js';
 import { X402Merchant } from '../utils/x402-merchant.js';
+import { createRegistryClientWithSigner } from '../utils/registry-client.js';
 
 const router = express.Router();
 const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN;
@@ -745,6 +747,310 @@ router.post('/:dealId/renew', express.json(), async (req, res) => {
 });
 
 /**
+ * GET /api/v1/deals/:dealId/verify
+ * 
+ * Verify that a deal's file is actually stored on the relay.
+ * Checks storage proof for the CID.
+ */
+router.get('/:dealId/verify', async (req, res) => {
+  try {
+    const { dealId } = req.params;
+    const gun = req.app.get('gunInstance');
+    const ipfs = req.app.get('ipfs');
+    
+    if (!gun) {
+      return res.status(503).json({ success: false, error: 'Gun not available' });
+    }
+    
+    if (!ipfs) {
+      return res.status(503).json({ success: false, error: 'IPFS client not available' });
+    }
+    
+    // Get deal
+    let deal = getCachedDeal(dealId);
+    if (!deal) {
+      deal = await StorageDeals.getDeal(gun, dealId);
+    }
+    
+    if (!deal) {
+      return res.status(404).json({ success: false, error: 'Deal not found' });
+    }
+    
+    // Only verify active deals
+    if (deal.status !== StorageDeals.DEAL_STATUS.ACTIVE) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Deal is ${deal.status}, cannot verify` 
+      });
+    }
+    
+    const cid = deal.cid;
+    
+    // Verify CID exists in IPFS
+    let ipfsStat;
+    let ipfsExists = false;
+    try {
+      ipfsStat = await ipfs.block.stat(cid);
+      ipfsExists = true;
+    } catch (error) {
+      console.log(`❌ CID ${cid} not found in IPFS:`, error.message);
+      ipfsExists = false;
+    }
+    
+    // Check if pinned
+    let isPinned = false;
+    try {
+      const pins = await ipfs.pin.ls();
+      for await (const pin of pins) {
+        if (pin.cid.toString() === cid) {
+          isPinned = true;
+          break;
+        }
+      }
+    } catch (error) {
+      console.warn('Error checking pin status:', error.message);
+    }
+    
+    // Try to fetch a small sample of data
+    let canRead = false;
+    let readError = null;
+    try {
+      const chunks = [];
+      for await (const chunk of ipfs.cat(cid, { length: 1024 })) {
+        chunks.push(chunk);
+        break; // Just check first chunk
+      }
+      canRead = chunks.length > 0;
+    } catch (error) {
+      readError = error.message;
+      canRead = false;
+    }
+    
+    const verification = {
+      dealId,
+      cid,
+      verified: ipfsExists && isPinned && canRead,
+      timestamp: Date.now(),
+      checks: {
+        existsInIPFS: ipfsExists,
+        isPinned: isPinned,
+        canRead: canRead,
+        blockSize: ipfsExists ? ipfsStat.size : null,
+      },
+      issues: [],
+    };
+    
+    if (!ipfsExists) {
+      verification.issues.push('CID not found in IPFS');
+    }
+    if (!isPinned) {
+      verification.issues.push('CID is not pinned');
+    }
+    if (!canRead) {
+      verification.issues.push(`Cannot read content: ${readError || 'unknown error'}`);
+    }
+    
+    res.json({
+      success: true,
+      verification,
+    });
+  } catch (error) {
+    console.error('Deal verification error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/v1/deals/:dealId/verify-proof
+ * 
+ * Challenge the relay to provide a storage proof for a deal.
+ * Similar to network/proof but deal-specific.
+ */
+router.get('/:dealId/verify-proof', async (req, res) => {
+  try {
+    const { dealId } = req.params;
+    const challenge = req.query.challenge || crypto.randomBytes(16).toString('hex');
+    
+    const gun = req.app.get('gunInstance');
+    if (!gun) {
+      return res.status(503).json({ success: false, error: 'Gun not available' });
+    }
+    
+    // Get deal
+    let deal = getCachedDeal(dealId);
+    if (!deal) {
+      deal = await StorageDeals.getDeal(gun, dealId);
+    }
+    
+    if (!deal) {
+      return res.status(404).json({ success: false, error: 'Deal not found' });
+    }
+    
+    // Redirect to network proof endpoint
+    const proofUrl = `/api/v1/network/proof/${deal.cid}?challenge=${challenge}`;
+    
+    // Forward request internally
+    const http = req.app.get('httpServer');
+    if (!http) {
+      return res.status(503).json({ success: false, error: 'HTTP server not available' });
+    }
+    
+    // Use the existing proof endpoint logic
+    const ipfs = req.app.get('ipfs');
+    if (!ipfs) {
+      return res.status(503).json({ success: false, error: 'IPFS client not available' });
+    }
+    
+    const cid = deal.cid;
+    
+    // Verify CID exists
+    let blockStat;
+    try {
+      blockStat = await ipfs.block.stat(cid);
+    } catch (error) {
+      return res.status(404).json({
+        success: false,
+        error: 'CID not found on this relay',
+        cid,
+        dealId,
+      });
+    }
+    
+    // Get content sample
+    let contentSample = null;
+    try {
+      const chunks = [];
+      for await (const chunk of ipfs.cat(cid, { length: 256 })) {
+        chunks.push(chunk);
+        break;
+      }
+      if (chunks.length > 0) {
+        contentSample = Buffer.concat(chunks).toString('base64');
+      }
+    } catch (error) {
+      console.warn('Could not read content sample:', error.message);
+    }
+    
+    // Check if pinned
+    let isPinned = false;
+    try {
+      const pins = await ipfs.pin.ls();
+      for await (const pin of pins) {
+        if (pin.cid.toString() === cid) {
+          isPinned = true;
+          break;
+        }
+      }
+    } catch (error) {
+      console.warn('Error checking pin status:', error.message);
+    }
+    
+    // Generate proof hash
+    const timestamp = Date.now();
+    const proofData = `${cid}:${challenge}:${timestamp}:${blockStat.size}`;
+    const proofHash = crypto.createHash('sha256').update(proofData).digest('hex');
+    
+    const relayPub = req.app.get('relayUserPub');
+    
+    res.json({
+      success: true,
+      proof: {
+        dealId,
+        cid,
+        challenge,
+        timestamp,
+        proofHash,
+        relayPub: relayPub || null,
+        block: {
+          size: blockStat.size,
+        },
+        contentSampleBase64: contentSample,
+        isPinned,
+        verification: {
+          method: 'sha256(cid:challenge:timestamp:size)',
+          validFor: 300000, // 5 minutes
+          expiresAt: timestamp + 300000,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Deal proof verification error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/v1/deals/:dealId/cancel
+ * 
+ * Cancel/terminate your own deal.
+ * Client can only cancel their own deals.
+ */
+router.post('/:dealId/cancel', express.json(), async (req, res) => {
+  try {
+    const gun = req.app.get('gunInstance');
+    const relayUser = getRelayUser();
+    
+    if (!gun || !relayUser) {
+      return res.status(503).json({ success: false, error: 'Relay not initialized' });
+    }
+    
+    const { dealId } = req.params;
+    const { clientAddress, reason = 'User requested cancellation' } = req.body;
+    
+    if (!clientAddress) {
+      return res.status(400).json({ success: false, error: 'clientAddress is required' });
+    }
+    
+    // Get deal (check cache first)
+    let deal = getCachedDeal(dealId);
+    if (!deal) {
+      deal = await StorageDeals.getDeal(gun, dealId);
+    }
+    
+    if (!deal) {
+      return res.status(404).json({ success: false, error: 'Deal not found' });
+    }
+    
+    // Verify ownership
+    if (deal.clientAddress.toLowerCase() !== clientAddress.toLowerCase()) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'You can only cancel your own deals' 
+      });
+    }
+    
+    // Only allow cancellation if deal is pending or active
+    if (deal.status === StorageDeals.DEAL_STATUS.TERMINATED) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Deal is already terminated' 
+      });
+    }
+    
+    const terminatedDeal = StorageDeals.terminateDeal(deal, reason);
+    await StorageDeals.saveDeal(gun, terminatedDeal, relayUser._.sea);
+    
+    // Update cache
+    cacheDeal(terminatedDeal);
+    
+    console.log(`✅ Deal ${dealId} cancelled by client ${clientAddress}`);
+    
+    res.json({
+      success: true,
+      deal: {
+        id: terminatedDeal.id,
+        status: terminatedDeal.status,
+        terminatedAt: terminatedDeal.terminatedAt,
+      },
+      message: 'Deal cancelled successfully',
+    });
+  } catch (error) {
+    console.error('Deal cancellation error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * POST /api/v1/deals/:dealId/terminate
  * 
  * Terminate a deal early.
@@ -769,7 +1075,11 @@ router.post('/:dealId/terminate', express.json(), async (req, res) => {
     const { dealId } = req.params;
     const { reason = 'Admin termination' } = req.body;
     
-    const deal = await StorageDeals.getDeal(gun, dealId);
+    // Check cache first
+    let deal = getCachedDeal(dealId);
+    if (!deal) {
+      deal = await StorageDeals.getDeal(gun, dealId);
+    }
     
     if (!deal) {
       return res.status(404).json({ success: false, error: 'Deal not found' });
@@ -777,6 +1087,9 @@ router.post('/:dealId/terminate', express.json(), async (req, res) => {
     
     const terminatedDeal = StorageDeals.terminateDeal(deal, reason);
     await StorageDeals.saveDeal(gun, terminatedDeal, relayUser._.sea);
+    
+    // Update cache
+    cacheDeal(terminatedDeal);
     
     res.json({
       success: true,

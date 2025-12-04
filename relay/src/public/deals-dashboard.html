@@ -74,6 +74,11 @@
       opacity: 0.7;
     }
 
+    .deal-card.terminated {
+      border-left: 4px solid #9E9E9E;
+      opacity: 0.7;
+    }
+
     .status-badge {
       padding: 0.25rem 0.75rem;
       border-radius: 9999px;
@@ -85,6 +90,7 @@
     .status-active { background-color: rgba(76, 175, 80, 0.2); color: #4CAF50; }
     .status-pending { background-color: rgba(255, 152, 0, 0.2); color: #FF9800; }
     .status-expired { background-color: rgba(244, 67, 54, 0.2); color: #F44336; }
+    .status-terminated { background-color: rgba(158, 158, 158, 0.2); color: #9E9E9E; }
 
     .badge-standard { background-color: #607D8B; color: white; }
     .badge-premium { background-color: #2196F3; color: white; }
@@ -840,6 +846,14 @@
                   <span class="text-[#A0A0A0]">${new Date(deal.expiresAt).toLocaleDateString()}</span>
                 </div>
               ` : ''}
+              ${deal.status !== 'terminated' && deal.status !== 'expired' ? `
+                <div class="mt-4 pt-3 border-t border-[#404040]">
+                  <button onclick="cancelDeal('${deal.id}')" 
+                          class="btn btn-sm bg-[#F44336] hover:bg-[#D32F2F] border-0 text-white rounded-lg w-full">
+                    Cancel Deal
+                  </button>
+                </div>
+              ` : ''}
             </div>
           `).join('');
         }
@@ -1179,6 +1193,41 @@
       } catch (e) {
         console.error('Error checking USDC balance:', e);
         return null;
+      }
+    }
+
+    // Cancel deal
+    async function cancelDeal(dealId) {
+      if (!connectedAddress) {
+        showMessage('createMessage', 'error', 'Please connect your wallet first');
+        return;
+      }
+
+      if (!confirm('Are you sure you want to cancel this deal? This action cannot be undone.')) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/v1/deals/${dealId}/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientAddress: connectedAddress,
+            reason: 'User requested cancellation'
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          showMessage('createMessage', 'success', 'Deal cancelled successfully');
+          loadMyDeals();
+        } else {
+          showMessage('createMessage', 'error', data.error || 'Failed to cancel deal');
+        }
+      } catch (error) {
+        console.error('Cancel deal error:', error);
+        showMessage('createMessage', 'error', 'Error cancelling deal: ' + error.message);
       }
     }
 

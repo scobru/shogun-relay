@@ -10,11 +10,13 @@ ARG IPFS_API_KEY
 ARG IPFS_API_TOKEN
 ARG IPFS_VERSION=0.29.0
 ARG RELAY_PEERS
-ARG RELAY_GUN_USERNAME
-ARG RELAY_GUN_PASSWORD
+ARG RELAY_SEA_KEYPAIR
+ARG RELAY_SEA_KEYPAIR_PATH
+ARG GENERATE_RELAY_KEYS=false
 ARG RELAY_HOST
 ARG RELAY_PORT
 ARG RELAY_NAME
+ARG RELAY_PROTECTED
 ARG X402_PAY_TO_ADDRESS
 ARG X402_NETWORK
 ARG X402_SETTLEMENT_MODE
@@ -120,6 +122,18 @@ RUN npm install --omit=dev
 
 # Copy the rest of the application
 COPY relay/ /app/relay/
+
+# Optionally generate relay SEA keypair if requested
+# This creates the keypair during build time
+RUN if [ "$GENERATE_RELAY_KEYS" = "true" ] && [ -z "$RELAY_SEA_KEYPAIR" ] && [ -z "$RELAY_SEA_KEYPAIR_PATH" ]; then \
+      echo "🔑 Generating relay SEA keypair..." && \
+      mkdir -p /app/keys && \
+      node /app/relay/scripts/generate-relay-keys-standalone.js /app/keys/relay-keypair.json && \
+      echo "✅ Keypair generated at /app/keys/relay-keypair.json" && \
+      echo "⚠️  IMPORTANT: Mount this file or copy it to a secure location!"; \
+    else \
+      echo "⏭️  Skipping keypair generation (use GENERATE_RELAY_KEYS=true to enable)"; \
+    fi
 
 # Set proper permissions
 RUN chown -R node:node /app \

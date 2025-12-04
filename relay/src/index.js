@@ -312,21 +312,65 @@ async function initializeServer() {
 
   // Initialize Relay User for x402 subscriptions
   // This user owns the subscription data in GunDB
-  const relayUsername = process.env.RELAY_GUN_USERNAME || process.env.RELAY_NAME || 'shogun-relay';
-  const relayPassword = process.env.RELAY_GUN_PASSWORD || process.env.ADMIN_PASSWORD;
+  // REQUIRED: Must use direct SEA keypair (prevents "Signature did not match" errors)
   
-  if (relayPassword) {
+  let relayKeyPair = null;
+  let relayPub = null;
+  
+  // Load SEA keypair from environment variable or file
+  if (process.env.RELAY_SEA_KEYPAIR) {
     try {
-      const { pub } = await initRelayUser(gun, relayUsername, relayPassword);
-      app.set('relayUserPub', pub);
-      console.log(`🔐 Relay GunDB user initialized: ${relayUsername}`);
-      console.log(`🔑 Relay public key: ${pub?.substring(0, 30)}...`);
+      relayKeyPair = JSON.parse(process.env.RELAY_SEA_KEYPAIR);
+      console.log('🔑 Using SEA keypair from RELAY_SEA_KEYPAIR env var');
     } catch (error) {
-      console.error('❌ Failed to initialize relay GunDB user:', error.message);
-      console.warn('⚠️ x402 subscriptions will not work without relay user');
+      console.error('❌ Failed to parse RELAY_SEA_KEYPAIR:', error.message);
+      console.error('   Make sure the JSON is valid and properly escaped in your env file');
+      throw new Error('Invalid RELAY_SEA_KEYPAIR configuration');
+    }
+  } else if (process.env.RELAY_SEA_KEYPAIR_PATH) {
+    try {
+      const fs = await import('fs');
+      const keyPairContent = fs.readFileSync(process.env.RELAY_SEA_KEYPAIR_PATH, 'utf8');
+      relayKeyPair = JSON.parse(keyPairContent);
+      console.log(`🔑 Loaded SEA keypair from ${process.env.RELAY_SEA_KEYPAIR_PATH}`);
+    } catch (error) {
+      console.error(`❌ Failed to load keypair from ${process.env.RELAY_SEA_KEYPAIR_PATH}:`, error.message);
+      throw new Error(`Failed to load keypair from ${process.env.RELAY_SEA_KEYPAIR_PATH}`);
     }
   } else {
-    console.warn('⚠️ RELAY_GUN_PASSWORD not set, x402 subscriptions disabled');
+    const errorMsg = `
+❌ RELAY_SEA_KEYPAIR or RELAY_SEA_KEYPAIR_PATH is REQUIRED!
+
+The relay MUST be configured with a SEA keypair to prevent "Signature did not match" errors.
+
+To generate a keypair:
+  1. Run: node scripts/generate-relay-keys.js
+  2. Copy the JSON output
+  3. Add to your .env file as: RELAY_SEA_KEYPAIR='{"pub":"...","priv":"...","epub":"...","epriv":"..."}'
+  OR save to a file and set: RELAY_SEA_KEYPAIR_PATH=/path/to/relay-keypair.json
+
+See docs/RELAY_KEYS.md for more information.
+    `.trim();
+    console.error(errorMsg);
+    throw new Error('RELAY_SEA_KEYPAIR or RELAY_SEA_KEYPAIR_PATH is required');
+  }
+  
+  // Validate and initialize with keypair
+  if (!relayKeyPair || !relayKeyPair.pub || !relayKeyPair.priv) {
+    console.error('❌ Invalid keypair: missing pub or priv fields');
+    throw new Error('Invalid keypair configuration. Please generate a new keypair using: node scripts/generate-relay-keys.js');
+  }
+  
+  try {
+    const result = await initRelayUser(gun, relayKeyPair);
+    relayPub = result.pub;
+    app.set('relayUserPub', relayPub);
+    app.set('relayKeyPair', relayKeyPair);
+    console.log(`✅ Relay GunDB user initialized with SEA keypair`);
+    console.log(`🔑 Relay public key: ${relayPub?.substring(0, 30)}...`);
+  } catch (error) {
+    console.error('❌ Failed to initialize relay with keypair:', error.message);
+    throw new Error(`Failed to initialize relay user: ${error.message}`);
   }
 
   // Initialize reputation tracking for this relay

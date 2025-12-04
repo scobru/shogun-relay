@@ -1,26 +1,68 @@
 /**
  * Relay User Management for GunDB
  * 
- * Creates or logs in the relay's GunDB user account.
+ * Initializes the relay's GunDB user account with a direct SEA keypair.
  * Subscription data is stored in the relay's user space,
  * ensuring only the relay can modify or delete this data.
+ * 
+ * The relay MUST use a SEA keypair for initialization (no username/password).
+ * This prevents "Signature did not match" errors when using frozen data.
  */
 
 let relayUser = null;
 let relayPub = null;
+let relayKeyPair = null;
 let isInitialized = false;
 let initPromise = null;
 
 /**
- * Initialize the relay user - creates new user or logs in existing one
+ * Initialize relay user with direct SEA keypair (no login needed)
  * @param {Gun} gun - GunDB instance
- * @param {string} username - Relay username (from env)
- * @param {string} password - Relay password (from env)
- * @returns {Promise<{user: object, pub: string}>}
+ * @param {object} keyPair - SEA keypair object {pub, priv, epub, epriv}
+ * @returns {Promise<{user: object, pub: string, keyPair: object}>}
  */
-export async function initRelayUser(gun, username, password) {
+async function initRelayUserWithKeyPair(gun, keyPair) {
+  if (isInitialized && relayUser && relayKeyPair) {
+    return { user: relayUser, pub: relayPub, keyPair: relayKeyPair };
+  }
+
+  console.log('🔐 Initializing relay user with direct SEA keypair...');
+
+  return new Promise((resolve, reject) => {
+    const user = gun.user();
+
+    // Authenticate directly with keypair (no username/password needed)
+    user.auth(keyPair, (ack) => {
+      if (ack && ack.err) {
+        console.error(`❌ Failed to authenticate with keypair: ${ack.err}`);
+        reject(new Error(ack.err));
+        return;
+      }
+
+      relayUser = user;
+      relayPub = keyPair.pub;
+      relayKeyPair = keyPair;
+      isInitialized = true;
+      
+      console.log(`✅ Relay user authenticated with keypair. Pub: ${relayPub?.substring(0, 30)}...`);
+      resolve({ user: relayUser, pub: relayPub, keyPair: relayKeyPair });
+    });
+  });
+}
+
+/**
+ * Initialize the relay user with a direct SEA keypair (REQUIRED)
+ * @param {Gun} gun - GunDB instance
+ * @param {object} keyPair - SEA keypair object {pub, priv, epub, epriv}
+ * @returns {Promise<{user: object, pub: string, keyPair: object}>}
+ */
+export async function initRelayUser(gun, keyPair) {
   if (isInitialized && relayUser) {
-    return { user: relayUser, pub: relayPub };
+    return { 
+      user: relayUser, 
+      pub: relayPub, 
+      keyPair: relayKeyPair 
+    };
   }
 
   // Prevent multiple simultaneous initializations
@@ -28,68 +70,17 @@ export async function initRelayUser(gun, username, password) {
     return initPromise;
   }
 
-  initPromise = new Promise((resolve, reject) => {
-    const user = gun.user();
+  // Validate keypair
+  if (!keyPair || typeof keyPair !== 'object') {
+    throw new Error('RELAY_SEA_KEYPAIR is required. Please configure a keypair via RELAY_SEA_KEYPAIR or RELAY_SEA_KEYPAIR_PATH environment variable.');
+  }
 
-    console.log(`🔐 Initializing relay user: ${username}`);
+  if (!keyPair.pub || !keyPair.priv) {
+    throw new Error('Invalid keypair: missing pub or priv fields. Please generate a new keypair using: node scripts/generate-relay-keys.js');
+  }
 
-    // Try to authenticate first
-    user.auth(username, password, (ack) => {
-      if (ack.err) {
-        // User doesn't exist, create it
-        console.log(`📝 Relay user not found, creating new user...`);
-        
-        user.create(username, password, (createAck) => {
-          if (createAck.err) {
-            // Check if error is "User already created" (race condition)
-            if (createAck.err.includes('already') || createAck.err.includes('User')) {
-              // Try auth again
-              user.auth(username, password, (retryAck) => {
-                if (retryAck.err) {
-                  console.error(`❌ Failed to authenticate relay user: ${retryAck.err}`);
-                  reject(new Error(retryAck.err));
-                  return;
-                }
-                
-                relayUser = user;
-                relayPub = user.is?.pub;
-                isInitialized = true;
-                console.log(`✅ Relay user authenticated (retry). Pub: ${relayPub?.substring(0, 20)}...`);
-                resolve({ user: relayUser, pub: relayPub });
-              });
-            } else {
-              console.error(`❌ Failed to create relay user: ${createAck.err}`);
-              reject(new Error(createAck.err));
-            }
-            return;
-          }
-
-          // User created, now authenticate
-          user.auth(username, password, (authAck) => {
-            if (authAck.err) {
-              console.error(`❌ Failed to authenticate new relay user: ${authAck.err}`);
-              reject(new Error(authAck.err));
-              return;
-            }
-
-            relayUser = user;
-            relayPub = user.is?.pub;
-            isInitialized = true;
-            console.log(`✅ Relay user created and authenticated. Pub: ${relayPub?.substring(0, 20)}...`);
-            resolve({ user: relayUser, pub: relayPub });
-          });
-        });
-      } else {
-        // Authentication successful
-        relayUser = user;
-        relayPub = user.is?.pub;
-        isInitialized = true;
-        console.log(`✅ Relay user authenticated. Pub: ${relayPub?.substring(0, 20)}...`);
-        resolve({ user: relayUser, pub: relayPub });
-      }
-    });
-  });
-
+  // Use the existing keypair initialization function
+  initPromise = initRelayUserWithKeyPair(gun, keyPair);
   return initPromise;
 }
 
@@ -107,6 +98,14 @@ export function getRelayUser() {
  */
 export function getRelayPub() {
   return relayPub;
+}
+
+/**
+ * Get the relay user's SEA keypair
+ * @returns {object|null}
+ */
+export function getRelayKeyPair() {
+  return relayKeyPair;
 }
 
 /**
