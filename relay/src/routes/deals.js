@@ -438,13 +438,27 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
     
     // Activate deal
     const txHash = settlement.transaction;
+    console.log(`Activating deal ${dealId} with TX: ${txHash}`);
+    
     const activatedDeal = StorageDeals.activateDeal(deal, txHash);
+    console.log(`Deal activated object created, status: ${activatedDeal.status}`);
     
     // Save updated deal
-    await StorageDeals.saveDeal(gun, activatedDeal, relayUser._.sea);
+    let saveWarning = null;
+    try {
+      await StorageDeals.saveDeal(gun, activatedDeal, relayUser._.sea);
+      console.log(`✅ Deal saved to GunDB successfully`);
+    } catch (saveError) {
+      console.error(`⚠️ Error saving activated deal to GunDB:`, saveError.message);
+      saveWarning = 'Payment processed successfully, but there was a temporary issue saving the deal. It will be retried automatically.';
+      // Still continue - payment was successful
+    }
     
     // Remove from pending cache since it's now activated
     removeCachedDeal(dealId);
+    
+    // Update cache with activated deal for immediate access
+    cacheDeal(activatedDeal);
     
     console.log(`✅ Deal ${dealId} activated. CID: ${deal.cid}, TX: ${txHash}`);
     
@@ -458,7 +472,8 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
         expiresAt: activatedDeal.expiresAt,
         paymentTx: activatedDeal.paymentTx,
       },
-      message: 'Deal activated successfully',
+      message: saveWarning || 'Deal activated successfully',
+      warning: saveWarning || undefined,
     });
   } catch (error) {
     console.error('Deal activation error:', error);

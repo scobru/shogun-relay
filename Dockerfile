@@ -38,7 +38,7 @@ ARG HOLSTER_MAX_CONNECTIONS
 ARG AUTO_REPLICATION
 
 # Install required system packages
-RUN apk add --no-cache \
+RUN apk add  \
     git \
     curl \
     wget \

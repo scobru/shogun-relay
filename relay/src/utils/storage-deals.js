@@ -196,7 +196,6 @@ export function activateDeal(deal, paymentTx) {
     activatedAt: now,
     expiresAt,
     status: DEAL_STATUS.ACTIVE,
-    activatedAt: now,
     activationReason: 'Payment verified',
   };
 }
