@@ -1607,37 +1607,63 @@
             
             // Approve USDC if griefing cost is required
             if (report.griefingCost && parseFloat(report.griefingCost.amount) > 0) {
-              showMessage('createMessage', 'info', 'Approving USDC spending...');
+              showMessage('createMessage', 'info', 'Checking USDC allowance...');
               
               const usdc = new ethers.Contract(USDC_ADDRESS, USDC_ABI, signer);
               const costWei = ethers.parseUnits(report.griefingCost.amount, 6);
+              const registryAddress = report.registryAddress;
+              const userAddress = await signer.getAddress();
               
               // Check current allowance
-              const registryAddress = report.registryAddress;
-              const currentAllowance = await usdc.allowance(await signer.getAddress(), registryAddress);
+              let currentAllowance = await usdc.allowance(userAddress, registryAddress);
+              
+              // Approve a bit more to account for any rounding or future griefs
+              const approveAmount = costWei * 2n; // Approve 2x to be safe
               
               if (currentAllowance < costWei) {
-                // Approve USDC
-                const approveTx = await usdc.approve(registryAddress, costWei);
+                showMessage('createMessage', 'info', 'Approving USDC spending...');
+                
+                // Approve USDC (approve more than needed to avoid repeated approvals)
+                const approveTx = await usdc.approve(registryAddress, approveAmount);
                 showMessage('createMessage', 'info', 'Waiting for USDC approval confirmation...');
-                await approveTx.wait();
-                showMessage('createMessage', 'success', 'USDC approved!');
+                
+                // Wait for approval confirmation
+                const approveReceipt = await approveTx.wait();
+                if (approveReceipt.status !== 1) {
+                  throw new Error('USDC approval transaction failed');
+                }
+                
+                // Verify allowance was set correctly
+                currentAllowance = await usdc.allowance(userAddress, registryAddress);
+                if (currentAllowance < costWei) {
+                  throw new Error(`Allowance insufficient after approval. Expected: ${costWei.toString()}, Got: ${currentAllowance.toString()}`);
+                }
+                
+                showMessage('createMessage', 'success', 'USDC approved successfully!');
+              } else {
+                showMessage('createMessage', 'info', 'USDC already approved');
+              }
+              
+              // Double-check balance
+              const balance = await usdc.balanceOf(userAddress);
+              if (balance < costWei) {
+                throw new Error(`Insufficient USDC balance. Required: ${report.griefingCost.amount} USDC, Available: ${ethers.formatUnits(balance, 6)} USDC`);
               }
             }
             
-            // Estimate gas
-            showMessage('createMessage', 'info', 'Estimating gas...');
-            const gasEstimate = await provider.estimateGas(report.transaction);
+            showMessage('createMessage', 'info', 'Preparing grief transaction...');
             
-            // Prepare transaction with gas estimate
+            // Prepare transaction (don't estimate gas manually - let ethers handle it)
+            // The transaction will be sent with automatic gas estimation
             const tx = {
               ...report.transaction,
-              gasLimit: gasEstimate,
+              // Remove value if it's 0x0 (ethers will handle it)
+              value: report.transaction.value === '0x0' ? undefined : report.transaction.value,
             };
             
-            showMessage('createMessage', 'info', 'Please confirm the transaction in your wallet...');
+            showMessage('createMessage', 'info', 'Please confirm the grief transaction in your wallet...');
             
-            // Send transaction
+            // Send transaction (ethers will automatically estimate gas)
             const txResponse = await signer.sendTransaction(tx);
             
             showMessage('createMessage', 'info', `Transaction sent! Waiting for confirmation...\nTX Hash: ${txResponse.hash}`);
@@ -1658,12 +1684,31 @@
             console.error('Transaction error:', txError);
             
             let errorMessage = 'Failed to send transaction: ' + txError.message;
+            
+            // Decode custom errors
+            if (txError.data) {
+              const errorData = txError.data;
+              // Check for known custom errors
+              if (errorData === '0xdcf2a3a7' || txError.message?.includes('InsufficientGriefingCost')) {
+                errorMessage = 'Insufficient USDC allowance. Please approve USDC spending first.';
+              } else if (errorData === '0x8c5be1e5' || txError.message?.includes('NotDealParty')) {
+                errorMessage = 'You can only grief relays for your own active deals.';
+              } else if (errorData === '0x1f2a2005' || txError.message?.includes('DealNotActive')) {
+                errorMessage = 'This deal is not active. You can only grief for active deals.';
+              } else if (errorData === '0x4e487b71' || txError.message?.includes('DealNotFound')) {
+                errorMessage = 'Deal not found in registry. Make sure the deal is registered on-chain.';
+              } else if (errorData === '0x5c60da1b' || txError.message?.includes('RelayNotRegistered')) {
+                errorMessage = 'Relay is not registered or not active.';
+              }
+            }
+            
+            // Check for common error patterns
             if (txError.message?.includes('user rejected') || txError.message?.includes('User rejected')) {
               errorMessage = 'Transaction cancelled by user';
-            } else if (txError.message?.includes('NotDealParty')) {
-              errorMessage = 'You can only grief relays for your own active deals.';
-            } else if (txError.message?.includes('DealNotActive')) {
-              errorMessage = 'This deal is not active. You can only grief for active deals.';
+            } else if (txError.message?.includes('execution reverted')) {
+              if (!errorMessage.includes('Insufficient') && !errorMessage.includes('allowance')) {
+                errorMessage = `Transaction reverted: ${txError.message}. This usually means:\n- Insufficient USDC allowance (approve first)\n- Deal is not active\n- You are not the deal client\n- Relay is not registered`;
+              }
             } else if (txError.message?.includes('Insufficient') || txError.message?.includes('allowance')) {
               errorMessage = 'Insufficient USDC balance or allowance. Please ensure you have approved USDC spending for the griefing cost.';
             }
