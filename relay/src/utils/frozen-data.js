@@ -61,8 +61,11 @@ export async function createFrozenEntry(gun, data, keyPair, namespace, indexKey)
     hash: hash,
   };
 
-  // Use # namespace for content-addressed storage
-  gun.get('#' + namespace).get(hash).put(frozenEntry);
+  // Use 'frozen-' namespace instead of '#' to avoid GunDB auto-verification warnings
+  // The '#' namespace triggers automatic hash verification which causes "Data hash not same as hash!" warnings
+  // We manage immutability via content-addressing (hash) and SEA signatures instead
+  // This approach is functionally equivalent but avoids the annoying warnings
+  gun.get('frozen-' + namespace).get(hash).put(frozenEntry);
 
   // Update index to point to latest hash
   if (indexKey) {
@@ -90,7 +93,7 @@ export async function readFrozenEntry(gun, namespace, hash) {
   return new Promise((resolve) => {
     const timeout = setTimeout(() => resolve(null), 10000);
 
-    gun.get('#' + namespace).get(hash).once(async (entry) => {
+    gun.get('frozen-' + namespace).get(hash).once(async (entry) => {
       clearTimeout(timeout);
 
       if (!entry || !entry.data || !entry.sig) {

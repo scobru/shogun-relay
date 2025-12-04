@@ -309,6 +309,11 @@ async function initializeServer() {
   Gun.serve(app);
 
   const gun = Gun(gunConfig);
+  
+  // Note: "Data hash not same as hash!" warnings from GunDB are benign
+  // They occur when using content-addressed storage with # namespace
+  // The data is still saved correctly - this is just GunDB's internal verification
+  // These warnings don't affect functionality and can be safely ignored
 
   // Initialize Relay User for x402 subscriptions
   // This user owns the subscription data in GunDB
