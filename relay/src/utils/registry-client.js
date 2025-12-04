@@ -10,18 +10,18 @@
 import { ethers } from 'ethers';
 
 // Contract addresses
-const REGISTRY_ADDRESSES = {
+export const REGISTRY_ADDRESSES = {
   84532: '0xb1F0a1eb9722A924F521E264Fa75243344868c4D', // Base Sepolia
   8453: null, // Base Mainnet - TBD
 };
 
-const USDC_ADDRESSES = {
+export const USDC_ADDRESSES = {
   84532: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // Base Sepolia
   8453: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',  // Base Mainnet
 };
 
 // Default RPC URLs
-const RPC_URLS = {
+export const RPC_URLS = {
   84532: 'https://sepolia.base.org',
   8453: 'https://mainnet.base.org',
 };
