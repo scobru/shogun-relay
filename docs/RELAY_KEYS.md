@@ -77,7 +77,7 @@ Nel `Dockerfile`, puoi generare le chiavi durante il build:
 ```dockerfile
 ARG GENERATE_RELAY_KEYS=false
 RUN if [ "$GENERATE_RELAY_KEYS" = "true" ]; then \
-      node scripts/generate-relay-keys-standalone.js /app/keys/relay-keypair.json; \
+      node scripts/generate-relay-keys-standalone.cjs /app/keys/relay-keypair.json; \
     fi
 ```
 
