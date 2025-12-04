@@ -1017,13 +1017,18 @@
           usdcAddress: usdcAddress
         });
 
-        // EIP-712 domain for USDC
+        // EIP-712 domain for USDC - use values from payment requirements if available
+        const domainName = paymentRequired.domainName || 'USDC';
+        const domainVersion = paymentRequired.domainVersion || '2';
+        
         const domain = {
-          name: 'USD Coin',
-          version: '2',
+          name: domainName,
+          version: domainVersion,
           chainId: networkConfig.chainId,
           verifyingContract: usdcAddress,
         };
+        
+        console.log('EIP-712 Domain:', domain);
 
         // EIP-3009 TransferWithAuthorization types
         const types = {

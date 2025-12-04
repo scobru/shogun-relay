@@ -286,16 +286,27 @@ router.post('/create', express.json(), async (req, res) => {
     cacheDeal(deal);
     console.log(`📝 Deal ${deal.id} created and cached for ${deal.cid}`);
     
+    // Get network config for domain info
+    const network = process.env.X402_NETWORK || 'base-sepolia';
+    const NETWORK_CONFIG = {
+      'base-sepolia': { usdcName: 'USDC', usdcVersion: '2' },
+      'base': { usdcName: 'USD Coin', usdcVersion: '2' },
+    };
+    const networkConfig = NETWORK_CONFIG[network] || NETWORK_CONFIG['base-sepolia'];
+    
     // Create x402 payment requirements
     const paymentRequirements = {
       x402Version: 1,
       scheme: 'exact',
-      network: process.env.X402_NETWORK || 'base-sepolia',
+      network,
       maxAmountRequired: Math.ceil(pricing.totalPriceUSDC * 1000000).toString(), // USDC atomic units
       resource: `storage-deal-${deal.id}`,
       description: `Storage Deal: ${sizeMB}MB for ${durationDays} days (${tier})`,
       payTo: process.env.X402_PAY_TO_ADDRESS,
       dealId: deal.id,
+      // EIP-712 domain info for signing
+      domainName: networkConfig.usdcName,
+      domainVersion: networkConfig.usdcVersion,
     };
     
     res.status(402).json({

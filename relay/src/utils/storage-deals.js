@@ -174,9 +174,7 @@ export function createDeal(params) {
     replicaCount: 0,
     // Status
     status: DEAL_STATUS.PENDING,
-    statusHistory: [
-      { status: DEAL_STATUS.PENDING, timestamp: now, reason: 'Deal created' },
-    ],
+    // Note: statusHistory removed - GunDB doesn't support arrays natively
   };
 }
 
@@ -198,10 +196,8 @@ export function activateDeal(deal, paymentTx) {
     activatedAt: now,
     expiresAt,
     status: DEAL_STATUS.ACTIVE,
-    statusHistory: [
-      ...deal.statusHistory,
-      { status: DEAL_STATUS.ACTIVE, timestamp: now, reason: 'Payment verified' },
-    ],
+    activatedAt: now,
+    activationReason: 'Payment verified',
   };
 }
 
@@ -284,15 +280,9 @@ export function renewDeal(deal, additionalDays, paymentTx) {
     durationDays: deal.durationDays + additionalDays,
     expiresAt: newExpiry,
     status: DEAL_STATUS.ACTIVE,
-    statusHistory: [
-      ...deal.statusHistory,
-      { 
-        status: DEAL_STATUS.ACTIVE, 
-        timestamp: now, 
-        reason: `Renewed for ${additionalDays} days`,
-        paymentTx,
-      },
-    ],
+    renewedAt: now,
+    renewalReason: `Renewed for ${additionalDays} days`,
+    renewalPaymentTx: paymentTx,
   };
 }
 
@@ -310,10 +300,7 @@ export function terminateDeal(deal, reason) {
     ...deal,
     status: DEAL_STATUS.TERMINATED,
     terminatedAt: now,
-    statusHistory: [
-      ...deal.statusHistory,
-      { status: DEAL_STATUS.TERMINATED, timestamp: now, reason },
-    ],
+    terminationReason: reason,
   };
 }
 
