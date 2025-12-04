@@ -254,6 +254,7 @@ router.post('/create', express.json(), async (req, res) => {
       durationDays,
       tier = 'standard',
       erasureMetadata = null,
+      relayAddress, // Optional: relay address from on-chain registry
     } = req.body;
     
     // Validate required fields
@@ -262,6 +263,43 @@ router.post('/create', express.json(), async (req, res) => {
         success: false,
         error: 'Missing required fields: cid, clientAddress, sizeMB, durationDays',
       });
+    }
+    
+    // Determine which relay to use
+    let selectedRelayPub = relayPub;
+    let selectedRelayAddress = null;
+    
+    // If relayAddress is provided, verify it's registered and get its info
+    if (relayAddress) {
+      try {
+        const REGISTRY_CHAIN_ID = process.env.REGISTRY_CHAIN_ID;
+        if (REGISTRY_CHAIN_ID) {
+          const registryClient = createRegistryClient(parseInt(REGISTRY_CHAIN_ID));
+          const relayInfo = await registryClient.getRelayInfo(relayAddress);
+          
+          if (!relayInfo || relayInfo.status !== 'Active') {
+            return res.status(400).json({
+              success: false,
+              error: `Relay ${relayAddress} is not active in the registry`,
+            });
+          }
+          
+          // Use the relay's GunDB pubkey from registry
+          selectedRelayPub = relayInfo.gunPubKey;
+          selectedRelayAddress = relayAddress;
+        } else {
+          return res.status(400).json({
+            success: false,
+            error: 'Registry not configured. Cannot verify relay address.',
+          });
+        }
+      } catch (error) {
+        console.error('Error verifying relay address:', error);
+        return res.status(400).json({
+          success: false,
+          error: `Failed to verify relay: ${error.message}`,
+        });
+      }
     }
     
     // Calculate pricing
@@ -275,12 +313,17 @@ router.post('/create', express.json(), async (req, res) => {
     const deal = StorageDeals.createDeal({
       cid,
       clientAddress,
-      providerPub: relayPub,
+      providerPub: selectedRelayPub,
       sizeMB: parseFloat(sizeMB),
       durationDays: parseInt(durationDays),
       tier,
       erasureMetadata,
     });
+    
+    // Store relay address if provided
+    if (selectedRelayAddress) {
+      deal.onChainRelay = selectedRelayAddress;
+    }
     
     // Save to GunDB (frozen)
     await StorageDeals.saveDeal(gun, deal, keyPair);

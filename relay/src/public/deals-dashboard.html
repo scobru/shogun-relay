@@ -464,6 +464,36 @@
                   </select>
                 </div>
 
+                <!-- Relay Selection -->
+                <div>
+                  <label class="text-[#A0A0A0] text-sm mb-2 block">Select Relay Provider *</label>
+                  <div class="flex gap-2 mb-2">
+                    <select id="dealRelay" class="input-field flex-1">
+                      <option value="">Loading relays...</option>
+                    </select>
+                    <button onclick="loadAvailableRelays()" class="btn bg-[#404040] hover:bg-[#505050] border-0 text-white rounded-xl px-4" title="Refresh relay list">
+                      🔄
+                    </button>
+                  </div>
+                  <div id="relayInfo" class="text-[#606060] text-xs mt-1" style="display: none;">
+                    <div class="p-2 bg-[#1A1A1A] rounded border border-[#404040]">
+                      <div class="flex justify-between mb-1">
+                        <span>Stake:</span>
+                        <span id="relayStake" class="text-[#A0A0A0]">--</span>
+                      </div>
+                      <div class="flex justify-between mb-1">
+                        <span>Deals:</span>
+                        <span id="relayDeals" class="text-[#A0A0A0]">--</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span>Endpoint:</span>
+                        <a id="relayEndpoint" href="#" target="_blank" class="text-[#42A5F5] hover:underline text-xs">--</a>
+                      </div>
+                    </div>
+                  </div>
+                  <p class="text-[#606060] text-xs mt-1">Choose a registered relay from the on-chain registry</p>
+                </div>
+
                 <div id="dealPreview" class="p-4 bg-[#1A1A1A] rounded-lg border border-[#404040]" style="display: none;">
                   <div class="flex justify-between mb-2">
                     <span class="text-[#A0A0A0]">Estimated Price:</span>
@@ -733,6 +763,62 @@
       }
     }
 
+    // Load available relays from on-chain registry
+    async function loadAvailableRelays() {
+      const relaySelect = document.getElementById('dealRelay');
+      relaySelect.innerHTML = '<option value="">Loading relays...</option>';
+      relaySelect.disabled = true;
+
+      try {
+        const response = await fetch('/api/v1/network/onchain/relays?chainId=84532');
+        const data = await response.json();
+
+        if (data.success && data.relays && data.relays.length > 0) {
+          relaySelect.innerHTML = '<option value="">Select a relay...</option>';
+          data.relays.forEach(relay => {
+            const option = document.createElement('option');
+            option.value = relay.address;
+            option.textContent = `${relay.address.slice(0, 6)}...${relay.address.slice(-4)} - ${relay.stakedAmount} USDC staked`;
+            option.dataset.stake = relay.stakedAmount;
+            option.dataset.deals = relay.totalDeals;
+            option.dataset.endpoint = relay.endpoint;
+            relaySelect.appendChild(option);
+          });
+          relaySelect.disabled = false;
+          
+          // Show relay info when selected
+          relaySelect.addEventListener('change', updateRelayInfo);
+        } else {
+          relaySelect.innerHTML = '<option value="">No relays available</option>';
+          showMessage('createMessage', 'warning', 'No active relays found in registry');
+        }
+      } catch (error) {
+        console.error('Error loading relays:', error);
+        relaySelect.innerHTML = '<option value="">Error loading relays</option>';
+        showMessage('createMessage', 'error', 'Failed to load relays: ' + error.message);
+      } finally {
+        relaySelect.disabled = false;
+      }
+    }
+
+    // Update relay info display
+    function updateRelayInfo() {
+      const relaySelect = document.getElementById('dealRelay');
+      const selectedOption = relaySelect.options[relaySelect.selectedIndex];
+      const relayInfoDiv = document.getElementById('relayInfo');
+      
+      if (selectedOption && selectedOption.value) {
+        document.getElementById('relayStake').textContent = selectedOption.dataset.stake + ' USDC';
+        document.getElementById('relayDeals').textContent = selectedOption.dataset.deals;
+        const endpointLink = document.getElementById('relayEndpoint');
+        endpointLink.href = selectedOption.dataset.endpoint;
+        endpointLink.textContent = selectedOption.dataset.endpoint || 'N/A';
+        relayInfoDiv.style.display = 'block';
+      } else {
+        relayInfoDiv.style.display = 'none';
+      }
+    }
+
     // Create deal
     async function createDeal() {
       if (!connectedAddress) {
@@ -744,9 +830,15 @@
       const sizeMB = document.getElementById('dealSizeMB').value;
       const duration = document.getElementById('dealDuration').value;
       const tier = document.getElementById('dealTier').value;
+      const relayAddress = document.getElementById('dealRelay').value;
 
       if (!cid || !sizeMB || !duration) {
         showMessage('createMessage', 'error', 'Please fill in all required fields');
+        return;
+      }
+
+      if (!relayAddress) {
+        showMessage('createMessage', 'error', 'Please select a relay provider');
         return;
       }
 
@@ -762,7 +854,8 @@
             clientAddress: connectedAddress,
             sizeMB: parseFloat(sizeMB),
             durationDays: parseInt(duration),
-            tier
+            tier,
+            relayAddress // Pass selected relay address
           })
         });
 
@@ -897,9 +990,13 @@
                       </button>
                     ` : ''}
                     <button onclick="reportIssue('${deal.id}', '${deal.clientAddress}')" 
-                            class="btn btn-sm bg-[#FF9800] hover:bg-[#F57C00] border-0 text-white rounded-lg">
-                      🚨 Report Issue
+                            class="btn btn-sm bg-[#FF9800] hover:bg-[#F57C00] border-0 text-white rounded-lg"
+                            title="Report relay misbehavior (missed proof or data loss). You will pay a griefing cost to slash the relay's stake.">
+                      ⚔️ Grief Relay
                     </button>
+                  </div>
+                  <div class="mt-2 text-[#606060] text-xs">
+                    💡 <strong>Griefing:</strong> Report relay misbehavior. You pay a small cost (USDC) to slash the relay's stake. This is decentralized - no owner needed!
                   </div>
                 </div>
               ` : deal.status !== 'terminated' && deal.status !== 'expired' ? `
@@ -1415,19 +1512,34 @@
         return;
       }
 
-      // Ask for report type and reason
-      const reportType = prompt('Report Type:\n1. missedProof - Relay missed storage proof\n2. dataLoss - File cannot be retrieved\n\nEnter 1 or 2:');
+      // Show a better UI for report type selection
+      const reportTypeChoice = prompt(
+        '⚔️ GRIEFING REPORT\n\n' +
+        'Select violation type:\n' +
+        '1. Missed Proof (1% slash) - Relay failed to provide storage proof\n' +
+        '2. Data Loss (10% slash) - File cannot be retrieved\n\n' +
+        'Enter 1 or 2:'
+      );
       
-      if (!reportType || (reportType !== '1' && reportType !== '2')) {
+      if (!reportTypeChoice || (reportTypeChoice !== '1' && reportTypeChoice !== '2')) {
         return;
       }
 
-      const reason = prompt('Please describe the issue:');
+      const reportType = reportTypeChoice === '1' ? 'missedProof' : 'dataLoss';
+      const slashPercent = reportTypeChoice === '1' ? '1%' : '10%';
+
+      const reason = prompt(`Please describe the issue (${slashPercent} of relay stake will be slashed):`);
       if (!reason) {
         return;
       }
 
-      if (!confirm('Are you sure you want to report this issue? This will initiate slashing proceedings against the relay.')) {
+      if (!confirm(
+        `⚠️ GRIEFING CONFIRMATION\n\n` +
+        `You are about to grief this relay for: ${reportTypeChoice === '1' ? 'Missed Proof' : 'Data Loss'}\n` +
+        `This will slash ${slashPercent} of the relay's stake.\n` +
+        `You will need to pay a griefing cost (small USDC amount).\n\n` +
+        `Continue?`
+      )) {
         return;
       }
 
@@ -1437,7 +1549,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             clientAddress: connectedAddress,
-            reportType: reportType === '1' ? 'missedProof' : 'dataLoss',
+            reportType: reportType, // Already 'missedProof' or 'dataLoss'
             reason: reason,
             evidence: '' // Can be extended with additional evidence
           })
@@ -1448,23 +1560,26 @@
         if (data.success && data.report) {
           const report = data.report;
           
-          // Show griefing cost information
-          let confirmMessage = `Report Type: ${reportType === '1' ? 'Missed Proof' : 'Data Loss'}\n`;
+          // Show griefing cost information in a more visible way
+          const violationType = reportType === 'missedProof' ? 'Missed Proof' : 'Data Loss';
+          let confirmMessage = `⚔️ GRIEFING DETAILS\n\n`;
+          confirmMessage += `Violation: ${violationType}\n`;
           confirmMessage += `Reason: ${reason}\n\n`;
           
           if (report.griefingCost) {
-            confirmMessage += `⚠️ GRIEFING COST: ${report.griefingCost.amount} ${report.griefingCost.currency}\n`;
-            confirmMessage += `   (This will be deducted from your USDC balance)\n\n`;
+            confirmMessage += `💰 YOUR COST: ${report.griefingCost.amount} ${report.griefingCost.currency}\n`;
+            confirmMessage += `   (You pay this to execute the grief)\n\n`;
           }
           
           if (report.slashAmount) {
-            confirmMessage += `📉 RELAY SLASH: ${report.slashAmount.amount} ${report.slashAmount.currency}\n`;
-            confirmMessage += `   (Amount that will be slashed from relay stake)\n\n`;
+            confirmMessage += `📉 RELAY PUNISHMENT: ${report.slashAmount.amount} ${report.slashAmount.currency}\n`;
+            confirmMessage += `   (Amount slashed from relay stake)\n\n`;
           }
           
-          confirmMessage += `Do you want to proceed? You will need to:\n`;
-          confirmMessage += `1. Approve USDC spending for the griefing cost\n`;
-          confirmMessage += `2. Sign and send the transaction`;
+          confirmMessage += `📋 NEXT STEPS:\n`;
+          confirmMessage += `1. Approve USDC spending (${report.griefingCost?.amount || '~0.05'} USDC)\n`;
+          confirmMessage += `2. Sign and send the grief transaction\n\n`;
+          confirmMessage += `This is decentralized griefing - no owner needed!`;
           
           const proceed = confirm(confirmMessage);
           if (!proceed) {
@@ -1534,7 +1649,8 @@
               showMessage('createMessage', 'success', `✅ Report submitted successfully!\n\nTransaction Hash: ${receipt.hash}\n\nThe slashing report has been recorded on-chain.`);
               
               // Show report details
-              alert(`Report Submitted Successfully!\n\nDeal ID: ${dealId}\nReport Type: ${reportType === '1' ? 'Missed Proof' : 'Data Loss'}\nReason: ${reason}\nTransaction: ${receipt.hash}\n\nView on BaseScan:\nhttps://sepolia.basescan.org/tx/${receipt.hash}`);
+              const violationType = reportType === 'missedProof' ? 'Missed Proof' : 'Data Loss';
+              alert(`✅ Grief Report Submitted!\n\nDeal ID: ${dealId}\nViolation: ${violationType}\nReason: ${reason}\nTransaction: ${receipt.hash}\n\nView on BaseScan:\nhttps://sepolia.basescan.org/tx/${receipt.hash}`);
             } else {
               showMessage('createMessage', 'error', 'Transaction failed. Please check the transaction details.');
             }
@@ -1734,6 +1850,21 @@
     // Initialize
     calculatePrice();
     calculateErasure();
+    
+    // Load relays when wallet is connected or tab is shown
+    document.getElementById('connectWalletBtn').addEventListener('click', () => {
+      setTimeout(loadAvailableRelays, 1000); // Load after wallet connection
+    });
+    
+    // Load relays when create tab is shown
+    const createTabBtn = document.querySelector('.tab-button[onclick*="create"]');
+    if (createTabBtn) {
+      createTabBtn.addEventListener('click', () => {
+        if (connectedAddress) {
+          loadAvailableRelays();
+        }
+      });
+    }
 
     // Tier card selection
     document.querySelectorAll('.tier-card').forEach(card => {
