@@ -51,7 +51,7 @@ Salva il keypair in un file JSON e passa il percorso.
 
 1. **Genera e salva le chiavi:**
    ```bash
-   node scripts/generate-relay-keys-standalone.js /path/to/relay-keypair.json
+   node scripts/generate-relay-keys-standalone.cjs /path/to/relay-keypair.json
    ```
 
 2. **Aggiungi al tuo `.env`:**
