@@ -583,6 +583,9 @@ export default (app) => {
   // Route per on-chain registry management (staking, registration)
   app.use(`${baseRoute}/registry`, registryRouter);
 
+  // Route per crypto operations (key derivation from EVM signatures)
+  app.use(`${baseRoute}/crypto`, cryptoRouter);
+
   // Route di test per verificare se le route sono registrate correttamente
   app.get(`${baseRoute}/test`, (req, res) => {
     res.json({
