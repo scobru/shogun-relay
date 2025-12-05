@@ -459,10 +459,15 @@ router.get('/deals', async (req, res) => {
 
     // Enrich deals with payment status
     // Payment is automatically received when registerDeal() is called (via safeTransferFrom)
+    // Note: If deal.active is false, it means registerDeal() was called but the deal is not active
+    // This could mean the deal expired, was terminated, or was never properly activated
     const enrichedDeals = deals.map(deal => ({
       ...deal,
       paymentReceived: deal.active && deal.createdAt !== '1970-01-01T00:00:00.000Z', // Payment received when deal is active and created
-      paymentStatus: deal.active ? 'paid' : 'pending',
+      // If deal exists on-chain but is not active, payment status depends on whether registerDeal was called
+      // If registerDeal was called, payment was received (even if deal is now inactive)
+      // If registerDeal was NOT called, payment is still pending
+      paymentStatus: deal.active ? 'paid' : (deal.createdAt && deal.createdAt !== '1970-01-01T00:00:00.000Z' ? 'paid' : 'pending'),
       canWithdraw: false, // Payment is already in relay wallet - no withdrawal needed
     }));
 

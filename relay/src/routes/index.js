@@ -463,6 +463,11 @@ export default (app) => {
     res.sendFile(path.resolve(publicPath, "stats.html"));
   });
 
+  app.get("/charts", (req, res) => {
+    const publicPath = path.resolve(__dirname, "../public");
+    res.sendFile(path.resolve(publicPath, "charts.html"));
+  });
+
   app.get("/services-dashboard", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "services-dashboard.html"));

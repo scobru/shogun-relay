@@ -857,6 +857,7 @@
                 <th>Created</th>
                 <th>Expires</th>
                 <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -870,6 +871,10 @@
                   ? '<span style="color: var(--success);">Active</span>' 
                   : '<span style="color: var(--text-secondary);">Inactive</span>';
                 
+                const activateButton = d.paymentStatus === 'pending' && !d.active
+                  ? `<button onclick="activatePendingDeal('${d.dealId}', '${d.cid}')" class="btn btn-sm btn-primary" title="Activate this deal (will call registerDeal on-chain)">Activate</button>`
+                  : '';
+                
                 return `
                 <tr>
                   <td class="address" title="${d.cid}">${truncateCid(d.cid)}</td>
@@ -880,6 +885,7 @@
                   <td>${createdDate}</td>
                   <td>${expiresDate}</td>
                   <td>${statusBadge}</td>
+                  <td>${activateButton}</td>
                 </tr>
               `;
               }).join('')}
@@ -1045,6 +1051,32 @@
     function truncateCid(cid) {
       if (!cid) return '-';
       return cid.length > 20 ? `${cid.slice(0, 10)}...${cid.slice(-6)}` : cid;
+    }
+
+    async function activatePendingDeal(dealId, cid) {
+      if (!confirm(`Activate deal ${truncateCid(dealId)}?\n\nThis will call registerDeal() on-chain to finalize payment.`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/v1/deals/${dealId}/activate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          alert(`Deal activated successfully!\n\nTransaction: ${data.onChainTx || 'pending'}`);
+          loadDeals(); // Reload deals list
+        } else {
+          alert(`Failed to activate deal: ${data.error || 'Unknown error'}`);
+        }
+      } catch (error) {
+        console.error('Activate deal error:', error);
+        alert(`Error activating deal: ${error.message}`);
+      }
     }
   </script>
 </body>
