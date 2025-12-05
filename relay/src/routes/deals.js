@@ -64,6 +64,256 @@ function removeCachedDeal(dealId) {
   pendingDealsCache.delete(dealId);
 }
 
+/**
+ * Apply tier-specific features (erasure coding and replication)
+ * Called automatically when premium/enterprise deals are activated
+ * 
+ * @param {object} deal - Activated deal
+ * @param {object} req - Express request object (for accessing app context)
+ */
+async function applyTierFeatures(deal, req) {
+  if (!req || !req.app) {
+    console.warn('⚠️ Request context not available, skipping tier features');
+    return;
+  }
+
+  const gun = req.app.get('gunInstance');
+  if (!gun) {
+    console.warn('⚠️ Gun not available, skipping tier features');
+    return;
+  }
+
+  const cid = deal.cid;
+  const replicationFactor = deal.replicationFactor || 1;
+  const shouldApplyErasure = deal.erasureCoding || false;
+
+  console.log(`🔧 Applying tier features for deal ${deal.id}:`);
+  console.log(`   - Erasure Coding: ${shouldApplyErasure ? 'Yes' : 'No'}`);
+  console.log(`   - Replication Factor: ${replicationFactor}x`);
+
+  // Apply erasure coding if enabled
+  if (shouldApplyErasure) {
+    try {
+      console.log(`📦 Applying erasure coding to CID: ${cid}`);
+      
+      // Helper function to download from IPFS
+      const downloadFromIPFS = async (cidToDownload) => {
+        return new Promise((resolve, reject) => {
+          const options = {
+            hostname: '127.0.0.1',
+            port: 5001,
+            path: `/api/v0/cat?arg=${encodeURIComponent(cidToDownload)}`,
+            method: 'POST',
+            headers: { 'Content-Length': '0' },
+          };
+          
+          if (IPFS_API_TOKEN) {
+            options.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
+          }
+          
+          const req = http.request(options, (res) => {
+            const chunks = [];
+            res.on('data', chunk => chunks.push(chunk));
+            res.on('end', () => {
+              if (res.statusCode === 200) {
+                resolve(Buffer.concat(chunks));
+              } else {
+                reject(new Error(`IPFS download failed with status ${res.statusCode}`));
+              }
+            });
+          });
+          
+          req.on('error', reject);
+          req.setTimeout(120000, () => {
+            req.destroy();
+            reject(new Error('IPFS download timeout'));
+          });
+          req.end();
+        });
+      };
+      
+      // Helper function to upload buffer to IPFS
+      const uploadToIPFS = async (buffer, filename = 'chunk') => {
+        return new Promise((resolve, reject) => {
+          const form = new FormData();
+          form.append('file', buffer, {
+            filename: filename,
+            contentType: 'application/octet-stream',
+          });
+          
+          const options = {
+            hostname: '127.0.0.1',
+            port: 5001,
+            path: '/api/v0/add?pin=true',
+            method: 'POST',
+            headers: form.getHeaders(),
+          };
+          
+          if (IPFS_API_TOKEN) {
+            options.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
+          }
+          
+          const req = http.request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+              if (res.statusCode === 200) {
+                try {
+                  const result = JSON.parse(data);
+                  resolve(result.Hash);
+                } catch (e) {
+                  reject(new Error('Failed to parse IPFS upload response'));
+                }
+              } else {
+                reject(new Error(`IPFS upload failed with status ${res.statusCode}`));
+              }
+            });
+          });
+          
+          req.on('error', reject);
+          req.setTimeout(60000, () => {
+            req.destroy();
+            reject(new Error('IPFS upload timeout'));
+          });
+          
+          form.pipe(req);
+        });
+      };
+      
+      // Step 1: Download file from IPFS
+      console.log(`📥 Downloading file from IPFS: ${cid}`);
+      const fileData = await downloadFromIPFS(cid);
+      console.log(`✅ Downloaded ${(fileData.length / 1024 / 1024).toFixed(2)} MB`);
+      
+      // Step 2: Apply erasure coding
+      const erasureConfig = {
+        chunkSize: 256 * 1024,      // 256KB chunks
+        dataChunks: 10,             // 10 data chunks
+        parityChunks: 4,             // 4 parity chunks (40% redundancy)
+        minChunksForRecovery: 10,    // Need 10 chunks to recover
+      };
+      
+      console.log(`🔧 Encoding data with erasure coding...`);
+      const encoded = ErasureCoding.encodeData(fileData, erasureConfig);
+      
+      console.log(`✅ Encoded into ${encoded.dataChunkCount} data chunks + ${encoded.parityChunkCount} parity chunks`);
+      
+      // Step 3: Upload all chunks to IPFS
+      console.log(`📤 Uploading chunks to IPFS...`);
+      const chunkCids = [];
+      
+      // Upload data chunks
+      for (let i = 0; i < encoded.dataChunks.length; i++) {
+        const chunkCid = await uploadToIPFS(encoded.dataChunks[i], `data-chunk-${i}`);
+        const chunkInfo = encoded.chunks[i]; // chunkInfos array has metadata
+        chunkCids.push({
+          type: 'data',
+          index: i,
+          cid: chunkCid,
+          hash: chunkInfo.hash,
+          size: chunkInfo.size,
+        });
+        console.log(`  ✅ Data chunk ${i + 1}/${encoded.dataChunkCount}: ${chunkCid}`);
+      }
+      
+      // Upload parity chunks
+      for (let i = 0; i < encoded.parityChunks.length; i++) {
+        const parityIndex = encoded.dataChunkCount + i;
+        const parityCid = await uploadToIPFS(encoded.parityChunks[i], `parity-chunk-${i}`);
+        const chunkInfo = encoded.chunks[parityIndex]; // chunkInfos includes both data and parity
+        chunkCids.push({
+          type: 'parity',
+          index: i,
+          cid: parityCid,
+          hash: chunkInfo.hash,
+          size: chunkInfo.size,
+        });
+        console.log(`  ✅ Parity chunk ${i + 1}/${encoded.parityChunkCount}: ${parityCid}`);
+      }
+      
+      // Step 4: Store erasure metadata in deal
+      const erasureMetadata = {
+        originalCid: cid,
+        originalSize: fileData.length,
+        chunkSize: erasureConfig.chunkSize,
+        dataChunks: encoded.dataChunkCount,
+        parityChunks: encoded.parityChunkCount,
+        minChunksForRecovery: erasureConfig.minChunksForRecovery,
+        redundancyPercent: encoded.redundancyPercent,
+        chunks: chunkCids,
+        encodedAt: Date.now(),
+      };
+      
+      deal.erasureMetadata = erasureMetadata;
+      
+      // Save updated deal with erasure metadata
+      const relayUser = getRelayUser();
+      if (relayUser?._.sea) {
+        await StorageDeals.saveDeal(gun, deal, relayUser._.sea);
+        console.log(`✅ Erasure coding metadata saved to deal ${deal.id}`);
+      }
+      
+      console.log(`✅ Erasure coding completed successfully for deal ${deal.id}`);
+      console.log(`   - Original CID: ${cid}`);
+      console.log(`   - Total chunks: ${chunkCids.length} (${encoded.dataChunkCount} data + ${encoded.parityChunkCount} parity)`);
+      console.log(`   - Redundancy: ${encoded.redundancyPercent}%`);
+      
+    } catch (error) {
+      console.error(`❌ Erasure coding failed:`, error);
+      // Don't throw - deal is still active without erasure coding
+      // But log the error for debugging
+      deal.erasureCodingError = {
+        message: error.message,
+        timestamp: Date.now(),
+      };
+    }
+  }
+
+  // Apply replication if replicationFactor > 1
+  if (replicationFactor > 1) {
+    try {
+      console.log(`🔄 Requesting ${replicationFactor}x replication for CID: ${cid}`);
+      
+      // Use network pin-request to request replication
+      const autoReplication = process.env.AUTO_REPLICATION !== 'false';
+      if (autoReplication) {
+        // Publish pin request to network via GunDB
+        const relayPub = req.app.get('relayUserPub');
+        const requestId = crypto.randomBytes(8).toString('hex');
+        
+        const pinRequest = {
+          id: requestId,
+          cid,
+          requester: relayPub,
+          replicationFactor,
+          priority: deal.tier === 'enterprise' ? 'high' : 'normal',
+          timestamp: Date.now(),
+          status: 'pending',
+          dealId: deal.id,
+        };
+
+        gun.get('shogun-network').get('pin-requests').get(requestId).put(pinRequest);
+        console.log(`✅ Replication request published: ${cid} (${replicationFactor}x)`);
+        
+        // Update deal with replication request info
+        deal.replicationRequestId = requestId;
+        deal.replicationRequestedAt = Date.now();
+        
+        // Save updated deal
+        const relayUser = getRelayUser();
+        if (relayUser?._.sea) {
+          await StorageDeals.saveDeal(gun, deal, relayUser._.sea);
+        }
+      } else {
+        console.log(`⚠️ Auto-replication disabled - replication not requested`);
+      }
+    } catch (error) {
+      console.error(`❌ Replication request failed:`, error);
+      // Don't throw - deal is still active without replication
+    }
+  }
+}
+
 // Configure multer for deal uploads
 const dealUpload = multer({
   storage: multer.memoryStorage(),
