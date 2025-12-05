@@ -436,7 +436,9 @@ router.post('/deal/complete', async (req, res) => {
 /**
  * GET /api/v1/registry/deals
  * 
- * Get all deals for this relay
+ * Get all deals for this relay from StorageDealRegistry
+ * Note: Payment is automatically transferred to relay when registerDeal() is called
+ * The relay receives payment immediately upon deal registration (via safeTransferFrom in the contract)
  */
 router.get('/deals', async (req, res) => {
   try {
@@ -447,16 +449,32 @@ router.get('/deals', async (req, res) => {
       });
     }
 
-    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
-    const deals = await client.getRelayDeals(client.wallet.address);
+    const { createStorageDealRegistryClient } = await import('../utils/registry-client.js');
+    const storageDealRegistryClient = createStorageDealRegistryClient(REGISTRY_CHAIN_ID);
+    const registryClient = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const relayAddress = registryClient.wallet.address;
+    
+    // Get deals from StorageDealRegistry (not from RelayRegistry)
+    const deals = await storageDealRegistryClient.getRelayDeals(relayAddress);
+
+    // Enrich deals with payment status
+    // Payment is automatically received when registerDeal() is called (via safeTransferFrom)
+    const enrichedDeals = deals.map(deal => ({
+      ...deal,
+      paymentReceived: deal.active && deal.createdAt !== '1970-01-01T00:00:00.000Z', // Payment received when deal is active and created
+      paymentStatus: deal.active ? 'paid' : 'pending',
+      canWithdraw: false, // Payment is already in relay wallet - no withdrawal needed
+    }));
 
     res.json({
       success: true,
-      relayAddress: client.wallet.address,
+      relayAddress,
       dealCount: deals.length,
-      deals,
+      deals: enrichedDeals,
+      note: 'Payment is automatically transferred to relay wallet when registerDeal() is called. No manual withdrawal needed.',
     });
   } catch (error) {
+    console.error('Error fetching relay deals:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

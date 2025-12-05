@@ -816,7 +816,36 @@
           return;
         }
         
+        // Calculate totals
+        const totalDeals = data.deals.length;
+        const activeDeals = data.deals.filter(d => d.active).length;
+        const totalRevenue = data.deals.reduce((sum, d) => sum + parseFloat(d.priceUSDC || 0), 0);
+        const paidDeals = data.deals.filter(d => d.paymentStatus === 'paid').length;
+        
         content.innerHTML = `
+          <div style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border);">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+              <div>
+                <div style="color: var(--text-secondary); font-size: 0.85rem;">Total Deals</div>
+                <div style="color: var(--accent); font-size: 1.25rem; font-weight: 600;">${totalDeals}</div>
+              </div>
+              <div>
+                <div style="color: var(--text-secondary); font-size: 0.85rem;">Active</div>
+                <div style="color: var(--success); font-size: 1.25rem; font-weight: 600;">${activeDeals}</div>
+              </div>
+              <div>
+                <div style="color: var(--text-secondary); font-size: 0.85rem;">Total Revenue</div>
+                <div style="color: var(--success); font-size: 1.25rem; font-weight: 600;">${totalRevenue.toFixed(4)} USDC</div>
+              </div>
+              <div>
+                <div style="color: var(--text-secondary); font-size: 0.85rem;">Paid Deals</div>
+                <div style="color: var(--success); font-size: 1.25rem; font-weight: 600;">${paidDeals}</div>
+              </div>
+            </div>
+            <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: 0.85rem;">
+              ℹ️ Payment is automatically transferred to your relay wallet when you call registerDeal(). No manual withdrawal needed.
+            </div>
+          </div>
           <table class="deals-table">
             <thead>
               <tr>
@@ -824,21 +853,36 @@
                 <th>Client</th>
                 <th>Size</th>
                 <th>Price</th>
+                <th>Payment Status</th>
+                <th>Created</th>
                 <th>Expires</th>
-                <th>Active</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              ${data.deals.map(d => `
+              ${data.deals.map(d => {
+                const createdDate = d.createdAt ? new Date(d.createdAt).toLocaleDateString() : 'N/A';
+                const expiresDate = d.expiresAt ? new Date(d.expiresAt).toLocaleDateString() : 'N/A';
+                const paymentStatus = d.paymentStatus === 'paid' 
+                  ? '<span style="color: var(--success);">✅ Paid</span>' 
+                  : '<span style="color: var(--warning);">⏳ Pending</span>';
+                const statusBadge = d.active 
+                  ? '<span style="color: var(--success);">Active</span>' 
+                  : '<span style="color: var(--text-secondary);">Inactive</span>';
+                
+                return `
                 <tr>
-                  <td class="address">${truncateCid(d.cid)}</td>
-                  <td class="address">${truncateAddress(d.client)}</td>
-                  <td>${d.sizeMB} MB</td>
-                  <td>${d.priceUSDC} USDC</td>
-                  <td>${new Date(d.expiresAt).toLocaleDateString()}</td>
-                  <td>${d.active ? 'Yes' : 'No'}</td>
+                  <td class="address" title="${d.cid}">${truncateCid(d.cid)}</td>
+                  <td class="address" title="${d.client}">${truncateAddress(d.client)}</td>
+                  <td>${d.sizeMB || '-'} MB</td>
+                  <td><strong>${d.priceUSDC || '0'} USDC</strong></td>
+                  <td>${paymentStatus}</td>
+                  <td>${createdDate}</td>
+                  <td>${expiresDate}</td>
+                  <td>${statusBadge}</td>
                 </tr>
-              `).join('')}
+              `;
+              }).join('')}
             </tbody>
           </table>
         `;
