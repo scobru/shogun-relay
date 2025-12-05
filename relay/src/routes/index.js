@@ -488,15 +488,8 @@ export default (app) => {
     res.sendFile(path.resolve(publicPath, "graph.html"));
   });
 
-  app.get("/chat", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "chat.html"));
-  });
-
-  app.get("/subscription", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "subscription.html"));
-  });
+  // Removed /chat and /subscription - these files have been deleted
+  // Chat and subscription functionality is now handled by external apps
 
   // Deals dashboard removed - now using external @shogun-deals app
 
@@ -829,9 +822,7 @@ export default (app) => {
     "/notes",
     "/upload",
     "/graph",
-    "/chat",
     "/charts",
-    "/subscription",
     "/registry-dashboard",
     "/endpoints",
     "/visualGraph",
