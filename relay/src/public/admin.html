@@ -85,8 +85,15 @@
         }
 
         @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4); }
-            50% { box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2); }
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4);
+            }
+
+            50% {
+                box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2);
+            }
         }
 
         .pulse-glow {
@@ -110,9 +117,12 @@
         <div class="container mx-auto px-4 py-8 max-w-6xl">
             <!-- Header -->
             <header class="text-center mb-12">
-                <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-[#FF69B4] to-[#FF1493] mb-6 pulse-glow">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                <div
+                    class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-[#FF69B4] to-[#FF1493] mb-6 pulse-glow">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                 </div>
                 <h1 class="text-4xl md:text-5xl font-bold text-white mb-4">Shogun Relay Admin Panel</h1>
@@ -120,37 +130,46 @@
             </header>
 
             <!-- Admin Password Section -->
-            <div id="adminPasswordSection" class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover max-w-md mx-auto mb-8">
+            <div id="adminPasswordSection"
+                class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover max-w-md mx-auto mb-8">
                 <div class="p-6">
                     <div class="flex items-center gap-3 mb-4">
                         <div class="feature-icon bg-gradient-to-br from-[#FF69B4] to-[#FF1493]">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none"
+                                viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                             </svg>
                         </div>
                         <h3 class="text-lg font-medium text-[#FF69B4]">Centralized Admin Authentication</h3>
                     </div>
                     <p class="text-sm text-[#E0E0E0] leading-relaxed mb-4">
-                        Enter the admin password to access all applications. If the password is incorrect, only public applications will be visible.
+                        Enter the admin password to access all applications. If the password is incorrect, only public
+                        applications will be visible.
                     </p>
                     <div class="space-y-4">
                         <input type="password" id="adminPassword"
                             class="input w-full bg-[#404040] border-0 text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:ring-opacity-50"
                             placeholder="Enter Admin Password" />
                         <div class="flex gap-3">
-                            <button class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] flex-1 rounded-xl px-4 py-3 font-medium transition-all duration-200"
+                            <button
+                                class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] flex-1 rounded-xl px-4 py-3 font-medium transition-all duration-200"
                                 onclick="saveAdminPassword()">
                                 Save Password
                             </button>
-                            <button class="btn bg-transparent border border-[#404040] text-[#E0E0E0] hover:bg-[#404040] flex-1 rounded-xl px-4 py-3 font-medium transition-all duration-200"
+                            <button
+                                class="btn bg-transparent border border-[#404040] text-[#E0E0E0] hover:bg-[#404040] flex-1 rounded-xl px-4 py-3 font-medium transition-all duration-200"
                                 onclick="clearAdminPassword()">
                                 Clear
                             </button>
                         </div>
-                        <div id="passwordStatus" class="flex items-center gap-2 text-sm text-center text-[#E0E0E0] opacity-90 min-h-[20px]">
+                        <div id="passwordStatus"
+                            class="flex items-center gap-2 text-sm text-center text-[#E0E0E0] opacity-90 min-h-[20px]">
                             <span class="text-[#FFA500]">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                 </svg>
                             </span>
                             <span>Limited Access - Only public applications visible</span>
@@ -161,16 +180,21 @@
 
             <!-- Quick Stats Bar -->
             <div class="flex flex-wrap justify-center gap-4 mb-12">
-                <a href="/" class="flex items-center gap-2 px-4 py-2 bg-[#282828] rounded-full border border-[#404040] hover:border-[#FF69B4] transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#42A5F5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                <a href="/"
+                    class="flex items-center gap-2 px-4 py-2 bg-[#282828] rounded-full border border-[#404040] hover:border-[#FF69B4] transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#42A5F5]" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                     </svg>
                     <span class="text-[#E0E0E0] text-sm">Back to Public Interface</span>
                 </a>
                 <div class="flex items-center gap-2 px-4 py-2 bg-[#282828] rounded-full border border-[#404040]">
                     <span class="text-[#FFA500]">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
                     </span>
                     <span class="text-[#E0E0E0] text-sm">Protected Area</span>
@@ -179,7 +203,7 @@
 
             <!-- Main Grid -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                
+
                 <!-- Monitoring & Analytics Card -->
                 <div class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover">
                     <div class="p-6">
@@ -188,8 +212,10 @@
                         <div class="space-y-2">
                             <a href="/stats" class="nav-link flex items-center gap-3 text-white admin-protected">
                                 <div class="feature-icon bg-[#4CAF50]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#4CAF50]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#4CAF50]" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                                     </svg>
                                 </div>
                                 <div class="flex-1">
@@ -197,15 +223,19 @@
                                     <p class="text-xs text-[#A0A0A0]">Real-time metrics and monitoring</p>
                                 </div>
                                 <span class="text-[#FFA500]">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                     </svg>
                                 </span>
                             </a>
                             <a href="/graph" class="nav-link flex items-center gap-3 text-white">
                                 <div class="feature-icon bg-[#42A5F5]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#42A5F5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#42A5F5]" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                                     </svg>
                                 </div>
                                 <div>
@@ -215,8 +245,10 @@
                             </a>
                             <a href="/visualGraph" class="nav-link flex items-center gap-3 text-white">
                                 <div class="feature-icon bg-[#9C27B0]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#9C27B0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#9C27B0]" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
                                     </svg>
                                 </div>
                                 <div>
@@ -234,26 +266,13 @@
                         <h2 class="text-xl font-semibold text-[#FF69B4] mb-4">Storage & Files</h2>
                         <p class="text-[#A0A0A0] text-sm mb-5">IPFS storage management and file operations</p>
                         <div class="space-y-2">
-                            <a href="/subscription" class="nav-link flex items-center gap-3 text-white admin-protected">
-                                <div class="feature-icon bg-gradient-to-br from-[#FF69B4] to-[#FF1493]">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                                    </svg>
-                                </div>
-                                <div class="flex-1">
-                                    <span class="font-medium">Storage Subscription</span>
-                                    <p class="text-xs text-[#A0A0A0]">x402 payment-based storage</p>
-                                </div>
-                                <span class="text-[#FFA500]">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                    </svg>
-                                </span>
-                            </a>
+
                             <a href="/upload" class="nav-link flex items-center gap-3 text-white admin-protected">
                                 <div class="feature-icon bg-[#42A5F5]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#42A5F5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#42A5F5]" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                                     </svg>
                                 </div>
                                 <div class="flex-1">
@@ -261,15 +280,19 @@
                                     <p class="text-xs text-[#A0A0A0]">Direct file upload with encryption</p>
                                 </div>
                                 <span class="text-[#FFA500]">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                     </svg>
                                 </span>
                             </a>
                             <a href="/pin-manager" class="nav-link flex items-center gap-3 text-white admin-protected">
                                 <div class="feature-icon bg-[#F44336]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#F44336]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#F44336]" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                                     </svg>
                                 </div>
                                 <div class="flex-1">
@@ -277,15 +300,19 @@
                                     <p class="text-xs text-[#A0A0A0]">Manage pins and garbage collection</p>
                                 </div>
                                 <span class="text-[#FFA500]">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                     </svg>
                                 </span>
                             </a>
                             <a href="/ipfs-status" class="nav-link flex items-center gap-3 text-white">
                                 <div class="feature-icon bg-[#00BCD4]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#00BCD4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#00BCD4]" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                                     </svg>
                                 </div>
                                 <div>
@@ -305,9 +332,12 @@
                         <div class="space-y-2">
                             <a href="/admin" class="nav-link flex items-center gap-3 text-white">
                                 <div class="feature-icon bg-[#FFB74D]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#FFB74D]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#FFB74D]" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                     </svg>
                                 </div>
                                 <div>
@@ -315,10 +345,13 @@
                                     <p class="text-xs text-[#A0A0A0]">GunDB management & config</p>
                                 </div>
                             </a>
-                            <a href="/services-dashboard" class="nav-link flex items-center gap-3 text-white admin-protected">
+                            <a href="/services-dashboard"
+                                class="nav-link flex items-center gap-3 text-white admin-protected">
                                 <div class="feature-icon bg-[#64B5F6]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#64B5F6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#64B5F6]" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
                                     </svg>
                                 </div>
                                 <div class="flex-1">
@@ -326,15 +359,19 @@
                                     <p class="text-xs text-[#A0A0A0]">Monitor system services</p>
                                 </div>
                                 <span class="text-[#FFA500]">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                     </svg>
                                 </span>
                             </a>
                             <a href="/charts" class="nav-link flex items-center gap-3 text-white admin-protected">
                                 <div class="feature-icon bg-[#4CAF50]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#4CAF50]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#4CAF50]" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
                                     </svg>
                                 </div>
                                 <div class="flex-1">
@@ -342,8 +379,10 @@
                                     <p class="text-xs text-[#A0A0A0]">Performance visualization</p>
                                 </div>
                                 <span class="text-[#FFA500]">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                     </svg>
                                 </span>
                             </a>
@@ -358,12 +397,16 @@
                             <h2 class="text-xl font-semibold text-[#FF69B4]">On-Chain Registry</h2>
                             <span class="badge-new">Base</span>
                         </div>
-                        <p class="text-[#A0A0A0] text-sm mb-5">Manage relay registration, staking, and on-chain operations</p>
+                        <p class="text-[#A0A0A0] text-sm mb-5">Manage relay registration, staking, and on-chain
+                            operations</p>
                         <div class="space-y-2">
-                            <a href="/registry-dashboard" class="nav-link flex items-center gap-3 text-white admin-protected">
+                            <a href="/registry-dashboard"
+                                class="nav-link flex items-center gap-3 text-white admin-protected">
                                 <div class="feature-icon bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9]">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                                     </svg>
                                 </div>
                                 <div class="flex-1">
@@ -371,8 +414,10 @@
                                     <p class="text-xs text-[#A0A0A0]">Staking, registration, slashing</p>
                                 </div>
                                 <span class="text-[#FFA500]">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                     </svg>
                                 </span>
                             </a>
@@ -388,9 +433,12 @@
                         <div class="space-y-2">
                             <a href="/ipfs-status" class="nav-link flex items-center gap-3 text-white">
                                 <div class="feature-icon bg-[#A0A0A0]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#A0A0A0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#A0A0A0]" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                     </svg>
                                 </div>
                                 <div>
@@ -400,8 +448,10 @@
                             </a>
                             <a href="/endpoints" class="nav-link flex items-center gap-3 text-white">
                                 <div class="feature-icon bg-[#64B5F6]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#64B5F6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#64B5F6]" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                                     </svg>
                                 </div>
                                 <div>
@@ -419,10 +469,12 @@
                 <div class="section-divider"></div>
                 <div class="flex flex-col items-center gap-4">
                     <div class="flex items-center gap-6">
-                        <a href="https://github.com/scobru/shogun" target="_blank" rel="noopener" 
-                           class="text-[#A0A0A0] hover:text-[#FF69B4] transition-colors flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                        <a href="https://github.com/scobru/shogun" target="_blank" rel="noopener"
+                            class="text-[#A0A0A0] hover:text-[#FF69B4] transition-colors flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor"
+                                viewBox="0 0 24 24">
+                                <path
+                                    d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
                             </svg>
                             GitHub
                         </a>
@@ -432,7 +484,8 @@
                         Shogun Relay Admin Panel - Built with GunDB & IPFS
                     </p>
                     <p class="text-[#606060] text-xs">
-                        Part of the <a href="https://github.com/scobru/shogun" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">Shogun Project</a>
+                        Part of the <a href="https://github.com/scobru/shogun"
+                            class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">Shogun Project</a>
                     </p>
                 </div>
             </footer>
