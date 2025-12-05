@@ -1452,22 +1452,6 @@ router.post('/:dealId/report', express.json(), async (req, res) => {
     const storageDealRegistryClient = createStorageDealRegistryClient(chainId);
     const storageDealRegistryAddress = storageDealRegistryClient.registryAddress;
     
-    // Calculate griefing cost before preparing transaction
-    let griefingCost = null;
-    let slashAmount = null;
-    try {
-      const slashBps = reportType === 'missedProof' ? 100 : 1000; // 1% or 10%
-      const costInfo = await registryClient.calculateGriefingCost(
-        relayAddress,
-        slashBps,
-        onChainDealId
-      );
-      slashAmount = costInfo.slashAmount;
-      griefingCost = costInfo.cost;
-    } catch (error) {
-      console.warn(`Failed to calculate griefing cost: ${error.message}`);
-    }
-    
     // Prepare function call data (using StorageDealRegistry.grief)
     // StorageDealRegistry.grief calculates griefing cost and delegates to RelayRegistry
     const storageDealRegistryInterface = new ethers.Interface([
