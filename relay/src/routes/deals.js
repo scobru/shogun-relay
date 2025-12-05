@@ -274,10 +274,14 @@ router.post('/create', express.json(), async (req, res) => {
     let selectedRelayPub = relayPub;
     let selectedRelayAddress = null;
     
+    // Return payment instructions for USDC transfer
+    // Client must transfer USDC to relay address, then relay will register deal on-chain
+    const REGISTRY_CHAIN_ID = process.env.REGISTRY_CHAIN_ID;
+    const RELAY_PRIVATE_KEY = process.env.RELAY_PRIVATE_KEY;
+    
     // If relayAddress is provided, verify it's registered and get its info
     if (relayAddress) {
       try {
-        const REGISTRY_CHAIN_ID = process.env.REGISTRY_CHAIN_ID;
         if (REGISTRY_CHAIN_ID) {
           const registryClient = createRegistryClient(parseInt(REGISTRY_CHAIN_ID));
           const relayInfo = await registryClient.getRelayInfo(relayAddress);
@@ -336,11 +340,6 @@ router.post('/create', express.json(), async (req, res) => {
     // Cache deal for quick activation (GunDB sync can be slow)
     cacheDeal(deal);
     console.log(`📝 Deal ${deal.id} created and cached for ${deal.cid}`);
-    
-    // Return payment instructions for USDC transfer
-    // Client must transfer USDC to relay address, then relay will register deal on-chain
-    const REGISTRY_CHAIN_ID = process.env.REGISTRY_CHAIN_ID;
-    const RELAY_PRIVATE_KEY = process.env.RELAY_PRIVATE_KEY;
     
     let relayAddress = null;
     if (RELAY_PRIVATE_KEY && REGISTRY_CHAIN_ID) {
