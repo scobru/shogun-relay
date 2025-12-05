@@ -36,7 +36,7 @@ const REGISTRY_ABI = [
   // View functions
   'function getActiveRelays() view returns (address[])',
   'function getActiveRelayCount() view returns (uint256)',
-  'function getRelayInfo(address relay) view returns (tuple(address owner, string endpoint, string gunPubKey, uint256 stakedAmount, uint256 registeredAt, uint256 unstakeRequestedAt, uint8 status, uint256 totalDeals, uint256 totalSlashed, uint256 griefingRatio))',
+  'function getRelayInfo(address relay) view returns (tuple(address owner, string endpoint, bytes pubkey, bytes epub, uint256 stakedAmount, uint256 registeredAt, uint256 updatedAt, uint256 unstakeRequestedAt, uint8 status, uint256 totalSlashed, uint256 griefingRatio))',
   'function isActiveRelay(address relay) view returns (bool)',
   'function deals(bytes32 dealId) view returns (tuple(bytes32 dealId, address relay, address client, string cid, uint256 sizeMB, uint256 priceUSDC, uint256 createdAt, uint256 expiresAt, bool active, uint256 clientStake))',
   'function getRelayDeals(address relay) view returns (bytes32[])',
@@ -122,16 +122,24 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
       for (const addr of addresses) {
         try {
           const info = await registry.getRelayInfo(addr);
+          // Convert bytes to string for pubkey and epub
+          const gunPubKey = info.pubkey && info.pubkey.length > 0 
+            ? ethers.toUtf8String(info.pubkey) 
+            : '';
+          const epub = info.epub && info.epub.length > 0 
+            ? ethers.toUtf8String(info.epub) 
+            : '';
+          
           relays.push({
             address: addr,
             owner: info.owner,
             endpoint: info.endpoint,
-            gunPubKey: info.gunPubKey,
+            gunPubKey,
+            epub,
             stakedAmount: ethers.formatUnits(info.stakedAmount, 6),
             stakedAmountRaw: info.stakedAmount.toString(),
             registeredAt: new Date(Number(info.registeredAt) * 1000).toISOString(),
             status: RelayStatus[info.status] || 'Unknown',
-            totalDeals: Number(info.totalDeals),
             totalSlashed: ethers.formatUnits(info.totalSlashed, 6),
             griefingRatio: info.griefingRatio ? Number(info.griefingRatio) : null,
           });
@@ -163,19 +171,28 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
         if (info.owner === ethers.ZeroAddress) {
           return null;
         }
+        // Convert bytes to string for pubkey and epub
+        const gunPubKey = info.pubkey && info.pubkey.length > 0 
+          ? ethers.toUtf8String(info.pubkey) 
+          : '';
+        const epub = info.epub && info.epub.length > 0 
+          ? ethers.toUtf8String(info.epub) 
+          : '';
+        
         return {
           address: relayAddress,
           owner: info.owner,
           endpoint: info.endpoint,
-          gunPubKey: info.gunPubKey,
+          gunPubKey,
+          epub,
           stakedAmount: ethers.formatUnits(info.stakedAmount, 6),
           stakedAmountRaw: info.stakedAmount.toString(),
           registeredAt: new Date(Number(info.registeredAt) * 1000).toISOString(),
+          updatedAt: new Date(Number(info.updatedAt) * 1000).toISOString(),
           unstakeRequestedAt: info.unstakeRequestedAt > 0
             ? new Date(Number(info.unstakeRequestedAt) * 1000).toISOString()
             : null,
           status: RelayStatus[info.status] || 'Unknown',
-          totalDeals: Number(info.totalDeals),
           totalSlashed: ethers.formatUnits(info.totalSlashed, 6),
           griefingRatio: info.griefingRatio ? Number(info.griefingRatio) : null,
         };
