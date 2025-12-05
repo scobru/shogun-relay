@@ -442,31 +442,34 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
     const relayAddress = registryClient.wallet.address;
     const { ethers } = await import('ethers');
     
-    // If paymentTxHash provided, verify it
-    if (paymentTxHash) {
-      try {
-        const provider = registryClient.provider;
-        const receipt = await provider.getTransactionReceipt(paymentTxHash);
-        
-        if (!receipt || receipt.status !== 1) {
-          return res.status(400).json({
-            success: false,
-            error: 'Invalid payment transaction',
-          });
-        }
-        
-        // Verify transaction was USDC transfer to relay
-        // TODO: Parse transaction to verify USDC amount matches deal price
-        console.log(`✅ Payment transaction verified: ${paymentTxHash}`);
-      } catch (error) {
-        console.warn(`⚠️ Could not verify payment transaction: ${error.message}`);
-        // Continue anyway - relay can verify payment manually
+    // Verify client has approved StorageDealRegistry for payment
+    // The contract will pull payment via safeTransferFrom when registerDeal is called
+    try {
+      const storageDealRegistryClient = createStorageDealRegistryClient(parseInt(REGISTRY_CHAIN_ID));
+      const usdcContract = new ethers.Contract(
+        storageDealRegistryClient.usdcAddress,
+        ['function allowance(address owner, address spender) view returns (uint256)'],
+        registryClient.provider
+      );
+      
+      const priceUSDCAtomic = Math.ceil(deal.pricing.totalPriceUSDC * 1000000);
+      const allowance = await usdcContract.allowance(deal.clientAddress, storageDealRegistryClient.registryAddress);
+      
+      if (allowance < BigInt(priceUSDCAtomic)) {
+        return res.status(400).json({
+          success: false,
+          error: `Client has not approved enough USDC. Need: ${priceUSDCAtomic}, Approved: ${allowance.toString()}`,
+        });
       }
+      
+      console.log(`✅ Client approval verified: ${allowance.toString()} USDC approved`);
+    } catch (error) {
+      console.warn(`⚠️ Could not verify approval: ${error.message}`);
+      // Continue anyway - contract will fail if approval insufficient
     }
     
     // Activate deal
-    const txHash = paymentTxHash || 'manual';
-    console.log(`Activating deal ${dealId} with payment TX: ${txHash}`);
+    console.log(`Activating deal ${dealId} - payment will be handled by StorageDealRegistry contract`);
     
     const activatedDeal = StorageDeals.activateDeal(deal, txHash);
     console.log(`Deal activated object created, status: ${activatedDeal.status}`);
