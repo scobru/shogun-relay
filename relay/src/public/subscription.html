@@ -319,6 +319,25 @@
               </div>
             </div>
 
+            <!-- Auto-suggest banner (suggests deals for large files) -->
+            <div id="suggestionBanner" class="mt-4 p-4 bg-[#1A1A1A] rounded-xl border border-[#42A5F5] hidden">
+              <div class="flex items-start gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#42A5F5] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div class="flex-1">
+                  <p class="text-[#42A5F5] font-medium mb-1">Consider using Storage Deals instead</p>
+                  <p class="text-[#A0A0A0] text-sm mb-2" id="suggestionReason"></p>
+                  <a href="/deals" class="text-[#42A5F5] text-sm hover:underline">Go to Storage Deals →</a>
+                </div>
+                <button onclick="document.getElementById('suggestionBanner').classList.add('hidden')" class="text-[#606060] hover:text-[#A0A0A0]">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
             <div id="uploadProgress" class="upload-progress" style="display: none;">
               <div class="progress-bar" id="progressBar" style="width: 0%;">0%</div>
             </div>
@@ -880,7 +899,7 @@
     }
 
     // File upload handlers
-    function handleFileSelect(file) {
+    async function handleFileSelect(file) {
       if (!file) return;
       
       selectedFile = file;
@@ -889,6 +908,44 @@
       selectedFileInfo.style.display = 'block';
       uploadBtn.disabled = false;
       uploadResult.style.display = 'none';
+      
+      // Auto-suggest: check if deals would be better
+      const fileSizeMB = file.size / (1024 * 1024);
+      const suggestionBanner = document.getElementById('suggestionBanner');
+      const suggestionReason = document.getElementById('suggestionReason');
+      
+      // Hide banner initially
+      suggestionBanner.classList.add('hidden');
+      
+      // Check recommendation if file is large (>100MB) or if we want to check always
+      if (fileSizeMB > 100) {
+        try {
+          const params = new URLSearchParams({
+            fileSizeMB: fileSizeMB.toString(),
+            durationDays: '30', // Default subscription duration
+          });
+          
+          if (connectedAddress) {
+            params.append('userAddress', connectedAddress);
+          }
+          
+          const response = await fetch(`/api/v1/x402/recommend?${params.toString()}`);
+          const data = await response.json();
+          
+          if (data.success && data.recommendation) {
+            const rec = data.recommendation;
+            
+            // Show suggestion if deals are recommended
+            if (rec.recommended === 'deal' && rec.reasons && rec.reasons.length > 0) {
+              suggestionReason.textContent = rec.reasons[0] || 'This file may be better suited for a storage deal';
+              suggestionBanner.classList.remove('hidden');
+            }
+          }
+        } catch (error) {
+          console.error('Auto-suggest error:', error);
+          // Silent fail - don't show error to user
+        }
+      }
     }
 
     function clearFile() {

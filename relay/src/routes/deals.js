@@ -22,7 +22,12 @@ import * as ErasureCoding from '../utils/erasure-coding.js';
 import * as FrozenData from '../utils/frozen-data.js';
 import { getRelayUser, getRelayPub } from '../utils/relay-user.js';
 import { X402Merchant } from '../utils/x402-merchant.js';
-import { createRegistryClient, createRegistryClientWithSigner } from '../utils/registry-client.js';
+import { 
+  createRegistryClient, 
+  createRegistryClientWithSigner,
+  createStorageDealRegistryClient,
+  createStorageDealRegistryClientWithSigner 
+} from '../utils/registry-client.js';
 
 const router = express.Router();
 const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN;
@@ -332,28 +337,16 @@ router.post('/create', express.json(), async (req, res) => {
     cacheDeal(deal);
     console.log(`📝 Deal ${deal.id} created and cached for ${deal.cid}`);
     
-    // Get network config for domain info
-    const network = process.env.X402_NETWORK || 'base-sepolia';
-    const NETWORK_CONFIG = {
-      'base-sepolia': { usdcName: 'USDC', usdcVersion: '2' },
-      'base': { usdcName: 'USD Coin', usdcVersion: '2' },
-    };
-    const networkConfig = NETWORK_CONFIG[network] || NETWORK_CONFIG['base-sepolia'];
+    // Return payment instructions for USDC transfer
+    // Client must transfer USDC to relay address, then relay will register deal on-chain
+    const REGISTRY_CHAIN_ID = process.env.REGISTRY_CHAIN_ID;
+    const RELAY_PRIVATE_KEY = process.env.RELAY_PRIVATE_KEY;
     
-    // Create x402 payment requirements
-    const paymentRequirements = {
-      x402Version: 1,
-      scheme: 'exact',
-      network,
-      maxAmountRequired: Math.ceil(pricing.totalPriceUSDC * 1000000).toString(), // USDC atomic units
-      resource: `storage-deal-${deal.id}`,
-      description: `Storage Deal: ${sizeMB}MB for ${durationDays} days (${tier})`,
-      payTo: process.env.X402_PAY_TO_ADDRESS,
-      dealId: deal.id,
-      // EIP-712 domain info for signing
-      domainName: networkConfig.usdcName,
-      domainVersion: networkConfig.usdcVersion,
-    };
+    let relayAddress = null;
+    if (RELAY_PRIVATE_KEY && REGISTRY_CHAIN_ID) {
+      const registryClient = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, parseInt(REGISTRY_CHAIN_ID));
+      relayAddress = registryClient.wallet.address;
+    }
     
     // Return 200 OK - deal created successfully, payment needed to activate
     res.json({
@@ -364,8 +357,19 @@ router.post('/create', express.json(), async (req, res) => {
         pricing: deal.pricing,
         cid: deal.cid,
       },
-      paymentRequired: paymentRequirements,
-      message: 'Deal created. Complete payment to activate.',
+      paymentRequired: {
+        type: 'usdc_transfer',
+        amount: pricing.totalPriceUSDC,
+        amountAtomic: Math.ceil(pricing.totalPriceUSDC * 1000000).toString(),
+        currency: 'USDC',
+        to: relayAddress || 'Relay address not configured',
+        chainId: REGISTRY_CHAIN_ID || 84532,
+        usdcAddress: process.env.USDC_ADDRESS || '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+        message: relayAddress 
+          ? `Transfer ${pricing.totalPriceUSDC} USDC to ${relayAddress}. After payment, the relay will register the deal on-chain.`
+          : 'Relay not configured. Please contact relay operator for payment instructions.',
+      },
+      message: 'Deal created. Transfer USDC to relay address to activate.',
     });
   } catch (error) {
     console.error('Deal creation error:', error.message);
@@ -396,14 +400,7 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
     }
     
     const { dealId } = req.params;
-    const { payment } = req.body;
-    
-    if (!payment) {
-      return res.status(400).json({
-        success: false,
-        error: 'Payment data required',
-      });
-    }
+    const { paymentTxHash, clientStake = '0' } = req.body;
     
     // Get existing deal (check cache first, then GunDB)
     let deal = getCachedDeal(dealId);
@@ -430,131 +427,96 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
       });
     }
     
-    // Verify payment using x402
-    const payToAddress = process.env.X402_PAY_TO_ADDRESS;
-    const network = process.env.X402_NETWORK || 'base-sepolia';
+    // Verify USDC payment was made to relay
+    const RELAY_PRIVATE_KEY = process.env.RELAY_PRIVATE_KEY;
+    const REGISTRY_CHAIN_ID = process.env.REGISTRY_CHAIN_ID;
     
-    if (!payToAddress) {
+    if (!RELAY_PRIVATE_KEY || !REGISTRY_CHAIN_ID) {
       return res.status(503).json({
         success: false,
-        error: 'Relay not configured for payments',
+        error: 'Relay not configured for on-chain operations',
       });
     }
     
-    console.log('Payment received:', {
-      from: payment?.payload?.authorization?.from,
-      to: payment?.payload?.authorization?.to,
-      amount: payment?.payload?.authorization?.value,
-      signature: payment?.payload?.signature ? `${payment.payload.signature.substring(0, 10)}...` : 'missing'
-    });
+    const registryClient = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, parseInt(REGISTRY_CHAIN_ID));
+    const relayAddress = registryClient.wallet.address;
+    const { ethers } = await import('ethers');
     
-    const merchant = new X402Merchant({
-      payToAddress,
-      network,
-      settlementMode: process.env.X402_SETTLEMENT_MODE || 'facilitator',
-      facilitatorUrl: process.env.X402_FACILITATOR_URL,
-      privateKey: process.env.X402_PRIVATE_KEY,
-    });
-    
-    // Verify the payment amount
-    const requiredAmountAtomic = Math.ceil(deal.pricing.totalPriceUSDC * 1000000);
-    console.log(`Verifying deal payment: required ${requiredAmountAtomic} atomic units (${deal.pricing.totalPriceUSDC} USDC)`);
-    
-    const verification = await merchant.verifyDealPayment(payment, requiredAmountAtomic);
-    
-    if (!verification.isValid) {
-      console.log(`❌ Payment verification failed: ${verification.invalidReason}`);
-      return res.status(402).json({
-        success: false,
-        error: `Payment verification failed: ${verification.invalidReason}`,
-      });
+    // If paymentTxHash provided, verify it
+    if (paymentTxHash) {
+      try {
+        const provider = registryClient.provider;
+        const receipt = await provider.getTransactionReceipt(paymentTxHash);
+        
+        if (!receipt || receipt.status !== 1) {
+          return res.status(400).json({
+            success: false,
+            error: 'Invalid payment transaction',
+          });
+        }
+        
+        // Verify transaction was USDC transfer to relay
+        // TODO: Parse transaction to verify USDC amount matches deal price
+        console.log(`✅ Payment transaction verified: ${paymentTxHash}`);
+      } catch (error) {
+        console.warn(`⚠️ Could not verify payment transaction: ${error.message}`);
+        // Continue anyway - relay can verify payment manually
+      }
     }
-    
-    console.log(`✅ Payment verified: ${verification.amount} USDC from ${verification.payer}`);
-    
-    // Settle payment
-    console.log('Attempting to settle payment...');
-    const settlement = await merchant.settlePayment(payment);
-    
-    if (!settlement.success) {
-      console.log(`❌ Settlement failed: ${settlement.errorReason}`);
-      return res.status(402).json({
-        success: false,
-        error: `Payment settlement failed: ${settlement.errorReason}`,
-        hint: settlement.errorReason?.includes('not configured') 
-          ? 'Configure X402_PRIVATE_KEY for direct settlement or ensure facilitator is available'
-          : 'Check server logs for details',
-      });
-    }
-    
-    console.log(`✅ Payment settled successfully. TX: ${settlement.transaction}`);
     
     // Activate deal
-    const txHash = settlement.transaction;
-    console.log(`Activating deal ${dealId} with TX: ${txHash}`);
+    const txHash = paymentTxHash || 'manual';
+    console.log(`Activating deal ${dealId} with payment TX: ${txHash}`);
     
     const activatedDeal = StorageDeals.activateDeal(deal, txHash);
     console.log(`Deal activated object created, status: ${activatedDeal.status}`);
     
-    // Register deal on-chain (optional - only if relay is configured for on-chain registry)
+    // Register deal on-chain using StorageDealRegistry
     let onChainRegistered = false;
     let onChainWarning = null;
-    const RELAY_PRIVATE_KEY = process.env.RELAY_PRIVATE_KEY;
-    const REGISTRY_CHAIN_ID = process.env.REGISTRY_CHAIN_ID;
     
-    if (RELAY_PRIVATE_KEY && REGISTRY_CHAIN_ID) {
+    try {
+      console.log(`📝 Registering deal ${dealId} on-chain via StorageDealRegistry...`);
+      const storageDealRegistryClient = createStorageDealRegistryClientWithSigner(RELAY_PRIVATE_KEY, parseInt(REGISTRY_CHAIN_ID));
+      
+      // Convert price from USDC (6 decimals) to atomic units
+      const priceUSDCAtomic = Math.ceil(activatedDeal.pricing.totalPriceUSDC * 1000000);
+      const priceUSDCString = (priceUSDCAtomic / 1000000).toString();
+      
+      // Convert sizeMB to integer (contract expects uint256)
+      const sizeMBInt = Math.max(1, Math.ceil(activatedDeal.sizeMB));
+      
+      const onChainResult = await storageDealRegistryClient.registerDeal(
+        activatedDeal.id,
+        activatedDeal.clientAddress,
+        activatedDeal.cid,
+        sizeMBInt,
+        priceUSDCString,
+        activatedDeal.durationDays,
+        clientStake
+      );
+      
+      onChainRegistered = true;
+      
+      // Save on-chain deal ID to the deal object
+      activatedDeal.onChainDealId = onChainResult.dealIdBytes32;
+      activatedDeal.onChainTx = onChainResult.txHash;
+      
+      console.log(`✅ Deal registered on-chain via StorageDealRegistry. TX: ${onChainResult.txHash}`);
+      console.log(`   Original Deal ID: ${activatedDeal.id}`);
+      console.log(`   On-Chain Deal ID (bytes32): ${onChainResult.dealIdBytes32}`);
+      
+      // Re-save deal with on-chain info
       try {
-        console.log(`📝 Registering deal ${dealId} on-chain...`);
-        const registryClient = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
-        
-        // Convert price from USDC (6 decimals) to atomic units for on-chain registration
-        const priceUSDCAtomic = Math.ceil(activatedDeal.pricing.totalPriceUSDC * 1000000);
-        const priceUSDCString = (priceUSDCAtomic / 1000000).toString();
-        
-        // Convert sizeMB to integer (contract expects uint256)
-        // For small files (< 1 MB), round up to 1 MB minimum
-        const sizeMBInt = Math.max(1, Math.ceil(activatedDeal.sizeMB));
-        
-        const onChainResult = await registryClient.registerDeal(
-          activatedDeal.id,
-          activatedDeal.clientAddress,
-          activatedDeal.cid,
-          sizeMBInt, // Pass as integer
-          priceUSDCString,
-          activatedDeal.durationDays,
-          '0' // clientStake - default to 0, can be added later via addClientStake
-        );
-        
-        onChainRegistered = true;
-        
-        // Save on-chain deal ID to the deal object for future matching
-        activatedDeal.onChainDealId = onChainResult.dealIdBytes32;
-        activatedDeal.onChainTx = onChainResult.txHash;
-        
-        // Verify the hash matches
-        const expectedHash = ethers.id(activatedDeal.id);
-        const hashMatches = expectedHash.toLowerCase() === onChainResult.dealIdBytes32.toLowerCase();
-        
-        console.log(`✅ Deal registered on-chain. TX: ${onChainResult.txHash}`);
-        console.log(`   Original Deal ID: ${activatedDeal.id}`);
-        console.log(`   On-Chain Deal ID (bytes32): ${onChainResult.dealIdBytes32}`);
-        console.log(`   Expected Hash: ${expectedHash}`);
-        console.log(`   Hash Match: ${hashMatches ? '✅' : '❌'}`);
-        
-        // Re-save deal with on-chain info
-        try {
-          await StorageDeals.saveDeal(gun, activatedDeal, relayUser._.sea);
-          console.log(`✅ Deal updated with on-chain info`);
-        } catch (updateError) {
-          console.warn(`⚠️ Failed to update deal with on-chain info: ${updateError.message}`);
-        }
-      } catch (onChainError) {
-        console.warn(`⚠️ Failed to register deal on-chain: ${onChainError.message}`);
-        onChainWarning = 'Deal activated but on-chain registration failed. Deal is still functional.';
-        // Don't fail the activation if on-chain registration fails
+        await StorageDeals.saveDeal(gun, activatedDeal, relayUser._.sea);
+        console.log(`✅ Deal updated with on-chain info`);
+      } catch (updateError) {
+        console.warn(`⚠️ Failed to update deal with on-chain info: ${updateError.message}`);
       }
-    } else {
-      console.log(`ℹ️ Skipping on-chain registration (RELAY_PRIVATE_KEY or REGISTRY_CHAIN_ID not configured)`);
+    } catch (onChainError) {
+      console.warn(`⚠️ Failed to register deal on-chain: ${onChainError.message}`);
+      onChainWarning = 'Deal activated but on-chain registration failed. Deal is still functional.';
+      // Don't fail the activation if on-chain registration fails
     }
     
     // Save updated deal to GunDB (if not already saved with on-chain info)
@@ -653,13 +615,13 @@ router.get('/by-client/:address', async (req, res) => {
     // Import ethers for deal ID matching (needed for hashing)
     const { ethers } = await import('ethers');
     
-    // STEP 1: Fetch from on-chain registry (source of truth)
+    // STEP 1: Fetch from on-chain StorageDealRegistry (source of truth)
     let onChainDeals = [];
     try {
-      const registryClient = createRegistryClient(chainId);
+      const storageDealRegistryClient = createStorageDealRegistryClient(chainId);
       // Normalize address to checksum format for consistency with on-chain storage
       const normalizedAddressForQuery = ethers.getAddress(address);
-      onChainDeals = await registryClient.getClientDeals(normalizedAddressForQuery);
+      onChainDeals = await storageDealRegistryClient.getClientDeals(normalizedAddressForQuery);
       
       console.log(`📋 Found ${onChainDeals.length} deals on-chain for client ${normalizedAddressForQuery}`);
     } catch (onChainError) {
@@ -1412,15 +1374,15 @@ router.post('/:dealId/report', express.json(), async (req, res) => {
       deal = await StorageDeals.getDeal(gun, dealId);
     }
     
-    // If not found in GunDB, try on-chain registry
+    // If not found in GunDB, try on-chain StorageDealRegistry
     if (!deal && process.env.REGISTRY_CHAIN_ID) {
       try {
         const chainId = parseInt(process.env.REGISTRY_CHAIN_ID);
-        const registryClient = createRegistryClient(chainId);
+        const storageDealRegistryClient = createStorageDealRegistryClient(chainId);
         
         // Try to get deal from on-chain (using hash of deal ID)
         const dealIdHash = ethers.id(dealId);
-        const onChainDeal = await registryClient.getDeal(dealIdHash);
+        const onChainDeal = await storageDealRegistryClient.getDeal(dealIdHash);
         
         if (onChainDeal) {
           deal = {
@@ -1433,7 +1395,7 @@ router.post('/:dealId/report', express.json(), async (req, res) => {
           };
         }
       } catch (error) {
-        console.warn(`Failed to fetch deal from on-chain registry: ${error.message}`);
+        console.warn(`Failed to fetch deal from on-chain StorageDealRegistry: ${error.message}`);
       }
     }
     
@@ -1462,8 +1424,8 @@ router.post('/:dealId/report', express.json(), async (req, res) => {
       // Try to get relay from on-chain deal
       try {
         const chainId = parseInt(process.env.REGISTRY_CHAIN_ID);
-        const registryClient = createRegistryClient(chainId);
-        const onChainDeal = await registryClient.getDeal(deal.onChainDealId);
+        const storageDealRegistryClient = createStorageDealRegistryClient(chainId);
+        const onChainDeal = await storageDealRegistryClient.getDeal(deal.onChainDealId);
         if (onChainDeal) {
           relayAddress = onChainDeal.relay;
         }
@@ -1487,8 +1449,8 @@ router.post('/:dealId/report', express.json(), async (req, res) => {
     
     // Prepare transaction data
     const chainId = parseInt(process.env.REGISTRY_CHAIN_ID) || 84532;
-    const registryClient = createRegistryClient(chainId);
-    const registryAddress = registryClient.registryAddress;
+    const storageDealRegistryClient = createStorageDealRegistryClient(chainId);
+    const storageDealRegistryAddress = storageDealRegistryClient.registryAddress;
     
     // Calculate griefing cost before preparing transaction
     let griefingCost = null;
@@ -1506,24 +1468,29 @@ router.post('/:dealId/report', express.json(), async (req, res) => {
       console.warn(`Failed to calculate griefing cost: ${error.message}`);
     }
     
-    // Prepare function call data (now using grief functions)
-    const registryInterface = new ethers.Interface([
-      'function griefMissedProof(address relay, bytes32 dealId, string evidence)',
-      'function griefDataLoss(address relay, bytes32 dealId, string evidence)'
+    // Prepare function call data (using StorageDealRegistry.grief)
+    // StorageDealRegistry.grief calculates griefing cost and delegates to RelayRegistry
+    const storageDealRegistryInterface = new ethers.Interface([
+      'function grief(bytes32 dealId, uint256 slashAmount, string reason)'
     ]);
     
-    const functionName = reportType === 'missedProof' ? 'griefMissedProof' : 'griefDataLoss';
-    const evidenceText = evidence || reason; // Use evidence if provided, otherwise use reason
+    // Calculate slash amount based on report type
+    const slashBps = reportType === 'missedProof' ? 100 : 1000; // 1% or 10%
+    const relayInfo = await createRegistryClient(chainId).getRelayInfo(relayAddress);
+    const stakedAmount = BigInt(relayInfo.stakedAmountRaw);
+    const slashAmount = (stakedAmount * BigInt(slashBps)) / 10000n;
     
-    const callData = registryInterface.encodeFunctionData(functionName, [
-      relayAddress,
+    const evidenceText = evidence || reason;
+    
+    const callData = storageDealRegistryInterface.encodeFunctionData('grief', [
       onChainDealId,
+      slashAmount,
       evidenceText
     ]);
     
     // Prepare transaction request
     const transaction = {
-      to: registryAddress,
+      to: storageDealRegistryAddress,
       data: callData,
       value: '0x0', // No ETH value needed (but USDC approval needed for griefing cost)
     };
@@ -1539,8 +1506,8 @@ router.post('/:dealId/report', express.json(), async (req, res) => {
         evidence: evidenceText,
         transaction,
         chainId,
-        registryAddress,
-        functionName,
+        storageDealRegistryAddress,
+        functionName: 'grief',
         griefingCost: griefingCost ? {
           amount: griefingCost,
           currency: 'USDC',

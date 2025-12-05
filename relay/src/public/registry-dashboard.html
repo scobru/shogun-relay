@@ -411,58 +411,17 @@
     <div id="alerts"></div>
 
     <div class="grid">
-      <!-- GunDB Identity Card -->
-      <div class="card" id="gunIdentityCard">
+      <!-- Server Relay Key Card -->
+      <div class="card">
         <div class="card-header">
-          <span class="card-title">GunDB Identity</span>
-          <span class="status-badge status-inactive" id="gunStatusBadge">Not Logged In</span>
+          <span class="card-title">Server Relay Key</span>
         </div>
-        <div id="gunIdentityContent">
-          <!-- Login/Register Form -->
-          <div id="gunAuthForm">
-            <div class="alert alert-info" style="margin-bottom: 1rem;">
-              Login or register to get your GunDB public key for relay registration.
-            </div>
-            <div class="form-group">
-              <label>Username</label>
-              <input type="text" id="gunUsername" placeholder="Enter username">
-            </div>
-            <div class="form-group">
-              <label>Password</label>
-              <input type="password" id="gunPassword" placeholder="Enter password">
-            </div>
-            <div class="button-group">
-              <button onclick="gunLogin()">Login</button>
-              <button class="secondary" onclick="gunRegister()">Register</button>
-            </div>
+        <div id="serverKeySection">
+          <div class="info-row">
+            <span class="info-label">Relay Public Key</span>
+            <span class="info-value address" id="serverRelayPubKey" style="font-size: 0.75rem;">Loading...</span>
           </div>
-          
-          <!-- Logged In State -->
-          <div id="gunLoggedIn" class="hidden">
-            <div class="info-row">
-              <span class="info-label">Username</span>
-              <span class="info-value" id="gunLoggedUsername">-</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Public Key</span>
-              <span class="info-value address" id="gunPubKeyDisplay" style="font-size: 0.75rem;">-</span>
-            </div>
-            <div class="button-group">
-              <button class="success" onclick="copyPubKey()">Copy Public Key</button>
-              <button class="secondary" onclick="useForRegistration()">Use for Registration</button>
-            </div>
-            <button class="danger" onclick="gunLogout()" style="margin-top: 0.5rem;">Logout</button>
-          </div>
-
-          <!-- Server Relay Key -->
-          <div id="serverKeySection" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
-            <div class="stat-label" style="margin-bottom: 0.5rem;">Or use server's relay key:</div>
-            <div class="info-row">
-              <span class="info-label">Relay Public Key</span>
-              <span class="info-value address" id="serverRelayPubKey" style="font-size: 0.75rem;">Loading...</span>
-            </div>
-            <button class="secondary" onclick="useServerKey()" style="margin-top: 0.5rem;">Use Server Relay Key</button>
-          </div>
+          <button class="secondary" onclick="useServerKey()" style="margin-top: 0.5rem;">Use Server Relay Key</button>
         </div>
       </div>
 
@@ -505,7 +464,8 @@
           </div>
           <div class="form-group">
             <label>GunDB Public Key</label>
-            <input type="text" id="gunPubKey" placeholder="Your GunDB public key">
+            <input type="text" id="gunPubKey" placeholder="Your GunDB public key (or use server key)">
+            <small class="form-hint">Use the server's relay key button above to auto-fill</small>
           </div>
           <div class="form-group">
             <label>Stake Amount (USDC)</label>
@@ -599,136 +559,11 @@
     </div>
   </div>
 
-  <!-- GunDB Library -->
-  <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
-
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
   <script>
     const API_BASE = '/api/v1/registry';
     let relayStatus = null;
     let config = null;
-    let gun = null;
-    let gunUser = null;
-
-    // Initialize GunDB
-    function initGun() {
-      gun = Gun({
-        peers: [window.location.origin + '/gun'],
-        localStorage: false
-      });
-      gunUser = gun.user();
-      
-      // Check if already logged in (session recall)
-      gunUser.recall({ sessionStorage: true }, (ack) => {
-        if (ack.err) {
-          console.log('No previous session');
-        } else if (gunUser.is) {
-          updateGunUI(true);
-        }
-      });
-    }
-
-    // GunDB Login
-    async function gunLogin() {
-      const username = document.getElementById('gunUsername').value;
-      const password = document.getElementById('gunPassword').value;
-      
-      if (!username || !password) {
-        showAlert('error', 'Please enter username and password');
-        return;
-      }
-      
-      gunUser.auth(username, password, (ack) => {
-        if (ack.err) {
-          showAlert('error', 'Login failed: ' + ack.err);
-        } else {
-          showAlert('success', 'Logged in successfully!');
-          updateGunUI(true, username);
-        }
-      });
-    }
-
-    // GunDB Register
-    async function gunRegister() {
-      const username = document.getElementById('gunUsername').value;
-      const password = document.getElementById('gunPassword').value;
-      
-      if (!username || !password) {
-        showAlert('error', 'Please enter username and password');
-        return;
-      }
-      
-      if (password.length < 8) {
-        showAlert('error', 'Password must be at least 8 characters');
-        return;
-      }
-      
-      gunUser.create(username, password, (ack) => {
-        if (ack.err) {
-          showAlert('error', 'Registration failed: ' + ack.err);
-        } else {
-          showAlert('success', 'Account created! Logging in...');
-          // Auto-login after registration
-          gunUser.auth(username, password, (authAck) => {
-            if (!authAck.err) {
-              updateGunUI(true, username);
-            }
-          });
-        }
-      });
-    }
-
-    // GunDB Logout
-    function gunLogout() {
-      gunUser.leave();
-      updateGunUI(false);
-      showAlert('info', 'Logged out');
-    }
-
-    // Update GunDB UI state
-    function updateGunUI(loggedIn, username = '') {
-      const badge = document.getElementById('gunStatusBadge');
-      const authForm = document.getElementById('gunAuthForm');
-      const loggedInSection = document.getElementById('gunLoggedIn');
-      
-      if (loggedIn && gunUser.is) {
-        badge.textContent = 'Authenticated';
-        badge.className = 'status-badge status-active';
-        authForm.classList.add('hidden');
-        loggedInSection.classList.remove('hidden');
-        
-        // Display user info
-        const pub = gunUser.is.pub;
-        document.getElementById('gunLoggedUsername').textContent = username || gunUser.is.alias || 'Anonymous';
-        document.getElementById('gunPubKeyDisplay').textContent = pub;
-      } else {
-        badge.textContent = 'Not Logged In';
-        badge.className = 'status-badge status-inactive';
-        authForm.classList.remove('hidden');
-        loggedInSection.classList.add('hidden');
-      }
-    }
-
-    // Copy public key to clipboard
-    function copyPubKey() {
-      if (!gunUser.is) return;
-      
-      navigator.clipboard.writeText(gunUser.is.pub).then(() => {
-        showAlert('success', 'Public key copied to clipboard!');
-      }).catch(() => {
-        showAlert('error', 'Failed to copy');
-      });
-    }
-
-    // Use public key for relay registration
-    function useForRegistration() {
-      if (!gunUser.is) return;
-      
-      const pubKeyInput = document.getElementById('gunPubKey');
-      pubKeyInput.value = gunUser.is.pub;
-      pubKeyInput.scrollIntoView({ behavior: 'smooth' });
-      showAlert('success', 'Public key added to registration form!');
-    }
 
     // Load server relay public key
     async function loadServerRelayKey() {
@@ -767,7 +602,6 @@
 
     // Initialize
     document.addEventListener('DOMContentLoaded', async () => {
-      initGun();
       await loadConfig();
       await Promise.all([
         loadStatus(),

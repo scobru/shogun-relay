@@ -444,6 +444,25 @@
                   <p class="text-[#606060] text-xs mt-1" id="cidVerification"></p>
                 </div>
 
+                <!-- Auto-suggest banner (suggests subscriptions for small files) -->
+                <div id="suggestionBanner" class="p-4 bg-[#1A1A1A] rounded-xl border border-[#FF69B4] hidden">
+                  <div class="flex items-start gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#FF69B4] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div class="flex-1">
+                      <p class="text-[#FF69B4] font-medium mb-1">Consider using a Subscription instead</p>
+                      <p class="text-[#A0A0A0] text-sm mb-2" id="suggestionReason"></p>
+                      <a href="/subscription" class="text-[#FF69B4] text-sm hover:underline">Go to Subscriptions →</a>
+                    </div>
+                    <button onclick="document.getElementById('suggestionBanner').classList.add('hidden')" class="text-[#606060] hover:text-[#A0A0A0]">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label class="text-[#A0A0A0] text-sm mb-2 block">File Size (MB) *</label>
@@ -862,9 +881,9 @@
         const data = await response.json();
 
         if (data.success && data.deal) {
-          if (data.paymentRequired) {
-            // Deal created, payment required - show payment modal
-            showPaymentModal(data);
+          if (data.paymentRequired && data.paymentRequired.type === 'usdc_transfer') {
+            // Deal created, payment required - show USDC transfer instructions
+            showUSDCTransferModal(data);
           } else {
             // Deal already activated (shouldn't happen but handle it)
             showMessage('createMessage', 'success', 'Deal created and activated!');
@@ -1032,27 +1051,11 @@
       }, 10000);
     }
 
-    // Network configuration for x402
-    const NETWORK_CONFIG = {
-      'base-sepolia': {
-        chainId: 84532,
-        name: 'Base Sepolia',
-        usdc: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
-        rpc: 'https://sepolia.base.org',
-      },
-      'base': {
-        chainId: 8453,
-        name: 'Base',
-        usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-        rpc: 'https://mainnet.base.org',
-      }
-    };
-
     // Current pending deal for payment
     let pendingDealPayment = null;
 
-    // Show payment modal
-    function showPaymentModal(data) {
+    // Show USDC transfer modal
+    function showUSDCTransferModal(data) {
       const { deal, paymentRequired } = data;
       const price = deal.pricing.totalPriceUSDC;
       
@@ -1079,7 +1082,7 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <h2 style="font-size: 1.5rem; font-weight: bold; color: #FFFFFF; margin-bottom: 0.5rem;">Deal Created!</h2>
-            <p style="color: #A0A0A0;">Sign the payment to activate your storage deal</p>
+            <p style="color: #A0A0A0;">Transfer USDC to activate your storage deal</p>
           </div>
           
           <div style="background: #1A1A1A; border-radius: 0.75rem; padding: 1rem; margin-bottom: 1.5rem;">
@@ -1106,9 +1109,14 @@
           </div>
           
           <div style="background: rgba(66, 165, 245, 0.1); border: 1px solid rgba(66, 165, 245, 0.3); border-radius: 0.75rem; padding: 1rem; margin-bottom: 1.5rem;">
-            <p style="color: #42A5F5; font-size: 0.9rem; text-align: center;">
-              Click "Pay with Wallet" to sign a USDC transfer authorization.
-              <br><small style="color: #A0A0A0;">Network: ${paymentRequired.network}</small>
+            <p style="color: #42A5F5; font-size: 0.9rem; text-align: center; margin-bottom: 0.5rem;">
+              <strong>Transfer ${price.toFixed(6)} USDC to:</strong>
+            </p>
+            <code style="display: block; background: #1A1A1A; padding: 0.5rem; border-radius: 0.5rem; color: #FFFFFF; font-size: 0.85rem; word-break: break-all; margin-bottom: 0.5rem;">
+              ${paymentRequired.to}
+            </code>
+            <p style="color: #A0A0A0; font-size: 0.8rem; text-align: center;">
+              After payment, the relay will register your deal on-chain.
             </p>
           </div>
           
@@ -1121,7 +1129,7 @@
             </button>
             <button id="payDealBtn" onclick="payForDeal()" 
                     style="flex: 1; padding: 1rem; background: #4CAF50; color: white; border: none; border-radius: 0.75rem; cursor: pointer; font-weight: 500;">
-              Pay with Wallet
+              Transfer USDC
             </button>
           </div>
         </div>
@@ -1130,7 +1138,7 @@
       modal.style.display = 'flex';
     }
 
-    // Pay for deal using x402 EIP-3009
+    // Pay for deal using USDC transfer
     async function payForDeal() {
       if (!pendingDealPayment || !connectedAddress || !signer) {
         showMessage('createMessage', 'error', 'Wallet not connected');
@@ -1146,138 +1154,83 @@
         payBtn.innerHTML = '<div class="loading-spinner" style="width:1rem;height:1rem;display:inline-block;margin-right:0.5rem;"></div> Processing...';
         
         statusEl.style.display = 'block';
-        statusEl.innerHTML = '<p style="color: #42A5F5; text-align: center;">Checking network...</p>';
+        statusEl.innerHTML = '<p style="color: #42A5F5; text-align: center;">Preparing USDC transfer...</p>';
 
-        const networkConfig = NETWORK_CONFIG[paymentRequired.network];
-        if (!networkConfig) {
-          throw new Error(`Unsupported network: ${paymentRequired.network}`);
-        }
-
-        // Check and switch network if needed
+        // Check network
         const network = await provider.getNetwork();
-        if (Number(network.chainId) !== networkConfig.chainId) {
-          statusEl.innerHTML = `<p style="color: #FF9800; text-align: center;">Please switch to ${networkConfig.name}...</p>`;
+        const expectedChainId = parseInt(paymentRequired.chainId);
+        
+        if (Number(network.chainId) !== expectedChainId) {
+          statusEl.innerHTML = `<p style="color: #FF9800; text-align: center;">Please switch to chain ${expectedChainId}...</p>`;
           try {
             await window.ethereum.request({
               method: 'wallet_switchEthereumChain',
-              params: [{ chainId: '0x' + networkConfig.chainId.toString(16) }],
+              params: [{ chainId: '0x' + expectedChainId.toString(16) }],
             });
           } catch (switchError) {
-            throw new Error(`Please switch to ${networkConfig.name} network manually`);
+            throw new Error(`Please switch to chain ${expectedChainId} manually`);
           }
         }
 
-        statusEl.innerHTML = '<p style="color: #42A5F5; text-align: center;">Preparing payment authorization...</p>';
+        // USDC contract
+        const usdcAddress = paymentRequired.usdcAddress;
+        const usdcContract = new ethers.Contract(usdcAddress, [
+          'function transfer(address to, uint256 amount) returns (bool)',
+          'function balanceOf(address account) view returns (uint256)',
+        ], signer);
 
-        // USDC contract for EIP-3009 transferWithAuthorization
-        const usdcAddress = networkConfig.usdc;
-        const amount = BigInt(paymentRequired.maxAmountRequired);
-        const validAfter = BigInt(0);
-        const validBefore = BigInt(Math.floor(Date.now() / 1000) + 3600); // 1 hour
+        const amount = ethers.parseUnits(paymentRequired.amount, 6);
         
-        // Generate random nonce (must be bytes32 = 32 bytes = 64 hex chars)
-        const nonceBytes = ethers.randomBytes(32);
-        const nonce = ethers.hexlify(nonceBytes);
+        // Check balance
+        const balance = await usdcContract.balanceOf(connectedAddress);
+        if (balance < amount) {
+          throw new Error(`Insufficient USDC balance. Need: ${paymentRequired.amount}, Have: ${ethers.formatUnits(balance, 6)}`);
+        }
+
+        statusEl.innerHTML = '<p style="color: #FF9800; text-align: center;">Please confirm the USDC transfer in your wallet...</p>';
+
+        // Transfer USDC
+        const tx = await usdcContract.transfer(paymentRequired.to, amount);
+        statusEl.innerHTML = '<p style="color: #42A5F5; text-align: center;">Transaction sent. Waiting for confirmation...</p>';
+
+        const receipt = await tx.wait();
         
-        console.log('Payment details:', {
-          from: connectedAddress,
-          to: paymentRequired.payTo,
-          amount: amount.toString(),
-          nonce: nonce,
-          usdcAddress: usdcAddress
-        });
-
-        // EIP-712 domain for USDC - use values from payment requirements if available
-        const domainName = paymentRequired.domainName || 'USDC';
-        const domainVersion = paymentRequired.domainVersion || '2';
-        
-        const domain = {
-          name: domainName,
-          version: domainVersion,
-          chainId: networkConfig.chainId,
-          verifyingContract: usdcAddress,
-        };
-        
-        console.log('EIP-712 Domain:', domain);
-
-        // EIP-3009 TransferWithAuthorization types
-        const types = {
-          TransferWithAuthorization: [
-            { name: 'from', type: 'address' },
-            { name: 'to', type: 'address' },
-            { name: 'value', type: 'uint256' },
-            { name: 'validAfter', type: 'uint256' },
-            { name: 'validBefore', type: 'uint256' },
-            { name: 'nonce', type: 'bytes32' },
-          ],
-        };
-
-        const message = {
-          from: connectedAddress,
-          to: paymentRequired.payTo,
-          value: amount,
-          validAfter: validAfter,
-          validBefore: validBefore,
-          nonce: nonce,
-        };
-
-        statusEl.innerHTML = '<p style="color: #FF9800; text-align: center;">Please sign the payment in your wallet...</p>';
-
-        // Sign the EIP-712 message
-        const signature = await signer.signTypedData(domain, types, message);
-
-        statusEl.innerHTML = '<p style="color: #42A5F5; text-align: center;">Submitting payment...</p>';
-
-        // Create x402 payment payload
-        const paymentPayload = {
-          x402Version: 1,
-          scheme: 'exact',
-          network: paymentRequired.network,
-          payload: {
-            authorization: {
-              from: connectedAddress,
-              to: paymentRequired.payTo,
-              value: amount.toString(),
-              validAfter: validAfter.toString(),
-              validBefore: validBefore.toString(),
-              nonce: nonce,
-            },
-            signature: signature,
-          },
-        };
-
-        // Submit payment to activate deal
-        const response = await fetch(`/api/v1/deals/${deal.id}/activate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ payment: paymentPayload }),
-        });
-
-        const result = await response.json();
-        
-        console.log('Activate deal response:', result);
-
-        if (result.success) {
+        if (receipt.status === 1) {
           statusEl.innerHTML = `
             <div style="text-align: center; padding: 1rem; background: rgba(76, 175, 80, 0.2); border-radius: 0.5rem;">
-              <p style="color: #4CAF50; font-weight: bold;">Payment Successful!</p>
-              <p style="color: #A0A0A0; font-size: 0.85rem; margin-top: 0.5rem;">Deal activated until ${new Date(result.deal.expiresAt).toLocaleDateString()}</p>
-              ${result.warning ? `<p style="color: #FF9800; font-size: 0.85rem; margin-top: 0.5rem;">⚠️ ${result.warning}</p>` : ''}
+              <p style="color: #4CAF50; font-weight: bold;">USDC Transfer Successful!</p>
+              <p style="color: #A0A0A0; font-size: 0.85rem; margin-top: 0.5rem;">TX: ${receipt.hash}</p>
+              <p style="color: #A0A0A0; font-size: 0.85rem; margin-top: 0.5rem;">The relay will now register your deal on-chain.</p>
             </div>
           `;
-          payBtn.style.display = 'none';
           
-          // Refresh deals list
-          setTimeout(() => {
-            closePaymentModal();
-            loadMyDeals();
-            showMessage('createMessage', 'success', result.warning || 'Deal activated successfully!');
-          }, 2000);
+          // Notify relay to register deal on-chain
+          const response = await fetch(`/api/v1/deals/${deal.id}/activate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              paymentTxHash: receipt.hash,
+              clientStake: '0' // Can be updated later
+            }),
+          });
+
+          const result = await response.json();
+          
+          if (result.success) {
+            setTimeout(() => {
+              closePaymentModal();
+              loadMyDeals();
+              showMessage('createMessage', 'success', 'Deal activated and registered on-chain!');
+            }, 2000);
+          } else {
+            statusEl.innerHTML += `
+              <div style="text-align: center; padding: 1rem; background: rgba(255, 152, 0, 0.2); border-radius: 0.5rem; margin-top: 1rem;">
+                <p style="color: #FF9800;">Payment sent but deal registration pending. The relay will register it shortly.</p>
+              </div>
+            `;
+          }
         } else {
-          // Show detailed error
-          const errorMsg = result.error || 'Payment failed';
-          console.error('Payment failed:', errorMsg);
-          throw new Error(errorMsg);
+          throw new Error('Transaction failed');
         }
 
       } catch (error) {
@@ -1611,11 +1564,11 @@
               
               const usdc = new ethers.Contract(USDC_ADDRESS, USDC_ABI, signer);
               const costWei = ethers.parseUnits(report.griefingCost.amount, 6);
-              const registryAddress = report.registryAddress;
+              const storageDealRegistryAddress = report.storageDealRegistryAddress;
               const userAddress = await signer.getAddress();
               
               // Check current allowance
-              let currentAllowance = await usdc.allowance(userAddress, registryAddress);
+              let currentAllowance = await usdc.allowance(userAddress, storageDealRegistryAddress);
               
               // Approve a bit more to account for any rounding or future griefs
               const approveAmount = costWei * 2n; // Approve 2x to be safe
@@ -1624,7 +1577,7 @@
                 showMessage('createMessage', 'info', 'Approving USDC spending...');
                 
                 // Approve USDC (approve more than needed to avoid repeated approvals)
-                const approveTx = await usdc.approve(registryAddress, approveAmount);
+                const approveTx = await usdc.approve(storageDealRegistryAddress, approveAmount);
                 showMessage('createMessage', 'info', 'Waiting for USDC approval confirmation...');
                 
                 // Wait for approval confirmation
@@ -1634,7 +1587,7 @@
                 }
                 
                 // Verify allowance was set correctly
-                currentAllowance = await usdc.allowance(userAddress, registryAddress);
+                currentAllowance = await usdc.allowance(userAddress, storageDealRegistryAddress);
                 if (currentAllowance < costWei) {
                   throw new Error(`Allowance insufficient after approval. Expected: ${costWei.toString()}, Got: ${currentAllowance.toString()}`);
                 }
@@ -1815,6 +1768,44 @@
           updateDealPreview();
 
           showMessage('createMessage', 'success', `File uploaded to IPFS! CID: ${data.cid}`);
+          
+          // Auto-suggest: check if subscription would be better for small files
+          const fileSizeMB = parseFloat(uploadedFileData.sizeMB);
+          const suggestionBanner = document.getElementById('suggestionBanner');
+          const suggestionReason = document.getElementById('suggestionReason');
+          
+          // Hide banner initially
+          if (suggestionBanner) suggestionBanner.classList.add('hidden');
+          
+          // Check recommendation if file is small (<100MB)
+          if (fileSizeMB < 100 && connectedAddress) {
+            try {
+              // Get duration from form or default to 30
+              const durationDays = parseInt(document.getElementById('dealDuration')?.value || '30');
+              
+              const params = new URLSearchParams({
+                fileSizeMB: fileSizeMB.toString(),
+                durationDays: durationDays.toString(),
+                userAddress: connectedAddress,
+              });
+              
+              const response = await fetch(`/api/v1/x402/recommend?${params.toString()}`);
+              const recData = await response.json();
+              
+              if (recData.success && recData.recommendation) {
+                const rec = recData.recommendation;
+                
+                // Show suggestion if subscription is recommended
+                if (rec.recommended === 'subscription' && rec.reasons && rec.reasons.length > 0 && suggestionBanner && suggestionReason) {
+                  suggestionReason.textContent = rec.reasons[0] || 'A subscription may be more cost-effective for this file';
+                  suggestionBanner.classList.remove('hidden');
+                }
+              }
+            } catch (error) {
+              console.error('Auto-suggest error:', error);
+              // Silent fail - don't show error to user
+            }
+          }
         } else {
           throw new Error(data.error || 'Upload failed');
         }

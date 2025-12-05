@@ -11,7 +11,12 @@ import { ethers } from 'ethers';
 
 // Contract addresses
 export const REGISTRY_ADDRESSES = {
-  84532: '0x412D3Cf47907C231EE26D261714D2126eb3735e6', // Base Sepolia
+  84532: '0xFa590FfCe642085c9b313cAD2111Ff6B556FBA44', // Base Sepolia (updated)
+  8453: null, // Base Mainnet - TBD
+};
+
+export const STORAGE_DEAL_REGISTRY_ADDRESSES = {
+  84532: '0x4dF1C272FaBDD4288582fe1DD1827F8037d7cD8f', // Base Sepolia
   8453: null, // Base Mainnet - TBD
 };
 
@@ -44,8 +49,7 @@ const REGISTRY_ABI = [
   'function increaseStake(uint256 amount)',
   'function requestUnstake()',
   'function withdrawStake()',
-  'function registerDeal(bytes32 dealId, address client, string cid, uint256 sizeMB, uint256 priceUSDC, uint256 durationDays, uint256 clientStake)',
-  'function completeDeal(bytes32 dealId)',
+  // Note: registerDeal and completeDeal moved to StorageDealRegistry
   // Client griefing functions (called by clients, not relays)
   'function griefMissedProof(address relay, bytes32 dealId, string evidence)',
   'function griefDataLoss(address relay, bytes32 dealId, string evidence)',
@@ -54,6 +58,18 @@ const REGISTRY_ABI = [
   'event RelayRegistered(address indexed relay, address indexed owner, string endpoint, string gunPubKey, uint256 stakedAmount)',
   'event StorageDealRegistered(bytes32 indexed dealId, address indexed relay, address indexed client, string cid, uint256 sizeMB, uint256 priceUSDC, uint256 expiresAt, uint256 clientStake)',
   'event RelaySlashed(bytes32 indexed reportId, address indexed relay, address indexed reporter, uint256 amount, uint256 cost, string reason)',
+];
+
+// StorageDealRegistry ABI
+const STORAGE_DEAL_REGISTRY_ABI = [
+  'function registerDeal(bytes32 dealId, address client, string cid, uint256 sizeMB, uint256 priceUSDC, uint256 durationDays, uint256 clientStake)',
+  'function getDeal(bytes32 dealId) view returns (tuple(bytes32 dealId, address relay, address client, string cid, uint256 sizeMB, uint256 priceUSDC, uint256 createdAt, uint256 expiresAt, bool active, uint256 clientStake))',
+  'function getClientDeals(address client) view returns (bytes32[])',
+  'function getRelayDeals(address relay) view returns (bytes32[])',
+  'function completeDeal(bytes32 dealId)',
+  'function addClientStake(bytes32 dealId, uint256 amount)',
+  'function withdrawClientStake(bytes32 dealId)',
+  'function grief(bytes32 dealId, uint256 slashAmount, string reason)',
 ];
 
 // USDC ABI (minimal)
@@ -411,57 +427,7 @@ export function createRegistryClientWithSigner(privateKey, chainId = 84532, rpcU
       };
     },
 
-    /**
-     * Register a storage deal on-chain
-     * @param {string} dealId - Unique deal ID (will be hashed to bytes32)
-     * @param {string} clientAddress - Client address
-     * @param {string} cid - IPFS CID
-     * @param {number} sizeMB - Size in MB
-     * @param {string} priceUSDC - Price in USDC (human readable)
-     * @param {number} durationDays - Duration in days
-     * @param {string} [clientStake] - Optional client stake in USDC (human readable, e.g., "10")
-     * @returns {Promise<Object>}
-     */
-    async registerDeal(dealId, clientAddress, cid, sizeMB, priceUSDC, durationDays, clientStake = '0') {
-      const dealIdBytes32 = ethers.id(dealId); // keccak256 hash
-      const priceWei = ethers.parseUnits(priceUSDC, 6);
-      const clientStakeWei = ethers.parseUnits(clientStake, 6);
-      
-      // Normalize client address to checksum format for consistency
-      const normalizedClientAddress = ethers.getAddress(clientAddress);
-
-      const tx = await registryWithSigner.registerDeal(
-        dealIdBytes32,
-        normalizedClientAddress,
-        cid,
-        sizeMB,
-        priceWei,
-        durationDays,
-        clientStakeWei
-      );
-      const receipt = await tx.wait();
-
-      return {
-        success: true,
-        txHash: receipt.hash,
-        dealIdBytes32,
-      };
-    },
-
-    /**
-     * Complete a storage deal
-     * @param {string} dealId - Deal ID (string, will be hashed)
-     * @returns {Promise<Object>}
-     */
-    async completeDeal(dealId) {
-      const dealIdBytes32 = ethers.id(dealId);
-      const tx = await registryWithSigner.completeDeal(dealIdBytes32);
-      const receipt = await tx.wait();
-      return {
-        success: true,
-        txHash: receipt.hash,
-      };
-    },
+    // Note: registerDeal and completeDeal moved to StorageDealRegistry - use createStorageDealRegistryClient
 
     /**
      * Increase stake
@@ -534,12 +500,213 @@ export function dealIdToBytes32(dealId) {
   return ethers.id(dealId);
 }
 
+/**
+ * Create a StorageDealRegistry client instance
+ * @param {number} chainId - Chain ID (84532 for Base Sepolia, 8453 for Base)
+ * @param {string} [rpcUrl] - Optional custom RPC URL
+ * @returns {Object} StorageDealRegistry client
+ */
+export function createStorageDealRegistryClient(chainId = 84532, rpcUrl = null) {
+  const registryAddress = STORAGE_DEAL_REGISTRY_ADDRESSES[chainId];
+  if (!registryAddress) {
+    throw new Error(`StorageDealRegistry not deployed on chain ${chainId}`);
+  }
+
+  const provider = new ethers.JsonRpcProvider(rpcUrl || RPC_URLS[chainId]);
+  const storageDealRegistry = new ethers.Contract(registryAddress, STORAGE_DEAL_REGISTRY_ABI, provider);
+
+  return {
+    chainId,
+    registryAddress,
+    provider,
+    storageDealRegistry,
+
+    /**
+     * Get deal info by ID
+     * @param {string} dealId - bytes32 deal ID (or string to hash)
+     * @returns {Promise<Object|null>}
+     */
+    async getDeal(dealId) {
+      try {
+        let dealIdBytes32;
+        if (typeof dealId === 'string') {
+          dealIdBytes32 = dealId.startsWith('0x') && dealId.length === 66 ? dealId : ethers.id(dealId);
+        } else {
+          dealIdBytes32 = ethers.hexlify(dealId);
+        }
+        
+        const deal = await storageDealRegistry.getDeal(dealIdBytes32);
+        
+        if (!deal || deal.createdAt === 0n || deal.createdAt === 0) {
+          return null;
+        }
+        
+        return {
+          dealId: typeof deal.dealId === 'string' ? deal.dealId : ethers.hexlify(deal.dealId),
+          relay: typeof deal.relay === 'string' ? deal.relay : deal.relay.toLowerCase(),
+          client: typeof deal.client === 'string' ? deal.client : deal.client.toLowerCase(),
+          cid: deal.cid,
+          sizeMB: Number(deal.sizeMB),
+          priceUSDC: ethers.formatUnits(deal.priceUSDC, 6),
+          createdAt: new Date(Number(deal.createdAt) * 1000).toISOString(),
+          expiresAt: new Date(Number(deal.expiresAt) * 1000).toISOString(),
+          active: deal.active,
+          clientStake: deal.clientStake ? ethers.formatUnits(deal.clientStake, 6) : '0',
+          clientStakeRaw: deal.clientStake ? deal.clientStake.toString() : '0',
+        };
+      } catch (e) {
+        if (!e.message.includes('could not decode') && !e.message.includes('execution reverted')) {
+          console.error(`Error fetching deal ${dealId}:`, e.message);
+        }
+        return null;
+      }
+    },
+
+    /**
+     * Get all deals for a client
+     * @param {string} clientAddress
+     * @returns {Promise<Array>}
+     */
+    async getClientDeals(clientAddress) {
+      try {
+        const normalizedAddress = ethers.getAddress(clientAddress);
+        const dealIds = await storageDealRegistry.getClientDeals(normalizedAddress);
+        
+        if (!dealIds || dealIds.length === 0) {
+          return [];
+        }
+        
+        const deals = [];
+        for (const id of dealIds) {
+          try {
+            let dealIdBytes32;
+            if (typeof id === 'string') {
+              dealIdBytes32 = id.startsWith('0x') ? id : ethers.id(id);
+            } else {
+              dealIdBytes32 = ethers.hexlify(id);
+            }
+            
+            const deal = await this.getDeal(dealIdBytes32);
+            if (deal) {
+              deals.push(deal);
+            }
+          } catch (dealError) {
+            if (!dealError.message.includes('could not decode')) {
+              console.warn(`⚠️ Error fetching deal:`, dealError.message.substring(0, 100));
+            }
+          }
+        }
+        return deals;
+      } catch (error) {
+        console.error(`Error fetching client deals for ${clientAddress}:`, error.message);
+        return [];
+      }
+    },
+
+    /**
+     * Get all deals for a relay
+     * @param {string} relayAddress
+     * @returns {Promise<Array>}
+     */
+    async getRelayDeals(relayAddress) {
+      try {
+        const normalizedAddress = ethers.getAddress(relayAddress);
+        const dealIds = await storageDealRegistry.getRelayDeals(normalizedAddress);
+        
+        const deals = [];
+        for (const id of dealIds) {
+          const deal = await this.getDeal(id);
+          if (deal) deals.push(deal);
+        }
+        return deals;
+      } catch (error) {
+        console.error(`Error fetching relay deals for ${relayAddress}:`, error.message);
+        return [];
+      }
+    },
+  };
+}
+
+/**
+ * Create a StorageDealRegistry client with signer for state-changing operations
+ * @param {string} privateKey - Relay operator private key
+ * @param {number} chainId - Chain ID
+ * @param {string} [rpcUrl] - Optional custom RPC URL
+ * @returns {Object} StorageDealRegistry client with signer
+ */
+export function createStorageDealRegistryClientWithSigner(privateKey, chainId = 84532, rpcUrl = null) {
+  const client = createStorageDealRegistryClient(chainId, rpcUrl);
+  const wallet = new ethers.Wallet(privateKey, client.provider);
+  const storageDealRegistryWithSigner = client.storageDealRegistry.connect(wallet);
+
+  return {
+    ...client,
+    wallet,
+    storageDealRegistryWithSigner,
+
+    /**
+     * Register a storage deal on-chain (called by relay)
+     * @param {string} dealId - Unique deal ID (will be hashed to bytes32)
+     * @param {string} clientAddress - Client address
+     * @param {string} cid - IPFS CID
+     * @param {number} sizeMB - Size in MB
+     * @param {string} priceUSDC - Price in USDC (human readable)
+     * @param {number} durationDays - Duration in days
+     * @param {string} [clientStake] - Optional client stake in USDC (human readable, e.g., "10")
+     * @returns {Promise<Object>}
+     */
+    async registerDeal(dealId, clientAddress, cid, sizeMB, priceUSDC, durationDays, clientStake = '0') {
+      const dealIdBytes32 = ethers.id(dealId); // keccak256 hash
+      const priceWei = ethers.parseUnits(priceUSDC, 6);
+      const clientStakeWei = ethers.parseUnits(clientStake, 6);
+      
+      // Normalize client address to checksum format
+      const normalizedClientAddress = ethers.getAddress(clientAddress);
+
+      const tx = await storageDealRegistryWithSigner.registerDeal(
+        dealIdBytes32,
+        normalizedClientAddress,
+        cid,
+        sizeMB,
+        priceWei,
+        durationDays,
+        clientStakeWei
+      );
+      const receipt = await tx.wait();
+
+      return {
+        success: true,
+        txHash: receipt.hash,
+        dealIdBytes32,
+      };
+    },
+
+    /**
+     * Complete a storage deal
+     * @param {string} dealId - Deal ID (string, will be hashed)
+     * @returns {Promise<Object>}
+     */
+    async completeDeal(dealId) {
+      const dealIdBytes32 = ethers.id(dealId);
+      const tx = await storageDealRegistryWithSigner.completeDeal(dealIdBytes32);
+      const receipt = await tx.wait();
+      return {
+        success: true,
+        txHash: receipt.hash,
+      };
+    },
+  };
+}
+
 export default {
   createRegistryClient,
   createRegistryClientWithSigner,
+  createStorageDealRegistryClient,
+  createStorageDealRegistryClientWithSigner,
   generateDealId,
   dealIdToBytes32,
   REGISTRY_ADDRESSES,
+  STORAGE_DEAL_REGISTRY_ADDRESSES,
   USDC_ADDRESSES,
   RPC_URLS,
 };
