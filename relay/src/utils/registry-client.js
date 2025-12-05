@@ -11,12 +11,12 @@ import { ethers } from 'ethers';
 
 // Contract addresses
 export const REGISTRY_ADDRESSES = {
-  84532: '0xFa590FfCe642085c9b313cAD2111Ff6B556FBA44', // Base Sepolia (updated)
+  84532: '0x644EA4f01fE1b444E4Dfe2Bc06A0FE916D1ffD28', // Base Sepolia
   8453: null, // Base Mainnet - TBD
 };
 
 export const STORAGE_DEAL_REGISTRY_ADDRESSES = {
-  84532: '0x4dF1C272FaBDD4288582fe1DD1827F8037d7cD8f', // Base Sepolia
+  84532: '0x7E0C8c90EF384622dff9CF836125E20D76F003d1', // Base Sepolia
   8453: null, // Base Mainnet - TBD
 };
 
