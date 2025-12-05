@@ -1058,20 +1058,42 @@ router.get('/:dealId/verify', async (req, res) => {
             }
           }
           
-          if (onChainDeal && onChainDeal.createdAt) {
+          // Check if deal exists (createdAt should be a valid date string or number)
+          const createdAtValue = onChainDeal?.createdAt;
+          const hasCreatedAt = createdAtValue && (
+            (typeof createdAtValue === 'bigint' && createdAtValue > 0n) ||
+            (typeof createdAtValue === 'number' && createdAtValue > 0) ||
+            (typeof createdAtValue === 'string' && createdAtValue !== '1970-01-01T00:00:00.000Z' && createdAtValue.length > 0)
+          );
+          
+          if (onChainDeal && hasCreatedAt) {
             // Convert on-chain deal to format expected by verification
+            // expiresAt might be ISO string or timestamp
+            let expiresAtDate;
+            if (typeof onChainDeal.expiresAt === 'string') {
+              expiresAtDate = new Date(onChainDeal.expiresAt);
+            } else if (typeof onChainDeal.expiresAt === 'number' || typeof onChainDeal.expiresAt === 'bigint') {
+              // If it's a timestamp, convert to Date
+              const timestamp = Number(onChainDeal.expiresAt);
+              expiresAtDate = new Date(timestamp * 1000); // Assuming seconds, convert to milliseconds
+            } else {
+              expiresAtDate = new Date(onChainDeal.expiresAt);
+            }
+            
+            const isActive = onChainDeal.active && !isNaN(expiresAtDate.getTime()) && expiresAtDate > new Date();
+            
             deal = {
               id: originalDealId,
               cid: onChainDeal.cid,
-              status: onChainDeal.active && new Date(onChainDeal.expiresAt) > new Date() 
+              status: isActive 
                 ? StorageDeals.DEAL_STATUS.ACTIVE 
                 : StorageDeals.DEAL_STATUS.EXPIRED,
-              active: onChainDeal.active && new Date(onChainDeal.expiresAt) > new Date(),
+              active: isActive,
               onChainDealId: dealId,
             };
-            console.log(`✅ Successfully loaded on-chain deal: ${deal.cid}, active: ${deal.active}`);
+            console.log(`✅ Successfully loaded on-chain deal: ${deal.cid}, active: ${deal.active}, expiresAt: ${onChainDeal.expiresAt}, expiresAtDate: ${expiresAtDate.toISOString()}`);
           } else {
-            console.warn(`⚠️ On-chain deal ${dealId} not found after all strategies`);
+            console.warn(`⚠️ On-chain deal ${dealId} not found after all strategies. createdAt: ${createdAtValue}, hasCreatedAt: ${hasCreatedAt}, onChainDeal: ${!!onChainDeal}`);
           }
         }
       } catch (e) {
