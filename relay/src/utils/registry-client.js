@@ -499,6 +499,41 @@ export function createRegistryClientWithSigner(privateKey, chainId = 84532, rpcU
         txHash: receipt.hash,
       };
     },
+
+    /**
+     * Report missed proof (Griefing)
+     * @param {string} relayAddress - Address of the relay to slash
+     * @param {string} dealId - Deal ID associated with the failure
+     * @param {string} evidence - Evidence string (e.g. IPFS hash of log)
+     * @returns {Promise<Object>}
+     */
+    async griefMissedProof(relayAddress, dealId, evidence) {
+      const dealIdBytes32 = ethers.id(dealId);
+      const tx = await registryWithSigner.griefMissedProof(relayAddress, dealIdBytes32, evidence);
+      const receipt = await tx.wait();
+      return {
+        success: true,
+        txHash: receipt.hash,
+      };
+    },
+
+    /**
+     * Report data loss (Griefing)
+     * @param {string} relayAddress - Address of the relay to slash
+     * @param {string} dealId - Deal ID associated with the failure
+     * @param {string} evidence - Evidence string
+     * @returns {Promise<Object>}
+     */
+    async griefDataLoss(relayAddress, dealId, evidence) {
+      const dealIdBytes32 = ethers.id(dealId);
+      const tx = await registryWithSigner.griefDataLoss(relayAddress, dealIdBytes32, evidence);
+      const receipt = await tx.wait();
+      return {
+        success: true,
+        txHash: receipt.hash,
+      };
+    },
+
   };
 }
 
@@ -717,6 +752,25 @@ export function createStorageDealRegistryClientWithSigner(privateKey, chainId = 
         txHash: receipt.hash,
       };
     },
+
+    /**
+     * Grief a storage deal
+     * @param {string} dealId - Deal ID
+     * @param {string} slashAmount - Amount to slash in USDC
+     * @param {string} reason - Reason for griefing
+     * @returns {Promise<Object>}
+     */
+    async grief(dealId, slashAmount, reason) {
+      const dealIdBytes32 = ethers.id(dealId);
+      const slashAmountWei = ethers.parseUnits(slashAmount, 6);
+      const tx = await storageDealRegistryWithSigner.grief(dealIdBytes32, slashAmountWei, reason);
+      const receipt = await tx.wait();
+      return {
+        success: true,
+        txHash: receipt.hash,
+      };
+    },
+
   };
 }
 

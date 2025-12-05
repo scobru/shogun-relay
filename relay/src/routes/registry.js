@@ -481,5 +481,76 @@ router.get('/config', (req, res) => {
   });
 });
 
+/**
+ * POST /api/v1/registry/grief/missed-proof
+ * 
+ * Report a missed proof
+ */
+router.post('/grief/missed-proof', async (req, res) => {
+  try {
+    if (!RELAY_PRIVATE_KEY) {
+      return res.status(400).json({ success: false, error: 'RELAY_PRIVATE_KEY not configured' });
+    }
+    const { relayAddress, dealId, evidence } = req.body;
+    if (!relayAddress || !dealId || !evidence) {
+      return res.status(400).json({ success: false, error: 'relayAddress, dealId, and evidence are required' });
+    }
+
+    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const result = await client.griefMissedProof(relayAddress, dealId, evidence);
+    res.json({ success: true, message: 'Missed proof reported', ...result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/v1/registry/grief/data-loss
+ * 
+ * Report data loss
+ */
+router.post('/grief/data-loss', async (req, res) => {
+  try {
+    if (!RELAY_PRIVATE_KEY) {
+      return res.status(400).json({ success: false, error: 'RELAY_PRIVATE_KEY not configured' });
+    }
+    const { relayAddress, dealId, evidence } = req.body;
+    if (!relayAddress || !dealId || !evidence) {
+      return res.status(400).json({ success: false, error: 'relayAddress, dealId, and evidence are required' });
+    }
+
+    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const result = await client.griefDataLoss(relayAddress, dealId, evidence);
+    res.json({ success: true, message: 'Data loss reported', ...result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/v1/registry/deal/grief
+ * 
+ * Grief a storage deal
+ */
+router.post('/deal/grief', async (req, res) => {
+  try {
+    if (!RELAY_PRIVATE_KEY) {
+      return res.status(400).json({ success: false, error: 'RELAY_PRIVATE_KEY not configured' });
+    }
+    const { dealId, slashAmount, reason } = req.body;
+    if (!dealId || !slashAmount || !reason) {
+      return res.status(400).json({ success: false, error: 'dealId, slashAmount, and reason are required' });
+    }
+
+    const { createStorageDealRegistryClientWithSigner } = await import('../utils/registry-client.js');
+    const client = createStorageDealRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const result = await client.grief(dealId, slashAmount, reason);
+    res.json({ success: true, message: 'Deal griefed', ...result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
 export default router;
 

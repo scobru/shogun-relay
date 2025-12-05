@@ -53,4 +53,13 @@ export class DealsModule {
   public async getDealsByClient(address: string): Promise<any> {
     return this.client.get(`/api/v1/deals/by-client/${address}`);
   }
+
+  public async grief(dealId: string, slashAmount: string, reason: string): Promise<any> {
+    return this.client.post('/api/v1/registry/deal/grief', {
+      dealId,
+      slashAmount,
+      reason,
+    });
+  }
 }
+

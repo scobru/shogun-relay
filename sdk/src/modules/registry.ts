@@ -45,4 +45,21 @@ export class RegistryModule {
   public async getDeals(): Promise<any> {
     return this.client.get('/api/v1/registry/deals');
   }
+
+  public async griefMissedProof(relayAddress: string, dealId: string, evidence: string): Promise<any> {
+    return this.client.post('/api/v1/registry/grief/missed-proof', {
+      relayAddress,
+      dealId,
+      evidence,
+    });
+  }
+
+  public async griefDataLoss(relayAddress: string, dealId: string, evidence: string): Promise<any> {
+    return this.client.post('/api/v1/registry/grief/data-loss', {
+      relayAddress,
+      dealId,
+      evidence,
+    });
+  }
 }
+
