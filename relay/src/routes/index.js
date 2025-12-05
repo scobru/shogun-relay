@@ -503,10 +503,7 @@ export default (app) => {
     res.sendFile(path.resolve(publicPath, "subscription.html"));
   });
 
-  app.get("/deals", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "deals-dashboard.html"));
-  });
+  // Deals dashboard removed - now using external @shogun-deals app
 
   app.get("/registry-dashboard", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
