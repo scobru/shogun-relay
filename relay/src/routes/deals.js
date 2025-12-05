@@ -471,43 +471,47 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
     // Activate deal
     console.log(`Activating deal ${dealId} - payment will be handled by StorageDealRegistry contract`);
     
-    const activatedDeal = StorageDeals.activateDeal(deal, txHash);
-    console.log(`Deal activated object created, status: ${activatedDeal.status}`);
-    
-    // Register deal on-chain using StorageDealRegistry
+    // Register deal on-chain using StorageDealRegistry first
+    // This will pull payment from client via safeTransferFrom
     let onChainRegistered = false;
     let onChainWarning = null;
+    let onChainTxHash = null;
     
     try {
       console.log(`📝 Registering deal ${dealId} on-chain via StorageDealRegistry...`);
       const storageDealRegistryClient = createStorageDealRegistryClientWithSigner(RELAY_PRIVATE_KEY, parseInt(REGISTRY_CHAIN_ID));
       
       // Convert price from USDC (6 decimals) to atomic units
-      const priceUSDCAtomic = Math.ceil(activatedDeal.pricing.totalPriceUSDC * 1000000);
+      const priceUSDCAtomic = Math.ceil(deal.pricing.totalPriceUSDC * 1000000);
       const priceUSDCString = (priceUSDCAtomic / 1000000).toString();
       
       // Convert sizeMB to integer (contract expects uint256)
-      const sizeMBInt = Math.max(1, Math.ceil(activatedDeal.sizeMB));
+      const sizeMBInt = Math.max(1, Math.ceil(deal.sizeMB));
       
       const onChainResult = await storageDealRegistryClient.registerDeal(
-        activatedDeal.id,
-        activatedDeal.clientAddress,
-        activatedDeal.cid,
+        deal.id,
+        deal.clientAddress,
+        deal.cid,
         sizeMBInt,
         priceUSDCString,
-        activatedDeal.durationDays,
+        deal.durationDays,
         clientStake
       );
       
       onChainRegistered = true;
+      onChainTxHash = onChainResult.txHash;
+      
+      console.log(`✅ Deal registered on-chain via StorageDealRegistry. TX: ${onChainResult.txHash}`);
+      console.log(`   Original Deal ID: ${deal.id}`);
+      console.log(`   On-Chain Deal ID (bytes32): ${onChainResult.dealIdBytes32}`);
+      
+      // Activate deal with on-chain transaction hash as payment proof
+      const activatedDeal = StorageDeals.activateDeal(deal, onChainTxHash);
+      console.log(`Deal activated object created, status: ${activatedDeal.status}`);
       
       // Save on-chain deal ID to the deal object
       activatedDeal.onChainDealId = onChainResult.dealIdBytes32;
       activatedDeal.onChainTx = onChainResult.txHash;
-      
-      console.log(`✅ Deal registered on-chain via StorageDealRegistry. TX: ${onChainResult.txHash}`);
-      console.log(`   Original Deal ID: ${activatedDeal.id}`);
-      console.log(`   On-Chain Deal ID (bytes32): ${onChainResult.dealIdBytes32}`);
       
       // Re-save deal with on-chain info
       try {
@@ -517,10 +521,16 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
         console.warn(`⚠️ Failed to update deal with on-chain info: ${updateError.message}`);
       }
     } catch (onChainError) {
-      console.warn(`⚠️ Failed to register deal on-chain: ${onChainError.message}`);
-      onChainWarning = 'Deal activated but on-chain registration failed. Deal is still functional.';
-      // Don't fail the activation if on-chain registration fails
+      console.error(`❌ Failed to register deal on-chain: ${onChainError.message}`);
+      // If on-chain registration fails, we can't activate the deal
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to register deal on-chain',
+        details: onChainError.message,
+      });
     }
+    
+    // At this point, on-chain registration succeeded and activatedDeal is defined
     
     // Save updated deal to GunDB (if not already saved with on-chain info)
     let saveWarning = null;
@@ -541,7 +551,7 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
     // Update cache with activated deal for immediate access
     cacheDeal(activatedDeal);
     
-    console.log(`✅ Deal ${dealId} activated. CID: ${deal.cid}, TX: ${txHash}`);
+    console.log(`✅ Deal ${dealId} activated. CID: ${deal.cid}, On-chain TX: ${onChainTxHash || activatedDeal.onChainTx}`);
     
     // Collect warnings
     const warnings = [];
