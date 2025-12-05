@@ -963,7 +963,7 @@ router.post('/:dealId/renew', express.json(), async (req, res) => {
  */
 router.get('/:dealId/verify', async (req, res) => {
   try {
-    const { dealId } = req.params;
+    let { dealId } = req.params;
     const gun = req.app.get('gunInstance');
     const IPFS_API_URL = req.app.get('IPFS_API_URL') || process.env.IPFS_API_URL || 'http://127.0.0.1:5001';
     const IPFS_API_TOKEN = req.app.get('IPFS_API_TOKEN') || process.env.IPFS_API_TOKEN;
@@ -972,21 +972,57 @@ router.get('/:dealId/verify', async (req, res) => {
       return res.status(503).json({ success: false, error: 'Gun not available' });
     }
     
-    // Get deal
+    // Handle on-chain deal IDs (remove "onchain_" prefix if present)
+    const originalDealId = dealId;
+    if (dealId.startsWith('onchain_')) {
+      dealId = dealId.replace(/^onchain_/, '');
+    }
+    
+    // Get deal from cache or GunDB
     let deal = getCachedDeal(dealId);
     if (!deal) {
       deal = await StorageDeals.getDeal(gun, dealId);
+    }
+    
+    // If still not found and it's an on-chain deal, try to get from StorageDealRegistry
+    if (!deal && originalDealId.startsWith('onchain_')) {
+      try {
+        const REGISTRY_CHAIN_ID = process.env.REGISTRY_CHAIN_ID;
+        if (REGISTRY_CHAIN_ID) {
+          const { createStorageDealRegistryClient } = await import('../utils/registry-client.js');
+          const storageDealRegistryClient = createStorageDealRegistryClient(parseInt(REGISTRY_CHAIN_ID));
+          
+          // Try to get deal from on-chain registry
+          const onChainDeal = await storageDealRegistryClient.getDeal(dealId);
+          if (onChainDeal && onChainDeal.createdAt > 0) {
+            // Convert on-chain deal to format expected by verification
+            deal = {
+              id: originalDealId,
+              cid: onChainDeal.cid,
+              status: onChainDeal.active && Number(onChainDeal.expiresAt) * 1000 > Date.now() 
+                ? StorageDeals.DEAL_STATUS.ACTIVE 
+                : StorageDeals.DEAL_STATUS.EXPIRED,
+              active: onChainDeal.active && Number(onChainDeal.expiresAt) * 1000 > Date.now(),
+              onChainDealId: dealId,
+            };
+          }
+        }
+      } catch (e) {
+        console.warn(`Could not fetch on-chain deal ${dealId}:`, e.message);
+      }
     }
     
     if (!deal) {
       return res.status(404).json({ success: false, error: 'Deal not found' });
     }
     
-    // Only verify active deals
-    if (deal.status !== StorageDeals.DEAL_STATUS.ACTIVE) {
+    // Only verify active deals (check both status field and active flag for on-chain deals)
+    const isActive = deal.status === StorageDeals.DEAL_STATUS.ACTIVE || 
+                     (deal.onChainDealId && deal.active !== false);
+    if (!isActive) {
       return res.status(400).json({ 
         success: false, 
-        error: `Deal is ${deal.status}, cannot verify` 
+        error: `Deal is ${deal.status || 'inactive'}, cannot verify` 
       });
     }
     

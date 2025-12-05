@@ -39,8 +39,8 @@
     ENV BEE_BLOCKCHAIN_RPC_ENDPOINT=https://gnosis-mainnet.g.alchemy.com/v2/yjhjIoJ3o_at8ALT7nCJtFtjdqFpiBdx
     ENV BEE_PASSWORD=shogun2025
     ENV BEE_WITHDRAWAL_ADDRESSES_WHITELIST=0xA6591dCDff5C7616110b4f84207184aef7835048
-    ENV BEE_WELCOME_MESSAGE="Welcome to the Bee Swarm Full Node"
-    ENV BEE_VERBOSITY=debug
+    ENV BEE_WELCOME_MESSAGE="Welcome to the Bee Swarm Full Node by scobru"
+    ENV BEE_VERBOSITY=info
     ENV BEE_RESOLVER_OPTIONS=https://mainnet.infura.io/v3/yjhjIoJ3o_at8ALT7nCJtFtjdqFpiBdx
     ENV BEE_RESERVE_CAPACITY_DOUBLING=1
     ENV BEE_RESYNC=false
