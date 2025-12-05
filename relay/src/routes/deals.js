@@ -990,29 +990,112 @@ router.get('/:dealId/verify', async (req, res) => {
         const REGISTRY_CHAIN_ID = process.env.REGISTRY_CHAIN_ID;
         if (REGISTRY_CHAIN_ID) {
           const { createStorageDealRegistryClient } = await import('../utils/registry-client.js');
+          const { ethers } = await import('ethers');
           const storageDealRegistryClient = createStorageDealRegistryClient(parseInt(REGISTRY_CHAIN_ID));
           
-          // Try to get deal from on-chain registry
-          const onChainDeal = await storageDealRegistryClient.getDeal(dealId);
-          if (onChainDeal && onChainDeal.createdAt > 0) {
+          console.log(`🔍 Searching for on-chain deal with ID: ${dealId}`);
+          
+          // Try multiple strategies to find the deal
+          let onChainDeal = null;
+          
+          // Strategy 1: Try with dealId as-is (if it's already a bytes32)
+          try {
+            onChainDeal = await storageDealRegistryClient.getDeal(dealId);
+            if (onChainDeal && onChainDeal.createdAt) {
+              console.log(`✅ Found deal using direct dealId`);
+            }
+          } catch (e) {
+            console.log(`⚠️ Direct dealId lookup failed: ${e.message.substring(0, 100)}`);
+          }
+          
+          // Strategy 2: If not found and dealId looks incomplete, try hashing it
+          if (!onChainDeal && dealId.startsWith('0x') && dealId.length < 66) {
+            try {
+              // Try padding to bytes32
+              const paddedId = dealId.padEnd(66, '0');
+              onChainDeal = await storageDealRegistryClient.getDeal(paddedId);
+              if (onChainDeal && onChainDeal.createdAt) {
+                console.log(`✅ Found deal using padded dealId`);
+                dealId = paddedId; // Update dealId for consistency
+              }
+            } catch (e) {
+              console.log(`⚠️ Padded dealId lookup failed: ${e.message.substring(0, 100)}`);
+            }
+          }
+          
+          // Strategy 3: If still not found, try hashing the dealId string
+          if (!onChainDeal) {
+            try {
+              const hashedId = ethers.id(dealId);
+              onChainDeal = await storageDealRegistryClient.getDeal(hashedId);
+              if (onChainDeal && onChainDeal.createdAt) {
+                console.log(`✅ Found deal using hashed dealId`);
+                dealId = hashedId; // Update dealId for consistency
+              }
+            } catch (e) {
+              console.log(`⚠️ Hashed dealId lookup failed: ${e.message.substring(0, 100)}`);
+            }
+          }
+          
+          // Strategy 4: If we have a client address from query, try searching all their deals
+          if (!onChainDeal && req.query.clientAddress) {
+            try {
+              const clientDeals = await storageDealRegistryClient.getClientDeals(req.query.clientAddress);
+              console.log(`🔍 Found ${clientDeals.length} deals for client, searching for match...`);
+              for (const clientDeal of clientDeals) {
+                // Try to match by partial dealId or other criteria
+                const clientDealIdStr = clientDeal.dealId || '';
+                if (clientDealIdStr.includes(dealId.replace('0x', '')) || 
+                    dealId.includes(clientDealIdStr.replace('0x', ''))) {
+                  onChainDeal = clientDeal;
+                  dealId = clientDeal.dealId;
+                  console.log(`✅ Found deal by searching client deals`);
+                  break;
+                }
+              }
+            } catch (e) {
+              console.log(`⚠️ Client deals search failed: ${e.message.substring(0, 100)}`);
+            }
+          }
+          
+          if (onChainDeal && onChainDeal.createdAt) {
             // Convert on-chain deal to format expected by verification
             deal = {
               id: originalDealId,
               cid: onChainDeal.cid,
-              status: onChainDeal.active && Number(onChainDeal.expiresAt) * 1000 > Date.now() 
+              status: onChainDeal.active && new Date(onChainDeal.expiresAt) > new Date() 
                 ? StorageDeals.DEAL_STATUS.ACTIVE 
                 : StorageDeals.DEAL_STATUS.EXPIRED,
-              active: onChainDeal.active && Number(onChainDeal.expiresAt) * 1000 > Date.now(),
+              active: onChainDeal.active && new Date(onChainDeal.expiresAt) > new Date(),
               onChainDealId: dealId,
             };
+            console.log(`✅ Successfully loaded on-chain deal: ${deal.cid}, active: ${deal.active}`);
+          } else {
+            console.warn(`⚠️ On-chain deal ${dealId} not found after all strategies`);
           }
         }
       } catch (e) {
-        console.warn(`Could not fetch on-chain deal ${dealId}:`, e.message);
+        console.error(`❌ Error fetching on-chain deal ${dealId}:`, e.message);
+        console.error(e.stack);
+      }
+    }
+    
+    // If still not found, try searching by CID if provided as query parameter
+    if (!deal && req.query.cid) {
+      try {
+        const dealsByCid = await StorageDeals.getDealsByCid(gun, req.query.cid);
+        if (dealsByCid && dealsByCid.length > 0) {
+          // Use the first matching deal
+          deal = dealsByCid[0];
+          console.log(`✅ Found deal by CID: ${req.query.cid}`);
+        }
+      } catch (e) {
+        console.warn(`Could not search deals by CID: ${e.message}`);
       }
     }
     
     if (!deal) {
+      console.error(`❌ Deal not found: ${dealId} (original: ${originalDealId})`);
       return res.status(404).json({ success: false, error: 'Deal not found' });
     }
     
