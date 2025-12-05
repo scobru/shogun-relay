@@ -340,13 +340,14 @@ router.post('/create', express.json(), async (req, res) => {
     // Cache deal for quick activation (GunDB sync can be slow)
     cacheDeal(deal);
     console.log(`📝 Deal ${deal.id} created and cached for ${deal.cid}`);
-    
-    let relayAddress = null;
+
+    // Get the relay's wallet address for payment
+    let relayWalletAddress = null;
     if (RELAY_PRIVATE_KEY && REGISTRY_CHAIN_ID) {
       const registryClient = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, parseInt(REGISTRY_CHAIN_ID));
-      relayAddress = registryClient.wallet.address;
+      relayWalletAddress = registryClient.wallet.address;
     }
-    
+
     // Return 200 OK - deal created successfully, payment needed to activate
     res.json({
       success: true,
@@ -361,11 +362,11 @@ router.post('/create', express.json(), async (req, res) => {
         amount: pricing.totalPriceUSDC,
         amountAtomic: Math.ceil(pricing.totalPriceUSDC * 1000000).toString(),
         currency: 'USDC',
-        to: relayAddress || 'Relay address not configured',
+        to: relayWalletAddress || 'Relay address not configured',
         chainId: REGISTRY_CHAIN_ID || 84532,
         usdcAddress: process.env.USDC_ADDRESS || '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
-        message: relayAddress 
-          ? `Transfer ${pricing.totalPriceUSDC} USDC to ${relayAddress}. After payment, the relay will register the deal on-chain.`
+        message: relayWalletAddress 
+          ? `Transfer ${pricing.totalPriceUSDC} USDC to ${relayWalletAddress}. After payment, the relay will register the deal on-chain.`
           : 'Relay not configured. Please contact relay operator for payment instructions.',
       },
       message: 'Deal created. Transfer USDC to relay address to activate.',
