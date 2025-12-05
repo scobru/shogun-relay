@@ -44,7 +44,7 @@ const REGISTRY_ABI = [
   'function minStake() view returns (uint256)',
   'function unstakingDelay() view returns (uint256)',
   // State-changing functions (require signer)
-  'function registerRelay(string endpoint, string gunPubKey, uint256 stakeAmount, uint256 griefingRatio)',
+  'function registerRelay(string endpoint, bytes pubkey, bytes epub, uint256 stakeAmount, uint256 griefingRatio)',
   'function updateRelay(string newEndpoint, string newGunPubKey)',
   'function increaseStake(uint256 amount)',
   'function requestUnstake()',
@@ -376,12 +376,13 @@ export function createRegistryClientWithSigner(privateKey, chainId = 84532, rpcU
     /**
      * Register this relay on-chain
      * @param {string} endpoint - Relay endpoint URL
-     * @param {string} gunPubKey - GunDB public key
+     * @param {string} gunPubKey - GunDB public key (string, will be converted to bytes)
      * @param {string} stakeAmount - Amount to stake in USDC (human readable, e.g., "100")
      * @param {number} [griefingRatio] - Custom griefing ratio in basis points (0 = use default)
+     * @param {string} [epub] - Ephemeral encryption public key (optional, defaults to empty bytes)
      * @returns {Promise<Object>} Transaction receipt
      */
-    async registerRelay(endpoint, gunPubKey, stakeAmount, griefingRatio = 0) {
+    async registerRelay(endpoint, gunPubKey, stakeAmount, griefingRatio = 0, epub = '') {
       const stakeWei = ethers.parseUnits(stakeAmount, 6);
 
       // Check USDC balance
@@ -399,9 +400,13 @@ export function createRegistryClientWithSigner(privateKey, chainId = 84532, rpcU
         console.log('USDC approved');
       }
 
+      // Convert pubkey and epub strings to bytes
+      const pubkeyBytes = ethers.toUtf8Bytes(gunPubKey || '');
+      const epubBytes = epub ? ethers.toUtf8Bytes(epub) : '0x';
+
       // Register
       console.log(`Registering relay: ${endpoint}${griefingRatio > 0 ? ` with griefing ratio ${griefingRatio} bps` : ''}`);
-      const tx = await registryWithSigner.registerRelay(endpoint, gunPubKey, stakeWei, griefingRatio);
+      const tx = await registryWithSigner.registerRelay(endpoint, pubkeyBytes, epubBytes, stakeWei, griefingRatio);
       const receipt = await tx.wait();
 
       return {
