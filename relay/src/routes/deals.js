@@ -476,6 +476,7 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
     let onChainRegistered = false;
     let onChainWarning = null;
     let onChainTxHash = null;
+    let activatedDeal = null;
     
     try {
       console.log(`📝 Registering deal ${dealId} on-chain via StorageDealRegistry...`);
@@ -506,7 +507,7 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
       console.log(`   On-Chain Deal ID (bytes32): ${onChainResult.dealIdBytes32}`);
       
       // Activate deal with on-chain transaction hash as payment proof
-      const activatedDeal = StorageDeals.activateDeal(deal, onChainTxHash);
+      activatedDeal = StorageDeals.activateDeal(deal, onChainTxHash);
       console.log(`Deal activated object created, status: ${activatedDeal.status}`);
       
       // Save on-chain deal ID to the deal object
@@ -531,6 +532,12 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
     }
     
     // At this point, on-chain registration succeeded and activatedDeal is defined
+    if (!activatedDeal) {
+      return res.status(500).json({
+        success: false,
+        error: 'Deal activation failed - activatedDeal not created',
+      });
+    }
     
     // Save updated deal to GunDB (if not already saved with on-chain info)
     let saveWarning = null;
