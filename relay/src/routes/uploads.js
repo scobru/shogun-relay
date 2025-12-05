@@ -581,6 +581,65 @@ router.delete("/:identifier/:hash", (req, res, next) => {
     const fileSizeMB = Math.ceil(fileData.size / (1024 * 1024));
     console.log(`📊 File size: ${fileData.size} bytes (${fileSizeMB} MB)`);
 
+    // Remove file from uploads node in GunDB
+    await new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error("Delete operation timeout"));
+      }, 10000);
+
+      uploadNode.put(null, (ack) => {
+        clearTimeout(timeoutId);
+        if (ack && ack.err) {
+          console.error(`❌ Error deleting file from uploads node:`, ack.err);
+          reject(new Error(ack.err));
+        } else {
+          console.log(`✅ File ${hash} removed from uploads node successfully`);
+          resolve();
+        }
+      });
+    });
+
+    // Update MB usage after deletion
+    try {
+      const currentMBData = await new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          reject(new Error("MB usage read timeout"));
+        }, 5000);
+
+        gun.get("shogun").get("mbUsage").get(identifier).once((data) => {
+          clearTimeout(timeoutId);
+          resolve(data);
+        });
+      });
+
+      const currentMB = currentMBData ? (currentMBData.mbUsed || 0) : 0;
+      const newMB = Math.max(0, currentMB - fileSizeMB);
+
+      await new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          reject(new Error("MB usage update timeout"));
+        }, 5000);
+
+        gun.get("shogun").get("mbUsage").get(identifier).put({
+          mbUsed: newMB,
+          lastUpdated: Date.now(),
+          userAddress: identifier
+        }, (ack) => {
+          clearTimeout(timeoutId);
+          if (ack && ack.err) {
+            console.warn(`⚠️ Failed to update MB usage:`, ack.err);
+            reject(new Error(ack.err));
+          } else {
+            console.log(`✅ MB usage updated: ${currentMB} -> ${newMB} MB`);
+            resolve();
+          }
+        });
+      });
+    } catch (error) {
+      console.warn(`⚠️ Failed to update MB usage after deletion:`, error.message);
+      // Continue even if MB update fails
+    }
+
     // Remove hash from systemhash node
     try {
       const adminToken = process.env.ADMIN_PASSWORD;
@@ -638,6 +697,7 @@ router.delete("/:identifier/:hash", (req, res, next) => {
       }
     } catch (error) {
       console.warn(`⚠️ Failed to remove hash ${hash} from systemhash node:`, error);
+      // Continue even if systemhash removal fails
     }
 
     res.json({
@@ -648,7 +708,7 @@ router.delete("/:identifier/:hash", (req, res, next) => {
       deletedFile: {
         name: fileData.name,
         size: fileData.size,
-        sizeMB: fileData.sizeMB,
+        sizeMB: fileSizeMB,
       }
     });
   } catch (error) {

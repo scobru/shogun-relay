@@ -493,11 +493,6 @@ export default (app) => {
     res.sendFile(path.resolve(publicPath, "chat.html"));
   });
 
-  app.get("/charts", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "charts.html"));
-  });
-
   app.get("/subscription", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "subscription.html"));
@@ -826,6 +821,7 @@ export default (app) => {
   });
 
   // Aggiungi middleware per proteggere le route statiche che richiedono autenticazione
+  // Tutte le dashboard sono ora protette e accessibili solo tramite admin
   const protectedStaticRoutes = [
     "/stats",
     "/services-dashboard",
@@ -835,6 +831,10 @@ export default (app) => {
     "/graph",
     "/chat",
     "/charts",
+    "/subscription",
+    "/registry-dashboard",
+    "/endpoints",
+    "/visualGraph",
     "/drive",
   ];
 
