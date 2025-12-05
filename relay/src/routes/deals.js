@@ -22,6 +22,7 @@ import * as ErasureCoding from '../utils/erasure-coding.js';
 import * as FrozenData from '../utils/frozen-data.js';
 import { getRelayUser, getRelayPub } from '../utils/relay-user.js';
 import { X402Merchant } from '../utils/x402-merchant.js';
+import * as Reputation from '../utils/relay-reputation.js';
 import { 
   createRegistryClient, 
   createRegistryClientWithSigner,
@@ -524,6 +525,7 @@ router.post('/create', express.json(), async (req, res) => {
     // Determine which relay to use
     let selectedRelayPub = relayPub;
     let selectedRelayAddress = null;
+    let selectedRelayReputation = null;
     
     // Return payment instructions for USDC transfer
     // Client must transfer USDC to relay address, then relay will register deal on-chain
@@ -547,6 +549,17 @@ router.post('/create', express.json(), async (req, res) => {
           // Use the relay's GunDB pubkey from registry
           selectedRelayPub = relayInfo.gunPubKey;
           selectedRelayAddress = relayAddress;
+          
+          // Get reputation for selected relay (if host can be determined)
+          // Try to get reputation by host or pubkey
+          try {
+            const gun = req.app.get('gunInstance');
+            if (gun && relayInfo.host) {
+              selectedRelayReputation = await Reputation.getReputation(gun, relayInfo.host);
+            }
+          } catch (repError) {
+            console.warn('Could not fetch reputation for selected relay:', repError.message);
+          }
         } else {
           return res.status(400).json({
             success: false,
@@ -559,6 +572,17 @@ router.post('/create', express.json(), async (req, res) => {
           success: false,
           error: `Failed to verify relay: ${error.message}`,
         });
+      }
+    } else {
+      // If no relay specified, get reputation for current relay
+      try {
+        const gun = req.app.get('gunInstance');
+        const host = process.env.RELAY_HOST || req.headers.host || 'localhost';
+        if (gun) {
+          selectedRelayReputation = await Reputation.getReputation(gun, host);
+        }
+      } catch (repError) {
+        console.warn('Could not fetch reputation for current relay:', repError.message);
       }
     }
     
@@ -599,6 +623,21 @@ router.post('/create', express.json(), async (req, res) => {
       relayWalletAddress = registryClient.wallet.address;
     }
 
+    // Prepare reputation info for response
+    const reputationInfo = selectedRelayReputation ? {
+      score: selectedRelayReputation.calculatedScore.total,
+      tier: selectedRelayReputation.calculatedScore.tier,
+      breakdown: selectedRelayReputation.calculatedScore.breakdown,
+      hasEnoughData: selectedRelayReputation.calculatedScore.hasEnoughData,
+      metrics: {
+        uptimePercent: selectedRelayReputation.uptimePercent || 0,
+        proofSuccessRate: selectedRelayReputation.proofsTotal > 0
+          ? (selectedRelayReputation.proofsSuccessful / selectedRelayReputation.proofsTotal) * 100
+          : null,
+        avgResponseTimeMs: selectedRelayReputation.avgResponseTimeMs || null,
+      },
+    } : null;
+
     // Return 200 OK - deal created successfully, payment needed to activate
     res.json({
       success: true,
@@ -607,6 +646,11 @@ router.post('/create', express.json(), async (req, res) => {
         status: deal.status,
         pricing: deal.pricing,
         cid: deal.cid,
+      },
+      relay: {
+        address: selectedRelayAddress || relayWalletAddress || null,
+        pub: selectedRelayPub,
+        reputation: reputationInfo,
       },
       paymentRequired: {
         type: 'usdc_transfer',
