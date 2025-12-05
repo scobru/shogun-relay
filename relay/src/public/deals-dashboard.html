@@ -1179,7 +1179,10 @@
           'function balanceOf(address account) view returns (uint256)',
         ], signer);
 
-        const amount = ethers.parseUnits(paymentRequired.amount, 6);
+        // Use amountAtomic if available (already in atomic units as string), otherwise parse amount
+        const amount = paymentRequired.amountAtomic 
+          ? BigInt(paymentRequired.amountAtomic)
+          : ethers.parseUnits(String(paymentRequired.amount), 6);
         
         // Check balance
         const balance = await usdcContract.balanceOf(connectedAddress);
