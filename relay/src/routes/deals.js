@@ -984,8 +984,8 @@ router.get('/:dealId/verify', async (req, res) => {
       deal = await StorageDeals.getDeal(gun, dealId);
     }
     
-    // If still not found and it's an on-chain deal, try to get from StorageDealRegistry
-    if (!deal && originalDealId.startsWith('onchain_')) {
+    // If still not found, try to get from StorageDealRegistry (for any dealId, not just onchain_ prefixed)
+    if (!deal) {
       try {
         const REGISTRY_CHAIN_ID = process.env.REGISTRY_CHAIN_ID;
         if (REGISTRY_CHAIN_ID) {
@@ -1001,11 +1001,16 @@ router.get('/:dealId/verify', async (req, res) => {
           // Strategy 1: Try with dealId as-is (if it's already a bytes32)
           try {
             onChainDeal = await storageDealRegistryClient.getDeal(dealId);
+            console.log(`🔍 getDeal returned: ${!!onChainDeal}, createdAt: ${onChainDeal?.createdAt}, type: ${typeof onChainDeal?.createdAt}`);
             if (onChainDeal && onChainDeal.createdAt) {
-              console.log(`✅ Found deal using direct dealId`);
+              console.log(`✅ Found deal using direct dealId, createdAt: ${onChainDeal.createdAt}`);
+            } else {
+              console.log(`⚠️ Deal found but createdAt invalid or missing: ${onChainDeal?.createdAt}`);
+              onChainDeal = null; // Reset if invalid
             }
           } catch (e) {
             console.log(`⚠️ Direct dealId lookup failed: ${e.message.substring(0, 100)}`);
+            onChainDeal = null;
           }
           
           // Strategy 2: If not found and dealId looks incomplete, try hashing it
