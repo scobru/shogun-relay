@@ -259,38 +259,54 @@ router.post("/upload",
     if (isAdmin) {
       req.authType = 'admin';
       next();
-    } else if (userAddress && process.env.X402_PAY_TO_ADDRESS) {
-      // User-based upload with x402 subscription
+    } else if (userAddress) {
+      // User-based upload - can be for subscriptions OR storage deals
       req.authType = 'user';
       req.userAddress = userAddress;
       
-      // Check subscription status
-      const gun = req.app.get('gunInstance');
-      if (!gun) {
-        return res.status(500).json({ success: false, error: "Server error - Gun instance not available" });
-      }
+      // Check if this is for a storage deal (no subscription required)
+      // Storage deals are paid on-chain, so upload should work without subscription
+      const isDealUpload = req.headers['x-deal-upload'] === 'true' || req.query.deal === 'true';
       
-      try {
-        const subscription = await X402Merchant.getSubscriptionStatus(gun, userAddress);
-        
-        if (!subscription.active) {
-          console.log(`Upload denied - No active subscription for ${userAddress}: ${subscription.reason}`);
-          return res.status(402).json({
-            success: false,
-            error: "Payment required - No active subscription",
-            reason: subscription.reason,
-            subscriptionRequired: true,
-            endpoint: "/api/v1/x402/subscribe",
-            tiers: "/api/v1/x402/tiers",
-          });
+      if (isDealUpload) {
+        // Allow upload for storage deals without subscription check
+        console.log(`Upload allowed for storage deal - user: ${userAddress}`);
+        req.isDealUpload = true;
+        next();
+      } else if (process.env.X402_PAY_TO_ADDRESS) {
+        // For subscription-based uploads, check subscription status
+        const gun = req.app.get('gunInstance');
+        if (!gun) {
+          return res.status(500).json({ success: false, error: "Server error - Gun instance not available" });
         }
         
-        req.subscription = subscription;
-        console.log(`User ${userAddress} has active ${subscription.tier} subscription with ${subscription.storageRemainingMB}MB remaining`);
+        try {
+          const subscription = await X402Merchant.getSubscriptionStatus(gun, userAddress);
+          
+          if (!subscription.active) {
+            console.log(`Upload denied - No active subscription for ${userAddress}: ${subscription.reason}`);
+            return res.status(402).json({
+              success: false,
+              error: "Payment required - No active subscription",
+              reason: subscription.reason,
+              subscriptionRequired: true,
+              endpoint: "/api/v1/x402/subscribe",
+              tiers: "/api/v1/x402/tiers",
+            });
+          }
+          
+          req.subscription = subscription;
+          console.log(`User ${userAddress} has active ${subscription.tier} subscription with ${subscription.storageRemainingMB}MB remaining`);
+          next();
+        } catch (error) {
+          console.error("Subscription check error:", error);
+          return res.status(500).json({ success: false, error: "Error checking subscription status" });
+        }
+      } else {
+        // X402 not configured, allow upload anyway (for deals)
+        console.log(`Upload allowed - X402 not configured, treating as deal upload`);
+        req.isDealUpload = true;
         next();
-      } catch (error) {
-        console.error("Subscription check error:", error);
-        return res.status(500).json({ success: false, error: "Error checking subscription status" });
       }
     } else {
       console.log("Auth failed - Admin token:", adminToken ? "provided" : "missing", "User address:", userAddress ? "provided" : "missing");
@@ -398,7 +414,8 @@ router.post("/upload",
             };
 
             // If user upload, save to Gun database and update MB usage
-            if (req.authType === 'user' && req.userAddress) {
+            // Skip GunDB save for deal uploads (they're tracked on-chain)
+            if (req.authType === 'user' && req.userAddress && !req.isDealUpload) {
               const gun = req.app.get('gunInstance');
               const fileSizeMB = req.file.size / (1024 * 1024);
               
