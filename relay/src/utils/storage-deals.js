@@ -24,35 +24,12 @@ export const DEAL_STATUS = {
   FAILED: 'failed',             // Storage failed
 };
 
+// Import pricing configuration
+import { PRICING_CONFIG } from '../config/pricing-config.js';
+
 // Pricing tiers (per MB per month in USDC)
-export const PRICING = {
-  standard: {
-    pricePerMBMonth: 0.0001,    // $0.0001 per MB/month
-    minSizeMB: 0.001,           // 1 KB minimum
-    maxSizeMB: 1000,
-    minDurationDays: 7,
-    maxDurationDays: 365,
-  },
-  premium: {
-    pricePerMBMonth: 0.0002,    // $0.0002 per MB/month (with erasure coding)
-    minSizeMB: 0.001,           // 1 KB minimum
-    maxSizeMB: 10000,
-    minDurationDays: 7,         // Lowered from 30 for flexibility
-    maxDurationDays: 730,
-    includesErasureCoding: true,
-    replicationFactor: 3,
-  },
-  enterprise: {
-    pricePerMBMonth: 0.0005,    // $0.0005 per MB/month
-    minSizeMB: 0.001,           // 1 KB minimum
-    maxSizeMB: 100000,
-    minDurationDays: 7,         // Lowered from 90 for flexibility
-    maxDurationDays: 1825,      // 5 years
-    includesErasureCoding: true,
-    replicationFactor: 5,
-    slaGuarantee: true,
-  },
-};
+// Now loaded from configuration (env variables or config file)
+export const PRICING = PRICING_CONFIG.deals;
 
 /**
  * Calculate deal price

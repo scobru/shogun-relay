@@ -99,10 +99,11 @@ router.get('/pricing', (req, res) => {
     }
     
     // Return general pricing info (when params missing or invalid)
+    // This exposes the relay's pricing configuration to clients
     res.json({
       success: true,
       tiers: StorageDeals.PRICING,
-      note: 'Prices are in USDC. Add ?sizeMB=X&durationDays=Y&tier=Z for specific quote.',
+      note: 'These are the pricing tiers configured for this relay. Prices may vary between relays.',
     });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });

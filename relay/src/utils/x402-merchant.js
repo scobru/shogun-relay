@@ -78,27 +78,12 @@ const NETWORK_CONFIG = {
   },
 };
 
+// Import pricing configuration
+import { PRICING_CONFIG } from '../config/pricing-config.js';
+
 // Subscription tiers
-export const SUBSCRIPTION_TIERS = {
-  basic: {
-    name: 'Basic',
-    storageMB: 100,
-    priceUSDC: 0.001,
-    durationDays: 30,
-  },
-  standard: {
-    name: 'Standard',
-    storageMB: 500,
-    priceUSDC: 0.004,
-    durationDays: 30,
-  },
-  premium: {
-    name: 'Premium',
-    storageMB: 2000,
-    priceUSDC: 0.01,
-    durationDays: 30,
-  },
-};
+// Now loaded from configuration (env variables or config file)
+export const SUBSCRIPTION_TIERS = PRICING_CONFIG.subscriptions;
 
 export class X402Merchant {
   constructor(options = {}) {
