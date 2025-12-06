@@ -855,6 +855,7 @@ See docs/RELAY_KEYS.md for more information.
       // Check uptime (warn if very low, might indicate recent restart)
       // But don't fail health check during startup
       const uptimeSeconds = process.uptime();
+      const uptimeHours = uptimeSeconds / 3600;
       if (uptimeSeconds < 30) {
         warnings.push("Recently started (still initializing)");
       }
@@ -872,9 +873,9 @@ See docs/RELAY_KEYS.md for more information.
         status,
         timestamp: new Date().toISOString(),
         uptime: {
-          seconds: Math.floor(process.uptime()),
+          seconds: Math.floor(uptimeSeconds),
           hours: Math.floor(uptimeHours * 10) / 10,
-          formatted: formatUptime(process.uptime())
+          formatted: `${Math.floor(uptimeHours)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m`
         },
         connections: {
           active: activeWires,
