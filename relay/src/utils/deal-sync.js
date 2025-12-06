@@ -450,7 +450,13 @@ export async function syncDealsWithIPFS(relayAddress, chainId, options = {}) {
               
               // If pending, the pin might still be processing in background
               if (pinResult.pending) {
-                console.warn(`⚠️ Deal ${dealId}: CID ${cid} pin timed out but may still be processing in background. Will retry on next sync.`);
+                console.warn(`⚠️ Deal ${dealId}: CID ${cid} pin timed out but may still be processing in background. Will retry later.`);
+                // Track failure for rate limiting, but don't count as hard failure
+                const existingFailure = pinFailureCache.get(cid) || { consecutiveFailures: 0 };
+                pinFailureCache.set(cid, {
+                  lastAttempt: Date.now(),
+                  consecutiveFailures: existingFailure.consecutiveFailures + 1,
+                });
                 // Don't count as failed - it might succeed later, but track it
                 results.errors.push({
                   dealId,
