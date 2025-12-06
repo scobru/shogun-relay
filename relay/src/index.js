@@ -1,6 +1,3 @@
-// Enhanced Gun relay server with Shogun improvements
-// MUST be required after Gun to work
-
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -10,9 +7,7 @@ import dotenv from "dotenv";
 import ip from "ip";
 import setSelfAdjustingInterval from "self-adjusting-interval";
 import crypto from "crypto";
-
 import Gun from "gun";
-
 import "gun/sea.js";
 import "gun/lib/stats.js";
 import "gun/lib/webrtc.js";
@@ -24,17 +19,13 @@ import "gun/lib/radisk.js";
 import "gun/lib/wire.js";
 import "gun/lib/axe.js";
 import "./utils/bullet-catcher.js";
-
 import Holster from "@mblaney/holster/src/holster.js";
-
 import multer from "multer";
-import { initRelayUser, isRelayUserInitialized, getRelayPub, getRelayUser } from "./utils/relay-user.js";
+import { initRelayUser, getRelayUser } from "./utils/relay-user.js";
 import * as Reputation from "./utils/relay-reputation.js";
 import * as FrozenData from "./utils/frozen-data.js";
 
 dotenv.config();
-
-const CLEANUP_CORRUPTED_DATA = process.env.CLEANUP_CORRUPTED_DATA || true;
 
 // --- IPFS Configuration ---
 const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
@@ -933,6 +924,80 @@ See docs/RELAY_KEYS.md for more information.
       },
       timestamp: Date.now(),
     });
+  });
+
+  // Contracts configuration endpoint
+  app.get("/api/v1/contracts", async (req, res) => {
+    try {
+      const { CONTRACTS_CONFIG, getConfigByChainId } = await import('shogun-contracts');
+      const chainIdParam = req.query.chainId;
+      
+      if (chainIdParam) {
+        // Get config for specific chain
+        const chainIdNum = typeof chainIdParam === 'string' ? parseInt(chainIdParam) : parseInt(String(chainIdParam));
+        if (isNaN(chainIdNum)) {
+          return res.status(400).json({
+            success: false,
+            error: 'Invalid chainId parameter'
+          });
+        }
+        const config = getConfigByChainId(chainIdNum);
+        
+        if (!config) {
+          return res.status(404).json({
+            success: false,
+            error: `No contracts configured for chain ID ${chainId}`
+          });
+        }
+        
+        return res.json({
+          success: true,
+          chainId: chainIdNum,
+          network: Object.keys(CONTRACTS_CONFIG).find(
+            key => CONTRACTS_CONFIG[key].chainId === chainIdNum
+          ),
+          contracts: {
+            relayRegistry: config.relayRegistry,
+            storageDealRegistry: config.storageDealRegistry,
+            dataPostRegistry: config.dataPostRegistry,
+            dataSaleEscrowFactory: config.dataSaleEscrowFactory,
+            usdc: config.usdc
+          },
+          rpc: config.rpc,
+          explorer: config.explorer
+        });
+      }
+      
+      // Return all configured networks
+      const networks = {};
+      for (const [networkName, config] of Object.entries(CONTRACTS_CONFIG)) {
+        networks[networkName] = {
+          chainId: config.chainId,
+          contracts: {
+            relayRegistry: config.relayRegistry,
+            storageDealRegistry: config.storageDealRegistry,
+            dataPostRegistry: config.dataPostRegistry,
+            dataSaleEscrowFactory: config.dataSaleEscrowFactory,
+            usdc: config.usdc
+          },
+          rpc: config.rpc,
+          explorer: config.explorer
+        };
+      }
+      
+      res.json({
+        success: true,
+        networks,
+        availableChains: Object.values(CONTRACTS_CONFIG).map(c => c.chainId)
+      });
+    } catch (error) {
+      console.error('Error fetching contracts config:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch contracts configuration',
+        message: error.message
+      });
+    }
   });
 
   // IPFS status endpoint
