@@ -753,10 +753,20 @@ router.get("/cat/:cid", async (req, res) => {
 router.get("/cat/:cid/decrypt", async (req, res) => {
   try {
     const { cid } = req.params;
-    const { token } = req.query;
+    let { token } = req.query;
     const IPFS_GATEWAY_URL = process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
 
     console.log(`🔓 IPFS Decrypt request for CID: ${cid}, Token: ${token ? "present" : "missing"}`);
+
+    // Parse token if it's a JSON string
+    if (token && typeof token === 'string') {
+      try {
+        token = JSON.parse(token);
+        console.log(`🔑 Token parsed successfully`);
+      } catch (parseError) {
+        console.warn(`⚠️ Token is not valid JSON, using as-is: ${parseError.message}`);
+      }
+    }
 
     if (!cid) {
       return res.status(400).json({
