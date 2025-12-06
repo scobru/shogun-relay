@@ -39,7 +39,9 @@ class SQLiteStore {
     
     // Prepared statements for better performance
     this.getStmt = this.db.prepare('SELECT data FROM radisk_files WHERE file = ?');
-    this.putStmt = this.db.prepare('INSERT OR REPLACE INTO radisk_files (file, data, updated_at) VALUES (?, ?, strftime("%s", "now"))');
+    // Use unixepoch() for timestamp (SQLite 3.38+) or fallback to strftime with single quotes
+    // Calculate timestamp in JavaScript to avoid SQL string literal issues
+    this.putStmt = this.db.prepare('INSERT OR REPLACE INTO radisk_files (file, data, updated_at) VALUES (?, ?, ?)');
     this.listStmt = this.db.prepare('SELECT file FROM radisk_files ORDER BY file');
     this.deleteStmt = this.db.prepare('DELETE FROM radisk_files WHERE file = ?');
     
@@ -72,7 +74,8 @@ class SQLiteStore {
    */
   put(file, data, cb) {
     try {
-      this.putStmt.run(file, data);
+      const timestamp = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
+      this.putStmt.run(file, data, timestamp);
       cb(null, 1); // Success
     } catch (err) {
       cb(err, null);
