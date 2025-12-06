@@ -998,12 +998,54 @@ router.get('/recommend', async (req, res) => {
     });
   } catch (error) {
     console.error('Recommendation error:', error);
-    res.status(500).json({
+    
+    // Provide more detailed error information
+    const errorResponse = {
       success: false,
-      error: error.message,
-    });
+      error: error.message || 'Internal server error',
+    };
+
+    // Include stack trace in development
+    if (process.env.NODE_ENV === 'development') {
+      errorResponse.stack = error.stack;
+    }
+
+    // Handle specific error types
+    if (error.name === 'ValidationError') {
+      return res.status(400).json(errorResponse);
+    }
+    
+    if (error.name === 'NetworkError' || error.code === 'ECONNREFUSED') {
+      errorResponse.error = 'Failed to connect to required service';
+      return res.status(503).json(errorResponse);
+    }
+
+    res.status(500).json(errorResponse);
   }
 });
+
+// Error handling wrapper for async routes
+function asyncHandler(fn) {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch((error) => {
+      console.error('Unhandled route error:', error);
+      
+      const errorResponse = {
+        success: false,
+        error: error.message || 'Internal server error',
+      };
+
+      if (process.env.NODE_ENV === 'development') {
+        errorResponse.stack = error.stack;
+      }
+
+      // Don't send response if already sent
+      if (!res.headersSent) {
+        res.status(error.statusCode || 500).json(errorResponse);
+      }
+    });
+  };
+}
 
 export default router;
 

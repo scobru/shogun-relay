@@ -241,6 +241,7 @@ router.get('/stats', async (req, res) => {
  * Proves this relay has the content pinned.
  */
 router.get('/proof/:cid', async (req, res) => {
+  const startTime = Date.now();
   try {
     const { cid } = req.params;
     const challenge = req.query.challenge || crypto.randomBytes(16).toString('hex');
@@ -313,6 +314,19 @@ router.get('/proof/:cid', async (req, res) => {
 
     // 5. Sign with relay identity if available
     const relayPub = req.app.get('relayUserPub');
+    const gun = req.app.get('gunInstance');
+    const host = process.env.RELAY_HOST || process.env.RELAY_ENDPOINT || req.headers.host || 'localhost';
+    const responseTime = Date.now() - startTime;
+
+    // Record successful proof for reputation tracking
+    if (gun && host) {
+      try {
+        await Reputation.recordProofSuccess(gun, host, responseTime);
+      } catch (e) {
+        // Non-critical, don't block proof generation
+        console.warn('Failed to record proof success for reputation:', e.message);
+      }
+    }
 
     res.json({
       success: true,
@@ -337,6 +351,18 @@ router.get('/proof/:cid', async (req, res) => {
     });
   } catch (error) {
     console.error('Storage proof error:', error);
+    
+    // Record failed proof for reputation tracking
+    const gun = req.app.get('gunInstance');
+    const host = process.env.RELAY_HOST || process.env.RELAY_ENDPOINT || req.headers.host || 'localhost';
+    if (gun && host) {
+      try {
+        await Reputation.recordProofFailure(gun, host);
+      } catch (e) {
+        console.warn('Failed to record proof failure for reputation:', e.message);
+      }
+    }
+    
     res.status(500).json({ success: false, error: error.message });
   }
 });

@@ -9,6 +9,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import ip from "ip";
 import setSelfAdjustingInterval from "self-adjusting-interval";
+import crypto from "crypto";
 
 import Gun from "gun";
 
@@ -221,24 +222,138 @@ async function initializeServer() {
   // IPFS File Upload Endpoint
   const upload = multer({ storage: multer.memoryStorage() });
 
-  // Middleware di autenticazione
+  // Enhanced authentication with rate limiting and token hashing
+  const failedAuthAttempts = new Map(); // Track failed attempts per IP
+  const AUTH_RATE_LIMIT = 5; // Max failed attempts
+  const AUTH_RATE_WINDOW = 15 * 60 * 1000; // 15 minutes
+  const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+  const activeSessions = new Map(); // Simple in-memory session store
+
+  // Hash token for secure comparison (prevents timing attacks)
+  function hashToken(token) {
+    return crypto.createHash('sha256').update(token || '').digest('hex');
+  }
+
+  // Get stored admin password hash (or compute on first use)
+  let adminPasswordHash = null;
+  function getAdminPasswordHash() {
+    if (!adminPasswordHash && process.env.ADMIN_PASSWORD) {
+      adminPasswordHash = hashToken(process.env.ADMIN_PASSWORD);
+    }
+    return adminPasswordHash;
+  }
+
+  // Check if IP is rate limited
+  function isRateLimited(ip) {
+    const attempts = failedAuthAttempts.get(ip);
+    if (!attempts) return false;
+    
+    const now = Date.now();
+    // Remove old attempts outside the window
+    const recentAttempts = attempts.filter(timestamp => now - timestamp < AUTH_RATE_WINDOW);
+    
+    if (recentAttempts.length >= AUTH_RATE_LIMIT) {
+      failedAuthAttempts.set(ip, recentAttempts);
+      return true;
+    }
+    
+    failedAuthAttempts.set(ip, recentAttempts);
+    return false;
+  }
+
+  // Record failed auth attempt
+  function recordFailedAttempt(ip) {
+    const now = Date.now();
+    const attempts = failedAuthAttempts.get(ip) || [];
+    attempts.push(now);
+    failedAuthAttempts.set(ip, attempts);
+  }
+
+  // Create session token
+  function createSession(ip) {
+    const sessionId = crypto.randomBytes(32).toString('hex');
+    const expiresAt = Date.now() + SESSION_DURATION;
+    activeSessions.set(sessionId, { ip, expiresAt });
+    return sessionId;
+  }
+
+  // Validate session
+  function isValidSession(sessionId, ip) {
+    const session = activeSessions.get(sessionId);
+    if (!session) return false;
+    if (Date.now() > session.expiresAt) {
+      activeSessions.delete(sessionId);
+      return false;
+    }
+    // Optional: verify IP matches (can be disabled for proxy scenarios)
+    if (process.env.STRICT_SESSION_IP !== 'false' && session.ip !== ip) {
+      return false;
+    }
+    return true;
+  }
+
+  // Cleanup expired sessions periodically
+  setInterval(() => {
+    const now = Date.now();
+    for (const [sessionId, session] of activeSessions.entries()) {
+      if (now > session.expiresAt) {
+        activeSessions.delete(sessionId);
+      }
+    }
+  }, 60 * 60 * 1000); // Cleanup every hour
+
+  // Middleware di autenticazione migliorato
   const tokenAuthMiddleware = (req, res, next) => {
-    // Check Authorization header (Bearer token)
+    const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
+
+    // Check if IP is rate limited
+    if (isRateLimited(clientIp)) {
+      console.log(`Rate limited IP: ${clientIp}`);
+      return res.status(429).json({ 
+        success: false, 
+        error: "Too many failed authentication attempts. Please try again later." 
+      });
+    }
+
+    // Check for session token first (more efficient)
+    const sessionToken = req.headers["x-session-token"] || req.cookies?.sessionToken;
+    if (sessionToken && isValidSession(sessionToken, clientIp)) {
+      return next();
+    }
+
+    // Fallback to password authentication
     const authHeader = req.headers["authorization"];
     const bearerToken = authHeader && authHeader.split(" ")[1];
-
-    // Check custom token header (for Gun/Wormhole compatibility)
     const customToken = req.headers["token"];
-
-    // Accept either format
     const token = bearerToken || customToken;
 
-    if (token === process.env.ADMIN_PASSWORD) {
-      // Use a more secure token in production
+    if (!token) {
+      recordFailedAttempt(clientIp);
+      return res.status(401).json({ success: false, error: "Unauthorized - Token required" });
+    }
+
+    // Secure token comparison using hash
+    const tokenHash = hashToken(token);
+    const adminHash = getAdminPasswordHash();
+
+    if (adminHash && tokenHash === adminHash) {
+      // Create session for future requests
+      const sessionId = createSession(clientIp);
+      res.setHeader('X-Session-Token', sessionId);
+      // Optionally set cookie
+      if (req.headers['accept']?.includes('text/html')) {
+        res.cookie('sessionToken', sessionId, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          maxAge: SESSION_DURATION,
+          sameSite: 'strict'
+        });
+      }
       next();
     } else {
-      console.log("Auth failed - Bearer:", bearerToken, "Custom:", customToken);
-      res.status(401).json({ success: false, error: "Unauthorized" });
+      recordFailedAttempt(clientIp);
+      console.log(`Auth failed for IP: ${clientIp}`);
+      res.status(401).json({ success: false, error: "Unauthorized - Invalid token" });
     }
   };
 
@@ -464,6 +579,9 @@ See docs/RELAY_KEYS.md for more information.
     throw new Error(`Failed to initialize relay user: ${error.message}`);
   }
 
+  // Get relay host identifier
+  const host = process.env.RELAY_HOST || process.env.RELAY_ENDPOINT || 'localhost';
+
   // Initialize reputation tracking for this relay
   try {
     Reputation.initReputationTracking(gun, host);
@@ -474,6 +592,7 @@ See docs/RELAY_KEYS.md for more information.
 
   // Initialize Network Pin Request Listener (auto-replication)
   const autoReplication = process.env.AUTO_REPLICATION !== 'false';
+  
   if (autoReplication) {
     console.log('🔄 Auto-replication enabled - listening for pin requests');
     
@@ -554,6 +673,13 @@ See docs/RELAY_KEYS.md for more information.
         if (pinResult.Pins || pinResult.raw?.includes('Pins')) {
           console.log(`✅ Successfully pinned ${data.cid}`);
           
+          // Record pin fulfillment for reputation tracking
+          try {
+            await Reputation.recordPinFulfillment(gun, host, true);
+          } catch (e) {
+            console.warn('Failed to record pin fulfillment for reputation:', e.message);
+          }
+          
           // Publish response
           const crypto = await import('crypto');
           const responseId = crypto.randomBytes(8).toString('hex');
@@ -566,9 +692,23 @@ See docs/RELAY_KEYS.md for more information.
           });
         } else {
           console.log(`⚠️ Pin result unclear for ${data.cid}:`, pinResult);
+          
+          // Record failed pin fulfillment
+          try {
+            await Reputation.recordPinFulfillment(gun, host, false);
+          } catch (e) {
+            console.warn('Failed to record pin fulfillment for reputation:', e.message);
+          }
         }
       } catch (error) {
         console.error(`❌ Failed to pin ${data.cid}:`, error.message);
+        
+        // Record failed pin fulfillment for reputation tracking
+        try {
+          await Reputation.recordPinFulfillment(gun, host, false);
+        } catch (e) {
+          console.warn('Failed to record pin failure for reputation:', e.message);
+        }
       }
     });
   } else {
@@ -611,22 +751,116 @@ See docs/RELAY_KEYS.md for more information.
 
   // Route legacy per compatibilità (definite prima delle route modulari)
 
-  // Health check endpoint
+  // Enhanced health check endpoint with detailed metrics
   app.get("/health", (req, res) => {
     const relayPub = app.get('relayUserPub');
+    const memUsage = process.memoryUsage();
+    
+    // Calculate health status
+    const memUsageMB = memUsage.heapUsed / 1024 / 1024;
+    const memLimitMB = memUsage.heapTotal / 1024 / 1024;
+    const memPercent = (memUsage.heapUsed / memUsage.heapTotal) * 100;
+    
+    let status = "healthy";
+    const warnings = [];
+    
+    // Check memory usage
+    if (memPercent > 90) {
+      status = "degraded";
+      warnings.push("High memory usage");
+    }
+    
+    // Check uptime (warn if very low, might indicate recent restart)
+    const uptimeHours = process.uptime() / 3600;
+    if (uptimeHours < 0.1) {
+      warnings.push("Recently restarted");
+    }
+    
     const healthData = {
       success: true,
-      status: "healthy",
+      status,
       timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      activeConnections: activeWires || 0,
-      totalConnections: totalConnections || 0,
-      memoryUsage: process.memoryUsage(),
-      relayPub: relayPub || null,
-      relayName: process.env.RELAY_NAME || 'shogun-relay',
+      uptime: {
+        seconds: Math.floor(process.uptime()),
+        hours: Math.floor(uptimeHours * 10) / 10,
+        formatted: formatUptime(process.uptime())
+      },
+      connections: {
+        active: activeWires || 0,
+        total: totalConnections || 0
+      },
+      memory: {
+        heapUsedMB: Math.round(memUsageMB * 10) / 10,
+        heapTotalMB: Math.round(memLimitMB * 10) / 10,
+        percent: Math.round(memPercent * 10) / 10,
+        rssMB: Math.round(memUsage.rss / 1024 / 1024 * 10) / 10
+      },
+      relay: {
+        pub: relayPub || null,
+        name: process.env.RELAY_NAME || 'shogun-relay',
+        host,
+        port
+      },
+      services: {
+        gun: gun ? "active" : "inactive",
+        holster: holster ? "active" : "inactive",
+        ipfs: "unknown" // Will be updated by IPFS status check
+      },
+      warnings: warnings.length > 0 ? warnings : undefined
     };
 
-    res.json(healthData);
+    // Set appropriate status code
+    const statusCode = status === "healthy" ? 200 : 503;
+    res.status(statusCode).json(healthData);
+  });
+
+  // Helper function to format uptime
+  function formatUptime(seconds) {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    
+    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    if (minutes > 0) return `${minutes}m ${secs}s`;
+    return `${secs}s`;
+  }
+
+  // Metrics endpoint for monitoring
+  app.get("/metrics", tokenAuthMiddleware, (req, res) => {
+    const memUsage = process.memoryUsage();
+    const cpuUsage = process.cpuUsage();
+    
+    const metrics = {
+      timestamp: Date.now(),
+      uptime: process.uptime(),
+      memory: {
+        heapUsed: memUsage.heapUsed,
+        heapTotal: memUsage.heapTotal,
+        rss: memUsage.rss,
+        external: memUsage.external
+      },
+      cpu: {
+        user: cpuUsage.user,
+        system: cpuUsage.system
+      },
+      connections: {
+        active: activeWires || 0,
+        total: totalConnections || 0
+      },
+      sessions: {
+        active: activeSessions.size,
+        failedAuthAttempts: failedAuthAttempts.size
+      },
+      relay: {
+        name: process.env.RELAY_NAME || 'shogun-relay',
+        host,
+        port
+      }
+    };
+
+    res.json(metrics);
   });
 
   // Holster status endpoint

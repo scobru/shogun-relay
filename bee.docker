@@ -39,13 +39,13 @@
     ENV BEE_BLOCKCHAIN_RPC_ENDPOINT=https://gnosis-mainnet.g.alchemy.com/v2/yjhjIoJ3o_at8ALT7nCJtFtjdqFpiBdx
     ENV BEE_PASSWORD=shogun2025
     ENV BEE_WITHDRAWAL_ADDRESSES_WHITELIST=0xA6591dCDff5C7616110b4f84207184aef7835048
-    ENV BEE_WELCOME_MESSAGE="Welcome to the Bee Swarm Full Node by scobru"
-    ENV BEE_VERBOSITY=info
+    ENV BEE_WELCOME_MESSAGE="Welcome to the Scobru Bee Node"
+    ENV BEE_VERBOSITY=debug
     ENV BEE_RESOLVER_OPTIONS=https://mainnet.infura.io/v3/yjhjIoJ3o_at8ALT7nCJtFtjdqFpiBdx
     ENV BEE_RESERVE_CAPACITY_DOUBLING=0
+    ENV BEE_NAT_ADDR=0.0.0.0:1634
     ENV BEE_RESYNC=false
-    ENV BEE_NAT_ADDR=164.132.57.192:1634
-    ENV BEE_RESYNC=false
+    ENV BEE_RESERVE_CAPACITY_DOUBLING=1
 
     # Crea directory per i dati se non esiste
     # RUN mkdir -p /home/bee/.bee
@@ -53,7 +53,7 @@
     # Espone le porte
     EXPOSE 1633 1634 1635
     
-    # RUN bee db repair-reserve --data-dir=/home/bee/.bee
+    RUN bee db repair-reserve --data-dir=/home/bee/.bee
 
     ENTRYPOINT ["bee", "start"]
 

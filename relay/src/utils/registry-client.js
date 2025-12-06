@@ -571,10 +571,12 @@ export function createStorageDealRegistryClient(chainId = 84532, rpcUrl = null) 
 
   const provider = new ethers.JsonRpcProvider(rpcUrl || RPC_URLS[chainId]);
   const storageDealRegistry = new ethers.Contract(registryAddress, STORAGE_DEAL_REGISTRY_ABI, provider);
+  const usdcAddress = USDC_ADDRESSES[chainId];
 
   return {
     chainId,
     registryAddress,
+    usdcAddress,
     provider,
     storageDealRegistry,
 
