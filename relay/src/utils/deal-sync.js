@@ -13,6 +13,12 @@ const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN;
 // Global flag to indicate shutdown is in progress
 let isShuttingDown = false;
 
+// Track CIDs that recently failed pinning to avoid immediate retries
+// Map of CID -> { lastAttempt: timestamp, consecutiveFailures: number }
+const pinFailureCache = new Map();
+const PIN_RETRY_DELAY_MS = 5 * 60 * 1000; // Wait 5 minutes before retrying a failed CID
+const MAX_CONSECUTIVE_FAILURES = 10; // After 10 failures, only retry once per hour
+
 /**
  * Mark that shutdown is in progress (call this when SIGTERM/SIGINT received)
  */
@@ -421,9 +427,15 @@ export async function syncDealsWithIPFS(relayAddress, chainId, options = {}) {
           console.log(`🔍 [DRY RUN] Would pin CID ${cid} for deal ${dealId}`);
           results.synced++;
         } else {
+          // Try to pin the CID (IPFS will attempt to fetch it from the network)
+          // Note: Even if the CID is not immediately available, IPFS will continue trying in background
+          // The pin request itself will succeed once IPFS retrieves the content
+          console.log(`📌 Attempting to pin CID ${cid} for deal ${dealId}...`);
           const pinResult = await pinCid(cid);
           if (pinResult.success) {
             console.log(`✅ Deal ${dealId}: CID ${cid} pinned successfully`);
+            // Clear from failure cache on success
+            pinFailureCache.delete(cid);
             results.synced++;
           } else {
               // Check if error is due to shutdown
