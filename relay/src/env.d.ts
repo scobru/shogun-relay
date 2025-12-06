@@ -17,6 +17,7 @@ declare namespace NodeJS {
     IPFS_API_URL?: string;
     IPFS_GATEWAY_URL?: string;
     IPFS_API_TOKEN?: string;
+    IPFS_PIN_TIMEOUT_MS?: string;
 
     // GunDB Configuration
     RELAY_SEA_KEYPAIR?: string;
