@@ -442,7 +442,7 @@
     <script>
       const DEFAULT_PEERS = [window.location.origin + "/gun"];
       const gun = Gun({ peers: DEFAULT_PEERS, retry: 2000 });
-      const user = gun.user();
+      const user = gun.user().recall({ sessionStorage: true });
       window.gun = gun;
       window.user = user;
 
