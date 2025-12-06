@@ -42,6 +42,8 @@ const __dirname = path.dirname(__filename);
 
 // Configuration
 let host = process.env.RELAY_HOST || ip.address();
+// Remove protocol from host if present (http:// or https://)
+host = host.replace(/^https?:\/\//, '');
 // Ensure port is always a valid integer, fallback to 8765 if NaN
 let port = parseInt(process.env.RELAY_PORT || process.env.PORT || 8765);
 if (isNaN(port) || port <= 0 || port >= 65536) {
