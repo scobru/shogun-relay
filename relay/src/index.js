@@ -43,7 +43,8 @@ const __dirname = path.dirname(__filename);
 // Configuration
 let host = process.env.RELAY_HOST || ip.address();
 // Remove protocol from host if present (http:// or https://)
-host = host.replace(/^https?:\/\//, '');
+// Also remove trailing slashes
+host = host.replace(/^https?:\/\//, '').replace(/\/$/, '');
 // Ensure port is always a valid integer, fallback to 8765 if NaN
 let port = parseInt(process.env.RELAY_PORT || process.env.PORT || 8765);
 if (isNaN(port) || port <= 0 || port >= 65536) {
@@ -419,8 +420,11 @@ async function initializeServer() {
     });
     console.log(`✅ Holster Relay initialized on port ${holsterConfig.port}`);
     console.log(`📁 Holster storage: ${holsterConfig.storageEnabled ? holsterConfig.storagePath : "disabled"}`);
+    // Store holster instance in app settings for health check
+    app.set("holsterInstance", holster);
   } catch (error) {
     console.error("❌ Error initializing Holster:", error);
+    app.set("holsterInstance", null);
   }
 
   const peersString = process.env.RELAY_PEERS;
@@ -813,69 +817,83 @@ See docs/RELAY_KEYS.md for more information.
 
   // Enhanced health check endpoint with detailed metrics
   app.get("/health", (req, res) => {
-    const relayPub = app.get('relayUserPub');
-    const memUsage = process.memoryUsage();
-    
-    // Calculate health status
-    const memUsageMB = memUsage.heapUsed / 1024 / 1024;
-    const memLimitMB = memUsage.heapTotal / 1024 / 1024;
-    const memPercent = (memUsage.heapUsed / memUsage.heapTotal) * 100;
-    
-    let status = "healthy";
-    const warnings = [];
-    
-    // Check memory usage
-    if (memPercent > 90) {
-      status = "degraded";
-      warnings.push("High memory usage");
-    }
-    
-    // Check uptime (warn if very low, might indicate recent restart)
-    const uptimeHours = process.uptime() / 3600;
-    if (uptimeHours < 0.1) {
-      warnings.push("Recently restarted");
-    }
-    
-    // Get connection stats from app settings
-    const activeWires = app.get('activeWires') || 0;
-    const totalConnections = app.get('totalConnections') || 0;
-    
-    const healthData = {
-      success: true,
-      status,
-      timestamp: new Date().toISOString(),
-      uptime: {
-        seconds: Math.floor(process.uptime()),
-        hours: Math.floor(uptimeHours * 10) / 10,
-        formatted: formatUptime(process.uptime())
-      },
-      connections: {
-        active: activeWires,
-        total: totalConnections
-      },
-      memory: {
-        heapUsedMB: Math.round(memUsageMB * 10) / 10,
-        heapTotalMB: Math.round(memLimitMB * 10) / 10,
-        percent: Math.round(memPercent * 10) / 10,
-        rssMB: Math.round(memUsage.rss / 1024 / 1024 * 10) / 10
-      },
-      relay: {
-        pub: relayPub || null,
-        name: process.env.RELAY_NAME || 'shogun-relay',
-        host,
-        port
-      },
-      services: {
-        gun: gun ? "active" : "inactive",
-        holster: holster ? "active" : "inactive",
-        ipfs: "unknown" // Will be updated by IPFS status check
-      },
-      warnings: warnings.length > 0 ? warnings : undefined
-    };
+    try {
+      const relayPub = app.get('relayUserPub');
+      const memUsage = process.memoryUsage();
+      
+      // Calculate health status
+      const memUsageMB = memUsage.heapUsed / 1024 / 1024;
+      const memLimitMB = memUsage.heapTotal / 1024 / 1024;
+      const memPercent = (memUsage.heapUsed / memUsage.heapTotal) * 100;
+      
+      let status = "healthy";
+      const warnings = [];
+      
+      // Check memory usage
+      if (memPercent > 90) {
+        status = "degraded";
+        warnings.push("High memory usage");
+      }
+      
+      // Check uptime (warn if very low, might indicate recent restart)
+      const uptimeHours = process.uptime() / 3600;
+      if (uptimeHours < 0.1) {
+        warnings.push("Recently restarted");
+      }
+      
+      // Get connection stats from app settings
+      const activeWires = app.get('activeWires') || 0;
+      const totalConnections = app.get('totalConnections') || 0;
+      
+      // Get service instances from app settings (may not be initialized yet)
+      const gunInstance = app.get('gunInstance');
+      const holsterInstance = app.get('holsterInstance');
+      
+      const healthData = {
+        success: true,
+        status,
+        timestamp: new Date().toISOString(),
+        uptime: {
+          seconds: Math.floor(process.uptime()),
+          hours: Math.floor(uptimeHours * 10) / 10,
+          formatted: formatUptime(process.uptime())
+        },
+        connections: {
+          active: activeWires,
+          total: totalConnections
+        },
+        memory: {
+          heapUsedMB: Math.round(memUsageMB * 10) / 10,
+          heapTotalMB: Math.round(memLimitMB * 10) / 10,
+          percent: Math.round(memPercent * 10) / 10,
+          rssMB: Math.round(memUsage.rss / 1024 / 1024 * 10) / 10
+        },
+        relay: {
+          pub: relayPub || null,
+          name: process.env.RELAY_NAME || 'shogun-relay',
+          host,
+          port
+        },
+        services: {
+          gun: gunInstance ? "active" : "inactive",
+          holster: holsterInstance ? "active" : "inactive",
+          ipfs: "unknown" // Will be updated by IPFS status check
+        },
+        warnings: warnings.length > 0 ? warnings : undefined
+      };
 
-    // Set appropriate status code
-    const statusCode = status === "healthy" ? 200 : 503;
-    res.status(statusCode).json(healthData);
+      // Set appropriate status code
+      const statusCode = status === "healthy" ? 200 : 503;
+      res.status(statusCode).json(healthData);
+    } catch (error) {
+      console.error("Error in /health endpoint:", error);
+      res.status(503).json({
+        success: false,
+        status: "error",
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
   });
 
   // Helper function to format uptime
