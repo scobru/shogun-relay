@@ -139,7 +139,9 @@ Admin dashboards live at `http://localhost:8765/`.
 
 ## Configuration
 
-Create a `.env` file or export the variables below:
+Create a `.env` file or export environment variables. For a complete reference of all available environment variables, see **[Environment Variables Documentation](./relay/docs/ENVIRONMENT_VARIABLES.md)**.
+
+### Quick Reference
 
 | Variable           | Description                                              | Default                |
 |--------------------|----------------------------------------------------------|------------------------|
@@ -178,7 +180,12 @@ Create a `.env` file or export the variables below:
 - SQLite database is stored at `DATA_DIR/gun.db`
 - RADISK files are stored in `DATA_DIR/radata/` directory
 
-Additional switches (Radisk toggle, cleanup, peers, etc.) are documented inside `index.js`.
+**See [Environment Variables Documentation](./relay/docs/ENVIRONMENT_VARIABLES.md) for complete reference including:**
+- All pricing configuration variables (deals and subscriptions)
+- Storage limits configuration
+- Network federation settings
+- Advanced options and debugging flags
+- Security considerations and best practices
 
 ---
 

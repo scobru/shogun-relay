@@ -69,73 +69,120 @@ async function isPinned(cid) {
 }
 
 /**
- * Pin a CID to IPFS
+ * Pin a CID to IPFS with retry logic
  * @param {string} cid - IPFS CID to pin
- * @returns {Promise<{success: boolean, error?: string}>}
+ * @param {number} maxRetries - Maximum number of retry attempts (default: 2)
+ * @returns {Promise<{success: boolean, error?: string, pending?: boolean}>}
  */
-async function pinCid(cid) {
-  try {
-    const gatewayUrl = new URL(IPFS_API_URL);
-    const protocolModule = gatewayUrl.protocol === 'https:'
-      ? await import('https')
-      : await import('http');
+async function pinCid(cid, maxRetries = 2) {
+  const PIN_TIMEOUT = parseInt(process.env.IPFS_PIN_TIMEOUT_MS) || 120000; // Default: 120 seconds (2 minutes)
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const gatewayUrl = new URL(IPFS_API_URL);
+      const protocolModule = gatewayUrl.protocol === 'https:'
+        ? await import('https')
+        : await import('http');
 
-    const requestOptions = {
-      hostname: gatewayUrl.hostname,
-      port: gatewayUrl.port ? Number(gatewayUrl.port) : (gatewayUrl.protocol === 'https:' ? 443 : 80),
-      path: `/api/v0/pin/add?arg=${encodeURIComponent(cid)}`,
-      method: 'POST',
-      headers: {
-        'Content-Length': '0',
-      },
-    };
+      const requestOptions = {
+        hostname: gatewayUrl.hostname,
+        port: gatewayUrl.port ? Number(gatewayUrl.port) : (gatewayUrl.protocol === 'https:' ? 443 : 80),
+        path: `/api/v0/pin/add?arg=${encodeURIComponent(cid)}&progress=false`,
+        method: 'POST',
+        headers: {
+          'Content-Length': '0',
+        },
+      };
 
-    if (IPFS_API_TOKEN) {
-      requestOptions.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
-    }
+      if (IPFS_API_TOKEN) {
+        requestOptions.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
+      }
 
-    return new Promise((resolve) => {
-      const req = protocolModule.request(requestOptions, (res) => {
-        let data = '';
-        res.on('data', (chunk) => (data += chunk));
-        res.on('end', () => {
-          if (res.statusCode === 200) {
-            try {
-              const result = JSON.parse(data);
-              console.log(`✅ CID ${cid} pinned successfully`);
-              resolve({ success: true, result });
-            } catch (e) {
-              console.log(`✅ CID ${cid} pinned (response: ${data})`);
-              resolve({ success: true });
+      const result = await new Promise((resolve) => {
+        const req = protocolModule.request(requestOptions, (res) => {
+          let data = '';
+          res.on('data', (chunk) => (data += chunk));
+          res.on('end', () => {
+            if (res.statusCode === 200) {
+              try {
+                const parsed = JSON.parse(data);
+                console.log(`✅ CID ${cid} pinned successfully${attempt > 0 ? ` (attempt ${attempt + 1})` : ''}`);
+                resolve({ success: true, result: parsed });
+              } catch (e) {
+                console.log(`✅ CID ${cid} pinned (response: ${data})${attempt > 0 ? ` (attempt ${attempt + 1})` : ''}`);
+                resolve({ success: true });
+              }
+            } else {
+              // Check if already pinned
+              if (data.includes('already pinned') || data.includes('is already pinned')) {
+                console.log(`ℹ️ CID ${cid} was already pinned${attempt > 0 ? ` (attempt ${attempt + 1})` : ''}`);
+                resolve({ success: true, alreadyPinned: true });
+              } else {
+                const error = `IPFS pin add failed with status ${res.statusCode}: ${data.substring(0, 200)}`;
+                resolve({ success: false, error, retryable: res.statusCode >= 500 });
+              }
             }
-          } else {
-            const error = `IPFS pin add failed with status ${res.statusCode}: ${data}`;
-            console.warn(`⚠️ ${error}`);
-            resolve({ success: false, error });
-          }
+          });
         });
+
+        req.on('error', (err) => {
+          const error = `IPFS pin add error: ${err.message}`;
+          resolve({ success: false, error, retryable: true });
+        });
+
+        req.setTimeout(PIN_TIMEOUT, () => {
+          req.destroy();
+          // Timeout doesn't necessarily mean failure - pin might continue in background
+          const error = `IPFS pin add timeout after ${PIN_TIMEOUT / 1000}s (CID may still be pinning in background)`;
+          console.warn(`⚠️ ${error}${attempt > 0 ? ` (attempt ${attempt + 1})` : ''}`);
+          resolve({ success: false, error, pending: true, retryable: attempt < maxRetries });
+        });
+
+        req.end();
       });
 
-      req.on('error', (err) => {
-        const error = `IPFS pin add error: ${err.message}`;
-        console.warn(`⚠️ ${error}`);
-        resolve({ success: false, error });
-      });
+      // If successful, return immediately
+      if (result.success) {
+        return result;
+      }
 
-      req.setTimeout(30000, () => {
-        req.destroy();
-        const error = 'IPFS pin add timeout';
-        console.warn(`⚠️ ${error}`);
-        resolve({ success: false, error });
-      });
+      // If pending (timeout but might still be processing), check if we should retry
+      if (result.pending && attempt < maxRetries) {
+        const retryDelay = Math.min(5000 * Math.pow(2, attempt), 30000); // Exponential backoff: 5s, 10s, 20s, max 30s
+        console.log(`⏳ CID ${cid} pin may still be processing. Retrying in ${retryDelay / 1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        continue;
+      }
 
-      req.end();
-    });
-  } catch (error) {
-    const errorMsg = `Error pinning CID ${cid}: ${error.message}`;
-    console.error(`❌ ${errorMsg}`);
-    return { success: false, error: errorMsg };
+      // If retryable error and we have retries left
+      if (result.retryable && attempt < maxRetries) {
+        const retryDelay = Math.min(2000 * Math.pow(2, attempt), 10000); // Exponential backoff: 2s, 4s, 8s, max 10s
+        console.log(`🔄 Retrying pin for CID ${cid} in ${retryDelay / 1000}s (attempt ${attempt + 2}/${maxRetries + 1})...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        continue;
+      }
+
+      // Final failure
+      if (!result.success) {
+        console.warn(`⚠️ CID ${cid}: ${result.error}`);
+        return result;
+      }
+
+    } catch (error) {
+      if (attempt < maxRetries) {
+        const retryDelay = Math.min(2000 * Math.pow(2, attempt), 10000);
+        console.warn(`⚠️ Error pinning CID ${cid} (attempt ${attempt + 1}): ${error.message}. Retrying in ${retryDelay / 1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        continue;
+      }
+      const errorMsg = `Error pinning CID ${cid}: ${error.message}`;
+      console.error(`❌ ${errorMsg}`);
+      return { success: false, error: errorMsg };
+    }
   }
+
+  // Should never reach here, but just in case
+  return { success: false, error: 'Pin failed after all retries' };
 }
 
 /**
@@ -297,13 +344,25 @@ export async function syncDealsWithIPFS(relayAddress, chainId, options = {}) {
             console.log(`✅ Deal ${dealId}: CID ${cid} pinned successfully`);
             results.synced++;
           } else {
-            console.warn(`⚠️ Deal ${dealId}: Failed to pin CID ${cid}: ${pinResult.error}`);
-            results.failed++;
-            results.errors.push({
-              dealId,
-              cid,
-              error: pinResult.error,
-            });
+            // If pending, the pin might still be processing in background
+            if (pinResult.pending) {
+              console.warn(`⚠️ Deal ${dealId}: CID ${cid} pin timed out but may still be processing in background. Will retry on next sync.`);
+              // Don't count as failed - it might succeed later, but track it
+              results.errors.push({
+                dealId,
+                cid,
+                error: pinResult.error,
+                pending: true,
+              });
+            } else {
+              console.warn(`⚠️ Deal ${dealId}: Failed to pin CID ${cid}: ${pinResult.error}`);
+              results.failed++;
+              results.errors.push({
+                dealId,
+                cid,
+                error: pinResult.error,
+              });
+            }
           }
         }
         
