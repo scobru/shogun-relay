@@ -628,7 +628,8 @@
             await Promise.all([
                 checkGunStatus(), 
                 checkIPFSStatus(), 
-                checkHolsterStatus()
+                checkHolsterStatus(),
+                checkRPCStatus()
             ]);
             document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
             log('All services refreshed', 'success');
@@ -702,7 +703,7 @@
 
             log('🔄 Restarting all services...', 'info');
 
-            const services = ['gun', 'ipfs', 'holster'];
+            const services = ['gun', 'ipfs', 'holster', 'rpc'];
             for (const service of services) {
                 try {
                     await restartService(service);
