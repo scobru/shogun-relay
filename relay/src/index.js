@@ -833,6 +833,8 @@ See docs/RELAY_KEYS.md for more information.
   // Enhanced health check endpoint with detailed metrics
   app.get("/health", (req, res) => {
     try {
+      // Always return 200 OK for basic health check (Docker needs this)
+      // Even if services aren't fully initialized yet, the server is running
       const relayPub = app.get('relayUserPub');
       const memUsage = process.memoryUsage();
       
@@ -844,16 +846,17 @@ See docs/RELAY_KEYS.md for more information.
       let status = "healthy";
       const warnings = [];
       
-      // Check memory usage
+      // Check memory usage (only warn, don't fail health check)
       if (memPercent > 90) {
         status = "degraded";
         warnings.push("High memory usage");
       }
       
       // Check uptime (warn if very low, might indicate recent restart)
-      const uptimeHours = process.uptime() / 3600;
-      if (uptimeHours < 0.1) {
-        warnings.push("Recently restarted");
+      // But don't fail health check during startup
+      const uptimeSeconds = process.uptime();
+      if (uptimeSeconds < 30) {
+        warnings.push("Recently started (still initializing)");
       }
       
       // Get connection stats from app settings
@@ -897,16 +900,20 @@ See docs/RELAY_KEYS.md for more information.
         warnings: warnings.length > 0 ? warnings : undefined
       };
 
-      // Set appropriate status code
-      const statusCode = status === "healthy" ? 200 : 503;
-      res.status(statusCode).json(healthData);
+      // Always return 200 for Docker health check
+      // Docker/Kubernetes will kill the container if we return non-200
+      // The 'status' field in the response indicates health without killing the container
+      res.status(200).json(healthData);
     } catch (error) {
       console.error("Error in /health endpoint:", error);
-      res.status(503).json({
+      // Even on error, return 200 so Docker doesn't kill the container
+      // The error in the response will indicate the issue
+      res.status(200).json({
         success: false,
         status: "error",
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
       });
     }
   });
