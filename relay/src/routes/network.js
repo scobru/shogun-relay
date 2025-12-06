@@ -565,14 +565,43 @@ router.get('/reputation/:host', async (req, res) => {
       return res.status(500).json({ success: false, error: 'Gun instance not available' });
     }
 
-    const { host } = req.params;
-    const reputation = await Reputation.getReputation(gun, host);
+    let { host } = req.params;
+    
+    // If host looks like a URL, extract hostname
+    try {
+      const url = new URL(host.startsWith('http') ? host : `https://${host}`);
+      host = url.hostname;
+    } catch (e) {
+      // Not a URL, use as-is (might be just hostname)
+    }
+    
+    // Try to get reputation with the provided host
+    let reputation = await Reputation.getReputation(gun, host);
+    
+    // If not found, try alternative host formats
+    if (!reputation) {
+      // Try with current relay's host if it matches
+      const relayHost = process.env.RELAY_HOST || process.env.RELAY_ENDPOINT;
+      if (relayHost) {
+        try {
+          const relayUrl = new URL(relayHost.startsWith('http') ? relayHost : `https://${relayHost}`);
+          const relayHostname = relayUrl.hostname;
+          if (relayHostname === host) {
+            // Try with the full endpoint as stored
+            reputation = await Reputation.getReputation(gun, relayHost);
+          }
+        } catch (e) {
+          // Ignore URL parsing errors
+        }
+      }
+    }
 
     if (!reputation) {
       return res.status(404).json({
         success: false,
         error: 'Relay not found or no reputation data',
         host,
+        hint: 'Reputation may not be initialized yet. The relay needs to send pulses to build reputation data.',
       });
     }
 

@@ -661,7 +661,17 @@ See docs/RELAY_KEYS.md for more information.
   }
 
   // Get relay host identifier
-  const host = process.env.RELAY_HOST || process.env.RELAY_ENDPOINT || 'localhost';
+  // Extract hostname from endpoint if it's a URL
+  let host = process.env.RELAY_HOST || process.env.RELAY_ENDPOINT || 'localhost';
+  try {
+    // If it's a URL, extract just the hostname
+    if (host.includes('://') || host.includes('.')) {
+      const url = new URL(host.startsWith('http') ? host : `https://${host}`);
+      host = url.hostname;
+    }
+  } catch (e) {
+    // Not a valid URL, use as-is
+  }
 
   // Initialize reputation tracking for this relay
   try {
