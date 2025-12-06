@@ -754,17 +754,42 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
   try {
     const { cid } = req.params;
     let { token } = req.query;
+    const userAddress = req.headers['x-user-address']; // Optional: user address for signature verification
     const IPFS_GATEWAY_URL = process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
 
     console.log(`🔓 IPFS Decrypt request for CID: ${cid}, Token: ${token ? "present" : "missing"}`);
 
-    // Parse token if it's a JSON string
-    if (token && typeof token === 'string') {
+    // Verify signature if userAddress is provided (for enhanced security)
+    // The token can be either:
+    // 1. An EIP-191 signature (recommended, more secure) - starts with 0x and is long
+    // 2. An address (legacy, less secure) - starts with 0x and is short
+    // 3. A JSON object (legacy keypair format)
+    if (token && userAddress && typeof token === 'string' && token.startsWith('0x') && token.length > 100) {
+      // Looks like a signature (long hex string), verify it if ethers is available
+      try {
+        const { ethers } = await import('ethers');
+        const expectedMessage = `Shogun File Encryption\nAddress: ${userAddress.toLowerCase()}`;
+        const recoveredAddress = ethers.verifyMessage(expectedMessage, token);
+        
+        if (recoveredAddress.toLowerCase() !== userAddress.toLowerCase()) {
+          console.warn(`⚠️ Signature verification failed: expected ${userAddress}, got ${recoveredAddress}`);
+          // Continue anyway - decryption will fail if signature is wrong
+        } else {
+          console.log(`✅ Signature verified for address: ${userAddress}`);
+        }
+      } catch (verifyError) {
+        // If verification fails, continue - might be a legacy address or different format
+        console.warn(`⚠️ Signature verification skipped: ${verifyError.message}`);
+      }
+    }
+
+    // Parse token if it's a JSON string (not a hex string)
+    if (token && typeof token === 'string' && !token.startsWith('0x')) {
       try {
         token = JSON.parse(token);
         console.log(`🔑 Token parsed successfully`);
       } catch (parseError) {
-        console.warn(`⚠️ Token is not valid JSON, using as-is: ${parseError.message}`);
+        // Not JSON, use as-is (could be address or signature)
       }
     }
 
