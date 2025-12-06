@@ -904,8 +904,55 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
                   });
                   return;
                 }
+              } else if (typeof decrypted === 'string') {
+                // Check if it's a plain base64 string (without data: prefix)
+                // This handles old files that were encrypted with only base64
+                try {
+                  // Try to decode as base64
+                  const buffer = Buffer.from(decrypted, "base64");
+                  
+                  // Try to detect content type from magic numbers
+                  let contentType = "application/octet-stream";
+                  if (buffer.length >= 4) {
+                    // PNG: 89 50 4E 47
+                    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+                      contentType = "image/png";
+                    }
+                    // JPEG: FF D8 FF
+                    else if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+                      contentType = "image/jpeg";
+                    }
+                    // GIF: 47 49 46 38
+                    else if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) {
+                      contentType = "image/gif";
+                    }
+                    // PDF: 25 50 44 46
+                    else if (buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46) {
+                      contentType = "application/pdf";
+                    }
+                    // WebP: Check for RIFF header
+                    else if (buffer.length >= 12 && 
+                             buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+                             buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) {
+                      contentType = "image/webp";
+                    }
+                  }
+                  
+                  console.log(`📁 Detected plain base64, converted to buffer (${contentType})`);
+                  res.setHeader("Content-Type", contentType);
+                  res.setHeader("Content-Length", buffer.length);
+                  res.setHeader("Cache-Control", "public, max-age=3600");
+                  res.send(buffer);
+                  return;
+                } catch (base64Error) {
+                  // Not valid base64, return as text/plain
+                  console.log(`📄 Returning as text/plain (not valid base64)`);
+                  res.setHeader("Content-Type", "text/plain");
+                  res.send(decrypted);
+                  return;
+                }
               } else {
-                // Return as text/plain
+                // Return as text/plain for other types
                 res.setHeader("Content-Type", "text/plain");
                 res.send(decrypted);
                 return;
