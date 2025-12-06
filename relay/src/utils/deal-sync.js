@@ -10,6 +10,23 @@ import http from 'http';
 const IPFS_API_URL = process.env.IPFS_API_URL || 'http://127.0.0.1:5001';
 const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN;
 
+// Global flag to indicate shutdown is in progress
+let isShuttingDown = false;
+
+/**
+ * Mark that shutdown is in progress (call this when SIGTERM/SIGINT received)
+ */
+export function markShutdownInProgress() {
+  isShuttingDown = true;
+}
+
+/**
+ * Check if shutdown is in progress
+ */
+export function isShutdownInProgress() {
+  return isShuttingDown;
+}
+
 /**
  * Check if a CID is pinned in IPFS
  * @param {string} cid - IPFS CID to check
@@ -147,18 +164,28 @@ async function pinCid(cid, maxRetries = 2) {
       }
 
       // If pending (timeout but might still be processing), check if we should retry
-      if (result.pending && attempt < maxRetries) {
+      if (result.pending && attempt < maxRetries && !isShuttingDown) {
         const retryDelay = Math.min(5000 * Math.pow(2, attempt), 30000); // Exponential backoff: 5s, 10s, 20s, max 30s
         console.log(`⏳ CID ${cid} pin may still be processing. Retrying in ${retryDelay / 1000}s...`);
         await new Promise(resolve => setTimeout(resolve, retryDelay));
+        // Check again after delay in case shutdown started during wait
+        if (isShuttingDown) {
+          console.log(`⚠️ Shutdown in progress, aborting pin retry for CID ${cid}`);
+          return { success: false, error: 'Pin aborted due to shutdown', pending: true };
+        }
         continue;
       }
 
       // If retryable error and we have retries left
-      if (result.retryable && attempt < maxRetries) {
+      if (result.retryable && attempt < maxRetries && !isShuttingDown) {
         const retryDelay = Math.min(2000 * Math.pow(2, attempt), 10000); // Exponential backoff: 2s, 4s, 8s, max 10s
         console.log(`🔄 Retrying pin for CID ${cid} in ${retryDelay / 1000}s (attempt ${attempt + 2}/${maxRetries + 1})...`);
         await new Promise(resolve => setTimeout(resolve, retryDelay));
+        // Check again after delay in case shutdown started during wait
+        if (isShuttingDown) {
+          console.log(`⚠️ Shutdown in progress, aborting pin retry for CID ${cid}`);
+          return { success: false, error: 'Pin aborted due to shutdown', pending: true };
+        }
         continue;
       }
 
@@ -317,6 +344,12 @@ export async function syncDealsWithIPFS(relayAddress, chainId, options = {}) {
 
     // Process each deal
     for (const deal of dealsToSync) {
+      // Check if shutdown started during processing
+      if (isShuttingDown) {
+        console.log(`⏭️ Deal sync interrupted (shutdown in progress)`);
+        break;
+      }
+
       const { cid, dealId } = deal;
       
       if (!cid) {
@@ -366,8 +399,8 @@ export async function syncDealsWithIPFS(relayAddress, chainId, options = {}) {
           }
         }
         
-        // Sync to GunDB if enabled
-        if (gun && relayKeyPair && relayPub && !dryRun) {
+        // Sync to GunDB if enabled (skip if shutdown in progress)
+        if (gun && relayKeyPair && relayPub && !dryRun && !isShuttingDown) {
           try {
             const { getDeal } = await import('./storage-deals.js');
             const { saveDeal } = await import('./storage-deals.js');
@@ -387,6 +420,11 @@ export async function syncDealsWithIPFS(relayAddress, chainId, options = {}) {
               console.log(`ℹ️ Deal ${dealId}: Already exists in GunDB`);
             }
           } catch (gunDBError) {
+            // Ignore errors if shutdown is in progress (database may be closed)
+            if (isShuttingDown) {
+              console.log(`⏭️ GunDB sync skipped for deal ${dealId} (shutdown in progress)`);
+              break;
+            }
             console.warn(`⚠️ Deal ${dealId}: Failed to sync to GunDB: ${gunDBError.message}`);
             results.gunDBFailed++;
             results.errors.push({

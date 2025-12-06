@@ -1441,11 +1441,15 @@ See docs/RELAY_KEYS.md for more information.
   const RELAY_PRIVATE_KEY = process.env.RELAY_PRIVATE_KEY;
   const REGISTRY_CHAIN_ID = process.env.REGISTRY_CHAIN_ID;
 
+  // Store interval/timeout references for cleanup
+  let dealSyncInitialTimeout = null;
+  let dealSyncInterval = null;
+
   if (DEAL_SYNC_ENABLED && RELAY_PRIVATE_KEY && REGISTRY_CHAIN_ID) {
     console.log(`🔄 Deal sync enabled (interval: ${DEAL_SYNC_INTERVAL_MS / 1000 / 60} minutes)`);
     
     // Initial sync after 5 minutes (give IPFS time to start)
-    setTimeout(async () => {
+    dealSyncInitialTimeout = setTimeout(async () => {
       try {
         const { createRegistryClientWithSigner } = await import('./utils/registry-client.js');
         const DealSync = await import('./utils/deal-sync.js');
@@ -1471,7 +1475,7 @@ See docs/RELAY_KEYS.md for more information.
     }, 5 * 60 * 1000); // 5 minutes
 
     // Periodic sync
-    setInterval(async () => {
+    dealSyncInterval = setInterval(async () => {
       try {
         const { createRegistryClientWithSigner } = await import('./utils/registry-client.js');
         const DealSync = await import('./utils/deal-sync.js');
@@ -1509,10 +1513,34 @@ See docs/RELAY_KEYS.md for more information.
   async function shutdown() {
     console.log("🛑 Shutting down Shogun Relay...");
 
+    // Mark shutdown in progress to stop deal sync operations
+    try {
+      const DealSync = await import('./utils/deal-sync.js');
+      if (DealSync.markShutdownInProgress) {
+        DealSync.markShutdownInProgress();
+      }
+    } catch (err) {
+      // Ignore if module not loaded
+    }
+
+    // Cancel deal sync timers
+    if (dealSyncInitialTimeout) {
+      clearTimeout(dealSyncInitialTimeout);
+      dealSyncInitialTimeout = null;
+    }
+    if (dealSyncInterval) {
+      clearInterval(dealSyncInterval);
+      dealSyncInterval = null;
+    }
+
+    // Give a short grace period for in-flight operations to complete
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     // Close SQLite store if it exists
     if (sqliteStore) {
       try {
         sqliteStore.close();
+        console.log("✅ SQLite store closed");
       } catch (err) {
         console.error("Error closing SQLite store:", err);
       }
