@@ -9,9 +9,7 @@
     "test:routes": "node scripts/test-all-routes.js",
     "test:routes:local": "node scripts/test-all-routes.js http://localhost:8765",
     "test:ipfs": "node scripts/test-ipfs-routes.js",
-    "test:ipfs:local": "node scripts/test-ipfs-routes.js http://localhost:8765 shogun2025 0xA6591dCDff5C7616110b4f84207184aef7835048",
-    "typecheck": "tsc --noEmit",
-    "typecheck:watch": "tsc --noEmit --watch"
+    "test:ipfs:local": "node scripts/test-ipfs-routes.js http://localhost:8765 shogun2025 0xA6591dCDff5C7616110b4f84207184aef7835048"
   },
   "keywords": [
     "gun",
@@ -47,12 +45,7 @@
     "viem": "^2.21.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.2",
-    "typescript": "^5.3.3",
-    "@types/node": "^20.10.6",
-    "@types/express": "^4.17.21",
-    "@types/cors": "^2.8.17",
-    "@types/multer": "^1.4.11"
+    "nodemon": "^3.0.2"
   },
   "engines": {
     "node": ">=16.0.0"

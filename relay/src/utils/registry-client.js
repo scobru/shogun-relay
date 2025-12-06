@@ -8,28 +8,40 @@
  */
 
 import { ethers } from 'ethers';
+import { CONTRACTS_CONFIG } from '../config/contracts-config.js';
 
-// Contract addresses - Updated with latest deployments (2025-12-05)
-export const REGISTRY_ADDRESSES = {
-  84532: '0xa1970aa00c97B7d87E4bE8516125A2A239F416B2', // Base Sepolia
-  8453: null, // Base Mainnet - TBD
+// Generate contract address mappings from centralized config
+// This maintains backward compatibility while using the centralized configuration
+const generateAddressMappings = () => {
+  /** @type {Record<number, string | null>} */
+  const registryAddresses = Object.create(null);
+  /** @type {Record<number, string | null>} */
+  const storageDealRegistryAddresses = Object.create(null);
+  /** @type {Record<number, string | null>} */
+  const usdcAddresses = Object.create(null);
+  /** @type {Record<number, string | null>} */
+  const rpcUrls = Object.create(null);
+
+  // Iterate through all network configs
+  for (const config of Object.values(CONTRACTS_CONFIG)) {
+    if (config && config.chainId) {
+      registryAddresses[config.chainId] = config.relayRegistry || null;
+      storageDealRegistryAddresses[config.chainId] = config.storageDealRegistry || null;
+      usdcAddresses[config.chainId] = config.usdc || null;
+      rpcUrls[config.chainId] = config.rpc || null;
+    }
+  }
+
+  return { registryAddresses, storageDealRegistryAddresses, usdcAddresses, rpcUrls };
 };
 
-export const STORAGE_DEAL_REGISTRY_ADDRESSES = {
-  84532: '0xc9D383bD540Ade3bcfe7868b50aa2D2d21b2C44e', // Base Sepolia
-  8453: null, // Base Mainnet - TBD
-};
+const { registryAddresses, storageDealRegistryAddresses, usdcAddresses, rpcUrls } = generateAddressMappings();
 
-export const USDC_ADDRESSES = {
-  84532: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // Base Sepolia
-  8453: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',  // Base Mainnet
-};
-
-// Default RPC URLs
-export const RPC_URLS = {
-  84532: 'https://sepolia.base.org',
-  8453: 'https://mainnet.base.org',
-};
+// Export for backward compatibility
+export const REGISTRY_ADDRESSES = registryAddresses;
+export const STORAGE_DEAL_REGISTRY_ADDRESSES = storageDealRegistryAddresses;
+export const USDC_ADDRESSES = usdcAddresses;
+export const RPC_URLS = rpcUrls;
 
 // ABI for ShogunRelayRegistry (minimal interface for queries)
 const REGISTRY_ABI = [
