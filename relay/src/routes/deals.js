@@ -30,6 +30,7 @@ import {
   createStorageDealRegistryClient,
   createStorageDealRegistryClientWithSigner 
 } from '../utils/registry-client.js';
+import * as DealSync from '../utils/deal-sync.js';
 
 const router = express.Router();
 const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN;
@@ -2153,6 +2154,123 @@ router.post('/:dealId/terminate', express.json(), async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/v1/deals/sync
+ * 
+ * Manually trigger synchronization of on-chain deals with IPFS pins.
+ * Fetches all active deals for this relay and ensures their CIDs are pinned.
+ */
+router.post('/sync', async (req, res) => {
+  try {
+    const RELAY_PRIVATE_KEY = process.env.RELAY_PRIVATE_KEY;
+    const REGISTRY_CHAIN_ID = parseInt(process.env.REGISTRY_CHAIN_ID);
+
+    if (!RELAY_PRIVATE_KEY) {
+      return res.status(400).json({
+        success: false,
+        error: 'RELAY_PRIVATE_KEY not configured',
+      });
+    }
+
+    if (!REGISTRY_CHAIN_ID) {
+      return res.status(400).json({
+        success: false,
+        error: 'REGISTRY_CHAIN_ID not configured',
+      });
+    }
+
+    // Get relay address from private key
+    const registryClient = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const relayAddress = registryClient.wallet.address;
+
+    // Get GunDB instance and relay user for GunDB sync
+    const gun = req.app.get('gunInstance');
+    const relayUser = getRelayUser();
+    const relayKeyPair = relayUser?._?.sea || null;
+
+    // Parse options from request body
+    const { onlyActive = true, dryRun = false } = req.body || {};
+
+    console.log(`🔄 Manual deal sync triggered for relay ${relayAddress}`);
+
+    // Perform sync
+    const results = await DealSync.syncDealsWithIPFS(relayAddress, REGISTRY_CHAIN_ID, {
+      onlyActive,
+      dryRun,
+      gun: gun,
+      relayKeyPair: relayKeyPair,
+    });
+
+    res.json({
+      success: true,
+      relayAddress,
+      chainId: REGISTRY_CHAIN_ID,
+      results,
+      message: `Sync completed: ${results.synced} pinned, ${results.alreadyPinned} already pinned, ${results.failed} failed`,
+    });
+  } catch (error) {
+    console.error('❌ Deal sync error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/v1/deals/sync/status
+ * 
+ * Get synchronization status for all active deals.
+ * Shows which deals are pinned and which need syncing.
+ */
+router.get('/sync/status', async (req, res) => {
+  try {
+    const RELAY_PRIVATE_KEY = process.env.RELAY_PRIVATE_KEY;
+    const REGISTRY_CHAIN_ID = parseInt(process.env.REGISTRY_CHAIN_ID);
+
+    if (!RELAY_PRIVATE_KEY) {
+      return res.status(400).json({
+        success: false,
+        error: 'RELAY_PRIVATE_KEY not configured',
+      });
+    }
+
+    if (!REGISTRY_CHAIN_ID) {
+      return res.status(400).json({
+        success: false,
+        error: 'REGISTRY_CHAIN_ID not configured',
+      });
+    }
+
+    // Get relay address from private key
+    const registryClient = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const relayAddress = registryClient.wallet.address;
+
+    // Get sync status
+    const status = await DealSync.getDealSyncStatus(relayAddress, REGISTRY_CHAIN_ID);
+
+    const summary = {
+      total: status.length,
+      pinned: status.filter(s => s.pinned).length,
+      needsSync: status.filter(s => s.needsSync).length,
+    };
+
+    res.json({
+      success: true,
+      relayAddress,
+      chainId: REGISTRY_CHAIN_ID,
+      summary,
+      deals: status,
+    });
+  } catch (error) {
+    console.error('❌ Deal sync status error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 });
 

@@ -1452,6 +1452,77 @@ See docs/RELAY_KEYS.md for more information.
     }
   }, 30000); // 30 seconds
 
+  // Periodic deal synchronization with IPFS pins
+  // Syncs active on-chain deals to ensure their CIDs are pinned
+  const DEAL_SYNC_ENABLED = process.env.DEAL_SYNC_ENABLED !== 'false';
+  const DEAL_SYNC_INTERVAL_MS = parseInt(process.env.DEAL_SYNC_INTERVAL_MS) || 6 * 60 * 60 * 1000; // Default: 6 hours
+  const RELAY_PRIVATE_KEY = process.env.RELAY_PRIVATE_KEY;
+  const REGISTRY_CHAIN_ID = process.env.REGISTRY_CHAIN_ID;
+
+  if (DEAL_SYNC_ENABLED && RELAY_PRIVATE_KEY && REGISTRY_CHAIN_ID) {
+    console.log(`🔄 Deal sync enabled (interval: ${DEAL_SYNC_INTERVAL_MS / 1000 / 60} minutes)`);
+    
+    // Initial sync after 5 minutes (give IPFS time to start)
+    setTimeout(async () => {
+      try {
+        const { createRegistryClientWithSigner } = await import('./utils/registry-client.js');
+        const DealSync = await import('./utils/deal-sync.js');
+        const { getRelayUser } = await import('./utils/relay-user.js');
+        
+        const registryClient = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, parseInt(REGISTRY_CHAIN_ID));
+        const relayAddress = registryClient.wallet.address;
+        
+        // Get relay user for GunDB sync
+        const relayUser = getRelayUser();
+        const relayKeyPair = relayUser?._?.sea || null;
+        
+        console.log(`🔄 Starting initial deal sync for relay ${relayAddress}...`);
+        await DealSync.syncDealsWithIPFS(relayAddress, parseInt(REGISTRY_CHAIN_ID), {
+          onlyActive: true,
+          dryRun: false,
+          gun: gun,
+          relayKeyPair: relayKeyPair,
+        });
+      } catch (error) {
+        console.warn(`⚠️ Initial deal sync failed: ${error.message}`);
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+
+    // Periodic sync
+    setInterval(async () => {
+      try {
+        const { createRegistryClientWithSigner } = await import('./utils/registry-client.js');
+        const DealSync = await import('./utils/deal-sync.js');
+        const { getRelayUser } = await import('./utils/relay-user.js');
+        
+        const registryClient = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, parseInt(REGISTRY_CHAIN_ID));
+        const relayAddress = registryClient.wallet.address;
+        
+        // Get relay user for GunDB sync
+        const relayUser = getRelayUser();
+        const relayKeyPair = relayUser?._?.sea || null;
+        
+        console.log(`🔄 Periodic deal sync for relay ${relayAddress}...`);
+        await DealSync.syncDealsWithIPFS(relayAddress, parseInt(REGISTRY_CHAIN_ID), {
+          onlyActive: true,
+          dryRun: false,
+          gun: gun,
+          relayKeyPair: relayKeyPair,
+        });
+      } catch (error) {
+        console.warn(`⚠️ Periodic deal sync failed: ${error.message}`);
+      }
+    }, DEAL_SYNC_INTERVAL_MS);
+  } else {
+    if (!DEAL_SYNC_ENABLED) {
+      console.log(`⏭️  Deal sync disabled (set DEAL_SYNC_ENABLED=true to enable)`);
+    } else if (!RELAY_PRIVATE_KEY) {
+      console.log(`⏭️  Deal sync disabled (RELAY_PRIVATE_KEY not configured)`);
+    } else if (!REGISTRY_CHAIN_ID) {
+      console.log(`⏭️  Deal sync disabled (REGISTRY_CHAIN_ID not configured)`);
+    }
+  }
+
   // Shutdown function
   async function shutdown() {
     console.log("🛑 Shutting down Shogun Relay...");
