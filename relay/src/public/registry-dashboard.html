@@ -436,7 +436,7 @@
             </div>
             <div class="flex justify-between items-center py-2">
               <span class="text-[#A0A0A0] text-sm">Total Deals</span>
-              <span class="text-[#FFFFFF] text-sm font-medium">${relay.totalDeals}</span>
+              <span class="text-[#FFFFFF] text-sm font-medium">${relay.totalDeals !== undefined ? relay.totalDeals : 0}</span>
             </div>
           </div>
         `;
@@ -643,7 +643,7 @@
     async function registerRelay() {
       const btn = document.getElementById('registerBtn');
       btn.disabled = true;
-      btn.textContent = 'Registering...';
+      btn.textContent = 'Approving USDC...';
       
       try {
         const griefingRatio = document.getElementById('griefingRatio').value;
@@ -658,11 +658,17 @@
           body.griefingRatio = parseInt(griefingRatio);
         }
         
+        // Update button text to show progress
+        btn.textContent = 'Waiting for approval...';
+        
         const res = await fetch(`${API_BASE}/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
+        
+        // Update button text during registration
+        btn.textContent = 'Registering relay...';
         
         const data = await res.json();
         

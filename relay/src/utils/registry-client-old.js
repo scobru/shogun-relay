@@ -1,27 +1,17 @@
 /**
- * Registry Client - On-chain relay registry interaction using SDK
- * 
- * This module uses the Shogun Contracts SDK (shogun-contracts/sdk) to interact
- * with smart contracts. It maintains backward compatibility with the previous
- * implementation while using the SDK under the hood.
+ * Registry Client - On-chain relay registry interaction
  * 
  * Provides utilities for:
  * - Querying registered relays from the smart contract
  * - Auto-registration of relays (optional)
  * - Storage deal registration on-chain
- * 
- * All contract interactions now go through the ShogunSDK which provides:
- * - Type-safe contract interfaces
- * - Automatic ABI and address resolution
- * - Consistent error handling
- * 
- * @version 2.0.0 - Refactored to use SDK
  */
 
 import { ethers } from 'ethers';
-import { ShogunSDK } from 'shogun-contracts/sdk';
 import { 
   CONTRACTS_CONFIG, 
+  getShogunRelayRegistryABI, 
+  getStorageDealRegistryABI,
   ERC20_ABI 
 } from 'shogun-contracts';
 
@@ -58,6 +48,24 @@ export const STORAGE_DEAL_REGISTRY_ADDRESSES = storageDealRegistryAddresses;
 export const USDC_ADDRESSES = usdcAddresses;
 export const RPC_URLS = rpcUrls;
 
+// Get ABIs from shogun-contracts package
+// These will be loaded dynamically based on chainId
+function getRegistryABI(chainId) {
+  const abi = getShogunRelayRegistryABI(chainId);
+  if (!abi) {
+    throw new Error(`ShogunRelayRegistry ABI not found for chain ${chainId}`);
+  }
+  return abi;
+}
+
+function getStorageDealRegistryABIForChain(chainId) {
+  const abi = getStorageDealRegistryABI(chainId);
+  if (!abi) {
+    throw new Error(`StorageDealRegistry ABI not found for chain ${chainId}`);
+  }
+  return abi;
+}
+
 // Relay status enum
 const RelayStatus = {
   0: 'Inactive',
@@ -67,42 +75,7 @@ const RelayStatus = {
 };
 
 /**
- * Helper to convert bytes to string
- */
-function bytesToString(bytes) {
-  if (!bytes || bytes.length === 0) return '';
-  try {
-    return ethers.toUtf8String(bytes);
-  } catch {
-    return '';
-  }
-}
-
-/**
- * Helper to format relay info from contract
- */
-function formatRelayInfo(info, relayAddress) {
-  return {
-    address: relayAddress,
-    owner: info.owner,
-    endpoint: info.endpoint,
-    gunPubKey: bytesToString(info.pubkey),
-    epub: bytesToString(info.epub),
-    stakedAmount: ethers.formatUnits(info.stakedAmount, 6),
-    stakedAmountRaw: info.stakedAmount.toString(),
-    registeredAt: new Date(Number(info.registeredAt) * 1000).toISOString(),
-    updatedAt: new Date(Number(info.updatedAt) * 1000).toISOString(),
-    unstakeRequestedAt: info.unstakeRequestedAt > 0
-      ? new Date(Number(info.unstakeRequestedAt) * 1000).toISOString()
-      : null,
-    status: RelayStatus[info.status] || 'Unknown',
-    totalSlashed: ethers.formatUnits(info.totalSlashed, 6),
-    griefingRatio: info.griefingRatio ? Number(info.griefingRatio) : null,
-  };
-}
-
-/**
- * Create a registry client instance using SDK
+ * Create a registry client instance
  * @param {number} chainId - Chain ID (84532 for Base Sepolia, 8453 for Base)
  * @param {string} [rpcUrl] - Optional custom RPC URL
  * @returns {Object} Registry client
@@ -114,8 +87,8 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
   }
 
   const provider = new ethers.JsonRpcProvider(rpcUrl || RPC_URLS[chainId]);
-  const sdk = new ShogunSDK({ provider, chainId });
-  const relayRegistry = sdk.getRelayRegistry();
+  const registryABI = getRegistryABI(chainId);
+  const registry = new ethers.Contract(registryAddress, registryABI, provider);
   const usdcAddress = USDC_ADDRESSES[chainId];
 
   return {
@@ -123,23 +96,40 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
     registryAddress,
     usdcAddress,
     provider,
-    registry: relayRegistry.getContract(), // For backward compatibility
-    sdk,
-    relayRegistry,
+    registry,
 
     /**
      * Get all active relays with their info
      * @returns {Promise<Array>} List of active relays
      */
     async getActiveRelays() {
-      const addresses = await relayRegistry.getActiveRelays();
+      const addresses = await registry.getActiveRelays();
       const relays = [];
 
       for (const addr of addresses) {
         try {
-          const info = await relayRegistry.getRelayInfo(addr);
-          if (info.owner === ethers.ZeroAddress) continue;
-          relays.push(formatRelayInfo(info, addr));
+          const info = await registry.getRelayInfo(addr);
+          // Convert bytes to string for pubkey and epub
+          const gunPubKey = info.pubkey && info.pubkey.length > 0 
+            ? ethers.toUtf8String(info.pubkey) 
+            : '';
+          const epub = info.epub && info.epub.length > 0 
+            ? ethers.toUtf8String(info.epub) 
+            : '';
+          
+          relays.push({
+            address: addr,
+            owner: info.owner,
+            endpoint: info.endpoint,
+            gunPubKey,
+            epub,
+            stakedAmount: ethers.formatUnits(info.stakedAmount, 6),
+            stakedAmountRaw: info.stakedAmount.toString(),
+            registeredAt: new Date(Number(info.registeredAt) * 1000).toISOString(),
+            status: RelayStatus[info.status] || 'Unknown',
+            totalSlashed: ethers.formatUnits(info.totalSlashed, 6),
+            griefingRatio: info.griefingRatio ? Number(info.griefingRatio) : null,
+          });
         } catch (e) {
           console.error(`Error fetching relay info for ${addr}:`, e.message);
         }
@@ -153,7 +143,7 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
      * @returns {Promise<number>}
      */
     async getActiveRelayCount() {
-      const count = await relayRegistry.getContract().getActiveRelayCount();
+      const count = await registry.getActiveRelayCount();
       return Number(count);
     },
 
@@ -164,11 +154,35 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
      */
     async getRelayInfo(relayAddress) {
       try {
-        const info = await relayRegistry.getRelayInfo(relayAddress);
+        const info = await registry.getRelayInfo(relayAddress);
         if (info.owner === ethers.ZeroAddress) {
           return null;
         }
-        return formatRelayInfo(info, relayAddress);
+        // Convert bytes to string for pubkey and epub
+        const gunPubKey = info.pubkey && info.pubkey.length > 0 
+          ? ethers.toUtf8String(info.pubkey) 
+          : '';
+        const epub = info.epub && info.epub.length > 0 
+          ? ethers.toUtf8String(info.epub) 
+          : '';
+        
+        return {
+          address: relayAddress,
+          owner: info.owner,
+          endpoint: info.endpoint,
+          gunPubKey,
+          epub,
+          stakedAmount: ethers.formatUnits(info.stakedAmount, 6),
+          stakedAmountRaw: info.stakedAmount.toString(),
+          registeredAt: new Date(Number(info.registeredAt) * 1000).toISOString(),
+          updatedAt: new Date(Number(info.updatedAt) * 1000).toISOString(),
+          unstakeRequestedAt: info.unstakeRequestedAt > 0
+            ? new Date(Number(info.unstakeRequestedAt) * 1000).toISOString()
+            : null,
+          status: RelayStatus[info.status] || 'Unknown',
+          totalSlashed: ethers.formatUnits(info.totalSlashed, 6),
+          griefingRatio: info.griefingRatio ? Number(info.griefingRatio) : null,
+        };
       } catch (e) {
         console.error(`Error fetching relay info:`, e.message);
         return null;
@@ -181,39 +195,114 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
      * @returns {Promise<boolean>}
      */
     async isActiveRelay(relayAddress) {
-      return await relayRegistry.isActiveRelay(relayAddress);
+      return await registry.isActiveRelay(relayAddress);
     },
 
     /**
-     * Get deal info by ID (from StorageDealRegistry)
+     * Get deal info by ID
      * @param {string} dealId - bytes32 deal ID
      * @returns {Promise<Object|null>}
      */
     async getDeal(dealId) {
-      // This method should use StorageDealRegistry, not RelayRegistry
-      // Keeping for backward compatibility but delegating to StorageDealRegistry
-      const storageDealClient = createStorageDealRegistryClient(this.chainId);
-      return await storageDealClient.getDeal(dealId);
+      try {
+        // Normalize dealId to bytes32 format
+        let dealIdBytes32;
+        if (typeof dealId === 'string') {
+          // If it's already a hex string, use it; otherwise treat as bytes32
+          dealIdBytes32 = dealId.startsWith('0x') ? dealId : ethers.id(dealId);
+        } else {
+          dealIdBytes32 = ethers.hexlify(dealId);
+        }
+        
+        const deal = await registry.deals(dealIdBytes32);
+        
+        // Check if deal exists (createdAt will be 0 if not found)
+        if (!deal || deal.createdAt === 0n || deal.createdAt === 0) {
+          return null;
+        }
+        
+        return {
+          dealId: typeof deal.dealId === 'string' ? deal.dealId : ethers.hexlify(deal.dealId),
+          relay: typeof deal.relay === 'string' ? deal.relay : deal.relay.toLowerCase(),
+          client: typeof deal.client === 'string' ? deal.client : deal.client.toLowerCase(),
+          cid: deal.cid,
+          sizeMB: Number(deal.sizeMB),
+          priceUSDC: ethers.formatUnits(deal.priceUSDC, 6),
+          createdAt: new Date(Number(deal.createdAt) * 1000).toISOString(),
+          expiresAt: new Date(Number(deal.expiresAt) * 1000).toISOString(),
+          active: deal.active,
+          clientStake: deal.clientStake ? ethers.formatUnits(deal.clientStake, 6) : '0',
+          clientStakeRaw: deal.clientStake ? deal.clientStake.toString() : '0',
+        };
+      } catch (e) {
+        // Only log if it's not a "deal not found" type error
+        if (!e.message.includes('could not decode') && !e.message.includes('execution reverted')) {
+          console.error(`Error fetching deal ${dealId}:`, e.message);
+        }
+        return null;
+      }
     },
 
     /**
-     * Get all deals for a relay (from StorageDealRegistry)
+     * Get all deals for a relay
      * @param {string} relayAddress
      * @returns {Promise<Array>}
      */
     async getRelayDeals(relayAddress) {
-      const storageDealClient = createStorageDealRegistryClient(this.chainId);
-      return await storageDealClient.getRelayDeals(relayAddress);
+      const dealIds = await registry.getRelayDeals(relayAddress);
+      const deals = [];
+      for (const id of dealIds) {
+        const deal = await this.getDeal(id);
+        if (deal) deals.push(deal);
+      }
+      return deals;
     },
 
     /**
-     * Get all deals for a client (from StorageDealRegistry)
+     * Get all deals for a client
      * @param {string} clientAddress
      * @returns {Promise<Array>}
      */
     async getClientDeals(clientAddress) {
-      const storageDealClient = createStorageDealRegistryClient(this.chainId);
-      return await storageDealClient.getClientDeals(clientAddress);
+      try {
+        // Normalize address to checksum format for consistency
+        const normalizedAddress = ethers.getAddress(clientAddress);
+        const dealIds = await registry.getClientDeals(normalizedAddress);
+        
+        if (!dealIds || dealIds.length === 0) {
+          return [];
+        }
+        
+        const deals = [];
+        for (const id of dealIds) {
+          try {
+            // Convert to bytes32 format if needed
+            let dealIdBytes32;
+            if (typeof id === 'string') {
+              // If already a hex string with 0x, use it directly
+              dealIdBytes32 = id.startsWith('0x') ? id : ethers.id(id);
+            } else {
+              // Convert BigNumber or other types to hex string
+              dealIdBytes32 = ethers.hexlify(id);
+            }
+            
+            const deal = await this.getDeal(dealIdBytes32);
+            if (deal) {
+              deals.push(deal);
+            }
+          } catch (dealError) {
+            // Only log non-decode errors (decode errors are expected for non-existent deals)
+            if (!dealError.message.includes('could not decode')) {
+              console.warn(`⚠️ Error fetching deal:`, dealError.message.substring(0, 100));
+            }
+            // Continue with other deals
+          }
+        }
+        return deals;
+      } catch (error) {
+        console.error(`Error fetching client deals for ${clientAddress}:`, error.message);
+        return [];
+      }
     },
 
     /**
@@ -221,10 +310,9 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
      * @returns {Promise<Object>}
      */
     async getRegistryParams() {
-      const contract = relayRegistry.getContract();
       const [minStake, unstakingDelay] = await Promise.all([
-        contract.minStake(),
-        contract.unstakingDelay(),
+        registry.minStake(),
+        registry.unstakingDelay(),
       ]);
       return {
         minStake: ethers.formatUnits(minStake, 6),
@@ -236,7 +324,6 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
 
     /**
      * Calculate griefing cost for slashing a relay
-     * Note: This method may not exist in the contract, keeping for backward compatibility
      * @param {string} relayAddress - Relay address
      * @param {number} slashBps - Slash percentage in basis points (100 = 1%, 1000 = 10%)
      * @param {string} dealId - Deal ID (bytes32 or string to hash)
@@ -251,37 +338,18 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
           dealIdBytes32 = ethers.hexlify(dealId);
         }
 
-        const contract = relayRegistry.getContract();
-        // Check if method exists
-        if (typeof contract.calculateGriefingCost === 'function') {
-          const [slashAmount, cost] = await contract.calculateGriefingCost(
-            relayAddress,
-            slashBps,
-            dealIdBytes32
-          );
+        const [slashAmount, cost] = await registry.calculateGriefingCost(
+          relayAddress,
+          slashBps,
+          dealIdBytes32
+        );
 
-          return {
-            slashAmount: ethers.formatUnits(slashAmount, 6),
-            slashAmountRaw: slashAmount.toString(),
-            cost: ethers.formatUnits(cost, 6),
-            costRaw: cost.toString(),
-          };
-        } else {
-          // Fallback: calculate manually if method doesn't exist
-          const relayInfo = await relayRegistry.getRelayInfo(relayAddress);
-          const stakedAmount = BigInt(relayInfo.stakedAmountRaw);
-          const slashAmount = (stakedAmount * BigInt(slashBps)) / BigInt(10000);
-          // Default griefing ratio is 500 bps (5% cost per 1% slash)
-          const griefingRatio = relayInfo.griefingRatio || 500;
-          const cost = (slashAmount * BigInt(griefingRatio)) / BigInt(10000);
-          
-          return {
-            slashAmount: ethers.formatUnits(slashAmount, 6),
-            slashAmountRaw: slashAmount.toString(),
-            cost: ethers.formatUnits(cost, 6),
-            costRaw: cost.toString(),
-          };
-        }
+        return {
+          slashAmount: ethers.formatUnits(slashAmount, 6),
+          slashAmountRaw: slashAmount.toString(),
+          cost: ethers.formatUnits(cost, 6),
+          costRaw: cost.toString(),
+        };
       } catch (error) {
         console.error(`Error calculating griefing cost:`, error.message);
         throw error;
@@ -300,21 +368,14 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
 export function createRegistryClientWithSigner(privateKey, chainId = 84532, rpcUrl = null) {
   const client = createRegistryClient(chainId, rpcUrl);
   const wallet = new ethers.Wallet(privateKey, client.provider);
-  const sdkWithSigner = new ShogunSDK({ 
-    provider: client.provider, 
-    signer: wallet, 
-    chainId 
-  });
-  const relayRegistry = sdkWithSigner.getRelayRegistry();
+  const registryWithSigner = client.registry.connect(wallet);
   const usdc = new ethers.Contract(client.usdcAddress, ERC20_ABI, wallet);
 
   return {
     ...client,
     wallet,
-    registryWithSigner: relayRegistry.getContract(), // For backward compatibility
+    registryWithSigner,
     usdc,
-    sdk: sdkWithSigner,
-    relayRegistry,
 
     /**
      * Register this relay on-chain
@@ -343,7 +404,7 @@ export function createRegistryClientWithSigner(privateKey, chainId = 84532, rpcU
         const approveReceipt = await approveTx.wait();
         console.log(`✅ Approve transaction confirmed in block ${approveReceipt.blockNumber}`);
         
-        // Verify allowance was updated
+        // Verify allowance was updated (wait a bit for state to sync)
         let retries = 5;
         while (retries > 0) {
           const newAllowance = await usdc.allowance(wallet.address, client.registryAddress);
@@ -368,15 +429,9 @@ export function createRegistryClientWithSigner(privateKey, chainId = 84532, rpcU
       const pubkeyBytes = ethers.toUtf8Bytes(gunPubKey || '');
       const epubBytes = epub ? ethers.toUtf8Bytes(epub) : '0x';
 
-      // Register using SDK
+      // Register
       console.log(`Registering relay: ${endpoint}${griefingRatio > 0 ? ` with griefing ratio ${griefingRatio} bps` : ''}`);
-      const tx = await relayRegistry.registerRelay(
-        endpoint,
-        pubkeyBytes,
-        epubBytes,
-        stakeWei,
-        BigInt(griefingRatio)
-      );
+      const tx = await registryWithSigner.registerRelay(endpoint, pubkeyBytes, epubBytes, stakeWei, griefingRatio);
       const receipt = await tx.wait();
 
       return {
@@ -391,32 +446,18 @@ export function createRegistryClientWithSigner(privateKey, chainId = 84532, rpcU
      * Update relay info
      * @param {string} [newEndpoint] - New endpoint (empty to keep current)
      * @param {string} [newGunPubKey] - New GunDB public key (empty to keep current)
-     * @param {string} [newEpub] - New epub (empty to keep current)
      * @returns {Promise<Object>}
      */
-    async updateRelay(newEndpoint = '', newGunPubKey = '', newEpub = '') {
-      if (newEndpoint) {
-        const tx = await relayRegistry.updateRelay(newEndpoint);
-        const receipt = await tx.wait();
-        return {
-          success: true,
-          txHash: receipt.hash,
-        };
-      }
-      
-      if (newGunPubKey || newEpub) {
-        const pubkeyBytes = newGunPubKey ? ethers.toUtf8Bytes(newGunPubKey) : '0x';
-        const epubBytes = newEpub ? ethers.toUtf8Bytes(newEpub) : '0x';
-        const tx = await relayRegistry.updateRelayEncryptionKeys(pubkeyBytes, epubBytes);
-        const receipt = await tx.wait();
-        return {
-          success: true,
-          txHash: receipt.hash,
-        };
-      }
-      
-      throw new Error('At least one field (endpoint, gunPubKey, or epub) must be provided');
+    async updateRelay(newEndpoint = '', newGunPubKey = '') {
+      const tx = await registryWithSigner.updateRelay(newEndpoint, newGunPubKey);
+      const receipt = await tx.wait();
+      return {
+        success: true,
+        txHash: receipt.hash,
+      };
     },
+
+    // Note: registerDeal and completeDeal moved to StorageDealRegistry - use createStorageDealRegistryClient
 
     /**
      * Increase stake
@@ -433,7 +474,7 @@ export function createRegistryClientWithSigner(privateKey, chainId = 84532, rpcU
         await approveTx.wait();
       }
 
-      const tx = await relayRegistry.increaseStake(amountWei);
+      const tx = await registryWithSigner.increaseStake(amountWei);
       const receipt = await tx.wait();
       return {
         success: true,
@@ -442,11 +483,11 @@ export function createRegistryClientWithSigner(privateKey, chainId = 84532, rpcU
     },
 
     /**
-     * Request unstake (start delay)
+     * Request unstake (start 7-day delay)
      * @returns {Promise<Object>}
      */
     async requestUnstake() {
-      const tx = await relayRegistry.requestUnstake();
+      const tx = await registryWithSigner.requestUnstake();
       const receipt = await tx.wait();
       return {
         success: true,
@@ -459,7 +500,7 @@ export function createRegistryClientWithSigner(privateKey, chainId = 84532, rpcU
      * @returns {Promise<Object>}
      */
     async withdrawStake() {
-      const tx = await relayRegistry.withdrawStake();
+      const tx = await registryWithSigner.withdrawStake();
       const receipt = await tx.wait();
       return {
         success: true,
@@ -469,46 +510,38 @@ export function createRegistryClientWithSigner(privateKey, chainId = 84532, rpcU
 
     /**
      * Report missed proof (Griefing)
-     * Note: This should use StorageDealRegistry.grief, keeping for backward compatibility
      * @param {string} relayAddress - Address of the relay to slash
      * @param {string} dealId - Deal ID associated with the failure
      * @param {string} evidence - Evidence string (e.g. IPFS hash of log)
      * @returns {Promise<Object>}
      */
     async griefMissedProof(relayAddress, dealId, evidence) {
-      // This should be handled by StorageDealRegistry
-      const storageDealClient = createStorageDealRegistryClientWithSigner(
-        privateKey,
-        chainId,
-        rpcUrl
-      );
-      const slashBps = 100; // 1%
-      const relayInfo = await this.getRelayInfo(relayAddress);
-      const stakedAmount = BigInt(relayInfo.stakedAmountRaw);
-      const slashAmount = (stakedAmount * BigInt(slashBps)) / BigInt(10000);
-      return await storageDealClient.grief(dealId, ethers.formatUnits(slashAmount, 6), evidence);
+      const dealIdBytes32 = ethers.id(dealId);
+      const tx = await registryWithSigner.griefMissedProof(relayAddress, dealIdBytes32, evidence);
+      const receipt = await tx.wait();
+      return {
+        success: true,
+        txHash: receipt.hash,
+      };
     },
 
     /**
      * Report data loss (Griefing)
-     * Note: This should use StorageDealRegistry.grief, keeping for backward compatibility
      * @param {string} relayAddress - Address of the relay to slash
      * @param {string} dealId - Deal ID associated with the failure
      * @param {string} evidence - Evidence string
      * @returns {Promise<Object>}
      */
     async griefDataLoss(relayAddress, dealId, evidence) {
-      const storageDealClient = createStorageDealRegistryClientWithSigner(
-        privateKey,
-        chainId,
-        rpcUrl
-      );
-      const slashBps = 1000; // 10%
-      const relayInfo = await this.getRelayInfo(relayAddress);
-      const stakedAmount = BigInt(relayInfo.stakedAmountRaw);
-      const slashAmount = (stakedAmount * BigInt(slashBps)) / BigInt(10000);
-      return await storageDealClient.grief(dealId, ethers.formatUnits(slashAmount, 6), evidence);
+      const dealIdBytes32 = ethers.id(dealId);
+      const tx = await registryWithSigner.griefDataLoss(relayAddress, dealIdBytes32, evidence);
+      const receipt = await tx.wait();
+      return {
+        success: true,
+        txHash: receipt.hash,
+      };
     },
+
   };
 }
 
@@ -533,7 +566,7 @@ export function dealIdToBytes32(dealId) {
 }
 
 /**
- * Create a StorageDealRegistry client instance using SDK
+ * Create a StorageDealRegistry client instance
  * @param {number} chainId - Chain ID (84532 for Base Sepolia, 8453 for Base)
  * @param {string} [rpcUrl] - Optional custom RPC URL
  * @returns {Object} StorageDealRegistry client
@@ -545,8 +578,8 @@ export function createStorageDealRegistryClient(chainId = 84532, rpcUrl = null) 
   }
 
   const provider = new ethers.JsonRpcProvider(rpcUrl || RPC_URLS[chainId]);
-  const sdk = new ShogunSDK({ provider, chainId });
-  const storageDealRegistry = sdk.getStorageDealRegistry();
+  const storageDealRegistryABI = getStorageDealRegistryABIForChain(chainId);
+  const storageDealRegistry = new ethers.Contract(registryAddress, storageDealRegistryABI, provider);
   const usdcAddress = USDC_ADDRESSES[chainId];
 
   return {
@@ -554,9 +587,7 @@ export function createStorageDealRegistryClient(chainId = 84532, rpcUrl = null) 
     registryAddress,
     usdcAddress,
     provider,
-    storageDealRegistry: storageDealRegistry.getContract(), // For backward compatibility
-    sdk,
-    storageDealRegistrySDK: storageDealRegistry,
+    storageDealRegistry,
 
     /**
      * Get deal info by ID
@@ -590,7 +621,6 @@ export function createStorageDealRegistryClient(chainId = 84532, rpcUrl = null) 
           active: deal.active,
           clientStake: deal.clientStake ? ethers.formatUnits(deal.clientStake, 6) : '0',
           clientStakeRaw: deal.clientStake ? deal.clientStake.toString() : '0',
-          griefed: deal.griefed || false,
         };
       } catch (e) {
         if (!e.message.includes('could not decode') && !e.message.includes('execution reverted')) {
@@ -675,19 +705,12 @@ export function createStorageDealRegistryClient(chainId = 84532, rpcUrl = null) 
 export function createStorageDealRegistryClientWithSigner(privateKey, chainId = 84532, rpcUrl = null) {
   const client = createStorageDealRegistryClient(chainId, rpcUrl);
   const wallet = new ethers.Wallet(privateKey, client.provider);
-  const sdkWithSigner = new ShogunSDK({ 
-    provider: client.provider, 
-    signer: wallet, 
-    chainId 
-  });
-  const storageDealRegistry = sdkWithSigner.getStorageDealRegistry();
+  const storageDealRegistryWithSigner = client.storageDealRegistry.connect(wallet);
 
   return {
     ...client,
     wallet,
-    storageDealRegistryWithSigner: storageDealRegistry.getContract(), // For backward compatibility
-    sdk: sdkWithSigner,
-    storageDealRegistrySDK: storageDealRegistry,
+    storageDealRegistryWithSigner,
 
     /**
      * Register a storage deal on-chain (called by relay)
@@ -708,13 +731,13 @@ export function createStorageDealRegistryClientWithSigner(privateKey, chainId = 
       // Normalize client address to checksum format
       const normalizedClientAddress = ethers.getAddress(clientAddress);
 
-      const tx = await storageDealRegistry.registerDeal(
+      const tx = await storageDealRegistryWithSigner.registerDeal(
         dealIdBytes32,
         normalizedClientAddress,
         cid,
-        BigInt(sizeMB),
+        sizeMB,
         priceWei,
-        BigInt(durationDays),
+        durationDays,
         clientStakeWei
       );
       const receipt = await tx.wait();
@@ -733,7 +756,7 @@ export function createStorageDealRegistryClientWithSigner(privateKey, chainId = 
      */
     async completeDeal(dealId) {
       const dealIdBytes32 = ethers.id(dealId);
-      const tx = await storageDealRegistry.completeDeal(dealIdBytes32);
+      const tx = await storageDealRegistryWithSigner.completeDeal(dealIdBytes32);
       const receipt = await tx.wait();
       return {
         success: true,
@@ -751,13 +774,14 @@ export function createStorageDealRegistryClientWithSigner(privateKey, chainId = 
     async grief(dealId, slashAmount, reason) {
       const dealIdBytes32 = ethers.id(dealId);
       const slashAmountWei = ethers.parseUnits(slashAmount, 6);
-      const tx = await storageDealRegistry.grief(dealIdBytes32, slashAmountWei, reason);
+      const tx = await storageDealRegistryWithSigner.grief(dealIdBytes32, slashAmountWei, reason);
       const receipt = await tx.wait();
       return {
         success: true,
         txHash: receipt.hash,
       };
     },
+
   };
 }
 

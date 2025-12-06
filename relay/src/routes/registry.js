@@ -60,6 +60,17 @@ router.get('/status', async (req, res) => {
       });
     }
 
+    // Get total deals count from StorageDealRegistry
+    let totalDeals = 0;
+    try {
+      const { createStorageDealRegistryClient } = await import('../utils/registry-client.js');
+      const storageDealRegistryClient = createStorageDealRegistryClient(REGISTRY_CHAIN_ID);
+      const deals = await storageDealRegistryClient.getRelayDeals(relayAddress);
+      totalDeals = deals.length;
+    } catch (error) {
+      console.warn('Could not fetch total deals count:', error.message);
+    }
+
     res.json({
       success: true,
       registered: true,
@@ -67,7 +78,10 @@ router.get('/status', async (req, res) => {
       relayAddress,
       chainId: REGISTRY_CHAIN_ID,
       registryAddress: client.registryAddress,
-      relay: info,
+      relay: {
+        ...info,
+        totalDeals,
+      },
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
