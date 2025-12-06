@@ -23,6 +23,7 @@ import * as FrozenData from '../utils/frozen-data.js';
 import { getRelayUser, getRelayPub } from '../utils/relay-user.js';
 import { X402Merchant } from '../utils/x402-merchant.js';
 import * as Reputation from '../utils/relay-reputation.js';
+import { ipfsUpload } from '../utils/ipfs-client.js';
 import { 
   createRegistryClient, 
   createRegistryClientWithSigner,
@@ -385,49 +386,17 @@ router.post('/upload', dealUpload.single('file'), async (req, res) => {
 
     console.log(`📤 Deal upload: ${req.file.originalname} (${(req.file.size / 1024 / 1024).toFixed(2)} MB) from ${walletAddress}`);
 
-    // Upload to IPFS
+    // Upload to IPFS using utility with automatic retry
     const form = new FormData();
     form.append('file', req.file.buffer, {
       filename: req.file.originalname,
       contentType: req.file.mimetype,
     });
 
-    const uploadOptions = {
-      hostname: '127.0.0.1',
-      port: 5001,
-      path: '/api/v0/add?pin=true',
-      method: 'POST',
-      headers: form.getHeaders(),
-    };
-
-    if (IPFS_API_TOKEN) {
-      uploadOptions.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
-    }
-
-    const ipfsResult = await new Promise((resolve, reject) => {
-      const ipfsReq = http.request(uploadOptions, (ipfsRes) => {
-        let data = '';
-        ipfsRes.on('data', chunk => data += chunk);
-        ipfsRes.on('end', () => {
-          if (ipfsRes.statusCode === 200) {
-            try {
-              resolve(JSON.parse(data));
-            } catch (e) {
-              reject(new Error('Failed to parse IPFS response'));
-            }
-          } else {
-            reject(new Error(`IPFS returned ${ipfsRes.statusCode}`));
-          }
-        });
-      });
-
-      ipfsReq.on('error', reject);
-      ipfsReq.setTimeout(60000, () => {
-        ipfsReq.destroy();
-        reject(new Error('Upload timeout'));
-      });
-
-      form.pipe(ipfsReq);
+    const ipfsResult = await ipfsUpload('/api/v0/add?pin=true', form, {
+      timeout: 60000,
+      maxRetries: 3,
+      retryDelay: 1000,
     });
 
     const cid = ipfsResult.Hash;

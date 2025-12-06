@@ -4,6 +4,7 @@ import FormData from 'form-data';
 import multer from 'multer';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { X402Merchant } from '../utils/x402-merchant.js';
+import { ipfsUpload } from '../utils/ipfs-client.js';
 
 const router = express.Router();
 
@@ -377,41 +378,23 @@ router.post("/upload",
         contentType: req.file.mimetype,
       });
 
-      const requestOptions = {
-        hostname: "127.0.0.1",
-        port: 5001,
-        path: "/api/v0/add?wrap-with-directory=false",
-        method: "POST",
-        headers: {
-          ...formData.getHeaders(),
-        },
+      // Use IPFS client utility with automatic retry
+      const fileResult = await ipfsUpload('/api/v0/add?wrap-with-directory=false', formData, {
+        timeout: 60000,
+        maxRetries: 3,
+        retryDelay: 1000,
+      });
+
+      console.log("📤 IPFS Upload response:", fileResult);
+
+      const uploadData = {
+        name: req.file.originalname,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+        hash: fileResult.Hash,
+        sizeBytes: fileResult.Size,
+        uploadedAt: Date.now(),
       };
-
-      if (IPFS_API_TOKEN) {
-        requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
-      }
-
-      const ipfsReq = http.request(requestOptions, (ipfsRes) => {
-        let data = "";
-        ipfsRes.on("data", (chunk) => (data += chunk));
-        ipfsRes.on("end", () => {
-          console.log("📤 IPFS Upload raw response:", data);
-
-          try {
-            const lines = data.trim().split("\n");
-            const results = lines.map((line) => JSON.parse(line));
-            const fileResult =
-              results.find((r) => r.Name === req.file.originalname) ||
-              results[0];
-
-            const uploadData = {
-              name: req.file.originalname,
-              size: req.file.size,
-              mimetype: req.file.mimetype,
-              hash: fileResult.Hash,
-              sizeBytes: fileResult.Size,
-              uploadedAt: Date.now(),
-            };
 
             // If user upload, save to Gun database and update MB usage
             // Skip GunDB save for deal uploads (they're tracked on-chain)
@@ -617,26 +600,6 @@ router.post("/upload",
                 authType: req.authType
               });
             }
-          } catch (parseError) {
-            console.error("❌ IPFS Upload parse error:", parseError);
-            res.status(500).json({
-              success: false,
-              error: "Failed to parse IPFS response",
-              rawResponse: data,
-            });
-          }
-        });
-      });
-
-      ipfsReq.on("error", (err) => {
-        console.error("❌ IPFS Upload error:", err);
-        res.status(500).json({
-          success: false,
-          error: err.message,
-        });
-      });
-
-      formData.pipe(ipfsReq);
     } catch (error) {
       console.error("❌ IPFS Upload error:", error);
       res.status(500).json({

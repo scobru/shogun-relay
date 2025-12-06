@@ -72,11 +72,20 @@ const holsterConfig = {
 };
 
 
-// Main server initialization function
+/**
+ * Main server initialization function
+ * Sets up Express, GunDB, Holster, and all routes
+ * @returns {Promise<void>}
+ */
 async function initializeServer() {
   console.log("🚀 Initializing Shogun Relay Server...");
 
-  // System logging function (console only, no GunDB storage)
+  /**
+   * System logging function (console only, no GunDB storage)
+   * @param {string} level - Log level (info, warn, error, etc.)
+   * @param {string} message - Log message
+   * @param {any} [data=null] - Optional data to log
+   */
   function addSystemLog(level, message, data = null) {
     const timestamp = new Date().toISOString();
 
@@ -229,13 +238,21 @@ async function initializeServer() {
   const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
   const activeSessions = new Map(); // Simple in-memory session store
 
-  // Hash token for secure comparison (prevents timing attacks)
+  /**
+   * Hash token for secure comparison (prevents timing attacks)
+   * @param {string} token - The token to hash
+   * @returns {string} SHA-256 hash of the token
+   */
   function hashToken(token) {
     return crypto.createHash('sha256').update(token || '').digest('hex');
   }
 
   // Get stored admin password hash (or compute on first use)
   let adminPasswordHash = null;
+  /**
+   * Get stored admin password hash (or compute on first use)
+   * @returns {string|null} The admin password hash, or null if not configured
+   */
   function getAdminPasswordHash() {
     if (!adminPasswordHash && process.env.ADMIN_PASSWORD) {
       adminPasswordHash = hashToken(process.env.ADMIN_PASSWORD);
@@ -243,7 +260,11 @@ async function initializeServer() {
     return adminPasswordHash;
   }
 
-  // Check if IP is rate limited
+  /**
+   * Check if IP is rate limited based on failed authentication attempts
+   * @param {string} ip - The IP address to check
+   * @returns {boolean} True if the IP is rate limited
+   */
   function isRateLimited(ip) {
     const attempts = failedAuthAttempts.get(ip);
     if (!attempts) return false;
@@ -261,7 +282,10 @@ async function initializeServer() {
     return false;
   }
 
-  // Record failed auth attempt
+  /**
+   * Record failed authentication attempt for an IP address
+   * @param {string} ip - The IP address that failed authentication
+   */
   function recordFailedAttempt(ip) {
     const now = Date.now();
     const attempts = failedAuthAttempts.get(ip) || [];
@@ -269,7 +293,11 @@ async function initializeServer() {
     failedAuthAttempts.set(ip, attempts);
   }
 
-  // Create session token
+  /**
+   * Create a new session token for an authenticated IP
+   * @param {string} ip - The IP address to create a session for
+   * @returns {string} The session ID
+   */
   function createSession(ip) {
     const sessionId = crypto.randomBytes(32).toString('hex');
     const expiresAt = Date.now() + SESSION_DURATION;
@@ -277,7 +305,12 @@ async function initializeServer() {
     return sessionId;
   }
 
-  // Validate session
+  /**
+   * Validate a session token
+   * @param {string} sessionId - The session ID to validate
+   * @param {string} ip - The IP address making the request
+   * @returns {boolean} True if the session is valid
+   */
   function isValidSession(sessionId, ip) {
     const session = activeSessions.get(sessionId);
     if (!session) return false;
@@ -302,7 +335,12 @@ async function initializeServer() {
     }
   }, 60 * 60 * 1000); // Cleanup every hour
 
-  // Middleware di autenticazione migliorato
+  /**
+   * Enhanced authentication middleware with rate limiting and session management
+   * @param {import('express').Request} req - Express request object
+   * @param {import('express').Response} res - Express response object
+   * @param {import('express').NextFunction} next - Express next function
+   */
   const tokenAuthMiddleware = (req, res, next) => {
     const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
 
@@ -357,7 +395,10 @@ async function initializeServer() {
     }
   };
 
-  // --- Start Server Function ---
+  /**
+   * Start the Express server
+   * @returns {Promise<import('http').Server>} The HTTP server instance
+   */
   async function startServer() {
     const server = app.listen(port, (error) => {
       if (error) {
