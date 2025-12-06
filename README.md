@@ -22,7 +22,7 @@ As an independent developer, you've likely faced these challenges:
 ✅ **Complete web interface** to monitor, manage, and inspect your data in real-time  
 ✅ **Unified REST APIs** with centralized authentication (one token for everything)  
 ✅ **Instant deployment** with Docker or manual setup in minutes  
-✅ **Production-ready** with RADISK persistence, rate limiting, and built-in security
+✅ **Production-ready** with SQLite/RADISK persistence, rate limiting, and built-in security
 
 In practice, instead of orchestrating 3-4 different services, you start a single server and have everything you need to manage your decentralized infrastructure.
 
@@ -61,8 +61,9 @@ See the complete **[Provider Guide](./PROVIDER_GUIDE.md)** for:
 ## Highlights
 
 - **GunDB Relay Core**
-  - WebSocket relay with RADISK persistence and WebRTC support.
+  - WebSocket relay with SQLite or RADISK persistence and WebRTC support.
   - Drop-in peer for any Gun client.
+  - SQLite storage backend for improved performance and reliability (default).
 
 - **Holster Relay Integration**
   - Built-in Holster relay with WebSocket server and connection management.
@@ -149,7 +150,8 @@ Create a `.env` file or export the variables below:
 | `RELAY_HOST`       | Advertised host                                          | auto-detected          |
 | `RELAY_PEERS`      | Comma-separated list of upstream GunDB peers to sync with| _(optional)_           |
 | `RELAY_NAME`       | Name of the relay node (visible in logs/status)          | `shogun-relay`         |
-| `DATA_DIR`         | RADISK data directory                                    | `./data`               |
+| `STORAGE_TYPE`     | Storage backend: "sqlite" (default) or "radisk"         | `sqlite`               |
+| `DATA_DIR`         | Data directory (SQLite DB or RADISK files)               | `./data`               |
 | `RELAY_PROTECTED`  | Require admin token for Gun writes                       | `true`                 |
 | `HOLSTER_RELAY_HOST` | Holster relay host address                              | `0.0.0.0`              |
 | `HOLSTER_RELAY_PORT` | Holster relay port                                      | `RELAY_PORT + 1` (8766)|
@@ -168,6 +170,12 @@ Create a `.env` file or export the variables below:
 | `RELAY_GUN_USERNAME` | GunDB username for relay user (x402 subscriptions) | `shogun-relay` |
 | `RELAY_GUN_PASSWORD` | GunDB password for relay user (x402 subscriptions) | `ADMIN_PASSWORD` |
 | `AUTO_REPLICATION` | Auto-pin content from network pin requests | `true` |
+
+**Storage Configuration:**
+- `STORAGE_TYPE=sqlite` (default) - Uses SQLite database for better performance and reliability
+- `STORAGE_TYPE=radisk` - Uses file-based RADISK storage (legacy)
+- SQLite database is stored at `DATA_DIR/gun.db`
+- RADISK files are stored in `DATA_DIR/radata/` directory
 
 Additional switches (Radisk toggle, cleanup, peers, etc.) are documented inside `index.js`.
 
@@ -196,12 +204,11 @@ The admin dashboards rely on `lib/admin-auth.js` to sync the token across tabs. 
 | `/services-dashboard` | Service health overview                    | ✅   |
 | `/pin-manager`        | IPFS pin manager with preview & batch ops  | ✅   |
 | `/upload`             | Direct IPFS uploads                        | ✅   |
-| `/endpoints`           | Complete API endpoints documentation       | ❌   |
+| `/endpoints`          | Complete API endpoints documentation       | ❌   |
 | `/visualGraph`        | GunDB visual explorer (public reads)       | ⚠️*  |
 | `/graph`              | Alternate Gun graph viewer                 | ⚠️*  |
 | `/charts`             | Charts and analytics dashboard             | ✅   |
-| `/chat`               | Demo public chat                           | ❌   |
-| `/subscription`       | x402 subscription management               | ❌   |
+| `/registry-dashboard` | On-chain registry management dashboard     | ✅   |
 
 `⚠️` The explorers browse public coordinates without a token but prompt for the admin token when write access is required.
 
@@ -216,6 +223,9 @@ The admin dashboards rely on `lib/admin-auth.js` to sync the token across tabs. 
 ### Holster Relay
 - `GET /holster-status` – Check Holster relay status and configuration.
 
+### Blockchain RPC
+- `GET /rpc-status` – Check status of all configured blockchain RPC endpoints (public).
+
 ### IPFS Management
 - `POST /api/v1/ipfs/upload` – Upload files to IPFS (admin, supports multipart/form-data with optional encryption).
 - `GET /api/v1/ipfs/cat/:cid` – Stream IPFS content (aligned with Kubo's `/api/v0/cat`).
@@ -223,7 +233,11 @@ The admin dashboards rely on `lib/admin-auth.js` to sync the token across tabs. 
 - `GET /api/v1/ipfs/cat/:cid/decrypt` – Get and decrypt SEA-encrypted IPFS content (requires token query param).
 - `POST /api/v1/ipfs/pin/add` – Pin content to IPFS (admin, aligned with Kubo's `/api/v0/pin/add`).
 - `POST /api/v1/ipfs/pin/rm` – Remove a pin from IPFS (admin, aligned with Kubo's `/api/v0/pin/rm`).
+- `POST /api/v1/ipfs/pins/rm` – Batch remove multiple pins from IPFS (admin).
 - `GET /api/v1/ipfs/pin/ls` – List all pinned content (admin, aligned with Kubo's `/api/v0/pin/ls`).
+- `GET /api/v1/ipfs/stat/:cid` – Get IPFS object/block statistics for a CID (public).
+- `GET /api/v1/ipfs/test` – Test IPFS API connectivity (admin).
+- `POST /api/v1/ipfs/api/:endpoint(*)` – Generic IPFS API proxy endpoint (admin).
 - `GET /api/v1/ipfs/status` – Check IPFS node connectivity and status (public).
 - `GET /api/v1/ipfs/version` – Get IPFS version information (public).
 - `GET /api/v1/ipfs/repo/stat` – Get IPFS repository statistics (admin).
@@ -251,6 +265,10 @@ The admin dashboards rely on `lib/admin-auth.js` to sync the token across tabs. 
 - `POST /api/v1/system/peers/add` – Add a GunDB peer (admin).
 - `GET /api/v1/services/status` – Get status of all services (IPFS, Relay, etc.) (public).
 - `POST /api/v1/services/:service/restart` – Restart a specific service (stub endpoint, admin).
+- `GET /rpc-status` – Check status of all configured blockchain RPC endpoints (public).
+- `GET /ipfs-status` – Check IPFS node status (public, legacy endpoint).
+- `GET /metrics` – Get detailed metrics and statistics (admin).
+- `GET /api/v1/contracts` – Get smart contract configuration for all chains (public).
 - `GET /api/v1/debug/mb-usage/:userAddress` – Get storage usage in MB for a specific user address (admin).
 - `GET /api/v1/debug/user-mb-usage/:identifier` – Get storage usage for a user identifier (admin).
 - `POST /api/v1/debug/user-mb-usage/:identifier/reset` – Reset storage usage counter for a user (admin).
@@ -279,6 +297,7 @@ The admin dashboards rely on `lib/admin-auth.js` to sync the token across tabs. 
 - `GET /api/v1/x402/config` – Get x402 configuration (public).
 - `GET /api/v1/x402/relay-storage` – Get relay's global storage status (public).
 - `GET /api/v1/x402/relay-storage/detailed` – Get all IPFS pins with sizes (admin).
+- `GET /api/v1/x402/recommend` – Get subscription tier recommendation based on usage (public).
 
 ### Network Federation & Storage Proofs
 - `GET /api/v1/network/relays` – Discover all relays in the network (public).
@@ -319,15 +338,23 @@ The admin dashboards rely on `lib/admin-auth.js` to sync the token across tabs. 
 - `POST /api/v1/registry/deal/register` – Register storage deal on-chain.
 - `POST /api/v1/registry/deal/complete` – Mark deal as completed.
 - `GET /api/v1/registry/deals` – Get all on-chain deals for this relay.
+- `POST /api/v1/registry/grief/missed-proof` – Report missed proof for slashing (admin).
+- `POST /api/v1/registry/grief/data-loss` – Report data loss for slashing (admin).
+- `POST /api/v1/registry/deal/grief` – Report deal griefing (admin).
 
 ### Storage Deals (Per-File Contracts)
 - `GET /api/v1/deals/pricing` – Get pricing tiers and calculate quotes (public).
 - `GET /api/v1/deals/overhead` – Calculate erasure coding overhead (public).
 - `POST /api/v1/deals/create` – Create a new storage deal (returns payment requirements).
 - `GET /api/v1/deals/:dealId` – Get deal information (public).
+- `POST /api/v1/deals/upload` – Upload file and create deal in one step (admin).
 - `POST /api/v1/deals/:dealId/activate` – Activate deal after payment (public).
 - `POST /api/v1/deals/:dealId/renew` – Renew an existing deal (public).
 - `POST /api/v1/deals/:dealId/terminate` – Terminate a deal early (admin).
+- `POST /api/v1/deals/:dealId/cancel` – Cancel a deal before activation (public).
+- `POST /api/v1/deals/:dealId/report` – Report deal issues or violations (public).
+- `GET /api/v1/deals/:dealId/verify` – Verify deal status and payment (public).
+- `GET /api/v1/deals/:dealId/verify-proof` – Verify storage proof for a deal (public).
 - `GET /api/v1/deals/by-cid/:cid` – Get all deals for a CID (public).
 - `GET /api/v1/deals/by-client/:address` – Get all deals for a client (public).
 - `GET /api/v1/deals/relay/active` – Get active deals for this relay (admin).
@@ -335,10 +362,6 @@ The admin dashboards rely on `lib/admin-auth.js` to sync the token across tabs. 
 ### Visual Graph
 - `GET /api/v1/visualGraph` – Visual graph explorer endpoint.
 - `/visualGraph/*` – Static assets backing the D3.js explorer.
-
-### Notes
-- `GET /api/v1/notes` – Notes endpoint.
-- `GET /api/v1/notes/regular` – Regular notes endpoint.
 
 ### Admin Pages
 - `GET /endpoints` – API endpoints documentation page (public).

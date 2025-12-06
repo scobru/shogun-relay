@@ -1,111 +1,37 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="shogun-dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Relay Registry - On-Chain Management</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+  <link href="https://unpkg.com/shogun-theme@1.0.0/styles/variables.css" rel="stylesheet" type="text/css" />
+  <link href="https://unpkg.com/shogun-theme@1.0.0/styles/base.css" rel="stylesheet" type="text/css" />
+  <link href="https://unpkg.com/shogun-theme@1.0.0/styles/daisyui-overrides.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="lib/admin-nav.js"></script>
+  <script src="lib/admin-auth.js"></script>
   <style>
-    :root {
-      --bg-primary: #0a0a0f;
-      --bg-secondary: #12121a;
-      --bg-card: #1a1a24;
-      --border: #2a2a3a;
-      --text-primary: #e8e8f0;
-      --text-secondary: #8888a0;
-      --accent: #3b82f6;
-      --accent-hover: #2563eb;
-      --success: #10b981;
-      --warning: #f59e0b;
-      --danger: #ef4444;
-      --purple: #8b5cf6;
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
     body {
-      font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
-      background: var(--bg-primary);
-      color: var(--text-primary);
+      background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
       min-height: 100vh;
-      line-height: 1.6;
     }
 
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 2rem;
+    .hero-gradient {
+      background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
     }
 
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 2rem;
-      padding-bottom: 1rem;
-      border-bottom: 1px solid var(--border);
+    .service-card {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 1px solid #404040;
+      background-color: #282828;
+      border-radius: 1rem;
     }
 
-    h1 {
-      font-size: 1.5rem;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    h1::before {
-      content: '';
-      width: 8px;
-      height: 8px;
-      background: var(--accent);
-      border-radius: 50%;
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-
-    .chain-badge {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      padding: 0.5rem 1rem;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      color: var(--text-secondary);
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-      gap: 1.5rem;
-    }
-
-    .card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.5rem;
-    }
-
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1.25rem;
-      padding-bottom: 0.75rem;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .card-title {
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--text-primary);
+    .service-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      border-color: rgba(255, 105, 180, 0.3);
     }
 
     .status-badge {
@@ -115,237 +41,15 @@
       font-weight: 500;
     }
 
-    .status-active { background: rgba(16, 185, 129, 0.15); color: var(--success); }
-    .status-inactive { background: rgba(136, 136, 160, 0.15); color: var(--text-secondary); }
-    .status-unstaking { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
-    .status-slashed { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
-    .status-not-configured { background: rgba(139, 92, 246, 0.15); color: var(--purple); }
-
-    .stat-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1rem;
-    }
-
-    .stat {
-      background: var(--bg-secondary);
-      padding: 1rem;
-      border-radius: 8px;
-    }
-
-    .stat-label {
-      font-size: 0.75rem;
-      color: var(--text-secondary);
-      margin-bottom: 0.25rem;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .stat-value {
-      font-size: 1.25rem;
-      font-weight: 600;
-    }
-
-    .stat-value.accent { color: var(--accent); }
-    .stat-value.success { color: var(--success); }
-    .stat-value.warning { color: var(--warning); }
-
-    .form-group {
-      margin-bottom: 1rem;
-    }
-
-    label {
-      display: block;
-      font-size: 0.8rem;
-      color: var(--text-secondary);
-      margin-bottom: 0.5rem;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    input, select {
-      width: 100%;
-      padding: 0.75rem 1rem;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text-primary);
-      font-family: inherit;
-      font-size: 0.9rem;
-      transition: border-color 0.2s;
-    }
-
-    input:focus, select:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-
-    input::placeholder {
-      color: var(--text-secondary);
-    }
-
-    .form-hint {
-      display: block;
-      margin-top: 0.25rem;
-      font-size: 0.75rem;
-      color: var(--text-secondary);
-      opacity: 0.7;
-    }
-
-    button {
-      padding: 0.75rem 1.5rem;
-      background: var(--accent);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-family: inherit;
-      font-size: 0.9rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background 0.2s;
-      width: 100%;
-    }
-
-    button:hover:not(:disabled) {
-      background: var(--accent-hover);
-    }
-
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    button.secondary {
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text-primary);
-    }
-
-    button.secondary:hover:not(:disabled) {
-      background: var(--bg-secondary);
-    }
-
-    button.danger {
-      background: var(--danger);
-    }
-
-    button.danger:hover:not(:disabled) {
-      background: #dc2626;
-    }
-
-    button.success {
-      background: var(--success);
-    }
-
-    .button-group {
-      display: flex;
-      gap: 0.5rem;
-      margin-top: 1rem;
-    }
-
-    .button-group button {
-      flex: 1;
-    }
-
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 0.75rem 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.9rem;
-    }
-
-    .info-row:last-child {
-      border-bottom: none;
-    }
-
-    .info-label {
-      color: var(--text-secondary);
-    }
-
-    .info-value {
-      color: var(--text-primary);
-      font-weight: 500;
-      text-align: right;
-      word-break: break-all;
-    }
-
-    .info-value a {
-      color: var(--accent);
-      text-decoration: none;
-    }
-
-    .info-value a:hover {
-      text-decoration: underline;
-    }
-
-    .alert {
-      padding: 1rem;
-      border-radius: 8px;
-      margin-bottom: 1rem;
-      font-size: 0.9rem;
-    }
-
-    .alert-info {
-      background: rgba(59, 130, 246, 0.1);
-      border: 1px solid rgba(59, 130, 246, 0.3);
-      color: var(--accent);
-    }
-
-    .alert-warning {
-      background: rgba(245, 158, 11, 0.1);
-      border: 1px solid rgba(245, 158, 11, 0.3);
-      color: var(--warning);
-    }
-
-    .alert-success {
-      background: rgba(16, 185, 129, 0.1);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      color: var(--success);
-    }
-
-    .alert-error {
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      color: var(--danger);
-    }
-
-    .loading {
-      display: none;
-      text-align: center;
-      padding: 2rem;
-      color: var(--text-secondary);
-    }
-
-    .loading.active {
-      display: block;
-    }
-
-    .spinner {
-      width: 24px;
-      height: 24px;
-      border: 2px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 1rem;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    .hidden {
-      display: none !important;
-    }
+    .status-active { background: rgba(76, 175, 80, 0.15); color: #4CAF50; }
+    .status-inactive { background: rgba(136, 136, 160, 0.15); color: #A0A0A0; }
+    .status-unstaking { background: rgba(255, 165, 0, 0.15); color: #FFA500; }
+    .status-slashed { background: rgba(244, 67, 54, 0.15); color: #F44336; }
+    .status-not-configured { background: rgba(139, 92, 246, 0.15); color: #8B5CF6; }
 
     .address {
       font-family: 'SF Mono', monospace;
       font-size: 0.85rem;
-    }
-
-    .full-width {
-      grid-column: 1 / -1;
     }
 
     .deals-table {
@@ -359,11 +63,11 @@
     .deals-table td {
       padding: 0.75rem;
       text-align: left;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid #404040;
     }
 
     .deals-table th {
-      color: var(--text-secondary);
+      color: #A0A0A0;
       font-weight: 500;
       text-transform: uppercase;
       font-size: 0.7rem;
@@ -371,188 +75,222 @@
     }
 
     .deals-table tr:hover {
-      background: var(--bg-secondary);
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 2rem;
-      color: var(--text-secondary);
-    }
-
-    @media (max-width: 768px) {
-      .container {
-        padding: 1rem;
-      }
-
-      .grid {
-        grid-template-columns: 1fr;
-      }
-
-      .stat-grid {
-        grid-template-columns: 1fr;
-      }
-
-      header {
-        flex-direction: column;
-        gap: 1rem;
-        text-align: center;
-      }
+      background: rgba(64, 64, 64, 0.3);
     }
   </style>
 </head>
-<body>
-  <div class="container">
-    <header>
-      <h1>Relay Registry</h1>
-      <div class="chain-badge" id="chainBadge">Loading...</div>
-    </header>
-
-    <div id="alerts"></div>
-
-    <div class="grid">
-      <!-- Server Relay Key Card -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Server Relay Key</span>
+<body class="antialiased">
+  <div class="hero-gradient min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+      <!-- Header -->
+      <header class="mb-12">
+        <div class="flex items-center mb-6">
+          <a href="/" class="flex items-center gap-2 text-[#A0A0A0] hover:text-[#FF69B4] transition-colors group">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            <span>Back to Control Panel</span>
+          </a>
         </div>
-        <div id="serverKeySection">
-          <div class="info-row">
-            <span class="info-label">Relay Public Key</span>
-            <span class="info-value address" id="serverRelayPubKey" style="font-size: 0.75rem;">Loading...</span>
-          </div>
-          <button class="secondary" onclick="useServerKey()" style="margin-top: 0.5rem;">Use Server Relay Key</button>
-        </div>
-      </div>
-
-      <!-- Status Card -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Registration Status</span>
-          <span class="status-badge status-inactive" id="statusBadge">Loading</span>
-        </div>
-        <div id="statusContent">
-          <div class="loading active">
-            <div class="spinner"></div>
-            <p>Loading status...</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Balances Card -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Wallet Balances</span>
-        </div>
-        <div id="balancesContent">
-          <div class="loading active">
-            <div class="spinner"></div>
-            <p>Loading balances...</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Registration Card -->
-      <div class="card" id="registerCard">
-        <div class="card-header">
-          <span class="card-title">Register Relay</span>
-        </div>
-        <div id="registerForm">
-          <div class="form-group">
-            <label>Endpoint URL</label>
-            <input type="text" id="endpoint" placeholder="https://your-relay.com">
-          </div>
-          <div class="form-group">
-            <label>GunDB Public Key</label>
-            <input type="text" id="gunPubKey" placeholder="Your GunDB public key (or use server key)">
-            <small class="form-hint">Use the server's relay key button above to auto-fill</small>
-          </div>
-          <div class="form-group">
-            <label>Stake Amount (USDC)</label>
-            <input type="number" id="stakeAmount" value="100" min="0.001" step="0.001">
-          </div>
-          <div class="form-group">
-            <label>Griefing Ratio (Basis Points, Optional)</label>
-            <input type="number" id="griefingRatio" placeholder="0 = use default (500 bps)" min="0" step="1">
-            <small class="form-hint">Custom griefing ratio. 0 = use contract default (500 bps = 5% cost per 1% slash)</small>
-          </div>
-          <button id="registerBtn" onclick="registerRelay()">Register On-Chain</button>
-        </div>
-      </div>
-
-      <!-- Staking Card -->
-      <div class="card" id="stakingCard">
-        <div class="card-header">
-          <span class="card-title">Stake Management</span>
-        </div>
-        <div id="stakingContent">
-          <div class="stat-grid">
-            <div class="stat">
-              <div class="stat-label">Current Stake</div>
-              <div class="stat-value accent" id="currentStake">-</div>
+        
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div class="flex items-center gap-4">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9]">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
             </div>
-            <div class="stat">
-              <div class="stat-label">Total Slashed</div>
-              <div class="stat-value warning" id="totalSlashed">-</div>
+            <div>
+              <h1 class="text-3xl md:text-4xl font-bold text-[#FFFFFF]">Relay Registry</h1>
+              <p class="text-[#8B94FF]">On-chain relay management and staking</p>
             </div>
           </div>
-          
-          <div class="form-group" style="margin-top: 1rem;">
-            <label>Increase Stake (USDC)</label>
-            <input type="number" id="increaseAmount" placeholder="100" min="0.001" step="0.001">
-          </div>
-          
-          <div class="button-group">
-            <button onclick="increaseStake()">Increase Stake</button>
-            <button class="danger" onclick="requestUnstake()">Request Unstake</button>
-          </div>
+          <div class="badge badge-outline bg-[#282828] border-[#606060] text-[#E0E0E0] text-base px-4 py-3" id="chainBadge">Loading...</div>
+        </div>
+      </header>
 
-          <div id="unstakeInfo" class="alert alert-warning hidden" style="margin-top: 1rem;">
-            Unstaking in progress. Withdraw available after delay period.
-            <button class="success" onclick="withdrawStake()" style="margin-top: 0.5rem;">Withdraw Stake</button>
-          </div>
-        </div>
-      </div>
+      <div id="alerts" class="mb-6"></div>
 
-      <!-- Update Card -->
-      <div class="card" id="updateCard">
-        <div class="card-header">
-          <span class="card-title">Update Relay Info</span>
-        </div>
-        <div class="form-group">
-          <label>New Endpoint (optional)</label>
-          <input type="text" id="newEndpoint" placeholder="https://new-endpoint.com">
-        </div>
-        <div class="form-group">
-          <label>New GunDB Public Key (optional)</label>
-          <input type="text" id="newGunPubKey" placeholder="Leave empty to keep current">
-        </div>
-        <button onclick="updateRelay()">Update On-Chain</button>
-      </div>
-
-      <!-- Registry Params Card -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Registry Parameters</span>
-        </div>
-        <div id="paramsContent">
-          <div class="loading active">
-            <div class="spinner"></div>
-            <p>Loading params...</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <!-- Server Relay Key Card -->
+        <div class="service-card card shadow-xl">
+          <div class="card-body p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="card-title text-lg text-[#FF69B4]">Server Relay Key</h2>
+            </div>
+            <div id="serverKeySection">
+              <div class="flex justify-between items-center mb-3">
+                <span class="text-[#E0E0E0] text-sm">Relay Public Key</span>
+                <span class="info-value address text-[#FFFFFF] text-xs" id="serverRelayPubKey">Loading...</span>
+              </div>
+              <button onclick="useServerKey()" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium w-full">Use Server Relay Key</button>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Deals Card -->
-      <div class="card full-width" id="dealsCard">
-        <div class="card-header">
-          <span class="card-title">On-Chain Deals</span>
-          <button class="secondary" onclick="loadDeals()" style="width: auto; padding: 0.5rem 1rem;">Refresh</button>
+        <!-- Status Card -->
+        <div class="service-card card shadow-xl">
+          <div class="card-body p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="card-title text-lg text-[#FF69B4]">Registration Status</h2>
+              <span class="status-badge status-inactive" id="statusBadge">Loading</span>
+            </div>
+            <div id="statusContent">
+              <div class="flex justify-center items-center py-8">
+                <span class="loading loading-spinner loading-md text-[#FF69B4]"></span>
+                <span class="ml-3 text-[#E0E0E0]">Loading status...</span>
+              </div>
+            </div>
+          </div>
         </div>
-        <div id="dealsContent">
-          <div class="loading active">
-            <div class="spinner"></div>
-            <p>Loading deals...</p>
+
+        <!-- Balances Card -->
+        <div class="service-card card shadow-xl">
+          <div class="card-body p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="card-title text-lg text-[#FF69B4]">Wallet Balances</h2>
+            </div>
+            <div id="balancesContent">
+              <div class="flex justify-center items-center py-8">
+                <span class="loading loading-spinner loading-md text-[#FF69B4]"></span>
+                <span class="ml-3 text-[#E0E0E0]">Loading balances...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Registration Card -->
+        <div class="service-card card shadow-xl" id="registerCard">
+          <div class="card-body p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="card-title text-lg text-[#FF69B4]">Register Relay</h2>
+            </div>
+            <div id="registerForm">
+              <div class="form-control mb-4">
+                <label class="label">
+                  <span class="label-text text-[#E0E0E0] text-sm uppercase tracking-wide">Endpoint URL</span>
+                </label>
+                <input type="text" id="endpoint" placeholder="https://your-relay.com" class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
+              </div>
+              <div class="form-control mb-4">
+                <label class="label">
+                  <span class="label-text text-[#E0E0E0] text-sm uppercase tracking-wide">GunDB Public Key</span>
+                </label>
+                <input type="text" id="gunPubKey" placeholder="Your GunDB public key (or use server key)" class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
+                <label class="label">
+                  <span class="label-text-alt text-[#A0A0A0] text-xs">Use the server's relay key button above to auto-fill</span>
+                </label>
+              </div>
+              <div class="form-control mb-4">
+                <label class="label">
+                  <span class="label-text text-[#E0E0E0] text-sm uppercase tracking-wide">Stake Amount (USDC)</span>
+                </label>
+                <input type="number" id="stakeAmount" value="100" min="0.001" step="0.001" class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
+              </div>
+              <div class="form-control mb-4">
+                <label class="label">
+                  <span class="label-text text-[#E0E0E0] text-sm uppercase tracking-wide">Griefing Ratio (Basis Points, Optional)</span>
+                </label>
+                <input type="number" id="griefingRatio" placeholder="0 = use default (500 bps)" min="0" step="1" class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
+                <label class="label">
+                  <span class="label-text-alt text-[#A0A0A0] text-xs">Custom griefing ratio. 0 = use contract default (500 bps = 5% cost per 1% slash)</span>
+                </label>
+              </div>
+              <button id="registerBtn" onclick="registerRelay()" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium w-full">Register On-Chain</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Staking Card -->
+        <div class="service-card card shadow-xl" id="stakingCard">
+          <div class="card-body p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="card-title text-lg text-[#FF69B4]">Stake Management</h2>
+            </div>
+            <div id="stakingContent">
+              <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="bg-[#1A1A1A] p-4 rounded-xl border border-[#404040]">
+                  <div class="text-[#A0A0A0] text-xs uppercase tracking-wide mb-1">Current Stake</div>
+                  <div class="text-[#3B82F6] text-xl font-semibold" id="currentStake">-</div>
+                </div>
+                <div class="bg-[#1A1A1A] p-4 rounded-xl border border-[#404040]">
+                  <div class="text-[#A0A0A0] text-xs uppercase tracking-wide mb-1">Total Slashed</div>
+                  <div class="text-[#FFA500] text-xl font-semibold" id="totalSlashed">-</div>
+                </div>
+              </div>
+              
+              <div class="form-control mb-4">
+                <label class="label">
+                  <span class="label-text text-[#E0E0E0] text-sm uppercase tracking-wide">Increase Stake (USDC)</span>
+                </label>
+                <input type="number" id="increaseAmount" placeholder="100" min="0.001" step="0.001" class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
+              </div>
+              
+              <div class="flex gap-2">
+                <button onclick="increaseStake()" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium flex-1">Increase Stake</button>
+                <button onclick="requestUnstake()" class="btn bg-[#F44336] hover:bg-[#DC2626] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium flex-1">Request Unstake</button>
+              </div>
+
+              <div id="unstakeInfo" class="alert alert-warning hidden mt-4 bg-[#FFA500]/20 border-[#FFA500]/30 text-[#FFA500] rounded-xl">
+                <div>
+                  <span>Unstaking in progress. Withdraw available after delay period.</span>
+                  <button onclick="withdrawStake()" class="btn btn-sm bg-[#4CAF50] hover:bg-[#45A049] border-0 text-[#FFFFFF] rounded-xl mt-2 w-full">Withdraw Stake</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Update Card -->
+        <div class="service-card card shadow-xl" id="updateCard">
+          <div class="card-body p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="card-title text-lg text-[#FF69B4]">Update Relay Info</h2>
+            </div>
+            <div class="form-control mb-4">
+              <label class="label">
+                <span class="label-text text-[#E0E0E0] text-sm uppercase tracking-wide">New Endpoint (optional)</span>
+              </label>
+              <input type="text" id="newEndpoint" placeholder="https://new-endpoint.com" class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
+            </div>
+            <div class="form-control mb-4">
+              <label class="label">
+                <span class="label-text text-[#E0E0E0] text-sm uppercase tracking-wide">New GunDB Public Key (optional)</span>
+              </label>
+              <input type="text" id="newGunPubKey" placeholder="Leave empty to keep current" class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
+            </div>
+            <button onclick="updateRelay()" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium w-full">Update On-Chain</button>
+          </div>
+        </div>
+
+        <!-- Registry Params Card -->
+        <div class="service-card card shadow-xl">
+          <div class="card-body p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="card-title text-lg text-[#FF69B4]">Registry Parameters</h2>
+            </div>
+            <div id="paramsContent">
+              <div class="flex justify-center items-center py-8">
+                <span class="loading loading-spinner loading-md text-[#FF69B4]"></span>
+                <span class="ml-3 text-[#E0E0E0]">Loading params...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Deals Card -->
+        <div class="service-card card shadow-xl col-span-1 md:col-span-2 lg:col-span-3" id="dealsCard">
+          <div class="card-body p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="card-title text-lg text-[#FF69B4]">On-Chain Deals</h2>
+              <button onclick="loadDeals()" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Refresh</button>
+            </div>
+            <div id="dealsContent">
+              <div class="flex justify-center items-center py-8">
+                <span class="loading loading-spinner loading-md text-[#FF69B4]"></span>
+                <span class="ml-3 text-[#E0E0E0]">Loading deals...</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -572,7 +310,10 @@
         const data = await res.json();
         
         const keyDisplay = document.getElementById('serverRelayPubKey');
-        if (data.relayPub) {
+        if (data.relay && data.relay.pub) {
+          keyDisplay.textContent = data.relay.pub;
+          keyDisplay.dataset.fullKey = data.relay.pub;
+        } else if (data.relayPub) {
           keyDisplay.textContent = data.relayPub;
           keyDisplay.dataset.fullKey = data.relayPub;
         } else {
@@ -636,7 +377,7 @@
           badge.textContent = 'Not Configured';
           badge.className = 'status-badge status-not-configured';
           content.innerHTML = `
-            <div class="alert alert-warning">
+            <div class="alert alert-warning bg-[#FFA500]/20 border-[#FFA500]/30 text-[#FFA500] rounded-xl">
               RELAY_PRIVATE_KEY not configured. Set it in your .env file to enable on-chain features.
             </div>
           `;
@@ -652,17 +393,17 @@
           badge.textContent = 'Not Registered';
           badge.className = 'status-badge status-inactive';
           content.innerHTML = `
-            <div class="info-row">
-              <span class="info-label">Wallet Address</span>
-              <span class="info-value address">${truncateAddress(relayStatus.relayAddress)}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Registry</span>
-              <span class="info-value">
-                <a href="${config.explorerUrl}/address/${relayStatus.registryAddress}" target="_blank">
+            <div class="space-y-2">
+              <div class="flex justify-between items-center py-2 border-b border-[#404040]">
+                <span class="text-[#A0A0A0] text-sm">Wallet Address</span>
+                <span class="address text-[#FFFFFF] text-sm font-medium">${truncateAddress(relayStatus.relayAddress)}</span>
+              </div>
+              <div class="flex justify-between items-center py-2">
+                <span class="text-[#A0A0A0] text-sm">Registry</span>
+                <a href="${config.explorerUrl}/address/${relayStatus.registryAddress}" target="_blank" class="address text-[#3B82F6] text-sm hover:underline">
                   ${truncateAddress(relayStatus.registryAddress)}
                 </a>
-              </span>
+              </div>
             </div>
           `;
           // Hide staking and update cards
@@ -678,25 +419,25 @@
         badge.className = `status-badge status-${relay.status.toLowerCase()}`;
         
         content.innerHTML = `
-          <div class="info-row">
-            <span class="info-label">Address</span>
-            <span class="info-value">
-              <a href="${config.explorerUrl}/address/${relayStatus.relayAddress}" target="_blank" class="address">
+          <div class="space-y-2">
+            <div class="flex justify-between items-center py-2 border-b border-[#404040]">
+              <span class="text-[#A0A0A0] text-sm">Address</span>
+              <a href="${config.explorerUrl}/address/${relayStatus.relayAddress}" target="_blank" class="address text-[#3B82F6] text-sm hover:underline">
                 ${truncateAddress(relayStatus.relayAddress)}
               </a>
-            </span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">Endpoint</span>
-            <span class="info-value">${relay.endpoint}</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">Registered</span>
-            <span class="info-value">${new Date(relay.registeredAt).toLocaleDateString()}</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">Total Deals</span>
-            <span class="info-value">${relay.totalDeals}</span>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-[#404040]">
+              <span class="text-[#A0A0A0] text-sm">Endpoint</span>
+              <span class="text-[#FFFFFF] text-sm font-medium">${relay.endpoint}</span>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-[#404040]">
+              <span class="text-[#A0A0A0] text-sm">Registered</span>
+              <span class="text-[#FFFFFF] text-sm font-medium">${new Date(relay.registeredAt).toLocaleDateString()}</span>
+            </div>
+            <div class="flex justify-between items-center py-2">
+              <span class="text-[#A0A0A0] text-sm">Total Deals</span>
+              <span class="text-[#FFFFFF] text-sm font-medium">${relay.totalDeals}</span>
+            </div>
           </div>
         `;
         
@@ -717,8 +458,10 @@
         
       } catch (e) {
         console.error('Failed to load status:', e);
-        document.getElementById('statusContent').innerHTML = `
-          <div class="alert alert-error">Failed to load status: ${e.message}</div>
+        content.innerHTML = `
+          <div class="alert alert-error bg-[#F44336]/20 border-[#F44336]/30 text-[#F44336] rounded-xl">
+            Failed to load status: ${e.message}
+          </div>
         `;
       }
     }
@@ -731,35 +474,35 @@
         
         if (!data.success) {
           content.innerHTML = `
-            <div class="alert alert-warning">${data.error}</div>
+            <div class="alert alert-warning bg-[#FFA500]/20 border-[#FFA500]/30 text-[#FFA500] rounded-xl">
+              ${data.error}
+            </div>
           `;
           return;
         }
         
         content.innerHTML = `
-          <div class="stat-grid">
-            <div class="stat">
-              <div class="stat-label">ETH (Gas)</div>
-              <div class="stat-value ${parseFloat(data.balances.eth) < 0.01 ? 'warning' : 'success'}">
+          <div class="grid grid-cols-2 gap-4 mb-4">
+            <div class="bg-[#1A1A1A] p-4 rounded-xl border border-[#404040]">
+              <div class="text-[#A0A0A0] text-xs uppercase tracking-wide mb-1">ETH (Gas)</div>
+              <div class="text-xl font-semibold ${parseFloat(data.balances.eth) < 0.01 ? 'text-[#FFA500]' : 'text-[#4CAF50]'}">
                 ${parseFloat(data.balances.eth).toFixed(4)}
               </div>
             </div>
-            <div class="stat">
-              <div class="stat-label">USDC (Stake)</div>
-              <div class="stat-value accent">${parseFloat(data.balances.usdc).toFixed(2)}</div>
+            <div class="bg-[#1A1A1A] p-4 rounded-xl border border-[#404040]">
+              <div class="text-[#A0A0A0] text-xs uppercase tracking-wide mb-1">USDC (Stake)</div>
+              <div class="text-[#3B82F6] text-xl font-semibold">${parseFloat(data.balances.usdc).toFixed(2)}</div>
             </div>
           </div>
-          <div class="info-row" style="margin-top: 1rem;">
-            <span class="info-label">Wallet</span>
-            <span class="info-value">
-              <a href="${config?.explorerUrl}/address/${data.relayAddress}" target="_blank" class="address">
-                ${truncateAddress(data.relayAddress)}
-              </a>
-            </span>
+          <div class="flex justify-between items-center py-2 border-t border-[#404040] pt-4">
+            <span class="text-[#A0A0A0] text-sm">Wallet</span>
+            <a href="${config?.explorerUrl}/address/${data.relayAddress}" target="_blank" class="address text-[#3B82F6] text-sm hover:underline">
+              ${truncateAddress(data.relayAddress)}
+            </a>
           </div>
         `;
       } catch (e) {
-        content.innerHTML = `<div class="alert alert-error">Failed to load balances</div>`;
+        content.innerHTML = `<div class="alert alert-error bg-[#F44336]/20 border-[#F44336]/30 text-[#F44336] rounded-xl">Failed to load balances</div>`;
       }
     }
 
@@ -770,33 +513,31 @@
         const data = await res.json();
         
         content.innerHTML = `
-          <div class="info-row">
-            <span class="info-label">Minimum Stake</span>
-            <span class="info-value">${data.params.minStake} USDC</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">Unstaking Delay</span>
-            <span class="info-value">${data.params.unstakingDelayDays} days</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">Registry</span>
-            <span class="info-value">
-              <a href="${config?.explorerUrl}/address/${data.registryAddress}" target="_blank" class="address">
+          <div class="space-y-2">
+            <div class="flex justify-between items-center py-2 border-b border-[#404040]">
+              <span class="text-[#A0A0A0] text-sm">Minimum Stake</span>
+              <span class="text-[#FFFFFF] text-sm font-medium">${data.params.minStake} USDC</span>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-[#404040]">
+              <span class="text-[#A0A0A0] text-sm">Unstaking Delay</span>
+              <span class="text-[#FFFFFF] text-sm font-medium">${data.params.unstakingDelayDays} days</span>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-[#404040]">
+              <span class="text-[#A0A0A0] text-sm">Registry</span>
+              <a href="${config?.explorerUrl}/address/${data.registryAddress}" target="_blank" class="address text-[#3B82F6] text-sm hover:underline">
                 ${truncateAddress(data.registryAddress)}
               </a>
-            </span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">USDC Token</span>
-            <span class="info-value">
-              <a href="${config?.explorerUrl}/address/${data.usdcAddress}" target="_blank" class="address">
+            </div>
+            <div class="flex justify-between items-center py-2">
+              <span class="text-[#A0A0A0] text-sm">USDC Token</span>
+              <a href="${config?.explorerUrl}/address/${data.usdcAddress}" target="_blank" class="address text-[#3B82F6] text-sm hover:underline">
                 ${truncateAddress(data.usdcAddress)}
               </a>
-            </span>
+            </div>
           </div>
         `;
       } catch (e) {
-        content.innerHTML = `<div class="alert alert-error">Failed to load params</div>`;
+        content.innerHTML = `<div class="alert alert-error bg-[#F44336]/20 border-[#F44336]/30 text-[#F44336] rounded-xl">Failed to load params</div>`;
       }
     }
 
@@ -807,12 +548,12 @@
         const data = await res.json();
         
         if (!data.success) {
-          content.innerHTML = `<div class="alert alert-warning">${data.error}</div>`;
+          content.innerHTML = `<div class="alert alert-warning bg-[#FFA500]/20 border-[#FFA500]/30 text-[#FFA500] rounded-xl">${data.error}</div>`;
           return;
         }
         
         if (data.deals.length === 0) {
-          content.innerHTML = `<div class="empty-state">No on-chain deals yet</div>`;
+          content.innerHTML = `<div class="text-center py-8 text-[#A0A0A0]">No on-chain deals yet</div>`;
           return;
         }
         
@@ -823,77 +564,79 @@
         const paidDeals = data.deals.filter(d => d.paymentStatus === 'paid').length;
         
         content.innerHTML = `
-          <div style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border);">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+          <div class="mb-4 p-4 bg-[#1A1A1A] rounded-xl border border-[#404040]">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
               <div>
-                <div style="color: var(--text-secondary); font-size: 0.85rem;">Total Deals</div>
-                <div style="color: var(--accent); font-size: 1.25rem; font-weight: 600;">${totalDeals}</div>
+                <div class="text-[#A0A0A0] text-xs mb-1">Total Deals</div>
+                <div class="text-[#3B82F6] text-xl font-semibold">${totalDeals}</div>
               </div>
               <div>
-                <div style="color: var(--text-secondary); font-size: 0.85rem;">Active</div>
-                <div style="color: var(--success); font-size: 1.25rem; font-weight: 600;">${activeDeals}</div>
+                <div class="text-[#A0A0A0] text-xs mb-1">Active</div>
+                <div class="text-[#4CAF50] text-xl font-semibold">${activeDeals}</div>
               </div>
               <div>
-                <div style="color: var(--text-secondary); font-size: 0.85rem;">Total Revenue</div>
-                <div style="color: var(--success); font-size: 1.25rem; font-weight: 600;">${totalRevenue.toFixed(4)} USDC</div>
+                <div class="text-[#A0A0A0] text-xs mb-1">Total Revenue</div>
+                <div class="text-[#4CAF50] text-xl font-semibold">${totalRevenue.toFixed(4)} USDC</div>
               </div>
               <div>
-                <div style="color: var(--text-secondary); font-size: 0.85rem;">Paid Deals</div>
-                <div style="color: var(--success); font-size: 1.25rem; font-weight: 600;">${paidDeals}</div>
+                <div class="text-[#A0A0A0] text-xs mb-1">Paid Deals</div>
+                <div class="text-[#4CAF50] text-xl font-semibold">${paidDeals}</div>
               </div>
             </div>
-            <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: 0.85rem;">
+            <div class="pt-3 border-t border-[#404040] text-[#A0A0A0] text-xs">
               ℹ️ Payment is automatically transferred to your relay wallet when you call registerDeal(). No manual withdrawal needed.
             </div>
           </div>
-          <table class="deals-table">
-            <thead>
-              <tr>
-                <th>CID</th>
-                <th>Client</th>
-                <th>Size</th>
-                <th>Price</th>
-                <th>Payment Status</th>
-                <th>Created</th>
-                <th>Expires</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${data.deals.map(d => {
-                const createdDate = d.createdAt ? new Date(d.createdAt).toLocaleDateString() : 'N/A';
-                const expiresDate = d.expiresAt ? new Date(d.expiresAt).toLocaleDateString() : 'N/A';
-                const paymentStatus = d.paymentStatus === 'paid' 
-                  ? '<span style="color: var(--success);">✅ Paid</span>' 
-                  : '<span style="color: var(--warning);">⏳ Pending</span>';
-                const statusBadge = d.active 
-                  ? '<span style="color: var(--success);">Active</span>' 
-                  : '<span style="color: var(--text-secondary);">Inactive</span>';
-                
-                const activateButton = d.paymentStatus === 'pending' && !d.active
-                  ? `<button onclick="activatePendingDeal('${d.dealId}', '${d.cid}')" class="btn btn-sm btn-primary" title="Activate this deal (will call registerDeal on-chain)">Activate</button>`
-                  : '';
-                
-                return `
+          <div class="overflow-x-auto">
+            <table class="deals-table">
+              <thead>
                 <tr>
-                  <td class="address" title="${d.cid}">${truncateCid(d.cid)}</td>
-                  <td class="address" title="${d.client}">${truncateAddress(d.client)}</td>
-                  <td>${d.sizeMB || '-'} MB</td>
-                  <td><strong>${d.priceUSDC || '0'} USDC</strong></td>
-                  <td>${paymentStatus}</td>
-                  <td>${createdDate}</td>
-                  <td>${expiresDate}</td>
-                  <td>${statusBadge}</td>
-                  <td>${activateButton}</td>
+                  <th>CID</th>
+                  <th>Client</th>
+                  <th>Size</th>
+                  <th>Price</th>
+                  <th>Payment Status</th>
+                  <th>Created</th>
+                  <th>Expires</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              `;
-              }).join('')}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                ${data.deals.map(d => {
+                  const createdDate = d.createdAt ? new Date(d.createdAt).toLocaleDateString() : 'N/A';
+                  const expiresDate = d.expiresAt ? new Date(d.expiresAt).toLocaleDateString() : 'N/A';
+                  const paymentStatus = d.paymentStatus === 'paid' 
+                    ? '<span class="text-[#4CAF50]">✅ Paid</span>' 
+                    : '<span class="text-[#FFA500]">⏳ Pending</span>';
+                  const statusBadge = d.active 
+                    ? '<span class="text-[#4CAF50]">Active</span>' 
+                    : '<span class="text-[#A0A0A0]">Inactive</span>';
+                  
+                  const activateButton = d.paymentStatus === 'pending' && !d.active
+                    ? `<button onclick="activatePendingDeal('${d.dealId}', '${d.cid}')" class="btn btn-sm bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl" title="Activate this deal (will call registerDeal on-chain)">Activate</button>`
+                    : '';
+                  
+                  return `
+                  <tr>
+                    <td class="address" title="${d.cid}">${truncateCid(d.cid)}</td>
+                    <td class="address" title="${d.client}">${truncateAddress(d.client)}</td>
+                    <td>${d.sizeMB || '-'} MB</td>
+                    <td><strong class="text-[#FFFFFF]">${d.priceUSDC || '0'} USDC</strong></td>
+                    <td>${paymentStatus}</td>
+                    <td>${createdDate}</td>
+                    <td>${expiresDate}</td>
+                    <td>${statusBadge}</td>
+                    <td>${activateButton}</td>
+                  </tr>
+                `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
         `;
       } catch (e) {
-        content.innerHTML = `<div class="alert alert-error">Failed to load deals</div>`;
+        content.innerHTML = `<div class="alert alert-error bg-[#F44336]/20 border-[#F44336]/30 text-[#F44336] rounded-xl">Failed to load deals</div>`;
       }
     }
 
@@ -1036,7 +779,15 @@
     function showAlert(type, message) {
       const alerts = document.getElementById('alerts');
       const alert = document.createElement('div');
-      alert.className = `alert alert-${type}`;
+      
+      const alertClasses = {
+        success: 'alert-success bg-[#4CAF50]/20 border-[#4CAF50]/30 text-[#4CAF50]',
+        error: 'alert-error bg-[#F44336]/20 border-[#F44336]/30 text-[#F44336]',
+        warning: 'alert-warning bg-[#FFA500]/20 border-[#FFA500]/30 text-[#FFA500]',
+        info: 'alert-info bg-[#3B82F6]/20 border-[#3B82F6]/30 text-[#3B82F6]'
+      };
+      
+      alert.className = `alert ${alertClasses[type] || alertClasses.info} rounded-xl p-4 mb-4`;
       alert.textContent = message;
       alerts.appendChild(alert);
       
@@ -1081,4 +832,3 @@
   </script>
 </body>
 </html>
-
