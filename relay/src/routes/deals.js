@@ -817,56 +817,68 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
     }
     
     // Pin the CID to IPFS to ensure it's stored on this relay
-    try {
-      console.log(`📌 Pinning CID ${deal.cid} for deal ${dealId}...`);
-      const IPFS_API_URL = process.env.IPFS_API_URL || 'http://127.0.0.1:5001';
-      const pinOptions = {
-        hostname: '127.0.0.1',
-        port: 5001,
-        path: `/api/v0/pin/add?arg=${encodeURIComponent(deal.cid)}`,
-        method: 'POST',
-        headers: { 'Content-Length': '0' },
-      };
-      
-      if (IPFS_API_TOKEN) {
-        pinOptions.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
-      }
-      
-      await new Promise((resolve, reject) => {
-        const req = http.request(pinOptions, (res) => {
-          let data = '';
-          res.on('data', chunk => data += chunk);
-          res.on('end', () => {
-            if (res.statusCode === 200) {
-              try {
-                const result = JSON.parse(data);
-                console.log(`✅ CID ${deal.cid} pinned successfully:`, result);
-                resolve(result);
-              } catch (e) {
-                console.log(`✅ CID ${deal.cid} pinned (response: ${data})`);
-                resolve(data);
+    // Note: This is done asynchronously and doesn't block activation
+    // The pin might take time if the CID needs to be fetched from the network
+    (async () => {
+      try {
+        console.log(`📌 Pinning CID ${deal.cid} for deal ${dealId}...`);
+        const IPFS_API_URL = process.env.IPFS_API_URL || 'http://127.0.0.1:5001';
+        const pinOptions = {
+          hostname: '127.0.0.1',
+          port: 5001,
+          path: `/api/v0/pin/add?arg=${encodeURIComponent(deal.cid)}`,
+          method: 'POST',
+          headers: { 'Content-Length': '0' },
+        };
+        
+        if (IPFS_API_TOKEN) {
+          pinOptions.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
+        }
+        
+        await new Promise((resolve, reject) => {
+          const req = http.request(pinOptions, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+              if (res.statusCode === 200) {
+                try {
+                  const result = JSON.parse(data);
+                  console.log(`✅ CID ${deal.cid} pinned successfully:`, result);
+                  // Note: Pin might still be processing in background
+                  // IPFS will fetch the content from network if not available locally
+                  resolve(result);
+                } catch (e) {
+                  console.log(`✅ CID ${deal.cid} pinned (response: ${data})`);
+                  resolve(data);
+                }
+              } else {
+                // Check if error is "already pinned"
+                if (data.includes('already pinned') || data.includes('is already pinned')) {
+                  console.log(`ℹ️ CID ${deal.cid} was already pinned`);
+                  resolve(null);
+                } else {
+                  console.warn(`⚠️ Failed to pin CID ${deal.cid}: ${res.statusCode} - ${data}`);
+                  resolve(null); // Don't reject - pin might already exist
+                }
               }
-            } else {
-              console.warn(`⚠️ Failed to pin CID ${deal.cid}: ${res.statusCode} - ${data}`);
-              resolve(null); // Don't reject - pin might already exist
-            }
+            });
           });
+          req.on('error', (err) => {
+            console.warn(`⚠️ Error pinning CID ${deal.cid}:`, err.message);
+            resolve(null); // Don't fail activation if pin fails
+          });
+          req.setTimeout(60000, () => {
+            req.destroy();
+            console.warn(`⚠️ Pin timeout for CID ${deal.cid} (this is normal if CID needs to be fetched from network)`);
+            resolve(null);
+          });
+          req.end();
         });
-        req.on('error', (err) => {
-          console.warn(`⚠️ Error pinning CID ${deal.cid}:`, err.message);
-          resolve(null); // Don't fail activation if pin fails
-        });
-        req.setTimeout(30000, () => {
-          req.destroy();
-          console.warn(`⚠️ Pin timeout for CID ${deal.cid}`);
-          resolve(null);
-        });
-        req.end();
-      });
-    } catch (pinError) {
-      console.warn(`⚠️ Error pinning CID ${deal.cid}:`, pinError.message);
-      // Don't fail the activation if pin fails - CID might already be pinned or IPFS might be slow
-    }
+      } catch (pinError) {
+        console.warn(`⚠️ Error pinning CID ${deal.cid}:`, pinError.message);
+        // Don't fail the activation if pin fails - CID might already be pinned or IPFS might be slow
+      }
+    })(); // Execute asynchronously without blocking
     
     // Remove from pending cache since it's now activated
     removeCachedDeal(dealId);
@@ -1538,17 +1550,35 @@ router.get('/:dealId/verify', async (req, res) => {
     }
     
     // 2. Check if pinned
+    // Note: Pin check might fail if IPFS is still processing the pin (e.g., downloading from network)
     let isPinned = false;
+    let pinCheckError = null;
     try {
+      // Try to get pin info for specific CID
       const pinResult = await makeIpfsRequest(`/pin/ls?arg=${encodeURIComponent(cid)}&type=all`);
-      // If pin/ls returns successfully, the CID is pinned
-      if (pinResult && (pinResult.Keys || pinResult.Type === 'recursive' || pinResult.Type === 'direct')) {
+      // If pin/ls returns successfully with Keys, the CID is pinned
+      if (pinResult && pinResult.Keys && Object.keys(pinResult.Keys).length > 0) {
+        isPinned = true;
+      } else if (pinResult && (pinResult.Type === 'recursive' || pinResult.Type === 'direct')) {
         isPinned = true;
       }
     } catch (error) {
-      // If pin/ls fails, it means the CID is not pinned
-      isPinned = false;
-      console.log(`ℹ️ CID ${cid} is not pinned: ${error.message}`);
+      pinCheckError = error;
+      // If pin/ls with arg fails, try listing all pins and check if CID is in the list
+      try {
+        const allPins = await makeIpfsRequest(`/pin/ls?type=all`);
+        if (allPins && allPins.Keys) {
+          isPinned = cid in allPins.Keys;
+        }
+        if (!isPinned) {
+          // Don't log as error - pin might still be processing
+          console.log(`ℹ️ CID ${cid} pin status unclear (may still be processing): ${error.message}`);
+        }
+      } catch (listError) {
+        // If both fail, assume not pinned (but don't treat as error - pin might be processing)
+        isPinned = false;
+        console.log(`ℹ️ CID ${cid} pin check failed (may still be processing): ${error.message}`);
+      }
     }
     
     // 3. Try to fetch a small sample of data (first 256 bytes)
