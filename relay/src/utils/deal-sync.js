@@ -92,9 +92,18 @@ async function isPinned(cid) {
  * @returns {Promise<{success: boolean, error?: string, pending?: boolean}>}
  */
 async function pinCid(cid, maxRetries = 2) {
+  // Check if shutdown is in progress - abort immediately if so
+  if (isShuttingDown) {
+    return { success: false, error: 'Pin aborted due to shutdown', pending: true };
+  }
+
   const PIN_TIMEOUT = parseInt(process.env.IPFS_PIN_TIMEOUT_MS) || 120000; // Default: 120 seconds (2 minutes)
   
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    // Check shutdown status before each attempt
+    if (isShuttingDown) {
+      return { success: false, error: 'Pin aborted due to shutdown', pending: true };
+    }
     try {
       const gatewayUrl = new URL(IPFS_API_URL);
       const protocolModule = gatewayUrl.protocol === 'https:'
@@ -143,8 +152,20 @@ async function pinCid(cid, maxRetries = 2) {
         });
 
         req.on('error', (err) => {
+          // Check if error is due to shutdown
+          const isShutdownError = isShuttingDown && (
+            err.message.includes('ECONNRESET') ||
+            err.message.includes('ECONNREFUSED') ||
+            err.message.includes('socket hang up')
+          );
+          
           const error = `IPFS pin add error: ${err.message}`;
-          resolve({ success: false, error, retryable: true });
+          resolve({ 
+            success: false, 
+            error, 
+            retryable: !isShutdownError,
+            shutdownError: isShutdownError
+          });
         });
 
         req.setTimeout(PIN_TIMEOUT, () => {
@@ -170,8 +191,7 @@ async function pinCid(cid, maxRetries = 2) {
         await new Promise(resolve => setTimeout(resolve, retryDelay));
         // Check again after delay in case shutdown started during wait
         if (isShuttingDown) {
-          console.log(`⚠️ Shutdown in progress, aborting pin retry for CID ${cid}`);
-          return { success: false, error: 'Pin aborted due to shutdown', pending: true };
+          return { success: false, error: 'Pin aborted due to shutdown', pending: true, shutdownError: true };
         }
         continue;
       }
@@ -183,28 +203,41 @@ async function pinCid(cid, maxRetries = 2) {
         await new Promise(resolve => setTimeout(resolve, retryDelay));
         // Check again after delay in case shutdown started during wait
         if (isShuttingDown) {
-          console.log(`⚠️ Shutdown in progress, aborting pin retry for CID ${cid}`);
-          return { success: false, error: 'Pin aborted due to shutdown', pending: true };
+          return { success: false, error: 'Pin aborted due to shutdown', pending: true, shutdownError: true };
         }
         continue;
       }
 
       // Final failure
       if (!result.success) {
-        console.warn(`⚠️ CID ${cid}: ${result.error}`);
+        // Only log as warning if not a shutdown error
+        if (!result.shutdownError) {
+          console.warn(`⚠️ CID ${cid}: ${result.error}`);
+        }
         return result;
       }
 
     } catch (error) {
-      if (attempt < maxRetries) {
+      // Check if shutdown happened during error handling
+      if (isShuttingDown) {
+        return { success: false, error: 'Pin aborted due to shutdown', pending: true, shutdownError: true };
+      }
+      
+      if (attempt < maxRetries && !isShuttingDown) {
         const retryDelay = Math.min(2000 * Math.pow(2, attempt), 10000);
         console.warn(`⚠️ Error pinning CID ${cid} (attempt ${attempt + 1}): ${error.message}. Retrying in ${retryDelay / 1000}s...`);
         await new Promise(resolve => setTimeout(resolve, retryDelay));
+        // Check again after delay
+        if (isShuttingDown) {
+          return { success: false, error: 'Pin aborted due to shutdown', pending: true, shutdownError: true };
+        }
         continue;
       }
       const errorMsg = `Error pinning CID ${cid}: ${error.message}`;
-      console.error(`❌ ${errorMsg}`);
-      return { success: false, error: errorMsg };
+      if (!isShuttingDown) {
+        console.error(`❌ ${errorMsg}`);
+      }
+      return { success: false, error: errorMsg, shutdownError: isShuttingDown };
     }
   }
 
@@ -377,26 +410,33 @@ export async function syncDealsWithIPFS(relayAddress, chainId, options = {}) {
             console.log(`✅ Deal ${dealId}: CID ${cid} pinned successfully`);
             results.synced++;
           } else {
-            // If pending, the pin might still be processing in background
-            if (pinResult.pending) {
-              console.warn(`⚠️ Deal ${dealId}: CID ${cid} pin timed out but may still be processing in background. Will retry on next sync.`);
-              // Don't count as failed - it might succeed later, but track it
-              results.errors.push({
-                dealId,
-                cid,
-                error: pinResult.error,
-                pending: true,
-              });
-            } else {
-              console.warn(`⚠️ Deal ${dealId}: Failed to pin CID ${cid}: ${pinResult.error}`);
-              results.failed++;
-              results.errors.push({
-                dealId,
-                cid,
-                error: pinResult.error,
-              });
+              // Check if error is due to shutdown
+              if (pinResult.shutdownError) {
+                // Don't log as error during shutdown - just skip silently
+                console.log(`ℹ️ Deal ${dealId}: Pin aborted due to shutdown`);
+                continue;
+              }
+              
+              // If pending, the pin might still be processing in background
+              if (pinResult.pending) {
+                console.warn(`⚠️ Deal ${dealId}: CID ${cid} pin timed out but may still be processing in background. Will retry on next sync.`);
+                // Don't count as failed - it might succeed later, but track it
+                results.errors.push({
+                  dealId,
+                  cid,
+                  error: pinResult.error,
+                  pending: true,
+                });
+              } else {
+                console.warn(`⚠️ Deal ${dealId}: Failed to pin CID ${cid}: ${pinResult.error}`);
+                results.failed++;
+                results.errors.push({
+                  dealId,
+                  cid,
+                  error: pinResult.error,
+                });
+              }
             }
-          }
         }
         
         // Sync to GunDB if enabled (skip if shutdown in progress)

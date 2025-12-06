@@ -1954,6 +1954,116 @@ router.get("/user-uploads/:userAddress", async (req, res) => {
   }
 });
 
+// View/download user uploaded file (for x402 subscription users)
+// Uses the same IPFS cat endpoint but validates subscription access
+router.get("/user-uploads/:userAddress/:hash/view", async (req, res) => {
+  try {
+    const { userAddress, hash } = req.params;
+    
+    const gun = req.app.get('gunInstance');
+    if (!gun) {
+      return res.status(500).json({
+        success: false,
+        error: "Server error - Gun instance not available",
+      });
+    }
+
+    // Get uploads to verify file belongs to user
+    const uploads = await X402Merchant.getUserUploads(gun, userAddress);
+    const uploadRecord = uploads.find(u => u.hash === hash);
+    
+    if (!uploadRecord) {
+      return res.status(404).json({
+        success: false,
+        error: "File not found for this user",
+      });
+    }
+
+    // Use the IPFS cat endpoint to stream the file
+    // Determine content type from mimetype or filename
+    const mimetype = uploadRecord.mimetype || 'application/octet-stream';
+    const filename = uploadRecord.name || hash;
+    
+    const requestOptions = {
+      hostname: "127.0.0.1",
+      port: 5001,
+      path: `/api/v0/cat?arg=${encodeURIComponent(hash)}`,
+      method: "POST",
+      headers: {
+        "Content-Length": "0",
+      },
+    };
+
+    if (IPFS_API_TOKEN) {
+      requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+    }
+
+    const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+      // Set appropriate headers based on request (view vs download)
+      const isDownload = req.query.download === 'true' || req.query.dl === 'true';
+      
+      if (isDownload) {
+        res.setHeader("Content-Type", mimetype);
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      } else {
+        // View in browser
+        res.setHeader("Content-Type", mimetype);
+        res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+      }
+      res.setHeader("Cache-Control", "public, max-age=31536000"); // 1 year cache
+
+      // Pipe the response directly
+      ipfsRes.pipe(res);
+
+      ipfsRes.on("error", (err) => {
+        console.error(`❌ IPFS Content error for ${hash}:`, err);
+        if (!res.headersSent) {
+          res.status(500).json({
+            success: false,
+            error: err.message,
+          });
+        }
+      });
+    });
+
+    ipfsReq.on("error", (err) => {
+      console.error(`❌ IPFS Content request error for ${hash}:`, err);
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: err.message,
+        });
+      }
+    });
+
+    ipfsReq.setTimeout(30000, () => {
+      ipfsReq.destroy();
+      if (!res.headersSent) {
+        res.status(408).json({
+          success: false,
+          error: "Content retrieval timeout",
+        });
+      }
+    });
+
+    ipfsReq.end();
+  } catch (error) {
+    console.error("❌ View user upload error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Download user uploaded file (alias for view with download=true)
+router.get("/user-uploads/:userAddress/:hash/download", async (req, res) => {
+  // Redirect to view endpoint with download parameter
+  req.query.download = 'true';
+  req.url = req.url.replace('/download', '/view');
+  return router.handle(req, res);
+});
+
 // Delete/unpin user file (for x402 subscription users)
 router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
   try {
