@@ -1,12 +1,32 @@
 #!/bin/sh
 set -e
 
-# Set correct permissions on the data volume
-# Prefer DATA_DIR env var (matches server default), fall back to /app/relay/data
+# Set correct permissions on persistent data volumes
+# These directories are mounted as volumes and need correct permissions
+
+# GunDB data directory
 DATA_DIR="${DATA_DIR:-/app/relay/data}"
-echo "🔐 Setting permissions for data volume at ${DATA_DIR}..."
+echo "🔐 Setting permissions for GunDB data volume at ${DATA_DIR}..."
 mkdir -p "$DATA_DIR"
-chown -R node:node "$DATA_DIR"
+chown -R node:node "$DATA_DIR" || true
+chmod 755 "$DATA_DIR" || true
+
+# Relay keys directory (for SEA keypair)
+KEYS_DIR="${RELAY_SEA_KEYPAIR_PATH%/*}"
+if [ -z "$KEYS_DIR" ] || [ "$KEYS_DIR" = "$RELAY_SEA_KEYPAIR_PATH" ]; then
+    KEYS_DIR="/app/keys"
+fi
+echo "🔐 Setting permissions for relay keys directory at ${KEYS_DIR}..."
+mkdir -p "$KEYS_DIR"
+chown -R node:node "$KEYS_DIR" || true
+chmod 755 "$KEYS_DIR" || true
+
+# Holster data directory
+HOLSTER_DIR="${HOLSTER_RELAY_STORAGE_PATH:-/app/relay/holster-data}"
+echo "🔐 Setting permissions for Holster data volume at ${HOLSTER_DIR}..."
+mkdir -p "$HOLSTER_DIR"
+chown -R node:node "$HOLSTER_DIR" || true
+chmod 755 "$HOLSTER_DIR" || true
 
 # Backwards compatibility: handle legacy radata directory if it exists
 LEGACY_RADATA_DIR="/app/relay/radata"

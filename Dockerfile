@@ -153,9 +153,16 @@ RUN if [ "$GENERATE_RELAY_KEYS" = "true" ] && [ -z "$RELAY_SEA_KEYPAIR" ] && [ -
     fi
 
 # Set proper permissions
+# Note: Volumes will override these permissions, but we set them here for initial setup
 RUN chown -R node:node /app \
+    && chown -R node:node /app/relay/data \
+    && chown -R node:node /app/relay/holster-data \
+    && chown -R node:node /app/keys \
     && chown -R ipfs:ipfs /data/ipfs \
-    && chmod 755 /app/relay/src/public
+    && chmod 755 /app/relay/src/public \
+    && chmod 755 /app/relay/data \
+    && chmod 755 /app/relay/holster-data \
+    && chmod 755 /app/keys
 
 # Expose ports
 EXPOSE 8765 5001 8080 4001
