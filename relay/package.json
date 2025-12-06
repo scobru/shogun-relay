@@ -22,6 +22,7 @@
   "license": "MIT",
   "dependencies": {
     "@mblaney/holster": "^1.0.35",
+    "better-sqlite3": "^11.0.0",
     "cors": "^2.8.5",
     "dockerode": "^4.0.0",
     "dotenv": "^16.5.0",

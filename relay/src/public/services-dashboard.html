@@ -235,6 +235,32 @@
                 </div>
             </div>
 
+            <!-- Blockchain RPC Service -->
+            <div class="service-card card shadow-xl">
+                <div class="card-body p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="card-title text-lg text-[#FF69B4]">
+                            <span class="status-indicator status-unknown pulse" id="rpc-status-indicator"></span>
+                            Blockchain RPC
+                        </h2>
+                        <div class="badge badge-outline bg-[#282828] border-[#606060] text-[#E0E0E0]" id="rpc-summary">--</div>
+                    </div>
+
+                    <div class="space-y-3 text-base">
+                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Status:</span><span id="rpc-status" class="font-semibold text-[#FFFFFF]">Checking...</span></div>
+                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Online:</span><span id="rpc-online" class="text-[#FFFFFF]">--</span></div>
+                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Total:</span><span id="rpc-total" class="text-[#FFFFFF]">--</span></div>
+                        <div id="rpc-details" class="mt-4 space-y-2 max-h-48 overflow-y-auto">
+                            <!-- RPC details will be populated here -->
+                        </div>
+                    </div>
+
+                    <div class="card-actions justify-end mt-6 service-actions">
+                        <button onclick="refreshService('rpc')" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">🔄 Refresh</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Quick Actions -->
             <div class="service-card card shadow-xl">
                 <div class="card-body p-6">
@@ -508,6 +534,81 @@
             }
         }
 
+        async function checkRPCStatus() {
+            try {
+                const response = await fetch('/rpc-status');
+                const data = await response.json();
+
+                if (data.success) {
+                    const summary = data.summary || { total: 0, online: 0, offline: 0 };
+                    const rpcs = data.rpcs || [];
+                    
+                    document.getElementById('rpc-online').textContent = `${summary.online}/${summary.total}`;
+                    document.getElementById('rpc-total').textContent = summary.total;
+                    document.getElementById('rpc-summary').textContent = `${summary.online}/${summary.total} Online`;
+                    
+                    const status = summary.online === summary.total && summary.total > 0 ? 'All Online' : 
+                                   summary.online > 0 ? 'Partial' : 'Offline';
+                    document.getElementById('rpc-status').textContent = status;
+                    
+                    // Update status indicator
+                    if (summary.online === summary.total && summary.total > 0) {
+                        updateStatusIndicator('rpc', 'online');
+                    } else if (summary.online > 0) {
+                        updateStatusIndicator('rpc', 'warning');
+                    } else {
+                        updateStatusIndicator('rpc', 'offline');
+                    }
+                    
+                    // Populate RPC details
+                    const detailsContainer = document.getElementById('rpc-details');
+                    detailsContainer.innerHTML = '';
+                    
+                    if (rpcs.length === 0) {
+                        detailsContainer.innerHTML = '<div class="text-[#A0A0A0] text-sm">No RPC endpoints configured</div>';
+                    } else {
+                        rpcs.forEach(rpc => {
+                            const rpcDiv = document.createElement('div');
+                            rpcDiv.className = 'text-sm border-b border-[#404040] pb-2';
+                            
+                            const statusColor = rpc.status === 'online' ? '#4CAF50' : '#F44336';
+                            const statusIcon = rpc.status === 'online' ? '●' : '○';
+                            
+                            rpcDiv.innerHTML = `
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[#E0E0E0] font-medium">${rpc.name}</span>
+                                    <span style="color: ${statusColor}">${statusIcon}</span>
+                                </div>
+                                ${rpc.status === 'online' ? `
+                                    <div class="text-[#A0A0A0] text-xs mt-1">
+                                        Block: ${rpc.blockNumber} | Latency: ${rpc.latency}
+                                    </div>
+                                ` : `
+                                    <div class="text-[#F44336] text-xs mt-1">
+                                        ${rpc.error || 'Connection failed'}
+                                    </div>
+                                `}
+                            `;
+                            detailsContainer.appendChild(rpcDiv);
+                        });
+                    }
+                    
+                    return true;
+                } else {
+                    throw new Error(data.error || 'RPC status check failed');
+                }
+            } catch (error) {
+                document.getElementById('rpc-status').textContent = 'Error';
+                document.getElementById('rpc-online').textContent = '--';
+                document.getElementById('rpc-total').textContent = '--';
+                document.getElementById('rpc-summary').textContent = '--';
+                document.getElementById('rpc-details').innerHTML = '<div class="text-[#F44336] text-sm">Failed to check RPC status</div>';
+                updateStatusIndicator('rpc', 'offline');
+                log(`RPC check failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
         async function refreshService(service) {
             log(`Refreshing ${service} service...`, 'info');
 
@@ -515,6 +616,7 @@
                 case 'gun': await checkGunStatus(); break;
                 case 'ipfs': await checkIPFSStatus(); break;
                 case 'holster': await checkHolsterStatus(); break;
+                case 'rpc': await checkRPCStatus(); break;
             }
 
             document.getElementById('last-update').textContent = new Date().toLocaleTimeString();

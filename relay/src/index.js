@@ -24,6 +24,7 @@ import multer from "multer";
 import { initRelayUser, getRelayUser } from "./utils/relay-user.js";
 import * as Reputation from "./utils/relay-reputation.js";
 import * as FrozenData from "./utils/frozen-data.js";
+import SQLiteStore from "./utils/sqlite-store.js";
 
 dotenv.config();
 
@@ -424,14 +425,31 @@ async function initializeServer() {
   const peers = peersString ? peersString.split(",") : [];
   console.log("🔍 Peers:", peers);
 
-  // Initialize Gun with conditional support
+  // Initialize Gun with storage (SQLite or radisk)
   const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
   console.log("📁 Data directory:", dataDir);
+  
+  // Choose storage type from environment variable
+  // Options: "sqlite" (default) or "radisk"
+  const storageType = (process.env.STORAGE_TYPE || "sqlite").toLowerCase();
+  let sqliteStore = null;
+  
+  if (storageType === "sqlite") {
+    const dbPath = path.join(dataDir, "gun.db");
+    sqliteStore = new SQLiteStore({
+      dbPath: dbPath,
+      file: "radata"
+    });
+    console.log("📁 Using SQLite storage for Gun");
+  } else {
+    console.log("📁 Using file-based radisk storage");
+  }
   
   const gunConfig = {
     super: true,
     file: dataDir,
     radisk: process.env.DISABLE_RADISK !== "true", // Allow disabling radisk via env var
+    store: sqliteStore, // Use SQLite store if available
     web: server,
     isValid: hasValidToken,
     uuid: process.env.RELAY_NAME,
@@ -449,6 +467,8 @@ async function initializeServer() {
 
   if (process.env.DISABLE_RADISK === "true") {
     console.log("📁 Radisk disabled via environment variable");
+  } else if (storageType === "sqlite") {
+    console.log("📁 Using SQLite storage with radisk");
   } else {
     console.log("📁 Using local file storage with radisk");
   }
@@ -1063,6 +1083,142 @@ See docs/RELAY_KEYS.md for more information.
     }
   });
 
+  // Blockchain RPC status endpoint
+  app.get("/rpc-status", async (req, res) => {
+    try {
+      const { CONTRACTS_CONFIG, getConfigByChainId } = await import('shogun-contracts');
+      const { ethers } = await import('ethers');
+      const { RPC_URLS } = await import('./utils/registry-client.js');
+      
+      const REGISTRY_CHAIN_ID = parseInt(process.env.REGISTRY_CHAIN_ID) || 84532;
+      const X402_NETWORK = process.env.X402_NETWORK || 'base-sepolia';
+      const X402_RPC_URL = process.env.X402_RPC_URL;
+      
+      const rpcStatuses = [];
+      
+      // Check registry chain RPC
+      const registryConfig = getConfigByChainId(REGISTRY_CHAIN_ID);
+      if (registryConfig && registryConfig.rpc) {
+        try {
+          const provider = new ethers.JsonRpcProvider(registryConfig.rpc);
+          const startTime = Date.now();
+          const blockNumber = await Promise.race([
+            provider.getBlockNumber(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+          ]);
+          const latency = Date.now() - startTime;
+          
+          rpcStatuses.push({
+            name: `Registry Chain (${REGISTRY_CHAIN_ID})`,
+            chainId: REGISTRY_CHAIN_ID,
+            rpc: registryConfig.rpc,
+            status: 'online',
+            latency: `${latency}ms`,
+            blockNumber: blockNumber.toString(),
+            network: registryConfig.network || 'unknown'
+          });
+        } catch (error) {
+          rpcStatuses.push({
+            name: `Registry Chain (${REGISTRY_CHAIN_ID})`,
+            chainId: REGISTRY_CHAIN_ID,
+            rpc: registryConfig.rpc,
+            status: 'offline',
+            error: error.message,
+            network: registryConfig.network || 'unknown'
+          });
+        }
+      }
+      
+      // Check X402 payment RPC
+      if (X402_RPC_URL) {
+        try {
+          const provider = new ethers.JsonRpcProvider(X402_RPC_URL);
+          const startTime = Date.now();
+          const blockNumber = await Promise.race([
+            provider.getBlockNumber(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+          ]);
+          const latency = Date.now() - startTime;
+          
+          rpcStatuses.push({
+            name: `X402 Payment (${X402_NETWORK})`,
+            chainId: 'custom',
+            rpc: X402_RPC_URL,
+            status: 'online',
+            latency: `${latency}ms`,
+            blockNumber: blockNumber.toString(),
+            network: X402_NETWORK
+          });
+        } catch (error) {
+          rpcStatuses.push({
+            name: `X402 Payment (${X402_NETWORK})`,
+            chainId: 'custom',
+            rpc: X402_RPC_URL,
+            status: 'offline',
+            error: error.message,
+            network: X402_NETWORK
+          });
+        }
+      }
+      
+      // Check all configured chains
+      for (const [key, config] of Object.entries(CONTRACTS_CONFIG)) {
+        if (config && config.chainId && config.rpc) {
+          // Skip if already checked
+          if (config.chainId === REGISTRY_CHAIN_ID) continue;
+          
+          try {
+            const provider = new ethers.JsonRpcProvider(config.rpc);
+            const startTime = Date.now();
+            const blockNumber = await Promise.race([
+              provider.getBlockNumber(),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+            ]);
+            const latency = Date.now() - startTime;
+            
+            rpcStatuses.push({
+              name: `${key} (${config.chainId})`,
+              chainId: config.chainId,
+              rpc: config.rpc,
+              status: 'online',
+              latency: `${latency}ms`,
+              blockNumber: blockNumber.toString(),
+              network: config.network || key
+            });
+          } catch (error) {
+            rpcStatuses.push({
+              name: `${key} (${config.chainId})`,
+              chainId: config.chainId,
+              rpc: config.rpc,
+              status: 'offline',
+              error: error.message,
+              network: config.network || key
+            });
+          }
+        }
+      }
+      
+      const onlineCount = rpcStatuses.filter(r => r.status === 'online').length;
+      const totalCount = rpcStatuses.length;
+      
+      res.json({
+        success: true,
+        rpcs: rpcStatuses,
+        summary: {
+          total: totalCount,
+          online: onlineCount,
+          offline: totalCount - onlineCount
+        }
+      });
+    } catch (error) {
+      console.error("❌ RPC Status Error:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
   // Importa e configura le route modulari
   try {
     const routes = await import("./routes/index.js");
@@ -1246,6 +1402,15 @@ See docs/RELAY_KEYS.md for more information.
   // Shutdown function
   async function shutdown() {
     console.log("🛑 Shutting down Shogun Relay...");
+
+    // Close SQLite store if it exists
+    if (sqliteStore) {
+      try {
+        sqliteStore.close();
+      } catch (err) {
+        console.error("Error closing SQLite store:", err);
+      }
+    }
 
     // Close server
     if (server) {
