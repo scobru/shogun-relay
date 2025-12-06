@@ -39,8 +39,7 @@
     "multer": "^2.0.1",
     "node-fetch": "^3.3.2",
     "self-adjusting-interval": "^1.0.0",
-    "shogun-contracts": "^1.3.5",
-    "shogun-theme": "^1.0.0",
+    "shogun-contracts": "^1.3.6",
     "viem": "^2.21.0"
   },
   "devDependencies": {

@@ -36,15 +36,15 @@ export class IpfsModule {
   }
 
   public async pinAdd(cid: string): Promise<any> {
-    return this.client.post(`/api/v1/ipfs/pin/add?arg=${cid}`);
+    return this.client.post('/api/v1/ipfs/pin/add', { cid });
   }
 
   public async pinRm(cid: string): Promise<any> {
-    return this.client.post(`/api/v1/ipfs/pin/rm?arg=${cid}`);
+    return this.client.post('/api/v1/ipfs/pin/rm', { cid });
   }
 
-  public async pinLs(cid?: string): Promise<any> {
-    const query = cid ? `?arg=${cid}` : '';
-    return this.client.post(`/api/v1/ipfs/pin/ls${query}`);
+  public async pinLs(): Promise<any> {
+    // Note: relay's pin/ls endpoint lists all pins and doesn't support filtering by CID
+    return this.client.get('/api/v1/ipfs/pin/ls');
   }
 }
