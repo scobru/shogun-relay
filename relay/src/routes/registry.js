@@ -30,6 +30,9 @@ const RELAY_PRIVATE_KEY = process.env.RELAY_PRIVATE_KEY;
  */
 router.get('/status', async (req, res) => {
   try {
+    const { getConfigByChainId } = await import('shogun-contracts');
+    const config = getConfigByChainId(REGISTRY_CHAIN_ID);
+    
     if (!RELAY_PRIVATE_KEY) {
       return res.json({
         success: true,
@@ -37,7 +40,7 @@ router.get('/status', async (req, res) => {
         configured: false,
         message: 'RELAY_PRIVATE_KEY not configured - on-chain features disabled',
         chainId: REGISTRY_CHAIN_ID,
-        registryAddress: REGISTRY_ADDRESSES[REGISTRY_CHAIN_ID],
+        registryAddress: config?.relayRegistry || null,
       });
     }
 
@@ -489,19 +492,39 @@ router.get('/deals', async (req, res) => {
  * 
  * Get current registry configuration (addresses, chain info)
  */
-router.get('/config', (req, res) => {
-  res.json({
-    success: true,
-    chainId: REGISTRY_CHAIN_ID,
-    chainName: REGISTRY_CHAIN_ID === 84532 ? 'Base Sepolia' : 
-               REGISTRY_CHAIN_ID === 8453 ? 'Base Mainnet' : 'Unknown',
-    registryAddress: REGISTRY_ADDRESSES[REGISTRY_CHAIN_ID],
-    usdcAddress: USDC_ADDRESSES[REGISTRY_CHAIN_ID],
-    configured: !!RELAY_PRIVATE_KEY,
-    explorerUrl: REGISTRY_CHAIN_ID === 84532 
-      ? 'https://sepolia.basescan.org' 
-      : 'https://basescan.org',
-  });
+router.get('/config', async (req, res) => {
+  try {
+    const { CONTRACTS_CONFIG, getConfigByChainId } = await import('shogun-contracts');
+    const config = getConfigByChainId(REGISTRY_CHAIN_ID);
+    
+    if (!config) {
+      return res.status(404).json({
+        success: false,
+        error: `No configuration found for chain ID ${REGISTRY_CHAIN_ID}`
+      });
+    }
+    
+    // Get network name
+    const networkName = Object.keys(CONTRACTS_CONFIG).find(
+      key => CONTRACTS_CONFIG[key].chainId === REGISTRY_CHAIN_ID
+    ) || 'Unknown';
+    
+    res.json({
+      success: true,
+      chainId: REGISTRY_CHAIN_ID,
+      chainName: networkName === 'baseSepolia' ? 'Base Sepolia' : 
+                 networkName === 'base' ? 'Base Mainnet' : networkName,
+      registryAddress: config.relayRegistry,
+      usdcAddress: config.usdc,
+      configured: !!RELAY_PRIVATE_KEY,
+      explorerUrl: config.explorer,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
 });
 
 /**
