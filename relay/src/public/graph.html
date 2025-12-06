@@ -325,20 +325,22 @@
               </p>
             </div>
           </div>
-          <div class="grid gap-4 sm:grid-cols-2">
-            <label class="text-sm text-[#E0E0E0] space-y-2" for="username">
-              <span>Alias</span>
-              <input id="username" type="text" class="relay-input" placeholder="e.g. neon-operator" />
-            </label>
-            <label class="text-sm text-[#E0E0E0] space-y-2" for="password">
-              <span>Password</span>
-              <input id="password" type="password" class="relay-input" placeholder="Password" />
-            </label>
-          </div>
-          <div class="flex flex-wrap justify-end gap-3 mt-6">
-            <button id="btnCreate" class="relay-button neutral">Create Account</button>
-            <button id="btnLogin" class="relay-button primary">Log In</button>
-          </div>
+          <form id="authForm" onsubmit="return false;">
+            <div class="grid gap-4 sm:grid-cols-2">
+              <label class="text-sm text-[#E0E0E0] space-y-2" for="username">
+                <span>Alias</span>
+                <input id="username" type="text" class="relay-input" placeholder="e.g. neon-operator" autocomplete="username" />
+              </label>
+              <label class="text-sm text-[#E0E0E0] space-y-2" for="password">
+                <span>Password</span>
+                <input id="password" type="password" class="relay-input" placeholder="Password" autocomplete="current-password" />
+              </label>
+            </div>
+            <div class="flex flex-wrap justify-end gap-3 mt-6">
+              <button id="btnCreate" type="button" class="relay-button neutral">Create Account</button>
+              <button id="btnLogin" type="submit" class="relay-button primary">Log In</button>
+            </div>
+          </form>
           <p id="authMessage" class="status-text info"></p>
         </section>
 
@@ -381,10 +383,12 @@
               </p>
             </div>
           </div>
-          <div class="input-group">
-            <input id="adminToken" type="password" class="relay-input" placeholder="Admin token (auto-loaded if saved)" />
-            <button id="btnLoadAllNodes" class="relay-button neutral">Load Full Graph Snapshot</button>
-          </div>
+          <form onsubmit="return false;">
+            <div class="input-group">
+              <input id="adminToken" type="password" class="relay-input" placeholder="Admin token (auto-loaded if saved)" autocomplete="off" />
+              <button id="btnLoadAllNodes" type="button" class="relay-button neutral">Load Full Graph Snapshot</button>
+            </div>
+          </form>
           <p id="statusMessage" class="status-text info"></p>
           <div id="graphSummary" class="text-xs text-[#A0A0A0] mt-3"></div>
           <pre id="graphDump" class="hidden"></pre>
@@ -913,31 +917,99 @@
         const password = passwordInput.value.trim();
         if (!username || !password) {
           authMessage.textContent = "Alias and password are required.";
+          authMessage.className = "status-text warning";
           return;
         }
+        
+        // Check if already authenticated
+        if (user.is) {
+          authMessage.textContent = "Already logged in. Please log out first.";
+          authMessage.className = "status-text warning";
+          return;
+        }
+        
         authMessage.textContent = "Creating account...";
+        authMessage.className = "status-text info";
+        btnCreate.disabled = true;
+        
         user.create(username, password, (ack) => {
+          btnCreate.disabled = false;
           if (ack.err) {
-            authMessage.textContent = "Error: " + ack.err;
+            // Handle specific error messages
+            let errorMsg = ack.err;
+            if (ack.err.includes("already") || ack.err.includes("User already")) {
+              errorMsg = "User already exists. Try logging in instead.";
+            }
+            authMessage.textContent = "Error: " + errorMsg;
+            authMessage.className = "status-text error";
           } else {
-            authMessage.textContent = "Account created. You can log in now.";
+            authMessage.textContent = "Account created successfully! Logging in...";
+            authMessage.className = "status-text success";
+            // Auto-login after creation
+            setTimeout(() => {
+              user.auth(username, password, (authAck) => {
+                if (authAck.err) {
+                  authMessage.textContent = "Account created but login failed. Please try logging in manually.";
+                  authMessage.className = "status-text warning";
+                }
+                // Success handled by gun.on("auth") event
+              });
+            }, 500);
           }
         });
       });
 
+      // Handle form submission for login
+      const authForm = document.getElementById("authForm");
+      if (authForm) {
+        authForm.addEventListener("submit", (e) => {
+          e.preventDefault();
+          btnLogin.click();
+        });
+      }
+      
+      // Handle Enter key in password field
+      passwordInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          btnLogin.click();
+        }
+      });
+      
       btnLogin.addEventListener("click", () => {
         const username = usernameInput.value.trim();
         const password = passwordInput.value.trim();
         if (!username || !password) {
           authMessage.textContent = "Alias and password are required.";
+          authMessage.className = "status-text warning";
           return;
         }
+        
+        // Check if already authenticated
+        if (user.is) {
+          authMessage.textContent = "Already logged in. Please log out first.";
+          authMessage.className = "status-text warning";
+          return;
+        }
+        
         authMessage.textContent = "Authenticating...";
+        authMessage.className = "status-text info";
+        btnLogin.disabled = true;
+        
         user.auth(username, password, (ack) => {
+          btnLogin.disabled = false;
           if (ack.err) {
-            authMessage.textContent = "Error: " + ack.err;
+            // Handle specific error messages
+            let errorMsg = ack.err;
+            if (ack.err.includes("Wrong") || ack.err.includes("password") || ack.err.includes("user")) {
+              errorMsg = "Invalid username or password. Please check your credentials.";
+            }
+            authMessage.textContent = "Error: " + errorMsg;
+            authMessage.className = "status-text error";
           } else {
             authMessage.textContent = "Login successful!";
+            authMessage.className = "status-text success";
+            // Success handled by gun.on("auth") event
           }
         });
       });
@@ -1003,6 +1075,10 @@
       }
 
       gun.on("auth", (ack) => {
+        if (ack && ack.err) {
+          // Don't proceed if there's an error
+          return;
+        }
         authSection.classList.add("hidden");
         explorerSection.classList.remove("hidden");
         usernameInput.value = "";
@@ -1014,6 +1090,19 @@
         btnLogout.classList.remove("hidden");
         startExplorer(user, "user", "user");
       });
+      
+      // Check if user is already authenticated on page load
+      user.recall({ sessionStorage: true });
+      if (user.is) {
+        authSection.classList.add("hidden");
+        explorerSection.classList.remove("hidden");
+        const alias = user.is.alias;
+        const pub = user.is.pub;
+        const aliasInfo = alias ? "Alias: " + alias + " • " : "";
+        userInfo.textContent = aliasInfo + "Public key: " + pub;
+        btnLogout.classList.remove("hidden");
+        startExplorer(user, "user", "user");
+      }
 
       document.addEventListener("DOMContentLoaded", () => {
         if (window.ShogunAdmin && typeof ShogunAdmin.init === "function") {

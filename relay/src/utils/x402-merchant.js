@@ -10,41 +10,10 @@ import { baseSepolia, base, polygon, polygonAmoy } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import httpModule from 'http';
 import * as RelayUser from './relay-user.js';
+import { USDC_EIP3009_ABI } from 'shogun-contracts';
 
-// USDC contract ABI for EIP-3009 transferWithAuthorization
-const USDC_ABI = [
-  {
-    inputs: [
-      { name: 'from', type: 'address' },
-      { name: 'to', type: 'address' },
-      { name: 'value', type: 'uint256' },
-      { name: 'validAfter', type: 'uint256' },
-      { name: 'validBefore', type: 'uint256' },
-      { name: 'nonce', type: 'bytes32' },
-      { name: 'v', type: 'uint8' },
-      { name: 'r', type: 'bytes32' },
-      { name: 's', type: 'bytes32' },
-    ],
-    name: 'transferWithAuthorization',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'account', type: 'address' }],
-    name: 'balanceOf',
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [],
-    name: 'decimals',
-    outputs: [{ name: '', type: 'uint8' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-];
+// Use USDC ABI from shogun-contracts package
+const USDC_ABI = USDC_EIP3009_ABI;
 
 // Network configurations with EIP-712 USDC domain info
 const NETWORK_CONFIG = {

@@ -8,7 +8,12 @@
  */
 
 import { ethers } from 'ethers';
-import { CONTRACTS_CONFIG } from '../config/contracts-config.js';
+import { 
+  CONTRACTS_CONFIG, 
+  getShogunRelayRegistryABI, 
+  getStorageDealRegistryABI,
+  ERC20_ABI 
+} from 'shogun-contracts';
 
 // Generate contract address mappings from centralized config
 // This maintains backward compatibility while using the centralized configuration
@@ -43,54 +48,23 @@ export const STORAGE_DEAL_REGISTRY_ADDRESSES = storageDealRegistryAddresses;
 export const USDC_ADDRESSES = usdcAddresses;
 export const RPC_URLS = rpcUrls;
 
-// ABI for ShogunRelayRegistry (minimal interface for queries)
-const REGISTRY_ABI = [
-  // View functions
-  'function getActiveRelays() view returns (address[])',
-  'function getActiveRelayCount() view returns (uint256)',
-  'function getRelayInfo(address relay) view returns (tuple(address owner, string endpoint, bytes pubkey, bytes epub, uint256 stakedAmount, uint256 registeredAt, uint256 updatedAt, uint256 unstakeRequestedAt, uint8 status, uint256 totalSlashed, uint256 griefingRatio))',
-  'function isActiveRelay(address relay) view returns (bool)',
-  'function deals(bytes32 dealId) view returns (tuple(bytes32 dealId, address relay, address client, string cid, uint256 sizeMB, uint256 priceUSDC, uint256 createdAt, uint256 expiresAt, bool active, uint256 clientStake))',
-  'function getRelayDeals(address relay) view returns (bytes32[])',
-  'function getClientDeals(address client) view returns (bytes32[])',
-  'function minStake() view returns (uint256)',
-  'function unstakingDelay() view returns (uint256)',
-  // State-changing functions (require signer)
-  'function registerRelay(string endpoint, bytes pubkey, bytes epub, uint256 stakeAmount, uint256 griefingRatio)',
-  'function updateRelay(string newEndpoint, string newGunPubKey)',
-  'function increaseStake(uint256 amount)',
-  'function requestUnstake()',
-  'function withdrawStake()',
-  // Note: registerDeal and completeDeal moved to StorageDealRegistry
-  // Client griefing functions (called by clients, not relays)
-  'function griefMissedProof(address relay, bytes32 dealId, string evidence)',
-  'function griefDataLoss(address relay, bytes32 dealId, string evidence)',
-  'function calculateGriefingCost(address relay, uint256 slashBps, bytes32 dealId) view returns (uint256 slashAmount, uint256 cost)',
-  // Events
-  'event RelayRegistered(address indexed relay, address indexed owner, string endpoint, string gunPubKey, uint256 stakedAmount)',
-  'event StorageDealRegistered(bytes32 indexed dealId, address indexed relay, address indexed client, string cid, uint256 sizeMB, uint256 priceUSDC, uint256 expiresAt, uint256 clientStake)',
-  'event RelaySlashed(bytes32 indexed reportId, address indexed relay, address indexed reporter, uint256 amount, uint256 cost, string reason)',
-];
+// Get ABIs from shogun-contracts package
+// These will be loaded dynamically based on chainId
+function getRegistryABI(chainId) {
+  const abi = getShogunRelayRegistryABI(chainId);
+  if (!abi) {
+    throw new Error(`ShogunRelayRegistry ABI not found for chain ${chainId}`);
+  }
+  return abi;
+}
 
-// StorageDealRegistry ABI
-const STORAGE_DEAL_REGISTRY_ABI = [
-  'function registerDeal(bytes32 dealId, address client, string cid, uint256 sizeMB, uint256 priceUSDC, uint256 durationDays, uint256 clientStake)',
-  'function getDeal(bytes32 dealId) view returns (tuple(bytes32 dealId, address relay, address client, string cid, uint256 sizeMB, uint256 priceUSDC, uint256 createdAt, uint256 expiresAt, bool active, uint256 clientStake))',
-  'function getClientDeals(address client) view returns (bytes32[])',
-  'function getRelayDeals(address relay) view returns (bytes32[])',
-  'function completeDeal(bytes32 dealId)',
-  'function addClientStake(bytes32 dealId, uint256 amount)',
-  'function withdrawClientStake(bytes32 dealId)',
-  'function grief(bytes32 dealId, uint256 slashAmount, string reason)',
-];
-
-// USDC ABI (minimal)
-const ERC20_ABI = [
-  'function approve(address spender, uint256 amount) returns (bool)',
-  'function allowance(address owner, address spender) view returns (uint256)',
-  'function balanceOf(address account) view returns (uint256)',
-  'function decimals() view returns (uint8)',
-];
+function getStorageDealRegistryABIForChain(chainId) {
+  const abi = getStorageDealRegistryABI(chainId);
+  if (!abi) {
+    throw new Error(`StorageDealRegistry ABI not found for chain ${chainId}`);
+  }
+  return abi;
+}
 
 // Relay status enum
 const RelayStatus = {
@@ -113,7 +87,8 @@ export function createRegistryClient(chainId = 84532, rpcUrl = null) {
   }
 
   const provider = new ethers.JsonRpcProvider(rpcUrl || RPC_URLS[chainId]);
-  const registry = new ethers.Contract(registryAddress, REGISTRY_ABI, provider);
+  const registryABI = getRegistryABI(chainId);
+  const registry = new ethers.Contract(registryAddress, registryABI, provider);
   const usdcAddress = USDC_ADDRESSES[chainId];
 
   return {
@@ -582,7 +557,8 @@ export function createStorageDealRegistryClient(chainId = 84532, rpcUrl = null) 
   }
 
   const provider = new ethers.JsonRpcProvider(rpcUrl || RPC_URLS[chainId]);
-  const storageDealRegistry = new ethers.Contract(registryAddress, STORAGE_DEAL_REGISTRY_ABI, provider);
+  const storageDealRegistryABI = getStorageDealRegistryABIForChain(chainId);
+  const storageDealRegistry = new ethers.Contract(registryAddress, storageDealRegistryABI, provider);
   const usdcAddress = USDC_ADDRESSES[chainId];
 
   return {
