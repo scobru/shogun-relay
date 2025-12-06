@@ -120,8 +120,9 @@ RUN cp /app/docker/entrypoint.sh /usr/local/bin/entrypoint.sh && \
 # Create environment files with Docker-optimized settings
 RUN cp /app/docker/relay.env /app/relay/.env
 
-# Copy package files and install dependencies
+# Copy package files and scripts (needed for postinstall)
 COPY relay/package*.json /app/relay/
+COPY relay/scripts/ /app/relay/scripts/
 WORKDIR /app/relay
 RUN npm install --omit=dev
 
