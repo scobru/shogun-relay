@@ -144,8 +144,20 @@ async function pinCid(cid, maxRetries = 2) {
                 console.log(`ℹ️ CID ${cid} was already pinned${attempt > 0 ? ` (attempt ${attempt + 1})` : ''}`);
                 resolve({ success: true, alreadyPinned: true });
               } else {
+                // Check if error is due to shutdown (promise channel closed during shutdown)
+                // Also check if shutdown is in progress when we receive the response
+                const isShutdownError = isShuttingDown || (
+                  data.includes('promise channel was closed') || 
+                  data.includes('channel was closed')
+                );
+                
                 const error = `IPFS pin add failed with status ${res.statusCode}: ${data.substring(0, 200)}`;
-                resolve({ success: false, error, retryable: res.statusCode >= 500 });
+                resolve({ 
+                  success: false, 
+                  error, 
+                  retryable: res.statusCode >= 500 && !isShutdownError,
+                  shutdownError: isShutdownError
+                });
               }
             }
           });
@@ -210,9 +222,13 @@ async function pinCid(cid, maxRetries = 2) {
 
       // Final failure
       if (!result.success) {
-        // Only log as warning if not a shutdown error
-        if (!result.shutdownError) {
+        // Only log as warning if not a shutdown error and shutdown is not in progress
+        if (!result.shutdownError && !isShuttingDown) {
           console.warn(`⚠️ CID ${cid}: ${result.error}`);
+        }
+        // If shutdown is in progress, mark it as shutdown error even if not already marked
+        if (isShuttingDown && !result.shutdownError) {
+          result.shutdownError = true;
         }
         return result;
       }
@@ -411,9 +427,12 @@ export async function syncDealsWithIPFS(relayAddress, chainId, options = {}) {
             results.synced++;
           } else {
               // Check if error is due to shutdown
-              if (pinResult.shutdownError) {
-                // Don't log as error during shutdown - just skip silently
-                console.log(`ℹ️ Deal ${dealId}: Pin aborted due to shutdown`);
+              if (pinResult.shutdownError || isShuttingDown) {
+                // Don't log as error during shutdown - just skip silently or with minimal info
+                if (!isShuttingDown) {
+                  // Only log if shutdown wasn't in progress (might be a different shutdown-related error)
+                  console.log(`ℹ️ Deal ${dealId}: Pin aborted due to shutdown`);
+                }
                 continue;
               }
               
@@ -428,13 +447,17 @@ export async function syncDealsWithIPFS(relayAddress, chainId, options = {}) {
                   pending: true,
                 });
               } else {
-                console.warn(`⚠️ Deal ${dealId}: Failed to pin CID ${cid}: ${pinResult.error}`);
-                results.failed++;
-                results.errors.push({
-                  dealId,
-                  cid,
-                  error: pinResult.error,
-                });
+                // Only log and track as failed if not a shutdown error
+                if (!pinResult.shutdownError && !isShuttingDown) {
+                  console.warn(`⚠️ Deal ${dealId}: Failed to pin CID ${cid}: ${pinResult.error}`);
+                  results.failed++;
+                  results.errors.push({
+                    dealId,
+                    cid,
+                    error: pinResult.error,
+                  });
+                }
+                // If shutdown error, silently skip (already handled above)
               }
             }
         }
