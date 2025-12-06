@@ -790,6 +790,12 @@ See docs/RELAY_KEYS.md for more information.
   // Esponi l'istanza Gun globalmente per le route
   global.gunInstance = gun;
 
+  // Initialize connection counters (before health endpoint)
+  let totalConnections = 0;
+  let activeWires = 0;
+  app.set('totalConnections', 0);
+  app.set('activeWires', 0);
+
   // Route legacy per compatibilità (definite prima delle route modulari)
 
   // Enhanced health check endpoint with detailed metrics
@@ -817,6 +823,10 @@ See docs/RELAY_KEYS.md for more information.
       warnings.push("Recently restarted");
     }
     
+    // Get connection stats from app settings
+    const activeWires = app.get('activeWires') || 0;
+    const totalConnections = app.get('totalConnections') || 0;
+    
     const healthData = {
       success: true,
       status,
@@ -827,8 +837,8 @@ See docs/RELAY_KEYS.md for more information.
         formatted: formatUptime(process.uptime())
       },
       connections: {
-        active: activeWires || 0,
-        total: totalConnections || 0
+        active: activeWires,
+        total: totalConnections
       },
       memory: {
         heapUsedMB: Math.round(memUsageMB * 10) / 10,
@@ -873,6 +883,10 @@ See docs/RELAY_KEYS.md for more information.
     const memUsage = process.memoryUsage();
     const cpuUsage = process.cpuUsage();
     
+    // Get connection stats from app settings
+    const activeWires = app.get('activeWires') || 0;
+    const totalConnections = app.get('totalConnections') || 0;
+    
     const metrics = {
       timestamp: Date.now(),
       uptime: process.uptime(),
@@ -887,8 +901,8 @@ See docs/RELAY_KEYS.md for more information.
         system: cpuUsage.system
       },
       connections: {
-        active: activeWires || 0,
-        total: totalConnections || 0
+        active: activeWires,
+        total: totalConnections
       },
       sessions: {
         active: activeSessions.size,
@@ -1000,12 +1014,11 @@ See docs/RELAY_KEYS.md for more information.
   // Set up relay stats database
   const db = gun.get("relays").get(host);
 
-  let totalConnections = 0;
-  let activeWires = 0;
-
   gun.on("hi", () => {
     totalConnections += 1;
     activeWires += 1;
+    app.set('totalConnections', totalConnections);
+    app.set('activeWires', activeWires);
     db?.get("totalConnections").put(totalConnections);
     db?.get("activeWires").put(activeWires);
     console.log(`Connection opened (active: ${activeWires})`);
@@ -1016,6 +1029,7 @@ See docs/RELAY_KEYS.md for more information.
     if (activeWires > 0) {
       activeWires -= 1;
     }
+    app.set('activeWires', activeWires);
     db?.get("activeWires").put(activeWires);
     console.log(`Connection closed (active: ${activeWires})`);
   });
