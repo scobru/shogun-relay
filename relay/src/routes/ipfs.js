@@ -775,22 +775,50 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
       });
     }
 
-    const gatewayUrl = new URL(IPFS_GATEWAY_URL);
-    const protocolModule = gatewayUrl.protocol === "https:"
-      ? await import("https")
-      : await import("http");
-
-    const requestOptions = {
-      hostname: gatewayUrl.hostname,
-      port: gatewayUrl.port
-        ? Number(gatewayUrl.port)
-        : gatewayUrl.protocol === "https:" ? 443 : 80,
-      path: `/ipfs/${cid}`,
-      method: "GET",
-      headers: {
-        Host: gatewayUrl.host,
-      },
-    };
+    // Try to use IPFS API first (localhost) for better availability
+    // Fallback to gateway if API is not available
+    let requestOptions;
+    let protocolModule;
+    const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN;
+    
+    // Try API first if we have a local API URL
+    const useApi = IPFS_GATEWAY_URL && (IPFS_GATEWAY_URL.includes('127.0.0.1') || IPFS_GATEWAY_URL.includes('localhost'));
+    
+    if (useApi) {
+      // Use IPFS API directly (more reliable for local files)
+      protocolModule = await import("http");
+      requestOptions = {
+        hostname: "127.0.0.1",
+        port: 5001,
+        path: `/api/v0/cat?arg=${encodeURIComponent(cid)}`,
+        method: "POST",
+        headers: {
+          "Content-Length": "0",
+        },
+      };
+      
+      if (IPFS_API_TOKEN) {
+        requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+      }
+    } else {
+      // Use gateway
+      const gatewayUrl = new URL(IPFS_GATEWAY_URL);
+      protocolModule = gatewayUrl.protocol === "https:"
+        ? await import("https")
+        : await import("http");
+      
+      requestOptions = {
+        hostname: gatewayUrl.hostname,
+        port: gatewayUrl.port
+          ? Number(gatewayUrl.port)
+          : gatewayUrl.protocol === "https:" ? 443 : 80,
+        path: `/ipfs/${cid}`,
+        method: "GET",
+        headers: {
+          Host: gatewayUrl.host,
+        },
+      };
+    }
 
     const ipfsReq = protocolModule.request(requestOptions, (ipfsRes) => {
       // If no token, just stream the response
@@ -807,52 +835,82 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
       ipfsRes.on("data", (chunk) => (body += chunk));
       ipfsRes.on("end", async () => {
         try {
-          const SEA = await import("gun/sea.js");
-          const decrypted = await SEA.default.decrypt(body, token);
+          // Check if body looks like encrypted JSON (SEA encrypted data)
+          let isEncryptedData = false;
+          try {
+            const parsed = JSON.parse(body);
+            // SEA encrypted data has specific structure
+            isEncryptedData = parsed && typeof parsed === 'object' && 
+                             (parsed.ct || parsed.iv || parsed.s || parsed.salt);
+          } catch (e) {
+            // Not JSON, probably not encrypted
+            isEncryptedData = false;
+          }
+          
+          // Only try to decrypt if it looks like encrypted data
+          if (isEncryptedData && token) {
+            const SEA = await import("gun/sea.js");
+            const decrypted = await SEA.default.decrypt(body, token);
 
-          if (decrypted) {
-            console.log(`✅ Decryption successful!`);
+            if (decrypted) {
+              console.log(`✅ Decryption successful!`);
 
-            // Check if decrypted data is a data URL
-            if (typeof decrypted === 'string' && decrypted.startsWith("data:")) {
-              console.log(`📁 Detected data URL, extracting content type and data`);
+              // Check if decrypted data is a data URL
+              if (typeof decrypted === 'string' && decrypted.startsWith("data:")) {
+                console.log(`📁 Detected data URL, extracting content type and data`);
 
-              const matches = decrypted.match(/^data:([^;]+);base64,(.+)$/);
-              if (matches) {
-                const contentType = matches[1];
-                const base64Data = matches[2];
-                const buffer = Buffer.from(base64Data, "base64");
+                const matches = decrypted.match(/^data:([^;]+);base64,(.+)$/);
+                if (matches) {
+                  const contentType = matches[1];
+                  const base64Data = matches[2];
+                  const buffer = Buffer.from(base64Data, "base64");
 
-                res.setHeader("Content-Type", contentType);
-                res.setHeader("Content-Length", buffer.length);
-                res.setHeader("Cache-Control", "public, max-age=3600");
-                res.send(buffer);
+                  res.setHeader("Content-Type", contentType);
+                  res.setHeader("Content-Length", buffer.length);
+                  res.setHeader("Cache-Control", "public, max-age=3600");
+                  res.send(buffer);
+                  return;
+                } else {
+                  res.json({
+                    success: true,
+                    message: "Decryption successful but could not parse data URL",
+                    decryptedData: decrypted,
+                    originalLength: body.length,
+                  });
+                  return;
+                }
               } else {
-                res.json({
-                  success: true,
-                  message: "Decryption successful but could not parse data URL",
-                  decryptedData: decrypted,
-                  originalLength: body.length,
-                });
+                // Return as text/plain
+                res.setHeader("Content-Type", "text/plain");
+                res.send(decrypted);
+                return;
               }
             } else {
-              // Return as text/plain
-              res.setHeader("Content-Type", "text/plain");
-              res.send(decrypted);
+              // Decryption failed - file might not be encrypted or wrong token
+              console.log(`⚠️ Decryption returned null - file might not be encrypted or token is wrong`);
+              // Return original content without decryption
+              res.setHeader("Content-Type", ipfsRes.headers["content-type"] || "application/octet-stream");
+              res.setHeader("Cache-Control", "public, max-age=3600");
+              res.send(body);
+              return;
             }
           } else {
-            res.status(400).json({
-              success: false,
-              error: "Decryption failed - invalid token or corrupted data",
-            });
+            // File doesn't look encrypted, return as-is
+            console.log(`📤 File doesn't appear to be encrypted, returning as-is`);
+            res.setHeader("Content-Type", ipfsRes.headers["content-type"] || "application/octet-stream");
+            res.setHeader("Cache-Control", "public, max-age=3600");
+            res.send(body);
+            return;
           }
         } catch (decryptError) {
           console.error("❌ Decryption error:", decryptError);
-          res.status(500).json({
-            success: false,
-            error: "Decryption error",
-            details: decryptError.message,
-          });
+          // On error, try to return original content
+          console.log(`⚠️ Returning original content due to decryption error`);
+          if (!res.headersSent) {
+            res.setHeader("Content-Type", ipfsRes.headers["content-type"] || "application/octet-stream");
+            res.setHeader("Cache-Control", "public, max-age=3600");
+            res.send(body);
+          }
         }
       });
     });
@@ -1980,9 +2038,10 @@ router.get("/user-uploads/:userAddress/:hash/view", async (req, res) => {
     }
 
     // Check if file is encrypted (SEA encrypted files are JSON)
-    // Encrypted files have mimetype 'application/json' or name ends with '.encrypted'
+    // Encrypted files have mimetype 'application/json', 'text/plain' (with .enc extension), or name ends with '.encrypted' or '.enc'
     const isEncrypted = uploadRecord.mimetype === 'application/json' || 
-                        (uploadRecord.name && uploadRecord.name.endsWith('.encrypted'));
+                        uploadRecord.mimetype === 'text/plain' ||
+                        (uploadRecord.name && (uploadRecord.name.endsWith('.encrypted') || uploadRecord.name.endsWith('.enc')));
     
     // For encrypted files, we need to return as JSON so client can decrypt
     // For non-encrypted files, use the original mimetype
