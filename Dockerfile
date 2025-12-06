@@ -93,6 +93,9 @@ RUN ln -sf /usr/local/bin/node /usr/bin/node
 RUN adduser -D -s /bin/sh ipfs \
     && mkdir -p /data/ipfs \
     && mkdir -p /app/relay \
+    && mkdir -p /app/relay/data \
+    && mkdir -p /app/relay/holster-data \
+    && mkdir -p /app/keys \
     && mkdir -p /var/log/supervisor \
     && mkdir -p /home/ipfs/.config/ipfs/denylists \
     && mkdir -p /root/.config/ipfs/denylists \

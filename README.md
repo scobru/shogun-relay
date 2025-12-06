@@ -34,14 +34,15 @@ In practice, instead of orchestrating 3-4 different services, you start a single
 2. [Architecture at a Glance](#architecture-at-a-glance)
 3. [Getting Started](#getting-started)
 4. [Configuration](#configuration)
-5. [Admin Authentication](#admin-authentication)
-6. [Admin Interfaces](#admin-interfaces)
-7. [API Overview](#api-overview)
-8. [Key Tools](#key-tools)
-9. [Development Notes](#development-notes)
-10. [Troubleshooting](#troubleshooting)
-11. [Contributing](#contributing)
-12. [License](#license)
+5. [Docker Persistence](#docker-persistence)
+6. [Admin Authentication](#admin-authentication)
+7. [Admin Interfaces](#admin-interfaces)
+8. [API Overview](#api-overview)
+9. [Key Tools](#key-tools)
+10. [Development Notes](#development-notes)
+11. [Troubleshooting](#troubleshooting)
+12. [Contributing](#contributing)
+13. [License](#license)
 
 ---
 
