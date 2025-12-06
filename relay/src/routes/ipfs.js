@@ -1979,9 +1979,14 @@ router.get("/user-uploads/:userAddress/:hash/view", async (req, res) => {
       });
     }
 
-    // Use the IPFS cat endpoint to stream the file
-    // Determine content type from mimetype or filename
-    const mimetype = uploadRecord.mimetype || 'application/octet-stream';
+    // Check if file is encrypted (SEA encrypted files are JSON)
+    // Encrypted files have mimetype 'application/json' or name ends with '.encrypted'
+    const isEncrypted = uploadRecord.mimetype === 'application/json' || 
+                        (uploadRecord.name && uploadRecord.name.endsWith('.encrypted'));
+    
+    // For encrypted files, we need to return as JSON so client can decrypt
+    // For non-encrypted files, use the original mimetype
+    const mimetype = isEncrypted ? 'application/json' : (uploadRecord.mimetype || 'application/octet-stream');
     const filename = uploadRecord.name || hash;
     
     const requestOptions = {
@@ -2002,13 +2007,23 @@ router.get("/user-uploads/:userAddress/:hash/view", async (req, res) => {
       // Set appropriate headers based on request (view vs download)
       const isDownload = req.query.download === 'true' || req.query.dl === 'true';
       
-      if (isDownload) {
-        res.setHeader("Content-Type", mimetype);
-        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      // For encrypted files, always return as JSON (client will decrypt)
+      // For non-encrypted files, use original mimetype
+      if (isEncrypted) {
+        // Encrypted files must be returned as JSON for client-side decryption
+        res.setHeader("Content-Type", "application/json");
+        res.setHeader("Content-Disposition", isDownload 
+          ? `attachment; filename="${filename}"` 
+          : `inline; filename="${filename}"`);
       } else {
-        // View in browser
-        res.setHeader("Content-Type", mimetype);
-        res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+        if (isDownload) {
+          res.setHeader("Content-Type", mimetype);
+          res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        } else {
+          // View in browser
+          res.setHeader("Content-Type", mimetype);
+          res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+        }
       }
       res.setHeader("Cache-Control", "public, max-age=31536000"); // 1 year cache
 
