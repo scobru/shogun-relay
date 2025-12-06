@@ -125,6 +125,14 @@ COPY relay/package*.json /app/relay/
 WORKDIR /app/relay
 RUN npm install --omit=dev
 
+# Build shogun-contracts SDK if needed (for local installations)
+# This ensures the SDK is compiled even if shogun-contracts is installed locally
+RUN if [ -d "node_modules/shogun-contracts/sdk" ] && [ ! -f "node_modules/shogun-contracts/sdk/dist/index.js" ]; then \
+      echo "🔨 Building shogun-contracts SDK..." && \
+      cd node_modules/shogun-contracts && \
+      npm run build:sdk 2>/dev/null || echo "⚠️  SDK build skipped (may already be compiled)"; \
+    fi
+
 # Copy the rest of the application
 COPY relay/ /app/relay/
 
