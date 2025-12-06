@@ -418,8 +418,25 @@ export async function syncDealsWithIPFS(relayAddress, chainId, options = {}) {
         
         if (pinned) {
           console.log(`✅ Deal ${dealId}: CID ${cid} already pinned`);
+          // Clear from failure cache if it was there
+          pinFailureCache.delete(cid);
           results.alreadyPinned++;
           continue;
+        }
+
+        // Check if this CID recently failed pinning
+        const failureInfo = pinFailureCache.get(cid);
+        if (failureInfo) {
+          const timeSinceLastAttempt = Date.now() - failureInfo.lastAttempt;
+          const shouldRetry = failureInfo.consecutiveFailures < MAX_CONSECUTIVE_FAILURES
+            ? timeSinceLastAttempt >= PIN_RETRY_DELAY_MS
+            : timeSinceLastAttempt >= (PIN_RETRY_DELAY_MS * 12); // 1 hour for high failure count
+          
+          if (!shouldRetry) {
+            const minutesSinceAttempt = Math.floor(timeSinceLastAttempt / 60000);
+            console.log(`⏭️ Deal ${dealId}: CID ${cid} failed ${failureInfo.consecutiveFailures} time(s) recently (${minutesSinceAttempt}m ago). Skipping retry for now.`);
+            continue;
+          }
         }
 
         // Pin the CID if not in dry run mode
@@ -468,6 +485,12 @@ export async function syncDealsWithIPFS(relayAddress, chainId, options = {}) {
                 // Only log and track as failed if not a shutdown error
                 if (!pinResult.shutdownError && !isShuttingDown) {
                   console.warn(`⚠️ Deal ${dealId}: Failed to pin CID ${cid}: ${pinResult.error}`);
+                  // Track failure for rate limiting
+                  const existingFailure = pinFailureCache.get(cid) || { consecutiveFailures: 0 };
+                  pinFailureCache.set(cid, {
+                    lastAttempt: Date.now(),
+                    consecutiveFailures: existingFailure.consecutiveFailures + 1,
+                  });
                   results.failed++;
                   results.errors.push({
                     dealId,
