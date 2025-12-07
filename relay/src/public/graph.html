@@ -13,6 +13,15 @@
     <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
     <script src="lib/admin-auth.js"></script>
     <script src="lib/admin-nav.js"></script>
+    
+    <script type="importmap">
+    {
+        "imports": {
+            "gun": "data:text/javascript;charset=utf-8,export default window.Gun;",
+            "gun/sea.js": "data:text/javascript;charset=utf-8,export default window.SEA;"
+        }
+    }
+    </script>
     <style>
       :root {
         --relay-bg: #1a1a1a;
