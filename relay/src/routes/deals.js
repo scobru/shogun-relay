@@ -12,7 +12,8 @@
  */
 
 import express from 'express';
-// http import removed
+import http from 'http';
+import https from 'https';
 import crypto from 'crypto';
 import multer from 'multer';
 import FormData from 'form-data';
@@ -760,9 +761,12 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
       try {
         console.log(`📌 Pinning CID ${deal.cid} for deal ${dealId}...`);
         const IPFS_API_URL = process.env.IPFS_API_URL || 'http://127.0.0.1:5001';
+        const url = new URL(IPFS_API_URL);
+        const isHttps = url.protocol === 'https:';
+        const protocolModule = isHttps ? https : http;
         const pinOptions = {
-          hostname: '127.0.0.1',
-          port: 5001,
+          hostname: url.hostname,
+          port: url.port || (isHttps ? 443 : 5001),
           path: `/api/v0/pin/add?arg=${encodeURIComponent(deal.cid)}`,
           method: 'POST',
           headers: { 'Content-Length': '0' },
@@ -773,7 +777,7 @@ router.post('/:dealId/activate', express.json(), async (req, res) => {
         }
         
         await new Promise((resolve, reject) => {
-          const req = http.request(pinOptions, (res) => {
+          const req = protocolModule.request(pinOptions, (res) => {
             let data = '';
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
@@ -1424,9 +1428,11 @@ router.get('/:dealId/verify', async (req, res) => {
     const makeIpfsRequest = (path, method = 'POST') => {
       return new Promise((resolve, reject) => {
         const url = new URL(IPFS_API_URL);
+        const isHttps = url.protocol === 'https:';
+        const protocolModule = isHttps ? https : http;
         const options = {
           hostname: url.hostname,
-          port: url.port || 5001,
+          port: url.port || (isHttps ? 443 : 5001),
           path: `/api/v0${path}`,
           method,
           headers: { 'Content-Length': '0' },
@@ -1436,7 +1442,7 @@ router.get('/:dealId/verify', async (req, res) => {
           options.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
         }
         
-        const req = http.request(options, (res) => {
+        const req = protocolModule.request(options, (res) => {
           let data = '';
           res.on('data', chunk => data += chunk);
           res.on('end', () => {
@@ -1525,9 +1531,11 @@ router.get('/:dealId/verify', async (req, res) => {
     
     try {
       const url = new URL(IPFS_API_URL);
+      const isHttps = url.protocol === 'https:';
+      const protocolModule = isHttps ? https : http;
       const catOptions = {
         hostname: url.hostname,
-        port: url.port || 5001,
+        port: url.port || (isHttps ? 443 : 5001),
         path: `/api/v0/cat?arg=${encodeURIComponent(cid)}&length=256`,
         method: 'POST',
         headers: { 'Content-Length': '0' },
@@ -1538,7 +1546,7 @@ router.get('/:dealId/verify', async (req, res) => {
       }
       
       const catData = await new Promise((resolve, reject) => {
-        const req = http.request(catOptions, (res) => {
+        const req = protocolModule.request(catOptions, (res) => {
           const chunks = [];
           res.on('data', chunk => chunks.push(chunk));
           res.on('end', () => {
@@ -1699,9 +1707,11 @@ router.get('/:dealId/verify-proof', async (req, res) => {
     let contentSample = null;
     try {
       const url = new URL(IPFS_API_URL);
+      const isHttps = url.protocol === 'https:';
+      const protocolModule = isHttps ? https : http;
       const catOptions = {
         hostname: url.hostname,
-        port: url.port || 5001,
+        port: url.port || (isHttps ? 443 : 5001),
         path: `/api/v0/cat?arg=${encodeURIComponent(cid)}&length=256`,
         method: 'POST',
         headers: { 'Content-Length': '0' },
@@ -1712,7 +1722,7 @@ router.get('/:dealId/verify-proof', async (req, res) => {
       }
       
       const catData = await new Promise((resolve, reject) => {
-        const req = http.request(catOptions, (res) => {
+        const req = protocolModule.request(catOptions, (res) => {
           const chunks = [];
           res.on('data', chunk => chunks.push(chunk));
           res.on('end', () => {
