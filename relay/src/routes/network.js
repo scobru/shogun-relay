@@ -560,31 +560,53 @@ router.get('/reputation/:host', async (req, res) => {
 
     let { host } = req.params;
     
-    // If host looks like a URL, extract hostname
+    // Normalize host - extract hostname if it's a URL
+    let normalizedHost = host;
     try {
-      const url = new URL(host.startsWith('http') ? host : `https://${host}`);
-      host = url.hostname;
+      // If it looks like a URL, extract hostname
+      if (host.includes('://') || (host.includes('.') && !host.includes(' '))) {
+        const url = new URL(host.startsWith('http') ? host : `https://${host}`);
+        normalizedHost = url.hostname;
+      }
     } catch (e) {
       // Not a URL, use as-is (might be just hostname)
+      normalizedHost = host;
     }
     
-    // Try to get reputation with the provided host
-    let reputation = await Reputation.getReputation(gun, host);
+    // Try to get reputation with the normalized hostname (without https://)
+    let reputation = await Reputation.getReputation(gun, normalizedHost);
     
     // If not found, try alternative host formats
     if (!reputation) {
+      // Try with the original host parameter (might be stored with different format)
+      if (host !== normalizedHost) {
+        reputation = await Reputation.getReputation(gun, host);
+      }
+      
       // Try with current relay's host if it matches
-      const relayHost = process.env.RELAY_HOST || process.env.RELAY_ENDPOINT;
-      if (relayHost) {
-        try {
-          const relayUrl = new URL(relayHost.startsWith('http') ? relayHost : `https://${relayHost}`);
-          const relayHostname = relayUrl.hostname;
-          if (relayHostname === host) {
-            // Try with the full endpoint as stored
-            reputation = await Reputation.getReputation(gun, relayHost);
+      if (!reputation) {
+        const relayHost = process.env.RELAY_HOST || process.env.RELAY_ENDPOINT;
+        if (relayHost) {
+          try {
+            let relayHostname = relayHost;
+            // Extract hostname from relay host if it's a URL
+            if (relayHost.includes('://')) {
+              const relayUrl = new URL(relayHost);
+              relayHostname = relayUrl.hostname;
+            }
+            
+            // If hostname matches, try both formats
+            if (relayHostname === normalizedHost || relayHostname === host) {
+              // Try with the full endpoint as stored
+              reputation = await Reputation.getReputation(gun, relayHost);
+              // Also try with just the hostname
+              if (!reputation) {
+                reputation = await Reputation.getReputation(gun, relayHostname);
+              }
+            }
+          } catch (e) {
+            // Ignore URL parsing errors
           }
-        } catch (e) {
-          // Ignore URL parsing errors
         }
       }
     }
@@ -593,14 +615,28 @@ router.get('/reputation/:host', async (req, res) => {
       return res.status(404).json({
         success: false,
         error: 'Relay not found or no reputation data',
-        host,
+        host: normalizedHost,
+        searchedHosts: [normalizedHost, host].filter((h, i, arr) => arr.indexOf(h) === i),
         hint: 'Reputation may not be initialized yet. The relay needs to send pulses to build reputation data.',
       });
     }
 
+    // Ensure uptimePercent and proofSuccessRate are always present
+    if (reputation.uptimePercent === undefined || reputation.uptimePercent === null) {
+      reputation.uptimePercent = reputation.receivedPulses && reputation.expectedPulses > 0
+        ? (reputation.receivedPulses / reputation.expectedPulses) * 100
+        : null;
+    }
+    
+    if (reputation.proofSuccessRate === undefined || reputation.proofSuccessRate === null) {
+      reputation.proofSuccessRate = reputation.proofsTotal > 0
+        ? (reputation.proofsSuccessful / reputation.proofsTotal) * 100
+        : null;
+    }
+
     res.json({
       success: true,
-      host,
+      host: normalizedHost,
       reputation,
     });
   } catch (error) {
