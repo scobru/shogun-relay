@@ -47,6 +47,7 @@ import networkRouter from "./network.js";
 import dealsRouter from "./deals.js";
 import registryRouter from "./registry.js";
 import { ipfsRequest } from "../utils/ipfs-client.js";
+import { generateOpenAPISpec } from "../utils/openapi-generator.js";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -462,6 +463,22 @@ export default (app) => {
   app.get("/rpc-console", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "rpc-console.html"));
+  });
+
+  // OpenAPI Specification endpoint
+  app.get("/api/openapi.json", (req, res) => {
+    try {
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const spec = generateOpenAPISpec(baseUrl);
+      res.setHeader('Content-Type', 'application/json');
+      res.json(spec);
+    } catch (error) {
+      console.error('Error generating OpenAPI spec:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to generate OpenAPI specification' 
+      });
+    }
   });
 
   app.get("/endpoints", (req, res) => {
