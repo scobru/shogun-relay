@@ -740,7 +740,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
       // Looks like a signature (long hex string), verify it if ethers is available
       try {
         const { ethers } = await import('ethers');
-        const expectedMessage = `Shogun File Encryption\nAddress: ${userAddress.toLowerCase()}`;
+        const expectedMessage = 'I Love Shogun';
         const recoveredAddress = ethers.verifyMessage(expectedMessage, token);
         
         if (recoveredAddress.toLowerCase() !== userAddress.toLowerCase()) {
