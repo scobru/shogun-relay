@@ -64,6 +64,24 @@ export default (app) => {
   // Configurazione generale delle route
   const baseRoute = "/api/v1";
 
+  // OpenAPI Specification endpoint - Must be registered BEFORE other API routes
+  app.get("/api/openapi.json", (req, res) => {
+    try {
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const spec = generateOpenAPISpec(baseUrl);
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Access-Control-Allow-Origin', '*'); // Allow CORS for API docs
+      res.json(spec);
+    } catch (error) {
+      console.error('Error generating OpenAPI spec:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to generate OpenAPI specification',
+        details: error.message 
+      });
+    }
+  });
+
   // Applica rate limiting generale
   app.use(generalLimiter);
 
@@ -463,22 +481,6 @@ export default (app) => {
   app.get("/rpc-console", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "rpc-console.html"));
-  });
-
-  // OpenAPI Specification endpoint
-  app.get("/api/openapi.json", (req, res) => {
-    try {
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const spec = generateOpenAPISpec(baseUrl);
-      res.setHeader('Content-Type', 'application/json');
-      res.json(spec);
-    } catch (error) {
-      console.error('Error generating OpenAPI spec:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Failed to generate OpenAPI specification' 
-      });
-    }
   });
 
   app.get("/endpoints", (req, res) => {

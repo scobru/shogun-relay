@@ -11,8 +11,8 @@
     <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     
-    <!-- RapiDoc -->
-    <script type="module" src="https://unpkg.com/rapidoc/dist/rapidoc-min.js"></script>
+    <!-- RapiDoc - Using UMD version for better compatibility -->
+    <script src="https://unpkg.com/rapidoc@9.3.4/dist/rapidoc-min.js"></script>
     
     <style>
         body {
@@ -115,8 +115,15 @@
                 </div>
             </div>
 
+            <!-- Loading indicator -->
+            <div id="loadingIndicator" class="card bg-[#282828] border border-[#404040] rounded-2xl p-8 text-center">
+                <div class="text-[#FF69B4] mb-4">Loading API documentation...</div>
+                <div class="text-[#A0A0A0] text-sm">Fetching OpenAPI specification from /api/openapi.json</div>
+            </div>
+
             <!-- RapiDoc Component -->
             <rapidoc
+                id="rapidoc-element"
                 spec-url="/api/openapi.json"
                 theme="dark"
                 render-style="read"
@@ -144,6 +151,7 @@
                 show-schema-description="true"
                 schema-style="table"
                 schema-expand-level="2"
+                style="display: none;"
             ></rapidoc>
         </div>
     </div>
@@ -153,9 +161,100 @@
     <script src="lib/admin-nav.js"></script>
 
     <script>
-        // RapiDoc will automatically load the spec from /api/openapi.json
-        // No need for manual loading since we're using spec-url attribute
-        console.log('API Documentation page loaded. RapiDoc will fetch spec from /api/openapi.json');
+        // Wait for DOM and RapiDoc to be ready
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('API Documentation page loaded');
+            
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const rapidocEl = document.getElementById('rapidoc-element');
+            
+            // First, test if the endpoint is accessible
+            fetch('/api/openapi.json')
+                .then(response => {
+                    console.log('OpenAPI endpoint response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(spec => {
+                    console.log('✅ OpenAPI spec loaded successfully:', spec.info?.title || 'Unknown');
+                    console.log('📊 Number of paths:', Object.keys(spec.paths || {}).length);
+                    
+                    // Wait a bit for RapiDoc to initialize, then show it
+                    setTimeout(() => {
+                        if (rapidocEl) {
+                            // Check if RapiDoc has loaded the spec
+                            if (rapidocEl.shadowRoot) {
+                                console.log('✅ RapiDoc shadow root found');
+                                loadingIndicator.style.display = 'none';
+                                rapidocEl.style.display = 'block';
+                            } else {
+                                // Force show after a delay
+                                setTimeout(() => {
+                                    loadingIndicator.style.display = 'none';
+                                    rapidocEl.style.display = 'block';
+                                }, 1000);
+                            }
+                        }
+                    }, 500);
+                })
+                .catch(error => {
+                    console.error('❌ Error loading OpenAPI spec:', error);
+                    if (loadingIndicator) {
+                        loadingIndicator.innerHTML = `
+                            <div style="color: #F44336; margin-bottom: 1rem;">
+                                <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Error loading API documentation</h2>
+                                <p style="color: #A0A0A0; font-size: 0.9rem;">${error.message}</p>
+                            </div>
+                            <div style="margin-top: 1rem;">
+                                <a href="/api/openapi.json" target="_blank" style="color: #42A5F5; text-decoration: underline;">
+                                    Try opening the spec directly
+                                </a>
+                            </div>
+                        `;
+                    }
+                });
+            
+            // Monitor RapiDoc events if available
+            if (rapidocEl) {
+                // Listen for RapiDoc custom events
+                rapidocEl.addEventListener('spec-loaded', (e) => {
+                    console.log('✅ RapiDoc spec loaded event fired');
+                    if (loadingIndicator) loadingIndicator.style.display = 'none';
+                    rapidocEl.style.display = 'block';
+                });
+                
+                rapidocEl.addEventListener('spec-error', (e) => {
+                    console.error('❌ RapiDoc spec error:', e.detail);
+                    if (loadingIndicator) {
+                        loadingIndicator.innerHTML = `
+                            <div style="color: #F44336;">
+                                <h2>RapiDoc Error</h2>
+                                <p>${e.detail || 'Unknown error'}</p>
+                            </div>
+                        `;
+                    }
+                });
+                
+                // Fallback: Check after 3 seconds if RapiDoc loaded
+                setTimeout(() => {
+                    if (loadingIndicator && loadingIndicator.style.display !== 'none') {
+                        // Try to manually load the spec
+                        fetch('/api/openapi.json')
+                            .then(r => r.json())
+                            .then(spec => {
+                                if (rapidocEl.setAttribute) {
+                                    rapidocEl.setAttribute('spec', JSON.stringify(spec));
+                                    loadingIndicator.style.display = 'none';
+                                    rapidocEl.style.display = 'block';
+                                }
+                            })
+                            .catch(err => console.error('Fallback load failed:', err));
+                    }
+                }, 3000);
+            }
+        });
     </script>
 </body>
 </html>
