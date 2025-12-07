@@ -61,5 +61,21 @@ export class RegistryModule {
       evidence,
     });
   }
+
+  public async griefDeal(dealId: string, slashAmount: string, reason: string): Promise<any> {
+    return this.client.post('/api/v1/registry/deal/grief', {
+      dealId,
+      slashAmount,
+      reason,
+    });
+  }
+
+  public async getParams(): Promise<any> {
+    return this.client.get('/api/v1/registry/params');
+  }
+
+  public async getConfig(): Promise<any> {
+    return this.client.get('/api/v1/registry/config');
+  }
 }
 

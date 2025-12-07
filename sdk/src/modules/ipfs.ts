@@ -47,4 +47,35 @@ export class IpfsModule {
     // Note: relay's pin/ls endpoint lists all pins and doesn't support filtering by CID
     return this.client.get('/api/v1/ipfs/pin/ls');
   }
+
+  public async catJson(cid: string): Promise<any> {
+    return this.client.get(`/api/v1/ipfs/cat/${cid}/json`);
+  }
+
+  public async catDecrypt(cid: string, token: string, userAddress?: string): Promise<Buffer> {
+    const params: any = { token };
+    const headers: any = {};
+    
+    if (userAddress) {
+      headers['x-user-address'] = userAddress;
+    }
+    
+    return this.client.get(`/api/v1/ipfs/cat/${cid}/decrypt`, {
+      params,
+      headers,
+      responseType: 'arraybuffer',
+    });
+  }
+
+  public async repoGC(): Promise<any> {
+    return this.client.post('/api/v1/ipfs/repo/gc');
+  }
+
+  public async repoStat(): Promise<any> {
+    return this.client.get('/api/v1/ipfs/repo/stat');
+  }
+
+  public async getVersion(): Promise<any> {
+    return this.client.get('/api/v1/ipfs/version');
+  }
 }

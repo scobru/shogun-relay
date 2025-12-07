@@ -34,4 +34,26 @@ export class X402Module {
   public async getStorageUsage(userAddress: string): Promise<any> {
     return this.client.get(`/api/v1/x402/storage/${userAddress}`);
   }
+
+  public async canUploadVerified(userAddress: string, sizeMB: number): Promise<any> {
+    return this.client.get(`/api/v1/x402/can-upload-verified/${userAddress}?size=${sizeMB}`);
+  }
+
+  public async getRecommendation(fileSizeMB: number, durationDays: number, userAddress?: string): Promise<any> {
+    const params: any = {
+      fileSizeMB,
+      durationDays,
+    };
+    if (userAddress) params.userAddress = userAddress;
+    
+    return this.client.get('/api/v1/x402/recommend', { params });
+  }
+
+  public async getConfig(): Promise<any> {
+    return this.client.get('/api/v1/x402/config');
+  }
+
+  public async getRelayStorage(): Promise<any> {
+    return this.client.get('/api/v1/x402/relay-storage');
+  }
 }

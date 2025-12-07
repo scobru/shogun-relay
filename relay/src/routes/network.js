@@ -17,6 +17,11 @@ import * as FrozenData from '../utils/frozen-data.js';
 import { getRelayUser } from '../utils/relay-user.js';
 import { createRegistryClient, REGISTRY_ADDRESSES } from '../utils/registry-client.js';
 
+// Helper to get relay user with keypair for reputation tracking
+function getRelayUserWithKeyPair() {
+  return getRelayUser();
+}
+
 const router = express.Router();
 
 // IPFS Configuration handled by ipfs-client.js
@@ -303,7 +308,9 @@ router.get('/proof/:cid', async (req, res) => {
     // Record successful proof for reputation tracking
     if (gun && host) {
       try {
-        await Reputation.recordProofSuccess(gun, host, responseTime);
+        const relayUser = getRelayUserWithKeyPair();
+        const keyPair = relayUser?._.sea || null;
+        await Reputation.recordProofSuccess(gun, host, responseTime, keyPair);
       } catch (e) {
         // Non-critical, don't block proof generation
         console.warn('Failed to record proof success for reputation:', e.message);
@@ -339,7 +346,9 @@ router.get('/proof/:cid', async (req, res) => {
     const host = process.env.RELAY_HOST || process.env.RELAY_ENDPOINT || req.headers.host || 'localhost';
     if (gun && host) {
       try {
-        await Reputation.recordProofFailure(gun, host);
+        const relayUser = getRelayUserWithKeyPair();
+        const keyPair = relayUser?._.sea || null;
+        await Reputation.recordProofFailure(gun, host, keyPair);
       } catch (e) {
         console.warn('Failed to record proof failure for reputation:', e.message);
       }
@@ -695,10 +704,13 @@ router.post('/reputation/record-proof', express.json(), async (req, res) => {
       return res.status(400).json({ success: false, error: 'host required' });
     }
 
+    const relayUser = getRelayUserWithKeyPair();
+    const keyPair = relayUser?._.sea || null;
+    
     if (success) {
-      await Reputation.recordProofSuccess(gun, host, responseTimeMs);
+      await Reputation.recordProofSuccess(gun, host, responseTimeMs, keyPair);
     } else {
-      await Reputation.recordProofFailure(gun, host);
+      await Reputation.recordProofFailure(gun, host, keyPair);
     }
 
     res.json({

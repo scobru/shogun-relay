@@ -403,29 +403,18 @@ router.post("/upload",
                 });
               });
 
-              // Update MB usage with Promise
-              const updateMBPromise = new Promise((resolve, reject) => {
-                const mbUsageNode = gun.get("shogun").get("mbUsage").get(req.userAddress);
-                mbUsageNode.once((currentUsage) => {
-                  console.log(`📊 Current MB usage:`, currentUsage);
-                  const newUsage = {
-                    mbUsed: (currentUsage?.mbUsed || 0) + fileSizeMB,
-                    lastUpdated: Date.now(),
-                    updatedBy: "file-upload",
-                  };
-                  console.log(`📊 New MB usage:`, newUsage);
-                  mbUsageNode.put(newUsage, (mbAck) => {
-                    console.log(`📊 MB usage update ack:`, mbAck);
-                    if (mbAck && mbAck.err) {
-                      console.error(`❌ Error updating MB usage:`, mbAck.err);
-                      reject(new Error(mbAck.err));
-                    } else {
-                      console.log(`✅ MB usage updated successfully`);
-                      resolve();
-                    }
-                  });
-                });
-              });
+              // Update MB usage with Promise (legacy system)
+              const updateMBPromise = (async () => {
+                try {
+                  const { updateMBUsage } = await import('../utils/storage-utils.js');
+                  const newMB = await updateMBUsage(gun, req.userAddress, fileSizeMB);
+                  console.log(`✅ MB usage updated successfully: ${newMB}MB`);
+                  return newMB;
+                } catch (error) {
+                  console.error(`❌ Error updating MB usage:`, error.message);
+                  throw error;
+                }
+              })();
 
               // Save hash to systemhash node with Promise
               const saveSystemHashPromise = new Promise((resolve) => {
@@ -2576,16 +2565,16 @@ router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
     console.log(`📊 Updating storage usage (-${fileSizeMB.toFixed(2)}MB)...`);
     
     try {
-      // Get current subscription and update storage
-      const currentSub = await X402Merchant.getSubscriptionStatus(gun, userAddress);
-      const newUsage = Math.max(0, (currentSub.storageUsedMB || 0) - fileSizeMB);
-      
-      const RelayUser = await import('../utils/relay-user.js');
-      await RelayUser.updateSubscriptionField(userAddress, 'storageUsedMB', newUsage);
-      
-      console.log(`✅ Storage updated: ${newUsage.toFixed(2)}MB`);
+      // Use centralized method for consistency
+      const updateResult = await X402Merchant.updateStorageUsage(gun, userAddress, -fileSizeMB);
+      console.log(`✅ Storage updated via X402Merchant: ${updateResult.storageUsedMB.toFixed(2)}MB used, ${updateResult.storageRemainingMB.toFixed(2)}MB remaining`);
     } catch (updateError) {
-      console.warn(`⚠️ Failed to update storage:`, updateError.message);
+      // If subscription is not active, this is expected - just log warning
+      if (updateError.message.includes('No active subscription')) {
+        console.log(`ℹ️ No active subscription for ${userAddress}, skipping storage update`);
+      } else {
+        console.warn(`⚠️ Failed to update storage:`, updateError.message);
+      }
     }
 
     // Get updated subscription status

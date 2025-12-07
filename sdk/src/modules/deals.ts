@@ -54,12 +54,40 @@ export class DealsModule {
     return this.client.get(`/api/v1/deals/by-client/${address}`);
   }
 
-  public async grief(dealId: string, slashAmount: string, reason: string): Promise<any> {
-    return this.client.post('/api/v1/registry/deal/grief', {
-      dealId,
-      slashAmount,
-      reason,
+  public async getDeal(dealId: string): Promise<any> {
+    return this.client.get(`/api/v1/deals/${dealId}`);
+  }
+
+  public async verifyDeal(dealId: string, clientAddress?: string): Promise<any> {
+    const params: any = {};
+    if (clientAddress) params.clientAddress = clientAddress;
+    
+    return this.client.get(`/api/v1/deals/${dealId}/verify`, { params });
+  }
+
+  public async renewDeal(dealId: string, additionalDays: number, payment?: any): Promise<any> {
+    return this.client.post(`/api/v1/deals/${dealId}/renew`, {
+      additionalDays,
+      payment,
     });
+  }
+
+  public async cancelDeal(dealId: string, clientAddress: string, reason?: string): Promise<any> {
+    return this.client.post(`/api/v1/deals/${dealId}/cancel`, {
+      clientAddress,
+      reason: reason || 'User requested cancellation',
+    });
+  }
+
+  public async getDealStats(): Promise<any> {
+    return this.client.get('/api/v1/deals/stats');
+  }
+
+  public async getLeaderboard(limit?: number): Promise<any> {
+    const params: any = {};
+    if (limit) params.limit = limit;
+    
+    return this.client.get('/api/v1/deals/leaderboard', { params });
   }
 }
 

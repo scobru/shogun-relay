@@ -1,6 +1,6 @@
 {
   "name": "@shogun/relay-sdk",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "SDK for interacting with Shogun Relay",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -15,7 +15,7 @@
     "ipfs",
     "gun"
   ],
-  "author": "",
+  "author": "scobru",
   "license": "MIT",
   "dependencies": {
     "axios": "^1.6.0",

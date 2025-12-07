@@ -108,7 +108,7 @@ async function getAllSystemHashes(req) {
 // Funzione helper per eliminare upload e aggiornare MB
 async function deleteUploadAndUpdateMB(userAddress, fileHash, fileSizeMB, req) {
   const gun = getGunInstance(req);
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     try {
       gun.get("shogun").get("uploads").get(userAddress).get(fileHash).put(null, (ack) => {
         if (ack && ack.err) {
@@ -116,22 +116,16 @@ async function deleteUploadAndUpdateMB(userAddress, fileHash, fileSizeMB, req) {
           return;
         }
 
-        gun.get("shogun").get("mbUsage").get(userAddress).once((currentData) => {
-          const currentMB = currentData ? (currentData.mbUsed || 0) : 0;
-          const newMB = Math.max(0, currentMB - fileSizeMB);
-
-          gun.get("shogun").get("mbUsage").get(userAddress).put({
-            mbUsed: newMB,
-            lastUpdated: Date.now(),
-            userAddress: userAddress
-          }, (mbAck) => {
-            if (mbAck && mbAck.err) {
-              reject(new Error(mbAck.err));
-            } else {
-              resolve(newMB);
-            }
-          });
-        });
+        // Use centralized helper for MB usage update
+        (async () => {
+          try {
+            const { updateMBUsage } = await import('../utils/storage-utils.js');
+            const newMB = await updateMBUsage(gun, userAddress, -fileSizeMB);
+            resolve(newMB);
+          } catch (error) {
+            reject(error);
+          }
+        })();
       });
     } catch (error) {
       reject(error);
@@ -599,42 +593,11 @@ router.delete("/:identifier/:hash", (req, res, next) => {
       });
     });
 
-    // Update MB usage after deletion
+    // Update MB usage after deletion (legacy system)
     try {
-      const currentMBData = await new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-          reject(new Error("MB usage read timeout"));
-        }, 5000);
-
-        gun.get("shogun").get("mbUsage").get(identifier).once((data) => {
-          clearTimeout(timeoutId);
-          resolve(data);
-        });
-      });
-
-      const currentMB = currentMBData ? (currentMBData.mbUsed || 0) : 0;
-      const newMB = Math.max(0, currentMB - fileSizeMB);
-
-      await new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-          reject(new Error("MB usage update timeout"));
-        }, 5000);
-
-        gun.get("shogun").get("mbUsage").get(identifier).put({
-          mbUsed: newMB,
-          lastUpdated: Date.now(),
-          userAddress: identifier
-        }, (ack) => {
-          clearTimeout(timeoutId);
-          if (ack && ack.err) {
-            console.warn(`⚠️ Failed to update MB usage:`, ack.err);
-            reject(new Error(ack.err));
-          } else {
-            console.log(`✅ MB usage updated: ${currentMB} -> ${newMB} MB`);
-            resolve();
-          }
-        });
-      });
+      const { updateMBUsage } = await import('../utils/storage-utils.js');
+      const newMB = await updateMBUsage(gun, identifier, -fileSizeMB);
+      console.log(`✅ MB usage updated: ${newMB} MB`);
     } catch (error) {
       console.warn(`⚠️ Failed to update MB usage after deletion:`, error.message);
       // Continue even if MB update fails

@@ -45,4 +45,41 @@ export class NetworkModule {
     
     return this.client.get('/api/v1/network/reputation', { params });
   }
+
+  public async getBestRelays(count?: number, minScore?: number, excludeHost?: string): Promise<any> {
+    const params: any = {};
+    if (count) params.count = count;
+    if (minScore) params.minScore = minScore;
+    if (excludeHost) params.exclude = excludeHost;
+    
+    return this.client.get('/api/v1/network/best-relays', { params });
+  }
+
+  public async getOnChainRelays(chainId?: number): Promise<any> {
+    const params: any = {};
+    if (chainId) params.chainId = chainId;
+    
+    return this.client.get('/api/v1/network/onchain/relays', { params });
+  }
+
+  public async getOnChainRelay(address: string, chainId?: number): Promise<any> {
+    const params: any = {};
+    if (chainId) params.chainId = chainId;
+    
+    return this.client.get(`/api/v1/network/onchain/relay/${address}`, { params });
+  }
+
+  public async getOnChainParams(chainId?: number): Promise<any> {
+    const params: any = {};
+    if (chainId) params.chainId = chainId;
+    
+    return this.client.get('/api/v1/network/onchain/params', { params });
+  }
+
+  public async getPinRequests(maxAge?: number): Promise<any> {
+    const params: any = {};
+    if (maxAge) params.maxAge = maxAge;
+    
+    return this.client.get('/api/v1/network/pin-requests', { params });
+  }
 }

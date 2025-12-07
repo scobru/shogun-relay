@@ -1757,10 +1757,14 @@ router.get('/:dealId/verify', async (req, res) => {
         if (isVerified) {
           // Calculate response time (approximate, since we don't track start time)
           const responseTime = 0; // Could be improved by tracking start time
-          await Reputation.recordProofSuccess(gun, normalizedHost, responseTime);
+          const relayUser = getRelayUser();
+          const keyPair = relayUser?._.sea || null;
+          await Reputation.recordProofSuccess(gun, normalizedHost, responseTime, keyPair);
           console.log(`✅ Recorded proof success for deal ${dealId} (host: ${normalizedHost})`);
         } else {
-          await Reputation.recordProofFailure(gun, normalizedHost);
+          const relayUser = getRelayUser();
+          const keyPair = relayUser?._.sea || null;
+          await Reputation.recordProofFailure(gun, normalizedHost, keyPair);
           console.log(`❌ Recorded proof failure for deal ${dealId} (host: ${normalizedHost})`);
         }
       } catch (e) {
