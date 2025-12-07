@@ -11,6 +11,8 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { ipfsRequest } from './ipfs-client.js';
 import * as RelayUser from './relay-user.js';
 import { USDC_EIP3009_ABI } from 'shogun-contracts';
+import httpModule from 'http';
+import httpsModule from 'https';
 
 // Use USDC ABI from shogun-contracts package
 const USDC_ABI = USDC_EIP3009_ABI;
@@ -973,10 +975,12 @@ export class X402Merchant {
       }, 30000);
 
       const url = new URL(ipfsApiUrl);
+      const isHttps = url.protocol === 'https:';
+      const protocolModule = isHttps ? httpsModule : httpModule;
       
       const requestOptions = {
         hostname: url.hostname,
-        port: url.port || 5001,
+        port: url.port || (isHttps ? 443 : 5001),
         path: '/api/v0/repo/stat?size-only=true',
         method: 'POST',
         headers: {
@@ -988,7 +992,7 @@ export class X402Merchant {
         requestOptions.headers['Authorization'] = `Bearer ${ipfsApiToken}`;
       }
 
-      const req = httpModule.request(requestOptions, (res) => {
+      const req = protocolModule.request(requestOptions, (res) => {
         let data = '';
         res.on('data', (chunk) => (data += chunk));
         res.on('end', () => {
@@ -1031,10 +1035,12 @@ export class X402Merchant {
       }, 60000);
 
       const url = new URL(ipfsApiUrl);
+      const isHttps = url.protocol === 'https:';
+      const protocolModule = isHttps ? httpsModule : httpModule;
       
       const requestOptions = {
         hostname: url.hostname,
-        port: url.port || 5001,
+        port: url.port || (isHttps ? 443 : 5001),
         path: '/api/v0/pin/ls?type=recursive',
         method: 'POST',
         headers: {
@@ -1046,7 +1052,7 @@ export class X402Merchant {
         requestOptions.headers['Authorization'] = `Bearer ${ipfsApiToken}`;
       }
 
-      const req = httpModule.request(requestOptions, (res) => {
+      const req = protocolModule.request(requestOptions, (res) => {
         let data = '';
         res.on('data', (chunk) => (data += chunk));
         res.on('end', async () => {
