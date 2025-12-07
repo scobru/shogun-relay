@@ -466,7 +466,7 @@
         "wss://g3ru5bwxmezpuu3ktnoclbpiw4.srv.us/gun"
       ];
 
-      const gun = Gun({ peers: GUN_PEERS, retry: 2000 });
+      const gun = Gun({ peers: GUN_PEERS, retry: 2000 , localStorage: false, radisk: false, log: () => { } });
       const user = gun.user();
       window.gun = gun;
       window.user = user;
