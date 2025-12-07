@@ -450,17 +450,31 @@ This document provides a comprehensive reference of all environment variables th
 ### `DEAL_SYNC_ENABLED`
 - **Type**: Boolean (String)
 - **Required**: No
-- **Default**: `false`
-- **Description**: Enable automatic synchronization of storage deals with on-chain registry. When enabled, deals are periodically synced with blockchain state.
+- **Default**: `true`
+- **Description**: Enable automatic near real-time synchronization of storage deals with on-chain registry. When enabled, deals are synced from blockchain to GunDB using a two-tier system: fast sync (every 2 minutes) for quick updates and full sync (every 5 minutes) for complete verification.
 - **Values**: `"true"` or `"false"`
 - **Example**: `DEAL_SYNC_ENABLED=true`
 
 ### `DEAL_SYNC_INTERVAL_MS`
 - **Type**: Integer
 - **Required**: No
-- **Default**: `21600000` (6 hours)
-- **Description**: Interval in milliseconds for deal synchronization. Only used when `DEAL_SYNC_ENABLED=true`.
-- **Example**: `DEAL_SYNC_INTERVAL_MS=21600000`
+- **Default**: `300000` (5 minutes)
+- **Description**: Interval in milliseconds for full deal synchronization. This performs a complete sync with all checks and detailed logging. Only used when `DEAL_SYNC_ENABLED=true`.
+- **Example**: `DEAL_SYNC_INTERVAL_MS=300000` (5 minutes)
+
+### `DEAL_SYNC_FAST_INTERVAL_MS`
+- **Type**: Integer
+- **Required**: No
+- **Default**: `120000` (2 minutes)
+- **Description**: Interval in milliseconds for fast deal synchronization. This performs a lightweight sync to quickly detect and sync new deals from on-chain to GunDB with minimal logging. Only used when `DEAL_SYNC_ENABLED=true`.
+- **Example**: `DEAL_SYNC_FAST_INTERVAL_MS=120000` (2 minutes)
+
+### `DEAL_SYNC_INITIAL_DELAY_MS`
+- **Type**: Integer
+- **Required**: No
+- **Default**: `30000` (30 seconds)
+- **Description**: Delay in milliseconds before starting the initial deal synchronization after relay startup. Gives IPFS time to initialize before syncing deals.
+- **Example**: `DEAL_SYNC_INITIAL_DELAY_MS=30000` (30 seconds)
 
 ---
 

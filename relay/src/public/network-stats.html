@@ -307,6 +307,30 @@
                                 <div class="stat-value" id="totalPins">-</div>
                                 <div class="stat-unit">pins</div>
                             </div>
+                            <div class="stat-card">
+                                <div class="stat-title">Active Deals</div>
+                                <div class="stat-value" id="activeDealsCount">-</div>
+                                <div class="stat-unit">deals</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-title">Active Subscriptions</div>
+                                <div class="stat-value" id="activeSubscriptionsCount">-</div>
+                                <div class="stat-unit">subscriptions</div>
+                            </div>
+                        </div>
+                        <!-- Storage Breakdown -->
+                        <div id="storageBreakdown" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #606060; display: none;">
+                            <h3 style="color: #FF69B4; font-size: 1.1rem; margin-bottom: 1rem;">Storage Breakdown</h3>
+                            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                                <div class="stat-item">
+                                    <span class="stat-label">From Deals:</span>
+                                    <span class="stat-data" id="dealStorageMB">-</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">From Subscriptions:</span>
+                                    <span class="stat-data" id="subscriptionStorageMB">-</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -458,20 +482,72 @@
                     document.getElementById('activeRelays').textContent = formatNumber(stats.activeRelays || 0);
                     document.getElementById('totalConnections').textContent = formatNumber(stats.totalConnections || 0);
                     
-                    const storageGB = parseFloat(stats.totalStorageGB || 0);
+                    // Use totalStorageBytes if available (includes deals + subscriptions), otherwise fallback to calculated values
+                    let totalStorageBytes = stats.totalStorageBytes || 0;
+                    
+                    // If totalStorageBytes is 0 but we have deal/subscription storage, calculate from those
+                    if (totalStorageBytes === 0) {
+                        const dealStorageBytes = (stats.totalDealStorageMB || 0) * 1024 * 1024;
+                        const subscriptionStorageBytes = (stats.totalSubscriptionStorageMB || 0) * 1024 * 1024;
+                        totalStorageBytes = dealStorageBytes + subscriptionStorageBytes;
+                    }
+                    
+                    // If still 0, use the calculated totalStorageMB/GB from backend
+                    if (totalStorageBytes === 0 && stats.totalStorageMB) {
+                        totalStorageBytes = stats.totalStorageMB * 1024 * 1024;
+                    }
+                    
+                    const storageGB = totalStorageBytes / (1024 * 1024 * 1024);
                     if (storageGB >= 1) {
                         document.getElementById('totalStorage').textContent = storageGB.toFixed(2);
                         document.getElementById('storageUnit').textContent = 'GB';
                     } else {
-                        const storageMB = stats.totalStorageMB || 0;
-                        document.getElementById('totalStorage').textContent = formatNumber(storageMB);
+                        const storageMB = totalStorageBytes / (1024 * 1024);
+                        document.getElementById('totalStorage').textContent = formatNumber(Math.round(storageMB));
                         document.getElementById('storageUnit').textContent = 'MB';
                     }
                     
-                    document.getElementById('totalPins').textContent = formatNumber(stats.totalPins || 0);
+                    // Total pins includes pins from IPFS + unique CIDs from active deals
+                    const totalPins = stats.totalPins || 0;
+                    document.getElementById('totalPins').textContent = formatNumber(totalPins);
+                    
+                    // Show active deals and subscriptions
+                    const activeDeals = stats.totalActiveDeals || 0;
+                    const activeSubscriptions = stats.totalActiveSubscriptions || 0;
+                    document.getElementById('activeDealsCount').textContent = formatNumber(activeDeals);
+                    document.getElementById('activeSubscriptionsCount').textContent = formatNumber(activeSubscriptions);
+                    
+                    // Show storage breakdown if available
+                    const dealStorageMB = stats.totalDealStorageMB || 0;
+                    const subscriptionStorageMB = stats.totalSubscriptionStorageMB || 0;
+                    
+                    if (dealStorageMB > 0 || subscriptionStorageMB > 0) {
+                        const breakdownDiv = document.getElementById('storageBreakdown');
+                        breakdownDiv.style.display = 'block';
+                        document.getElementById('dealStorageMB').textContent = formatNumber(dealStorageMB) + ' MB';
+                        document.getElementById('subscriptionStorageMB').textContent = formatNumber(subscriptionStorageMB) + ' MB';
+                    }
+                    
+                    // Log debug info if available
+                    if (result.debug && result.debug.sources) {
+                        console.log('Network stats sources:', result.debug.sources);
+                        console.log('Deal stats:', {
+                            activeDeals: activeDeals,
+                            dealStorageMB: dealStorageMB,
+                        });
+                        console.log('Subscription stats:', {
+                            activeSubscriptions: activeSubscriptions,
+                            subscriptionStorageMB: subscriptionStorageMB,
+                        });
+                    }
                 }
             } catch (error) {
                 console.error('Error fetching network stats:', error);
+                const errorDiv = document.getElementById('error');
+                if (errorDiv) {
+                    errorDiv.textContent = `Error loading network stats: ${error.message}`;
+                    errorDiv.style.display = 'block';
+                }
             }
         }
 
