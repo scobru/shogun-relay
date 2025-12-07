@@ -2210,6 +2210,215 @@ router.get("/user-uploads/:userAddress/:hash/download", async (req, res) => {
   return router.handle(req, res);
 });
 
+// Decrypt user uploaded file (for subscription files)
+router.get("/user-uploads/:userAddress/:hash/decrypt", async (req, res) => {
+  try {
+    const { userAddress, hash } = req.params;
+    let { token } = req.query;
+    const headerUserAddress = req.headers['x-user-address'];
+    
+    console.log(`🔓 User upload decrypt request for hash: ${hash}, User: ${userAddress}, Token: ${token ? "present" : "missing"}`);
+
+    // Verify user address matches
+    if (!headerUserAddress || headerUserAddress.toLowerCase() !== userAddress.toLowerCase()) {
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized - User address mismatch",
+      });
+    }
+
+    const gun = req.app.get('gunInstance');
+    if (!gun) {
+      return res.status(500).json({
+        success: false,
+        error: "Server error - Gun instance not available",
+      });
+    }
+
+    // Get uploads to verify file belongs to user
+    const uploads = await X402Merchant.getUserUploads(gun, userAddress);
+    const uploadRecord = uploads.find(u => u.hash === hash);
+    
+    if (!uploadRecord) {
+      return res.status(404).json({
+        success: false,
+        error: "File not found for this user",
+      });
+    }
+
+    // Verify EIP-191 signature if provided
+    let verifiedToken = null;
+    if (headerUserAddress && token && typeof token === 'string' && token.startsWith('0x')) {
+      try {
+        const { ethers } = await import('ethers');
+        const decryptionMessage = `Shogun File Encryption\nAddress: ${headerUserAddress.toLowerCase()}`;
+        const recoveredAddress = ethers.verifyMessage(decryptionMessage, token);
+        if (recoveredAddress.toLowerCase() === headerUserAddress.toLowerCase()) {
+          verifiedToken = token;
+          console.log(`✅ Signature verified for address: ${headerUserAddress}`);
+        } else {
+          console.warn(`⚠️ Signature verification failed for address: ${headerUserAddress}`);
+        }
+      } catch (signVerifyError) {
+        console.warn(`⚠️ Error verifying signature: ${signVerifyError.message}`);
+      }
+    } else if (token) {
+      // Fallback for legacy tokens
+      verifiedToken = token;
+    }
+
+    // Fetch content from IPFS using the hash as CID
+    const requestOptions = {
+      hostname: "127.0.0.1",
+      port: 5001,
+      path: `/api/v0/cat?arg=${encodeURIComponent(hash)}`,
+      method: "POST",
+      headers: {
+        "Content-Length": "0",
+      },
+    };
+
+    if (IPFS_API_TOKEN) {
+      requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+    }
+
+    const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+      let body = "";
+      ipfsRes.on("data", (chunk) => (body += chunk));
+      ipfsRes.on("end", async () => {
+        try {
+          // Try to decrypt if encrypted
+          let isEncryptedData = false;
+          try {
+            const parsed = JSON.parse(body);
+            isEncryptedData = parsed && typeof parsed === 'object' && (parsed.ct || parsed.iv || parsed.s || parsed.salt);
+          } catch (e) { /* Not JSON */ }
+          
+          if (isEncryptedData && verifiedToken) {
+            const SEA = await import("gun/sea.js");
+            const decrypted = await SEA.default.decrypt(body, verifiedToken);
+
+            if (decrypted) {
+              console.log(`✅ Decryption successful!`);
+              
+              // Check if decrypted data is a data URL
+              if (typeof decrypted === 'string' && decrypted.startsWith("data:")) {
+                const matches = decrypted.match(/^data:([^;]+);base64,(.+)$/);
+                if (matches) {
+                  const contentType = matches[1];
+                  const base64Data = matches[2];
+                  const buffer = Buffer.from(base64Data, "base64");
+
+                  res.setHeader("Content-Type", contentType);
+                  res.setHeader("Content-Length", buffer.length);
+                  res.setHeader("Cache-Control", "public, max-age=3600");
+                  res.send(buffer);
+                  return;
+                }
+              } else if (typeof decrypted === 'string') {
+                // Check if it's a plain base64 string (without data: prefix)
+                try {
+                  const buffer = Buffer.from(decrypted, "base64");
+                  
+                  // Try to detect content type from magic numbers
+                  let contentType = uploadRecord.mimetype || "application/octet-stream";
+                  if (buffer.length >= 4) {
+                    // PNG: 89 50 4E 47
+                    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+                      contentType = "image/png";
+                    }
+                    // JPEG: FF D8 FF
+                    else if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+                      contentType = "image/jpeg";
+                    }
+                    // GIF: 47 49 46 38
+                    else if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) {
+                      contentType = "image/gif";
+                    }
+                    // PDF: 25 50 44 46
+                    else if (buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46) {
+                      contentType = "application/pdf";
+                    }
+                    // WebP: Check for RIFF header
+                    else if (buffer.length >= 12 && 
+                             buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+                             buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) {
+                      contentType = "image/webp";
+                    }
+                  }
+                  
+                  console.log(`📁 Detected plain base64, converted to buffer (${contentType})`);
+                  res.setHeader("Content-Type", contentType);
+                  res.setHeader("Content-Length", buffer.length);
+                  res.setHeader("Cache-Control", "public, max-age=3600");
+                  res.send(buffer);
+                  return;
+                } catch (base64Error) {
+                  // Not valid base64, return as text/plain
+                  console.log(`📄 Returning as text/plain (not valid base64)`);
+                  res.setHeader("Content-Type", "text/plain");
+                  res.send(decrypted);
+                  return;
+                }
+              } else {
+                res.setHeader("Content-Type", "text/plain");
+                res.send(decrypted);
+                return;
+              }
+            }
+          }
+          
+          // If not encrypted or decryption failed, return original content
+          console.log(`⚠️ Decryption skipped or failed, returning original content`);
+          const mimetype = uploadRecord.mimetype || ipfsRes.headers["content-type"] || "application/octet-stream";
+          res.setHeader("Content-Type", mimetype);
+          res.setHeader("Cache-Control", "public, max-age=3600");
+          res.send(body);
+          return;
+        } catch (decryptError) {
+          console.error("❌ Decryption error:", decryptError);
+          if (!res.headersSent) {
+            const mimetype = uploadRecord.mimetype || ipfsRes.headers["content-type"] || "application/octet-stream";
+            res.setHeader("Content-Type", mimetype);
+            res.setHeader("Cache-Control", "public, max-age=3600");
+            res.send(body);
+          }
+        }
+      });
+    });
+
+    ipfsReq.on("error", (error) => {
+      console.error(`❌ IPFS request error for ${hash}:`, error);
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: error.message,
+        });
+      }
+    });
+
+    ipfsReq.setTimeout(30000, () => {
+      ipfsReq.destroy();
+      if (!res.headersSent) {
+        res.status(408).json({
+          success: false,
+          error: "Content retrieval timeout",
+        });
+      }
+    });
+
+    ipfsReq.end();
+  } catch (error) {
+    console.error("❌ User upload decrypt error:", error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+});
+
 // Delete/unpin user file (for x402 subscription users)
 router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
   try {
