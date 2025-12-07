@@ -588,13 +588,14 @@
 
                 // Try to get registered relays count
                 try {
-                    const relaysResponse = await fetch('/api/v1/network/registry/relays?chainId=84532');
+                    const relaysResponse = await fetch('/api/v1/network/onchain/relays?chainId=84532');
                     const relaysResult = await relaysResponse.json();
                     if (relaysResult.success && relaysResult.relays) {
-                        document.getElementById('registeredRelays').textContent = formatNumber(relaysResult.relays.length || 0);
+                        document.getElementById('registeredRelays').textContent = formatNumber(relaysResult.relayCount || relaysResult.relays.length || 0);
                     }
                 } catch (e) {
                     // Ignore if endpoint not available
+                    console.warn('Could not fetch registered relays:', e);
                 }
 
                 document.getElementById('registryLoading').style.display = 'none';
