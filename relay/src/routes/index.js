@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import multer from "multer";
 import FormData from "form-data";
-import http from "http";
+// http import removed
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -46,6 +46,7 @@ import x402Router from "./x402.js";
 import networkRouter from "./network.js";
 import dealsRouter from "./deals.js";
 import registryRouter from "./registry.js";
+import { ipfsRequest } from "../utils/ipfs-client.js";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -78,64 +79,14 @@ export default (app) => {
   // IPFS Gateway handler with direct IPFS API fallback
   app.get("/ipfs/:cid", async (req, res, next) => {
     const { cid } = req.params;
-    const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
-    const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN || process.env.IPFS_API_KEY;
-    
-    // Helper function to make IPFS API HTTP requests
-    const makeIpfsRequest = (path, method = 'POST', isBinary = false) => {
-      return new Promise((resolve, reject) => {
-        const url = new URL(IPFS_API_URL);
-        const options = {
-          hostname: url.hostname,
-          port: url.port || 5001,
-          path: `/api/v0${path}`,
-          method,
-          headers: { 
-            'Content-Type': 'application/json',
-            'Content-Length': '0'
-          },
-        };
-        
-        if (IPFS_API_TOKEN) {
-          options.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
-        }
-        
-        const req = http.request(options, (res) => {
-          const chunks = [];
-          res.on('data', chunk => chunks.push(chunk));
-          res.on('end', () => {
-            const buffer = Buffer.concat(chunks);
-            if (res.statusCode === 200) {
-              if (isBinary) {
-                resolve(buffer);
-              } else {
-                try {
-                  resolve(JSON.parse(buffer.toString()));
-                } catch (e) {
-                  resolve({ raw: buffer.toString() });
-                }
-              }
-            } else {
-              reject(new Error(`IPFS API returned ${res.statusCode}: ${buffer.toString().substring(0, 200)}`));
-            }
-          });
-        });
-        
-        req.on('error', reject);
-        req.setTimeout(30000, () => {
-          req.destroy();
-          reject(new Error('IPFS request timeout'));
-        });
-        req.end();
-      });
-    };
-    
     // Try to retrieve file directly from IPFS API
     try {
       console.log(`📁 Direct IPFS retrieval attempt for CID: ${cid}`);
       
       // Try to get file from IPFS directly using HTTP API
-      const fileBuffer = await makeIpfsRequest(`/cat?arg=${encodeURIComponent(cid)}`, 'POST', true);
+      const fileBuffer = await ipfsRequest(`/cat?arg=${encodeURIComponent(cid)}`, {
+        responseType: 'arraybuffer'
+      });
       
       if (fileBuffer && fileBuffer.length > 0) {
         // Try to detect content type from first bytes

@@ -10,8 +10,8 @@
  */
 
 import express from 'express';
-import http from 'http';
 import crypto from 'crypto';
+import { ipfsRequest } from '../utils/ipfs-client.js';
 import * as Reputation from '../utils/relay-reputation.js';
 import * as FrozenData from '../utils/frozen-data.js';
 import { getRelayUser } from '../utils/relay-user.js';
@@ -19,48 +19,7 @@ import { createRegistryClient, REGISTRY_ADDRESSES } from '../utils/registry-clie
 
 const router = express.Router();
 
-// IPFS Configuration
-const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
-const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN;
-
-/**
- * Helper: Make IPFS API request
- */
-function ipfsRequest(path, method = 'POST') {
-  return new Promise((resolve, reject) => {
-    const url = new URL(IPFS_API_URL);
-    const requestOptions = {
-      hostname: url.hostname,
-      port: url.port || 5001,
-      path: `/api/v0${path}`,
-      method,
-      headers: { 'Content-Length': '0' },
-    };
-
-    if (IPFS_API_TOKEN) {
-      requestOptions.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
-    }
-
-    const req = http.request(requestOptions, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          resolve(JSON.parse(data));
-        } catch (e) {
-          resolve({ raw: data });
-        }
-      });
-    });
-
-    req.on('error', reject);
-    req.setTimeout(10000, () => {
-      req.destroy();
-      reject(new Error('IPFS request timeout'));
-    });
-    req.end();
-  });
-}
+// IPFS Configuration handled by ipfs-client.js
 
 /**
  * GET /api/v1/network/relays
@@ -269,28 +228,8 @@ router.get('/proof/:cid', async (req, res) => {
     // 2. Get the first bytes of content for proof
     let contentSample;
     try {
-      const catResult = await new Promise((resolve, reject) => {
-        const url = new URL(IPFS_API_URL);
-        const options = {
-          hostname: url.hostname,
-          port: url.port || 5001,
-          path: `/api/v0/cat?arg=${cid}&length=256`,
-          method: 'POST',
-          headers: { 'Content-Length': '0' },
-        };
-        
-        if (IPFS_API_TOKEN) {
-          options.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
-        }
-
-        const req = http.request(options, (res) => {
-          const chunks = [];
-          res.on('data', chunk => chunks.push(chunk));
-          res.on('end', () => resolve(Buffer.concat(chunks)));
-        });
-        req.on('error', reject);
-        req.setTimeout(5000, () => { req.destroy(); reject(new Error('timeout')); });
-        req.end();
+      const catResult = await ipfsRequest(`/cat?arg=${cid}&length=256`, { 
+        responseType: 'arraybuffer' 
       });
       
       contentSample = catResult.toString('base64').substring(0, 64);

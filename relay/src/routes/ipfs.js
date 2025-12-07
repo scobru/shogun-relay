@@ -897,9 +897,9 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
                 isEncryptedData = false;
               }
             } else {
-              // Not JSON, probably not encrypted
-              isEncryptedData = false;
-              console.log(`📄 Body is not valid JSON, skipping decryption. Error: ${e.message}, Body preview: ${body.substring(0, 200)}`);
+            // Not JSON, probably not encrypted
+            isEncryptedData = false;
+            console.log(`📄 Body is not valid JSON, skipping decryption. Error: ${e.message}, Body preview: ${body.substring(0, 200)}`);
             }
           }
           

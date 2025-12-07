@@ -29,6 +29,9 @@ const THRESHOLDS = {
   maxLongevityDays: 365,          // Cap longevity bonus at 1 year
 };
 
+import * as FrozenData from './frozen-data.js';
+
+
 /**
  * Calculate reputation score from metrics
  * @param {object} metrics - Relay metrics
@@ -162,85 +165,162 @@ export function initReputationTracking(gun, relayHost) {
 }
 
 /**
- * Record a successful storage proof
+ * Record a successful storage proof (Signed)
  * @param {Gun} gun - GunDB instance
  * @param {string} relayHost - Host that provided the proof
  * @param {number} responseTimeMs - Time to generate proof
+ * @param {object} observerKeyPair - Observer's SEA key pair (REQUIRED)
  */
-export async function recordProofSuccess(gun, relayHost, responseTimeMs = 0) {
-  const node = gun.get('shogun-network').get('reputation').get(relayHost);
-  
-  return new Promise((resolve) => {
-    node.once((data) => {
-      const current = data || {};
-      const newAvgResponseTime = current.responseTimeSamples > 0
-        ? ((current.avgResponseTimeMs * current.responseTimeSamples) + responseTimeMs) / (current.responseTimeSamples + 1)
-        : responseTimeMs;
-      
-      node.put({
-        proofsTotal: (current.proofsTotal || 0) + 1,
-        proofsSuccessful: (current.proofsSuccessful || 0) + 1,
-        avgResponseTimeMs: Math.round(newAvgResponseTime),
-        responseTimeSamples: (current.responseTimeSamples || 0) + 1,
-        dataPoints: (current.dataPoints || 0) + 1,
-        lastSeenTimestamp: Date.now(),
+export async function recordProofSuccess(gun, relayHost, responseTimeMs = 0, observerKeyPair) {
+  if (!observerKeyPair) {
+    console.warn('⚠️ recordProofSuccess called without keyPair - falling back to unsigned (deprecated)');
+    // Legacy fallback (mutable counter)
+    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    return new Promise((resolve) => {
+      node.once((data) => {
+        const current = data || {};
+        const newAvgResponseTime = current.responseTimeSamples > 0
+          ? ((current.avgResponseTimeMs * current.responseTimeSamples) + responseTimeMs) / (current.responseTimeSamples + 1)
+          : responseTimeMs;
+        
+        node.put({
+          proofsTotal: (current.proofsTotal || 0) + 1,
+          proofsSuccessful: (current.proofsSuccessful || 0) + 1,
+          avgResponseTimeMs: Math.round(newAvgResponseTime),
+          responseTimeSamples: (current.responseTimeSamples || 0) + 1,
+          dataPoints: (current.dataPoints || 0) + 1,
+          lastSeenTimestamp: Date.now(),
+        });
+        resolve();
       });
-      
-      resolve();
+    });
+  }
+
+  // New Signed Path
+  await FrozenData.createSignedReputationEvent(
+    gun, 
+    relayHost, 
+    'proof_success', 
+    { responseTimeMs }, 
+    observerKeyPair
+  );
+  
+  // Update local optimistic cache/index for backward compatibility
+  // (We still write to generic node for non-validating clients, but truth is in frozen-data)
+  const node = gun.get('shogun-network').get('reputation').get(relayHost);
+  node.once((data) => {
+    const current = data || {};
+    const newAvgResponseTime = current.responseTimeSamples > 0
+      ? ((current.avgResponseTimeMs * current.responseTimeSamples) + responseTimeMs) / (current.responseTimeSamples + 1)
+      : responseTimeMs;
+    
+    node.put({
+      proofsTotal: (current.proofsTotal || 0) + 1,
+      proofsSuccessful: (current.proofsSuccessful || 0) + 1,
+      avgResponseTimeMs: Math.round(newAvgResponseTime),
+      responseTimeSamples: (current.responseTimeSamples || 0) + 1,
+      dataPoints: (current.dataPoints || 0) + 1,
+      lastSeenTimestamp: Date.now(),
     });
   });
 }
 
 /**
- * Record a failed storage proof
+ * Record a failed storage proof (Signed)
  * @param {Gun} gun - GunDB instance
  * @param {string} relayHost - Host that failed the proof
+ * @param {object} observerKeyPair - Observer's SEA key pair (REQUIRED)
  */
-export async function recordProofFailure(gun, relayHost) {
-  const node = gun.get('shogun-network').get('reputation').get(relayHost);
-  
-  return new Promise((resolve) => {
-    node.once((data) => {
-      const current = data || {};
-      
-      node.put({
-        proofsTotal: (current.proofsTotal || 0) + 1,
-        proofsFailed: (current.proofsFailed || 0) + 1,
-        dataPoints: (current.dataPoints || 0) + 1,
-        lastSeenTimestamp: Date.now(),
+export async function recordProofFailure(gun, relayHost, observerKeyPair) {
+  if (!observerKeyPair) {
+    console.warn('⚠️ recordProofFailure called without keyPair - falling back to unsigned');
+    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    return new Promise((resolve) => {
+      node.once((data) => {
+        const current = data || {};
+        node.put({
+          proofsTotal: (current.proofsTotal || 0) + 1,
+          proofsFailed: (current.proofsFailed || 0) + 1,
+          dataPoints: (current.dataPoints || 0) + 1,
+          lastSeenTimestamp: Date.now(),
+        });
+        resolve();
       });
-      
-      resolve();
+    });
+  }
+
+  // New Signed Path
+  await FrozenData.createSignedReputationEvent(
+    gun, 
+    relayHost, 
+    'proof_failure', 
+    {}, 
+    observerKeyPair
+  );
+  
+  // Optimistic update
+  const node = gun.get('shogun-network').get('reputation').get(relayHost);
+  node.once((data) => {
+    const current = data || {};
+    node.put({
+      proofsTotal: (current.proofsTotal || 0) + 1,
+      proofsFailed: (current.proofsFailed || 0) + 1,
+      dataPoints: (current.dataPoints || 0) + 1,
+      lastSeenTimestamp: Date.now(),
     });
   });
 }
 
 /**
- * Record pin request fulfillment
+ * Record pin request fulfillment (Signed)
  * @param {Gun} gun - GunDB instance
  * @param {string} relayHost - Host that fulfilled the request
  * @param {boolean} fulfilled - Whether the request was fulfilled
+ * @param {object} observerKeyPair - Observer's SEA key pair (REQUIRED)
  */
-export async function recordPinFulfillment(gun, relayHost, fulfilled) {
-  const node = gun.get('shogun-network').get('reputation').get(relayHost);
-  
-  return new Promise((resolve) => {
-    node.once((data) => {
-      const current = data || {};
-      
-      const update = {
-        pinRequestsReceived: (current.pinRequestsReceived || 0) + 1,
-        dataPoints: (current.dataPoints || 0) + 1,
-        lastSeenTimestamp: Date.now(),
-      };
-      
-      if (fulfilled) {
-        update.pinRequestsFulfilled = (current.pinRequestsFulfilled || 0) + 1;
-      }
-      
-      node.put(update);
-      resolve();
+export async function recordPinFulfillment(gun, relayHost, fulfilled, observerKeyPair) {
+  if (!observerKeyPair) {
+    console.warn('⚠️ recordPinFulfillment called without keyPair - falling back to unsigned');
+    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    return new Promise((resolve) => {
+      node.once((data) => {
+        const current = data || {};
+        const update = {
+          pinRequestsReceived: (current.pinRequestsReceived || 0) + 1,
+          dataPoints: (current.dataPoints || 0) + 1,
+          lastSeenTimestamp: Date.now(),
+        };
+        if (fulfilled) {
+          update.pinRequestsFulfilled = (current.pinRequestsFulfilled || 0) + 1;
+        }
+        node.put(update);
+        resolve();
+      });
     });
+  }
+
+  // New Signed Path
+  await FrozenData.createSignedReputationEvent(
+    gun, 
+    relayHost, 
+    'pin_fulfillment', 
+    { fulfilled }, 
+    observerKeyPair
+  );
+  
+  // Optimistic update
+  const node = gun.get('shogun-network').get('reputation').get(relayHost);
+  node.once((data) => {
+    const current = data || {};
+    const update = {
+      pinRequestsReceived: (current.pinRequestsReceived || 0) + 1,
+      dataPoints: (current.dataPoints || 0) + 1,
+      lastSeenTimestamp: Date.now(),
+    };
+    if (fulfilled) {
+      update.pinRequestsFulfilled = (current.pinRequestsFulfilled || 0) + 1;
+    }
+    node.put(update);
   });
 }
 

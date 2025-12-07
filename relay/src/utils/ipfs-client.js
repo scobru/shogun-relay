@@ -146,17 +146,23 @@ async function ipfsRequest(path, options = {}) {
         }
 
         const req = httpModule.request(requestOptions, (res) => {
-          let data = '';
-          res.on('data', (chunk) => (data += chunk));
+          const chunks = [];
+          res.on('data', (chunk) => chunks.push(chunk));
           res.on('end', () => {
+            const buffer = Buffer.concat(chunks);
             if (res.statusCode === 200) {
-              try {
-                resolve(JSON.parse(data));
-              } catch {
-                resolve(data);
+              if (options.responseType === 'arraybuffer') {
+                resolve(buffer);
+              } else {
+                const data = buffer.toString();
+                try {
+                  resolve(JSON.parse(data));
+                } catch {
+                  resolve(data);
+                }
               }
             } else {
-              reject(new Error(`IPFS API returned status ${res.statusCode}: ${data}`));
+              reject(new Error(`IPFS API returned status ${res.statusCode}: ${buffer.toString()}`));
             }
           });
         });

@@ -12,7 +12,7 @@
  */
 
 import express from 'express';
-import http from 'http';
+// http import removed
 import crypto from 'crypto';
 import multer from 'multer';
 import FormData from 'form-data';
@@ -23,7 +23,7 @@ import * as FrozenData from '../utils/frozen-data.js';
 import { getRelayUser, getRelayPub } from '../utils/relay-user.js';
 import { X402Merchant } from '../utils/x402-merchant.js';
 import * as Reputation from '../utils/relay-reputation.js';
-import { ipfsUpload } from '../utils/ipfs-client.js';
+import { ipfsUpload, ipfsRequest } from '../utils/ipfs-client.js';
 import { 
   createRegistryClient, 
   createRegistryClientWithSigner,
@@ -33,7 +33,7 @@ import {
 import * as DealSync from '../utils/deal-sync.js';
 
 const router = express.Router();
-const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN;
+// IPFS_API_TOKEN is handled by ipfs-client.js
 
 // In-memory cache for recently created deals (GunDB sync can be slow)
 // Deals are cached for 10 minutes to allow time for payment
@@ -101,86 +101,22 @@ async function applyTierFeatures(deal, req) {
       
       // Helper function to download from IPFS
       const downloadFromIPFS = async (cidToDownload) => {
-        return new Promise((resolve, reject) => {
-          const options = {
-            hostname: '127.0.0.1',
-            port: 5001,
-            path: `/api/v0/cat?arg=${encodeURIComponent(cidToDownload)}`,
-            method: 'POST',
-            headers: { 'Content-Length': '0' },
-          };
-          
-          if (IPFS_API_TOKEN) {
-            options.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
-          }
-          
-          const req = http.request(options, (res) => {
-            const chunks = [];
-            res.on('data', chunk => chunks.push(chunk));
-            res.on('end', () => {
-              if (res.statusCode === 200) {
-                resolve(Buffer.concat(chunks));
-              } else {
-                reject(new Error(`IPFS download failed with status ${res.statusCode}`));
-              }
-            });
-          });
-          
-          req.on('error', reject);
-          req.setTimeout(120000, () => {
-            req.destroy();
-            reject(new Error('IPFS download timeout'));
-          });
-          req.end();
+        return ipfsRequest(`/cat?arg=${encodeURIComponent(cidToDownload)}`, {
+          responseType: 'arraybuffer'
         });
       };
       
       // Helper function to upload buffer to IPFS
       const uploadToIPFS = async (buffer, filename = 'chunk') => {
-        return new Promise((resolve, reject) => {
-          const form = new FormData();
-          form.append('file', buffer, {
-            filename: filename,
-            contentType: 'application/octet-stream',
-          });
-          
-          const options = {
-            hostname: '127.0.0.1',
-            port: 5001,
-            path: '/api/v0/add?pin=true',
-            method: 'POST',
-            headers: form.getHeaders(),
-          };
-          
-          if (IPFS_API_TOKEN) {
-            options.headers['Authorization'] = `Bearer ${IPFS_API_TOKEN}`;
-          }
-          
-          const req = http.request(options, (res) => {
-            let data = '';
-            res.on('data', chunk => data += chunk);
-            res.on('end', () => {
-              if (res.statusCode === 200) {
-                try {
-                  const result = JSON.parse(data);
-                  resolve(result.Hash);
-                } catch (e) {
-                  reject(new Error('Failed to parse IPFS upload response'));
-                }
-              } else {
-                reject(new Error(`IPFS upload failed with status ${res.statusCode}`));
-              }
-            });
-          });
-          
-          req.on('error', reject);
-          req.setTimeout(60000, () => {
-            req.destroy();
-            reject(new Error('IPFS upload timeout'));
-          });
-          
-          form.pipe(req);
+        const form = new FormData();
+        form.append('file', buffer, {
+          filename: filename,
+          contentType: 'application/octet-stream',
         });
+        
+        // Use unified ipfsUpload
+        const result = await ipfsUpload('/api/v0/add?pin=true', form);
+        return result.Hash;
       };
       
       // Step 1: Download file from IPFS

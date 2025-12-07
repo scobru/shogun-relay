@@ -8,7 +8,7 @@
 import { createPublicClient, createWalletClient, http, parseUnits, formatUnits } from 'viem';
 import { baseSepolia, base, polygon, polygonAmoy } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
-import httpModule from 'http';
+import { ipfsRequest } from './ipfs-client.js';
 import * as RelayUser from './relay-user.js';
 import { USDC_EIP3009_ABI } from 'shogun-contracts';
 
@@ -710,58 +710,31 @@ export class X402Merchant {
   /**
    * Get the actual size of an IPFS object from the IPFS API
    */
-  static async getIpfsObjectSize(cid, ipfsApiUrl = 'http://127.0.0.1:5001', ipfsApiToken = null) {
-    return new Promise((resolve) => {
-      const timeout = setTimeout(() => {
-        console.log(`Timeout getting IPFS stats for ${cid}`);
-        resolve(null);
-      }, 10000);
-
-      const url = new URL(ipfsApiUrl);
+  /**
+   * Get the actual size of an IPFS object from the IPFS API
+   * Uses the unified ipfs-client for robust handling of HTTP/HTTPS and retries.
+   * 
+   * @param {string} cid - The CID to check
+   * @param {string} [ipfsApiUrl] - Deprecated/Ignored. Uses IPFS_API_URL env var via ipfs-client
+   * @param {string} [ipfsApiToken] - Deprecated/Ignored. Uses IPFS_API_TOKEN env var via ipfs-client
+   */
+  static async getIpfsObjectSize(cid, ipfsApiUrl = null, ipfsApiToken = null) {
+    try {
+      // Use the unified ipfs-client which handles auth, connection headers, and protocol switching
+      const result = await ipfsRequest(`/api/v0/object/stat?arg=${cid}`);
       
-      const requestOptions = {
-        hostname: url.hostname,
-        port: url.port || 5001,
-        path: `/api/v0/object/stat?arg=${cid}`,
-        method: 'POST',
-        headers: {
-          'Content-Length': '0',
-        },
+      if (!result) return null;
+
+      return {
+        cid,
+        size: result.CumulativeSize || result.DataSize || 0,
+        numLinks: result.NumLinks || 0,
+        blockSize: result.BlockSize || 0,
       };
-
-      if (ipfsApiToken) {
-        requestOptions.headers['Authorization'] = `Bearer ${ipfsApiToken}`;
-      }
-
-      const req = httpModule.request(requestOptions, (res) => {
-        let data = '';
-        res.on('data', (chunk) => (data += chunk));
-        res.on('end', () => {
-          clearTimeout(timeout);
-          try {
-            const result = JSON.parse(data);
-            // CumulativeSize includes the object and all linked objects
-            resolve({
-              cid,
-              size: result.CumulativeSize || result.DataSize || 0,
-              numLinks: result.NumLinks || 0,
-              blockSize: result.BlockSize || 0,
-            });
-          } catch (error) {
-            console.error(`Error parsing IPFS stats for ${cid}:`, error.message);
-            resolve(null);
-          }
-        });
-      });
-
-      req.on('error', (err) => {
-        clearTimeout(timeout);
-        console.error(`Error getting IPFS stats for ${cid}:`, err.message);
-        resolve(null);
-      });
-
-      req.end();
-    });
+    } catch (error) {
+      console.error(`Error getting IPFS stats for ${cid}:`, error.message);
+      return null;
+    }
   }
 
   /**

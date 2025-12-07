@@ -408,6 +408,60 @@ export function aggregateReputation(observations) {
   };
 }
 
+/**
+ * Create a signed acknowledgment (receipt) for a previous entry
+ * Implements the "ACK" concept: a = σ'(Φ'(m), p)
+ * 
+ * @param {Gun} gun - GunDB instance
+ * @param {string} originalHash - Hash of the entry being acknowledged
+ * @param {string} message - Acknowledgment message (e.g., "Received and verified")
+ * @param {object} keyPair - Signer's SEA key pair
+ * @returns {Promise<{hash: string}>}
+ */
+export async function createSignedAcknowledgment(gun, originalHash, message, keyPair) {
+  const data = {
+    type: 'ack',
+    re: originalHash, // Reference to original entry
+    msg: message,
+    signer: keyPair.pub,
+  };
+
+  const result = await createFrozenEntry(
+    gun,
+    data,
+    keyPair,
+    'acks',
+    originalHash // Index by the original hash so we can find ACKs for it
+  );
+  
+  console.log(`✅ Signed ACK created for ${originalHash.substring(0, 8)}...`);
+  return result;
+}
+
+/**
+ * Create a signed reputation event
+ * This replaces mutable metrics with immutable signed observations
+ * 
+ * @param {Gun} gun - GunDB instance
+ * @param {string} subjectHost - The relay being rated
+ * @param {string} eventType - 'proof_success', 'proof_failure', 'pin_fulfillment'
+ * @param {object} details - Extra details (e.g. responseTimeMs)
+ * @param {object} observerKeyPair - Observer's SEA key pair
+ */
+export async function createSignedReputationEvent(gun, subjectHost, eventType, details, observerKeyPair) {
+  const observation = {
+    type: 'reputation_event',
+    event: eventType,
+    subject: subjectHost,
+    details: details || {},
+    timestamp: Date.now()
+  };
+  
+  // Use createFrozenObservation to store it
+  // This automatically indexes it under the subject host
+  return await createFrozenObservation(gun, subjectHost, observation, observerKeyPair);
+}
+
 export default {
   createFrozenEntry,
   readFrozenEntry,
@@ -416,5 +470,8 @@ export default {
   createFrozenObservation,
   getObservationsForHost,
   aggregateReputation,
+  createSignedAcknowledgment,
+  createSignedReputationEvent,
 };
+
 
