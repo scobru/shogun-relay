@@ -219,23 +219,73 @@ router.get('/stats', async (req, res) => {
     });
 
     // STEP 2: Retroactive sync from GunDB deals (persistent across restarts)
+    // Deals are stored as frozen entries in 'storage-deals' namespace
     console.log(`📊 Syncing deals from GunDB (retroactive)...`);
     try {
-      const allDeals = [];
-      await new Promise((resolve) => {
-        const timer = setTimeout(resolve, 5000);
-        
-        gun.get('shogun-deals').map().once((deal, dealId) => {
-          if (deal && typeof deal === 'object' && deal.cid) {
-            allDeals.push({ id: dealId, ...deal });
-          }
-        });
-        
-        setTimeout(() => {
-          clearTimeout(timer);
-          resolve();
-        }, 4000);
+      // List all frozen deal entries
+      const frozenEntries = await FrozenData.listFrozenEntries(gun, 'storage-deals', {
+        verifyAll: true, // Get full deal data, not just index
+        limit: 1000,
       });
+
+      const allDeals = [];
+      const dealMap = new Map(); // Use map to deduplicate by deal ID
+      
+      // Extract deal data from frozen entries
+      for (const entry of frozenEntries) {
+        if (entry.data && entry.data.cid) {
+          // entry.data is the actual deal object
+          const deal = entry.data;
+          // Deduplicate by deal ID (in case of multiple versions)
+          if (!dealMap.has(deal.id)) {
+            dealMap.set(deal.id, deal);
+            allDeals.push(deal);
+          }
+        }
+      }
+
+      console.log(`   📋 Found ${allDeals.length} deals in frozen storage`);
+
+      // Optional: Also check on-chain deals if relay is configured
+      // This includes deals registered on-chain but not yet synced to GunDB
+      const RELAY_PRIVATE_KEY = process.env.RELAY_PRIVATE_KEY;
+      const REGISTRY_CHAIN_ID = process.env.REGISTRY_CHAIN_ID;
+      
+      if (RELAY_PRIVATE_KEY && REGISTRY_CHAIN_ID && allDeals.length === 0) {
+        console.log(`   🔗 No deals in GunDB, checking on-chain registry as fallback...`);
+        try {
+          const { createStorageDealRegistryClient, createRegistryClientWithSigner } = await import('../utils/registry-client.js');
+          const registryClient = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, parseInt(REGISTRY_CHAIN_ID));
+          const relayAddress = registryClient.wallet.address;
+          const storageDealRegistryClient = createStorageDealRegistryClient(parseInt(REGISTRY_CHAIN_ID));
+          
+          const onChainDeals = await storageDealRegistryClient.getRelayDeals(relayAddress);
+          console.log(`   📋 Found ${onChainDeals.length} deals on-chain`);
+          
+          // Convert on-chain deals to GunDB format for stats calculation
+          for (const onChainDeal of onChainDeals) {
+            if (onChainDeal.active && new Date(onChainDeal.expiresAt) > new Date()) {
+              const deal = {
+                id: onChainDeal.dealId,
+                cid: onChainDeal.cid,
+                clientAddress: onChainDeal.client,
+                sizeMB: onChainDeal.sizeMB,
+                status: StorageDeals.DEAL_STATUS.ACTIVE,
+                expiresAt: new Date(onChainDeal.expiresAt).getTime(),
+                createdAt: new Date(onChainDeal.createdAt).getTime(),
+                onChainRegistered: true,
+              };
+              
+              if (!dealMap.has(deal.id)) {
+                dealMap.set(deal.id, deal);
+                allDeals.push(deal);
+              }
+            }
+          }
+        } catch (onChainError) {
+          console.warn(`   ⚠️ Error fetching on-chain deals: ${onChainError.message}`);
+        }
+      }
 
       const dealStats = StorageDeals.getDealStats(allDeals);
       stats.totalActiveDeals = dealStats.active || 0;
@@ -255,9 +305,10 @@ router.get('/stats', async (req, res) => {
       }
       stats.totalPins += activeDealCids.size;
       
-      console.log(`   ✅ Deals synced: ${stats.totalActiveDeals} active, ${stats.totalDealStorageMB} MB`);
+      console.log(`   ✅ Deals synced: ${stats.totalActiveDeals} active, ${stats.totalDealStorageMB} MB, ${activeDealCids.size} unique CIDs`);
     } catch (dealError) {
       console.warn(`   ⚠️ Error syncing deals: ${dealError.message}`);
+      console.error(`   Stack: ${dealError.stack}`);
     }
 
     // STEP 3: Retroactive sync from subscriptions (persistent across restarts)
