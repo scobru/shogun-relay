@@ -1468,21 +1468,27 @@ See docs/RELAY_KEYS.md for more information.
     }
   }, 30000); // 30 seconds
 
-  // Periodic deal synchronization with IPFS pins
+  // Real-time deal synchronization with IPFS pins
   // Syncs active on-chain deals to ensure their CIDs are pinned
+  // Uses two-tier sync: fast sync (every 2 min) + full sync (every 5 min)
   const DEAL_SYNC_ENABLED = process.env.DEAL_SYNC_ENABLED !== 'false';
-  const DEAL_SYNC_INTERVAL_MS = parseInt(process.env.DEAL_SYNC_INTERVAL_MS) || 6 * 60 * 60 * 1000; // Default: 6 hours
+  const DEAL_SYNC_INTERVAL_MS = parseInt(process.env.DEAL_SYNC_INTERVAL_MS) || 5 * 60 * 1000; // Default: 5 minutes (reduced from 6 hours)
+  const DEAL_SYNC_FAST_INTERVAL_MS = parseInt(process.env.DEAL_SYNC_FAST_INTERVAL_MS) || 2 * 60 * 1000; // Default: 2 minutes for fast sync
+  const DEAL_SYNC_INITIAL_DELAY_MS = parseInt(process.env.DEAL_SYNC_INITIAL_DELAY_MS) || 30 * 1000; // Default: 30 seconds (reduced from 5 minutes)
   const RELAY_PRIVATE_KEY = process.env.RELAY_PRIVATE_KEY;
   const REGISTRY_CHAIN_ID = process.env.REGISTRY_CHAIN_ID;
 
   // Store interval/timeout references for cleanup
   let dealSyncInitialTimeout = null;
-  let dealSyncInterval = null;
+  let dealSyncFastInterval = null; // Fast sync for near real-time updates
+  let dealSyncFullInterval = null; // Full sync for complete synchronization
 
   if (DEAL_SYNC_ENABLED && RELAY_PRIVATE_KEY && REGISTRY_CHAIN_ID) {
-    console.log(`🔄 Deal sync enabled (interval: ${DEAL_SYNC_INTERVAL_MS / 1000 / 60} minutes)`);
+    console.log(`🔄 Real-time deal sync enabled:`);
+    console.log(`   - Fast sync: every ${DEAL_SYNC_FAST_INTERVAL_MS / 1000} seconds (near real-time)`);
+    console.log(`   - Full sync: every ${DEAL_SYNC_INTERVAL_MS / 1000 / 60} minutes (complete sync)`);
     
-    // Initial sync after 5 minutes (give IPFS time to start)
+    // Initial sync after short delay (give IPFS time to start)
     dealSyncInitialTimeout = setTimeout(async () => {
       try {
         const { createRegistryClientWithSigner } = await import('./utils/registry-client.js');
@@ -1503,13 +1509,15 @@ See docs/RELAY_KEYS.md for more information.
           gun: gun,
           relayKeyPair: relayKeyPair,
         });
+        console.log(`✅ Initial deal sync completed`);
       } catch (error) {
         console.warn(`⚠️ Initial deal sync failed: ${error.message}`);
       }
-    }, 5 * 60 * 1000); // 5 minutes
+    }, DEAL_SYNC_INITIAL_DELAY_MS);
 
-    // Periodic sync
-    dealSyncInterval = setInterval(async () => {
+    // Fast sync: frequent lightweight sync for near real-time updates
+    // This checks for new deals and syncs them quickly
+    dealSyncFastInterval = setInterval(async () => {
       try {
         const { createRegistryClientWithSigner } = await import('./utils/registry-client.js');
         const DealSync = await import('./utils/deal-sync.js');
@@ -1522,15 +1530,49 @@ See docs/RELAY_KEYS.md for more information.
         const relayUser = getRelayUser();
         const relayKeyPair = relayUser?._?.sea || null;
         
-        console.log(`🔄 Periodic deal sync for relay ${relayAddress}...`);
+        // Fast sync: only sync new/active deals (lightweight)
         await DealSync.syncDealsWithIPFS(relayAddress, parseInt(REGISTRY_CHAIN_ID), {
           onlyActive: true,
           dryRun: false,
           gun: gun,
           relayKeyPair: relayKeyPair,
+          fastSync: true, // Enable fast sync mode (skip expensive operations)
         });
       } catch (error) {
-        console.warn(`⚠️ Periodic deal sync failed: ${error.message}`);
+        // Don't log fast sync errors as warnings (too noisy)
+        // Only log if it's a critical error
+        if (error.message && !error.message.includes('timeout') && !error.message.includes('ECONNREFUSED')) {
+          console.warn(`⚠️ Fast deal sync error: ${error.message}`);
+        }
+      }
+    }, DEAL_SYNC_FAST_INTERVAL_MS);
+
+    // Full sync: complete synchronization with all checks
+    // This runs less frequently but does a thorough sync
+    dealSyncFullInterval = setInterval(async () => {
+      try {
+        const { createRegistryClientWithSigner } = await import('./utils/registry-client.js');
+        const DealSync = await import('./utils/deal-sync.js');
+        const { getRelayUser } = await import('./utils/relay-user.js');
+        
+        const registryClient = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, parseInt(REGISTRY_CHAIN_ID));
+        const relayAddress = registryClient.wallet.address;
+        
+        // Get relay user for GunDB sync
+        const relayUser = getRelayUser();
+        const relayKeyPair = relayUser?._?.sea || null;
+        
+        console.log(`🔄 Full deal sync for relay ${relayAddress}...`);
+        await DealSync.syncDealsWithIPFS(relayAddress, parseInt(REGISTRY_CHAIN_ID), {
+          onlyActive: true,
+          dryRun: false,
+          gun: gun,
+          relayKeyPair: relayKeyPair,
+          fastSync: false, // Full sync mode
+        });
+        console.log(`✅ Full deal sync completed`);
+      } catch (error) {
+        console.warn(`⚠️ Full deal sync failed: ${error.message}`);
       }
     }, DEAL_SYNC_INTERVAL_MS);
   } else {
@@ -1562,9 +1604,13 @@ See docs/RELAY_KEYS.md for more information.
       clearTimeout(dealSyncInitialTimeout);
       dealSyncInitialTimeout = null;
     }
-    if (dealSyncInterval) {
-      clearInterval(dealSyncInterval);
-      dealSyncInterval = null;
+    if (dealSyncFastInterval) {
+      clearInterval(dealSyncFastInterval);
+      dealSyncFastInterval = null;
+    }
+    if (dealSyncFullInterval) {
+      clearInterval(dealSyncFullInterval);
+      dealSyncFullInterval = null;
     }
 
     // Give a grace period for in-flight operations to complete

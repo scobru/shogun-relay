@@ -361,10 +361,15 @@ async function convertOnChainDealToGunDB(onChainDeal, relayPub) {
  * @returns {Promise<{synced: number, alreadyPinned: number, failed: number, gunDBSynced: number, errors: Array}>}
  */
 export async function syncDealsWithIPFS(relayAddress, chainId, options = {}) {
-  const { onlyActive = true, dryRun = false, gun = null, relayKeyPair = null } = options;
+  const { onlyActive = true, dryRun = false, gun = null, relayKeyPair = null, fastSync = false } = options;
   
-  console.log(`🔄 Starting deal sync for relay ${relayAddress} on chain ${chainId}...`);
-  console.log(`   Options: onlyActive=${onlyActive}, dryRun=${dryRun}, gunDB=${gun ? 'enabled' : 'disabled'}`);
+  if (fastSync) {
+    // Fast sync: minimal logging, skip expensive operations
+    // Only log if there are issues
+  } else {
+    console.log(`🔄 Starting deal sync for relay ${relayAddress} on chain ${chainId}...`);
+    console.log(`   Options: onlyActive=${onlyActive}, dryRun=${dryRun}, gunDB=${gun ? 'enabled' : 'disabled'}`);
+  }
 
   try {
     // Import registry client
@@ -373,14 +378,19 @@ export async function syncDealsWithIPFS(relayAddress, chainId, options = {}) {
 
     // Fetch all deals for this relay
     const deals = await storageDealRegistryClient.getRelayDeals(relayAddress);
-    console.log(`📋 Found ${deals.length} deals on-chain for relay ${relayAddress}`);
+    
+    if (!fastSync) {
+      console.log(`📋 Found ${deals.length} deals on-chain for relay ${relayAddress}`);
+    }
 
     // Filter active deals if requested
     const dealsToSync = onlyActive
       ? deals.filter(deal => deal.active && new Date(deal.expiresAt) > new Date())
       : deals;
 
-    console.log(`📌 Syncing ${dealsToSync.length} ${onlyActive ? 'active' : ''} deals...`);
+    if (!fastSync) {
+      console.log(`📌 Syncing ${dealsToSync.length} ${onlyActive ? 'active' : ''} deals...`);
+    }
 
     const results = {
       synced: 0,
@@ -417,10 +427,29 @@ export async function syncDealsWithIPFS(relayAddress, chainId, options = {}) {
         const pinned = await isPinned(cid);
         
         if (pinned) {
-          console.log(`✅ Deal ${dealId}: CID ${cid} already pinned`);
+          if (!fastSync) {
+            console.log(`✅ Deal ${dealId}: CID ${cid} already pinned`);
+          }
           // Clear from failure cache if it was there
           pinFailureCache.delete(cid);
           results.alreadyPinned++;
+          
+          // In fast sync mode, still sync to GunDB even if already pinned
+          // This ensures GunDB is up to date
+          if (fastSync && gun && relayKeyPair && relayPub) {
+            try {
+              const { getDeal } = await import('./storage-deals.js');
+              const { saveDeal } = await import('./storage-deals.js');
+              const existingDeal = await getDeal(gun, dealId);
+              if (!existingDeal || existingDeal.syncedFromOnChain !== true) {
+                const gunDBDeal = await convertOnChainDealToGunDB(deal, relayPub);
+                await saveDeal(gun, gunDBDeal, relayKeyPair);
+                results.gunDBSynced++;
+              }
+            } catch (gunDBError) {
+              // Silent in fast sync mode
+            }
+          }
           continue;
         }
 
@@ -433,24 +462,32 @@ export async function syncDealsWithIPFS(relayAddress, chainId, options = {}) {
             : timeSinceLastAttempt >= (PIN_RETRY_DELAY_MS * 12); // 1 hour for high failure count
           
           if (!shouldRetry) {
-            const minutesSinceAttempt = Math.floor(timeSinceLastAttempt / 60000);
-            console.log(`⏭️ Deal ${dealId}: CID ${cid} failed ${failureInfo.consecutiveFailures} time(s) recently (${minutesSinceAttempt}m ago). Skipping retry for now.`);
+            if (!fastSync) {
+              const minutesSinceAttempt = Math.floor(timeSinceLastAttempt / 60000);
+              console.log(`⏭️ Deal ${dealId}: CID ${cid} failed ${failureInfo.consecutiveFailures} time(s) recently (${minutesSinceAttempt}m ago). Skipping retry for now.`);
+            }
             continue;
           }
         }
 
         // Pin the CID if not in dry run mode
         if (dryRun) {
-          console.log(`🔍 [DRY RUN] Would pin CID ${cid} for deal ${dealId}`);
+          if (!fastSync) {
+            console.log(`🔍 [DRY RUN] Would pin CID ${cid} for deal ${dealId}`);
+          }
           results.synced++;
         } else {
           // Try to pin the CID (IPFS will attempt to fetch it from the network)
           // Note: Even if the CID is not immediately available, IPFS will continue trying in background
           // The pin request itself will succeed once IPFS retrieves the content
-          console.log(`📌 Attempting to pin CID ${cid} for deal ${dealId}...`);
+          if (!fastSync) {
+            console.log(`📌 Attempting to pin CID ${cid} for deal ${dealId}...`);
+          }
           const pinResult = await pinCid(cid);
           if (pinResult.success) {
-            console.log(`✅ Deal ${dealId}: CID ${cid} pinned successfully`);
+            if (!fastSync) {
+              console.log(`✅ Deal ${dealId}: CID ${cid} pinned successfully`);
+            }
             // Clear from failure cache on success
             pinFailureCache.delete(cid);
             results.synced++;
@@ -518,18 +555,24 @@ export async function syncDealsWithIPFS(relayAddress, chainId, options = {}) {
             // Only save if it doesn't exist or if it's different
             if (!existingDeal || existingDeal.syncedFromOnChain !== true) {
               await saveDeal(gun, gunDBDeal, relayKeyPair);
-              console.log(`✅ Deal ${dealId}: Synced to GunDB`);
+              if (!fastSync) {
+                console.log(`✅ Deal ${dealId}: Synced to GunDB`);
+              }
               results.gunDBSynced++;
-            } else {
+            } else if (!fastSync) {
               console.log(`ℹ️ Deal ${dealId}: Already exists in GunDB`);
             }
           } catch (gunDBError) {
             // Ignore errors if shutdown is in progress (database may be closed)
             if (isShuttingDown) {
-              console.log(`⏭️ GunDB sync skipped for deal ${dealId} (shutdown in progress)`);
+              if (!fastSync) {
+                console.log(`⏭️ GunDB sync skipped for deal ${dealId} (shutdown in progress)`);
+              }
               break;
             }
-            console.warn(`⚠️ Deal ${dealId}: Failed to sync to GunDB: ${gunDBError.message}`);
+            if (!fastSync) {
+              console.warn(`⚠️ Deal ${dealId}: Failed to sync to GunDB: ${gunDBError.message}`);
+            }
             results.gunDBFailed++;
             results.errors.push({
               dealId,
@@ -552,13 +595,15 @@ export async function syncDealsWithIPFS(relayAddress, chainId, options = {}) {
       }
     }
 
-    console.log(`✅ Deal sync completed:`);
-    console.log(`   - IPFS pinned: ${results.synced}`);
-    console.log(`   - Already pinned: ${results.alreadyPinned}`);
-    console.log(`   - IPFS failed: ${results.failed}`);
-    if (gun && relayKeyPair) {
-      console.log(`   - GunDB synced: ${results.gunDBSynced}`);
-      console.log(`   - GunDB failed: ${results.gunDBFailed}`);
+    if (!fastSync) {
+      console.log(`✅ Deal sync completed:`);
+      console.log(`   - IPFS pinned: ${results.synced}`);
+      console.log(`   - Already pinned: ${results.alreadyPinned}`);
+      console.log(`   - IPFS failed: ${results.failed}`);
+      if (gun && relayKeyPair) {
+        console.log(`   - GunDB synced: ${results.gunDBSynced}`);
+        console.log(`   - GunDB failed: ${results.gunDBFailed}`);
+      }
     }
 
     return results;
