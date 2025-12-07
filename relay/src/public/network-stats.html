@@ -476,6 +476,9 @@
                 const response = await fetch('/api/v1/network/stats');
                 const result = await response.json();
 
+                // Store network stats for use in deals stats
+                networkStatsData = result;
+
                 if (result.success && result.stats) {
                     const stats = result.stats;
                     document.getElementById('totalRelays').textContent = formatNumber(stats.totalRelays || 0);
@@ -596,47 +599,102 @@
             }
         }
 
+        // Store network stats for use in deals stats
+        let networkStatsData = null;
+
         // Fetch Deals Statistics
         async function fetchDealsStats() {
             try {
                 document.getElementById('dealsLoading').style.display = 'block';
                 document.getElementById('dealsContent').style.display = 'none';
 
-                const response = await fetch('/api/v1/deals/stats');
-                const result = await response.json();
+                let stats = {
+                    totalDeals: 0,
+                    activeDeals: 0,
+                    pendingDeals: 0,
+                    expiredDeals: 0,
+                    totalSizeMB: 0,
+                    totalRevenueUSDC: 0,
+                    byTier: {}
+                };
 
-                if (result.success && result.stats) {
-                    const stats = result.stats;
-                    document.getElementById('totalDeals').textContent = formatNumber(stats.totalDeals || 0);
-                    document.getElementById('activeDeals').textContent = formatNumber(stats.activeDeals || 0);
-                    document.getElementById('pendingDeals').textContent = formatNumber(stats.pendingDeals || 0);
-                    document.getElementById('expiredDeals').textContent = formatNumber(stats.expiredDeals || 0);
-                    document.getElementById('totalDealSize').textContent = formatNumber(stats.totalSizeMB || 0);
-                    document.getElementById('totalRevenue').textContent = formatNumber(stats.totalRevenueUSDC || 0);
+                // Try to fetch from deals stats endpoint
+                try {
+                    const response = await fetch('/api/v1/deals/stats');
+                    const result = await response.json();
 
-                    // Deals by Tier
-                    if (stats.byTier && Object.keys(stats.byTier).length > 0) {
-                        const tierDiv = document.getElementById('dealsByTier');
-                        tierDiv.innerHTML = '<h3 class="text-lg font-semibold mb-4 text-[#FFFFFF]">Deals by Tier</h3>';
-                        const tierGrid = document.createElement('div');
-                        tierGrid.className = 'stats-grid';
-                        
-                        Object.entries(stats.byTier).forEach(([tier, count]) => {
-                            const card = document.createElement('div');
-                            card.className = 'stat-card';
-                            card.innerHTML = `
-                                <div class="stat-title">${tier}</div>
-                                <div class="stat-value">${formatNumber(count)}</div>
-                            `;
-                            tierGrid.appendChild(card);
-                        });
-                        
-                        tierDiv.appendChild(tierGrid);
+                    if (result.success && result.stats) {
+                        stats = {
+                            totalDeals: result.stats.totalDeals || 0,
+                            activeDeals: result.stats.activeDeals || 0,
+                            pendingDeals: result.stats.pendingDeals || 0,
+                            expiredDeals: result.stats.expiredDeals || 0,
+                            totalSizeMB: result.stats.totalSizeMB || 0,
+                            totalRevenueUSDC: result.stats.totalRevenueUSDC || 0,
+                            byTier: result.stats.byTier || {}
+                        };
                     }
-
-                    document.getElementById('dealsLoading').style.display = 'none';
-                    document.getElementById('dealsContent').style.display = 'block';
+                } catch (dealsError) {
+                    console.warn('Error fetching deals stats endpoint, using network stats fallback:', dealsError);
                 }
+
+                // Use network stats as fallback/supplement if deals stats are empty
+                if (networkStatsData && networkStatsData.stats) {
+                    const ns = networkStatsData.stats;
+                    
+                    // If deals stats endpoint returned empty data, use network stats
+                    if (stats.totalDeals === 0 && stats.activeDeals === 0) {
+                        stats.activeDeals = ns.totalActiveDeals || 0;
+                        stats.totalSizeMB = ns.totalDealStorageMB || 0;
+                        
+                        // Estimate total deals from active deals if we don't have the breakdown
+                        if (stats.totalDeals === 0 && stats.activeDeals > 0) {
+                            stats.totalDeals = stats.activeDeals;
+                        }
+                    } else {
+                        // Supplement with network stats if available
+                        if (stats.totalSizeMB === 0 && ns.totalDealStorageMB) {
+                            stats.totalSizeMB = ns.totalDealStorageMB;
+                        }
+                        if (stats.activeDeals === 0 && ns.totalActiveDeals) {
+                            stats.activeDeals = ns.totalActiveDeals;
+                        }
+                    }
+                }
+
+                // Update UI
+                document.getElementById('totalDeals').textContent = formatNumber(stats.totalDeals || 0);
+                document.getElementById('activeDeals').textContent = formatNumber(stats.activeDeals || 0);
+                document.getElementById('pendingDeals').textContent = formatNumber(stats.pendingDeals || 0);
+                document.getElementById('expiredDeals').textContent = formatNumber(stats.expiredDeals || 0);
+                document.getElementById('totalDealSize').textContent = formatNumber(stats.totalSizeMB || 0);
+                document.getElementById('totalRevenue').textContent = formatNumber(stats.totalRevenueUSDC || 0);
+
+                // Deals by Tier
+                if (stats.byTier && Object.keys(stats.byTier).length > 0) {
+                    const tierDiv = document.getElementById('dealsByTier');
+                    tierDiv.innerHTML = '<h3 class="text-lg font-semibold mb-4 text-[#FFFFFF]">Deals by Tier</h3>';
+                    const tierGrid = document.createElement('div');
+                    tierGrid.className = 'stats-grid';
+                    
+                    Object.entries(stats.byTier).forEach(([tier, count]) => {
+                        const card = document.createElement('div');
+                        card.className = 'stat-card';
+                        card.innerHTML = `
+                            <div class="stat-title">${tier}</div>
+                            <div class="stat-value">${formatNumber(count)}</div>
+                        `;
+                        tierGrid.appendChild(card);
+                    });
+                    
+                    tierDiv.appendChild(tierGrid);
+                } else {
+                    // Clear deals by tier if empty
+                    document.getElementById('dealsByTier').innerHTML = '';
+                }
+
+                document.getElementById('dealsLoading').style.display = 'none';
+                document.getElementById('dealsContent').style.display = 'block';
             } catch (error) {
                 console.error('Error fetching deals stats:', error);
                 document.getElementById('dealsLoading').textContent = 'Error loading deals statistics';
@@ -688,8 +746,9 @@
             return div.innerHTML;
         }
 
-        function refreshAll() {
-            fetchNetworkStats();
+        async function refreshAll() {
+            // Fetch network stats first so deals stats can use it as fallback
+            await fetchNetworkStats();
             fetchReputation();
             fetchDealsStats();
             fetchRegistryInfo();
