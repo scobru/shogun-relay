@@ -756,12 +756,20 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
     }
 
     // Parse token if it's a JSON string (not a hex string)
+    // Note: Simple passwords like "shogun2025" should NOT be parsed as JSON
     if (token && typeof token === 'string' && !token.startsWith('0x')) {
-      try {
-        token = JSON.parse(token);
-        console.log(`🔑 Token parsed successfully`);
-      } catch (parseError) {
-        // Not JSON, use as-is (could be address or signature)
+      // Only try to parse as JSON if it looks like JSON (starts with { or [)
+      if (token.trim().startsWith('{') || token.trim().startsWith('[')) {
+        try {
+          token = JSON.parse(token);
+          console.log(`🔑 Token parsed as JSON successfully`);
+        } catch (parseError) {
+          // Not valid JSON, use as-is (could be password, address, or signature)
+          console.log(`🔑 Token is not JSON, using as-is (password or other format)`);
+        }
+      } else {
+        // Token is a simple string (password), use as-is
+        console.log(`🔑 Token is a simple string (password), using as-is`);
       }
     }
 
@@ -828,9 +836,13 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
 
       // If token is provided, buffer the response to decrypt it
       console.log(`🔓 Attempting decryption for CID: ${cid}`);
-      let body = "";
-      ipfsRes.on("data", (chunk) => (body += chunk));
+      console.log(`   Token received: ${token ? (typeof token === 'string' ? token.substring(0, 20) + '...' : 'object') : 'missing'}`);
+      const chunks = [];
+      ipfsRes.on("data", (chunk) => chunks.push(chunk));
       ipfsRes.on("end", async () => {
+        // Convert chunks to string properly (handles both Buffer and string chunks)
+        const body = Buffer.concat(chunks).toString('utf8');
+        console.log(`   Body length: ${body.length}, preview: ${body.substring(0, 100)}...`);
         try {
           // Check if body looks like encrypted JSON (SEA encrypted data)
           let isEncryptedData = false;
@@ -905,9 +917,13 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
           
           // Only try to decrypt if it looks like encrypted data
           if (isEncryptedData && encryptedObject && token) {
-            console.log(`🔓 Attempting decryption with token (length: ${token.length})`);
+            console.log(`🔓 Attempting decryption with token`);
+            console.log(`   Token type: ${typeof token}, length: ${typeof token === 'string' ? token.length : 'N/A'}`);
+            console.log(`   Token preview: ${typeof token === 'string' ? token.substring(0, 20) + '...' : JSON.stringify(token).substring(0, 50)}`);
+            console.log(`   Encrypted object keys: ${Object.keys(encryptedObject).join(', ')}`);
             const SEA = await import("gun/sea.js");
-            // Decrypt using the token (signature or key)
+            // Decrypt using the token (signature, password, or key)
+            // Token can be: string (password), signature (hex), or keypair object
             const decrypted = await SEA.default.decrypt(encryptedObject, token);
 
             if (decrypted) {
@@ -993,13 +1009,19 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
             } else {
               // Decryption failed - file might not be encrypted or wrong token
               console.log(`⚠️ Decryption returned null - file might not be encrypted or token is wrong`);
-              console.log(`   Token type: ${typeof token}, length: ${token?.length || 0}`);
+              console.log(`   Token type: ${typeof token}, length: ${typeof token === 'string' ? token.length : 'N/A'}`);
+              console.log(`   Token value: ${typeof token === 'string' ? token.substring(0, 30) + '...' : JSON.stringify(token).substring(0, 50)}`);
               console.log(`   Encrypted object keys: ${encryptedObject ? Object.keys(encryptedObject).join(', ') : 'none'}`);
-              // Try to return original content, but log the issue
+              console.log(`   Encrypted object preview: ${JSON.stringify(encryptedObject).substring(0, 200)}`);
+              
+              // Return error instead of encrypted content
               if (!res.headersSent) {
-                res.setHeader("Content-Type", ipfsRes.headers["content-type"] || "application/octet-stream");
-                res.setHeader("Cache-Control", "public, max-age=3600");
-                res.send(body);
+                res.status(400).json({
+                  success: false,
+                  error: "Decryption failed",
+                  message: "The file could not be decrypted. Please check that you're using the correct token/password.",
+                  details: "This usually means the token/password is incorrect or the file was encrypted with a different key."
+                });
               }
               return;
             }

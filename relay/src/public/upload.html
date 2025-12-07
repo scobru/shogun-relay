@@ -332,10 +332,13 @@
 
 
           const encryptedData = await SEA.encrypt(base64data, token);
+          // Convert encrypted object to JSON string (SEA.encrypt returns an object)
+          // This is critical: if we don't stringify, File constructor will convert it to "[object Object]"
+          const encryptedDataJson = JSON.stringify(encryptedData);
           const encryptionFileName = baseFileName.endsWith(".enc")
             ? baseFileName
             : `${baseFileName}.enc`;
-          fileToUpload = new File([encryptedData], encryptionFileName, {
+          fileToUpload = new File([encryptedDataJson], encryptionFileName, {
             type: "text/plain",
           });
           uploadFileName = encryptionFileName;
