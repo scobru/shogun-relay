@@ -853,19 +853,54 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
           try {
             // Try to parse as JSON
             const parsed = JSON.parse(body);
-            // SEA encrypted data has specific structure
-            isEncryptedData = parsed && typeof parsed === 'object' && 
-                             (parsed.ct || parsed.iv || parsed.s || parsed.salt);
-            if (isEncryptedData) {
+            
+            // Check if parsed result is a string that starts with "SEA{" (double-encoded JSON)
+            if (typeof parsed === 'string' && parsed.trim().startsWith('SEA{')) {
+              console.log(`🔐 Detected double-encoded SEA data for CID: ${cid}`);
+              try {
+                // Parse the inner SEA string
+                const innerParsed = JSON.parse(parsed);
+                if (innerParsed && typeof innerParsed === 'object' && 
+                    (innerParsed.ct || innerParsed.iv || innerParsed.s || innerParsed.salt)) {
+                  isEncryptedData = true;
+                  encryptedObject = innerParsed;
+                  console.log(`🔐 Detected encrypted data structure (double-encoded) for CID: ${cid}`);
+                }
+              } catch (innerError) {
+                console.log(`⚠️ Failed to parse inner SEA string: ${innerError.message}`);
+                isEncryptedData = false;
+              }
+            }
+            // SEA encrypted data has specific structure (direct object)
+            else if (parsed && typeof parsed === 'object' && 
+                     (parsed.ct || parsed.iv || parsed.s || parsed.salt)) {
+              isEncryptedData = true;
               encryptedObject = parsed;
               console.log(`🔐 Detected encrypted data structure for CID: ${cid}`);
             } else if (parsed && typeof parsed === 'object') {
               console.log(`📄 Body is JSON object but doesn't look encrypted. Keys: ${Object.keys(parsed).join(', ')}`);
             }
           } catch (e) {
-            // Not JSON, probably not encrypted
-            isEncryptedData = false;
-            console.log(`📄 Body is not valid JSON, skipping decryption. Error: ${e.message}, Body preview: ${body.substring(0, 200)}`);
+            // Not JSON, but might be direct SEA string
+            if (typeof body === 'string' && body.trim().startsWith('SEA{')) {
+              console.log(`🔐 Body is not JSON but starts with SEA{, trying to parse as SEA data for CID: ${cid}`);
+              try {
+                const seaParsed = JSON.parse(body.trim());
+                if (seaParsed && typeof seaParsed === 'object' && 
+                    (seaParsed.ct || seaParsed.iv || seaParsed.s || seaParsed.salt)) {
+                  isEncryptedData = true;
+                  encryptedObject = seaParsed;
+                  console.log(`🔐 Detected encrypted data structure (direct SEA, no JSON wrapper) for CID: ${cid}`);
+                }
+              } catch (seaError) {
+                console.log(`📄 Body is not valid JSON and not valid SEA data. Error: ${e.message}, Body preview: ${body.substring(0, 200)}`);
+                isEncryptedData = false;
+              }
+            } else {
+              // Not JSON, probably not encrypted
+              isEncryptedData = false;
+              console.log(`📄 Body is not valid JSON, skipping decryption. Error: ${e.message}, Body preview: ${body.substring(0, 200)}`);
+            }
           }
           
           // Only try to decrypt if it looks like encrypted data
