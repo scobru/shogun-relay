@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="shogun-dark">
+<head>
+    <meta charset="UTF-8">
+    <title>API Documentation - Shogun Relay</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/variables.css" rel="stylesheet" type="text/css" />
+    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/base.css" rel="stylesheet" type="text/css" />
+    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/daisyui-overrides.css" rel="stylesheet" type="text/css" />
+    <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    
+    <!-- RapiDoc -->
+    <script type="module" src="https://unpkg.com/rapidoc/dist/rapidoc-min.js"></script>
+    
+    <style>
+        body {
+            line-height: 1.6;
+            background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
+            min-height: 100vh;
+        }
+
+        .hero-gradient {
+            background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            color: #42A5F5;
+            text-decoration: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            margin-bottom: 1.5rem;
+            transition: all 0.2s ease;
+            font-size: 1rem;
+        }
+
+        .back-link:hover {
+            background-color: rgba(66, 165, 245, 0.1);
+            color: #64B5F6;
+        }
+
+        /* Override RapiDoc styles for dark theme */
+        :root {
+            --rapidoc-primary-color: #FF69B4;
+            --rapidoc-bg-color: #1A1A1A;
+            --rapidoc-text-color: #E0E0E0;
+            --rapidoc-border-color: #404040;
+            --rapidoc-nav-bg-color: #282828;
+            --rapidoc-nav-hover-bg-color: #353535;
+            --rapidoc-nav-text-color: #E0E0E0;
+            --rapidoc-nav-accent-color: #FF69B4;
+        }
+
+        rapidoc {
+            --nav-hover-bg-color: #353535;
+            --nav-active-bg-color: #404040;
+            --nav-active-text-color: #FF69B4;
+            --nav-group-title-color: #FF69B4;
+            --nav-tag-color: #42A5F5;
+            --nav-text-color: #E0E0E0;
+            --nav-bg-color: #282828;
+            --bg-color: #1A1A1A;
+            --text-color: #E0E0E0;
+            --border-color: #404040;
+            --primary-color: #FF69B4;
+            --code-bg-color: #282828;
+            --code-text-color: #E0E0E0;
+            --param-bg-color: #282828;
+            --param-text-color: #E0E0E0;
+            --param-border-color: #404040;
+            --btn-primary-bg-color: #FF69B4;
+            --btn-primary-text-color: #FFFFFF;
+            --btn-secondary-bg-color: #404040;
+            --btn-secondary-text-color: #E0E0E0;
+            --response-bg-color: #282828;
+            --response-text-color: #E0E0E0;
+            --response-border-color: #404040;
+        }
+    </style>
+</head>
+
+<body class="antialiased">
+    <div class="hero-gradient min-h-screen">
+        <div class="container mx-auto px-4 py-8">
+            <!-- Back Navigation -->
+            <div class="flex items-center mb-8">
+                <a href="/" class="back-link">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    <span>Back to Control Panel</span>
+                </a>
+            </div>
+
+            <div class="card bg-[#282828] border border-[#404040] rounded-2xl mb-8">
+                <div class="p-8">
+                    <div class="flex flex-col items-center mb-6">
+                        <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-[#42A5F5] to-[#1E88E5] mb-6">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <h1 class="text-3xl md:text-4xl font-bold mb-4 text-[#FFFFFF]">API Documentation</h1>
+                        <p class="text-[#8B94FF] mb-4 text-center">Interactive API explorer - Test endpoints directly from your browser</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RapiDoc Component -->
+            <rapidoc
+                spec-url="/api/openapi.json"
+                theme="dark"
+                render-style="read"
+                show-header="false"
+                allow-authentication="true"
+                allow-server-selection="false"
+                show-meta="true"
+                show-components="true"
+                show-info="true"
+                show-servers="false"
+                regular-font="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+                mono-font="'Fira Code', 'Courier New', monospace"
+                font-size="14px"
+                primary-color="#FF69B4"
+                bg-color="#1A1A1A"
+                text-color="#E0E0E0"
+                nav-bg-color="#282828"
+                nav-text-color="#E0E0E0"
+                nav-hover-bg-color="#353535"
+                nav-accent-color="#FF69B4"
+                nav-hover-text-color="#FF69B4"
+                header-color="#FF69B4"
+                border-color="#404040"
+            ></rapidoc>
+        </div>
+    </div>
+
+    <!-- Include centralized admin authentication -->
+    <script src="lib/admin-auth.js"></script>
+    <script src="lib/admin-nav.js"></script>
+
+    <script>
+        // Generate OpenAPI spec dynamically or fetch from endpoint
+        // For now, we'll create a basic spec inline
+        async function loadOpenAPISpec() {
+            try {
+                // Try to fetch from API endpoint first
+                const response = await fetch('/api/openapi.json');
+                if (response.ok) {
+                    const spec = await response.json();
+                    const rapidocEl = document.querySelector('rapidoc');
+                    rapidocEl.spec = JSON.stringify(spec);
+                    return;
+                }
+            } catch (e) {
+                console.log('OpenAPI endpoint not available, using inline spec');
+            }
+
+            // Fallback: Generate basic OpenAPI spec
+            const baseUrl = window.location.origin;
+            const openAPISpec = {
+                openapi: "3.0.0",
+                info: {
+                    title: "Shogun Relay API",
+                    version: "1.0.0",
+                    description: "Complete API documentation for Shogun Relay. Test endpoints directly from this interface.",
+                    contact: {
+                        name: "Shogun Project",
+                        url: "https://github.com/scobru/shogun"
+                    }
+                },
+                servers: [
+                    {
+                        url: baseUrl,
+                        description: "Current Server"
+                    }
+                ],
+                components: {
+                    securitySchemes: {
+                        bearerAuth: {
+                            type: "http",
+                            scheme: "bearer",
+                            bearerFormat: "JWT",
+                            description: "Bearer token authentication using ADMIN_PASSWORD"
+                        },
+                        tokenHeader: {
+                            type: "apiKey",
+                            in: "header",
+                            name: "token",
+                            description: "Custom token header authentication"
+                        },
+                        sessionToken: {
+                            type: "apiKey",
+                            in: "header",
+                            name: "X-Session-Token",
+                            description: "Session token after initial authentication"
+                        }
+                    },
+                    schemas: {
+                        Error: {
+                            type: "object",
+                            properties: {
+                                success: {
+                                    type: "boolean",
+                                    example: false
+                                },
+                                error: {
+                                    type: "string",
+                                    example: "Error message"
+                                },
+                                reason: {
+                                    type: "string",
+                                    example: "Detailed reason (optional)"
+                                }
+                            }
+                        },
+                        HealthResponse: {
+                            type: "object",
+                            properties: {
+                                success: { type: "boolean" },
+                                status: { type: "string", example: "healthy" },
+                                timestamp: { type: "string", format: "date-time" },
+                                uptime: {
+                                    type: "object",
+                                    properties: {
+                                        seconds: { type: "number" },
+                                        hours: { type: "number" },
+                                        formatted: { type: "string" }
+                                    }
+                                },
+                                connections: {
+                                    type: "object",
+                                    properties: {
+                                        active: { type: "number" },
+                                        total: { type: "number" }
+                                    }
+                                },
+                                memory: {
+                                    type: "object",
+                                    properties: {
+                                        heapUsedMB: { type: "number" },
+                                        heapTotalMB: { type: "number" },
+                                        percent: { type: "number" },
+                                        rssMB: { type: "number" }
+                                    }
+                                }
+                            }
+                        },
+                        NetworkStats: {
+                            type: "object",
+                            properties: {
+                                success: { type: "boolean" },
+                                stats: {
+                                    type: "object",
+                                    properties: {
+                                        totalRelays: { type: "number" },
+                                        activeRelays: { type: "number" },
+                                        totalConnections: { type: "number" },
+                                        totalStorageBytes: { type: "number" },
+                                        totalPins: { type: "number" },
+                                        totalActiveDeals: { type: "number" },
+                                        totalActiveSubscriptions: { type: "number" },
+                                        totalDealStorageMB: { type: "number" },
+                                        totalSubscriptionStorageMB: { type: "number" },
+                                        totalStorageMB: { type: "number" },
+                                        totalStorageGB: { type: "string" }
+                                    }
+                                },
+                                timestamp: { type: "number" }
+                            }
+                        }
+                    }
+                },
+                security: [
+                    { bearerAuth: [] },
+                    { tokenHeader: [] },
+                    { sessionToken: [] }
+                ],
+                paths: {
+                    "/health": {
+                        get: {
+                            tags: ["Health & Status"],
+                            summary: "Health check",
+                            description: "Health check endpoint with detailed system status",
+                            operationId: "getHealth",
+                            responses: {
+                                "200": {
+                                    description: "System health status",
+                                    content: {
+                                        "application/json": {
+                                            schema: { $ref: "#/components/schemas/HealthResponse" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "/api/v1/network/stats": {
+                        get: {
+                            tags: ["Network"],
+                            summary: "Network statistics",
+                            description: "Network-wide statistics aggregated from all known relays",
+                            operationId: "getNetworkStats",
+                            responses: {
+                                "200": {
+                                    description: "Network statistics",
+                                    content: {
+                                        "application/json": {
+                                            schema: { $ref: "#/components/schemas/NetworkStats" }
+                                        }
+                                    }
+                                },
+                                "500": {
+                                    description: "Server error",
+                                    content: {
+                                        "application/json": {
+                                            schema: { $ref: "#/components/schemas/Error" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "/api/v1/network/reputation": {
+                        get: {
+                            tags: ["Network"],
+                            summary: "Reputation leaderboard",
+                            description: "Get reputation scores for all relays in the network",
+                            operationId: "getReputationLeaderboard",
+                            parameters: [
+                                {
+                                    name: "limit",
+                                    in: "query",
+                                    schema: { type: "integer", default: 50 },
+                                    description: "Maximum number of results"
+                                },
+                                {
+                                    name: "minScore",
+                                    in: "query",
+                                    schema: { type: "number" },
+                                    description: "Minimum reputation score"
+                                },
+                                {
+                                    name: "tier",
+                                    in: "query",
+                                    schema: { type: "string" },
+                                    description: "Filter by tier (platinum, gold, silver, bronze, basic)"
+                                }
+                            ],
+                            responses: {
+                                "200": {
+                                    description: "Reputation leaderboard",
+                                    content: {
+                                        "application/json": {
+                                            schema: {
+                                                type: "object",
+                                                properties: {
+                                                    success: { type: "boolean" },
+                                                    count: { type: "number" },
+                                                    leaderboard: {
+                                                        type: "array",
+                                                        items: {
+                                                            type: "object",
+                                                            properties: {
+                                                                host: { type: "string" },
+                                                                score: { type: "number" },
+                                                                tier: { type: "string" },
+                                                                uptimePercent: { type: "number" },
+                                                                proofsSuccessful: { type: "number" },
+                                                                proofsTotal: { type: "number" }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "/api/v1/deals/stats": {
+                        get: {
+                            tags: ["Storage Deals"],
+                            summary: "Deals statistics",
+                            description: "Get aggregate statistics for all deals (network-wide)",
+                            operationId: "getDealsStats",
+                            parameters: [
+                                {
+                                    name: "timeout",
+                                    in: "query",
+                                    schema: { type: "integer", default: 5000 },
+                                    description: "Timeout in milliseconds"
+                                }
+                            ],
+                            responses: {
+                                "200": {
+                                    description: "Deals statistics",
+                                    content: {
+                                        "application/json": {
+                                            schema: {
+                                                type: "object",
+                                                properties: {
+                                                    success: { type: "boolean" },
+                                                    stats: {
+                                                        type: "object",
+                                                        properties: {
+                                                            totalDeals: { type: "number" },
+                                                            activeDeals: { type: "number" },
+                                                            pendingDeals: { type: "number" },
+                                                            expiredDeals: { type: "number" },
+                                                            totalSizeMB: { type: "number" },
+                                                            totalRevenueUSDC: { type: "number" },
+                                                            byTier: { type: "object" }
+                                                        }
+                                                    },
+                                                    timestamp: { type: "number" }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "503": {
+                                    description: "Service unavailable",
+                                    content: {
+                                        "application/json": {
+                                            schema: { $ref: "#/components/schemas/Error" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "/api/v1/registry/params": {
+                        get: {
+                            tags: ["Registry"],
+                            summary: "Registry parameters",
+                            description: "Get on-chain registry parameters",
+                            operationId: "getRegistryParams",
+                            responses: {
+                                "200": {
+                                    description: "Registry parameters",
+                                    content: {
+                                        "application/json": {
+                                            schema: {
+                                                type: "object",
+                                                properties: {
+                                                    success: { type: "boolean" },
+                                                    chainId: { type: "number" },
+                                                    registryAddress: { type: "string" },
+                                                    params: {
+                                                        type: "object",
+                                                        properties: {
+                                                            minStake: { type: "string" },
+                                                            minStakeRaw: { type: "string" },
+                                                            unstakingDelay: { type: "number" },
+                                                            unstakingDelayDays: { type: "number" }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "/api/v1/network/onchain/relays": {
+                        get: {
+                            tags: ["Registry"],
+                            summary: "On-chain relays",
+                            description: "Get list of relays registered on-chain",
+                            operationId: "getOnChainRelays",
+                            parameters: [
+                                {
+                                    name: "chainId",
+                                    in: "query",
+                                    required: true,
+                                    schema: { type: "integer" },
+                                    description: "Chain ID (e.g., 84532 for Base Sepolia)"
+                                }
+                            ],
+                            responses: {
+                                "200": {
+                                    description: "List of on-chain relays",
+                                    content: {
+                                        "application/json": {
+                                            schema: {
+                                                type: "object",
+                                                properties: {
+                                                    success: { type: "boolean" },
+                                                    chainId: { type: "number" },
+                                                    relayCount: { type: "number" },
+                                                    relays: {
+                                                        type: "array",
+                                                        items: {
+                                                            type: "object",
+                                                            properties: {
+                                                                address: { type: "string" },
+                                                                owner: { type: "string" },
+                                                                endpoint: { type: "string" },
+                                                                stakedAmount: { type: "string" },
+                                                                status: { type: "string" },
+                                                                registeredAt: { type: "string" }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            const rapidocEl = document.querySelector('rapidoc');
+            rapidocEl.spec = JSON.stringify(openAPISpec);
+        }
+
+        // Load spec when page loads
+        document.addEventListener('DOMContentLoaded', loadOpenAPISpec);
+    </script>
+</body>
+</html>
