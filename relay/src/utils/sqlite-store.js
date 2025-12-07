@@ -15,6 +15,7 @@ class SQLiteStore {
   constructor(options = {}) {
     this.dbPath = options.dbPath || path.join(process.cwd(), 'data', 'gun.db');
     this.file = options.file || 'radata';
+    this.isClosed = false; // Track if database is closed
     
     // Ensure data directory exists
     const dataDir = path.dirname(this.dbPath);
@@ -54,6 +55,13 @@ class SQLiteStore {
    * @param {function} cb - Callback(err, data)
    */
   get(file, cb) {
+    // Check if database is closed (during shutdown)
+    if (this.isClosed) {
+      // Silently return null during shutdown to avoid errors
+      // GunDB may still have pending operations during shutdown
+      return cb(null, null);
+    }
+    
     try {
       const row = this.getStmt.get(file);
       if (row) {
@@ -62,6 +70,11 @@ class SQLiteStore {
         cb(null, null); // File not found, return null
       }
     } catch (err) {
+      // If error is due to closed database, return null silently
+      if (err.message && err.message.includes('not open')) {
+        this.isClosed = true; // Mark as closed
+        return cb(null, null);
+      }
       cb(err, null);
     }
   }
@@ -73,11 +86,22 @@ class SQLiteStore {
    * @param {function} cb - Callback(err, ok)
    */
   put(file, data, cb) {
+    // Check if database is closed (during shutdown)
+    if (this.isClosed) {
+      // Silently ignore writes during shutdown
+      return cb(null, 1);
+    }
+    
     try {
       const timestamp = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
       this.putStmt.run(file, data, timestamp);
       cb(null, 1); // Success
     } catch (err) {
+      // If error is due to closed database, silently ignore
+      if (err.message && err.message.includes('not open')) {
+        this.isClosed = true; // Mark as closed
+        return cb(null, 1);
+      }
       cb(err, null);
     }
   }
@@ -87,6 +111,12 @@ class SQLiteStore {
    * @param {function} cb - Callback(file) called for each file, then with null when done
    */
   list(cb) {
+    // Check if database is closed (during shutdown)
+    if (this.isClosed) {
+      // Signal completion immediately during shutdown
+      return cb(null);
+    }
+    
     try {
       const rows = this.listStmt.all();
       for (const row of rows) {
@@ -94,6 +124,10 @@ class SQLiteStore {
       }
       cb(null); // Signal completion
     } catch (err) {
+      // If error is due to closed database, mark as closed and signal completion
+      if (err.message && err.message.includes('not open')) {
+        this.isClosed = true; // Mark as closed
+      }
       cb(null); // On error, just signal completion
     }
   }
@@ -102,7 +136,9 @@ class SQLiteStore {
    * Close database connection
    */
   close() {
-    if (this.db) {
+    if (this.db && !this.isClosed) {
+      // Mark as closed first to prevent new operations
+      this.isClosed = true;
       this.db.close();
       console.log('✅ SQLite store closed');
     }

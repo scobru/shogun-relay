@@ -1567,10 +1567,13 @@ See docs/RELAY_KEYS.md for more information.
       dealSyncInterval = null;
     }
 
-    // Give a short grace period for in-flight operations to complete
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Give a grace period for in-flight operations to complete
+    // GunDB may still have pending operations, so we wait a bit longer
+    console.log("⏳ Waiting for in-flight operations to complete...");
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
     // Close SQLite store if it exists
+    // The SQLiteStore will now gracefully handle any remaining GunDB operations
     if (sqliteStore) {
       try {
         sqliteStore.close();
