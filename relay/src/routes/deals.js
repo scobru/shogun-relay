@@ -1714,10 +1714,11 @@ router.get('/:dealId/verify', async (req, res) => {
       console.log(`⚠️ Could not read content sample for CID ${cid}: ${error.message}`);
     }
     
+    const isVerified = ipfsExists && isPinned && canRead;
     const verification = {
       dealId,
       cid,
-      verified: ipfsExists && isPinned && canRead,
+      verified: isVerified,
       timestamp: Date.now(),
       checks: {
         existsInIPFS: ipfsExists,
@@ -1736,6 +1737,36 @@ router.get('/:dealId/verify', async (req, res) => {
     }
     if (!canRead) {
       verification.issues.push(`Cannot read content: ${readError || 'unknown error'}`);
+    }
+    
+    // Record proof success/failure for reputation tracking
+    if (gun) {
+      try {
+        const host = process.env.RELAY_HOST || process.env.RELAY_ENDPOINT || req.headers.host || 'localhost';
+        // Normalize host - remove protocol if present
+        let normalizedHost = host;
+        try {
+          if (host.includes('://')) {
+            const url = new URL(host);
+            normalizedHost = url.hostname;
+          }
+        } catch (e) {
+          // If URL parsing fails, use as-is
+        }
+        
+        if (isVerified) {
+          // Calculate response time (approximate, since we don't track start time)
+          const responseTime = 0; // Could be improved by tracking start time
+          await Reputation.recordProofSuccess(gun, normalizedHost, responseTime);
+          console.log(`✅ Recorded proof success for deal ${dealId} (host: ${normalizedHost})`);
+        } else {
+          await Reputation.recordProofFailure(gun, normalizedHost);
+          console.log(`❌ Recorded proof failure for deal ${dealId} (host: ${normalizedHost})`);
+        }
+      } catch (e) {
+        // Non-critical, don't block verification response
+        console.warn('Failed to record proof result for reputation:', e.message);
+      }
     }
     
     res.json({
