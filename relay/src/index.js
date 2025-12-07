@@ -1391,6 +1391,31 @@ See docs/RELAY_KEYS.md for more information.
 
     // Legacy pulse (for backward compatibility)
     db?.get("pulse").put(pulse);
+    
+    // CRITICAL: Save pulse to GunDB relays namespace for network discovery
+    // This is what /api/v1/network/stats reads from
+    try {
+      // Save pulse with timestamp for filtering
+      const relayData = {
+        pulse: {
+          ...pulse,
+          timestamp: pulse.timestamp || Date.now(), // Ensure timestamp is set
+        },
+        lastUpdated: Date.now(),
+      };
+      
+      gun.get('relays').get(host).put(relayData);
+      
+      // Also save to a separate pulse namespace for easier querying
+      gun.get('relays').get(host).get('pulse').put(pulse);
+      
+      if (process.env.DEBUG) {
+        console.log(`📡 Pulse saved to relays/${host} (connections: ${activeWires}, IPFS: ${pulse.ipfs?.connected ? 'connected' : 'disconnected'}, pins: ${pulse.ipfs?.numPins || 0})`);
+      }
+    } catch (e) {
+      console.warn('⚠️ Failed to save pulse to GunDB relays namespace:', e.message);
+    }
+    
     addTimeSeriesPoint("connections.active", activeWires);
     addTimeSeriesPoint("memory.heapUsed", process.memoryUsage().heapUsed);
 

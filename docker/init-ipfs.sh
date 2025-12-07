@@ -95,6 +95,20 @@ fi
 if [ ! -f "$IPFS_PATH/config" ]; then
     echo "📦 IPFS not initialized. Initializing now..."
     
+    # CRITICAL: Check if this is a volume mount issue
+    # If the directory exists but config is missing, warn about potential data loss
+    if [ -d "$IPFS_PATH" ] && [ "$(ls -A $IPFS_PATH 2>/dev/null)" ]; then
+        echo "⚠️ WARNING: IPFS directory exists but config is missing!"
+        echo "⚠️ This might indicate a volume mount issue or data corruption."
+        echo "⚠️ If you have existing pins, they may be lost!"
+        echo "⚠️ Directory contents:"
+        ls -la "$IPFS_PATH" 2>/dev/null | head -20 || echo "   (cannot list contents)"
+        echo ""
+        echo "⚠️ To preserve existing data, ensure the volume is mounted correctly."
+        echo "⚠️ Waiting 5 seconds before proceeding with initialization..."
+        sleep 5
+    fi
+    
     # Wait for lock file to be released if it exists
     if [ -f "$IPFS_PATH/repo.lock" ]; then
         echo "⏳ Waiting for IPFS lock to be released..."
@@ -177,6 +191,30 @@ if [ ! -f "$IPFS_PATH/config" ]; then
     echo "✅ IPFS initialization completed"
 else
     echo "✅ IPFS already initialized"
+    
+    # Verify that the repository is valid and not corrupted
+    echo "🔍 Verifying IPFS repository integrity..."
+    set +e
+    if [ ! -f "$IPFS_PATH/config" ]; then
+        echo "❌ ERROR: IPFS config file is missing even though repository should exist!"
+        echo "❌ This indicates a serious problem with the volume mount."
+        echo "❌ Your pins may be lost. Check your Docker volume configuration."
+        exit 1
+    fi
+    
+    # Check for critical IPFS directories
+    if [ ! -d "$IPFS_PATH/blocks" ] && [ ! -d "$IPFS_PATH/datastore" ]; then
+        echo "⚠️ WARNING: IPFS repository structure appears incomplete"
+        echo "⚠️ Blocks or datastore directory missing. Repository may be corrupted."
+    fi
+    
+    # Try to read the config to verify it's valid
+    if ! /usr/local/bin/ipfs config show >/dev/null 2>&1; then
+        echo "⚠️ WARNING: Could not read IPFS config. Repository may be corrupted."
+    else
+        echo "✅ IPFS repository structure verified"
+    fi
+    set -e
     
     # Check if IPFS daemon is running and has the lock
     if [ -f "$IPFS_PATH/repo.lock" ]; then

@@ -753,6 +753,8 @@ export default (app) => {
           `${baseRoute}/deals/by-cid/:cid`,
           `${baseRoute}/deals/by-client/:address`,
           `${baseRoute}/deals/relay/active`,
+          `${baseRoute}/deals/stats`,
+          `${baseRoute}/deals/leaderboard`,
         ],
       },
     });

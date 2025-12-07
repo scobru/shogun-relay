@@ -1107,6 +1107,145 @@ router.get('/relay/active', async (req, res) => {
 });
 
 /**
+ * GET /api/v1/deals/stats
+ * 
+ * Get aggregate statistics for all deals (network-wide).
+ * Aggregates stats from all relays in the network.
+ */
+router.get('/stats', async (req, res) => {
+  try {
+    const gun = req.app.get('gunInstance');
+    if (!gun) {
+      return res.status(503).json({ success: false, error: 'Gun not available' });
+    }
+    
+    // Get all deals from GunDB (across all relays)
+    const allDeals = [];
+    const timeout = parseInt(req.query.timeout) || 5000;
+    
+    await new Promise((resolve) => {
+      const timer = setTimeout(resolve, timeout);
+      
+      // Get deals from frozen space (all relays publish their deals there)
+      gun.get('shogun-deals').map().once((deal, dealId) => {
+        if (deal && typeof deal === 'object' && deal.cid) {
+          allDeals.push({ id: dealId, ...deal });
+        }
+      });
+      
+      setTimeout(() => {
+        clearTimeout(timer);
+        resolve();
+      }, Math.min(timeout, 3000));
+    });
+    
+    // Calculate aggregate stats
+    const stats = StorageDeals.getDealStats(allDeals);
+    
+    res.json({
+      success: true,
+      stats: {
+        ...stats,
+        totalDeals: stats.total,
+        activeDeals: stats.active,
+        expiredDeals: stats.expired,
+        pendingDeals: stats.pending,
+        totalSizeMB: stats.totalSizeMB,
+        totalRevenueUSDC: stats.totalRevenue,
+        byTier: stats.byTier,
+      },
+      timestamp: Date.now(),
+      note: 'Statistics aggregated from all relays in the network',
+    });
+  } catch (error) {
+    console.error('Error fetching deal stats:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/v1/deals/leaderboard
+ * 
+ * Get leaderboard of relays sorted by deal statistics.
+ * Shows which relays have the most active deals, storage, revenue, etc.
+ */
+router.get('/leaderboard', async (req, res) => {
+  try {
+    const gun = req.app.get('gunInstance');
+    if (!gun) {
+      return res.status(503).json({ success: false, error: 'Gun not available' });
+    }
+    
+    const limit = parseInt(req.query.limit) || 50;
+    const timeout = parseInt(req.query.timeout) || 5000;
+    
+    // Get all relays and their deal stats
+    const relayStats = new Map(); // host -> { deals, stats }
+    
+    await new Promise((resolve) => {
+      const timer = setTimeout(resolve, timeout);
+      
+      // Get deals grouped by relay
+      gun.get('shogun-deals').map().once((deal, dealId) => {
+        if (deal && typeof deal === 'object' && deal.relayPub) {
+          // Try to get relay host from reputation or pulse data
+          gun.get('relays').map().once((relayData, host) => {
+            if (relayData && relayData.pulse) {
+              // Check if this relay matches the deal's relayPub
+              // For now, we'll aggregate by relayPub directly
+              if (!relayStats.has(deal.relayPub)) {
+                relayStats.set(deal.relayPub, {
+                  relayPub: deal.relayPub,
+                  host: host || 'unknown',
+                  deals: [],
+                });
+              }
+              const entry = relayStats.get(deal.relayPub);
+              entry.deals.push({ id: dealId, ...deal });
+            }
+          });
+        }
+      });
+      
+      setTimeout(() => {
+        clearTimeout(timer);
+        resolve();
+      }, Math.min(timeout, 3000));
+    });
+    
+    // Calculate stats for each relay
+    const leaderboard = Array.from(relayStats.values()).map(entry => {
+      const stats = StorageDeals.getDealStats(entry.deals);
+      return {
+        relayPub: entry.relayPub,
+        host: entry.host,
+        ...stats,
+        dealCount: stats.total,
+        activeDealCount: stats.active,
+      };
+    });
+    
+    // Sort by active deals, then by total storage
+    leaderboard.sort((a, b) => {
+      if (b.activeDealCount !== a.activeDealCount) {
+        return b.activeDealCount - a.activeDealCount;
+      }
+      return b.totalSizeMB - a.totalSizeMB;
+    });
+    
+    res.json({
+      success: true,
+      count: leaderboard.length,
+      leaderboard: leaderboard.slice(0, limit),
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error fetching deal leaderboard:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * GET /api/v1/deals/:dealId
  * 
  * Get deal information.

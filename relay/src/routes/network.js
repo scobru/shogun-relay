@@ -147,32 +147,70 @@ router.get('/stats', async (req, res) => {
       totalPins: 0,
     };
 
+    const relaysFound = [];
     const fiveMinutesAgo = Date.now() - 300000;
 
     await new Promise((resolve) => {
-      const timer = setTimeout(resolve, 3000);
+      const timer = setTimeout(() => {
+        console.log(`📊 Network stats collection timeout. Found ${relaysFound.length} relays`);
+        resolve();
+      }, 5000); // Increased timeout to 5 seconds
+      
+      let processedCount = 0;
       
       gun.get('relays').map().once((data, host) => {
-        if (!data || typeof data !== 'object') return;
+        processedCount++;
+        console.log(`📊 Processing relay ${processedCount}: ${host}`);
+        
+        if (!data || typeof data !== 'object') {
+          console.log(`   ⚠️ Invalid data for relay ${host}`);
+          return;
+        }
         
         stats.totalRelays++;
+        relaysFound.push({ host, hasPulse: !!data.pulse });
         
         const pulse = data.pulse;
-        if (pulse && pulse.timestamp > fiveMinutesAgo) {
-          stats.activeRelays++;
-          stats.totalConnections += pulse.connections?.active || 0;
+        if (pulse && typeof pulse === 'object') {
+          console.log(`   ✅ Pulse found for ${host}, timestamp: ${pulse.timestamp}, age: ${Date.now() - (pulse.timestamp || 0)}ms`);
           
-          if (pulse.ipfs) {
-            stats.totalStorageBytes += pulse.ipfs.repoSize || 0;
-            stats.totalPins += pulse.ipfs.numPins || 0;
+          if (pulse.timestamp && pulse.timestamp > fiveMinutesAgo) {
+            stats.activeRelays++;
+            const activeConnections = pulse.connections?.active || 0;
+            stats.totalConnections += activeConnections;
+            console.log(`   📡 Active relay: ${host}, connections: ${activeConnections}`);
+            
+            if (pulse.ipfs && typeof pulse.ipfs === 'object') {
+              const repoSize = pulse.ipfs.repoSize || 0;
+              const numPins = pulse.ipfs.numPins || 0;
+              stats.totalStorageBytes += repoSize;
+              stats.totalPins += numPins;
+              console.log(`   💾 IPFS stats: ${repoSize} bytes, ${numPins} pins`);
+            } else {
+              console.log(`   ⚠️ No IPFS stats for ${host}`);
+            }
+          } else {
+            console.log(`   ⏰ Relay ${host} pulse too old (${pulse.timestamp ? Date.now() - pulse.timestamp : 'no timestamp'}ms ago)`);
           }
+        } else {
+          console.log(`   ⚠️ No pulse data for relay ${host}`);
         }
       });
 
+      // Give more time for GunDB to sync
       setTimeout(() => {
         clearTimeout(timer);
+        console.log(`📊 Network stats collection complete. Total relays: ${stats.totalRelays}, Active: ${stats.activeRelays}`);
         resolve();
-      }, 2500);
+      }, 4500);
+    });
+
+    console.log(`📊 Final network stats:`, {
+      totalRelays: stats.totalRelays,
+      activeRelays: stats.activeRelays,
+      totalConnections: stats.totalConnections,
+      totalStorageBytes: stats.totalStorageBytes,
+      totalPins: stats.totalPins,
     });
 
     res.json({
@@ -183,8 +221,13 @@ router.get('/stats', async (req, res) => {
         totalStorageGB: (stats.totalStorageBytes / (1024 * 1024 * 1024)).toFixed(2),
       },
       timestamp: Date.now(),
+      debug: {
+        relaysFound: relaysFound.length,
+        relaysWithPulse: relaysFound.filter(r => r.hasPulse).length,
+      },
     });
   } catch (error) {
+    console.error('❌ Network stats error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -348,6 +391,17 @@ router.post('/verify-proof', express.json(), (req, res) => {
 // ============================================
 // PIN COORDINATION (via GunDB pub/sub)
 // ============================================
+
+/**
+ * GET /api/v1/network/pin-request
+ * 
+ * Get information about pin requests endpoint.
+ * Returns endpoint info and redirects to pin-requests list.
+ */
+router.get('/pin-request', async (req, res) => {
+  // Redirect to pin-requests endpoint for consistency
+  res.redirect(`${req.baseUrl || '/api/v1/network'}/pin-requests`);
+});
 
 /**
  * POST /api/v1/network/pin-request
