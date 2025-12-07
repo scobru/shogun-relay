@@ -1126,10 +1126,23 @@ router.get('/stats', async (req, res) => {
     await new Promise((resolve) => {
       const timer = setTimeout(resolve, timeout);
       
-      // Get deals from frozen space (all relays publish their deals there)
+      // Get deals from frozen space (deals are saved via FrozenData.createFrozenEntry)
+      // Note: deals are stored in 'frozen-storage-deals' node by createFrozenEntry()
+      gun.get('frozen-storage-deals').map().once((entry, hash) => {
+        if (entry && entry.data && typeof entry.data === 'object' && entry.data.cid) {
+          // Extract deal data from frozen entry
+          const deal = entry.data;
+          allDeals.push({ id: deal.id || hash, ...deal });
+        }
+      });
+      
+      // Also check legacy 'shogun-deals' node for backwards compatibility
       gun.get('shogun-deals').map().once((deal, dealId) => {
         if (deal && typeof deal === 'object' && deal.cid) {
-          allDeals.push({ id: dealId, ...deal });
+          // Avoid duplicates by checking if already added
+          if (!allDeals.find(d => d.id === dealId)) {
+            allDeals.push({ id: dealId, ...deal });
+          }
         }
       });
       
