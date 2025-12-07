@@ -119,34 +119,6 @@ router.use(
   })
 );
 
-// Middleware di autenticazione per webui
-function ensureAdmin(req, res, next) {
-  const authHeader = req.headers["authorization"];
-  const bearerToken = authHeader && authHeader.split(" ")[1];
-  const customHeaderToken = req.headers["token"];
-  const queryToken =
-    req.query?.auth_token ||
-    req.query?.token ||
-    req.query?._auth_token;
-  const token = bearerToken || customHeaderToken || queryToken;
-
-  if (token === process.env.ADMIN_PASSWORD) {
-    // Rimuovi il token dalla query string prima di proxy-passarlo
-    if (queryToken) {
-      const cleanedQuery = { ...req.query };
-      delete cleanedQuery.auth_token;
-      delete cleanedQuery.token;
-
-      const queryString = new URLSearchParams(cleanedQuery).toString();
-      req.url = req.path + (queryString ? `?${queryString}` : "");
-    }
-
-    next();
-  } else {
-    res.status(401).json({ success: false, error: "Unauthorized" });
-  }
-}
-
 // Note: Kubo WebUI proxy removed for security reasons
 // Access Kubo WebUI directly at http://localhost:5001/webui if needed
 
@@ -862,20 +834,46 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
         try {
           // Check if body looks like encrypted JSON (SEA encrypted data)
           let isEncryptedData = false;
+          let encryptedObject = null;
+          
+          // Check if body is "[object Object]" (happens when File was created with object instead of JSON string)
+          if (body && typeof body === 'string' && body.trim() === '[object Object]') {
+            console.warn(`⚠️ Detected "[object Object]" string for CID: ${cid} - file was uploaded incorrectly`);
+            // Cannot decrypt this, return error
+            if (!res.headersSent) {
+              res.status(400).json({
+                success: false,
+                error: "File was uploaded in incorrect format. Please re-upload the file.",
+                details: "The encrypted file was saved as '[object Object]' instead of JSON. This is a known issue with files uploaded before the fix.",
+              });
+            }
+            return;
+          }
+          
           try {
+            // Try to parse as JSON
             const parsed = JSON.parse(body);
             // SEA encrypted data has specific structure
             isEncryptedData = parsed && typeof parsed === 'object' && 
                              (parsed.ct || parsed.iv || parsed.s || parsed.salt);
+            if (isEncryptedData) {
+              encryptedObject = parsed;
+              console.log(`🔐 Detected encrypted data structure for CID: ${cid}`);
+            } else if (parsed && typeof parsed === 'object') {
+              console.log(`📄 Body is JSON object but doesn't look encrypted. Keys: ${Object.keys(parsed).join(', ')}`);
+            }
           } catch (e) {
             // Not JSON, probably not encrypted
             isEncryptedData = false;
+            console.log(`📄 Body is not valid JSON, skipping decryption. Error: ${e.message}, Body preview: ${body.substring(0, 200)}`);
           }
           
           // Only try to decrypt if it looks like encrypted data
-          if (isEncryptedData && token) {
+          if (isEncryptedData && encryptedObject && token) {
+            console.log(`🔓 Attempting decryption with token (length: ${token.length})`);
             const SEA = await import("gun/sea.js");
-            const decrypted = await SEA.default.decrypt(body, token);
+            // Decrypt using the token (signature or key)
+            const decrypted = await SEA.default.decrypt(encryptedObject, token);
 
             if (decrypted) {
               console.log(`✅ Decryption successful!`);
@@ -960,18 +958,25 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
             } else {
               // Decryption failed - file might not be encrypted or wrong token
               console.log(`⚠️ Decryption returned null - file might not be encrypted or token is wrong`);
-              // Return original content without decryption
-              res.setHeader("Content-Type", ipfsRes.headers["content-type"] || "application/octet-stream");
-              res.setHeader("Cache-Control", "public, max-age=3600");
-              res.send(body);
+              console.log(`   Token type: ${typeof token}, length: ${token?.length || 0}`);
+              console.log(`   Encrypted object keys: ${encryptedObject ? Object.keys(encryptedObject).join(', ') : 'none'}`);
+              // Try to return original content, but log the issue
+              if (!res.headersSent) {
+                res.setHeader("Content-Type", ipfsRes.headers["content-type"] || "application/octet-stream");
+                res.setHeader("Cache-Control", "public, max-age=3600");
+                res.send(body);
+              }
               return;
             }
           } else {
             // File doesn't look encrypted, return as-is
-            console.log(`📤 File doesn't appear to be encrypted, returning as-is`);
-            res.setHeader("Content-Type", ipfsRes.headers["content-type"] || "application/octet-stream");
-            res.setHeader("Cache-Control", "public, max-age=3600");
-            res.send(body);
+            console.log(`📤 File doesn't appear to be encrypted (isEncryptedData: ${isEncryptedData}, hasToken: ${!!token}), returning as-is`);
+            console.log(`   Body preview (first 200 chars): ${body.substring(0, 200)}`);
+            if (!res.headersSent) {
+              res.setHeader("Content-Type", ipfsRes.headers["content-type"] || "application/octet-stream");
+              res.setHeader("Cache-Control", "public, max-age=3600");
+              res.send(body);
+            }
             return;
           }
         } catch (decryptError) {
