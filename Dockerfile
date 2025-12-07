@@ -115,10 +115,12 @@ COPY docker/ /app/docker/
 # Convert script line endings from CRLF to LF
 RUN dos2unix /app/docker/init-ipfs.sh
 RUN dos2unix /app/docker/entrypoint.sh
+RUN dos2unix /app/docker/verify-volumes.sh || true
 
 # Set executable permissions for scripts
 RUN chmod +x /app/docker/init-ipfs.sh
 RUN chmod +x /app/docker/entrypoint.sh
+RUN chmod +x /app/docker/verify-volumes.sh || true
 
 # Copy entrypoint to final location and ensure it's executable
 RUN cp /app/docker/entrypoint.sh /usr/local/bin/entrypoint.sh && \

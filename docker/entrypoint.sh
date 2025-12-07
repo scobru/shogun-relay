@@ -64,5 +64,15 @@ else
     echo "⚠️ IPFS_API_TOKEN not set, API will be publicly accessible"
 fi
 
+# Optional: Run volume verification script (can be disabled with SKIP_VOLUME_CHECK=true)
+if [ "${SKIP_VOLUME_CHECK:-false}" != "true" ] && [ -f "/app/docker/verify-volumes.sh" ]; then
+    echo "🔍 Running volume verification..."
+    /bin/sh /app/docker/verify-volumes.sh || {
+        echo "⚠️  Volume verification found issues. Continuing anyway..."
+        echo "⚠️  Set SKIP_VOLUME_CHECK=true to skip this check."
+    }
+    echo ""
+fi
+
 # Execute the main container command (supervisord)
 exec "$@" 
