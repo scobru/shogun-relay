@@ -238,6 +238,69 @@
             font-weight: 500;
         }
 
+        /* Complete Statistics Styles */
+        .stats-category {
+            background-color: #353535;
+            border: 1px solid #505050;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            transition: all 0.2s ease;
+        }
+
+        .stats-category:hover {
+            border-color: #FF69B4;
+        }
+
+        .stats-category h3 {
+            user-select: none;
+        }
+
+        .stats-details {
+            display: none;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #505050;
+        }
+
+        .stats-details.expanded {
+            display: block;
+        }
+
+        .stat-item {
+            background-color: #282828;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #404040;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+
+        .stat-item:hover {
+            border-color: #606060;
+            background-color: #2d2d2d;
+        }
+
+        .stat-label {
+            color: #A0A0A0;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .stat-data {
+            color: #FFFFFF;
+            font-size: 0.95rem;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        #rawJsonContent {
+            font-family: 'Courier New', monospace;
+            line-height: 1.6;
+        }
+
         /* Live Logs Styles */
         .log-entry {
             padding: 0.75rem;
@@ -381,6 +444,193 @@
                                 <div class="stat-title">Uptime</div>
                                 <div class="stat-value" id="uptime">-</div>
                                 <div class="stat-unit">hours</div>
+                            </div>
+                        </div>
+
+                        <!-- Complete Statistics Section -->
+                        <div class="admin-controls">
+                            <div class="flex items-center justify-between mb-6">
+                                <h2 class="text-xl font-bold text-[#FF69B4]">Complete Statistics</h2>
+                                <button id="toggleStatsBtn" 
+                                    class="btn bg-[#404040] hover:bg-[#606060] border-[#606060] text-[#FFFFFF] rounded-xl px-4 py-2 text-sm font-medium">
+                                    ▼ Expand All
+                                </button>
+                            </div>
+                            
+                            <div id="completeStatsContainer" class="space-y-6">
+                                <!-- System Info -->
+                                <div class="stats-category">
+                                    <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
+                                        onclick="toggleCategory('systemInfo')">
+                                        <span>🖥️ System Information</span>
+                                        <span class="text-sm text-[#A0A0A0]">▼</span>
+                                    </h3>
+                                    <div id="systemInfo" class="stats-details grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <div class="stat-item">
+                                            <span class="stat-label">Version:</span>
+                                            <span class="stat-data" id="statVersion">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">Uptime:</span>
+                                            <span class="stat-data" id="statUptime">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">Timestamp:</span>
+                                            <span class="stat-data" id="statTimestamp">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Memory Stats -->
+                                <div class="stats-category">
+                                    <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
+                                        onclick="toggleCategory('memoryStats')">
+                                        <span>💾 Memory Statistics</span>
+                                        <span class="text-sm text-[#A0A0A0]">▼</span>
+                                    </h3>
+                                    <div id="memoryStats" class="stats-details grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <div class="stat-item">
+                                            <span class="stat-label">Heap Used:</span>
+                                            <span class="stat-data" id="statHeapUsed">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">Heap Total:</span>
+                                            <span class="stat-data" id="statHeapTotal">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">External:</span>
+                                            <span class="stat-data" id="statExternal">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">RSS:</span>
+                                            <span class="stat-data" id="statRSS">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- CPU Stats -->
+                                <div class="stats-category">
+                                    <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
+                                        onclick="toggleCategory('cpuStats')">
+                                        <span>⚡ CPU Statistics</span>
+                                        <span class="text-sm text-[#A0A0A0]">▼</span>
+                                    </h3>
+                                    <div id="cpuStats" class="stats-details grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <div class="stat-item">
+                                            <span class="stat-label">User (μs):</span>
+                                            <span class="stat-data" id="statCpuUser">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">System (μs):</span>
+                                            <span class="stat-data" id="statCpuSystem">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Peers Stats -->
+                                <div class="stats-category">
+                                    <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
+                                        onclick="toggleCategory('peersStats')">
+                                        <span>🌐 Peers Statistics</span>
+                                        <span class="text-sm text-[#A0A0A0]">▼</span>
+                                    </h3>
+                                    <div id="peersStats" class="stats-details grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <div class="stat-item">
+                                            <span class="stat-label">Count:</span>
+                                            <span class="stat-data" id="statPeersCount">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">Time:</span>
+                                            <span class="stat-data" id="statPeersTime">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Node Stats -->
+                                <div class="stats-category">
+                                    <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
+                                        onclick="toggleCategory('nodeStats')">
+                                        <span>📦 Node Statistics</span>
+                                        <span class="text-sm text-[#A0A0A0]">▼</span>
+                                    </h3>
+                                    <div id="nodeStats" class="stats-details grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <div class="stat-item">
+                                            <span class="stat-label">Count:</span>
+                                            <span class="stat-data" id="statNodeCount">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">Heap Used:</span>
+                                            <span class="stat-data" id="statNodeHeapUsed">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">Heap Total:</span>
+                                            <span class="stat-data" id="statNodeHeapTotal">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- DAM (Data Access Manager) Stats -->
+                                <div class="stats-category">
+                                    <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
+                                        onclick="toggleCategory('damStats')">
+                                        <span>📊 Data Access Manager (DAM)</span>
+                                        <span class="text-sm text-[#A0A0A0]">▼</span>
+                                    </h3>
+                                    <div id="damStats" class="stats-details">
+                                        <div class="mb-4">
+                                            <h4 class="text-base font-medium mb-3 text-[#E0E0E0]">Incoming</h4>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div class="stat-item">
+                                                    <span class="stat-label">Rate:</span>
+                                                    <span class="stat-data" id="statDamInRate">-</span>
+                                                </div>
+                                                <div class="stat-item">
+                                                    <span class="stat-label">Count:</span>
+                                                    <span class="stat-data" id="statDamInCount">-</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <h4 class="text-base font-medium mb-3 text-[#E0E0E0]">Outgoing</h4>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div class="stat-item">
+                                                    <span class="stat-label">Rate:</span>
+                                                    <span class="stat-data" id="statDamOutRate">-</span>
+                                                </div>
+                                                <div class="stat-item">
+                                                    <span class="stat-label">Count:</span>
+                                                    <span class="stat-data" id="statDamOutCount">-</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Storage (RAD) Stats -->
+                                <div class="stats-category">
+                                    <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
+                                        onclick="toggleCategory('radStats')">
+                                        <span>💿 Storage (RAD) Statistics</span>
+                                        <span class="text-sm text-[#A0A0A0]">▼</span>
+                                    </h3>
+                                    <div id="radStats" class="stats-details">
+                                        <div id="radStatsContent" class="text-[#A0A0A0]">
+                                            No storage statistics available
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Raw JSON View -->
+                                <div class="stats-category">
+                                    <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
+                                        onclick="toggleCategory('rawJson')">
+                                        <span>📄 Raw JSON Data</span>
+                                        <span class="text-sm text-[#A0A0A0]">▼</span>
+                                    </h3>
+                                    <div id="rawJson" class="stats-details">
+                                        <pre id="rawJsonContent" class="bg-[#282828] p-4 rounded-xl text-xs text-[#E0E0E0] overflow-x-auto max-h-96 overflow-y-auto"></pre>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -885,6 +1135,49 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
         }
 
+        // Toggle category expansion
+        function toggleCategory(categoryId) {
+            const category = document.getElementById(categoryId);
+            if (!category) return;
+            
+            const header = category.previousElementSibling;
+            if (!header) return;
+            
+            const arrow = header.querySelector('span:last-child');
+            
+            if (category.classList.contains('expanded')) {
+                category.classList.remove('expanded');
+                if (arrow) arrow.textContent = '▼';
+            } else {
+                category.classList.add('expanded');
+                if (arrow) arrow.textContent = '▲';
+            }
+        }
+
+        // Toggle all categories
+        const toggleBtn = document.getElementById('toggleStatsBtn');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function() {
+                const allCategories = document.querySelectorAll('.stats-details');
+                const allArrows = document.querySelectorAll('.stats-category h3 span:last-child');
+                const isExpanded = Array.from(allCategories).some(cat => cat.classList.contains('expanded'));
+                
+                allCategories.forEach(cat => {
+                    if (isExpanded) {
+                        cat.classList.remove('expanded');
+                    } else {
+                        cat.classList.add('expanded');
+                    }
+                });
+                
+                allArrows.forEach(arrow => {
+                    arrow.textContent = isExpanded ? '▼' : '▲';
+                });
+                
+                this.textContent = isExpanded ? '▼ Expand All' : '▲ Collapse All';
+            });
+        }
+
         async function fetchStats() {
             try {
                 const response = await fetch('/api/v1/system/stats');
@@ -896,8 +1189,8 @@
                 if (result.success) {
                     errorEl.style.display = 'none';
 
-                    // Update stats
-                    const { peers, node, rad, up, dam } = result;
+                    // Update main stats cards
+                    const { peers, node, rad, up, dam, memory, cpu, version, timestamp } = result;
 
                     peersCountEl.textContent = peers?.count || 0;
 
@@ -913,6 +1206,75 @@
                         const hours = (up.time / (1000 * 60 * 60)).toFixed(2);
                         uptimeEl.textContent = hours;
                     }
+
+                    // Update complete statistics
+                    // System Info
+                    document.getElementById('statVersion').textContent = version || 'N/A';
+                    if (up?.time) {
+                        const days = Math.floor(up.time / (1000 * 60 * 60 * 24));
+                        const hours = Math.floor((up.time % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                        const minutes = Math.floor((up.time % (1000 * 60 * 60)) / (1000 * 60));
+                        document.getElementById('statUptime').textContent = `${days}d ${hours}h ${minutes}m`;
+                    }
+                    if (timestamp) {
+                        document.getElementById('statTimestamp').textContent = new Date(timestamp).toLocaleString();
+                    }
+
+                    // Memory Stats
+                    if (memory) {
+                        document.getElementById('statHeapUsed').textContent = formatBytes(memory.heapUsed || 0);
+                        document.getElementById('statHeapTotal').textContent = formatBytes(memory.heapTotal || 0);
+                        document.getElementById('statExternal').textContent = formatBytes(memory.external || 0);
+                        document.getElementById('statRSS').textContent = formatBytes(memory.rss || 0);
+                    }
+
+                    // CPU Stats
+                    if (cpu) {
+                        document.getElementById('statCpuUser').textContent = (cpu.user / 1000).toFixed(2) + ' ms';
+                        document.getElementById('statCpuSystem').textContent = (cpu.system / 1000).toFixed(2) + ' ms';
+                    }
+
+                    // Peers Stats
+                    if (peers) {
+                        document.getElementById('statPeersCount').textContent = peers.count || 0;
+                        if (peers.time) {
+                            document.getElementById('statPeersTime').textContent = new Date(peers.time).toLocaleString();
+                        } else {
+                            document.getElementById('statPeersTime').textContent = 'N/A';
+                        }
+                    }
+
+                    // Node Stats
+                    if (node) {
+                        document.getElementById('statNodeCount').textContent = node.count || 0;
+                        if (node.memory) {
+                            document.getElementById('statNodeHeapUsed').textContent = formatBytes(node.memory.heapUsed || 0);
+                            document.getElementById('statNodeHeapTotal').textContent = formatBytes(node.memory.heapTotal || 0);
+                        }
+                    }
+
+                    // DAM Stats
+                    if (dam) {
+                        if (dam.in) {
+                            document.getElementById('statDamInRate').textContent = (dam.in.rate || 0).toFixed(2) + ' req/s';
+                            document.getElementById('statDamInCount').textContent = dam.in.count || 0;
+                        }
+                        if (dam.out) {
+                            document.getElementById('statDamOutRate').textContent = (dam.out.rate || 0).toFixed(2) + ' req/s';
+                            document.getElementById('statDamOutCount').textContent = dam.out.count || 0;
+                        }
+                    }
+
+                    // RAD Stats
+                    if (rad) {
+                        const radContent = document.getElementById('radStatsContent');
+                        radContent.innerHTML = '<pre class="text-sm">' + JSON.stringify(rad, null, 2) + '</pre>';
+                    } else {
+                        document.getElementById('radStatsContent').textContent = 'No storage statistics available';
+                    }
+
+                    // Raw JSON
+                    document.getElementById('rawJsonContent').textContent = JSON.stringify(result, null, 2);
 
                     lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
 

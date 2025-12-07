@@ -1,0 +1,28 @@
+{
+  "name": "@shogun/relay-sdk",
+  "version": "1.0.0",
+  "description": "SDK for interacting with Shogun Relay",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "shogun",
+    "relay",
+    "sdk",
+    "ipfs",
+    "gun"
+  ],
+  "author": "scobru",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "form-data": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0"
+  }
+}
