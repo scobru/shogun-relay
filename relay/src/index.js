@@ -9,6 +9,7 @@ import setSelfAdjustingInterval from "self-adjusting-interval";
 import crypto from "crypto";
 import Gun from "gun";
 import "gun/sea.js";
+import "gun-authd"; // Import the extension
 import "gun/lib/stats.js";
 import "gun/lib/webrtc.js";
 import "gun/lib/yson.js";

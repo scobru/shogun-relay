@@ -1,20 +1,21 @@
 <!doctype html>
 <html lang="en" data-theme="shogun-dark">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Shogun Relay Graph Explorer</title>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/variables.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/base.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/daisyui-overrides.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
-    <script src="lib/admin-auth.js"></script>
-    <script src="lib/admin-nav.js"></script>
-    
-    <script type="importmap">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shogun Relay Graph Explorer</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+  <link href="https://unpkg.com/shogun-theme@1.0.0/styles/variables.css" rel="stylesheet" type="text/css" />
+  <link href="https://unpkg.com/shogun-theme@1.0.0/styles/base.css" rel="stylesheet" type="text/css" />
+  <link href="https://unpkg.com/shogun-theme@1.0.0/styles/daisyui-overrides.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+  <script src="lib/admin-auth.js"></script>
+  <script src="lib/admin-nav.js"></script>
+
+  <script type="importmap">
     {
         "imports": {
             "gun": "data:text/javascript;charset=utf-8,export default window.Gun;",
@@ -22,307 +23,320 @@
         }
     }
     </script>
-    <style>
-      :root {
-        --relay-bg: #1a1a1a;
-        --relay-panel: #282828;
-        --relay-input: #404040;
-        --relay-border: #404040;
-        --relay-border-light: #606060;
-        --relay-text-primary: #ffffff;
-        --relay-text-secondary: #e0e0e0;
-        --relay-text-muted: #a0a0a0;
-        --relay-accent: #ff69b4;
-        --relay-accent-hover: #ff1493;
-        --relay-link: #42a5f5;
-        --relay-success: #4caf50;
-        --relay-warning: #ffa500;
-        --relay-error: #f44336;
+  <style>
+    :root {
+      --relay-bg: #1a1a1a;
+      --relay-panel: #282828;
+      --relay-input: #404040;
+      --relay-border: #404040;
+      --relay-border-light: #606060;
+      --relay-text-primary: #ffffff;
+      --relay-text-secondary: #e0e0e0;
+      --relay-text-muted: #a0a0a0;
+      --relay-accent: #ff69b4;
+      --relay-accent-hover: #ff1493;
+      --relay-link: #42a5f5;
+      --relay-success: #4caf50;
+      --relay-warning: #ffa500;
+      --relay-error: #f44336;
+    }
+
+    body {
+      font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
+      color: var(--relay-text-secondary);
+      min-height: 100vh;
+    }
+
+    .hero-gradient {
+      background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
+    }
+
+    @keyframes pulse-glow {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4);
       }
 
-      body {
-        font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-        background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
-        color: var(--relay-text-secondary);
-        min-height: 100vh;
+      50% {
+        box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2);
       }
+    }
 
-      .hero-gradient {
-        background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
-      }
+    .pulse-glow {
+      animation: pulse-glow 2s infinite;
+    }
 
-      @keyframes pulse-glow {
-        0%, 100% { box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4); }
-        50% { box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2); }
-      }
+    .section-divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #404040, transparent);
+      margin: 2rem 0;
+    }
 
-      .pulse-glow {
-        animation: pulse-glow 2s infinite;
-      }
+    a {
+      color: var(--relay-link);
+      text-decoration: none;
+    }
 
-      .section-divider {
-        height: 1px;
-        background: linear-gradient(90deg, transparent, #404040, transparent);
-        margin: 2rem 0;
-      }
+    a:hover {
+      color: #64b5f6;
+    }
 
-      a {
-        color: var(--relay-link);
-        text-decoration: none;
-      }
+    .page-container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 3rem;
+    }
 
-      a:hover {
-        color: #64b5f6;
-      }
+    .page-card {
+      background-color: var(--relay-panel);
+      border: 1px solid var(--relay-border);
+      border-radius: 1.5rem;
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.35);
+      padding: 2.75rem 2.5rem;
+    }
 
-      .page-container {
-        max-width: 960px;
-        margin: 0 auto;
-        padding: 2.5rem 1.5rem 3rem;
-      }
-
+    @media (max-width: 640px) {
       .page-card {
-        background-color: var(--relay-panel);
-        border: 1px solid var(--relay-border);
-        border-radius: 1.5rem;
-        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.35);
-        padding: 2.75rem 2.5rem;
-      }
-
-      @media (max-width: 640px) {
-        .page-card {
-          padding: 1.75rem;
-        }
-      }
-
-      .page-title {
-        font-size: clamp(2rem, 4vw, 2.5rem);
-        color: var(--relay-text-primary);
-        font-weight: 600;
-        text-align: center;
-        margin-bottom: 0.75rem;
-      }
-
-      .page-subtitle {
-        text-align: center;
-        color: var(--relay-text-muted);
-        margin-bottom: 2.25rem;
-      }
-
-      .section-card {
-        background-color: var(--relay-panel);
-        border: 1px solid var(--relay-border);
-        border-radius: 1.25rem;
         padding: 1.75rem;
-        margin-top: 1.75rem;
       }
+    }
 
-      .pill-heading {
-        display: inline-block;
-        color: var(--relay-accent);
-        font-size: 0.75rem;
-        letter-spacing: 0.35em;
-        text-transform: uppercase;
-      }
+    .page-title {
+      font-size: clamp(2rem, 4vw, 2.5rem);
+      color: var(--relay-text-primary);
+      font-weight: 600;
+      text-align: center;
+      margin-bottom: 0.75rem;
+    }
 
-      .section-header {
-        display: flex;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-      }
+    .page-subtitle {
+      text-align: center;
+      color: var(--relay-text-muted);
+      margin-bottom: 2.25rem;
+    }
 
-      .section-title {
-        font-size: 1.35rem;
-        color: var(--relay-text-primary);
-        font-weight: 600;
-      }
+    .section-card {
+      background-color: var(--relay-panel);
+      border: 1px solid var(--relay-border);
+      border-radius: 1.25rem;
+      padding: 1.75rem;
+      margin-top: 1.75rem;
+    }
 
-      .section-description {
-        margin-top: 0.25rem;
-        color: var(--relay-text-muted);
-        font-size: 0.92rem;
-      }
+    .pill-heading {
+      display: inline-block;
+      color: var(--relay-accent);
+      font-size: 0.75rem;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+    }
 
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .section-title {
+      font-size: 1.35rem;
+      color: var(--relay-text-primary);
+      font-weight: 600;
+    }
+
+    .section-description {
+      margin-top: 0.25rem;
+      color: var(--relay-text-muted);
+      font-size: 0.92rem;
+    }
+
+    .input-group {
+      display: grid;
+      gap: 1rem;
+    }
+
+    @media (min-width: 640px) {
       .input-group {
-        display: grid;
-        gap: 1rem;
-      }
-
-      @media (min-width: 640px) {
-        .input-group {
-          grid-template-columns: minmax(0, 1fr) auto;
-          align-items: center;
-        }
-      }
-
-      .relay-input {
-        width: 100%;
-        background-color: var(--relay-input);
-        border: 1px solid var(--relay-border-light);
-        border-radius: 0.85rem;
-        padding: 0.75rem 1rem;
-        color: var(--relay-text-primary);
-        font-size: 0.95rem;
-      }
-
-      .relay-input::placeholder {
-        color: var(--relay-text-muted);
-      }
-
-      .relay-input:focus {
-        outline: 2px solid var(--relay-accent);
-        outline-offset: 2px;
-      }
-
-      .relay-button {
-        display: inline-flex;
+        grid-template-columns: minmax(0, 1fr) auto;
         align-items: center;
-        justify-content: center;
-        border-radius: 0.85rem;
-        font-weight: 600;
-        padding: 0.65rem 1.4rem;
-        font-size: 0.95rem;
-        border: none;
-        cursor: pointer;
-        transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
       }
+    }
 
-      .relay-button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 12px 24px rgba(255, 105, 180, 0.2);
-      }
+    .relay-input {
+      width: 100%;
+      background-color: var(--relay-input);
+      border: 1px solid var(--relay-border-light);
+      border-radius: 0.85rem;
+      padding: 0.75rem 1rem;
+      color: var(--relay-text-primary);
+      font-size: 0.95rem;
+    }
 
-      .relay-button:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-        transform: none;
-        box-shadow: none;
-      }
+    .relay-input::placeholder {
+      color: var(--relay-text-muted);
+    }
 
-      .relay-button.primary {
-        background-color: var(--relay-accent);
-        color: #ffffff;
-      }
+    .relay-input:focus {
+      outline: 2px solid var(--relay-accent);
+      outline-offset: 2px;
+    }
 
-      .relay-button.primary:hover {
-        background-color: var(--relay-accent-hover);
-      }
+    .relay-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 0.85rem;
+      font-weight: 600;
+      padding: 0.65rem 1.4rem;
+      font-size: 0.95rem;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+    }
 
-      .relay-button.neutral {
-        background-color: rgba(255, 255, 255, 0.06);
-        color: var(--relay-text-secondary);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-      }
+    .relay-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 24px rgba(255, 105, 180, 0.2);
+    }
 
-      .relay-button.neutral:hover {
-        background-color: rgba(255, 255, 255, 0.12);
-      }
+    .relay-button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
 
-      .status-text {
-        font-size: 0.85rem;
-        margin-top: 0.75rem;
-      }
+    .relay-button.primary {
+      background-color: var(--relay-accent);
+      color: #ffffff;
+    }
 
-      .status-text.info {
-        color: var(--relay-text-muted);
-      }
+    .relay-button.primary:hover {
+      background-color: var(--relay-accent-hover);
+    }
 
-      .status-text.success {
-        color: var(--relay-success);
-      }
+    .relay-button.neutral {
+      background-color: rgba(255, 255, 255, 0.06);
+      color: var(--relay-text-secondary);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
 
-      .status-text.warning {
-        color: var(--relay-warning);
-      }
+    .relay-button.neutral:hover {
+      background-color: rgba(255, 255, 255, 0.12);
+    }
 
-      .status-text.error {
-        color: var(--relay-error);
-      }
+    .status-text {
+      font-size: 0.85rem;
+      margin-top: 0.75rem;
+    }
 
-      .explorer-panel {
-        background-color: var(--relay-input);
-        border: 1px solid var(--relay-border-light);
-        border-radius: 1rem;
-        padding: 1.25rem;
-      }
+    .status-text.info {
+      color: var(--relay-text-muted);
+    }
 
-      .explorer-panel pre {
-        white-space: pre-wrap;
-        word-break: break-word;
-        background: rgba(0, 0, 0, 0.35);
-        border-radius: 0.75rem;
-        padding: 1rem;
-        margin-top: 1rem;
-        font-family: "JetBrains Mono", "Fira Code", monospace;
-        font-size: 0.85rem;
-      }
+    .status-text.success {
+      color: var(--relay-success);
+    }
 
-      .explorer-list li {
-        background-color: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 0.85rem;
-        padding: 1rem;
-      }
+    .status-text.warning {
+      color: var(--relay-warning);
+    }
 
-      .explorer-list li + li {
-        margin-top: 0.75rem;
-      }
+    .status-text.error {
+      color: var(--relay-error);
+    }
 
-      .property-actions button {
-        font-size: 0.75rem;
-        padding: 0.35rem 0.65rem;
-        border-radius: 0.65rem;
-        border: none;
-        cursor: pointer;
-        font-weight: 600;
-      }
+    .explorer-panel {
+      background-color: var(--relay-input);
+      border: 1px solid var(--relay-border-light);
+      border-radius: 1rem;
+      padding: 1.25rem;
+    }
 
-      .property-actions button:first-child {
-        background-color: rgba(255, 215, 0, 0.2);
-        color: #ffd700;
-      }
+    .explorer-panel pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      margin-top: 1rem;
+      font-family: "JetBrains Mono", "Fira Code", monospace;
+      font-size: 0.85rem;
+    }
 
-      .property-actions button:first-child:hover {
-        background-color: rgba(255, 215, 0, 0.3);
-      }
+    .explorer-list li {
+      background-color: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 0.85rem;
+      padding: 1rem;
+    }
 
-      .property-actions button:last-child {
-        background-color: rgba(244, 67, 54, 0.25);
-        color: #ff7961;
-      }
+    .explorer-list li+li {
+      margin-top: 0.75rem;
+    }
 
-      .property-actions button:last-child:hover {
-        background-color: rgba(244, 67, 54, 0.35);
-      }
-    </style>
-  </head>
-  <body>
-    <div class="hero-gradient min-h-screen">
-      <div class="page-container">
-        <div class="page-card">
-          <div class="text-center">
-            <a href="/" class="inline-flex items-center gap-2 text-sm text-[#A0A0A0] hover:text-[#FF69B4] transition-colors group mb-6">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              <span>Back to Control Panel</span>
-            </a>
-            
-            <!-- Header Icon -->
-            <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-[#42A5F5] to-[#1976D2] mb-6 pulse-glow mx-auto">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-              </svg>
-            </div>
-            
-            <h1 class="page-title">Shogun Relay Graph Explorer</h1>
-            <p class="page-subtitle">
-              Inspect GunDB data, traverse linked nodes, and export relay snapshots.
-            </p>
+    .property-actions button {
+      font-size: 0.75rem;
+      padding: 0.35rem 0.65rem;
+      border-radius: 0.65rem;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .property-actions button:first-child {
+      background-color: rgba(255, 215, 0, 0.2);
+      color: #ffd700;
+    }
+
+    .property-actions button:first-child:hover {
+      background-color: rgba(255, 215, 0, 0.3);
+    }
+
+    .property-actions button:last-child {
+      background-color: rgba(244, 67, 54, 0.25);
+      color: #ff7961;
+    }
+
+    .property-actions button:last-child:hover {
+      background-color: rgba(244, 67, 54, 0.35);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="hero-gradient min-h-screen">
+    <div class="page-container">
+      <div class="page-card">
+        <div class="text-center">
+          <a href="/"
+            class="inline-flex items-center gap-2 text-sm text-[#A0A0A0] hover:text-[#FF69B4] transition-colors group mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 group-hover:-translate-x-1 transition-transform"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            <span>Back to Control Panel</span>
+          </a>
+
+          <!-- Header Icon -->
+          <div
+            class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-[#42A5F5] to-[#1976D2] mb-6 pulse-glow mx-auto">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+            </svg>
           </div>
+
+          <h1 class="page-title">Shogun Relay Graph Explorer</h1>
+          <p class="page-subtitle">
+            Inspect GunDB data, traverse linked nodes, and export relay snapshots.
+          </p>
+        </div>
 
         <section id="authSection" class="section-card mt-10">
           <div class="section-header">
@@ -330,7 +344,8 @@
               <span class="pill-heading">Authentication</span>
               <h2 class="section-title mt-2">Relay Credentials</h2>
               <p class="section-description">
-                Log in with your alias and password to edit protected GunDB spaces. Use public mode to read without authentication.
+                Log in with your alias and password to edit protected GunDB spaces. Use public mode to read without
+                authentication.
               </p>
             </div>
           </div>
@@ -338,11 +353,13 @@
             <div class="grid gap-4 sm:grid-cols-2">
               <label class="text-sm text-[#E0E0E0] space-y-2" for="username">
                 <span>Alias</span>
-                <input id="username" type="text" class="relay-input" placeholder="e.g. neon-operator" autocomplete="username" />
+                <input id="username" type="text" class="relay-input" placeholder="e.g. neon-operator"
+                  autocomplete="username" />
               </label>
               <label class="text-sm text-[#E0E0E0] space-y-2" for="password">
                 <span>Password</span>
-                <input id="password" type="password" class="relay-input" placeholder="Password" autocomplete="current-password" />
+                <input id="password" type="password" class="relay-input" placeholder="Password"
+                  autocomplete="current-password" />
               </label>
             </div>
             <div class="flex flex-wrap justify-end gap-3 mt-6">
@@ -359,7 +376,8 @@
               <span class="pill-heading">Public Access</span>
               <h2 class="section-title mt-2">Graph Console</h2>
               <p class="section-description">
-                Follow any Gun coordinate (for example <code>shogun-relay.logs.events</code>) to inspect live relay data instantly.
+                Follow any Gun coordinate (for example <code>shogun-relay.logs.events</code>) to inspect live relay data
+                instantly.
               </p>
             </div>
           </div>
@@ -372,7 +390,8 @@
           <div class="mt-8">
             <h3 class="text-lg font-semibold text-[#FFFFFF]">Relay Peers</h3>
             <p class="section-description">
-              Append HTTPS or WSS endpoints to improve synchronization. Peers remain active only for the current session.
+              Append HTTPS or WSS endpoints to improve synchronization. Peers remain active only for the current
+              session.
             </p>
             <div class="input-group mt-3">
               <input id="newPeerInput" type="text" class="relay-input" placeholder="https://relay.example.com/gun" />
@@ -388,13 +407,15 @@
               <span class="pill-heading">Snapshot</span>
               <h2 class="section-title mt-2">Data Operations</h2>
               <p class="section-description">
-                Export a full snapshot of the relay graph using your administrator token. Tokens sync automatically when available.
+                Export a full snapshot of the relay graph using your administrator token. Tokens sync automatically when
+                available.
               </p>
             </div>
           </div>
           <form onsubmit="return false;">
             <div class="input-group">
-              <input id="adminToken" type="password" class="relay-input" placeholder="Admin token (auto-loaded if saved)" autocomplete="off" />
+              <input id="adminToken" type="password" class="relay-input"
+                placeholder="Admin token (auto-loaded if saved)" autocomplete="off" />
               <button id="btnLoadAllNodes" type="button" class="relay-button neutral">Load Full Graph Snapshot</button>
             </div>
           </form>
@@ -414,10 +435,12 @@
             <button id="btnLogout" class="relay-button neutral">Log Out</button>
           </div>
 
-          <div class="section-card" style="background-color: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05);">
+          <div class="section-card"
+            style="background-color: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05);">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
               <div class="flex items-center gap-3 text-xs text-[#A0A0A0]">
-                <button id="btnGoToRoot" class="relay-button neutral" style="padding: 0.4rem 0.85rem; font-size: 0.8rem;">Jump to origin</button>
+                <button id="btnGoToRoot" class="relay-button neutral"
+                  style="padding: 0.4rem 0.85rem; font-size: 0.8rem;">Jump to origin</button>
                 <span class="uppercase tracking-[0.3em]">Path:</span>
                 <span id="currentPath" class="font-mono text-[#FFFFFF]"></span>
               </div>
@@ -428,7 +451,8 @@
             </div>
           </div>
 
-          <div class="section-card" style="background-color: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05);">
+          <div class="section-card"
+            style="background-color: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05);">
             <h3 class="text-lg font-semibold text-[#FFFFFF] mb-3">Write Operations</h3>
             <div class="input-group">
               <input id="newKey" type="text" class="relay-input" placeholder="Property key" />
@@ -440,715 +464,715 @@
             </p>
           </div>
         </section>
-        </div>
-
-        <!-- Footer -->
-        <footer class="mt-12 text-center">
-          <div class="section-divider"></div>
-          <p class="text-[#606060] text-sm">
-            Shogun Relay Graph - Part of the <a href="https://github.com/scobru/shogun" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">Shogun Project</a>
-          </p>
-        </footer>
       </div>
+
+      <!-- Footer -->
+      <footer class="mt-12 text-center">
+        <div class="section-divider"></div>
+        <p class="text-[#606060] text-sm">
+          Shogun Relay Graph - Part of the <a href="https://github.com/scobru/shogun"
+            class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">Shogun Project</a>
+        </p>
+      </footer>
     </div>
+  </div>
 
-    
+  <script type="module">
+    import "https://cdn.jsdelivr.net/npm/gun-authd/dist/gun-authd.min.js";
 
-    <script type="module">
-      import "https://cdn.jsdelivr.net/npm/gun-authd/dist/gun-authd.min.js"; 
-      
-      const DEFAULT_PEERS = [window.location.origin + "/gun"];
+    const DEFAULT_PEERS = [window.location.origin + "/gun"];
 
-       const gun = Gun({
-          peers: ['https://shogun-relay.scobrudot.dev/gun'],
-          localStorage: false,
-          radisk: false
-      });
+    const gun = Gun({
+      peers: ['https://shogun-relay.scobrudot.dev/gun'],
+      localStorage: false,
+      radisk: false
+    });
 
-      window.gun = gun;
-      const user = gun.user().recall({ sessionStorage: true });
-      window.gun = gun;
-      window.user = user;
+    window.gun = gun;
+    const user = gun.user().recall({ sessionStorage: true });
+    window.gun = gun;
+    window.user = user;
 
-      const authSection = document.getElementById("authSection");
-      const explorerSection = document.getElementById("explorerSection");
-      const authMessage = document.getElementById("authMessage");
-      const userInfo = document.getElementById("userInfo");
-      const peerStatus = document.getElementById("peerStatus");
-      const currentPathEl = document.getElementById("currentPath");
-      const explorerContent = document.getElementById("explorerContent");
-      const publicExplorerMessage = document.getElementById("publicExplorerMessage");
-      const peerFeedback = document.getElementById("peerFeedback");
-      const statusMessage = document.getElementById("statusMessage");
-      const graphSummary = document.getElementById("graphSummary");
-      const graphDump = document.getElementById("graphDump");
-      const adminTokenInput = document.getElementById("adminToken");
+    const authSection = document.getElementById("authSection");
+    const explorerSection = document.getElementById("explorerSection");
+    const authMessage = document.getElementById("authMessage");
+    const userInfo = document.getElementById("userInfo");
+    const peerStatus = document.getElementById("peerStatus");
+    const currentPathEl = document.getElementById("currentPath");
+    const explorerContent = document.getElementById("explorerContent");
+    const publicExplorerMessage = document.getElementById("publicExplorerMessage");
+    const peerFeedback = document.getElementById("peerFeedback");
+    const statusMessage = document.getElementById("statusMessage");
+    const graphSummary = document.getElementById("graphSummary");
+    const graphDump = document.getElementById("graphDump");
+    const adminTokenInput = document.getElementById("adminToken");
 
-      const usernameInput = document.getElementById("username");
-      const passwordInput = document.getElementById("password");
-      const publicPathInput = document.getElementById("publicPathInput");
-      const newPeerInput = document.getElementById("newPeerInput");
-      const newKeyInput = document.getElementById("newKey");
-      const newValueInput = document.getElementById("newValue");
+    const usernameInput = document.getElementById("username");
+    const passwordInput = document.getElementById("password");
+    const publicPathInput = document.getElementById("publicPathInput");
+    const newPeerInput = document.getElementById("newPeerInput");
+    const newKeyInput = document.getElementById("newKey");
+    const newValueInput = document.getElementById("newValue");
 
-      const btnCreate = document.getElementById("btnCreate");
-      const btnLogin = document.getElementById("btnLogin");
-      const btnLogout = document.getElementById("btnLogout");
-      const btnGoToRoot = document.getElementById("btnGoToRoot");
-      const btnAddProperty = document.getElementById("btnAddProperty");
-      const btnExplorePublic = document.getElementById("btnExplorePublic");
-      const btnAddPeer = document.getElementById("btnAddPeer");
-      const btnLoadAllNodes = document.getElementById("btnLoadAllNodes");
+    const btnCreate = document.getElementById("btnCreate");
+    const btnLogin = document.getElementById("btnLogin");
+    const btnLogout = document.getElementById("btnLogout");
+    const btnGoToRoot = document.getElementById("btnGoToRoot");
+    const btnAddProperty = document.getElementById("btnAddProperty");
+    const btnExplorePublic = document.getElementById("btnExplorePublic");
+    const btnAddPeer = document.getElementById("btnAddPeer");
+    const btnLoadAllNodes = document.getElementById("btnLoadAllNodes");
 
-      const configuredPeers = new Set(DEFAULT_PEERS);
-      const activePeers = new Set();
+    const configuredPeers = new Set(DEFAULT_PEERS);
+    const activePeers = new Set();
 
-      let currentNode = null;
-      let currentPathString = "";
-      let rootNode = null;
-      let rootPathString = "";
-      let explorerMode = null;
+    let currentNode = null;
+    let currentPathString = "";
+    let rootNode = null;
+    let rootPathString = "";
+    let explorerMode = null;
 
-      function setStatus(message, type = "info") {
-        if (!statusMessage) return;
-        if (!message) {
-          statusMessage.textContent = "";
-          statusMessage.className = "status-text info";
-          return;
-        }
-        statusMessage.textContent = message;
-        statusMessage.className = "status-text " + type;
+    function setStatus(message, type = "info") {
+      if (!statusMessage) return;
+      if (!message) {
+        statusMessage.textContent = "";
+        statusMessage.className = "status-text info";
+        return;
       }
+      statusMessage.textContent = message;
+      statusMessage.className = "status-text " + type;
+    }
 
-      function setPublicExplorerMessage(message, type = "info") {
-        if (!publicExplorerMessage) return;
-        if (!message) {
-          publicExplorerMessage.textContent = "";
-          publicExplorerMessage.className = "status-text info";
-          return;
-        }
-        publicExplorerMessage.textContent = message;
-        publicExplorerMessage.className = "status-text " + type;
+    function setPublicExplorerMessage(message, type = "info") {
+      if (!publicExplorerMessage) return;
+      if (!message) {
+        publicExplorerMessage.textContent = "";
+        publicExplorerMessage.className = "status-text info";
+        return;
       }
+      publicExplorerMessage.textContent = message;
+      publicExplorerMessage.className = "status-text " + type;
+    }
 
-      function setPeerFeedback(message, type = "info") {
-        if (!peerFeedback) return;
-        if (!message) {
-          peerFeedback.textContent = "";
-          peerFeedback.className = "status-text info";
-          return;
-        }
-        peerFeedback.textContent = message;
-        peerFeedback.className = "status-text " + type;
+    function setPeerFeedback(message, type = "info") {
+      if (!peerFeedback) return;
+      if (!message) {
+        peerFeedback.textContent = "";
+        peerFeedback.className = "status-text info";
+        return;
       }
+      peerFeedback.textContent = message;
+      peerFeedback.className = "status-text " + type;
+    }
 
-      function updatePeerStatusDisplay() {
-        if (!peerStatus) return;
-        if (activePeers.size === 0) {
-          peerStatus.textContent = "Connecting to peers...";
-          peerStatus.className = "status-text info";
-        } else {
-          peerStatus.textContent =
-            "Connected to " + activePeers.size + " peer(s): " + Array.from(activePeers).join(", ");
-          peerStatus.className = "status-text success";
-        }
+    function updatePeerStatusDisplay() {
+      if (!peerStatus) return;
+      if (activePeers.size === 0) {
+        peerStatus.textContent = "Connecting to peers...";
+        peerStatus.className = "status-text info";
+      } else {
+        peerStatus.textContent =
+          "Connected to " + activePeers.size + " peer(s): " + Array.from(activePeers).join(", ");
+        peerStatus.className = "status-text success";
       }
+    }
 
-      function updateRootButtonState() {
-        btnGoToRoot.disabled = !rootNode;
-        if (rootNode) {
-          btnGoToRoot.textContent = "Jump to '" + (rootPathString || "root") + "'";
-        } else {
-          btnGoToRoot.textContent = "Jump to origin";
-        }
+    function updateRootButtonState() {
+      btnGoToRoot.disabled = !rootNode;
+      if (rootNode) {
+        btnGoToRoot.textContent = "Jump to '" + (rootPathString || "root") + "'";
+      } else {
+        btnGoToRoot.textContent = "Jump to origin";
       }
+    }
 
-      function getAuthToken() {
-        if (window.ShogunAdmin && typeof ShogunAdmin.getPassword === "function") {
-          const saved = ShogunAdmin.getPassword();
-          if (saved && adminTokenInput && !adminTokenInput.value) {
-            adminTokenInput.value = saved;
-            return saved;
-          }
-          if (saved) return saved;
+    function getAuthToken() {
+      if (window.ShogunAdmin && typeof ShogunAdmin.getPassword === "function") {
+        const saved = ShogunAdmin.getPassword();
+        if (saved && adminTokenInput && !adminTokenInput.value) {
+          adminTokenInput.value = saved;
+          return saved;
         }
-        return adminTokenInput ? adminTokenInput.value.trim() : "";
+        if (saved) return saved;
       }
+      return adminTokenInput ? adminTokenInput.value.trim() : "";
+    }
 
-      function getAuthHeaders() {
-        const token = getAuthToken();
-        if (!token) {
-          return {};
-        }
-        return {
-          Authorization: "Bearer " + token,
-          token
-        };
+    function getAuthHeaders() {
+      const token = getAuthToken();
+      if (!token) {
+        return {};
       }
+      return {
+        Authorization: "Bearer " + token,
+        token
+      };
+    }
 
-      function resolvePathToNode(pathString) {
-        const sanitized = (pathString || "").trim();
-        if (!sanitized) {
-          return { node: gun, resolvedPath: "root" };
-        }
-        const segments = sanitized
-          .split(".")
-          .map((segment) => segment.trim())
-          .filter(Boolean);
-        if (segments.length === 0) {
-          return { node: gun, resolvedPath: "root" };
-        }
-        let nodeInstance = gun.get(segments[0]);
-        let resolvedPath = segments[0];
-        for (let i = 1; i < segments.length; i += 1) {
-          nodeInstance = nodeInstance.get(segments[i]);
-          resolvedPath += "." + segments[i];
-        }
-        return { node: nodeInstance, resolvedPath };
+    function resolvePathToNode(pathString) {
+      const sanitized = (pathString || "").trim();
+      if (!sanitized) {
+        return { node: gun, resolvedPath: "root" };
       }
-
-      function updateExplorerHeader() {
-        if (!userInfo) return;
-        if (explorerMode === "user" && user.is) {
-          const alias = user.is.alias;
-          const pub = user.is.pub;
-          const aliasInfo = alias ? "Alias: " + alias + " • " : "";
-          userInfo.textContent = aliasInfo + "Public key: " + pub;
-        } else if (explorerMode === "public") {
-          userInfo.textContent = "Public mode • Root: " + rootPathString;
-        } else {
-          userInfo.textContent = "";
-        }
+      const segments = sanitized
+        .split(".")
+        .map((segment) => segment.trim())
+        .filter(Boolean);
+      if (segments.length === 0) {
+        return { node: gun, resolvedPath: "root" };
       }
-
-      function startExplorer(nodeInstance, pathString, mode) {
-        explorerMode = mode;
-        rootNode = nodeInstance;
-        rootPathString = pathString || "root";
-        updateExplorerHeader();
-        updateRootButtonState();
-        explorerSection.classList.remove("hidden");
-        exploreNode(nodeInstance, pathString || "root");
+      let nodeInstance = gun.get(segments[0]);
+      let resolvedPath = segments[0];
+      for (let i = 1; i < segments.length; i += 1) {
+        nodeInstance = nodeInstance.get(segments[i]);
+        resolvedPath += "." + segments[i];
       }
+      return { node: nodeInstance, resolvedPath };
+    }
 
-      function startPublicExplorer(rawPath) {
-        try {
-          const { node, resolvedPath } = resolvePathToNode(rawPath);
-          setPublicExplorerMessage("Exploring path: " + resolvedPath, "success");
-          startExplorer(node, resolvedPath, "public");
-        } catch (error) {
-          setPublicExplorerMessage(error.message || "Invalid path provided.", "error");
-        }
-      }
-
-      function addPeer(url) {
-        const trimmed = (url || "").trim();
-        if (!trimmed) {
-          setPeerFeedback("Provide a relay URL.", "warning");
-          return;
-        }
-        if (!/^https?:\/\//i.test(trimmed) && !/^wss?:\/\//i.test(trimmed)) {
-          setPeerFeedback("Relay URLs must begin with https://, http://, wss://, or ws://.", "error");
-          return;
-        }
-        if (configuredPeers.has(trimmed)) {
-          setPeerFeedback("Relay already configured.", "warning");
-          return;
-        }
-        try {
-          configuredPeers.add(trimmed);
-          gun.opt({ peers: [trimmed] });
-          setPeerFeedback("Relay added: " + trimmed, "success");
-        } catch (error) {
-          setPeerFeedback("Unable to add relay: " + error.message, "error");
-        }
-      }
-
-      function attemptRenderSetFallback(nodeInstance) {
-        const aggregated = {};
-        const seenKeys = new Set();
-        let hasAnyChild = false;
-        let idleTimer = null;
-        let finalized = false;
-        const MAX_WAIT_MS = 2000;
-        const QUIET_WINDOW_MS = 350;
-
-        const mapChain = nodeInstance.map();
-        const maxTimer = setTimeout(finalize, MAX_WAIT_MS);
-
-        function cleanup() {
-          if (idleTimer) {
-            clearTimeout(idleTimer);
-            idleTimer = null;
-          }
-          clearTimeout(maxTimer);
-          if (typeof mapChain.off === "function") {
-            mapChain.off();
-          }
-        }
-
-        function finalize() {
-          if (finalized) return;
-          finalized = true;
-          cleanup();
-          if (hasAnyChild) {
-            renderData(aggregated, nodeInstance);
-          } else {
-            explorerContent.innerHTML =
-              '<div class="text-cyan-200/60 italic">This node is empty or not accessible.</div>';
-          }
-        }
-
-        mapChain.once((childData, childKey) => {
-          if (!childKey || seenKeys.has(childKey)) {
-            return;
-          }
-          seenKeys.add(childKey);
-          hasAnyChild = true;
-          aggregated[childKey] = childData;
-          if (idleTimer) {
-            clearTimeout(idleTimer);
-          }
-          idleTimer = setTimeout(finalize, QUIET_WINDOW_MS);
-        });
-      }
-
-      function renderData(data, nodeInstance) {
-        explorerContent.innerHTML = "";
-
-        if (data === null || data === undefined) {
-          explorerContent.innerHTML = '<div class="text-cyan-200/60 italic">Node is null or undefined.</div>';
-          return;
-        }
-
-        if (typeof data !== "object") {
-          explorerContent.textContent = "Primitive value: " + data;
-          return;
-        }
-
-        const keys = Object.keys(data)
-          .filter((k) => k !== "_" && k !== "#")
-          .sort();
-
-        if (keys.length === 0) {
-          explorerContent.innerHTML = '<div class="text-cyan-200/60 italic">This node has no properties.</div>';
-          return;
-        }
-
-        const list = document.createElement("ul");
-        list.className = "explorer-list";
-
-        keys.forEach((key) => {
-          const value = data[key];
-          const item = document.createElement("li");
-
-          const top = document.createElement("div");
-          top.className = "flex items-start justify-between gap-4";
-
-          const labelWrapper = document.createElement("div");
-          labelWrapper.className = "space-y-1 flex-1";
-
-          const label = document.createElement("div");
-          label.className = "font-semibold text-[#FFFFFF]";
-          label.textContent = key;
-          labelWrapper.appendChild(label);
-
-          const valueEl = document.createElement("div");
-          valueEl.className = "text-sm text-[#E0E0E0] break-all";
-
-          if (typeof value === "object" && value !== null && value["#"]) {
-            valueEl.textContent = "Linked node: " + value["#"];
-            valueEl.classList.add("italic");
-            label.classList.add("node-key");
-            label.title = "Follow " + key;
-            label.addEventListener("click", () => {
-              const nextPath = currentPathString ? currentPathString + "." + key : key;
-              exploreNode(nodeInstance.get(key), nextPath);
-            });
-          } else if (value === null) {
-            valueEl.textContent = "null";
-            valueEl.classList.add("italic");
-          } else {
-            valueEl.textContent = JSON.stringify(value);
-          }
-
-          labelWrapper.appendChild(valueEl);
-
-          const actions = document.createElement("div");
-          actions.className = "property-actions flex gap-2";
-
-          const editBtn = document.createElement("button");
-          editBtn.textContent = "Modify";
-          editBtn.addEventListener("click", () => {
-            const nextValue = prompt("Enter a new value for '" + key + "':", JSON.stringify(value));
-            if (nextValue === null) return;
-            try {
-              let parsed;
-              try {
-                parsed = JSON.parse(nextValue);
-              } catch (parseErr) {
-                parsed = nextValue;
-              }
-              nodeInstance.get(key).put(parsed);
-              setTimeout(() => exploreNode(currentNode, currentPathString), 150);
-            } catch (error) {
-              alert("Invalid value: " + error.message);
-            }
-          });
-
-          const deleteBtn = document.createElement("button");
-          deleteBtn.textContent = "Set null";
-          deleteBtn.addEventListener("click", () => {
-            if (!confirm("Set '" + key + "' to null?")) return;
-            nodeInstance.get(key).put(null);
-            setTimeout(() => exploreNode(currentNode, currentPathString), 150);
-          });
-
-          actions.append(editBtn, deleteBtn);
-
-          top.appendChild(labelWrapper);
-          top.appendChild(actions);
-          item.appendChild(top);
-          list.appendChild(item);
-        });
-
-        explorerContent.appendChild(list);
-      }
-
-      function exploreNode(nodeInstance, pathString) {
-        currentNode = nodeInstance;
-        currentPathString = pathString;
-        currentPathEl.textContent = pathString;
-        explorerContent.innerHTML = '<div class="text-cyan-200/60">Loading data...</div>';
-
-        let resolved = false;
-        const timeoutId = setTimeout(() => {
-          if (!resolved) {
-            explorerContent.innerHTML =
-              '<div class="text-rose-300 text-sm">No data received. Check relay connectivity.</div>';
-          }
-        }, 6000);
-
-        nodeInstance.once((data) => {
-          resolved = true;
-          clearTimeout(timeoutId);
-          if (data === null || data === undefined) {
-            attemptRenderSetFallback(nodeInstance);
-          } else {
-            renderData(data, nodeInstance);
-          }
-        }, { wait: 1200 });
-      }
-
-      function addProperty() {
-        const key = newKeyInput.value.trim();
-        const valueRaw = newValueInput.value.trim();
-        if (!key) {
-          alert("Property key is required.");
-          return;
-        }
-        if (!currentNode) {
-          alert("No node selected at the moment.");
-          return;
-        }
-        try {
-          let parsedValue;
-          try {
-            parsedValue = JSON.parse(valueRaw);
-          } catch (error) {
-            parsedValue = valueRaw;
-          }
-          currentNode.get(key).put(parsedValue);
-          newKeyInput.value = "";
-          newValueInput.value = "";
-          setTimeout(() => exploreNode(currentNode, currentPathString), 150);
-        } catch (error) {
-          alert("Save failed: " + error.message);
-        }
-      }
-
-      function loadAllNodes(event) {
-        if (event) event.preventDefault();
-        const headers = getAuthHeaders();
-        if (!headers.Authorization) {
-          setStatus("Admin token required to load the full graph.", "error");
-          return;
-        }
-        setStatus("Requesting graph snapshot...", "info");
-        graphSummary.textContent = "";
-        if (graphDump) {
-          graphDump.textContent = "";
-          graphDump.classList.add("hidden");
-        }
-        if (btnLoadAllNodes) {
-          btnLoadAllNodes.disabled = true;
-          btnLoadAllNodes.textContent = "Loading...";
-        }
-        fetch("/api/v1/system/alldata", { headers })
-          .then((response) => {
-            if (!response.ok) {
-              throw new Error("HTTP " + response.status + " " + response.statusText);
-            }
-            return response.json();
-          })
-          .then((payload) => {
-            if (!payload.success) {
-              throw new Error(payload.error || "Unknown error");
-            }
-            const { nodeCount = 0, rawSize = 0, data = {} } = payload;
-            const sizeKb = rawSize ? (rawSize / 1024).toFixed(1) : "0";
-            graphSummary.textContent =
-              "Loaded " + nodeCount + " node(s), " + sizeKb + " KB snapshot at " + new Date().toLocaleTimeString();
-            if (graphDump) {
-              const preview = JSON.stringify(data, null, 2) || "{}";
-              graphDump.textContent =
-                preview.length > 4000 ? preview.slice(0, 4000) + "\n// truncated for preview" : preview;
-              graphDump.classList.remove("hidden");
-            }
-            setStatus("Full graph snapshot loaded successfully.", "success");
-          })
-          .catch((error) => {
-            setStatus("Unable to load full graph: " + error.message, "error");
-          })
-          .finally(() => {
-            if (btnLoadAllNodes) {
-              btnLoadAllNodes.disabled = false;
-              btnLoadAllNodes.textContent = "Load Full Graph Snapshot";
-            }
-          });
-      }
-
-      gun.on("hi", (peer) => {
-        if (peer && peer.url) {
-          activePeers.add(peer.url);
-          updatePeerStatusDisplay();
-        }
-      });
-
-      gun.on("bye", (peer) => {
-        if (peer && peer.url) {
-          activePeers.delete(peer.url);
-          updatePeerStatusDisplay();
-        }
-      });
-
-      btnCreate.addEventListener("click", () => {
-        const username = usernameInput.value.trim();
-        const password = passwordInput.value.trim();
-        if (!username || !password) {
-          authMessage.textContent = "Alias and password are required.";
-          authMessage.className = "status-text warning";
-          return;
-        }
-        
-        // Check if already authenticated
-        if (user.is) {
-          authMessage.textContent = "Already logged in. Please log out first.";
-          authMessage.className = "status-text warning";
-          return;
-        }
-        
-        authMessage.textContent = "Creating account...";
-        authMessage.className = "status-text info";
-        btnCreate.disabled = true;
-        
-        user.create(username, password, (ack) => {
-          btnCreate.disabled = false;
-          if (ack.err) {
-            // Handle specific error messages
-            let errorMsg = ack.err;
-            if (ack.err.includes("already") || ack.err.includes("User already")) {
-              errorMsg = "User already exists. Try logging in instead.";
-            }
-            authMessage.textContent = "Error: " + errorMsg;
-            authMessage.className = "status-text error";
-          } else {
-            authMessage.textContent = "Account created successfully! Logging in...";
-            authMessage.className = "status-text success";
-            // Auto-login after creation
-            setTimeout(() => {
-              user.auth(username, password, (authAck) => {
-                if (authAck.err) {
-                  authMessage.textContent = "Account created but login failed. Please try logging in manually.";
-                  authMessage.className = "status-text warning";
-                }
-                // Success handled by gun.on("auth") event
-              });
-            }, 500);
-          }
-        });
-      });
-
-      // Handle form submission for login
-      const authForm = document.getElementById("authForm");
-      if (authForm) {
-        authForm.addEventListener("submit", (e) => {
-          e.preventDefault();
-          btnLogin.click();
-        });
-      }
-      
-      // Handle Enter key in password field
-      passwordInput.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          btnLogin.click();
-        }
-      });
-      
-      btnLogin.addEventListener("click", () => {
-        const username = usernameInput.value.trim();
-        const password = passwordInput.value.trim();
-        if (!username || !password) {
-          authMessage.textContent = "Alias and password are required.";
-          authMessage.className = "status-text warning";
-          return;
-        }
-        
-        // Check if already authenticated
-        if (user.is) {
-          authMessage.textContent = "Already logged in. Please log out first.";
-          authMessage.className = "status-text warning";
-          return;
-        }
-        
-        authMessage.textContent = "Authenticating...";
-        authMessage.className = "status-text info";
-        btnLogin.disabled = true;
-        
-        user.auth(username, password, (ack) => {
-          btnLogin.disabled = false;
-          if (ack.err) {
-            // Handle specific error messages
-            let errorMsg = ack.err;
-            if (ack.err.includes("Wrong") || ack.err.includes("password") || ack.err.includes("user")) {
-              errorMsg = "Invalid username or password. Please check your credentials.";
-            }
-            authMessage.textContent = "Error: " + errorMsg;
-            authMessage.className = "status-text error";
-          } else {
-            authMessage.textContent = "Login successful!";
-            authMessage.className = "status-text success";
-            // Success handled by gun.on("auth") event
-          }
-        });
-      });
-
-      btnLogout.addEventListener("click", () => {
-        user.leave();
-        explorerMode = null;
-        rootNode = null;
-        rootPathString = "";
-        updateExplorerHeader();
-        updateRootButtonState();
-        explorerSection.classList.add("hidden");
-        authSection.classList.remove("hidden");
-        explorerContent.innerHTML = "Select a node to inspect its state.";
-        currentNode = null;
-        currentPathString = "";
-        currentPathEl.textContent = "";
-      });
-
-      btnExplorePublic.addEventListener("click", () => {
-        startPublicExplorer(publicPathInput.value);
-      });
-
-      publicPathInput.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          startPublicExplorer(publicPathInput.value);
-        }
-      });
-
-      btnAddPeer.addEventListener("click", () => {
-        addPeer(newPeerInput.value);
-        newPeerInput.value = "";
-      });
-
-      newPeerInput.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          addPeer(newPeerInput.value);
-          newPeerInput.value = "";
-        }
-      });
-
-      btnGoToRoot.addEventListener("click", () => {
-        if (!rootNode) {
-          setPublicExplorerMessage("Choose a path to explore first.", "warning");
-          return;
-        }
-        exploreNode(rootNode, rootPathString);
-      });
-
-      btnAddProperty.addEventListener("click", addProperty);
-
-      newValueInput.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          addProperty();
-        }
-      });
-
-      if (btnLoadAllNodes) {
-        btnLoadAllNodes.addEventListener("click", loadAllNodes);
-      }
-
-      gun.on("auth", (ack) => {
-        if (ack && ack.err) {
-          // Don't proceed if there's an error
-          return;
-        }
-        authSection.classList.add("hidden");
-        explorerSection.classList.remove("hidden");
-        usernameInput.value = "";
-        passwordInput.value = "";
-        const alias = user.is ? user.is.alias : null;
-        const pub = (user.is && user.is.pub) || (ack && ack.pub) || "not available";
-        const aliasInfo = alias ? "Alias: " + alias + " • " : "";
-        userInfo.textContent = aliasInfo + "Public key: " + pub;
-        btnLogout.classList.remove("hidden");
-        startExplorer(user, "user", "user");
-      });
-      
-      // Check if user is already authenticated on page load
-      user.recall({ sessionStorage: true });
-      if (user.is) {
-        authSection.classList.add("hidden");
-        explorerSection.classList.remove("hidden");
+    function updateExplorerHeader() {
+      if (!userInfo) return;
+      if (explorerMode === "user" && user.is) {
         const alias = user.is.alias;
         const pub = user.is.pub;
         const aliasInfo = alias ? "Alias: " + alias + " • " : "";
         userInfo.textContent = aliasInfo + "Public key: " + pub;
-        btnLogout.classList.remove("hidden");
-        startExplorer(user, "user", "user");
+      } else if (explorerMode === "public") {
+        userInfo.textContent = "Public mode • Root: " + rootPathString;
+      } else {
+        userInfo.textContent = "";
+      }
+    }
+
+    function startExplorer(nodeInstance, pathString, mode) {
+      explorerMode = mode;
+      rootNode = nodeInstance;
+      rootPathString = pathString || "root";
+      updateExplorerHeader();
+      updateRootButtonState();
+      explorerSection.classList.remove("hidden");
+      exploreNode(nodeInstance, pathString || "root");
+    }
+
+    function startPublicExplorer(rawPath) {
+      try {
+        const { node, resolvedPath } = resolvePathToNode(rawPath);
+        setPublicExplorerMessage("Exploring path: " + resolvedPath, "success");
+        startExplorer(node, resolvedPath, "public");
+      } catch (error) {
+        setPublicExplorerMessage(error.message || "Invalid path provided.", "error");
+      }
+    }
+
+    function addPeer(url) {
+      const trimmed = (url || "").trim();
+      if (!trimmed) {
+        setPeerFeedback("Provide a relay URL.", "warning");
+        return;
+      }
+      if (!/^https?:\/\//i.test(trimmed) && !/^wss?:\/\//i.test(trimmed)) {
+        setPeerFeedback("Relay URLs must begin with https://, http://, wss://, or ws://.", "error");
+        return;
+      }
+      if (configuredPeers.has(trimmed)) {
+        setPeerFeedback("Relay already configured.", "warning");
+        return;
+      }
+      try {
+        configuredPeers.add(trimmed);
+        gun.opt({ peers: [trimmed] });
+        setPeerFeedback("Relay added: " + trimmed, "success");
+      } catch (error) {
+        setPeerFeedback("Unable to add relay: " + error.message, "error");
+      }
+    }
+
+    function attemptRenderSetFallback(nodeInstance) {
+      const aggregated = {};
+      const seenKeys = new Set();
+      let hasAnyChild = false;
+      let idleTimer = null;
+      let finalized = false;
+      const MAX_WAIT_MS = 2000;
+      const QUIET_WINDOW_MS = 350;
+
+      const mapChain = nodeInstance.map();
+      const maxTimer = setTimeout(finalize, MAX_WAIT_MS);
+
+      function cleanup() {
+        if (idleTimer) {
+          clearTimeout(idleTimer);
+          idleTimer = null;
+        }
+        clearTimeout(maxTimer);
+        if (typeof mapChain.off === "function") {
+          mapChain.off();
+        }
       }
 
-      document.addEventListener("DOMContentLoaded", () => {
-        if (window.ShogunAdmin && typeof ShogunAdmin.init === "function") {
-          ShogunAdmin.init({
-            autoFill: true,
-            showIndicator: true,
-            fieldId: "adminToken",
-            syncEnabled: true
+      function finalize() {
+        if (finalized) return;
+        finalized = true;
+        cleanup();
+        if (hasAnyChild) {
+          renderData(aggregated, nodeInstance);
+        } else {
+          explorerContent.innerHTML =
+            '<div class="text-cyan-200/60 italic">This node is empty or not accessible.</div>';
+        }
+      }
+
+      mapChain.once((childData, childKey) => {
+        if (!childKey || seenKeys.has(childKey)) {
+          return;
+        }
+        seenKeys.add(childKey);
+        hasAnyChild = true;
+        aggregated[childKey] = childData;
+        if (idleTimer) {
+          clearTimeout(idleTimer);
+        }
+        idleTimer = setTimeout(finalize, QUIET_WINDOW_MS);
+      });
+    }
+
+    function renderData(data, nodeInstance) {
+      explorerContent.innerHTML = "";
+
+      if (data === null || data === undefined) {
+        explorerContent.innerHTML = '<div class="text-cyan-200/60 italic">Node is null or undefined.</div>';
+        return;
+      }
+
+      if (typeof data !== "object") {
+        explorerContent.textContent = "Primitive value: " + data;
+        return;
+      }
+
+      const keys = Object.keys(data)
+        .filter((k) => k !== "_" && k !== "#")
+        .sort();
+
+      if (keys.length === 0) {
+        explorerContent.innerHTML = '<div class="text-cyan-200/60 italic">This node has no properties.</div>';
+        return;
+      }
+
+      const list = document.createElement("ul");
+      list.className = "explorer-list";
+
+      keys.forEach((key) => {
+        const value = data[key];
+        const item = document.createElement("li");
+
+        const top = document.createElement("div");
+        top.className = "flex items-start justify-between gap-4";
+
+        const labelWrapper = document.createElement("div");
+        labelWrapper.className = "space-y-1 flex-1";
+
+        const label = document.createElement("div");
+        label.className = "font-semibold text-[#FFFFFF]";
+        label.textContent = key;
+        labelWrapper.appendChild(label);
+
+        const valueEl = document.createElement("div");
+        valueEl.className = "text-sm text-[#E0E0E0] break-all";
+
+        if (typeof value === "object" && value !== null && value["#"]) {
+          valueEl.textContent = "Linked node: " + value["#"];
+          valueEl.classList.add("italic");
+          label.classList.add("node-key");
+          label.title = "Follow " + key;
+          label.addEventListener("click", () => {
+            const nextPath = currentPathString ? currentPathString + "." + key : key;
+            exploreNode(nodeInstance.get(key), nextPath);
           });
+        } else if (value === null) {
+          valueEl.textContent = "null";
+          valueEl.classList.add("italic");
+        } else {
+          valueEl.textContent = JSON.stringify(value);
         }
-      });
 
-      window.addEventListener("shogun-admin-password-updated", () => {
-        if (window.ShogunAdmin && typeof ShogunAdmin.getPassword === "function" && adminTokenInput) {
-          const latest = ShogunAdmin.getPassword();
-          if (latest) {
-            adminTokenInput.value = latest;
+        labelWrapper.appendChild(valueEl);
+
+        const actions = document.createElement("div");
+        actions.className = "property-actions flex gap-2";
+
+        const editBtn = document.createElement("button");
+        editBtn.textContent = "Modify";
+        editBtn.addEventListener("click", () => {
+          const nextValue = prompt("Enter a new value for '" + key + "':", JSON.stringify(value));
+          if (nextValue === null) return;
+          try {
+            let parsed;
+            try {
+              parsed = JSON.parse(nextValue);
+            } catch (parseErr) {
+              parsed = nextValue;
+            }
+            nodeInstance.get(key).put(parsed);
+            setTimeout(() => exploreNode(currentNode, currentPathString), 150);
+          } catch (error) {
+            alert("Invalid value: " + error.message);
           }
-        }
+        });
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "Set null";
+        deleteBtn.addEventListener("click", () => {
+          if (!confirm("Set '" + key + "' to null?")) return;
+          nodeInstance.get(key).put(null);
+          setTimeout(() => exploreNode(currentNode, currentPathString), 150);
+        });
+
+        actions.append(editBtn, deleteBtn);
+
+        top.appendChild(labelWrapper);
+        top.appendChild(actions);
+        item.appendChild(top);
+        list.appendChild(item);
       });
 
-      setStatus("", "info");
-      setPublicExplorerMessage("", "info");
-      setPeerFeedback("", "info");
-      updatePeerStatusDisplay();
+      explorerContent.appendChild(list);
+    }
+
+    function exploreNode(nodeInstance, pathString) {
+      currentNode = nodeInstance;
+      currentPathString = pathString;
+      currentPathEl.textContent = pathString;
+      explorerContent.innerHTML = '<div class="text-cyan-200/60">Loading data...</div>';
+
+      let resolved = false;
+      const timeoutId = setTimeout(() => {
+        if (!resolved) {
+          explorerContent.innerHTML =
+            '<div class="text-rose-300 text-sm">No data received. Check relay connectivity.</div>';
+        }
+      }, 6000);
+
+      nodeInstance.once((data) => {
+        resolved = true;
+        clearTimeout(timeoutId);
+        if (data === null || data === undefined) {
+          attemptRenderSetFallback(nodeInstance);
+        } else {
+          renderData(data, nodeInstance);
+        }
+      }, { wait: 1200 });
+    }
+
+    function addProperty() {
+      const key = newKeyInput.value.trim();
+      const valueRaw = newValueInput.value.trim();
+      if (!key) {
+        alert("Property key is required.");
+        return;
+      }
+      if (!currentNode) {
+        alert("No node selected at the moment.");
+        return;
+      }
+      try {
+        let parsedValue;
+        try {
+          parsedValue = JSON.parse(valueRaw);
+        } catch (error) {
+          parsedValue = valueRaw;
+        }
+        currentNode.get(key).put(parsedValue);
+        newKeyInput.value = "";
+        newValueInput.value = "";
+        setTimeout(() => exploreNode(currentNode, currentPathString), 150);
+      } catch (error) {
+        alert("Save failed: " + error.message);
+      }
+    }
+
+    function loadAllNodes(event) {
+      if (event) event.preventDefault();
+      const headers = getAuthHeaders();
+      if (!headers.Authorization) {
+        setStatus("Admin token required to load the full graph.", "error");
+        return;
+      }
+      setStatus("Requesting graph snapshot...", "info");
+      graphSummary.textContent = "";
+      if (graphDump) {
+        graphDump.textContent = "";
+        graphDump.classList.add("hidden");
+      }
+      if (btnLoadAllNodes) {
+        btnLoadAllNodes.disabled = true;
+        btnLoadAllNodes.textContent = "Loading...";
+      }
+      fetch("/api/v1/system/alldata", { headers })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error("HTTP " + response.status + " " + response.statusText);
+          }
+          return response.json();
+        })
+        .then((payload) => {
+          if (!payload.success) {
+            throw new Error(payload.error || "Unknown error");
+          }
+          const { nodeCount = 0, rawSize = 0, data = {} } = payload;
+          const sizeKb = rawSize ? (rawSize / 1024).toFixed(1) : "0";
+          graphSummary.textContent =
+            "Loaded " + nodeCount + " node(s), " + sizeKb + " KB snapshot at " + new Date().toLocaleTimeString();
+          if (graphDump) {
+            const preview = JSON.stringify(data, null, 2) || "{}";
+            graphDump.textContent =
+              preview.length > 4000 ? preview.slice(0, 4000) + "\n// truncated for preview" : preview;
+            graphDump.classList.remove("hidden");
+          }
+          setStatus("Full graph snapshot loaded successfully.", "success");
+        })
+        .catch((error) => {
+          setStatus("Unable to load full graph: " + error.message, "error");
+        })
+        .finally(() => {
+          if (btnLoadAllNodes) {
+            btnLoadAllNodes.disabled = false;
+            btnLoadAllNodes.textContent = "Load Full Graph Snapshot";
+          }
+        });
+    }
+
+    gun.on("hi", (peer) => {
+      if (peer && peer.url) {
+        activePeers.add(peer.url);
+        updatePeerStatusDisplay();
+      }
+    });
+
+    gun.on("bye", (peer) => {
+      if (peer && peer.url) {
+        activePeers.delete(peer.url);
+        updatePeerStatusDisplay();
+      }
+    });
+
+    btnCreate.addEventListener("click", () => {
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value.trim();
+      if (!username || !password) {
+        authMessage.textContent = "Alias and password are required.";
+        authMessage.className = "status-text warning";
+        return;
+      }
+
+      // Check if already authenticated
+      if (user.is) {
+        authMessage.textContent = "Already logged in. Please log out first.";
+        authMessage.className = "status-text warning";
+        return;
+      }
+
+      authMessage.textContent = "Creating account...";
+      authMessage.className = "status-text info";
+      btnCreate.disabled = true;
+
+      user.create(username, password, (ack) => {
+        btnCreate.disabled = false;
+        if (ack.err) {
+          // Handle specific error messages
+          let errorMsg = ack.err;
+          if (ack.err.includes("already") || ack.err.includes("User already")) {
+            errorMsg = "User already exists. Try logging in instead.";
+          }
+          authMessage.textContent = "Error: " + errorMsg;
+          authMessage.className = "status-text error";
+        } else {
+          authMessage.textContent = "Account created successfully! Logging in...";
+          authMessage.className = "status-text success";
+          // Auto-login after creation
+          setTimeout(() => {
+            user.auth(username, password, (authAck) => {
+              if (authAck.err) {
+                authMessage.textContent = "Account created but login failed. Please try logging in manually.";
+                authMessage.className = "status-text warning";
+              }
+              // Success handled by gun.on("auth") event
+            });
+          }, 500);
+        }
+      });
+    });
+
+    // Handle form submission for login
+    const authForm = document.getElementById("authForm");
+    if (authForm) {
+      authForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        btnLogin.click();
+      });
+    }
+
+    // Handle Enter key in password field
+    passwordInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        btnLogin.click();
+      }
+    });
+
+    btnLogin.addEventListener("click", () => {
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value.trim();
+      if (!username || !password) {
+        authMessage.textContent = "Alias and password are required.";
+        authMessage.className = "status-text warning";
+        return;
+      }
+
+      // Check if already authenticated
+      if (user.is) {
+        authMessage.textContent = "Already logged in. Please log out first.";
+        authMessage.className = "status-text warning";
+        return;
+      }
+
+      authMessage.textContent = "Authenticating...";
+      authMessage.className = "status-text info";
+      btnLogin.disabled = true;
+
+      user.auth(username, password, (ack) => {
+        btnLogin.disabled = false;
+        if (ack.err) {
+          // Handle specific error messages
+          let errorMsg = ack.err;
+          if (ack.err.includes("Wrong") || ack.err.includes("password") || ack.err.includes("user")) {
+            errorMsg = "Invalid username or password. Please check your credentials.";
+          }
+          authMessage.textContent = "Error: " + errorMsg;
+          authMessage.className = "status-text error";
+        } else {
+          authMessage.textContent = "Login successful!";
+          authMessage.className = "status-text success";
+          // Success handled by gun.on("auth") event
+        }
+      });
+    });
+
+    btnLogout.addEventListener("click", () => {
+      user.leave();
+      explorerMode = null;
+      rootNode = null;
+      rootPathString = "";
+      updateExplorerHeader();
       updateRootButtonState();
-    </script>
-  </body>
+      explorerSection.classList.add("hidden");
+      authSection.classList.remove("hidden");
+      explorerContent.innerHTML = "Select a node to inspect its state.";
+      currentNode = null;
+      currentPathString = "";
+      currentPathEl.textContent = "";
+    });
+
+    btnExplorePublic.addEventListener("click", () => {
+      startPublicExplorer(publicPathInput.value);
+    });
+
+    publicPathInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        startPublicExplorer(publicPathInput.value);
+      }
+    });
+
+    btnAddPeer.addEventListener("click", () => {
+      addPeer(newPeerInput.value);
+      newPeerInput.value = "";
+    });
+
+    newPeerInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addPeer(newPeerInput.value);
+        newPeerInput.value = "";
+      }
+    });
+
+    btnGoToRoot.addEventListener("click", () => {
+      if (!rootNode) {
+        setPublicExplorerMessage("Choose a path to explore first.", "warning");
+        return;
+      }
+      exploreNode(rootNode, rootPathString);
+    });
+
+    btnAddProperty.addEventListener("click", addProperty);
+
+    newValueInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addProperty();
+      }
+    });
+
+    if (btnLoadAllNodes) {
+      btnLoadAllNodes.addEventListener("click", loadAllNodes);
+    }
+
+    gun.on("auth", (ack) => {
+      if (ack && ack.err) {
+        // Don't proceed if there's an error
+        return;
+      }
+      authSection.classList.add("hidden");
+      explorerSection.classList.remove("hidden");
+      usernameInput.value = "";
+      passwordInput.value = "";
+      const alias = user.is ? user.is.alias : null;
+      const pub = (user.is && user.is.pub) || (ack && ack.pub) || "not available";
+      const aliasInfo = alias ? "Alias: " + alias + " • " : "";
+      userInfo.textContent = aliasInfo + "Public key: " + pub;
+      btnLogout.classList.remove("hidden");
+      startExplorer(user, "user", "user");
+    });
+
+    // Check if user is already authenticated on page load
+    user.recall({ sessionStorage: true });
+    if (user.is) {
+      authSection.classList.add("hidden");
+      explorerSection.classList.remove("hidden");
+      const alias = user.is.alias;
+      const pub = user.is.pub;
+      const aliasInfo = alias ? "Alias: " + alias + " • " : "";
+      userInfo.textContent = aliasInfo + "Public key: " + pub;
+      btnLogout.classList.remove("hidden");
+      startExplorer(user, "user", "user");
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      if (window.ShogunAdmin && typeof ShogunAdmin.init === "function") {
+        ShogunAdmin.init({
+          autoFill: true,
+          showIndicator: true,
+          fieldId: "adminToken",
+          syncEnabled: true
+        });
+      }
+    });
+
+    window.addEventListener("shogun-admin-password-updated", () => {
+      if (window.ShogunAdmin && typeof ShogunAdmin.getPassword === "function" && adminTokenInput) {
+        const latest = ShogunAdmin.getPassword();
+        if (latest) {
+          adminTokenInput.value = latest;
+        }
+      }
+    });
+
+    setStatus("", "info");
+    setPublicExplorerMessage("", "info");
+    setPeerFeedback("", "info");
+    updatePeerStatusDisplay();
+    updateRootButtonState();
+  </script>
+</body>
+
 </html>

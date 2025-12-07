@@ -33,6 +33,7 @@
     "express-rate-limit": "^8.0.1",
     "form-data": "^4.0.3",
     "gun": "git+https://github.com/amark/gun.git",
+    "gun-authd": "^1.0.0",
     "http-proxy-middleware": "^3.0.5",
     "ip": "^2.0.1",
     "is-fn": "^3.0.0",
