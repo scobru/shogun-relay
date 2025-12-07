@@ -304,6 +304,14 @@
                                     placeholder='["0x1", "latest"]'></textarea>
                             </div>
 
+                            <!-- Use Proxy Option -->
+                            <div class="form-group">
+                                <label class="form-label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                    <input type="checkbox" id="useProxy" style="width: auto; cursor: pointer;">
+                                    <span>Use relay proxy (if CORS blocked)</span>
+                                </label>
+                            </div>
+
                             <!-- Execute Button -->
                             <button onclick="executeRpc()" id="executeBtn" class="btn-primary">
                                 Execute Request
@@ -459,7 +467,7 @@ print(response.json())`;
             document.getElementById('requestCode').textContent = code;
         }
 
-        // Execute RPC call
+        // Execute RPC call - directly to RPC endpoint
         async function executeRpc() {
             const endpointUrl = document.getElementById('endpointUrl').value;
             const method = document.getElementById('methodSelect').value;
@@ -467,6 +475,14 @@ print(response.json())`;
 
             if (!endpointUrl || !method) {
                 alert('Please configure endpoint URL and method');
+                return;
+            }
+
+            // Validate endpoint URL
+            try {
+                new URL(endpointUrl);
+            } catch (e) {
+                alert('Invalid endpoint URL: ' + e.message);
                 return;
             }
 
@@ -488,36 +504,77 @@ print(response.json())`;
             responseCode.textContent = 'Executing request...';
             responseCode.className = 'code-block response';
 
+            const useProxy = document.getElementById('useProxy').checked;
+            const requestBody = {
+                jsonrpc: "2.0",
+                method: method,
+                params: paramsArray,
+                id: 1
+            };
+
             try {
-                const requestBody = {
-                    jsonrpc: "2.0",
-                    method: method,
-                    params: paramsArray,
-                    id: 1
-                };
-
-                const response = await fetch('/api/v1/rpc/execute', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        endpoint: endpointUrl,
-                        request: requestBody
-                    })
-                });
-
-                const result = await response.json();
+                let response;
                 
-                if (result.success) {
-                    responseCode.textContent = JSON.stringify(result.response, null, 2);
-                    responseCode.classList.add('response-success');
+                if (useProxy) {
+                    // Use relay proxy
+                    response = await fetch('/api/v1/system/rpc/execute', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            endpoint: endpointUrl,
+                            request: requestBody
+                        })
+                    });
+
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        responseCode.textContent = JSON.stringify(result.response, null, 2);
+                        responseCode.classList.add('response-success');
+                    } else {
+                        responseCode.textContent = JSON.stringify(result, null, 2);
+                        responseCode.classList.add('response-error');
+                    }
                 } else {
-                    responseCode.textContent = JSON.stringify(result, null, 2);
-                    responseCode.classList.add('response-error');
+                    // Make request directly to RPC endpoint
+                    response = await fetch(endpointUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify(requestBody)
+                    });
+
+                    const responseData = await response.json();
+                    
+                    if (response.ok) {
+                        responseCode.textContent = JSON.stringify(responseData, null, 2);
+                        responseCode.classList.add('response-success');
+                    } else {
+                        responseCode.textContent = JSON.stringify({
+                            error: `HTTP ${response.status}: ${response.statusText}`,
+                            response: responseData
+                        }, null, 2);
+                        responseCode.classList.add('response-error');
+                    }
                 }
             } catch (error) {
-                responseCode.textContent = `Error: ${error.message}`;
+                // Handle CORS or network errors
+                if (!useProxy && (error.message.includes('CORS') || error.message.includes('Failed to fetch'))) {
+                    responseCode.textContent = JSON.stringify({
+                        error: 'CORS Error: Cannot make direct request to this endpoint from browser.',
+                        message: 'The RPC endpoint does not allow cross-origin requests.',
+                        suggestion: 'Enable "Use relay proxy" checkbox to route through the relay server.'
+                    }, null, 2);
+                } else {
+                    responseCode.textContent = JSON.stringify({
+                        error: error.message,
+                        type: error.name
+                    }, null, 2);
+                }
                 responseCode.classList.add('response-error');
             } finally {
                 executeBtn.disabled = false;

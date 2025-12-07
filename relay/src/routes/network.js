@@ -14,6 +14,7 @@ import crypto from 'crypto';
 import { ipfsRequest } from '../utils/ipfs-client.js';
 import * as Reputation from '../utils/relay-reputation.js';
 import * as FrozenData from '../utils/frozen-data.js';
+import * as StorageDeals from '../utils/storage-deals.js';
 import { getRelayUser } from '../utils/relay-user.js';
 import { createRegistryClient, REGISTRY_ADDRESSES } from '../utils/registry-client.js';
 
@@ -136,6 +137,8 @@ router.get('/relay/:host', async (req, res) => {
  * GET /api/v1/network/stats
  * 
  * Network-wide statistics aggregated from all known relays.
+ * Now includes retroactive sync from IPFS, GunDB deals, and subscriptions.
+ * Statistics persist across restarts by reading from persistent sources.
  */
 router.get('/stats', async (req, res) => {
   try {
@@ -150,16 +153,22 @@ router.get('/stats', async (req, res) => {
       totalConnections: 0,
       totalStorageBytes: 0,
       totalPins: 0,
+      // New: Deal and subscription stats
+      totalActiveDeals: 0,
+      totalActiveSubscriptions: 0,
+      totalDealStorageMB: 0,
+      totalSubscriptionStorageMB: 0,
     };
 
     const relaysFound = [];
     const fiveMinutesAgo = Date.now() - 300000;
 
+    // STEP 1: Collect stats from pulse data (real-time relay status)
     await new Promise((resolve) => {
       const timer = setTimeout(() => {
         console.log(`📊 Network stats collection timeout. Found ${relaysFound.length} relays`);
         resolve();
-      }, 5000); // Increased timeout to 5 seconds
+      }, 5000);
       
       let processedCount = 0;
       
@@ -202,7 +211,6 @@ router.get('/stats', async (req, res) => {
         }
       });
 
-      // Give more time for GunDB to sync
       setTimeout(() => {
         clearTimeout(timer);
         console.log(`📊 Network stats collection complete. Total relays: ${stats.totalRelays}, Active: ${stats.activeRelays}`);
@@ -210,12 +218,129 @@ router.get('/stats', async (req, res) => {
       }, 4500);
     });
 
-    console.log(`📊 Final network stats:`, {
+    // STEP 2: Retroactive sync from GunDB deals (persistent across restarts)
+    console.log(`📊 Syncing deals from GunDB (retroactive)...`);
+    try {
+      const allDeals = [];
+      await new Promise((resolve) => {
+        const timer = setTimeout(resolve, 5000);
+        
+        gun.get('shogun-deals').map().once((deal, dealId) => {
+          if (deal && typeof deal === 'object' && deal.cid) {
+            allDeals.push({ id: dealId, ...deal });
+          }
+        });
+        
+        setTimeout(() => {
+          clearTimeout(timer);
+          resolve();
+        }, 4000);
+      });
+
+      const dealStats = StorageDeals.getDealStats(allDeals);
+      stats.totalActiveDeals = dealStats.active || 0;
+      stats.totalDealStorageMB = dealStats.totalSizeMB || 0;
+      
+      // Add deal storage to total (convert MB to bytes)
+      stats.totalStorageBytes += (stats.totalDealStorageMB * 1024 * 1024);
+      
+      // Count unique CIDs from active deals as pins
+      const activeDealCids = new Set();
+      for (const deal of allDeals) {
+        if (deal.status === StorageDeals.DEAL_STATUS.ACTIVE && 
+            !StorageDeals.isDealExpired(deal) && 
+            deal.cid) {
+          activeDealCids.add(deal.cid);
+        }
+      }
+      stats.totalPins += activeDealCids.size;
+      
+      console.log(`   ✅ Deals synced: ${stats.totalActiveDeals} active, ${stats.totalDealStorageMB} MB`);
+    } catch (dealError) {
+      console.warn(`   ⚠️ Error syncing deals: ${dealError.message}`);
+    }
+
+    // STEP 3: Retroactive sync from subscriptions (persistent across restarts)
+    console.log(`📊 Syncing subscriptions from GunDB (retroactive)...`);
+    try {
+      const relayUser = getRelayUser();
+      if (relayUser) {
+        const subscriptions = [];
+        await new Promise((resolve) => {
+          const timer = setTimeout(resolve, 5000);
+          
+          relayUser.get('x402').get('subscriptions').map().once((subData, userAddress) => {
+            if (subData && typeof subData === 'object') {
+              // Filter out Gun metadata
+              const cleanData = {};
+              Object.keys(subData).forEach(key => {
+                if (!['_', '#', '>', '<'].includes(key)) {
+                  cleanData[key] = subData[key];
+                }
+              });
+              
+              if (cleanData.expiresAt && Date.now() < cleanData.expiresAt) {
+                subscriptions.push(cleanData);
+              }
+            }
+          });
+          
+          setTimeout(() => {
+            clearTimeout(timer);
+            resolve();
+          }, 4000);
+        });
+
+        stats.totalActiveSubscriptions = subscriptions.length;
+        
+        // Calculate total subscription storage
+        let totalSubStorageMB = 0;
+        for (const sub of subscriptions) {
+          totalSubStorageMB += (sub.storageMB || 0);
+        }
+        stats.totalSubscriptionStorageMB = totalSubStorageMB;
+        
+        // Add subscription storage to total (convert MB to bytes)
+        stats.totalStorageBytes += (totalSubStorageMB * 1024 * 1024);
+        
+        console.log(`   ✅ Subscriptions synced: ${stats.totalActiveSubscriptions} active, ${totalSubStorageMB} MB`);
+      }
+    } catch (subError) {
+      console.warn(`   ⚠️ Error syncing subscriptions: ${subError.message}`);
+    }
+
+    // STEP 4: If pulse data is missing/old, try to sync directly from IPFS for this relay
+    if (stats.totalStorageBytes === 0 && stats.totalPins === 0) {
+      console.log(`📊 Pulse data missing/old, syncing directly from IPFS...`);
+      try {
+        // Get IPFS repo stats
+        const repoStats = await ipfsRequest('/api/v0/repo/stat?size-only=true');
+        if (repoStats && repoStats.RepoSize) {
+          stats.totalStorageBytes += repoStats.RepoSize;
+          console.log(`   ✅ IPFS repo size: ${repoStats.RepoSize} bytes`);
+        }
+        
+        // Get pin count
+        const pinLs = await ipfsRequest('/api/v0/pin/ls?type=recursive');
+        if (pinLs && pinLs.Keys) {
+          stats.totalPins += Object.keys(pinLs.Keys).length;
+          console.log(`   ✅ IPFS pins: ${Object.keys(pinLs.Keys).length}`);
+        }
+      } catch (ipfsError) {
+        console.warn(`   ⚠️ Error syncing from IPFS: ${ipfsError.message}`);
+      }
+    }
+
+    console.log(`📊 Final network stats (with retroactive sync):`, {
       totalRelays: stats.totalRelays,
       activeRelays: stats.activeRelays,
       totalConnections: stats.totalConnections,
       totalStorageBytes: stats.totalStorageBytes,
       totalPins: stats.totalPins,
+      totalActiveDeals: stats.totalActiveDeals,
+      totalActiveSubscriptions: stats.totalActiveSubscriptions,
+      totalDealStorageMB: stats.totalDealStorageMB,
+      totalSubscriptionStorageMB: stats.totalSubscriptionStorageMB,
     });
 
     res.json({
@@ -229,6 +354,12 @@ router.get('/stats', async (req, res) => {
       debug: {
         relaysFound: relaysFound.length,
         relaysWithPulse: relaysFound.filter(r => r.hasPulse).length,
+        sources: {
+          pulse: stats.activeRelays > 0 ? 'pulse data' : 'missing/old',
+          deals: stats.totalActiveDeals > 0 ? 'GunDB deals' : 'none',
+          subscriptions: stats.totalActiveSubscriptions > 0 ? 'GunDB subscriptions' : 'none',
+          ipfsDirect: stats.totalStorageBytes > 0 && stats.activeRelays === 0 ? 'IPFS direct' : 'not used',
+        },
       },
     });
   } catch (error) {
