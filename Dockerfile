@@ -93,6 +93,7 @@ RUN set -ex \
 RUN ln -sf /usr/local/bin/node /usr/bin/node
 
 # Create users and set up directories
+# Note: These directories will be preserved if volumes are mounted
 RUN adduser -D -s /bin/sh ipfs \
     && mkdir -p /data/ipfs \
     && mkdir -p /app/relay \
@@ -102,8 +103,8 @@ RUN adduser -D -s /bin/sh ipfs \
     && mkdir -p /var/log/supervisor \
     && mkdir -p /home/ipfs/.config/ipfs/denylists \
     && mkdir -p /root/.config/ipfs/denylists \
-    && chown -R ipfs:ipfs /data/ipfs /home/ipfs/.config \
-    && chmod -R 755 /home/ipfs/.config /root/.config
+    && chown -R ipfs:ipfs /data/ipfs /home/ipfs/.config || true \
+    && chmod -R 755 /home/ipfs/.config /root/.config || true
 
 # Set up relay application
 WORKDIR /app
@@ -157,15 +158,16 @@ RUN if [ "$GENERATE_RELAY_KEYS" = "true" ] && [ -z "$RELAY_SEA_KEYPAIR" ] && [ -
 
 # Set proper permissions
 # Note: Volumes will override these permissions, but we set them here for initial setup
-RUN chown -R node:node /app \
-    && chown -R node:node /app/relay/data \
-    && chown -R node:node /app/relay/holster-data \
-    && chown -R node:node /app/keys \
-    && chown -R ipfs:ipfs /data/ipfs \
-    && chmod 755 /app/relay/src/public \
-    && chmod 755 /app/relay/data \
-    && chmod 755 /app/relay/holster-data \
-    && chmod 755 /app/keys
+# Use || true to avoid failures if directories don't exist or are already mounted as volumes
+RUN chown -R node:node /app || true \
+    && chown -R node:node /app/relay/data || true \
+    && chown -R node:node /app/relay/holster-data || true \
+    && chown -R node:node /app/keys || true \
+    && chown -R ipfs:ipfs /data/ipfs || true \
+    && chmod 755 /app/relay/src/public || true \
+    && chmod 755 /app/relay/data || true \
+    && chmod 755 /app/relay/holster-data || true \
+    && chmod 755 /app/keys || true
 
 # Expose ports
 EXPOSE 8765 5001 8080 4001

@@ -27,23 +27,43 @@ set -e
 
 # Create and set proper permissions for IPFS directory
 echo "📁 Setting up IPFS directory..."
-if ! mkdir -p "$IPFS_PATH"; then
-    echo "❌ Failed to create IPFS directory at $IPFS_PATH"
-    exit 1
+if [ -d "$IPFS_PATH" ] && [ -f "$IPFS_PATH/config" ]; then
+    echo "✅ IPFS repository already exists, preserving existing data"
+    echo "   Repository path: $IPFS_PATH"
+    echo "   Config file: $IPFS_PATH/config"
+    # Only update permissions, preserve all existing data
+    set +e
+    chown -R ipfs:ipfs "$IPFS_PATH" 2>/dev/null
+    if [ $? -ne 0 ]; then
+        echo "⚠️ Warning: Could not set IPFS directory ownership (may be running as ipfs user)"
+    fi
+    set -e
+    # Preserve existing files and subdirectories
+    chmod -R 755 "$IPFS_PATH" 2>/dev/null || {
+        echo "⚠️ Warning: Could not set all IPFS directory permissions"
+    }
+    # Ensure config file is readable
+    chmod 644 "$IPFS_PATH/config" 2>/dev/null || true
+else
+    echo "📁 Creating new IPFS directory..."
+    if ! mkdir -p "$IPFS_PATH"; then
+        echo "❌ Failed to create IPFS directory at $IPFS_PATH"
+        exit 1
+    fi
+    
+    # Try to set ownership, but don't fail if we don't have permission (running as ipfs user)
+    set +e
+    chown -R ipfs:ipfs "$IPFS_PATH" 2>/dev/null
+    if [ $? -ne 0 ]; then
+        echo "⚠️ Warning: Could not set IPFS directory ownership (may be running as ipfs user)"
+    fi
+    set -e
+    
+    # Set permissions (this should work even as ipfs user)
+    chmod -R 755 "$IPFS_PATH" 2>/dev/null || {
+        echo "⚠️ Warning: Could not set all IPFS directory permissions"
+    }
 fi
-
-# Try to set ownership, but don't fail if we don't have permission (running as ipfs user)
-set +e
-chown -R ipfs:ipfs "$IPFS_PATH" 2>/dev/null
-if [ $? -ne 0 ]; then
-    echo "⚠️ Warning: Could not set IPFS directory ownership (may be running as ipfs user)"
-fi
-set -e
-
-# Set permissions (this should work even as ipfs user)
-chmod -R 755 "$IPFS_PATH" 2>/dev/null || {
-    echo "⚠️ Warning: Could not set all IPFS directory permissions"
-}
 
 # Verify IPFS binary
 echo "🔍 Verifying IPFS binary..."
