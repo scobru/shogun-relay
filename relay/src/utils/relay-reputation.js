@@ -29,6 +29,37 @@ const THRESHOLDS = {
   maxLongevityDays: 365,          // Cap longevity bonus at 1 year
 };
 
+// Simple mutex-like lock for preventing concurrent counter updates
+// Key = relayHost, Value = timestamp of lock acquisition
+const updateLocks = new Map();
+const LOCK_TIMEOUT_MS = 5000;
+
+/**
+ * Acquire a lock for updating a relay's reputation
+ * @param {string} relayHost - Host identifier
+ * @returns {boolean} - True if lock acquired
+ */
+function acquireLock(relayHost) {
+  const now = Date.now();
+  const existingLock = updateLocks.get(relayHost);
+  
+  // Check if existing lock has expired
+  if (existingLock && (now - existingLock) < LOCK_TIMEOUT_MS) {
+    return false; // Lock held by another operation
+  }
+  
+  updateLocks.set(relayHost, now);
+  return true;
+}
+
+/**
+ * Release a lock for a relay
+ * @param {string} relayHost - Host identifier
+ */
+function releaseLock(relayHost) {
+  updateLocks.delete(relayHost);
+}
+
 import * as FrozenData from './frozen-data.js';
 
 
@@ -166,19 +197,67 @@ export function initReputationTracking(gun, relayHost) {
 
 /**
  * Record a successful storage proof (Signed)
+ * Uses lock to prevent race conditions on counter updates.
  * @param {Gun} gun - GunDB instance
  * @param {string} relayHost - Host that provided the proof
  * @param {number} responseTimeMs - Time to generate proof
  * @param {object} observerKeyPair - Observer's SEA key pair (REQUIRED)
  */
 export async function recordProofSuccess(gun, relayHost, responseTimeMs = 0, observerKeyPair) {
-  if (!observerKeyPair) {
-    console.warn('⚠️ recordProofSuccess called without keyPair - falling back to unsigned (deprecated)');
-    // Legacy fallback (mutable counter)
+  // Acquire lock to prevent concurrent updates
+  const maxWaitMs = 3000;
+  const startWait = Date.now();
+  while (!acquireLock(relayHost)) {
+    if (Date.now() - startWait > maxWaitMs) {
+      console.warn(`⚠️ recordProofSuccess: timeout waiting for lock on ${relayHost}`);
+      break; // Proceed anyway after timeout
+    }
+    await new Promise(r => setTimeout(r, 50));
+  }
+  
+  try {
+    if (!observerKeyPair) {
+      console.warn('⚠️ recordProofSuccess called without keyPair - falling back to unsigned (deprecated)');
+      // Legacy fallback (mutable counter)
+      const node = gun.get('shogun-network').get('reputation').get(relayHost);
+      return new Promise((resolve) => {
+        node.once((data) => {
+          const current = data || {};
+          const now = Date.now();
+          const newAvgResponseTime = current.responseTimeSamples > 0
+            ? ((current.avgResponseTimeMs * current.responseTimeSamples) + responseTimeMs) / (current.responseTimeSamples + 1)
+            : responseTimeMs;
+          
+          node.put({
+            proofsTotal: (current.proofsTotal || 0) + 1,
+            proofsSuccessful: (current.proofsSuccessful || 0) + 1,
+            avgResponseTimeMs: Math.round(newAvgResponseTime),
+            responseTimeSamples: (current.responseTimeSamples || 0) + 1,
+            dataPoints: (current.dataPoints || 0) + 1,
+            lastSeenTimestamp: now,
+            _lastUpdateId: `${now}-${Math.random().toString(36).substr(2, 9)}`, // Conflict resolution
+          });
+          releaseLock(relayHost);
+          resolve();
+        });
+      });
+    }
+
+    // New Signed Path
+    await FrozenData.createSignedReputationEvent(
+      gun, 
+      relayHost, 
+      'proof_success', 
+      { responseTimeMs }, 
+      observerKeyPair
+    );
+    
+    // Update local optimistic cache/index for backward compatibility
     const node = gun.get('shogun-network').get('reputation').get(relayHost);
-    return new Promise((resolve) => {
+    await new Promise((resolve) => {
       node.once((data) => {
         const current = data || {};
+        const now = Date.now();
         const newAvgResponseTime = current.responseTimeSamples > 0
           ? ((current.avgResponseTimeMs * current.responseTimeSamples) + responseTimeMs) / (current.responseTimeSamples + 1)
           : responseTimeMs;
@@ -189,106 +268,151 @@ export async function recordProofSuccess(gun, relayHost, responseTimeMs = 0, obs
           avgResponseTimeMs: Math.round(newAvgResponseTime),
           responseTimeSamples: (current.responseTimeSamples || 0) + 1,
           dataPoints: (current.dataPoints || 0) + 1,
-          lastSeenTimestamp: Date.now(),
+          lastSeenTimestamp: now,
+          _lastUpdateId: `${now}-${Math.random().toString(36).substr(2, 9)}`,
         });
         resolve();
       });
     });
+  } finally {
+    releaseLock(relayHost);
   }
-
-  // New Signed Path
-  await FrozenData.createSignedReputationEvent(
-    gun, 
-    relayHost, 
-    'proof_success', 
-    { responseTimeMs }, 
-    observerKeyPair
-  );
-  
-  // Update local optimistic cache/index for backward compatibility
-  // (We still write to generic node for non-validating clients, but truth is in frozen-data)
-  const node = gun.get('shogun-network').get('reputation').get(relayHost);
-  node.once((data) => {
-    const current = data || {};
-    const newAvgResponseTime = current.responseTimeSamples > 0
-      ? ((current.avgResponseTimeMs * current.responseTimeSamples) + responseTimeMs) / (current.responseTimeSamples + 1)
-      : responseTimeMs;
-    
-    node.put({
-      proofsTotal: (current.proofsTotal || 0) + 1,
-      proofsSuccessful: (current.proofsSuccessful || 0) + 1,
-      avgResponseTimeMs: Math.round(newAvgResponseTime),
-      responseTimeSamples: (current.responseTimeSamples || 0) + 1,
-      dataPoints: (current.dataPoints || 0) + 1,
-      lastSeenTimestamp: Date.now(),
-    });
-  });
 }
 
 /**
  * Record a failed storage proof (Signed)
+ * Uses lock to prevent race conditions on counter updates.
  * @param {Gun} gun - GunDB instance
  * @param {string} relayHost - Host that failed the proof
  * @param {object} observerKeyPair - Observer's SEA key pair (REQUIRED)
  */
 export async function recordProofFailure(gun, relayHost, observerKeyPair) {
-  if (!observerKeyPair) {
-    console.warn('⚠️ recordProofFailure called without keyPair - falling back to unsigned');
+  // Acquire lock to prevent concurrent updates
+  const maxWaitMs = 3000;
+  const startWait = Date.now();
+  while (!acquireLock(relayHost)) {
+    if (Date.now() - startWait > maxWaitMs) {
+      console.warn(`⚠️ recordProofFailure: timeout waiting for lock on ${relayHost}`);
+      break;
+    }
+    await new Promise(r => setTimeout(r, 50));
+  }
+  
+  try {
+    if (!observerKeyPair) {
+      console.warn('⚠️ recordProofFailure called without keyPair - falling back to unsigned');
+      const node = gun.get('shogun-network').get('reputation').get(relayHost);
+      return new Promise((resolve) => {
+        node.once((data) => {
+          const current = data || {};
+          const now = Date.now();
+          node.put({
+            proofsTotal: (current.proofsTotal || 0) + 1,
+            proofsFailed: (current.proofsFailed || 0) + 1,
+            dataPoints: (current.dataPoints || 0) + 1,
+            lastSeenTimestamp: now,
+            _lastUpdateId: `${now}-${Math.random().toString(36).substr(2, 9)}`,
+          });
+          releaseLock(relayHost);
+          resolve();
+        });
+      });
+    }
+
+    // New Signed Path
+    await FrozenData.createSignedReputationEvent(
+      gun, 
+      relayHost, 
+      'proof_failure', 
+      {}, 
+      observerKeyPair
+    );
+    
+    // Optimistic update
     const node = gun.get('shogun-network').get('reputation').get(relayHost);
-    return new Promise((resolve) => {
+    await new Promise((resolve) => {
       node.once((data) => {
         const current = data || {};
+        const now = Date.now();
         node.put({
           proofsTotal: (current.proofsTotal || 0) + 1,
           proofsFailed: (current.proofsFailed || 0) + 1,
           dataPoints: (current.dataPoints || 0) + 1,
-          lastSeenTimestamp: Date.now(),
+          lastSeenTimestamp: now,
+          _lastUpdateId: `${now}-${Math.random().toString(36).substr(2, 9)}`,
         });
         resolve();
       });
     });
+  } finally {
+    releaseLock(relayHost);
   }
-
-  // New Signed Path
-  await FrozenData.createSignedReputationEvent(
-    gun, 
-    relayHost, 
-    'proof_failure', 
-    {}, 
-    observerKeyPair
-  );
-  
-  // Optimistic update
-  const node = gun.get('shogun-network').get('reputation').get(relayHost);
-  node.once((data) => {
-    const current = data || {};
-    node.put({
-      proofsTotal: (current.proofsTotal || 0) + 1,
-      proofsFailed: (current.proofsFailed || 0) + 1,
-      dataPoints: (current.dataPoints || 0) + 1,
-      lastSeenTimestamp: Date.now(),
-    });
-  });
 }
 
 /**
  * Record pin request fulfillment (Signed)
+ * Uses lock to prevent race conditions on counter updates.
  * @param {Gun} gun - GunDB instance
  * @param {string} relayHost - Host that fulfilled the request
  * @param {boolean} fulfilled - Whether the request was fulfilled
  * @param {object} observerKeyPair - Observer's SEA key pair (REQUIRED)
  */
 export async function recordPinFulfillment(gun, relayHost, fulfilled, observerKeyPair) {
-  if (!observerKeyPair) {
-    console.warn('⚠️ recordPinFulfillment called without keyPair - falling back to unsigned');
+  // Acquire lock to prevent concurrent updates
+  const maxWaitMs = 3000;
+  const startWait = Date.now();
+  while (!acquireLock(relayHost)) {
+    if (Date.now() - startWait > maxWaitMs) {
+      console.warn(`⚠️ recordPinFulfillment: timeout waiting for lock on ${relayHost}`);
+      break;
+    }
+    await new Promise(r => setTimeout(r, 50));
+  }
+  
+  try {
+    if (!observerKeyPair) {
+      console.warn('⚠️ recordPinFulfillment called without keyPair - falling back to unsigned');
+      const node = gun.get('shogun-network').get('reputation').get(relayHost);
+      return new Promise((resolve) => {
+        node.once((data) => {
+          const current = data || {};
+          const now = Date.now();
+          const update = {
+            pinRequestsReceived: (current.pinRequestsReceived || 0) + 1,
+            dataPoints: (current.dataPoints || 0) + 1,
+            lastSeenTimestamp: now,
+            _lastUpdateId: `${now}-${Math.random().toString(36).substr(2, 9)}`,
+          };
+          if (fulfilled) {
+            update.pinRequestsFulfilled = (current.pinRequestsFulfilled || 0) + 1;
+          }
+          node.put(update);
+          releaseLock(relayHost);
+          resolve();
+        });
+      });
+    }
+
+    // New Signed Path
+    await FrozenData.createSignedReputationEvent(
+      gun, 
+      relayHost, 
+      'pin_fulfillment', 
+      { fulfilled }, 
+      observerKeyPair
+    );
+    
+    // Optimistic update
     const node = gun.get('shogun-network').get('reputation').get(relayHost);
-    return new Promise((resolve) => {
+    await new Promise((resolve) => {
       node.once((data) => {
         const current = data || {};
+        const now = Date.now();
         const update = {
           pinRequestsReceived: (current.pinRequestsReceived || 0) + 1,
           dataPoints: (current.dataPoints || 0) + 1,
-          lastSeenTimestamp: Date.now(),
+          lastSeenTimestamp: now,
+          _lastUpdateId: `${now}-${Math.random().toString(36).substr(2, 9)}`,
         };
         if (fulfilled) {
           update.pinRequestsFulfilled = (current.pinRequestsFulfilled || 0) + 1;
@@ -297,64 +421,62 @@ export async function recordPinFulfillment(gun, relayHost, fulfilled, observerKe
         resolve();
       });
     });
+  } finally {
+    releaseLock(relayHost);
   }
-
-  // New Signed Path
-  await FrozenData.createSignedReputationEvent(
-    gun, 
-    relayHost, 
-    'pin_fulfillment', 
-    { fulfilled }, 
-    observerKeyPair
-  );
-  
-  // Optimistic update
-  const node = gun.get('shogun-network').get('reputation').get(relayHost);
-  node.once((data) => {
-    const current = data || {};
-    const update = {
-      pinRequestsReceived: (current.pinRequestsReceived || 0) + 1,
-      dataPoints: (current.dataPoints || 0) + 1,
-      lastSeenTimestamp: Date.now(),
-    };
-    if (fulfilled) {
-      update.pinRequestsFulfilled = (current.pinRequestsFulfilled || 0) + 1;
-    }
-    node.put(update);
-  });
 }
 
 /**
  * Record relay pulse (for uptime tracking)
+ * Uses lock to prevent race conditions on counter updates.
  * @param {Gun} gun - GunDB instance
  * @param {string} relayHost - Host that sent the pulse
  */
 export async function recordPulse(gun, relayHost) {
+  // Acquire lock to prevent concurrent updates
+  const maxWaitMs = 2000;
+  const startWait = Date.now();
+  while (!acquireLock(relayHost)) {
+    if (Date.now() - startWait > maxWaitMs) {
+      // Don't warn for pulses as they're frequent
+      break;
+    }
+    await new Promise(r => setTimeout(r, 50));
+  }
+  
   const node = gun.get('shogun-network').get('reputation').get(relayHost);
   
-  return new Promise((resolve) => {
-    node.once((data) => {
-      const current = data || {};
-      const received = (current.receivedPulses || 0) + 1;
-      
-      // Calculate expected pulses since first seen
-      // Assuming 30s pulse interval
-      const timeSinceFirstSeen = Date.now() - (current.firstSeenTimestamp || Date.now());
-      const expected = Math.max(1, Math.floor(timeSinceFirstSeen / 30000));
-      
-      // Calculate uptime percentage (capped at 100%)
-      const uptimePercent = Math.min(100, (received / expected) * 100);
-      
-      node.put({
-        receivedPulses: received,
-        expectedPulses: expected,
-        uptimePercent: Math.round(uptimePercent * 100) / 100,
-        lastSeenTimestamp: Date.now(),
+  try {
+    return new Promise((resolve) => {
+      node.once((data) => {
+        const current = data || {};
+        const now = Date.now();
+        const received = (current.receivedPulses || 0) + 1;
+        
+        // Calculate expected pulses since first seen
+        // Assuming 30s pulse interval
+        const timeSinceFirstSeen = now - (current.firstSeenTimestamp || now);
+        const expected = Math.max(1, Math.floor(timeSinceFirstSeen / 30000));
+        
+        // Calculate uptime percentage (capped at 100%)
+        const uptimePercent = Math.min(100, (received / expected) * 100);
+        
+        node.put({
+          receivedPulses: received,
+          expectedPulses: expected,
+          uptimePercent: Math.round(uptimePercent * 100) / 100,
+          lastSeenTimestamp: now,
+          _lastUpdateId: `${now}-${Math.random().toString(36).substr(2, 9)}`,
+        });
+        
+        releaseLock(relayHost);
+        resolve();
       });
-      
-      resolve();
     });
-  });
+  } catch (e) {
+    releaseLock(relayHost);
+    throw e;
+  }
 }
 
 /**
@@ -405,11 +527,17 @@ export async function getReputationLeaderboard(gun, options = {}) {
   
   return new Promise((resolve) => {
     const relays = [];
-    const timeout = setTimeout(() => {
-      // Sort and return
+    let resolved = false; // Flag to prevent double resolution
+    
+    const finalize = () => {
+      if (resolved) return;
+      resolved = true;
       relays.sort((a, b) => b.calculatedScore.total - a.calculatedScore.total);
       resolve(relays.slice(0, limit));
-    }, 3000);
+    };
+    
+    // Timeout as safety net
+    const timeout = setTimeout(finalize, 3000);
     
     gun.get('shogun-network').get('reputation').map().once((data, host) => {
       if (!data || typeof data !== 'object') return;
@@ -435,14 +563,14 @@ export async function getReputationLeaderboard(gun, options = {}) {
       });
     });
     
-    // Allow time for GunDB to collect
+    // Allow time for GunDB to collect, then finalize
     setTimeout(() => {
       clearTimeout(timeout);
-      relays.sort((a, b) => b.calculatedScore.total - a.calculatedScore.total);
-      resolve(relays.slice(0, limit));
+      finalize();
     }, 2500);
   });
 }
+
 
 /**
  * Update stored score (call periodically)

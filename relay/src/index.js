@@ -35,6 +35,22 @@ const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN;
 const IPFS_GATEWAY_URL =
   process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
 
+// Parse IPFS API URL for direct http requests
+let IPFS_API_HOST = '127.0.0.1';
+let IPFS_API_PORT = 5001;
+try {
+  const ipfsUrl = new URL(IPFS_API_URL);
+  IPFS_API_HOST = ipfsUrl.hostname;
+  IPFS_API_PORT = parseInt(ipfsUrl.port) || 5001;
+} catch (e) {
+  console.warn('⚠️ Failed to parse IPFS_API_URL, using defaults');
+}
+
+// Cache for processed pin requests to prevent infinite retries
+// Map of requestId -> { processedAt: timestamp, status: 'completed'|'failed' }
+const processedPinRequests = new Map();
+const PIN_REQUEST_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour - don't reprocess within this time
+
 const isProtectedRelay = process.env.RELAY_PROTECTED === "true" ? true : false;
 
 // ES Module equivalent for __dirname
@@ -670,6 +686,16 @@ See docs/RELAY_KEYS.md for more information.
   if (autoReplication) {
     console.log('🔄 Auto-replication enabled - listening for pin requests');
     
+    // Cleanup old processed requests periodically
+    setInterval(() => {
+      const now = Date.now();
+      for (const [reqId, info] of processedPinRequests.entries()) {
+        if (now - info.processedAt > PIN_REQUEST_CACHE_TTL_MS) {
+          processedPinRequests.delete(reqId);
+        }
+      }
+    }, 10 * 60 * 1000); // Cleanup every 10 minutes
+    
     gun.get('shogun-network').get('pin-requests').map().on(async (data, requestId) => {
       if (!data || typeof data !== 'object' || !data.cid) return;
       if (data.status !== 'pending') return;
@@ -677,11 +703,23 @@ See docs/RELAY_KEYS.md for more information.
       // Don't process old requests (older than 1 hour)
       if (data.timestamp && Date.now() - data.timestamp > 3600000) return;
       
+      // Check if we already processed this request recently
+      const cached = processedPinRequests.get(requestId);
+      if (cached && Date.now() - cached.processedAt < PIN_REQUEST_CACHE_TTL_MS) {
+        // Skip - already processed
+        return;
+      }
+      
       // Don't process own requests
       const relayPub = app.get('relayUserPub');
       if (data.requester === relayPub) return;
       
-      console.log(`📥 Received pin request: ${data.cid} from ${data.requester?.substring(0, 20)}...`);
+      // Mark as being processed to prevent duplicate processing
+      processedPinRequests.set(requestId, { processedAt: Date.now(), status: 'processing' });
+      
+      if (process.env.DEBUG) {
+        console.log(`📥 Received pin request: ${data.cid} from ${data.requester?.substring(0, 20)}...`);
+      }
       
       try {
         // Check if we already have this pinned
@@ -689,8 +727,8 @@ See docs/RELAY_KEYS.md for more information.
         const alreadyPinned = await new Promise((resolve) => {
           const timeout = setTimeout(() => resolve(false), 5000);
           const options = {
-            hostname: '127.0.0.1',
-            port: 5001,
+            hostname: IPFS_API_HOST,
+            port: IPFS_API_PORT,
             path: `/api/v0/pin/ls?arg=${data.cid}&type=all`,
             method: 'POST',
             headers: { 'Content-Length': '0' },
@@ -714,17 +752,22 @@ See docs/RELAY_KEYS.md for more information.
         });
         
         if (alreadyPinned) {
-          console.log(`✅ CID ${data.cid} already pinned locally`);
+          if (process.env.DEBUG) {
+            console.log(`✅ CID ${data.cid} already pinned locally`);
+          }
+          processedPinRequests.set(requestId, { processedAt: Date.now(), status: 'completed' });
           return;
         }
         
         // Pin the content
-        console.log(`📌 Pinning ${data.cid}...`);
+        if (process.env.DEBUG) {
+          console.log(`📌 Pinning ${data.cid}...`);
+        }
         const pinResult = await new Promise((resolve, reject) => {
           const timeout = setTimeout(() => reject(new Error('Pin timeout')), 60000);
           const options = {
-            hostname: '127.0.0.1',
-            port: 5001,
+            hostname: IPFS_API_HOST,
+            port: IPFS_API_PORT,
             path: `/api/v0/pin/add?arg=${data.cid}`,
             method: 'POST',
             headers: { 'Content-Length': '0' },
@@ -745,7 +788,10 @@ See docs/RELAY_KEYS.md for more information.
         });
         
         if (pinResult.Pins || pinResult.raw?.includes('Pins')) {
-          console.log(`✅ Successfully pinned ${data.cid}`);
+          if (process.env.DEBUG) {
+            console.log(`✅ Successfully pinned ${data.cid}`);
+          }
+          processedPinRequests.set(requestId, { processedAt: Date.now(), status: 'completed' });
           
           // Record pin fulfillment for reputation tracking
           try {
@@ -765,23 +811,32 @@ See docs/RELAY_KEYS.md for more information.
             timestamp: Date.now(),
           });
         } else {
-          console.log(`⚠️ Pin result unclear for ${data.cid}:`, pinResult);
+          if (process.env.DEBUG) {
+            console.log(`⚠️ Pin result unclear for ${data.cid}:`, pinResult);
+          }
+          processedPinRequests.set(requestId, { processedAt: Date.now(), status: 'failed' });
           
           // Record failed pin fulfillment
           try {
             await Reputation.recordPinFulfillment(gun, host, false);
           } catch (e) {
-            console.warn('Failed to record pin fulfillment for reputation:', e.message);
+            // Silent in production
+            if (process.env.DEBUG) {
+              console.warn('Failed to record pin fulfillment for reputation:', e.message);
+            }
           }
         }
       } catch (error) {
-        console.error(`❌ Failed to pin ${data.cid}:`, error.message);
+        if (process.env.DEBUG) {
+          console.error(`❌ Failed to pin ${data.cid}:`, error.message);
+        }
+        processedPinRequests.set(requestId, { processedAt: Date.now(), status: 'failed' });
         
         // Record failed pin fulfillment for reputation tracking
         try {
           await Reputation.recordPinFulfillment(gun, host, false);
         } catch (e) {
-          console.warn('Failed to record pin failure for reputation:', e.message);
+          // Silent in production
         }
       }
     });

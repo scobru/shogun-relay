@@ -18,6 +18,40 @@ let isShuttingDown = false;
 const pinFailureCache = new Map();
 const PIN_RETRY_DELAY_MS = 5 * 60 * 1000; // Wait 5 minutes before retrying a failed CID
 const MAX_CONSECUTIVE_FAILURES = 10; // After 10 failures, only retry once per hour
+const CACHE_CLEANUP_INTERVAL_MS = 30 * 60 * 1000; // Cleanup every 30 minutes
+const CACHE_MAX_AGE_MS = 4 * 60 * 60 * 1000; // Remove entries older than 4 hours
+
+// Periodic cleanup of stale cache entries to prevent memory leaks
+let cleanupIntervalId = null;
+
+function startCacheCleanup() {
+  if (cleanupIntervalId) return;
+  
+  cleanupIntervalId = setInterval(() => {
+    if (isShuttingDown) {
+      clearInterval(cleanupIntervalId);
+      cleanupIntervalId = null;
+      return;
+    }
+    
+    const now = Date.now();
+    let cleaned = 0;
+    
+    for (const [cid, info] of pinFailureCache.entries()) {
+      if (now - info.lastAttempt > CACHE_MAX_AGE_MS) {
+        pinFailureCache.delete(cid);
+        cleaned++;
+      }
+    }
+    
+    if (cleaned > 0) {
+      console.log(`🧹 Cleaned ${cleaned} stale entries from pin failure cache`);
+    }
+  }, CACHE_CLEANUP_INTERVAL_MS);
+}
+
+// Start cleanup on module load
+startCacheCleanup();
 
 /**
  * Mark that shutdown is in progress (call this when SIGTERM/SIGINT received)

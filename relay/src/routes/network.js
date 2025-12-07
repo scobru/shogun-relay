@@ -15,12 +15,24 @@ import { ipfsRequest } from '../utils/ipfs-client.js';
 import * as Reputation from '../utils/relay-reputation.js';
 import * as FrozenData from '../utils/frozen-data.js';
 import * as StorageDeals from '../utils/storage-deals.js';
-import { getRelayUser } from '../utils/relay-user.js';
+import { getRelayUser, getRelayKeyPair } from '../utils/relay-user.js';
 import { createRegistryClient, REGISTRY_ADDRESSES } from '../utils/registry-client.js';
 
-// Helper to get relay user with keypair for reputation tracking
+// Helper to get relay keypair safely for reputation tracking
+// Returns null instead of undefined if keypair not available
 function getRelayUserWithKeyPair() {
-  return getRelayUser();
+  const user = getRelayUser();
+  const keyPair = getRelayKeyPair();
+  // Return a mock object with the keypair attached for backward compatibility
+  if (user && keyPair) {
+    return { ...user, _keyPair: keyPair };
+  }
+  return user;
+}
+
+// Helper to safely get signing keypair
+function getSigningKeyPair() {
+  return getRelayKeyPair() || null;
 }
 
 const router = express.Router();
@@ -490,8 +502,7 @@ router.get('/proof/:cid', async (req, res) => {
     // Record successful proof for reputation tracking
     if (gun && host) {
       try {
-        const relayUser = getRelayUserWithKeyPair();
-        const keyPair = relayUser?._.sea || null;
+        const keyPair = getSigningKeyPair();
         await Reputation.recordProofSuccess(gun, host, responseTime, keyPair);
       } catch (e) {
         // Non-critical, don't block proof generation
@@ -528,8 +539,7 @@ router.get('/proof/:cid', async (req, res) => {
     const host = process.env.RELAY_HOST || process.env.RELAY_ENDPOINT || req.headers.host || 'localhost';
     if (gun && host) {
       try {
-        const relayUser = getRelayUserWithKeyPair();
-        const keyPair = relayUser?._.sea || null;
+        const keyPair = getSigningKeyPair();
         await Reputation.recordProofFailure(gun, host, keyPair);
       } catch (e) {
         console.warn('Failed to record proof failure for reputation:', e.message);
@@ -886,8 +896,7 @@ router.post('/reputation/record-proof', express.json(), async (req, res) => {
       return res.status(400).json({ success: false, error: 'host required' });
     }
 
-    const relayUser = getRelayUserWithKeyPair();
-    const keyPair = relayUser?._.sea || null;
+    const keyPair = getSigningKeyPair();
     
     if (success) {
       await Reputation.recordProofSuccess(gun, host, responseTimeMs, keyPair);

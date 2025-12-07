@@ -328,7 +328,13 @@ export async function saveDeal(gun, deal, keyPair) {
 export async function getDeal(gun, dealId) {
   const entry = await FrozenData.getLatestFrozenEntry(gun, 'storage-deals', dealId);
   
-  if (!entry || !entry.verified) {
+  if (!entry) {
+    return null;
+  }
+  
+  if (!entry.verified) {
+    console.warn(`⚠️ getDeal: Deal ${dealId} exists but signature verification failed. ` +
+      `Details: ${JSON.stringify(entry.verificationDetails || {})}`);
     return null;
   }
   
