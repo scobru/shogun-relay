@@ -864,23 +864,50 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
           
           try {
             // Try to parse as JSON
-            const parsed = JSON.parse(body);
+            let parsed = JSON.parse(body);
+            console.log(`📦 Parsed JSON, type: ${typeof parsed}, is string: ${typeof parsed === 'string'}`);
             
             // Check if parsed result is a string that starts with "SEA{" (double-encoded JSON)
+            // This happens when the encrypted object was stringified: JSON.stringify(SEA.encrypt(...))
+            // But SEA.encrypt() returns an object, so JSON.stringify() should produce normal JSON
+            // However, if the body was saved as a string representation, it might be "SEA{...}"
             if (typeof parsed === 'string' && parsed.trim().startsWith('SEA{')) {
-              console.log(`🔐 Detected double-encoded SEA data for CID: ${cid}`);
+              console.log(`🔐 Detected string starting with SEA{ (might be SEA serialization) for CID: ${cid}`);
+              console.log(`   String length: ${parsed.length}, preview: ${parsed.substring(0, 100)}...`);
               try {
-                // Parse the inner SEA string
-                const innerParsed = JSON.parse(parsed);
+                // Try to parse the SEA string - remove "SEA" prefix if present
+                let seaString = parsed.trim();
+                if (seaString.startsWith('SEA{')) {
+                  seaString = seaString.substring(3); // Remove "SEA" prefix, keep the "{...}"
+                }
+                const innerParsed = JSON.parse(seaString);
+                console.log(`   Inner parsed type: ${typeof innerParsed}, keys: ${innerParsed && typeof innerParsed === 'object' ? Object.keys(innerParsed).join(', ') : 'N/A'}`);
                 if (innerParsed && typeof innerParsed === 'object' && 
                     (innerParsed.ct || innerParsed.iv || innerParsed.s || innerParsed.salt)) {
                   isEncryptedData = true;
                   encryptedObject = innerParsed;
-                  console.log(`🔐 Detected encrypted data structure (double-encoded) for CID: ${cid}`);
+                  console.log(`✅ Detected encrypted data structure (SEA string format) for CID: ${cid}`);
+                } else {
+                  console.log(`⚠️ Inner parsed object doesn't have SEA structure`);
                 }
               } catch (innerError) {
-                console.log(`⚠️ Failed to parse inner SEA string: ${innerError.message}`);
-                isEncryptedData = false;
+                console.log(`⚠️ Failed to parse SEA string: ${innerError.message}`);
+                // The string might not be valid JSON - this is expected if it's a SEA serialization
+                // In this case, the original body should be the actual JSON object
+                console.log(`   Trying to use original body as encrypted object...`);
+                // Try to parse the original body directly as JSON (without the outer string wrapper)
+                try {
+                  const directParsed = JSON.parse(body);
+                  if (directParsed && typeof directParsed === 'object' && 
+                      (directParsed.ct || directParsed.iv || directParsed.s || directParsed.salt)) {
+                    isEncryptedData = true;
+                    encryptedObject = directParsed;
+                    console.log(`✅ Detected encrypted data structure (direct from body) for CID: ${cid}`);
+                  }
+                } catch (directError) {
+                  console.log(`⚠️ Also failed to parse body directly: ${directError.message}`);
+                  isEncryptedData = false;
+                }
               }
             }
             // SEA encrypted data has specific structure (direct object)
@@ -888,24 +915,33 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
                      (parsed.ct || parsed.iv || parsed.s || parsed.salt)) {
               isEncryptedData = true;
               encryptedObject = parsed;
-              console.log(`🔐 Detected encrypted data structure for CID: ${cid}`);
+              console.log(`✅ Detected encrypted data structure (direct object) for CID: ${cid}`);
             } else if (parsed && typeof parsed === 'object') {
               console.log(`📄 Body is JSON object but doesn't look encrypted. Keys: ${Object.keys(parsed).join(', ')}`);
+            } else if (typeof parsed === 'string') {
+              console.log(`📄 Parsed JSON is a string (not SEA{...}), length: ${parsed.length}, preview: ${parsed.substring(0, 100)}`);
             }
           } catch (e) {
             // Not JSON, but might be direct SEA string
             if (typeof body === 'string' && body.trim().startsWith('SEA{')) {
               console.log(`🔐 Body is not JSON but starts with SEA{, trying to parse as SEA data for CID: ${cid}`);
               try {
-                const seaParsed = JSON.parse(body.trim());
+                let seaString = body.trim();
+                if (seaString.startsWith('SEA{')) {
+                  seaString = seaString.substring(3); // Remove "SEA" prefix
+                }
+                const seaParsed = JSON.parse(seaString);
                 if (seaParsed && typeof seaParsed === 'object' && 
                     (seaParsed.ct || seaParsed.iv || seaParsed.s || seaParsed.salt)) {
                   isEncryptedData = true;
                   encryptedObject = seaParsed;
-                  console.log(`🔐 Detected encrypted data structure (direct SEA, no JSON wrapper) for CID: ${cid}`);
+                  console.log(`✅ Detected encrypted data structure (direct SEA, no JSON wrapper) for CID: ${cid}`);
+                } else {
+                  console.log(`⚠️ SEA parsed object doesn't have expected structure`);
                 }
               } catch (seaError) {
-                console.log(`📄 Body is not valid JSON and not valid SEA data. Error: ${e.message}, Body preview: ${body.substring(0, 200)}`);
+                console.log(`📄 Body is not valid JSON and not valid SEA data. Parse error: ${e.message}, SEA parse error: ${seaError.message}`);
+                console.log(`   Body preview: ${body.substring(0, 200)}`);
                 isEncryptedData = false;
               }
             } else {
@@ -921,10 +957,20 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
             console.log(`   Token type: ${typeof token}, length: ${typeof token === 'string' ? token.length : 'N/A'}`);
             console.log(`   Token preview: ${typeof token === 'string' ? token.substring(0, 20) + '...' : JSON.stringify(token).substring(0, 50)}`);
             console.log(`   Encrypted object keys: ${Object.keys(encryptedObject).join(', ')}`);
+            console.log(`   Encrypted object preview: ${JSON.stringify(encryptedObject).substring(0, 200)}`);
             const SEA = await import("gun/sea.js");
             // Decrypt using the token (signature, password, or key)
             // Token can be: string (password), signature (hex), or keypair object
-            const decrypted = await SEA.default.decrypt(encryptedObject, token);
+            // Note: SEA.decrypt expects the encrypted object and the key/password
+            let decrypted;
+            try {
+              decrypted = await SEA.default.decrypt(encryptedObject, token);
+              console.log(`   Decryption result: ${decrypted ? (typeof decrypted === 'string' ? `string (${decrypted.length} chars)` : typeof decrypted) : 'null/undefined'}`);
+            } catch (decryptErr) {
+              console.error(`   Decryption threw error: ${decryptErr.message}`);
+              console.error(`   Error stack: ${decryptErr.stack}`);
+              decrypted = null;
+            }
 
             if (decrypted) {
               console.log(`✅ Decryption successful!`);
@@ -1026,6 +1072,70 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
               return;
             }
           } else {
+            // File doesn't look encrypted, but if token is provided, we should try to decrypt anyway
+            // This handles edge cases where the encrypted structure isn't detected properly
+            if (token && body && body.length > 0) {
+              console.log(`⚠️ File doesn't appear encrypted but token provided, attempting decryption anyway`);
+              console.log(`   Body preview (first 200 chars): ${body.substring(0, 200)}`);
+              try {
+                const SEA = await import("gun/sea.js");
+                // Try to parse body as JSON first
+                let encryptedObj = null;
+                try {
+                  const parsed = JSON.parse(body);
+                  if (parsed && typeof parsed === 'object' && (parsed.ct || parsed.iv || parsed.s || parsed.salt)) {
+                    encryptedObj = parsed;
+                  } else if (typeof parsed === 'string' && parsed.trim().startsWith('SEA{')) {
+                    // Handle SEA{...} format
+                    let seaString = parsed.trim();
+                    if (seaString.startsWith('SEA{')) {
+                      seaString = seaString.substring(3);
+                    }
+                    encryptedObj = JSON.parse(seaString);
+                  }
+                } catch (parseErr) {
+                  // Body might not be JSON, but could still be encrypted
+                  console.log(`   Body is not JSON, cannot attempt decryption`);
+                }
+                
+                if (encryptedObj) {
+                  console.log(`   Attempting decryption with parsed object`);
+                  const decrypted = await SEA.default.decrypt(encryptedObj, token);
+                  if (decrypted) {
+                    console.log(`✅ Decryption successful!`);
+                    // Handle decrypted data (same as above)
+                    if (typeof decrypted === 'string' && decrypted.startsWith("data:")) {
+                      const matches = decrypted.match(/^data:([^;]+);base64,(.+)$/);
+                      if (matches) {
+                        const contentType = matches[1];
+                        const base64Data = matches[2];
+                        const buffer = Buffer.from(base64Data, "base64");
+                        res.setHeader("Content-Type", contentType);
+                        res.setHeader("Content-Length", buffer.length);
+                        res.setHeader("Cache-Control", "public, max-age=3600");
+                        res.send(buffer);
+                        return;
+                      }
+                    } else if (typeof decrypted === 'string') {
+                      try {
+                        const buffer = Buffer.from(decrypted, "base64");
+                        res.setHeader("Content-Type", "application/octet-stream");
+                        res.setHeader("Content-Length", buffer.length);
+                        res.send(buffer);
+                        return;
+                      } catch (e) {
+                        res.setHeader("Content-Type", "text/plain");
+                        res.send(decrypted);
+                        return;
+                      }
+                    }
+                  }
+                }
+              } catch (fallbackErr) {
+                console.log(`   Fallback decryption failed: ${fallbackErr.message}`);
+              }
+            }
+            
             // File doesn't look encrypted, return as-is
             console.log(`📤 File doesn't appear to be encrypted (isEncryptedData: ${isEncryptedData}, hasToken: ${!!token}), returning as-is`);
             console.log(`   Body preview (first 200 chars): ${body.substring(0, 200)}`);
