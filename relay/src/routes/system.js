@@ -574,4 +574,61 @@ router.post("/peers/add", (req, res) => {
   }
 });
 
+// RPC Execute endpoint
+router.post("/rpc/execute", async (req, res) => {
+  try {
+    const { endpoint, request } = req.body;
+
+    if (!endpoint || !request) {
+      return res.status(400).json({
+        success: false,
+        error: "Endpoint URL and request body are required",
+      });
+    }
+
+    // Validate endpoint URL
+    try {
+      new URL(endpoint);
+    } catch (e) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid endpoint URL",
+      });
+    }
+
+    // Validate request format
+    if (!request.method || !request.jsonrpc) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid RPC request format. Must include 'method' and 'jsonrpc'",
+      });
+    }
+
+    // Execute RPC call
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    const responseData = await response.json();
+
+    res.json({
+      success: true,
+      response: responseData,
+      status: response.status,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error("❌ RPC Execute error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 export default router;

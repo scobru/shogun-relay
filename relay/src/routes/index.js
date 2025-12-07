@@ -459,6 +459,11 @@ export default (app) => {
     res.sendFile(path.resolve(publicPath, "network-stats.html"));
   });
 
+  app.get("/rpc-console", (req, res) => {
+    const publicPath = path.resolve(__dirname, "../public");
+    res.sendFile(path.resolve(publicPath, "rpc-console.html"));
+  });
+
   app.get("/endpoints", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "endpoints.html"));
