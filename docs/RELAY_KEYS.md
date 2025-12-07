@@ -1,32 +1,32 @@
 # Relay SEA Keypair Configuration
 
-## Panoramica
+## Overview
 
-Il relay usa una coppia di chiavi SEA (Signed Encrypted Authenticated) di GunDB per firmare i dati "frozen" e prevenire errori "Signature did not match".
+The relay uses a GunDB SEA (Signed Encrypted Authenticated) key pair to sign "frozen" data and prevent "Signature did not match" errors.
 
-Esistono **3 modi** per configurare le chiavi:
+There are **3 ways** to configure the keys:
 
 ---
 
-## Opzione 1: Variabile d'Ambiente (JSON) ⭐ CONSIGLIATO
+## Option 1: Environment Variable (JSON) ⭐ RECOMMENDED
 
-Passa il keypair direttamente come variabile d'ambiente in formato JSON.
+Pass the keypair directly as an environment variable in JSON format.
 
-### Passi:
+### Steps:
 
-1. **Genera le chiavi:**
+1. **Generate the keys:**
    ```bash
    node scripts/generate-relay-keys.js
    ```
 
-2. **Copia il JSON generato**
+2. **Copy the generated JSON**
 
-3. **Aggiungi al tuo `.env` o Docker compose:**
+3. **Add to your `.env` or Docker compose:**
    ```bash
    RELAY_SEA_KEYPAIR='{"pub":"...","priv":"...","epub":"...","epriv":"..."}'
    ```
 
-### Esempio Docker Compose:
+### Docker Compose Example:
 
 ```yaml
 services:
@@ -35,7 +35,7 @@ services:
       - RELAY_SEA_KEYPAIR='{"pub":"abc123...","priv":"def456...","epub":"ghi789...","epriv":"jkl012..."}'
 ```
 
-### Esempio Docker Run:
+### Docker Run Example:
 
 ```bash
 docker run -e RELAY_SEA_KEYPAIR='{"pub":"...","priv":"...","epub":"...","epriv":"..."}' ...
@@ -43,23 +43,23 @@ docker run -e RELAY_SEA_KEYPAIR='{"pub":"...","priv":"...","epub":"...","epriv":
 
 ---
 
-## Opzione 2: File Path
+## Option 2: File Path
 
-Salva il keypair in un file JSON e passa il percorso.
+Save the keypair in a JSON file and pass the path.
 
-### Passi:
+### Steps:
 
-1. **Genera e salva le chiavi:**
+1. **Generate and save the keys:**
    ```bash
    node scripts/generate-relay-keys-standalone.cjs /path/to/relay-keypair.json
    ```
 
-2. **Aggiungi al tuo `.env`:**
+2. **Add to your `.env`:**
    ```bash
    RELAY_SEA_KEYPAIR_PATH=/path/to/relay-keypair.json
    ```
 
-### Esempio Docker Compose (con volume):
+### Docker Compose Example (with volume):
 
 ```yaml
 services:
@@ -70,9 +70,9 @@ services:
       - RELAY_SEA_KEYPAIR_PATH=/app/keys/relay-keypair.json
 ```
 
-### Esempio Dockerfile (build-time):
+### Dockerfile Example (build-time):
 
-Nel `Dockerfile`, puoi generare le chiavi durante il build:
+In the `Dockerfile`, you can generate keys during build:
 
 ```dockerfile
 ARG GENERATE_RELAY_KEYS=false
@@ -81,39 +81,39 @@ RUN if [ "$GENERATE_RELAY_KEYS" = "true" ]; then \
     fi
 ```
 
-Poi build con:
+Then build with:
 ```bash
 docker build --build-arg GENERATE_RELAY_KEYS=true -t my-relay .
 ```
 
 ---
 
-## Opzione 3: Generazione Automatica (Docker Build)
+## Option 3: Automatic Generation (Docker Build)
 
-Genera le chiavi automaticamente durante il build del Docker container.
+Generate keys automatically during Docker container build.
 
-### Passi:
+### Steps:
 
-1. **Build con flag:**
+1. **Build with flag:**
    ```bash
    docker build --build-arg GENERATE_RELAY_KEYS=true -t my-relay .
    ```
 
-2. **Le chiavi saranno generate in:**
+2. **Keys will be generated in:**
    ```
    /app/keys/relay-keypair.json
    ```
 
-3. **Mount il file o copialo:**
+3. **Mount the file or copy it:**
    ```bash
-   # Opzione A: Mount come volume
+   # Option A: Mount as volume
    docker run -v $(pwd)/keys:/app/keys my-relay
    
-   # Opzione B: Copia dal container
+   # Option B: Copy from container
    docker cp <container-id>:/app/keys/relay-keypair.json ./keys/
    ```
 
-4. **Usa con RELAY_SEA_KEYPAIR_PATH:**
+4. **Use with RELAY_SEA_KEYPAIR_PATH:**
    ```bash
    docker run -e RELAY_SEA_KEYPAIR_PATH=/app/keys/relay-keypair.json \
               -v $(pwd)/keys:/app/keys my-relay
@@ -123,123 +123,123 @@ Genera le chiavi automaticamente durante il build del Docker container.
 
 ## Fallback: Username/Password
 
-Se né `RELAY_SEA_KEYPAIR` né `RELAY_SEA_KEYPAIR_PATH` sono configurati, il relay usa il metodo tradizionale username/password:
+If neither `RELAY_SEA_KEYPAIR` nor `RELAY_SEA_KEYPAIR_PATH` are configured, the relay uses the traditional username/password method:
 
 ```bash
 RELAY_GUN_USERNAME=shogun-relay
 RELAY_GUN_PASSWORD=your_password
 ```
 
-⚠️ **Nota**: Questo metodo può causare errori "Signature did not match" se il login non funziona correttamente.
+⚠️ **Note**: This method can cause "Signature did not match" errors if login doesn't work correctly.
 
 ---
 
-## Script Disponibili
+## Available Scripts
 
 ### 1. `scripts/generate-relay-keys.js`
-- Versione completa con ES modules
-- Output formattato con istruzioni
-- Salva automaticamente in `./keys/relay-keypair.json`
+- Full version with ES modules
+- Formatted output with instructions
+- Automatically saves to `./keys/relay-keypair.json`
 
 ### 2. `scripts/generate-relay-keys-standalone.cjs`
-- Versione CommonJS (compatibile con Dockerfile, usa estensione .cjs)
-- Output JSON pulito (perfetto per catturare in variabili)
-- Può salvare in un percorso personalizzato
+- CommonJS version (compatible with Dockerfile, uses .cjs extension)
+- Clean JSON output (perfect for capturing in variables)
+- Can save to a custom path
 
-**Esempi:**
+**Examples:**
 ```bash
-# Genera e mostra JSON (per copiare in env var)
+# Generate and show JSON (to copy to env var)
 node scripts/generate-relay-keys-standalone.cjs
 
-# Genera e salva in file
+# Generate and save to file
 node scripts/generate-relay-keys-standalone.cjs /path/to/keys.json
 ```
 
 ---
 
-## Priorità di Configurazione
+## Configuration Priority
 
-Il relay controlla nell'ordine:
+The relay checks in this order:
 
-1. ✅ `RELAY_SEA_KEYPAIR` (env var JSON) - **PRIMA PRIORITÀ**
-2. ✅ `RELAY_SEA_KEYPAIR_PATH` (file path) - **SECONDA PRIORITÀ**
+1. ✅ `RELAY_SEA_KEYPAIR` (env var JSON) - **FIRST PRIORITY**
+2. ✅ `RELAY_SEA_KEYPAIR_PATH` (file path) - **SECOND PRIORITY**
 3. ⚠️ `RELAY_GUN_USERNAME` + `RELAY_GUN_PASSWORD` - **FALLBACK**
 
 ---
 
-## Sicurezza
+## Security
 
-### ⚠️ IMPORTANTE:
+### ⚠️ IMPORTANT:
 
-- **NON** committare le chiavi private (`priv`, `epriv`) in git
-- Usa un secret manager per produzione (es. Docker secrets, Kubernetes secrets)
-- Le chiavi private danno accesso completo ai dati del relay
-- La chiave pubblica (`pub`) può essere condivisa
+- **DO NOT** commit private keys (`priv`, `epriv`) to git
+- Use a secret manager for production (e.g., Docker secrets, Kubernetes secrets)
+- Private keys give full access to relay data
+- The public key (`pub`) can be shared
 
 ### Best Practices:
 
-1. **Sviluppo locale:**
-   - Usa file locale in `./keys/`
-   - Aggiungi `keys/` al `.gitignore`
+1. **Local Development:**
+   - Use local file in `./keys/`
+   - Add `keys/` to `.gitignore`
 
-2. **Produzione:**
-   - Usa variabili d'ambiente o secret manager
-   - Non salvare in file sul filesystem se possibile
-   - Usa Docker secrets o Kubernetes secrets
+2. **Production:**
+   - Use environment variables or secret manager
+   - Don't save to filesystem if possible
+   - Use Docker secrets or Kubernetes secrets
 
 3. **Docker:**
-   - Passa via env var o mount read-only
-   - Non hardcodare nel Dockerfile
+   - Pass via env var or mount read-only
+   - Don't hardcode in Dockerfile
 
 ---
 
-## Verifica Configurazione
+## Verify Configuration
 
-Dopo aver configurato le chiavi, controlla i log del relay:
+After configuring keys, check relay logs:
 
 ```
 ✅ Relay GunDB user initialized with SEA keypair
 🔑 Relay public key: abc123...
 ```
 
-Se vedi errori "Signature did not match", significa che:
-- Le chiavi non sono configurate correttamente
-- O stai usando username/password ma il login è fallito
+If you see "Signature did not match" errors, it means:
+- Keys are not configured correctly
+- Or you're using username/password but login failed
 
 ---
 
-## Risoluzione Problemi
+## Troubleshooting
 
-### Errore: "Signature did not match"
+### Error: "Signature did not match"
 
-**Soluzione:**
-1. Verifica che `RELAY_SEA_KEYPAIR` o `RELAY_SEA_KEYPAIR_PATH` siano configurati
-2. Controlla che il JSON sia valido
-3. Se usi file path, verifica che il file esista e sia leggibile
-4. Riconfigura con nuove chiavi se necessario
+**Solution:**
+1. Verify that `RELAY_SEA_KEYPAIR` or `RELAY_SEA_KEYPAIR_PATH` are configured
+2. Check that JSON is valid
+3. If using file path, verify file exists and is readable
+4. Reconfigure with new keys if necessary
 
-### Errore: "Failed to parse RELAY_SEA_KEYPAIR"
+### Error: "Failed to parse RELAY_SEA_KEYPAIR"
 
-**Soluzione:**
-- Verifica che il JSON sia valido (usa `JSON.parse()` per testare)
-- Assicurati di usare apici singoli per wrappare il JSON in env var:
+**Solution:**
+- Verify JSON is valid (use `JSON.parse()` to test)
+- Make sure to use single quotes to wrap JSON in env var:
   ```bash
-  RELAY_SEA_KEYPAIR='{"pub":"..."}'  # ✅ Corretto
-  RELAY_SEA_KEYPAIR="{'pub':'...'}"  # ❌ Errato
+  RELAY_SEA_KEYPAIR='{"pub":"..."}'  # ✅ Correct
+  RELAY_SEA_KEYPAIR="{'pub':'...'}"  # ❌ Wrong
   ```
 
-### Le chiavi non vengono usate
+### Keys are not being used
 
-**Soluzione:**
-- Controlla i log del relay all'avvio
-- Verifica che non ci siano errori nel parsing
-- Assicurati che le chiavi abbiano tutti i campi: `pub`, `priv`, `epub`, `epriv`
+**Solution:**
+- Check relay logs on startup
+- Verify there are no parsing errors
+- Make sure keys have all fields: `pub`, `priv`, `epub`, `epriv`
 
 ---
 
-## Esempi Completi
+## Complete Examples
 
-### Docker Compose (Produzione)
+### Docker Compose (Production)
 
 ```yaml
 version: '3.8'
@@ -262,11 +262,11 @@ secrets:
 ### Kubernetes Secret
 
 ```bash
-# Crea secret
+# Create secret
 kubectl create secret generic relay-keypair \
   --from-file=keypair=./keys/relay-keypair.json
 
-# Usa nel deployment
+# Use in deployment
 env:
   - name: RELAY_SEA_KEYPAIR_PATH
     value: /etc/secrets/keypair
@@ -282,7 +282,7 @@ volumes:
 
 ### CapRover (One-Click Deploy)
 
-Passa come environment variable nella UI di CapRover o nel `docker-compose.yml`:
+Pass as environment variable in CapRover UI or in `docker-compose.yml`:
 
 ```yaml
 services:
@@ -293,9 +293,8 @@ services:
 
 ---
 
-## Riferimenti
+## References
 
 - [GunDB SEA Documentation](https://gun.eco/docs/SEA)
 - [Provider Guide](./PROVIDER_GUIDE.md)
 - [README](../README.md)
-

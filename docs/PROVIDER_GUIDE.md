@@ -199,8 +199,22 @@ cp env.example .env
 # Generate admin password
 openssl rand -hex 32
 
-# Generate relay GunDB password
-openssl rand -hex 32
+# Generate relay SEA keypair (REQUIRED)
+# This prevents "Signature did not match" errors
+cd relay
+node scripts/generate-relay-keys.js
+```
+
+**Important**: The relay requires a SEA keypair for proper operation. See [RELAY_KEYS.md](./RELAY_KEYS.md) for detailed configuration options.
+
+The script will output a JSON keypair. Add it to your `.env`:
+```bash
+RELAY_SEA_KEYPAIR='{"pub":"...","priv":"...","epub":"...","epriv":"..."}'
+```
+
+Or save to a file and use:
+```bash
+RELAY_SEA_KEYPAIR_PATH=./relay-keypair.json
 ```
 
 ### Step 5: Create Wallet
@@ -232,6 +246,13 @@ Edit `.env` with your values:
 
 # Admin password (generate with: openssl rand -hex 32)
 ADMIN_PASSWORD=your_secure_admin_password_here
+
+# Relay SEA keypair (REQUIRED - prevents "Signature did not match" errors)
+# Generate with: node scripts/generate-relay-keys.js
+# See RELAY_KEYS.md for detailed instructions
+RELAY_SEA_KEYPAIR='{"pub":"...","priv":"...","epub":"...","epriv":"..."}'
+# OR use file path:
+# RELAY_SEA_KEYPAIR_PATH=./relay-keypair.json
 
 # Your wallet private key (starts with 0x)
 RELAY_PRIVATE_KEY=0x...your_private_key...
@@ -299,6 +320,10 @@ open http://localhost:8765/admin
 | `RELAY_HOST` | Yes | Public hostname/IP | `relay.example.com` |
 | `RELAY_PORT` | No | HTTP port | `8765` |
 | `RELAY_NAME` | No | Display name | `MyRelay` |
+| `RELAY_SEA_KEYPAIR` | Yes* | SEA keypair JSON (prevents signature errors) | `{"pub":"...","priv":"..."}` |
+| `RELAY_SEA_KEYPAIR_PATH` | Yes* | Path to keypair file | `./relay-keypair.json` |
+
+*Required for proper operation. See [RELAY_KEYS.md](./RELAY_KEYS.md) for details.
 
 ### IPFS Settings
 
@@ -384,10 +409,20 @@ await registry.registerRelay(endpoint, gunPubKey, stakeAmount);
 
 ### Contract Addresses
 
+**Note**: Contract addresses for Shogun Protocol contracts (RelayRegistry, StorageDealRegistry, etc.) are managed by the `shogun-contracts` SDK and retrieved automatically. The addresses below are for reference when using the SDK or for manual contract interaction.
+
 | Network | Registry | USDC |
 |---------|----------|------|
 | Base Sepolia | `0x412D3Cf47907C231EE26D261714D2126eb3735e6` | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 | Base Mainnet | TBD | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+
+**To get current addresses programmatically:**
+```javascript
+import { ShogunSDK } from 'shogun-contracts/sdk';
+const sdk = new ShogunSDK({ provider, chainId: 84532 });
+const relayRegistry = sdk.getRelayRegistry();
+console.log(relayRegistry.getAddress()); // Get current address
+```
 
 ---
 
@@ -665,11 +700,33 @@ curl http://localhost:8765/api/v1/x402/status
 # Try X402_SETTLEMENT_MODE=direct
 ```
 
+#### "Signature did not match" Errors
+
+This error occurs when the relay's GunDB keypair is not properly configured.
+
+**Solution:**
+1. Generate a new SEA keypair:
+   ```bash
+   cd relay
+   node scripts/generate-relay-keys.js
+   ```
+
+2. Add to `.env`:
+   ```bash
+   RELAY_SEA_KEYPAIR='{"pub":"...","priv":"...","epub":"...","epriv":"..."}'
+   ```
+
+3. Restart the relay
+
+4. See [RELAY_KEYS.md](./RELAY_KEYS.md) for detailed configuration options and troubleshooting
+
 ### Getting Help
 
 - **GitHub Issues**: [Report bugs](https://github.com/scobru/shogun-relay/issues)
 - **Discord**: Join the community
-- **Documentation**: [Full README](./README.md)
+- **Documentation**: 
+  - [Full README](../README.md)
+  - [RELAY_KEYS.md](./RELAY_KEYS.md) - Keypair configuration guide
 
 ---
 
@@ -731,7 +788,10 @@ Before announcing your relay:
 
 ## Support
 
-- **Documentation**: This guide + [README.md](./README.md)
+- **Documentation**: 
+  - This guide
+  - [RELAY_KEYS.md](./RELAY_KEYS.md) - Detailed keypair configuration
+  - [README.md](../README.md) - Main documentation
 - **Issues**: https://github.com/scobru/shogun-relay/issues
 - **Updates**: Watch the repository for releases
 
