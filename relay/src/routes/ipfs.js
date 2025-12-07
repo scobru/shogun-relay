@@ -826,6 +826,20 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
     }
 
     const ipfsReq = protocolModule.request(requestOptions, (ipfsRes) => {
+      console.log(`📥 IPFS response received for CID: ${cid}, status: ${ipfsRes.statusCode}`);
+      
+      // Handle IPFS errors
+      ipfsRes.on("error", (err) => {
+        console.error(`❌ IPFS response error for CID ${cid}:`, err.message);
+        if (!res.headersSent) {
+          res.status(500).json({
+            success: false,
+            error: "Failed to fetch from IPFS",
+            message: err.message,
+          });
+        }
+      });
+
       // If no token, just stream the response
       if (!token) {
         console.log(`📤 Streaming content without decryption for CID: ${cid}`);
@@ -837,9 +851,18 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
       // If token is provided, buffer the response to decrypt it
       console.log(`🔓 Attempting decryption for CID: ${cid}`);
       console.log(`   Token received: ${token ? (typeof token === 'string' ? token.substring(0, 20) + '...' : 'object') : 'missing'}`);
+      console.log(`   Token type: ${typeof token}, length: ${typeof token === 'string' ? token.length : 'N/A'}`);
       const chunks = [];
-      ipfsRes.on("data", (chunk) => chunks.push(chunk));
+      let chunkCount = 0;
+      ipfsRes.on("data", (chunk) => {
+        chunks.push(chunk);
+        chunkCount++;
+        if (chunkCount === 1) {
+          console.log(`   First chunk received, size: ${chunk.length}`);
+        }
+      });
       ipfsRes.on("end", async () => {
+        console.log(`   All chunks received, total chunks: ${chunkCount}, total size: ${chunks.reduce((sum, c) => sum + c.length, 0)}`);
         // Convert chunks to string properly (handles both Buffer and string chunks)
         const body = Buffer.concat(chunks).toString('utf8');
         console.log(`   Body length: ${body.length}, preview: ${body.substring(0, 100)}...`);
@@ -1160,14 +1183,18 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
     });
 
     ipfsReq.on("error", (error) => {
-      console.error("❌ IPFS Gateway error:", error);
-      res.status(500).json({
-        success: false,
-        error: "IPFS Gateway error",
-        details: error.message,
-      });
+      console.error(`❌ IPFS Gateway error for CID ${cid}:`, error);
+      console.error(`   Error details:`, error);
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: "IPFS Gateway error",
+          details: error.message,
+        });
+      }
     });
 
+    console.log(`📤 Sending IPFS request for CID: ${cid}, method: ${requestOptions.method}, path: ${requestOptions.path}`);
     ipfsReq.end();
   } catch (error) {
     console.error(`❌ IPFS Decrypt error for ${req.params.cid}:`, error);

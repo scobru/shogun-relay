@@ -74,9 +74,9 @@ const holsterConfig = {
  */
 async function initializeServer() {
   // Welcome message with ASCII art logo
-  const welcomeMessage = `
+  const welcomeMessage = process.env.WELCOME_MESSAGE || `
 *** WELCOME TO SHOGUN RELAY ***
-` || process.env.WELCOME_MESSAGE;
+`;
   console.log(welcomeMessage);
   console.log("🚀 Initializing Shogun Relay Server...");
 
