@@ -454,6 +454,11 @@ export default (app) => {
     res.sendFile(path.resolve(publicPath, "registry-dashboard.html"));
   });
 
+  app.get("/network-stats", (req, res) => {
+    const publicPath = path.resolve(__dirname, "../public");
+    res.sendFile(path.resolve(publicPath, "network-stats.html"));
+  });
+
   app.get("/endpoints", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "endpoints.html"));
