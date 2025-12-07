@@ -2268,21 +2268,52 @@ router.get("/user-uploads/:userAddress/:hash/decrypt", async (req, res) => {
     }
 
     // Fetch content from IPFS using the hash as CID
-    const requestOptions = {
-      hostname: "127.0.0.1",
-      port: 5001,
-      path: `/api/v0/cat?arg=${encodeURIComponent(hash)}`,
-      method: "POST",
-      headers: {
-        "Content-Length": "0",
-      },
-    };
-
-    if (IPFS_API_TOKEN) {
-      requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+    // Try to use IPFS API first (localhost) for better availability
+    // Fallback to gateway if API is not available
+    let requestOptions;
+    let protocolModule;
+    const IPFS_GATEWAY_URL = process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
+    
+    // Try API first if we have a local API URL
+    const useApi = IPFS_GATEWAY_URL && (IPFS_GATEWAY_URL.includes('127.0.0.1') || IPFS_GATEWAY_URL.includes('localhost'));
+    
+    if (useApi) {
+      // Use IPFS API directly (more reliable for local files)
+      protocolModule = await import("http");
+      requestOptions = {
+        hostname: "127.0.0.1",
+        port: 5001,
+        path: `/api/v0/cat?arg=${encodeURIComponent(hash)}`,
+        method: "POST",
+        headers: {
+          "Content-Length": "0",
+        },
+      };
+      
+      if (IPFS_API_TOKEN) {
+        requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+      }
+    } else {
+      // Use gateway
+      const gatewayUrl = new URL(IPFS_GATEWAY_URL);
+      protocolModule = gatewayUrl.protocol === "https:"
+        ? await import("https")
+        : await import("http");
+      
+      requestOptions = {
+        hostname: gatewayUrl.hostname,
+        port: gatewayUrl.port
+          ? Number(gatewayUrl.port)
+          : gatewayUrl.protocol === "https:" ? 443 : 80,
+        path: `/ipfs/${hash}`,
+        method: "GET",
+        headers: {
+          Host: gatewayUrl.host,
+        },
+      };
     }
 
-    const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+    const ipfsReq = protocolModule.request(requestOptions, (ipfsRes) => {
       let body = "";
       ipfsRes.on("data", (chunk) => (body += chunk));
       ipfsRes.on("end", async () => {
@@ -2387,9 +2418,138 @@ router.get("/user-uploads/:userAddress/:hash/decrypt", async (req, res) => {
       });
     });
 
-    ipfsReq.on("error", (error) => {
+    ipfsReq.on("error", async (error) => {
       console.error(`❌ IPFS request error for ${hash}:`, error);
-      if (!res.headersSent) {
+      
+      // If API failed and we were using API, try gateway as fallback
+      if (useApi && !res.headersSent) {
+        console.log(`🔄 API failed, trying gateway fallback for ${hash}`);
+        try {
+          const gatewayUrl = new URL(IPFS_GATEWAY_URL || "https://ipfs.io");
+          const gatewayProtocol = gatewayUrl.protocol === "https:" ? await import("https") : await import("http");
+          
+          const gatewayReq = gatewayProtocol.request({
+            hostname: gatewayUrl.hostname,
+            port: gatewayUrl.port ? Number(gatewayUrl.port) : (gatewayUrl.protocol === "https:" ? 443 : 80),
+            path: `/ipfs/${hash}`,
+            method: "GET",
+            headers: { Host: gatewayUrl.host },
+          }, (gatewayRes) => {
+            let gatewayBody = "";
+            gatewayRes.on("data", (chunk) => (gatewayBody += chunk));
+            gatewayRes.on("end", async () => {
+              try {
+                // Process decryption same as before
+                let isEncryptedData = false;
+                try {
+                  const parsed = JSON.parse(gatewayBody);
+                  isEncryptedData = parsed && typeof parsed === 'object' && (parsed.ct || parsed.iv || parsed.s || parsed.salt);
+                } catch (e) { /* Not JSON */ }
+                
+                if (isEncryptedData && verifiedToken) {
+                  const SEA = await import("gun/sea.js");
+                  const decrypted = await SEA.default.decrypt(gatewayBody, verifiedToken);
+                  
+                  if (decrypted) {
+                    console.log(`✅ Decryption successful via gateway!`);
+                    // Same decryption handling as above...
+                    if (typeof decrypted === 'string' && decrypted.startsWith("data:")) {
+                      const matches = decrypted.match(/^data:([^;]+);base64,(.+)$/);
+                      if (matches) {
+                        const contentType = matches[1];
+                        const base64Data = matches[2];
+                        const buffer = Buffer.from(base64Data, "base64");
+                        res.setHeader("Content-Type", contentType);
+                        res.setHeader("Content-Length", buffer.length);
+                        res.setHeader("Cache-Control", "public, max-age=3600");
+                        res.send(buffer);
+                        return;
+                      }
+                    } else if (typeof decrypted === 'string') {
+                      try {
+                        const buffer = Buffer.from(decrypted, "base64");
+                        let contentType = uploadRecord.mimetype || "application/octet-stream";
+                        if (buffer.length >= 4) {
+                          if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+                            contentType = "image/png";
+                          } else if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+                            contentType = "image/jpeg";
+                          } else if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) {
+                            contentType = "image/gif";
+                          } else if (buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46) {
+                            contentType = "application/pdf";
+                          } else if (buffer.length >= 12 && 
+                                   buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+                                   buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) {
+                            contentType = "image/webp";
+                          }
+                        }
+                        res.setHeader("Content-Type", contentType);
+                        res.setHeader("Content-Length", buffer.length);
+                        res.setHeader("Cache-Control", "public, max-age=3600");
+                        res.send(buffer);
+                        return;
+                      } catch (base64Error) {
+                        res.setHeader("Content-Type", "text/plain");
+                        res.send(decrypted);
+                        return;
+                      }
+                    } else {
+                      res.setHeader("Content-Type", "text/plain");
+                      res.send(decrypted);
+                      return;
+                    }
+                  }
+                }
+                
+                // Not encrypted or decryption failed
+                const mimetype = uploadRecord.mimetype || gatewayRes.headers["content-type"] || "application/octet-stream";
+                res.setHeader("Content-Type", mimetype);
+                res.setHeader("Cache-Control", "public, max-age=3600");
+                res.send(gatewayBody);
+              } catch (gatewayError) {
+                console.error("❌ Gateway fallback error:", gatewayError);
+                if (!res.headersSent) {
+                  res.status(500).json({
+                    success: false,
+                    error: gatewayError.message,
+                  });
+                }
+              }
+            });
+          });
+          
+          gatewayReq.on("error", (gatewayErr) => {
+            console.error(`❌ Gateway fallback request error:`, gatewayErr);
+            if (!res.headersSent) {
+              res.status(500).json({
+                success: false,
+                error: `Both API and gateway failed: ${error.message}`,
+              });
+            }
+          });
+          
+          gatewayReq.setTimeout(60000, () => {
+            gatewayReq.destroy();
+            if (!res.headersSent) {
+              res.status(408).json({
+                success: false,
+                error: "Gateway fallback timeout",
+              });
+            }
+          });
+          
+          gatewayReq.end();
+        } catch (fallbackError) {
+          console.error("❌ Gateway fallback setup error:", fallbackError);
+          if (!res.headersSent) {
+            res.status(500).json({
+              success: false,
+              error: error.message,
+            });
+          }
+        }
+      } else if (!res.headersSent) {
         res.status(500).json({
           success: false,
           error: error.message,
@@ -2397,9 +2557,14 @@ router.get("/user-uploads/:userAddress/:hash/decrypt", async (req, res) => {
       }
     });
 
-    ipfsReq.setTimeout(30000, () => {
+    ipfsReq.setTimeout(60000, () => {
       ipfsReq.destroy();
-      if (!res.headersSent) {
+      // Try gateway fallback on timeout if using API
+      if (useApi && !res.headersSent) {
+        console.log(`⏱️ API timeout, trying gateway fallback for ${hash}`);
+        // The error handler will trigger and try gateway
+        ipfsReq.emit('error', new Error('API request timeout'));
+      } else if (!res.headersSent) {
         res.status(408).json({
           success: false,
           error: "Content retrieval timeout",
