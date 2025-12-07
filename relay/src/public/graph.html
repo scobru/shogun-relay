@@ -11,7 +11,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gun-authd/dist/gun-authd.min.js" type="module"></script>
     <script src="lib/admin-auth.js"></script>
     <script src="lib/admin-nav.js"></script>
     <style>
@@ -444,9 +443,22 @@
       </div>
     </div>
 
+    <script type="module">
+      import "../dist/gun-authd.min.js"; 
+
+      // Inizializza Gun
+      // localStorage: false è utile nei test rapidi per evitare errori di scrittura su disco browser
+      const gun = Gun({
+          peers: ['https://shogun-relay.scobrudot.dev/gun'],
+          localStorage: false,
+          radisk: false
+      });
+
+      window.gun = gun;
+    </script>
+
     <script>
       const DEFAULT_PEERS = [window.location.origin + "/gun"];
-      const gun = Gun({ peers: DEFAULT_PEERS, retry: 2000 , localStorage: false, radisk: false, log: () => { } });
       const user = gun.user().recall({ sessionStorage: true });
       window.gun = gun;
       window.user = user;
