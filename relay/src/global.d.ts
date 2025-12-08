@@ -20,3 +20,4 @@ declare global {
   type mb<T>  = T | und;     // "Maybe": T oppure undefined
   type opt<T> = Partial<T>;  // "Optional": rende i campi opzionali
 }
+

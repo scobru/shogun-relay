@@ -13,35 +13,35 @@ import { execSync } from 'child_process';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const relayRoot = join(__dirname, '..');
-const nodeModulesPath = join(relayRoot, 'node_modules', 'shogun-contracts');
+const nodeModulesPath = join(relayRoot, 'node_modules', 'shogun-contracts-sdk');
 
 // Check if shogun-contracts is installed
 if (!existsSync(nodeModulesPath)) {
-  console.log('⚠️  shogun-contracts not found in node_modules');
+  console.log('⚠️  shogun-contracts-sdk not found in node_modules');
   process.exit(0);
 }
 
 // Check if SDK is already compiled
-const sdkDistPath = join(nodeModulesPath, 'sdk', 'dist', 'index.js');
+const sdkDistPath = join(nodeModulesPath, 'dist', 'index.js');
 if (existsSync(sdkDistPath)) {
-  console.log('✅ shogun-contracts SDK already compiled');
+  console.log('✅ shogun-contracts-sdk SDK already compiled');
   process.exit(0);
 }
 
 // Check if SDK source exists (local installation)
-const sdkSourcePath = join(nodeModulesPath, 'sdk', 'index.ts');
+const sdkSourcePath = join(nodeModulesPath, 'index.ts');
 if (!existsSync(sdkSourcePath)) {
-  console.log('⚠️  shogun-contracts SDK source not found (may be installed from npm)');
+  console.log('⚠️  shogun-contracts-sdk SDK source not found (may be installed from npm)');
   process.exit(0);
 }
 
 // Try to build the SDK
-console.log('🔨 Building shogun-contracts SDK...');
+console.log('🔨 Building shogun-contracts-sdk SDK...');
 try {
   // Check if TypeScript is available
   const packageJsonPath = join(nodeModulesPath, 'package.json');
   if (!existsSync(packageJsonPath)) {
-    console.log('⚠️  shogun-contracts package.json not found');
+    console.log('⚠️  shogun-contracts-sdk package.json not found');
     process.exit(0);
   }
 
@@ -54,16 +54,16 @@ try {
       stdio: 'inherit',
       env: { ...process.env, NODE_ENV: 'production' }
     });
-    console.log('✅ shogun-contracts SDK built successfully');
+    console.log('✅ shogun-contracts-sdk SDK built successfully');
   } catch (error) {
-    console.warn('⚠️  Failed to build shogun-contracts SDK:', error.message);
-    console.warn('   This is normal if shogun-contracts is installed from npm registry');
+    console.warn('⚠️  Failed to build shogun-contracts-sdk SDK:', error.message);
+    console.warn('   This is normal if shogun-contracts-sdk is installed from npm registry');
     console.warn('   The SDK should already be compiled in the published package');
   } finally {
     process.chdir(originalCwd);
   }
 } catch (error) {
-  console.warn('⚠️  Could not build shogun-contracts SDK:', error.message);
-  console.warn('   Make sure TypeScript is installed in shogun-contracts');
+  console.warn('⚠️  Could not build shogun-contracts-sdk SDK:', error.message);
+  console.warn('   Make sure TypeScript is installed in shogun-contracts-sdk');
 }
 

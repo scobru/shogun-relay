@@ -26,7 +26,7 @@ const tokenAuthMiddleware = (req, res, next) => {
   // Accept either format
   const token = bearerToken || customToken;
 
-  if (token === process.env.ADMIN_PASSWORD) {
+  if (token === authConfig.adminPassword) {
     // Use a more secure token in production
     next();
   } else {
@@ -87,9 +87,9 @@ export default (app) => {
 
   // --- IPFS Desktop Proxy Configuration ---
   const IPFS_GATEWAY_URL =
-    process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080";
-  const IPFS_API_TOKEN = process.env.IPFS_API_TOKEN || process.env.IPFS_API_KEY;
-  const IPFS_API_URL = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
+    ipfsConfig.gatewayUrl || "http://127.0.0.1:8080";
+  const IPFS_API_TOKEN = ipfsConfig.apiToken || ipfsConfig.apiKey;
+  const IPFS_API_URL = ipfsConfig.apiUrl || "http://127.0.0.1:5001";
 
   console.log(`🌐 IPFS API Proxy: ${IPFS_API_URL}`);
   console.log(`🌐 IPFS Gateway Proxy: ${IPFS_GATEWAY_URL}`);
@@ -388,7 +388,7 @@ export default (app) => {
         req.headers["authorization"].split(" ")[1]) ||
       req.headers["token"];
 
-    if (token === process.env.ADMIN_PASSWORD) {
+    if (token === authConfig.adminPassword) {
       res.redirect(
         "/api/v1/ipfs/webui/?auth_token=" + encodeURIComponent(token)
       );
@@ -582,17 +582,17 @@ export default (app) => {
   app.get(`${baseRoute}/debug/admin-config`, (req, res) => {
     res.json({
       success: true,
-      adminPassword: process.env.ADMIN_PASSWORD
+      adminPassword: authConfig.adminPassword
         ? "CONFIGURED"
         : "NOT_CONFIGURED",
-      adminPasswordLength: process.env.ADMIN_PASSWORD
-        ? process.env.ADMIN_PASSWORD.length
+      adminPasswordLength: authConfig.adminPassword
+        ? authConfig.adminPassword.length
         : 0,
-      adminPasswordPreview: process.env.ADMIN_PASSWORD
-        ? process.env.ADMIN_PASSWORD.substring(0, 4) +
+      adminPasswordPreview: authConfig.adminPassword
+        ? authConfig.adminPassword.substring(0, 4) +
           "..." +
-          process.env.ADMIN_PASSWORD.substring(
-            process.env.ADMIN_PASSWORD.length - 4
+          authConfig.adminPassword.substring(
+            authConfig.adminPassword.length - 4
           )
         : "N/A",
       timestamp: Date.now(),
@@ -613,7 +613,7 @@ export default (app) => {
       const customToken = req.headers["token"];
       const token = bearerToken || customToken;
 
-      if (token === process.env.ADMIN_PASSWORD) {
+      if (token === authConfig.adminPassword) {
         next();
       } else {
         res.status(401).json({ success: false, error: "Unauthorized" });
@@ -691,7 +691,7 @@ export default (app) => {
       message: "Shogun Relay API is running",
       data: {
         timestamp: new Date().toISOString(),
-        version: process.env.npm_package_version || "1.0.0",
+        version: packageConfig.version || "1.0.0",
         uptime: process.uptime(),
       },
     });
@@ -829,7 +829,7 @@ export default (app) => {
       const queryToken = req.query["auth_token"];
       const token = bearerToken || customToken || formToken || queryToken;
 
-      if (token === process.env.ADMIN_PASSWORD) {
+      if (token === authConfig.adminPassword) {
         next();
       } else {
         console.log(

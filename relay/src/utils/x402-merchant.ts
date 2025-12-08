@@ -1,277 +1,291 @@
 /**
  * x402 Merchant Utility for Shogun Relay
- * 
+ *
  * Handles payment verification and settlement for IPFS storage subscriptions.
  * Supports both facilitator-based and direct (local) settlement modes.
  */
 
-import { createPublicClient, createWalletClient, http, parseUnits, formatUnits } from 'viem';
-import { baseSepolia, base, polygon, polygonAmoy } from 'viem/chains';
-import { privateKeyToAccount } from 'viem/accounts';
-import { ipfsRequest } from './ipfs-client.js';
-import * as RelayUser from './relay-user.js';
-import { USDC_EIP3009_ABI } from 'shogun-contracts-sdk';
-import httpModule from 'http';
-import httpsModule from 'https';
+import {
+  createPublicClient,
+  createWalletClient,
+  http,
+  parseUnits,
+  formatUnits,
+} from "viem";
+import { baseSepolia, base, polygon, polygonAmoy } from "viem/chains";
+import { privateKeyToAccount } from "viem/accounts";
+import { ipfsRequest } from "./ipfs-client";
+import * as RelayUser from "./relay-user";
+import { USDC_EIP3009_ABI } from "shogun-contracts-sdk";
+import httpModule from "http";
+import httpsModule from "https";
+import "./global.d.ts";
+import { loggers } from "./logger";
 
-type NetworkKey = 'base' | 'base-sepolia' | 'polygon' | 'polygon-amoy';
+const log = loggers.x402;
+
+export type NetworkKey = "base" | "base-sepolia" | "polygon" | "polygon-amoy";
 
 interface NetworkConfigType {
-  chain: any,
-  usdc: string,
-  explorer: string,
-  usdcName: string,
-  usdcVersion: string,
+  chain: any;
+  usdc: str;
+  explorer: str;
+  usdcName: str;
+  usdcVersion: str;
 }
 
-type PricingTier = {
-  name: string;
-  priceUSDC: number;
-  storageMB: number;
-  durationDays: number;
+export type PricingTier = {
+  name: str;
+  priceUSDC: num;
+  storageMB: num;
+  durationDays: num;
 };
 
 interface SubscriptionTiersMap {
-  [tier: string]: PricingTier;
+  [tier: str]: PricingTier;
 }
 
-interface PaymentPayload {
+export interface PaymentPayload {
   payload: {
     authorization: {
-      from: string;
-      to: string;
-      value: string;
-      validAfter: string;
-      validBefore: string;
-      nonce: string;
+      from: str;
+      to: str;
+      value: str;
+      validAfter: str;
+      validBefore: str;
+      nonce: str;
     };
-    signature: string;
-  }
+    signature: str;
+  };
 }
 
 interface PaymentVerificationResult {
-  isValid: boolean;
-  invalidReason?: string;
-  payer?: string;
-  amount?: string;
-  tier?: string;
-  amountAtomic?: string;
+  isValid: bool;
+  invalidReason?: str;
+  payer?: str;
+  amount?: str;
+  tier?: str;
+  amountAtomic?: str;
 }
 
 interface PaymentSettlementResult {
-  success: boolean;
-  transaction?: string;
-  network?: string;
-  explorer?: string;
-  blockNumber?: string;
-  errorReason?: string;
+  success: bool;
+  transaction?: str;
+  network?: str;
+  explorer?: str;
+  blockNumber?: str;
+  errorReason?: str;
 }
 
 interface FacilitatorVerifyResult {
-  isValid: boolean;
-  payer?: string;
-  invalidReason?: string;
+  isValid: bool;
+  payer?: str;
+  invalidReason?: str;
 }
 
 interface FacilitatorSettleResult {
-  success: boolean;
-  transaction?: string;
-  network?: string;
-  explorer?: string;
-  errorReason?: string;
+  success: bool;
+  transaction?: str;
+  network?: str;
+  explorer?: str;
+  errorReason?: str;
 }
 
-interface SubscriptionStatus {
-  active: boolean;
-  reason?: string;
-  tier?: string;
-  storageMB?: number;
-  storageUsedMB?: number;
-  storageRemainingMB?: number;
-  expiresAt?: string;
-  purchasedAt?: string | null;
-  ownedBy?: string;
-  expiredAt?: string;
+export interface SubscriptionStatus {
+  active: bool;
+  reason?: str;
+  tier?: str;
+  storageMB?: num;
+  storageUsedMB?: num;
+  storageRemainingMB?: num;
+  expiresAt?: str;
+  purchasedAt?: str | null;
+  ownedBy?: str;
+  expiredAt?: str;
 }
 
 interface Subscription {
-  tier: string;
-  storageMB: number;
-  storageUsedMB: number;
-  priceUSDC: number;
-  purchasedAt: number;
-  expiresAt: number;
-  paymentTx: string | null;
-  paymentNetwork: string | null;
-  userAddress: string;
+  tier: str;
+  storageMB: num;
+  storageUsedMB: num;
+  priceUSDC: num;
+  purchasedAt: num;
+  expiresAt: num;
+  paymentTx: str | null;
+  paymentNetwork: str | null;
+  userAddress: str;
 }
 
 interface StorageUsageResult {
-  storageUsedMB: number;
-  storageRemainingMB: number;
+  storageUsedMB: num;
+  storageRemainingMB: num;
 }
 
-interface CanUploadResult {
-  allowed: boolean;
-  reason?: string;
-  requiresPayment?: boolean;
-  requiresUpgrade?: boolean;
-  currentTier?: string;
-  storageAfterUpload?: number;
+export interface CanUploadResult {
+  allowed: bool;
+  reason?: str;
+  requiresPayment?: bool;
+  requiresUpgrade?: bool;
+  currentTier?: str;
+  storageAfterUpload?: num;
+  x402?: any; // Payment requirements when requiresPayment is true
 }
 
-interface CanUploadVerifiedResult extends CanUploadResult {
-  storageUsedMB?: number;
-  storageRemainingMB?: number;
-  storageTotalMB?: number;
-  verified?: boolean;
+export interface CanUploadVerifiedResult extends CanUploadResult {
+  storageUsedMB?: num;
+  storageRemainingMB?: num;
+  storageTotalMB?: num;
+  verified?: bool;
 }
 
 interface IpfsObjectSize {
-  cid: string;
-  size: number;
-  numLinks: number;
-  blockSize: number;
+  cid: str;
+  size: num;
+  numLinks: num;
+  blockSize: num;
 }
 
 interface IpfsRepoStats {
-  repoSize: number;
-  storageMax: number;
-  numObjects: number;
-  repoPath: string;
-  version: string;
+  repoSize: num;
+  storageMax: num;
+  numObjects: num;
+  repoPath: str;
+  version: str;
 }
 
 interface PinsSizeResult {
-  totalBytes: number;
-  totalMB?: number;
-  totalGB?: number;
-  pinCount: number;
-  pins: Array<{ cid: string; size: number; sizeMB: number }>;
+  totalBytes: num;
+  totalMB?: num;
+  totalGB?: num;
+  pinCount: num;
+  pins: arr<{ cid: str; size: num; sizeMB: num }>;
 }
 
-interface RelayStorageStatus {
-  available: boolean;
-  unlimited?: boolean;
-  usedBytes?: number;
-  usedMB?: number;
-  usedGB?: number;
-  maxStorageGB?: number | null;
-  remainingGB?: number | null;
-  percentUsed?: number | null;
-  warning?: boolean;
-  numObjects?: number;
-  maxStorageMB?: number;
-  remainingBytes?: number;
-  remainingMB?: number;
-  full?: boolean;
-  warningThreshold?: number;
-  error?: string;
+export interface RelayStorageStatus {
+  available: bool;
+  unlimited?: bool;
+  usedBytes?: num;
+  usedMB?: num;
+  usedGB?: num;
+  maxStorageGB?: num | null;
+  remainingGB?: num | null;
+  percentUsed?: num | null;
+  warning?: bool;
+  numObjects?: num;
+  maxStorageMB?: num;
+  remainingBytes?: num;
+  remainingMB?: num;
+  full?: bool;
+  warningThreshold?: num;
+  error?: str;
 }
 
 interface CanAcceptSubscriptionResult {
-  allowed: boolean;
-  reason?: string;
+  allowed: bool;
+  reason?: str;
   relayStorage?: RelayStorageStatus;
-  relayFull?: boolean;
-  warning?: string;
-  error?: string;
+  relayFull?: bool;
+  warning?: str;
+  error?: str;
 }
 
 interface CanAcceptUploadResult extends CanAcceptSubscriptionResult {
-  warning?: string | null;
+  warning?: str;
 }
 
 interface CalculateRealStorageUsageResult {
-  totalBytes: number;
-  totalMB: number;
-  fileCount: number;
-  files: Array<any>;
-  verified: boolean;
+  totalBytes: num;
+  totalMB: num;
+  fileCount: num;
+  files: arr<any>;
+  verified: bool;
 }
 
 interface SyncStorageUsageResult {
-  success: boolean;
-  previousMB?: number;
-  currentMB?: number;
-  discrepancy?: number;
-  corrected?: boolean;
+  success: bool;
+  previousMB?: num;
+  currentMB?: num;
+  discrepancy?: num;
+  corrected?: bool;
   realUsage?: CalculateRealStorageUsageResult;
-  storageRemainingMB?: number;
-  error?: string;
+  storageRemainingMB?: num;
+  error?: str;
 }
 
 const USDC_ABI = USDC_EIP3009_ABI;
 
 // Network configurations with EIP-712 USDC domain info
 const NETWORK_CONFIG: Record<NetworkKey, NetworkConfigType> = {
-  'base': {
+  base: {
     chain: base,
-    usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-    explorer: 'https://basescan.org',
-    usdcName: 'USD Coin',
-    usdcVersion: '2',
+    usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    explorer: "https://basescan.org",
+    usdcName: "USD Coin",
+    usdcVersion: "2",
   },
-  'base-sepolia': {
+  "base-sepolia": {
     chain: baseSepolia,
-    usdc: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
-    explorer: 'https://sepolia.basescan.org',
-    usdcName: 'USDC',
-    usdcVersion: '2',
+    usdc: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+    explorer: "https://sepolia.basescan.org",
+    usdcName: "USDC",
+    usdcVersion: "2",
   },
-  'polygon': {
+  polygon: {
     chain: polygon,
-    usdc: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
-    explorer: 'https://polygonscan.com',
-    usdcName: 'USD Coin',
-    usdcVersion: '2',
+    usdc: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+    explorer: "https://polygonscan.com",
+    usdcName: "USD Coin",
+    usdcVersion: "2",
   },
-  'polygon-amoy': {
+  "polygon-amoy": {
     chain: polygonAmoy,
-    usdc: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
-    explorer: 'https://amoy.polygonscan.com',
-    usdcName: 'USDC',
-    usdcVersion: '2',
+    usdc: "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
+    explorer: "https://amoy.polygonscan.com",
+    usdcName: "USDC",
+    usdcVersion: "2",
   },
 };
 
 // Import pricing configuration
-import { PRICING_CONFIG } from '../config/pricing-config.js';
+import { PRICING_CONFIG } from "../config/pricing-config";
+import { relayConfig, storageConfig } from "../config";
 
 // Subscription tiers
-export const SUBSCRIPTION_TIERS: SubscriptionTiersMap = PRICING_CONFIG.subscriptions;
+export const SUBSCRIPTION_TIERS: SubscriptionTiersMap =
+  PRICING_CONFIG.subscriptions;
 
 interface X402MerchantOptions {
-  payToAddress: string;
+  payToAddress: str;
   network?: NetworkKey;
-  facilitatorUrl?: string;
-  facilitatorApiKey?: string;
-  settlementMode?: 'facilitator' | 'direct';
-  privateKey?: string;
-  rpcUrl?: string;
+  facilitatorUrl?: str;
+  facilitatorApiKey?: str;
+  settlementMode?: "facilitator" | "direct";
+  privateKey?: str;
+  rpcUrl?: str;
 }
 
 export class X402Merchant {
-  payToAddress: string;
+  payToAddress: str;
   network: NetworkKey;
-  facilitatorUrl: string;
-  facilitatorApiKey?: string;
-  settlementMode: 'facilitator' | 'direct';
-  privateKey?: string;
-  rpcUrl?: string;
+  facilitatorUrl: str;
+  facilitatorApiKey?: str;
+  settlementMode: "facilitator" | "direct";
+  privateKey?: str;
+  rpcUrl?: str;
   networkConfig: NetworkConfigType;
   publicClient?: any;
   walletClient?: any;
 
-  constructor(options: X402MerchantOptions = { payToAddress: '' }) {
+  constructor(options: X402MerchantOptions = { payToAddress: "" }) {
     this.payToAddress = options.payToAddress;
-    this.network = options.network || 'base-sepolia';
-    this.facilitatorUrl = options.facilitatorUrl || 'https://x402.org/facilitator';
+    this.network = options.network || "base-sepolia";
+    this.facilitatorUrl =
+      options.facilitatorUrl || "https://x402.org/facilitator";
     this.facilitatorApiKey = options.facilitatorApiKey;
-    this.settlementMode = options.settlementMode || 'facilitator';
+    this.settlementMode = options.settlementMode || "facilitator";
     this.privateKey = options.privateKey;
     this.rpcUrl = options.rpcUrl;
-    
+
     // Get network config
     this.networkConfig = NETWORK_CONFIG[this.network];
     if (!this.networkConfig) {
@@ -281,11 +295,18 @@ export class X402Merchant {
     // Always initialize clients if privateKey is available (for fallback support)
     if (this.privateKey) {
       this.initializeClients();
-      console.log(`x402 Merchant initialized with direct settlement ${this.settlementMode === 'direct' ? '(primary)' : '(fallback)'}`);
-    } else if (this.settlementMode === 'facilitator') {
-      console.log(`x402 Merchant initialized with facilitator only (no direct settlement fallback)`);
+      log.info(
+        `x402 Merchant initialized with direct settlement ${this.settlementMode === "direct" ? "(primary)" : "(fallback)"
+        }`
+      );
+    } else if (this.settlementMode === "facilitator") {
+      log.info(
+        `x402 Merchant initialized with facilitator only (no direct settlement fallback)`
+      );
     } else {
-      console.warn(`x402 Merchant: Direct settlement mode but no private key configured!`);
+      log.warn(
+        `x402 Merchant: Direct settlement mode but no private key configured!`
+      );
     }
   }
 
@@ -299,7 +320,11 @@ export class X402Merchant {
     });
 
     if (this.privateKey) {
-      const privateKey = (this.privateKey.startsWith('0x') ? this.privateKey : `0x${this.privateKey}`) as `0x${string}`;
+      const privateKey = (
+        this.privateKey.startsWith("0x")
+          ? this.privateKey
+          : `0x${this.privateKey}`
+      ) as `0x${string}`;
       const account = privateKeyToAccount(privateKey);
       this.walletClient = createWalletClient({
         account,
@@ -312,21 +337,24 @@ export class X402Merchant {
   /**
    * Create payment requirements for a subscription tier
    */
-  createPaymentRequirements(tier: string = 'basic') {
+  createPaymentRequirements(tier: str = "basic") {
     const tierConfig = SUBSCRIPTION_TIERS[tier];
     if (!tierConfig) {
       throw new Error(`Invalid subscription tier: ${tier}`);
     }
 
-    const priceInAtomicUnits = parseUnits(tierConfig.priceUSDC.toString(), 6).toString();
+    const priceInAtomicUnits = parseUnits(
+      tierConfig.priceUSDC.toString(),
+      6
+    ).toString();
 
     return {
-      scheme: 'exact',
+      scheme: "exact",
       network: this.network,
       maxAmountRequired: priceInAtomicUnits,
       resource: `ipfs-storage-${tier}`,
       description: `${tierConfig.name} IPFS Storage Subscription - ${tierConfig.storageMB}MB for ${tierConfig.durationDays} days`,
-      mimeType: 'application/json',
+      mimeType: "application/json",
       payTo: this.payToAddress,
       maxTimeoutSeconds: 300,
       asset: this.networkConfig.usdc,
@@ -345,22 +373,25 @@ export class X402Merchant {
   /**
    * Create a payment-required response following x402 protocol
    */
-  createPaymentRequiredResponse(tier: string = 'basic') {
+  createPaymentRequiredResponse(tier: str = "basic") {
     const requirements = this.createPaymentRequirements(tier);
-    
+
     return {
       x402Version: 1,
       accepts: [requirements],
-      error: 'Payment required for IPFS storage subscription',
+      error: "Payment required for IPFS storage subscription",
     };
   }
 
   /**
    * Verify a payment payload
    */
-  async verifyPayment(paymentPayload: PaymentPayload, expectedTier: string = 'basic'): Promise<PaymentVerificationResult> {
+  async verifyPayment(
+    paymentPayload: PaymentPayload,
+    expectedTier: str = "basic"
+  ): prm<PaymentVerificationResult> {
     if (!paymentPayload) {
-      return { isValid: false, invalidReason: 'No payment payload provided' };
+      return { isValid: false, invalidReason: "No payment payload provided" };
     }
 
     const tierConfig = SUBSCRIPTION_TIERS[expectedTier];
@@ -371,72 +402,87 @@ export class X402Merchant {
     try {
       // Basic validation
       if (!paymentPayload.payload) {
-        return { isValid: false, invalidReason: 'Missing payload in payment' };
+        return { isValid: false, invalidReason: "Missing payload in payment" };
       }
 
       const { authorization, signature } = paymentPayload.payload;
       if (!authorization) {
-        return { isValid: false, invalidReason: 'Missing authorization in payload' };
+        return {
+          isValid: false,
+          invalidReason: "Missing authorization in payload",
+        };
       }
 
       if (!signature) {
-        return { isValid: false, invalidReason: 'Missing signature in payload' };
+        return {
+          isValid: false,
+          invalidReason: "Missing signature in payload",
+        };
       }
 
       // Verify recipient
       if (authorization.to?.toLowerCase() !== this.payToAddress.toLowerCase()) {
-        return { 
-          isValid: false, 
-          invalidReason: `Invalid recipient. Expected ${this.payToAddress}, got ${authorization.to}` 
+        return {
+          isValid: false,
+          invalidReason: `Invalid recipient. Expected ${this.payToAddress}, got ${authorization.to}`,
         };
       }
 
       // Verify amount
       const expectedAmount = parseUnits(tierConfig.priceUSDC.toString(), 6);
-      const paymentAmount = BigInt(authorization.value || '0');
-      
+      const paymentAmount = BigInt(authorization.value || "0");
+
       if (paymentAmount < expectedAmount) {
-        return { 
-          isValid: false, 
-          invalidReason: `Insufficient payment. Expected ${formatUnits(expectedAmount, 6)} USDC, got ${formatUnits(paymentAmount, 6)} USDC` 
+        return {
+          isValid: false,
+          invalidReason: `Insufficient payment. Expected ${formatUnits(
+            expectedAmount,
+            6
+          )} USDC, got ${formatUnits(paymentAmount, 6)} USDC`,
         };
       }
 
       // Verify timing
       const now = Math.floor(Date.now() / 1000);
-      const validAfter = parseInt(authorization.validAfter || '0');
-      const validBefore = parseInt(authorization.validBefore || '0');
+      const validAfter = parseInt(authorization.validAfter || "0");
+      const validBefore = parseInt(authorization.validBefore || "0");
 
       if (now < validAfter) {
-        return { isValid: false, invalidReason: 'Payment not yet valid' };
+        return { isValid: false, invalidReason: "Payment not yet valid" };
       }
 
       if (now > validBefore) {
-        return { isValid: false, invalidReason: 'Payment has expired' };
+        return { isValid: false, invalidReason: "Payment has expired" };
       }
 
       // If using facilitator, try to verify with facilitator
-      if (this.settlementMode === 'facilitator') {
-        const facilitatorResult = await this.verifyWithFacilitator(paymentPayload);
+      if (this.settlementMode === "facilitator") {
+        const facilitatorResult = await this.verifyWithFacilitator(
+          paymentPayload
+        );
         if (!facilitatorResult.isValid) {
           // If facilitator fails, fall back to local verification if we have the tools
-          console.warn(`Facilitator verification failed: ${facilitatorResult.invalidReason}`);
-          console.log('Attempting local signature verification...');
-          
+          log.warn(
+            `Facilitator verification failed: ${facilitatorResult.invalidReason}`
+          );
+          log.info("Attempting local signature verification...");
+
           // For now, accept the payment if basic validation passed and signature exists
           // The actual signature verification happens on-chain during settlement
-          console.log('Local verification: signature present, will verify during settlement');
+          log.info(
+            "Local verification: signature present, will verify during settlement"
+          );
         }
       }
 
-      return { 
-        isValid: true, 
+      return {
+        isValid: true,
         payer: authorization.from,
         amount: formatUnits(paymentAmount, 6),
         tier: expectedTier,
       };
     } catch (error: any) {
-      console.error('Payment verification error:', error);
+      log.error({ err: error }, "Payment verification error");
       return { isValid: false, invalidReason: error.message };
     }
   }
@@ -446,68 +492,80 @@ export class X402Merchant {
    * @param {object} paymentPayload - The x402 payment payload
    * @param {number} requiredAmountAtomic - Required amount in atomic units (6 decimals for USDC)
    */
-  async verifyDealPayment(paymentPayload: PaymentPayload, requiredAmountAtomic: number | string): Promise<PaymentVerificationResult> {
+  async verifyDealPayment(
+    paymentPayload: PaymentPayload,
+    requiredAmountAtomic: num | str
+  ): prm<PaymentVerificationResult> {
     if (!paymentPayload) {
-      return { isValid: false, invalidReason: 'No payment payload provided' };
+      return { isValid: false, invalidReason: "No payment payload provided" };
     }
 
     try {
       // Basic validation
       if (!paymentPayload.payload) {
-        return { isValid: false, invalidReason: 'Missing payload in payment' };
+        return { isValid: false, invalidReason: "Missing payload in payment" };
       }
 
       const { authorization, signature } = paymentPayload.payload;
       if (!authorization) {
-        return { isValid: false, invalidReason: 'Missing authorization in payload' };
+        return {
+          isValid: false,
+          invalidReason: "Missing authorization in payload",
+        };
       }
 
       if (!signature) {
-        return { isValid: false, invalidReason: 'Missing signature in payload' };
+        return {
+          isValid: false,
+          invalidReason: "Missing signature in payload",
+        };
       }
 
       // Verify recipient
       if (authorization.to?.toLowerCase() !== this.payToAddress.toLowerCase()) {
-        return { 
-          isValid: false, 
-          invalidReason: `Invalid recipient. Expected ${this.payToAddress}, got ${authorization.to}` 
+        return {
+          isValid: false,
+          invalidReason: `Invalid recipient. Expected ${this.payToAddress}, got ${authorization.to}`,
         };
       }
 
       // Verify amount
-      const paymentAmount = BigInt(authorization.value || '0');
+      const paymentAmount = BigInt(authorization.value || "0");
       const requiredAmount = BigInt(requiredAmountAtomic);
-      
+
       if (paymentAmount < requiredAmount) {
-        return { 
-          isValid: false, 
-          invalidReason: `Insufficient payment. Required: ${requiredAmount}, got: ${paymentAmount}` 
+        return {
+          isValid: false,
+          invalidReason: `Insufficient payment. Required: ${requiredAmount}, got: ${paymentAmount}`,
         };
       }
 
       // Verify validity period
       const now = Math.floor(Date.now() / 1000);
-      const validAfter = parseInt(authorization.validAfter || '0');
-      const validBefore = parseInt(authorization.validBefore || '0');
+      const validAfter = parseInt(authorization.validAfter || "0");
+      const validBefore = parseInt(authorization.validBefore || "0");
 
       if (now < validAfter) {
-        return { isValid: false, invalidReason: 'Payment not yet valid' };
+        return { isValid: false, invalidReason: "Payment not yet valid" };
       }
 
       if (now > validBefore) {
-        return { isValid: false, invalidReason: 'Payment expired' };
+        return { isValid: false, invalidReason: "Payment expired" };
       }
 
-      console.log(`Deal payment verified: ${formatUnits(paymentAmount, 6)} USDC from ${authorization.from}`);
+      log.info(
+        `Deal payment verified: ${formatUnits(paymentAmount, 6)} USDC from ${authorization.from
+        }`
+      );
 
-      return { 
-        isValid: true, 
+      return {
+        isValid: true,
         payer: authorization.from,
         amount: formatUnits(paymentAmount, 6),
         amountAtomic: paymentAmount.toString(),
       };
     } catch (error: any) {
-      console.error('Deal payment verification error:', error);
+      log.error({ err: error }, "Deal payment verification error");
       return { isValid: false, invalidReason: error.message };
     }
   }
@@ -515,18 +573,20 @@ export class X402Merchant {
   /**
    * Verify payment with facilitator
    */
-  async verifyWithFacilitator(paymentPayload: PaymentPayload): Promise<FacilitatorVerifyResult> {
+  async verifyWithFacilitator(
+    paymentPayload: PaymentPayload
+  ): prm<FacilitatorVerifyResult> {
     try {
       const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       };
 
       if (this.facilitatorApiKey) {
-        headers['X-API-Key'] = this.facilitatorApiKey;
+        headers["X-API-Key"] = this.facilitatorApiKey;
       }
 
       const response = await fetch(`${this.facilitatorUrl}/verify`, {
-        method: 'POST',
+        method: "POST",
         headers,
         body: JSON.stringify({
           paymentPayload,
@@ -535,18 +595,22 @@ export class X402Merchant {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        return { 
-          isValid: false, 
-          invalidReason: errorData.error || `Facilitator returned ${response.status}` 
+        const errorData = (await response.json().catch(() => ({}))) as { error?: str };
+        return {
+          isValid: false,
+          invalidReason:
+            errorData.error || `Facilitator returned ${response.status}`,
         };
       }
 
-      const result = await response.json();
-      return { isValid: result.isValid, payer: result.payer };
+      const result = (await response.json()) as { isValid?: bool; payer?: str };
+      return { isValid: result.isValid ?? false, payer: result.payer };
     } catch (error: any) {
-      console.error('Facilitator verification error:', error);
-      return { isValid: false, invalidReason: `Facilitator error: ${error.message}` };
+      log.error({ err: error }, "Facilitator verification error");
+      return {
+        isValid: false,
+        invalidReason: `Facilitator error: ${error.message}`,
+      };
     }
   }
 
@@ -554,61 +618,75 @@ export class X402Merchant {
    * Settle payment (transfer USDC to merchant)
    * Tries facilitator first (if configured), then falls back to direct settlement
    */
-  async settlePayment(paymentPayload: PaymentPayload): Promise<PaymentSettlementResult> {
+  async settlePayment(
+    paymentPayload: PaymentPayload
+  ): prm<PaymentSettlementResult> {
     // If direct mode is explicitly set, use direct only
-    if (this.settlementMode === 'direct') {
-      console.log('Using direct settlement mode');
+    if (this.settlementMode === "direct") {
+      log.info("Using direct settlement mode");
       return this.settleDirectly(paymentPayload);
     }
 
     // Try facilitator first
-    console.log('Attempting facilitator settlement...');
+    log.info("Attempting facilitator settlement...");
     const facilitatorResult = await this.settleWithFacilitator(paymentPayload);
-    
+
     if (facilitatorResult.success) {
-      console.log(`Facilitator settlement successful: ${facilitatorResult.transaction}`);
+      log.info(
+        `Facilitator settlement successful: ${facilitatorResult.transaction}`
+      );
       return facilitatorResult;
     }
 
-    console.log(`Facilitator failed: ${facilitatorResult.errorReason}`);
+    log.warn(`Facilitator failed: ${facilitatorResult.errorReason}`);
 
     // If facilitator failed and we have direct settlement configured, try that
     if (this.walletClient && this.publicClient) {
-      console.log('Falling back to direct settlement...');
+      log.info("Falling back to direct settlement...");
       const directResult = await this.settleDirectly(paymentPayload);
       if (directResult.success) {
-        console.log(`Direct settlement successful: ${directResult.transaction}`);
+        log.info(
+          `Direct settlement successful: ${directResult.transaction}`
+        );
       } else {
-        console.log(`Direct settlement also failed: ${directResult.errorReason}`);
+        log.warn(
+          `Direct settlement also failed: ${directResult.errorReason}`
+        );
       }
       return directResult;
     }
 
     // No fallback available
-    console.log('No direct settlement fallback available (X402_PRIVATE_KEY not configured)');
+    log.warn(
+      "No direct settlement fallback available (X402_PRIVATE_KEY not configured)"
+    );
     return {
       success: false,
-      errorReason: facilitatorResult.errorReason || 'Settlement failed and no fallback available',
+      errorReason:
+        facilitatorResult.errorReason ||
+        "Settlement failed and no fallback available",
     };
   }
 
   /**
    * Settle payment via facilitator
    */
-  async settleWithFacilitator(paymentPayload: PaymentPayload): Promise<FacilitatorSettleResult> {
+  async settleWithFacilitator(
+    paymentPayload: PaymentPayload
+  ): prm<FacilitatorSettleResult> {
     try {
       const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       };
 
       if (this.facilitatorApiKey) {
-        headers['X-API-Key'] = this.facilitatorApiKey;
+        headers["X-API-Key"] = this.facilitatorApiKey;
       }
 
-      console.log(`Calling facilitator: ${this.facilitatorUrl}/settle`);
-      
+      log.info(`Calling facilitator: ${this.facilitatorUrl}/settle`);
+
       const response = await fetch(`${this.facilitatorUrl}/settle`, {
-        method: 'POST',
+        method: "POST",
         headers,
         body: JSON.stringify({
           paymentPayload,
@@ -616,30 +694,34 @@ export class X402Merchant {
         }),
       });
 
-      let result: any;
+      let result: { error?: str; message?: str; reason?: str; transactionHash?: str };
       try {
-        result = await response.json();
+        result = (await response.json()) as { error?: str; message?: str; reason?: str; transactionHash?: str };
       } catch (parseError: any) {
-        console.error('Failed to parse facilitator response:', parseError);
+        log.error({ err: parseError }, "Failed to parse facilitator response");
         return {
           success: false,
           errorReason: `Facilitator returned invalid response (status ${response.status})`,
         };
       }
 
-      console.log(`Facilitator response: ${response.status}`, result);
+      log.info({ result }, `Facilitator response: ${response.status}`);
 
       if (!response.ok) {
         return {
           success: false,
-          errorReason: result.error || result.message || result.reason || `Facilitator returned status ${response.status}`,
+          errorReason:
+            result.error ||
+            result.message ||
+            result.reason ||
+            `Facilitator returned status ${response.status}`,
         };
       }
 
       if (!result.transactionHash) {
         return {
           success: false,
-          errorReason: 'Facilitator did not return transaction hash',
+          errorReason: "Facilitator did not return transaction hash",
         };
       }
 
@@ -650,61 +732,80 @@ export class X402Merchant {
         explorer: `${this.networkConfig.explorer}/tx/${result.transactionHash}`,
       };
     } catch (error: any) {
-      console.error('Facilitator settlement error:', error);
-      return { success: false, errorReason: `Facilitator error: ${error.message}` };
+      log.error({ err: error }, "Facilitator settlement error");
+      return {
+        success: false,
+        errorReason: `Facilitator error: ${error.message}`,
+      };
     }
   }
 
   /**
    * Settle payment directly on-chain
    */
-  async settleDirectly(paymentPayload: PaymentPayload): Promise<PaymentSettlementResult> {
+  async settleDirectly(
+    paymentPayload: PaymentPayload
+  ): prm<PaymentSettlementResult> {
     if (!this.walletClient || !this.publicClient) {
-      return { success: false, errorReason: 'Direct settlement not configured' };
+      return {
+        success: false,
+        errorReason: "Direct settlement not configured",
+      };
     }
 
     try {
       const { authorization, signature } = paymentPayload.payload;
 
       // Parse signature components (EIP-712 returns 65-byte signature)
-      let sig = signature.startsWith('0x') ? signature.slice(2) : signature;
-      
+      let sig = signature.startsWith("0x") ? signature.slice(2) : signature;
+
       // Ensure signature is 130 hex chars (65 bytes)
       if (sig.length !== 130) {
-        throw new Error(`Invalid signature length: expected 130 hex chars, got ${sig.length}`);
+        throw new Error(
+          `Invalid signature length: expected 130 hex chars, got ${sig.length}`
+        );
       }
-      
+
       const r = `0x${sig.slice(0, 64)}`;
       const s = `0x${sig.slice(64, 128)}`;
       let v = parseInt(sig.slice(128, 130), 16);
-      
+
       // EIP-712 v is already 27 or 28, but some contracts expect 0/1
       // For USDC, we need v as-is (27 or 28)
-      console.log(`Parsed signature: r=${r.substring(0, 10)}..., s=${s.substring(0, 10)}..., v=${v}`);
+      log.debug(
+        `Parsed signature: r=${r.substring(0, 10)}..., s=${s.substring(
+          0,
+          10
+        )}..., v=${v}`
+      );
 
       // Ensure nonce is bytes32 (64 hex chars)
       let nonce = authorization.nonce;
-      if (nonce.startsWith('0x')) {
+      if (nonce.startsWith("0x")) {
         nonce = nonce.slice(2);
       }
       if (nonce.length !== 64) {
-        throw new Error(`Invalid nonce length: expected 64 hex chars, got ${nonce.length}`);
+        throw new Error(
+          `Invalid nonce length: expected 64 hex chars, got ${nonce.length}`
+        );
       }
       const nonceBytes32 = `0x${nonce}`;
-      
-      console.log('Executing transferWithAuthorization:', {
+
+      log.info({
         from: authorization.from,
         to: authorization.to,
         value: authorization.value,
         nonce: nonceBytes32,
-        v, r: r.substring(0, 10) + '...', s: s.substring(0, 10) + '...'
-      });
-      
+        v,
+        r: r.substring(0, 10) + "...",
+        s: s.substring(0, 10) + "...",
+      }, "Executing transferWithAuthorization");
+
       // Execute transferWithAuthorization
       const hash = await this.walletClient.writeContract({
         address: this.networkConfig.usdc,
         abi: USDC_ABI,
-        functionName: 'transferWithAuthorization',
+        functionName: "transferWithAuthorization",
         args: [
           authorization.from,
           authorization.to,
@@ -725,14 +826,14 @@ export class X402Merchant {
       });
 
       return {
-        success: receipt.status === 'success',
+        success: receipt.status === "success",
         transaction: hash,
         network: this.network,
         explorer: `${this.networkConfig.explorer}/tx/${hash}`,
         blockNumber: receipt.blockNumber?.toString(),
       };
     } catch (error: any) {
-      console.error('Direct settlement error:', error);
+      log.error({ err: error }, "Direct settlement error");
       return { success: false, errorReason: error.message };
     }
   }
@@ -740,45 +841,55 @@ export class X402Merchant {
   /**
    * Get subscription status for a user from GunDB (relay user space)
    */
-  static async getSubscriptionStatus(gun: any, userAddress: string): Promise<SubscriptionStatus> {
+  static async getSubscriptionStatus(
+    gun: any,
+    userAddress: str
+  ): prm<SubscriptionStatus> {
     // Check if relay user is initialized
     if (!RelayUser.isRelayUserInitialized()) {
-      console.warn('⚠️ Relay user not initialized, cannot read subscription');
-      return { active: false, reason: 'Relay user not initialized' };
+      log.warn("Relay user not initialized, cannot read subscription");
+      return { active: false, reason: "Relay user not initialized" };
     }
 
     try {
       const data = await RelayUser.getSubscription(userAddress);
 
-      if (!data || typeof data !== 'object') {
-        return { active: false, reason: 'No subscription found' };
+      if (!data || typeof data !== "object") {
+        return { active: false, reason: "No subscription found" };
       }
 
       const now = Date.now();
-      const expiresAt = data.expiresAt || 0;
+      const subData = data as unknown as Subscription;
+      const expiresAt = (subData.expiresAt as num) || 0;
 
       if (now > expiresAt) {
-        return { 
-          active: false, 
-          reason: 'Subscription expired',
+        return {
+          active: false,
+          reason: "Subscription expired",
           expiredAt: new Date(expiresAt).toISOString(),
         };
       }
 
-      const tierConfig = SUBSCRIPTION_TIERS[data.tier] || SUBSCRIPTION_TIERS.basic;
+      const tierConfig =
+        SUBSCRIPTION_TIERS[subData.tier as str] || SUBSCRIPTION_TIERS.basic;
 
       return {
         active: true,
-        tier: data.tier,
+        tier: subData.tier as str,
         storageMB: tierConfig.storageMB,
-        storageUsedMB: data.storageUsedMB || 0,
-        storageRemainingMB: Math.max(0, tierConfig.storageMB - (data.storageUsedMB || 0)),
+        storageUsedMB: (subData.storageUsedMB as num) || 0,
+        storageRemainingMB: Math.max(
+          0,
+          tierConfig.storageMB - ((subData.storageUsedMB as num) || 0)
+        ),
         expiresAt: new Date(expiresAt).toISOString(),
-        purchasedAt: data.purchasedAt ? new Date(data.purchasedAt).toISOString() : null,
-        ownedBy: RelayUser.getRelayPub(),
+        purchasedAt: subData.purchasedAt
+          ? new Date(subData.purchasedAt as num).toISOString()
+          : null,
+        ownedBy: RelayUser.getRelayPub() || undefined,
       };
     } catch (error: any) {
-      console.error('Error getting subscription:', error);
+      log.error({ err: error }, "Error getting subscription");
       return { active: false, reason: error.message };
     }
   }
@@ -786,10 +897,15 @@ export class X402Merchant {
   /**
    * Save subscription to GunDB (relay user space)
    */
-  static async saveSubscription(gun: any, userAddress: string, tier: string, paymentDetails?: { transaction?: string, network?: string }): Promise<Subscription & { ownedBy: string }> {
+  static async saveSubscription(
+    gun: any,
+    userAddress: string,
+    tier: string,
+    paymentDetails?: { transaction?: string; network?: string }
+  ): Promise<Subscription & { ownedBy: string }> {
     // Check if relay user is initialized
     if (!RelayUser.isRelayUserInitialized()) {
-      throw new Error('Relay user not initialized, cannot save subscription');
+      throw new Error("Relay user not initialized, cannot save subscription");
     }
 
     const tierConfig = SUBSCRIPTION_TIERS[tier];
@@ -798,7 +914,7 @@ export class X402Merchant {
     }
 
     const now = Date.now();
-    const expiresAt = now + (tierConfig.durationDays * 24 * 60 * 60 * 1000);
+    const expiresAt = now + tierConfig.durationDays * 24 * 60 * 60 * 1000;
 
     // Get current subscription to handle renewals
     const currentSub = await this.getSubscriptionStatus(gun, userAddress);
@@ -811,7 +927,8 @@ export class X402Merchant {
       const currentTierConfig = SUBSCRIPTION_TIERS[currentSub.tier as string];
       if (tierConfig.storageMB >= (currentTierConfig?.storageMB ?? 0)) {
         // Add remaining time
-        const remainingTime = new Date(currentSub.expiresAt as string).getTime() - now;
+        const remainingTime =
+          new Date(currentSub.expiresAt as string).getTime() - now;
         if (remainingTime > 0) {
           finalExpiresAt = expiresAt + remainingTime;
         }
@@ -832,53 +949,67 @@ export class X402Merchant {
       userAddress,
     };
 
-    await RelayUser.saveSubscription(userAddress, subscription);
-    
+    await RelayUser.saveSubscription(userAddress, subscription as unknown as obj);
+
     return {
       ...subscription,
-      ownedBy: RelayUser.getRelayPub(),
+      ownedBy: RelayUser.getRelayPub() || '',
     };
   }
 
   /**
    * Update storage usage for a subscription (relay user space)
    */
-  static async updateStorageUsage(gun: any, userAddress: string, addMB: number): Promise<StorageUsageResult> {
+  static async updateStorageUsage(
+    gun: any,
+    userAddress: str,
+    addMB: num
+  ): prm<StorageUsageResult> {
     // Check if relay user is initialized
     if (!RelayUser.isRelayUserInitialized()) {
-      throw new Error('Relay user not initialized, cannot update storage');
+      throw new Error("Relay user not initialized, cannot update storage");
     }
 
     const currentSub = await this.getSubscriptionStatus(gun, userAddress);
-    
+
     if (!currentSub.active) {
-      throw new Error('No active subscription');
+      throw new Error("No active subscription");
     }
 
     const newUsage = (currentSub.storageUsedMB || 0) + addMB;
 
     if (newUsage > (currentSub.storageMB || 0)) {
-      throw new Error(`Storage limit exceeded. Used: ${newUsage}MB, Limit: ${currentSub.storageMB}MB`);
+      throw new Error(
+        `Storage limit exceeded. Used: ${newUsage}MB, Limit: ${currentSub.storageMB}MB`
+      );
     }
 
-    await RelayUser.updateSubscriptionField(userAddress, 'storageUsedMB', newUsage);
-    
-    return { 
-      storageUsedMB: newUsage, 
-      storageRemainingMB: (currentSub.storageMB || 0) - newUsage 
+    await RelayUser.updateSubscriptionField(
+      userAddress,
+      "storageUsedMB",
+      newUsage
+    );
+
+    return {
+      storageUsedMB: newUsage,
+      storageRemainingMB: (currentSub.storageMB || 0) - newUsage,
     };
   }
 
   /**
    * Check if user can upload a file of given size
    */
-  static async canUpload(gun: any, userAddress: string, fileSizeMB: number): Promise<CanUploadResult> {
+  static async canUpload(
+    gun: any,
+    userAddress: str,
+    fileSizeMB: num
+  ): prm<CanUploadResult> {
     const sub = await this.getSubscriptionStatus(gun, userAddress);
 
     if (!sub.active) {
-      return { 
-        allowed: false, 
-        reason: sub.reason || 'No active subscription',
+      return {
+        allowed: false,
+        reason: sub.reason || "No active subscription",
         requiresPayment: true,
       };
     }
@@ -892,7 +1023,7 @@ export class X402Merchant {
       };
     }
 
-    return { 
+    return {
       allowed: true,
       storageAfterUpload: (sub.storageRemainingMB || 0) - fileSizeMB,
     };
@@ -901,17 +1032,17 @@ export class X402Merchant {
   /**
    * Get all uploads for a user from GunDB (relay user space)
    */
-  static async getUserUploads(gun: any, userAddress: string): Promise<any[]> {
+  static async getUserUploads(gun: any, userAddress: str): prm<arr<any>> {
     // Check if relay user is initialized
     if (!RelayUser.isRelayUserInitialized()) {
-      console.warn('⚠️ Relay user not initialized, cannot read uploads');
+      log.warn("Relay user not initialized, cannot read uploads");
       return [];
     }
 
     try {
       return await RelayUser.getUserUploads(userAddress);
     } catch (error: any) {
-      console.error('Error getting user uploads:', error);
+      log.error({ err: error }, "Error getting user uploads");
       return [];
     }
   }
@@ -919,26 +1050,32 @@ export class X402Merchant {
   /**
    * Get the actual size of an IPFS object from the IPFS API
    * Uses the unified ipfs-client for robust handling of HTTP/HTTPS and retries.
-   * 
+   *
    * @param cid - The CID to check
    * @param ipfsApiUrl - Deprecated/Ignored. Uses IPFS_API_URL env var via ipfs-client
    * @param ipfsApiToken - Deprecated/Ignored. Uses IPFS_API_TOKEN env var via ipfs-client
    */
-  static async getIpfsObjectSize(cid: string, ipfsApiUrl: string | null = null, ipfsApiToken: string | null = null): Promise<IpfsObjectSize | null> {
+  static async getIpfsObjectSize(
+    cid: string,
+    ipfsApiUrl: string | null = null,
+    ipfsApiToken: string | null = null
+  ): Promise<IpfsObjectSize | null> {
     try {
       // Use the unified ipfs-client which handles auth, connection headers, and protocol switching
       const result = await ipfsRequest(`/api/v0/object/stat?arg=${cid}`);
-      
+
       if (!result) return null;
+
+      const statResult = result as { CumulativeSize?: num; DataSize?: num; NumLinks?: num; BlockSize?: num };
 
       return {
         cid,
-        size: result.CumulativeSize || result.DataSize || 0,
-        numLinks: result.NumLinks || 0,
-        blockSize: result.BlockSize || 0,
+        size: statResult.CumulativeSize || statResult.DataSize || 0,
+        numLinks: statResult.NumLinks || 0,
+        blockSize: statResult.BlockSize || 0,
       };
     } catch (error: any) {
-      console.error(`Error getting IPFS stats for ${cid}:`, error.message);
+      log.error({ err: error }, `Error getting IPFS stats for ${cid}`);
       return null;
     }
   }
@@ -947,12 +1084,17 @@ export class X402Merchant {
    * Calculate real storage usage from IPFS for a user
    * This queries IPFS to get the actual size of each pinned hash
    */
-  static async calculateRealStorageUsage(gun: any, userAddress: string, ipfsApiUrl?: string, ipfsApiToken?: string): Promise<CalculateRealStorageUsageResult> {
-    console.log(`Calculating real IPFS storage for ${userAddress}...`);
-    
+  static async calculateRealStorageUsage(
+    gun: any,
+    userAddress: str,
+    ipfsApiUrl?: str,
+    ipfsApiToken?: str
+  ): prm<CalculateRealStorageUsageResult> {
+    log.info(`Calculating real IPFS storage for ${userAddress}...`);
+
     // Get all uploads from GunDB
     const uploads = await this.getUserUploads(gun, userAddress);
-    
+
     if (uploads.length === 0) {
       return {
         totalBytes: 0,
@@ -963,15 +1105,21 @@ export class X402Merchant {
       };
     }
 
-    console.log(`Found ${uploads.length} uploads for ${userAddress}, verifying sizes on IPFS...`);
+    log.info(
+      `Found ${uploads.length} uploads for ${userAddress}, verifying sizes on IPFS...`
+    );
 
     // Get actual sizes from IPFS
-    const filesWithSizes: Array<any> = [];
+    const filesWithSizes: arr<any> = [];
     let totalBytes = 0;
 
     for (const upload of uploads) {
-      const ipfsStats = await this.getIpfsObjectSize(upload.hash, ipfsApiUrl, ipfsApiToken);
-      
+      const ipfsStats = await this.getIpfsObjectSize(
+        upload.hash,
+        ipfsApiUrl,
+        ipfsApiToken
+      );
+
       if (ipfsStats) {
         filesWithSizes.push({
           hash: upload.hash,
@@ -989,7 +1137,7 @@ export class X402Merchant {
           recordedSize: upload.size,
           actualSize: upload.size,
           sizeMB: upload.size / (1024 * 1024),
-          warning: 'Could not verify on IPFS',
+          warning: "Could not verify on IPFS",
         });
         totalBytes += upload.size || 0;
       }
@@ -997,7 +1145,10 @@ export class X402Merchant {
 
     const totalMB = totalBytes / (1024 * 1024);
 
-    console.log(`Real IPFS storage for ${userAddress}: ${totalMB.toFixed(2)}MB across ${filesWithSizes.length} files`);
+    log.info(
+      `Real IPFS storage for ${userAddress}: ${totalMB.toFixed(2)}MB across ${filesWithSizes.length
+      } files`
+    );
 
     return {
       totalBytes,
@@ -1011,25 +1162,35 @@ export class X402Merchant {
   /**
    * Sync storage usage - verifies and updates GunDB with real IPFS storage (relay user space)
    */
-  static async syncStorageUsage(gun: any, userAddress: string, ipfsApiUrl?: string, ipfsApiToken?: string): Promise<SyncStorageUsageResult> {
+  static async syncStorageUsage(
+    gun: any,
+    userAddress: str,
+    ipfsApiUrl?: str,
+    ipfsApiToken?: str
+  ): prm<SyncStorageUsageResult> {
     // Check if relay user is initialized
     if (!RelayUser.isRelayUserInitialized()) {
       return {
         success: false,
-        error: 'Relay user not initialized',
+        error: "Relay user not initialized",
       };
     }
 
     // Calculate real storage from IPFS
-    const realUsage = await this.calculateRealStorageUsage(gun, userAddress, ipfsApiUrl, ipfsApiToken);
-    
+    const realUsage = await this.calculateRealStorageUsage(
+      gun,
+      userAddress,
+      ipfsApiUrl,
+      ipfsApiToken
+    );
+
     // Get current subscription
     const subscription = await this.getSubscriptionStatus(gun, userAddress);
-    
+
     if (!subscription.active) {
       return {
         success: false,
-        error: 'No active subscription',
+        error: "No active subscription",
         realUsage,
       };
     }
@@ -1038,18 +1199,27 @@ export class X402Merchant {
     const realMB = realUsage.totalMB;
     const discrepancy = Math.abs(recordedMB - realMB);
 
-    console.log(`Storage sync for ${userAddress}:`);
-    console.log(`  Recorded: ${recordedMB.toFixed(2)}MB`);
-    console.log(`  Actual: ${realMB.toFixed(2)}MB`);
-    console.log(`  Discrepancy: ${discrepancy.toFixed(2)}MB`);
+    log.info({
+      recordedMB: recordedMB.toFixed(2),
+      realMB: realMB.toFixed(2),
+      discrepancy: discrepancy.toFixed(2)
+    }, `Storage sync for ${userAddress}`);
 
     // If there's a significant discrepancy (> 0.1MB), update GunDB
     if (discrepancy > 0.1) {
-      console.log(`Updating storage usage from ${recordedMB.toFixed(2)}MB to ${realMB.toFixed(2)}MB`);
-      
+      log.info(
+        `Updating storage usage from ${recordedMB.toFixed(
+          2
+        )}MB to ${realMB.toFixed(2)}MB`
+      );
+
       try {
-        await RelayUser.updateSubscriptionField(userAddress, 'storageUsedMB', realMB);
-        
+        await RelayUser.updateSubscriptionField(
+          userAddress,
+          "storageUsedMB",
+          realMB
+        );
+
         return {
           success: true,
           previousMB: recordedMB,
@@ -1057,7 +1227,10 @@ export class X402Merchant {
           discrepancy,
           corrected: true,
           realUsage,
-          storageRemainingMB: Math.max(0, (subscription.storageMB || 0) - realMB),
+          storageRemainingMB: Math.max(
+            0,
+            (subscription.storageMB || 0) - realMB
+          ),
         };
       } catch (error: any) {
         return {
@@ -1086,13 +1259,17 @@ export class X402Merchant {
    * This verifies actual storage before allowing upload
    */
   static async canUploadVerified(
-    gun: any, userAddress: string, fileSizeMB: number, ipfsApiUrl?: string, ipfsApiToken?: string
-  ): Promise<CanUploadVerifiedResult> {
+    gun: any,
+    userAddress: str,
+    fileSizeMB: num,
+    ipfsApiUrl?: str,
+    ipfsApiToken?: str
+  ): prm<CanUploadVerifiedResult> {
     // Check if relay user is initialized
     if (!RelayUser.isRelayUserInitialized()) {
-      return { 
-        allowed: false, 
-        reason: 'Relay user not initialized',
+      return {
+        allowed: false,
+        reason: "Relay user not initialized",
         requiresPayment: false,
       };
     }
@@ -1100,34 +1277,48 @@ export class X402Merchant {
     const sub = await this.getSubscriptionStatus(gun, userAddress);
 
     if (!sub.active) {
-      return { 
-        allowed: false, 
-        reason: sub.reason || 'No active subscription',
+      return {
+        allowed: false,
+        reason: sub.reason || "No active subscription",
         requiresPayment: true,
       };
     }
 
     // Calculate real storage usage from IPFS
-    const realUsage = await this.calculateRealStorageUsage(gun, userAddress, ipfsApiUrl, ipfsApiToken);
+    const realUsage = await this.calculateRealStorageUsage(
+      gun,
+      userAddress,
+      ipfsApiUrl,
+      ipfsApiToken
+    );
     const realUsedMB = realUsage.totalMB;
     const realRemainingMB = Math.max(0, (sub.storageMB || 0) - realUsedMB);
 
     // Update GunDB if there's a discrepancy
     if (Math.abs(realUsedMB - (sub.storageUsedMB || 0)) > 0.1) {
-      console.log(`Storage discrepancy detected. Recorded: ${sub.storageUsedMB || 0}MB, Actual: ${realUsedMB.toFixed(2)}MB`);
-      
+      log.warn(
+        `Storage discrepancy detected. Recorded: ${sub.storageUsedMB || 0
+        }MB, Actual: ${realUsedMB.toFixed(2)}MB`
+      );
+
       // Update the stored value using relay user
       try {
-        await RelayUser.updateSubscriptionField(userAddress, 'storageUsedMB', realUsedMB);
+        await RelayUser.updateSubscriptionField(
+          userAddress,
+          "storageUsedMB",
+          realUsedMB
+        );
       } catch (error: any) {
-        console.warn('Failed to update storage discrepancy:', error.message);
+        log.warn({ err: error }, "Failed to update storage discrepancy");
       }
     }
 
     if (realRemainingMB < fileSizeMB) {
       return {
         allowed: false,
-        reason: `File too large. Remaining storage: ${realRemainingMB.toFixed(2)}MB, File size: ${fileSizeMB.toFixed(2)}MB`,
+        reason: `File too large. Remaining storage: ${realRemainingMB.toFixed(
+          2
+        )}MB, File size: ${fileSizeMB.toFixed(2)}MB`,
         requiresUpgrade: true,
         currentTier: sub.tier,
         storageUsedMB: realUsedMB,
@@ -1137,7 +1328,7 @@ export class X402Merchant {
       };
     }
 
-    return { 
+    return {
       allowed: true,
       storageUsedMB: realUsedMB,
       storageRemainingMB: realRemainingMB,
@@ -1150,9 +1341,13 @@ export class X402Merchant {
   /**
    * Save upload record for a user (relay user space)
    */
-  static async saveUploadRecord(userAddress: string, hash: string, uploadData: any): Promise<void> {
+  static async saveUploadRecord(
+    userAddress: str,
+    hash: str,
+    uploadData: any
+  ): prm<void> {
     if (!RelayUser.isRelayUserInitialized()) {
-      throw new Error('Relay user not initialized');
+      throw new Error("Relay user not initialized");
     }
 
     await RelayUser.saveUpload(userAddress, hash, uploadData);
@@ -1161,9 +1356,9 @@ export class X402Merchant {
   /**
    * Delete upload record for a user (relay user space)
    */
-  static async deleteUploadRecord(userAddress: string, hash: string): Promise<void> {
+  static async deleteUploadRecord(userAddress: str, hash: str): prm<void> {
     if (!RelayUser.isRelayUserInitialized()) {
-      throw new Error('Relay user not initialized');
+      throw new Error("Relay user not initialized");
     }
 
     await RelayUser.deleteUpload(userAddress, hash);
@@ -1173,35 +1368,38 @@ export class X402Merchant {
    * Get IPFS repository statistics (total storage used by all pins)
    * This uses the IPFS repo/stat API to get actual disk usage
    */
-  static async getIpfsRepoStats(ipfsApiUrl: string = 'http://127.0.0.1:5001', ipfsApiToken: string | null = null): Promise<IpfsRepoStats | null> {
+  static async getIpfsRepoStats(
+    ipfsApiUrl: str = "http://127.0.0.1:5001",
+    ipfsApiToken: str | null = null
+  ): prm<IpfsRepoStats | null> {
     return new Promise((resolve) => {
       const timeout = setTimeout(() => {
-        console.log('Timeout getting IPFS repo stats');
+        log.error("Timeout getting IPFS repo stats");
         resolve(null);
       }, 30000);
 
       const url = new URL(ipfsApiUrl);
-      const isHttps = url.protocol === 'https:';
+      const isHttps = url.protocol === "https:";
       const protocolModule = isHttps ? httpsModule : httpModule;
-      
+
       const requestOptions: any = {
         hostname: url.hostname,
         port: url.port || (isHttps ? 443 : 5001),
-        path: '/api/v0/repo/stat?size-only=true',
-        method: 'POST',
+        path: "/api/v0/repo/stat?size-only=true",
+        method: "POST",
         headers: {
-          'Content-Length': '0',
+          "Content-Length": "0",
         },
       };
 
       if (ipfsApiToken) {
-        requestOptions.headers['Authorization'] = `Bearer ${ipfsApiToken}`;
+        requestOptions.headers["Authorization"] = `Bearer ${ipfsApiToken}`;
       }
 
       const req = protocolModule.request(requestOptions, (res: any) => {
-        let data = '';
-        res.on('data', (chunk: string) => (data += chunk));
-        res.on('end', () => {
+        let data = "";
+        res.on("data", (chunk: str) => (data += chunk));
+        res.on("end", () => {
           clearTimeout(timeout);
           try {
             const result = JSON.parse(data);
@@ -1209,19 +1407,19 @@ export class X402Merchant {
               repoSize: result.RepoSize || 0,
               storageMax: result.StorageMax || 0,
               numObjects: result.NumObjects || 0,
-              repoPath: result.RepoPath || '',
-              version: result.Version || '',
+              repoPath: result.RepoPath || "",
+              version: result.Version || "",
             });
           } catch (error: any) {
-            console.error('Error parsing IPFS repo stats:', error.message);
+            log.error({ err: error }, "Error parsing IPFS repo stats");
             resolve(null);
           }
         });
       });
 
-      req.on('error', (err: any) => {
+      req.on("error", (err: any) => {
         clearTimeout(timeout);
-        console.error('Error getting IPFS repo stats:', err.message);
+        log.error({ err }, "Error getting IPFS repo stats");
         resolve(null);
       });
 
@@ -1233,40 +1431,43 @@ export class X402Merchant {
    * Get all pinned content from IPFS with their sizes
    * Returns total size of all pins
    */
-  static async getAllPinsSize(ipfsApiUrl: string = 'http://127.0.0.1:5001', ipfsApiToken: string | null = null): Promise<PinsSizeResult> {
+  static async getAllPinsSize(
+    ipfsApiUrl: str = "http://127.0.0.1:5001",
+    ipfsApiToken: str | null = null
+  ): prm<PinsSizeResult> {
     return new Promise((resolve) => {
       const timeout = setTimeout(() => {
-        console.log('Timeout getting IPFS pins');
+        log.error("Timeout getting IPFS pins");
         resolve({ totalBytes: 0, pinCount: 0, pins: [] });
       }, 60000);
 
       const url = new URL(ipfsApiUrl);
-      const isHttps = url.protocol === 'https:';
+      const isHttps = url.protocol === "https:";
       const protocolModule = isHttps ? httpsModule : httpModule;
-      
+
       const requestOptions: any = {
         hostname: url.hostname,
         port: url.port || (isHttps ? 443 : 5001),
-        path: '/api/v0/pin/ls?type=recursive',
-        method: 'POST',
+        path: "/api/v0/pin/ls?type=recursive",
+        method: "POST",
         headers: {
-          'Content-Length': '0',
+          "Content-Length": "0",
         },
       };
 
       if (ipfsApiToken) {
-        requestOptions.headers['Authorization'] = `Bearer ${ipfsApiToken}`;
+        requestOptions.headers["Authorization"] = `Bearer ${ipfsApiToken}`;
       }
 
       const req = protocolModule.request(requestOptions, (res: any) => {
-        let data = '';
-        res.on('data', (chunk: string) => (data += chunk));
-        res.on('end', async () => {
+        let data = "";
+        res.on("data", (chunk: str) => (data += chunk));
+        res.on("end", async () => {
           clearTimeout(timeout);
           try {
             const result = JSON.parse(data);
             const pins = result.Keys ? Object.keys(result.Keys) : [];
-            
+
             if (pins.length === 0) {
               resolve({ totalBytes: 0, pinCount: 0, pins: [] });
               return;
@@ -1274,10 +1475,14 @@ export class X402Merchant {
 
             // Get sizes for each pin (batch processing)
             let totalBytes = 0;
-            const pinsWithSizes: Array<{ cid: string; size: number; sizeMB: number }> = [];
+            const pinsWithSizes: arr<{ cid: str; size: num; sizeMB: num }> = [];
 
             for (const cid of pins) {
-              const stats = await X402Merchant.getIpfsObjectSize(cid, ipfsApiUrl, ipfsApiToken);
+              const stats = await X402Merchant.getIpfsObjectSize(
+                cid,
+                ipfsApiUrl,
+                ipfsApiToken
+              );
               if (stats) {
                 pinsWithSizes.push({
                   cid,
@@ -1296,15 +1501,15 @@ export class X402Merchant {
               pins: pinsWithSizes,
             });
           } catch (error: any) {
-            console.error('Error parsing IPFS pins:', error.message);
+            log.error({ err: error }, "Error parsing IPFS pins");
             resolve({ totalBytes: 0, pinCount: 0, pins: [] });
           }
         });
       });
 
-      req.on('error', (err: any) => {
+      req.on("error", (err: any) => {
         clearTimeout(timeout);
-        console.error('Error getting IPFS pins:', err.message);
+        log.error({ err }, "Error getting IPFS pins");
         resolve({ totalBytes: 0, pinCount: 0, pins: [] });
       });
 
@@ -1316,17 +1521,24 @@ export class X402Merchant {
    * Get relay's global storage status
    * Combines IPFS repo stats with configured limits
    */
-  static async getRelayStorageStatus(ipfsApiUrl?: string, ipfsApiToken?: string): Promise<RelayStorageStatus> {
-    const maxStorageGB = parseFloat((process.env.RELAY_MAX_STORAGE_GB as string) || '0') || 0;
-    const warningThreshold = parseFloat((process.env.RELAY_STORAGE_WARNING_THRESHOLD as string) || '80') || 80;
+  static async getRelayStorageStatus(
+    ipfsApiUrl?: str,
+    ipfsApiToken?: str
+  ): prm<RelayStorageStatus> {
+    const maxStorageGB =
+      parseFloat(storageConfig.maxStorageGB.toString()) || 0;
+    const warningThreshold =
+      parseFloat(
+        storageConfig.storageWarningThreshold.toString() || "80"
+      ) || 80;
 
     // Get IPFS repo stats (faster, gives total repo size)
     const repoStats = await this.getIpfsRepoStats(ipfsApiUrl, ipfsApiToken);
-    
+
     if (!repoStats) {
       return {
         available: false,
-        error: 'Could not get IPFS repository stats',
+        error: "Could not get IPFS repository stats",
       };
     }
 
@@ -1379,7 +1591,11 @@ export class X402Merchant {
    * Check if relay has enough space for a new subscription tier
    * Returns availability status and any warnings
    */
-  static async canAcceptSubscription(tier: string, ipfsApiUrl?: string, ipfsApiToken?: string): Promise<CanAcceptSubscriptionResult> {
+  static async canAcceptSubscription(
+    tier: str,
+    ipfsApiUrl?: str,
+    ipfsApiToken?: str
+  ): prm<CanAcceptSubscriptionResult> {
     const tierConfig = SUBSCRIPTION_TIERS[tier];
     if (!tierConfig) {
       return {
@@ -1388,12 +1604,15 @@ export class X402Merchant {
       };
     }
 
-    const relayStorage = await this.getRelayStorageStatus(ipfsApiUrl, ipfsApiToken);
-    
+    const relayStorage = await this.getRelayStorageStatus(
+      ipfsApiUrl,
+      ipfsApiToken
+    );
+
     if (!relayStorage.available) {
       return {
         allowed: false,
-        reason: 'Could not verify relay storage status',
+        reason: "Could not verify relay storage status",
         error: relayStorage.error,
       };
     }
@@ -1413,7 +1632,9 @@ export class X402Merchant {
     if (availableMB < requiredMB) {
       return {
         allowed: false,
-        reason: `Relay storage insufficient. Available: ${availableMB.toFixed(2)}MB, Required for ${tierConfig.name}: ${requiredMB}MB`,
+        reason: `Relay storage insufficient. Available: ${availableMB.toFixed(
+          2
+        )}MB, Required for ${tierConfig.name}: ${requiredMB}MB`,
         relayFull: true,
         relayStorage,
       };
@@ -1423,7 +1644,9 @@ export class X402Merchant {
     if (relayStorage.warning) {
       return {
         allowed: true,
-        warning: `Relay storage is at ${(relayStorage.percentUsed ?? 0).toFixed(1)}% capacity`,
+        warning: `Relay storage is at ${(relayStorage.percentUsed ?? 0).toFixed(
+          1
+        )}% capacity`,
         relayStorage,
       };
     }
@@ -1437,13 +1660,20 @@ export class X402Merchant {
   /**
    * Check if relay has enough space for a file upload (global check)
    */
-  static async canAcceptUpload(fileSizeMB: number, ipfsApiUrl?: string, ipfsApiToken?: string): Promise<CanAcceptUploadResult> {
-    const relayStorage = await this.getRelayStorageStatus(ipfsApiUrl, ipfsApiToken);
-    
+  static async canAcceptUpload(
+    fileSizeMB: num,
+    ipfsApiUrl?: str,
+    ipfsApiToken?: str
+  ): prm<CanAcceptUploadResult> {
+    const relayStorage = await this.getRelayStorageStatus(
+      ipfsApiUrl,
+      ipfsApiToken
+    );
+
     if (!relayStorage.available) {
       return {
         allowed: false,
-        reason: 'Could not verify relay storage status',
+        reason: "Could not verify relay storage status",
         error: relayStorage.error,
       };
     }
@@ -1459,7 +1689,9 @@ export class X402Merchant {
     if ((relayStorage.remainingMB || 0) < fileSizeMB) {
       return {
         allowed: false,
-        reason: `Relay storage full. Available: ${relayStorage.remainingMB?.toFixed(2)}MB, File size: ${fileSizeMB.toFixed(2)}MB`,
+        reason: `Relay storage full. Available: ${relayStorage.remainingMB?.toFixed(
+          2
+        )}MB, File size: ${fileSizeMB.toFixed(2)}MB`,
         relayFull: true,
         relayStorage,
       };
@@ -1467,11 +1699,12 @@ export class X402Merchant {
 
     return {
       allowed: true,
-      warning: relayStorage.warning ? `Relay storage at ${(relayStorage.percentUsed ?? 0).toFixed(1)}%` : null,
+      warning: relayStorage.warning
+        ? `Relay storage at ${(relayStorage.percentUsed ?? 0).toFixed(1)}%`
+        : undefined,
       relayStorage,
     };
   }
 }
 
 export default X402Merchant;
-

@@ -5,17 +5,39 @@
  * to ensure consistency across the relay.
  */
 
+interface GunInstance {
+  get: (path: str) => GunNode;
+}
+
+interface GunNode {
+  get: (path: str) => GunNode;
+  once: (cb: (data: mb<MBUsageData>) => void) => void;
+  put: (data: obj, cb?: (ack: GunAck) => void) => void;
+}
+
+interface MBUsageData {
+  mbUsed: num;
+  lastUpdated?: num;
+  userAddress?: str;
+  updatedBy?: str;
+}
+
+interface GunAck {
+  err?: str;
+  ok?: bool;
+}
+
 /**
  * Update MB usage for a user (legacy system)
  * This is the legacy tracking system for general uploads.
  * For x402 subscriptions, use X402Merchant.updateStorageUsage() instead.
  * 
- * @param {object} gun - GunDB instance
- * @param {string} userAddress - User address
- * @param {number} deltaMB - Change in MB (positive for add, negative for subtract)
- * @returns {Promise<number>} - New MB usage
+ * @param gun - GunDB instance
+ * @param userAddress - User address
+ * @param deltaMB - Change in MB (positive for add, negative for subtract)
+ * @returns New MB usage
  */
-export async function updateMBUsage(gun, userAddress, deltaMB) {
+export async function updateMBUsage(gun: GunInstance, userAddress: str, deltaMB: num): prm<num> {
   if (!gun) {
     throw new Error('Gun instance is required');
   }
@@ -27,18 +49,18 @@ export async function updateMBUsage(gun, userAddress, deltaMB) {
   return new Promise((resolve, reject) => {
     const mbUsageNode = gun.get("shogun").get("mbUsage").get(userAddress);
     
-    mbUsageNode.once((currentData) => {
+    mbUsageNode.once((currentData: mb<MBUsageData>) => {
       const currentMB = currentData ? (currentData.mbUsed || 0) : 0;
       const newMB = Math.max(0, currentMB + deltaMB);
       
-      const updateData = {
+      const updateData: MBUsageData = {
         mbUsed: newMB,
         lastUpdated: Date.now(),
         userAddress: userAddress,
         updatedBy: "storage-utils"
       };
       
-      mbUsageNode.put(updateData, (ack) => {
+      mbUsageNode.put(updateData, (ack: GunAck) => {
         if (ack && ack.err) {
           reject(new Error(ack.err));
         } else {
@@ -52,11 +74,11 @@ export async function updateMBUsage(gun, userAddress, deltaMB) {
 /**
  * Get MB usage for a user (legacy system)
  * 
- * @param {object} gun - GunDB instance
- * @param {string} userAddress - User address
- * @returns {Promise<number>} - Current MB usage
+ * @param gun - GunDB instance
+ * @param userAddress - User address
+ * @returns Current MB usage
  */
-export async function getMBUsage(gun, userAddress) {
+export async function getMBUsage(gun: GunInstance, userAddress: str): prm<num> {
   if (!gun) {
     throw new Error('Gun instance is required');
   }
@@ -68,16 +90,9 @@ export async function getMBUsage(gun, userAddress) {
   return new Promise((resolve) => {
     const mbUsageNode = gun.get("shogun").get("mbUsage").get(userAddress);
     
-    mbUsageNode.once((currentData) => {
+    mbUsageNode.once((currentData: mb<MBUsageData>) => {
       const currentMB = currentData ? (currentData.mbUsed || 0) : 0;
       resolve(currentMB);
     });
   });
 }
-
-
-
-
-
-
-
