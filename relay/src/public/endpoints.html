@@ -85,6 +85,27 @@
             --response-text-color: #E0E0E0;
             --response-border-color: #404040;
         }
+
+        /* Fix scroll issues with RapiDoc */
+        body {
+            overflow-x: hidden;
+        }
+
+        #rapidoc-element {
+            height: calc(100vh - 300px);
+            min-height: 600px;
+        }
+
+        /* Prevent RapiDoc from interfering with page scroll */
+        rapidoc {
+            display: block;
+            height: 100%;
+        }
+
+        /* Ensure container doesn't interfere */
+        .container {
+            overflow: visible;
+        }
     </style>
 </head>
 
@@ -151,6 +172,9 @@
                 show-schema-description="true"
                 schema-style="table"
                 schema-expand-level="2"
+                layout="column"
+                use-path-in-nav-bar="false"
+                style="height: calc(100vh - 300px); min-height: 600px;"
             ></rapi-doc>
         </div>
     </div>
@@ -160,6 +184,64 @@
     <script src="lib/admin-nav.js"></script>
 
     <script>
+        // Prevent scroll jumping - more aggressive approach
+        let lastScrollTop = 0;
+        let scrollTimeout = null;
+        let isUserScrolling = true;
+        
+        // Save scroll position frequently
+        window.addEventListener('scroll', () => {
+            if (isUserScrolling) {
+                lastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            }
+        }, { passive: true });
+        
+        // Prevent hash change from scrolling to top
+        const originalPushState = history.pushState;
+        history.pushState = function() {
+            const scrollPos = window.pageYOffset || document.documentElement.scrollTop;
+            originalPushState.apply(history, arguments);
+            // Restore scroll position after state change
+            requestAnimationFrame(() => {
+                window.scrollTo(0, scrollPos);
+            });
+        };
+        
+        window.addEventListener('hashchange', (e) => {
+            // Don't scroll to top on hash change
+            e.preventDefault();
+            requestAnimationFrame(() => {
+                if (lastScrollTop > 0) {
+                    window.scrollTo(0, lastScrollTop);
+                }
+            });
+        }, false);
+        
+        // Prevent anchor links from jumping
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('a');
+            if (link && link.getAttribute('href')?.startsWith('#')) {
+                const href = link.getAttribute('href');
+                if (href !== '#' && href !== '#top') {
+                    // Allow navigation but prevent scroll jump
+                    setTimeout(() => {
+                        const target = document.querySelector(href);
+                        if (target) {
+                            const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
+                            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            // If it jumped too much, restore
+                            setTimeout(() => {
+                                const newScroll = window.pageYOffset || document.documentElement.scrollTop;
+                                if (Math.abs(newScroll - currentScroll) > 500) {
+                                    window.scrollTo(0, currentScroll);
+                                }
+                            }, 100);
+                        }
+                    }, 50);
+                }
+            }
+        }, true);
+        
         // Simple initialization - RapiDoc will load spec-url automatically
         document.addEventListener('DOMContentLoaded', () => {
             console.log('📄 API Documentation page loaded');
@@ -214,7 +296,29 @@
                 rapidocEl.addEventListener('spec-error', (e) => {
                     console.error('❌ RapiDoc spec-error:', e.detail);
                 });
+                
+                // Prevent RapiDoc from scrolling page to top on navigation
+                rapidocEl.addEventListener('click', (e) => {
+                    // Allow normal click behavior but prevent scroll jumps
+                    lastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                }, true);
             }
+            
+            // Prevent anchor links from scrolling to top
+            document.addEventListener('click', (e) => {
+                if (e.target.tagName === 'A' && e.target.getAttribute('href')?.startsWith('#')) {
+                    const href = e.target.getAttribute('href');
+                    if (href !== '#') {
+                        // Allow the hash change but prevent scroll
+                        setTimeout(() => {
+                            const target = document.querySelector(href);
+                            if (target) {
+                                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                        }, 100);
+                    }
+                }
+            }, true);
         });
     </script>
 </body>
