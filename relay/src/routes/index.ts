@@ -53,6 +53,7 @@ import x402Router from "./x402";
 import networkRouter from "./network";
 import dealsRouter from "./deals";
 import registryRouter from "./registry";
+import bridgeRouter from "./bridge";
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
@@ -636,6 +637,9 @@ export default (app: express.Application) => {
 
   // Route per on-chain registry management (staking, registration)
   app.use(`${baseRoute}/registry`, registryRouter);
+
+  // Route per L2 Bridge (deposits, withdrawals, batch submission)
+  app.use(`${baseRoute}/bridge`, bridgeRouter);
 
   // Route di test per verificare se le route sono registrate correttamente
   app.get(`${baseRoute}/test`, (req, res) => {

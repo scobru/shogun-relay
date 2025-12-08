@@ -48,6 +48,7 @@ import {
   blockchainConfig,
   x402Config,
   dealSyncConfig,
+  bridgeConfig,
   replicationConfig,
   loggingConfig,
   packageConfig,
@@ -984,6 +985,7 @@ See docs/RELAY_KEYS.md for more information.
 
   // Configura l'istanza Gun per le route di autenticazione
   app.set("gunInstance", gun);
+  app.set("relayKeyPair", relayKeyPair); // Make relay keypair available to routes
 
   // Esponi le funzioni helper per le route
   app.set("addSystemLog", addSystemLog);
@@ -1848,9 +1850,191 @@ See docs/RELAY_KEYS.md for more information.
     }
   }
 
+  // ============================================================================
+  // BRIDGE LISTENER & AUTO BATCH SUBMISSION
+  // ============================================================================
+
+  const BRIDGE_ENABLED = bridgeConfig.enabled;
+  const BRIDGE_RPC_URL = bridgeConfig.rpcUrl;
+  const BRIDGE_CHAIN_ID = bridgeConfig.chainId;
+  const BRIDGE_AUTO_BATCH_ENABLED = bridgeConfig.autoBatchEnabled;
+  const BRIDGE_AUTO_BATCH_INTERVAL_MS = bridgeConfig.autoBatchIntervalMs;
+  const BRIDGE_AUTO_BATCH_MIN_WITHDRAWALS = bridgeConfig.autoBatchMinWithdrawals;
+
+  let bridgeBatchInterval: any = null;
+
+  // Initialize Bridge Listener (listens to Deposit events)
+  if (BRIDGE_ENABLED && BRIDGE_RPC_URL) {
+    try {
+      const { startBridgeListener } = await import("./utils/bridge-listener");
+      
+      await startBridgeListener(gun, {
+        rpcUrl: BRIDGE_RPC_URL,
+        chainId: BRIDGE_CHAIN_ID,
+        startBlock: bridgeConfig.startBlock,
+        minConfirmations: bridgeConfig.minConfirmations,
+        relayKeyPair: relayKeyPair, // Pass relay keypair for signing balance data
+        enabled: true,
+      });
+
+      // Get contract address from SDK for logging
+      const { createBridgeClient } = await import("./utils/bridge-client");
+      const tempClient = createBridgeClient({
+        rpcUrl: BRIDGE_RPC_URL,
+        chainId: BRIDGE_CHAIN_ID,
+      });
+
+      loggers.server.info(
+        {
+          contractAddress: tempClient.contractAddress,
+          chainId: BRIDGE_CHAIN_ID,
+        },
+        "🌉 Bridge deposit listener started"
+      );
+    } catch (error: any) {
+      loggers.server.error(
+        { err: error },
+        "❌ Failed to start bridge listener"
+      );
+    }
+
+    // Auto batch submission (if enabled and relay can act as sequencer)
+    if (BRIDGE_AUTO_BATCH_ENABLED && BRIDGE_RPC_URL) {
+      try {
+        const { createBridgeClient } = await import("./utils/bridge-client");
+        const { getPendingWithdrawals, removePendingWithdrawals, saveBatch } = await import("./utils/bridge-state");
+        const { buildMerkleTreeFromWithdrawals } = await import("./utils/merkle-tree");
+
+        const bridgeClient = createBridgeClient({
+          rpcUrl: BRIDGE_RPC_URL,
+          chainId: BRIDGE_CHAIN_ID,
+          privateKey: bridgeConfig.sequencerPrivateKey,
+        });
+
+        // Check if this relay can submit batches
+        const sequencer = await bridgeClient.getSequencer();
+        const relayAddress = bridgeClient.wallet?.address;
+
+        if (sequencer === "0x0000000000000000000000000000000000000000" || 
+            (relayAddress && relayAddress.toLowerCase() === sequencer.toLowerCase())) {
+          loggers.server.info(
+            {
+              interval: BRIDGE_AUTO_BATCH_INTERVAL_MS / 1000,
+              minWithdrawals: BRIDGE_AUTO_BATCH_MIN_WITHDRAWALS,
+            },
+            "🔄 Auto batch submission enabled"
+          );
+
+          bridgeBatchInterval = setInterval(async () => {
+            try {
+              const pending = await getPendingWithdrawals(gun);
+
+              if (pending.length < BRIDGE_AUTO_BATCH_MIN_WITHDRAWALS) {
+                return; // Not enough withdrawals to batch
+              }
+
+              // Convert to withdrawal leaves
+              const withdrawals = pending.map((w) => ({
+                user: w.user,
+                amount: BigInt(w.amount),
+                nonce: BigInt(w.nonce),
+              }));
+
+              // Build Merkle tree
+              const { root } = buildMerkleTreeFromWithdrawals(withdrawals);
+
+              // Submit batch
+              const result = await bridgeClient.submitBatch(root);
+              const batchId = await bridgeClient.getCurrentBatchId();
+
+              // Save batch to GunDB
+              await saveBatch(gun, {
+                batchId: batchId.toString(),
+                root,
+                withdrawals: pending,
+                timestamp: Date.now(),
+                blockNumber: result.blockNumber,
+                txHash: result.txHash,
+              });
+
+              // Remove processed withdrawals
+              await removePendingWithdrawals(gun, pending);
+
+              loggers.server.info(
+                {
+                  batchId: batchId.toString(),
+                  root,
+                  withdrawalCount: pending.length,
+                  txHash: result.txHash,
+                },
+                "✅ Auto batch submitted"
+              );
+            } catch (error: any) {
+              // Don't log every error (too noisy)
+              if (
+                error.message &&
+                !error.message.includes("timeout") &&
+                !error.message.includes("ECONNREFUSED") &&
+                !error.message.includes("insufficient funds")
+              ) {
+                loggers.server.warn(
+                  { err: error },
+                  "⚠️ Auto batch submission error"
+                );
+              }
+            }
+          }, BRIDGE_AUTO_BATCH_INTERVAL_MS);
+        } else {
+          loggers.server.info(
+            {
+              sequencer,
+              relayAddress,
+            },
+            "⏭️  Auto batch disabled (relay is not sequencer)"
+          );
+        }
+      } catch (error: any) {
+        loggers.server.warn(
+          { err: error },
+          "⚠️ Failed to initialize auto batch submission"
+        );
+      }
+    } else {
+      if (!BRIDGE_AUTO_BATCH_ENABLED) {
+        loggers.server.info(
+          "⏭️  Auto batch submission disabled (set BRIDGE_AUTO_BATCH_ENABLED=true to enable)"
+        );
+      }
+    }
+  } else {
+    if (!BRIDGE_ENABLED) {
+      loggers.server.info(
+        "⏭️  Bridge disabled (set BRIDGE_ENABLED=true to enable)"
+      );
+    } else if (!BRIDGE_RPC_URL) {
+      loggers.server.info(
+        "⏭️  Bridge disabled (BRIDGE_RPC_URL not configured)"
+      );
+    }
+  }
+
   // Shutdown function
   async function shutdown() {
     loggers.server.info("🛑 Shutting down Shogun Relay...");
+
+    // Stop bridge listener
+    try {
+      const { stopBridgeListener } = await import("./utils/bridge-listener");
+      stopBridgeListener();
+    } catch (err: any) {
+      // Ignore if module not loaded
+    }
+
+    // Cancel bridge batch interval
+    if (bridgeBatchInterval) {
+      clearInterval(bridgeBatchInterval);
+      bridgeBatchInterval = null;
+    }
 
     // Mark shutdown in progress to stop deal sync operations
     try {

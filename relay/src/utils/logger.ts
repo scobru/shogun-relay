@@ -70,6 +70,7 @@ export const loggers = {
     services: createLogger('services'),
     uploads: createLogger('uploads'),
     visualGraph: createLogger('visual-graph'),
+    bridge: createLogger('bridge-client'),
 };
 
 export default logger;
