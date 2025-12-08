@@ -106,8 +106,8 @@ interface Subscription {
   priceUSDC: num;
   purchasedAt: num;
   expiresAt: num;
-  paymentTx: str | null;
-  paymentNetwork: str | null;
+  paymentTx: str | null | undefined;
+  paymentNetwork: str | null | undefined;
   userAddress: str;
 }
 
@@ -954,16 +954,25 @@ export class X402Merchant {
     let storageUsedMB = 0;
 
     // If renewing same or higher tier and subscription is still active, extend expiry
-    if (currentSub.active) {
+    if (currentSub.active && currentSub.tier) {
       const currentTierConfig = SUBSCRIPTION_TIERS[currentSub.tier as string];
+      
+      // Prevent downgrade: new tier must have storageMB >= current tier
+      if (currentTierConfig && tierConfig.storageMB < currentTierConfig.storageMB) {
+        throw new Error(
+          `Cannot downgrade from ${currentSub.tier} (${currentTierConfig.storageMB}MB) to ${tier} (${tierConfig.storageMB}MB). You can only upgrade to a higher or equal tier.`
+        );
+      }
+      
+      // If same or higher tier, extend expiry and keep storage usage
       if (tierConfig.storageMB >= (currentTierConfig?.storageMB ?? 0)) {
-        // Add remaining time
+        // Add remaining time from current subscription
         const remainingTime =
           new Date(currentSub.expiresAt as string).getTime() - now;
         if (remainingTime > 0) {
           finalExpiresAt = expiresAt + remainingTime;
         }
-        // Keep current storage usage if upgrading
+        // Keep current storage usage if upgrading or renewing
         storageUsedMB = currentSub.storageUsedMB || 0;
       }
     }
@@ -975,8 +984,9 @@ export class X402Merchant {
       priceUSDC: tierConfig.priceUSDC,
       purchasedAt: now,
       expiresAt: finalExpiresAt,
-      paymentTx: paymentDetails?.transaction || null,
-      paymentNetwork: paymentDetails?.network || null,
+      // Convert null to undefined for GunDB compatibility
+      paymentTx: paymentDetails?.transaction || undefined,
+      paymentNetwork: paymentDetails?.network || undefined,
       userAddress,
     };
 

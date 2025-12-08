@@ -227,17 +227,40 @@ export async function saveSubscription(userAddress: str, subscriptionData: Subsc
   }
 
   return new Promise((resolve, reject) => {
+    // Clean and serialize data for GunDB
+    // GunDB doesn't handle null values well, convert them to undefined
+    const cleanedData: obj = {};
+    for (const [key, value] of Object.entries(subscriptionData)) {
+      // Skip internal GunDB keys
+      if (['_', '#', '>', '<'].includes(key)) {
+        continue;
+      }
+      // Convert null to undefined (GunDB prefers undefined)
+      if (value === null) {
+        cleanedData[key] = undefined;
+      } else {
+        cleanedData[key] = value;
+      }
+    }
+
     const dataToSave: SubscriptionData = {
-      ...subscriptionData,
+      ...cleanedData,
       userAddress,
       updatedAt: Date.now(),
       updatedBy: relayPub!,
-    };
+    } as SubscriptionData;
+
+    // Add timeout to prevent hanging
+    const timeout = setTimeout(() => {
+      reject(new Error('Timeout saving subscription to GunDB'));
+    }, 10000);
 
     relayUser?.get('x402').get('subscriptions').get(userAddress).put(dataToSave as obj, (ack: GunAck) => {
-      if ('err' in ack) {
-        log.error({ userAddress, err: ack.err }, 'Error saving subscription');
-        reject(new Error(ack.err));
+      clearTimeout(timeout);
+      if (ack && 'err' in ack && ack.err) {
+        const errorMsg = typeof ack.err === 'string' ? ack.err : String(ack.err);
+        log.error({ userAddress, err: errorMsg, data: dataToSave }, 'Error saving subscription');
+        reject(new Error(errorMsg));
       } else {
         log.info({ userAddress }, 'Subscription saved');
         resolve();

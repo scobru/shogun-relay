@@ -297,6 +297,59 @@ router.post("/subscribe", async (req, res) => {
       console.warn(`Relay storage warning: ${relayCapacity.warning}`);
     }
 
+    // Check if user already has an active subscription
+    // New subscription can only be activated if it's better or equal to the current one
+    const currentSubscription = await X402Merchant.getSubscriptionStatus(gun, userAddress);
+    
+    if (currentSubscription.active && currentSubscription.tier) {
+      const currentTier = currentSubscription.tier;
+      const currentTierConfig = SUBSCRIPTION_TIERS[currentTier];
+      const newTierConfig = SUBSCRIPTION_TIERS[tier];
+      
+      if (!currentTierConfig || !newTierConfig) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid tier configuration",
+        });
+      }
+      
+      // Compare tiers: new tier must have storageMB >= current tier
+      // This ensures only upgrades or same-tier renewals are allowed
+      if (newTierConfig.storageMB < currentTierConfig.storageMB) {
+        const expiresAt = currentSubscription.expiresAt 
+          ? new Date(currentSubscription.expiresAt).toLocaleDateString()
+          : 'unknown';
+        
+        // Get available upgrade tiers
+        const availableUpgrades = Object.entries(SUBSCRIPTION_TIERS)
+          .filter(([tierName, tierCfg]) => tierCfg.storageMB >= currentTierConfig.storageMB)
+          .map(([tierName, tierCfg]) => ({
+            tier: tierName,
+            storageMB: tierCfg.storageMB,
+            priceUSDC: tierCfg.priceUSDC,
+          }));
+        
+        return res.status(409).json({
+          success: false,
+          error: "Cannot downgrade subscription",
+          message: `You already have an active ${currentTier} subscription (${currentTierConfig.storageMB}MB) that expires on ${expiresAt}. You can only activate a subscription with equal or higher storage capacity.`,
+          currentSubscription: {
+            tier: currentTier,
+            storageMB: currentTierConfig.storageMB,
+            expiresAt: currentSubscription.expiresAt,
+          },
+          requestedTier: {
+            tier: tier,
+            storageMB: newTierConfig.storageMB,
+          },
+          availableUpgrades: availableUpgrades,
+        });
+      }
+      
+      // If same or better tier, allow (will extend expiry in saveSubscription)
+      console.log(`User has active ${currentTier} subscription, allowing ${tier} subscription (upgrade or renewal)`);
+    }
+
     // If no payment provided, return payment requirements
     if (!payment) {
       console.log("No payment provided, returning requirements");
