@@ -5,7 +5,8 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "start": "nodemon src/index.js",
+    "start": "tsx src/index.ts",
+    "start:dev": "nodemon --exec tsx src/index.ts",
     "postinstall": "node scripts/postinstall.js",
     "build:ts": "tsc",
     "build:ts:watch": "tsc --watch"
@@ -46,6 +47,7 @@
     "prettier": "^3.7.4",
     "self-adjusting-interval": "^1.0.0",
     "shogun-contracts-sdk": "^1.0.3",
+    "tsx": "^4.19.2",
     "viem": "^2.21.0"
   },
   "devDependencies": {
@@ -73,7 +75,7 @@
     "watch": [
       "src"
     ],
-    "ext": "js,json",
+    "ext": "ts,js,json",
     "ignore": [
       "radata/*",
       "node_modules/*"
