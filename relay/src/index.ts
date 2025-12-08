@@ -1,13 +1,3 @@
-// Initialize global 'und' variable for tsx runtime
-// This is needed because tsx executes TypeScript directly
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).und = undefined;
-} else if (typeof global !== 'undefined') {
-  (global as any).und = undefined;
-} else if (typeof window !== 'undefined') {
-  (window as any).und = undefined;
-}
-
 import express from "express";
 import path from "path";
 import fs from "fs";

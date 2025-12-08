@@ -43,7 +43,7 @@ export function computeLeaf(user: string, amount: bigint, nonce: bigint): string
 export class MerkleTree {
   private leaves: string[];
   private tree: string[][];
-  private root: string;
+  private root: string = "";
   private proofs: Map<string, string[]>;
 
   constructor(leaves: string[]) {

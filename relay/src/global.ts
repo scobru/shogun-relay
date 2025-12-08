@@ -22,13 +22,3 @@ declare global {
   type opt<T> = Partial<T>;  // "Optional": rende i campi opzionali
 }
 
-// Inizializza 'und' come variabile runtime per tsx
-// Questo è necessario perché tsx esegue TypeScript direttamente
-if (typeof globalThis !== 'undefined') {
-  (globalThis as any).und = undefined;
-} else if (typeof global !== 'undefined') {
-  (global as any).und = undefined;
-} else if (typeof window !== 'undefined') {
-  (window as any).und = undefined;
-}
-
