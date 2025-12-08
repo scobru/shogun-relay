@@ -628,9 +628,9 @@ async function initializeServer() {
 
       // Try default locations
       const defaultPaths = [
-        "/app/keys/relay-keypairon",
-        path.join(process.cwd(), "relay-keypairon"),
-        path.join(process.cwd(), "keys", "relay-keypairon"),
+        "/app/keys/relay-keypair.json",
+        path.join(process.cwd(), "relay-keypair.json"),
+        path.join(process.cwd(), "keys", "relay-keypair.json"),
       ];
 
       let keyPairPath = null;
@@ -644,7 +644,7 @@ async function initializeServer() {
 
       // If no existing keypair found, generate new one in first default location
       if (!keyPairPath) {
-        keyPairPath = defaultPaths[0]; // Use /app/keys/relay-keypairon as default
+        keyPairPath = defaultPaths[0]; // Use /app/keys/relay-keypair.json as default
 
         loggers.server.info(`🔑 Generating new keypair at ${keyPairPath}...`);
 
@@ -692,7 +692,7 @@ To configure a keypair manually:
   1. Run: node scripts/generate-relay-keys
   2. Copy the JSON output
   3. Add to your .env file as: RELAY_SEA_KEYPAIR='{"pub":"...","priv":"...","epub":"...","epriv":"..."}'
-  OR save to a file and set: RELAY_SEA_KEYPAIR_PATH=/path/to/relay-keypairon
+  OR save to a file and set: RELAY_SEA_KEYPAIR_PATH=/path/to/relay-keypair.json
 
 See docs/RELAY_KEYS.md for more information.
       `.trim();
@@ -1465,7 +1465,7 @@ See docs/RELAY_KEYS.md for more information.
 
   // Importa e configura le route modulari
   try {
-    const routes = await import("./routes/index");
+    const routes = await import("./routes/index.js");
     routes.default(app);
     loggers.server.info("✅ Route modulari configurate con successo");
   } catch (error) {
