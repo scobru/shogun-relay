@@ -229,28 +229,31 @@ export async function debitBalance(
  * 1. The GunDB keypair (derived from Ethereum address)
  * 2. The Ethereum wallet (that owns the balance)
  * 
- * The message should include the ethereumAddress to prevent replay attacks.
+ * The message must include: ethereumAddress, to (if transfer), amount, timestamp, nonce
+ * to prevent replay attacks and ensure message integrity.
  * 
- * @param message - The plain message that was signed (must include ethereumAddress)
+ * @param message - The plain message that was signed (must be JSON string with required fields)
  * @param seaSignature - SEA signature from GunDB keypair (signs the message)
  * @param ethSignature - Ethereum signature (EIP-191) from wallet (signs the message)
  * @param ethAddress - Ethereum address that should match the signer
  * @param gunPubKey - GunDB public key (derived from ethAddress)
- * @returns true if both signatures are valid and match the addresses
+ * @param expectedFields - Optional: expected fields in message (for validation)
+ * @returns verified message data if signatures are valid, null otherwise
  */
 export async function verifyDualSignatures(
   message: string,
   seaSignature: string,
   ethSignature: string,
   ethAddress: string,
-  gunPubKey: string
-): Promise<boolean> {
+  gunPubKey: string,
+  expectedFields?: { to?: string; amount?: string; timestamp?: number; nonce?: string }
+): Promise<{ ethereumAddress: string; [key: string]: any } | null> {
   try {
     // 1. Verify SEA signature (GunDB keypair)
     // SEA.verify returns the original data if signature is valid
     const seaVerified = await SEA.verify(seaSignature, gunPubKey);
     if (!seaVerified) {
-      return false;
+      return null;
     }
 
     // Check that the verified data matches the message
@@ -263,7 +266,7 @@ export async function verifyDualSignatures(
       : JSON.stringify(message);
     
     if (seaData !== normalizedMessage) {
-      return false;
+      return null;
     }
 
     // 2. Verify Ethereum signature (wallet)
@@ -273,13 +276,57 @@ export async function verifyDualSignatures(
     
     // Check that recovered address matches the provided address
     if (recoveredAddress.toLowerCase() !== ethAddress.toLowerCase()) {
-      return false;
+      return null;
     }
 
-    // Both signatures are valid and match!
-    return true;
+    // 3. Parse and validate message content
+    let messageData: { ethereumAddress?: string; [key: string]: any };
+    try {
+      messageData = typeof seaVerified === 'string' 
+        ? JSON.parse(seaVerified) 
+        : seaVerified;
+    } catch {
+      // If not JSON, treat as plain string (less secure, but backward compatible)
+      messageData = { ethereumAddress: ethAddress };
+    }
+
+    // Verify ethereumAddress in message matches
+    if (!messageData.ethereumAddress || 
+        messageData.ethereumAddress.toLowerCase() !== ethAddress.toLowerCase()) {
+      return null;
+    }
+
+    // 4. Validate expected fields (if provided)
+    if (expectedFields) {
+      if (expectedFields.to && messageData.to?.toLowerCase() !== expectedFields.to.toLowerCase()) {
+        return null;
+      }
+      if (expectedFields.amount && messageData.amount !== expectedFields.amount) {
+        return null;
+      }
+      if (expectedFields.nonce && messageData.nonce !== expectedFields.nonce) {
+        return null;
+      }
+      // Timestamp validation: must be recent (within 1 hour) to prevent replay
+      if (expectedFields.timestamp !== undefined && messageData.timestamp) {
+        const messageTime = typeof messageData.timestamp === 'number' 
+          ? messageData.timestamp 
+          : parseInt(messageData.timestamp);
+        const now = Date.now();
+        const maxAge = 60 * 60 * 1000; // 1 hour
+        if (Math.abs(now - messageTime) > maxAge) {
+          return null; // Message too old or from future
+        }
+      }
+    }
+
+    // All checks passed!
+    return {
+      ...messageData,
+      ethereumAddress: messageData.ethereumAddress,
+    } as { ethereumAddress: string; [key: string]: any };
   } catch (error) {
-    return false;
+    return null;
   }
 }
 
@@ -325,16 +372,22 @@ export async function transferBalance(
     // SECURITY: Verify dual signatures - client must prove control of BOTH:
     // 1. GunDB keypair (derived from Ethereum address)
     // 2. Ethereum wallet (that owns the balance)
-    const signaturesValid = await verifyDualSignatures(
+    // Also verify message content matches the transfer parameters
+    const verifiedMessage = await verifyDualSignatures(
       message,
       seaSignature,
       ethSignature,
       fromAddress,
-      gunPubKey
+      gunPubKey,
+      {
+        to: toAddress,
+        amount: amount.toString(),
+        timestamp: Date.now(), // Will check message timestamp is recent
+      }
     );
 
-    if (!signaturesValid) {
-      throw new Error("Invalid signatures: must provide valid SEA and Ethereum signatures");
+    if (!verifiedMessage) {
+      throw new Error("Invalid signatures or message content mismatch: must provide valid SEA and Ethereum signatures with correct message content");
     }
 
     // Get current balances (by Ethereum address)

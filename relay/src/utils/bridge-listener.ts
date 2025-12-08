@@ -163,9 +163,11 @@ export async function startBridgeListener(
           }
 
           // All security checks passed - credit balance (with signature if relay keypair available)
+          // SECURITY: Only mark as processed AFTER successful credit to ensure idempotency
+          // If creditBalance fails, the deposit will be retried (which is correct behavior)
           await creditBalance(gun, event.user, event.amount, config.relayKeyPair);
           
-          // Mark as processed (idempotency)
+          // Mark as processed (idempotency) - only if creditBalance succeeded
           await markDepositProcessed(gun, depositKey, {
             txHash: event.txHash,
             user: event.user,

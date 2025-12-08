@@ -237,12 +237,12 @@ router.post("/withdraw", express.json(), async (req, res) => {
       });
     }
 
-    const { user, amount, nonce } = req.body;
+    const { user, amount, nonce, message, seaSignature, ethSignature, gunPubKey } = req.body;
 
-    if (!user || !amount || nonce === undefined) {
+    if (!user || !amount || nonce === undefined || !message || !seaSignature || !ethSignature || !gunPubKey) {
       return res.status(400).json({
         success: false,
-        error: "user, amount, and nonce required",
+        error: "user, amount, nonce, message, seaSignature, ethSignature, and gunPubKey required",
       });
     }
 
@@ -264,6 +264,28 @@ router.post("/withdraw", express.json(), async (req, res) => {
       return res.status(400).json({
         success: false,
         error: "Amount must be positive",
+      });
+    }
+
+    // SECURITY: Verify dual signatures before processing withdrawal
+    const { verifyDualSignatures } = await import("../utils/bridge-state");
+    const verifiedMessage = await verifyDualSignatures(
+      message,
+      seaSignature,
+      ethSignature,
+      userAddress,
+      gunPubKey,
+      {
+        amount: amountBigInt.toString(),
+        nonce: nonceBigInt.toString(),
+        timestamp: Date.now(), // Will check message timestamp is recent
+      }
+    );
+
+    if (!verifiedMessage) {
+      return res.status(401).json({
+        success: false,
+        error: "Invalid signatures: must provide valid SEA and Ethereum signatures with correct message content",
       });
     }
 
