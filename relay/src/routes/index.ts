@@ -25,7 +25,7 @@ const tokenAuthMiddleware = (
   const bearerToken = authHeader && authHeader.split(" ")[1];
 
   // Check custom token header (for Gun/Wormhole compatibility)
-  const customToken = req.headers["token"] as str | undefined;
+  const customToken = req.headers["token"] as string | undefined;
 
   // Accept either format
   const token = bearerToken || customToken;
