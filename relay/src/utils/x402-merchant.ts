@@ -21,6 +21,13 @@ import httpModule from "http";
 import httpsModule from "https";
 import "./global.d.ts";
 import { loggers } from "./logger";
+import type {
+  PaymentPayload,
+  PaymentRequirements,
+  X402Response,
+  ExactEvmPayload,
+  ExactEvmPayloadAuthorization,
+} from "../types/x402-types";
 
 const log = loggers.x402;
 
@@ -45,19 +52,8 @@ interface SubscriptionTiersMap {
   [tier: str]: PricingTier;
 }
 
-export interface PaymentPayload {
-  payload: {
-    authorization: {
-      from: str;
-      to: str;
-      value: str;
-      validAfter: str;
-      validBefore: str;
-      nonce: str;
-    };
-    signature: str;
-  };
-}
+// Use official x402 types
+// PaymentPayload is now imported from "x402/types"
 
 interface PaymentVerificationResult {
   isValid: bool;
@@ -337,7 +333,7 @@ export class X402Merchant {
   /**
    * Create payment requirements for a subscription tier
    */
-  createPaymentRequirements(tier: str = "basic") {
+  createPaymentRequirements(tier: str = "basic"): PaymentRequirements {
     const tierConfig = SUBSCRIPTION_TIERS[tier];
     if (!tierConfig) {
       throw new Error(`Invalid subscription tier: ${tier}`);
@@ -373,13 +369,13 @@ export class X402Merchant {
   /**
    * Create a payment-required response following x402 protocol
    */
-  createPaymentRequiredResponse(tier: str = "basic") {
+  createPaymentRequiredResponse(tier: str = "basic"): X402Response {
     const requirements = this.createPaymentRequirements(tier);
 
     return {
       x402Version: 1,
       accepts: [requirements],
-      error: "Payment required for IPFS storage subscription",
+      error: "Payment required for IPFS storage subscription" as any, // Using 'as any' since ErrorReason enum doesn't include this string, but x402 spec allows custom error messages
     };
   }
 
@@ -403,6 +399,18 @@ export class X402Merchant {
       // Basic validation
       if (!paymentPayload.payload) {
         return { isValid: false, invalidReason: "Missing payload in payment" };
+      }
+
+      // Type guard: check if it's EVM payload (has authorization and signature)
+      const isEvmPayload = (payload: any): payload is ExactEvmPayload => {
+        return payload && "authorization" in payload && "signature" in payload;
+      };
+
+      if (!isEvmPayload(paymentPayload.payload)) {
+        return {
+          isValid: false,
+          invalidReason: "Only EVM payments are supported",
+        };
       }
 
       const { authorization, signature } = paymentPayload.payload;
@@ -504,6 +512,18 @@ export class X402Merchant {
       // Basic validation
       if (!paymentPayload.payload) {
         return { isValid: false, invalidReason: "Missing payload in payment" };
+      }
+
+      // Type guard: check if it's EVM payload (has authorization and signature)
+      const isEvmPayload = (payload: any): payload is ExactEvmPayload => {
+        return payload && "authorization" in payload && "signature" in payload;
+      };
+
+      if (!isEvmPayload(paymentPayload.payload)) {
+        return {
+          isValid: false,
+          invalidReason: "Only EVM payments are supported",
+        };
       }
 
       const { authorization, signature } = paymentPayload.payload;
@@ -754,6 +774,18 @@ export class X402Merchant {
     }
 
     try {
+      // Type guard: check if it's EVM payload
+      const isEvmPayload = (payload: any): payload is ExactEvmPayload => {
+        return payload && "authorization" in payload && "signature" in payload;
+      };
+
+      if (!paymentPayload.payload || !isEvmPayload(paymentPayload.payload)) {
+        return {
+          success: false,
+          errorReason: "Only EVM payments are supported for direct settlement",
+        };
+      }
+
       const { authorization, signature } = paymentPayload.payload;
 
       // Parse signature components (EIP-712 returns 65-byte signature)
