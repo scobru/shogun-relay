@@ -11,8 +11,8 @@
     <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     
-    <!-- RapiDoc - Load synchronously before body -->
-    <script src="https://unpkg.com/rapidoc@9.3.4/dist/rapidoc-min.js"></script>
+    <!-- RapiDoc - Must be loaded as ES module -->
+    <script type="module" src="https://unpkg.com/rapidoc/dist/rapidoc-min.js"></script>
     
     <style>
         body {
@@ -121,9 +121,10 @@
                 <div class="text-[#A0A0A0] text-sm">Fetching OpenAPI specification from /api/openapi.json</div>
             </div>
 
-            <!-- RapiDoc Component -->
-            <rapidoc
+            <!-- RapiDoc Component - Note: tag name is rapi-doc (with hyphen) -->
+            <rapi-doc
                 id="rapidoc-element"
+                spec-url="/api/openapi.json"
                 theme="dark"
                 render-style="read"
                 show-header="false"
@@ -150,7 +151,7 @@
                 show-schema-description="true"
                 schema-style="table"
                 schema-expand-level="2"
-            ></rapidoc>
+            ></rapi-doc>
         </div>
     </div>
 
@@ -159,17 +160,17 @@
     <script src="lib/admin-nav.js"></script>
 
     <script>
-        // Wait for everything to be ready
-        window.addEventListener('load', () => {
-            console.log('🌐 Window loaded, initializing RapiDoc...');
+        // Simple initialization - RapiDoc will load spec-url automatically
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('📄 API Documentation page loaded');
             
             const loadingIndicator = document.getElementById('loadingIndicator');
             const rapidocEl = document.getElementById('rapidoc-element');
             
-            // Load spec
+            // Verify endpoint is accessible
             fetch('/api/openapi.json')
                 .then(response => {
-                    console.log('OpenAPI endpoint response status:', response.status);
+                    console.log('✅ OpenAPI endpoint response status:', response.status);
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
@@ -179,46 +180,12 @@
                     console.log('✅ OpenAPI spec loaded successfully:', spec.info?.title || 'Unknown');
                     console.log('📊 Number of paths:', Object.keys(spec.paths || {}).length);
                     
-                    // Wait a moment for RapiDoc to be ready
+                    // Hide loading indicator after a short delay to let RapiDoc start rendering
                     setTimeout(() => {
-                        if (rapidocEl) {
-                            console.log('🔧 Setting spec on RapiDoc element...');
-                            
-                            // Method 1: Set as property
-                            if (rapidocEl.spec !== undefined) {
-                                rapidocEl.spec = JSON.stringify(spec);
-                                console.log('✅ Spec set as property');
-                            }
-                            
-                            // Method 2: Set as attribute
-                            rapidocEl.setAttribute('spec', JSON.stringify(spec));
-                            console.log('✅ Spec set as attribute');
-                            
-                            // Hide loading indicator
-                            if (loadingIndicator) {
-                                setTimeout(() => {
-                                    loadingIndicator.style.display = 'none';
-                                }, 500);
-                            }
-                            
-                            // Check periodically if shadow root appears
-                            let checkCount = 0;
-                            const shadowCheck = setInterval(() => {
-                                checkCount++;
-                                if (rapidocEl.shadowRoot) {
-                                    clearInterval(shadowCheck);
-                                    console.log('✅ RapiDoc shadow root found after', checkCount * 100, 'ms');
-                                    if (loadingIndicator) loadingIndicator.style.display = 'none';
-                                } else if (checkCount > 50) {
-                                    clearInterval(shadowCheck);
-                                    console.warn('⚠️ Shadow root not found after 5 seconds, but showing RapiDoc anyway');
-                                    if (loadingIndicator) loadingIndicator.style.display = 'none';
-                                }
-                            }, 100);
-                        } else {
-                            console.error('❌ RapiDoc element not found');
+                        if (loadingIndicator) {
+                            loadingIndicator.style.display = 'none';
                         }
-                    }, 500);
+                    }, 1000);
                 })
                 .catch(error => {
                     console.error('❌ Error loading OpenAPI spec:', error);
@@ -236,6 +203,18 @@
                         `;
                     }
                 });
+            
+            // Monitor RapiDoc events
+            if (rapidocEl) {
+                rapidocEl.addEventListener('spec-loaded', () => {
+                    console.log('✅ RapiDoc spec-loaded event fired');
+                    if (loadingIndicator) loadingIndicator.style.display = 'none';
+                });
+                
+                rapidocEl.addEventListener('spec-error', (e) => {
+                    console.error('❌ RapiDoc spec-error:', e.detail);
+                });
+            }
         });
     </script>
 </body>
