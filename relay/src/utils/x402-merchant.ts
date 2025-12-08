@@ -19,7 +19,7 @@ import * as RelayUser from "./relay-user";
 import { USDC_EIP3009_ABI } from "shogun-contracts-sdk";
 import httpModule from "http";
 import httpsModule from "https";
-import "./global.d.ts";
+import "../global.d.ts";
 import { loggers } from "./logger";
 import type {
   PaymentPayload,
