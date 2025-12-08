@@ -354,6 +354,7 @@ export async function getObservationsForHost(gun, observedHost, options = {}) {
 
 /**
  * Aggregate reputation from verified observations
+ * Applies different weights to self-rating vs external observations
  * 
  * @param {Array} observations - Array of verified observations
  * @returns {object} - Aggregated reputation metrics
@@ -367,6 +368,12 @@ export function aggregateReputation(observations) {
     };
   }
 
+  // Observer type weights (self-rating has reduced weight)
+  const OBSERVER_WEIGHTS = {
+    self: 0.1,      // Self-rating has only 10% weight
+    external: 0.9,  // External observations have 90% weight
+  };
+
   const metrics = {
     proofsSuccessful: 0,
     proofsFailed: 0,
@@ -374,24 +381,66 @@ export function aggregateReputation(observations) {
     responseTimeSamples: 0,
     pinsFulfilled: 0,
     pinsRequested: 0,
+    selfRatings: 0,
+    externalRatings: 0,
   };
 
   observations.forEach(obs => {
     const o = obs.observation || obs;
-    metrics.proofsSuccessful += o.proofsSuccessful || 0;
-    metrics.proofsFailed += o.proofsFailed || 0;
-    if (o.avgResponseTimeMs) {
-      metrics.totalResponseTimeMs += o.avgResponseTimeMs;
-      metrics.responseTimeSamples += 1;
+    
+    // Determine observer type from observation details
+    // Check if this is a reputation event with observerType field
+    const observerType = o.details?.observerType || 
+                        (obs.observerType) || 
+                        'external'; // Default to external if unknown
+    
+    const weight = OBSERVER_WEIGHTS[observerType] || OBSERVER_WEIGHTS.external;
+    
+    // Count observer types
+    if (observerType === 'self') {
+      metrics.selfRatings += 1;
+    } else {
+      metrics.externalRatings += 1;
     }
-    metrics.pinsFulfilled += o.pinsFulfilled || 0;
-    metrics.pinsRequested += o.pinsRequested || 0;
+    
+    // Apply weights to metrics
+    // For reputation events, check the event type
+    if (o.type === 'reputation_event') {
+      if (o.event === 'proof_success') {
+        metrics.proofsSuccessful += weight; // Weighted count
+        if (o.details?.responseTimeMs) {
+          metrics.totalResponseTimeMs += o.details.responseTimeMs * weight;
+          metrics.responseTimeSamples += weight;
+        }
+      } else if (o.event === 'proof_failure') {
+        metrics.proofsFailed += weight; // Weighted count
+      } else if (o.event === 'pin_fulfillment') {
+        metrics.pinsRequested += weight;
+        if (o.details?.fulfilled) {
+          metrics.pinsFulfilled += weight;
+        }
+      }
+    } else {
+      // Legacy format - aggregate as before but with reduced weight for self-rating
+      metrics.proofsSuccessful += (o.proofsSuccessful || 0) * weight;
+      metrics.proofsFailed += (o.proofsFailed || 0) * weight;
+      if (o.avgResponseTimeMs) {
+        metrics.totalResponseTimeMs += o.avgResponseTimeMs * weight;
+        metrics.responseTimeSamples += weight;
+      }
+      metrics.pinsFulfilled += (o.pinsFulfilled || 0) * weight;
+      metrics.pinsRequested += (o.pinsRequested || 0) * weight;
+    }
   });
 
   const proofsTotal = metrics.proofsSuccessful + metrics.proofsFailed;
   
   return {
     totalObservers: observations.length,
+    observerBreakdown: {
+      self: metrics.selfRatings,
+      external: metrics.externalRatings,
+    },
     aggregated: {
       proofSuccessRate: proofsTotal > 0 
         ? Math.round((metrics.proofsSuccessful / proofsTotal) * 100) 
@@ -402,9 +451,10 @@ export function aggregateReputation(observations) {
       pinFulfillmentRate: metrics.pinsRequested > 0 
         ? Math.round((metrics.pinsFulfilled / metrics.pinsRequested) * 100) 
         : null,
-      totalProofsObserved: proofsTotal,
+      totalProofsObserved: Math.round(proofsTotal),
     },
-    confidence: Math.min(100, observations.length * 10), // More observers = more confidence
+    confidence: Math.min(100, metrics.externalRatings * 10), // Only external ratings count for confidence
+    note: 'Self-ratings have reduced weight (10%) in reputation calculation',
   };
 }
 

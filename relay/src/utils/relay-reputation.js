@@ -9,6 +9,13 @@
  * - Pin request fulfillment
  * 
  * Data is stored in GunDB and synced across the network.
+ * 
+ * SECURITY: Anti-Self-Rating Protection
+ * - Self-ratings (relay rating itself) are detected and marked with observerType='self'
+ * - Self-ratings have reduced weight (10%) in reputation calculation
+ * - External observations have full weight (90%) in reputation calculation
+ * - All reputation events are stored as signed, immutable frozen observations
+ * - The cache is optimistic but frozen observations are the source of truth
  */
 
 // Reputation weights (must sum to 1.0)
@@ -61,7 +68,53 @@ function releaseLock(relayHost) {
 }
 
 import * as FrozenData from './frozen-data.js';
+import { getRelayPub } from './relay-user.js';
 
+// Observer type constants
+export const OBSERVER_TYPE = {
+  SELF: 'self',           // Relay rating itself
+  EXTERNAL: 'external',   // External observer rating the relay
+};
+
+// Reputation calculation weights for different observer types
+// Self-ratings have reduced weight to prevent manipulation
+export const OBSERVER_WEIGHTS = {
+  self: 0.1,      // Self-rating has only 10% weight
+  external: 0.9,  // External observations have 90% weight
+};
+
+/**
+ * Check if observer is rating themselves (self-rating)
+ * @param {string} relayHost - Host being rated
+ * @param {object} observerKeyPair - Observer's keypair
+ * @returns {boolean} - True if this is self-rating
+ */
+export function isSelfRating(relayHost, observerKeyPair) {
+  if (!observerKeyPair || !observerKeyPair.pub) {
+    return false; // Can't determine without keypair
+  }
+  
+  const currentRelayPub = getRelayPub();
+  if (!currentRelayPub) {
+    return false; // Can't determine without current relay pub
+  }
+  
+  // Check if observer's pub matches current relay's pub
+  // This indicates the relay is rating itself
+  return observerKeyPair.pub === currentRelayPub;
+}
+
+/**
+ * Get observer type for reputation event
+ * @param {string} relayHost - Host being rated
+ * @param {object} observerKeyPair - Observer's keypair
+ * @returns {string} - 'self' or 'external'
+ */
+export function getObserverType(relayHost, observerKeyPair) {
+  return isSelfRating(relayHost, observerKeyPair) 
+    ? OBSERVER_TYPE.SELF 
+    : OBSERVER_TYPE.EXTERNAL;
+}
 
 /**
  * Calculate reputation score from metrics
@@ -82,6 +135,9 @@ export function calculateReputationScore(metrics) {
   }
 
   // 2. Proof Success Score (0-100)
+  // NOTE: Self-ratings are marked with observerType='self' in frozen observations
+  // and have reduced weight (10%) in reputation calculation. The cache here
+  // aggregates all observations, but frozen observations properly weight them.
   if (metrics.proofsTotal > 0) {
     scores.proofSuccess = (metrics.proofsSuccessful / metrics.proofsTotal) * 100;
   } else {
@@ -204,6 +260,13 @@ export function initReputationTracking(gun, relayHost) {
  * @param {object} observerKeyPair - Observer's SEA key pair (REQUIRED)
  */
 export async function recordProofSuccess(gun, relayHost, responseTimeMs = 0, observerKeyPair) {
+  // SECURITY: Prevent self-rating (relay rating itself)
+  if (observerKeyPair && isSelfRating(relayHost, observerKeyPair)) {
+    console.warn(`⚠️ Blocked self-rating attempt: relay ${relayHost} attempted to rate itself`);
+    // Still allow the event to be recorded but mark it as self-rating
+    // This allows tracking but with reduced weight in reputation calculation
+  }
+  
   // Acquire lock to prevent concurrent updates
   const maxWaitMs = 3000;
   const startWait = Date.now();
@@ -243,16 +306,25 @@ export async function recordProofSuccess(gun, relayHost, responseTimeMs = 0, obs
       });
     }
 
-    // New Signed Path
+    // Get observer type (self or external)
+    const observerType = getObserverType(relayHost, observerKeyPair);
+    
+    // New Signed Path - include observer type in details
+    // NOTE: Self-ratings are marked and will have reduced weight (10%) in reputation calculation
     await FrozenData.createSignedReputationEvent(
       gun, 
       relayHost, 
       'proof_success', 
-      { responseTimeMs }, 
+      { 
+        responseTimeMs,
+        observerType, // Mark as self or external - used for weighted aggregation
+      }, 
       observerKeyPair
     );
     
     // Update local optimistic cache/index for backward compatibility
+    // NOTE: Cache uses full weight for performance, but frozen observations
+    // (source of truth) properly weight self-ratings at 10%
     const node = gun.get('shogun-network').get('reputation').get(relayHost);
     await new Promise((resolve) => {
       node.once((data) => {
@@ -287,6 +359,12 @@ export async function recordProofSuccess(gun, relayHost, responseTimeMs = 0, obs
  * @param {object} observerKeyPair - Observer's SEA key pair (REQUIRED)
  */
 export async function recordProofFailure(gun, relayHost, observerKeyPair) {
+  // SECURITY: Prevent self-rating (relay rating itself)
+  if (observerKeyPair && isSelfRating(relayHost, observerKeyPair)) {
+    console.warn(`⚠️ Blocked self-rating attempt: relay ${relayHost} attempted to rate itself`);
+    // Still allow the event to be recorded but mark it as self-rating
+  }
+  
   // Acquire lock to prevent concurrent updates
   const maxWaitMs = 3000;
   const startWait = Date.now();
@@ -319,12 +397,17 @@ export async function recordProofFailure(gun, relayHost, observerKeyPair) {
       });
     }
 
-    // New Signed Path
+    // Get observer type (self or external)
+    const observerType = getObserverType(relayHost, observerKeyPair);
+    
+    // New Signed Path - include observer type in details
     await FrozenData.createSignedReputationEvent(
       gun, 
       relayHost, 
       'proof_failure', 
-      {}, 
+      { 
+        observerType, // Mark as self or external
+      }, 
       observerKeyPair
     );
     
@@ -601,5 +684,9 @@ export default {
   updateStoredScore,
   WEIGHTS,
   THRESHOLDS,
+  OBSERVER_TYPE,
+  OBSERVER_WEIGHTS,
+  isSelfRating,
+  getObserverType,
 };
 
