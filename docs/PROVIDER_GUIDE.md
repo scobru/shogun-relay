@@ -409,7 +409,7 @@ await registry.registerRelay(endpoint, gunPubKey, stakeAmount);
 
 ### Contract Addresses
 
-**Note**: Contract addresses for Shogun Protocol contracts (RelayRegistry, StorageDealRegistry, etc.) are managed by the `shogun-contracts` SDK and retrieved automatically. The addresses below are for reference when using the SDK or for manual contract interaction.
+**Note**: Contract addresses for Shogun Protocol contracts (RelayRegistry, StorageDealRegistry, etc.) are managed by the `shogun-contracts-sdk` SDK and retrieved automatically. The addresses below are for reference when using the SDK or for manual contract interaction.
 
 | Network | Registry | USDC |
 |---------|----------|------|
@@ -418,7 +418,7 @@ await registry.registerRelay(endpoint, gunPubKey, stakeAmount);
 
 **To get current addresses programmatically:**
 ```javascript
-import { ShogunSDK } from 'shogun-contracts/sdk';
+import { ShogunSDK } from 'shogun-contracts-sdk';
 const sdk = new ShogunSDK({ provider, chainId: 84532 });
 const relayRegistry = sdk.getRelayRegistry();
 console.log(relayRegistry.getAddress()); // Get current address

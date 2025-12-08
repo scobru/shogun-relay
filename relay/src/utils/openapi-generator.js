@@ -1115,6 +1115,1484 @@ export function generateOpenAPISpec(baseUrl = 'http://localhost:8765') {
             }
           }
         }
+      },
+      "/api/v1/x402/payment-requirements/{tier}": {
+        get: {
+          tags: ["x402 Subscriptions"],
+          summary: "Get payment requirements for tier",
+          description: "Get x402 payment requirements for a specific subscription tier",
+          operationId: "getX402PaymentRequirements",
+          parameters: [
+            {
+              name: "tier",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "Subscription tier"
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Payment requirements",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/x402/subscribe": {
+        post: {
+          tags: ["x402 Subscriptions"],
+          summary: "Purchase or renew subscription",
+          description: "Purchase or renew a subscription with x402 payment",
+          operationId: "subscribeX402",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    userAddress: { type: "string" },
+                    tier: { type: "string" },
+                    payment: { type: "object" }
+                  },
+                  required: ["userAddress", "tier"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Subscription activated",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "402": {
+              description: "Payment required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/x402/storage/{userAddress}": {
+        get: {
+          tags: ["x402 Subscriptions"],
+          summary: "Get user storage usage",
+          description: "Get real storage usage by verifying IPFS pins",
+          operationId: "getX402Storage",
+          parameters: [
+            {
+              name: "userAddress",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "User Ethereum address"
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Storage usage information",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/x402/config": {
+        get: {
+          tags: ["x402 Subscriptions"],
+          summary: "Get x402 configuration",
+          description: "Get x402 configuration (public info only)",
+          operationId: "getX402Config",
+          responses: {
+            "200": {
+              description: "Configuration information",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/deals/create": {
+        post: {
+          tags: ["Storage Deals"],
+          summary: "Create storage deal",
+          description: "Create a new storage deal. Returns payment requirements.",
+          operationId: "createDeal",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    cid: { type: "string" },
+                    clientAddress: { type: "string" },
+                    sizeMB: { type: "number" },
+                    durationDays: { type: "number" },
+                    tier: { type: "string" },
+                    relayAddress: { type: "string" }
+                  },
+                  required: ["cid", "clientAddress", "sizeMB", "durationDays"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Deal created",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/deals/{dealId}/activate": {
+        post: {
+          tags: ["Storage Deals"],
+          summary: "Activate deal",
+          description: "Activate a deal after payment",
+          operationId: "activateDeal",
+          parameters: [
+            {
+              name: "dealId",
+              in: "path",
+              required: true,
+              schema: { type: "string" }
+            }
+          ],
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    paymentTxHash: { type: "string" },
+                    clientStake: { type: "string" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Deal activated",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/deals/{dealId}/renew": {
+        post: {
+          tags: ["Storage Deals"],
+          summary: "Renew deal",
+          description: "Renew an existing deal",
+          operationId: "renewDeal",
+          parameters: [
+            {
+              name: "dealId",
+              in: "path",
+              required: true,
+              schema: { type: "string" }
+            }
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    additionalDays: { type: "number" },
+                    payment: { type: "object" }
+                  },
+                  required: ["additionalDays"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Deal renewed",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "402": {
+              description: "Payment required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/deals/{dealId}/terminate": {
+        post: {
+          tags: ["Storage Deals"],
+          summary: "Terminate deal",
+          description: "Terminate a storage deal",
+          operationId: "terminateDeal",
+          parameters: [
+            {
+              name: "dealId",
+              in: "path",
+              required: true,
+              schema: { type: "string" }
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Deal terminated",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/deals/{dealId}/verify": {
+        get: {
+          tags: ["Storage Deals"],
+          summary: "Verify deal storage",
+          description: "Verify that a deal's file is actually stored on the relay",
+          operationId: "verifyDeal",
+          parameters: [
+            {
+              name: "dealId",
+              in: "path",
+              required: true,
+              schema: { type: "string" }
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Verification result",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/deals/overhead": {
+        get: {
+          tags: ["Storage Deals"],
+          summary: "Calculate erasure coding overhead",
+          description: "Calculate erasure coding overhead for a file size",
+          operationId: "getDealOverhead",
+          parameters: [
+            {
+              name: "sizeMB",
+              in: "query",
+              schema: { type: "number" },
+              description: "File size in MB"
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Overhead calculation",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/deals/leaderboard": {
+        get: {
+          tags: ["Storage Deals"],
+          summary: "Deals leaderboard",
+          description: "Get leaderboard of relays sorted by deal statistics",
+          operationId: "getDealsLeaderboard",
+          parameters: [
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", default: 50 }
+            },
+            {
+              name: "timeout",
+              in: "query",
+              schema: { type: "integer", default: 5000 }
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Leaderboard",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/network/relay/{host}": {
+        get: {
+          tags: ["Network"],
+          summary: "Get relay details",
+          description: "Get details for a specific relay",
+          operationId: "getNetworkRelay",
+          parameters: [
+            {
+              name: "host",
+              in: "path",
+              required: true,
+              schema: { type: "string" }
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Relay details",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/network/proof/{cid}": {
+        get: {
+          tags: ["Network"],
+          summary: "Generate storage proof",
+          description: "Generate a storage proof for a CID",
+          operationId: "getNetworkProof",
+          parameters: [
+            {
+              name: "cid",
+              in: "path",
+              required: true,
+              schema: { type: "string" }
+            },
+            {
+              name: "challenge",
+              in: "query",
+              schema: { type: "string" }
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Storage proof",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/network/verify-proof": {
+        post: {
+          tags: ["Network"],
+          summary: "Verify storage proof",
+          description: "Verify a storage proof from another relay",
+          operationId: "verifyNetworkProof",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    proof: { type: "object" }
+                  },
+                  required: ["proof"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Verification result",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/network/pin-request": {
+        get: {
+          tags: ["Network"],
+          summary: "Get pin request info",
+          description: "Get information about pin requests endpoint",
+          operationId: "getPinRequestInfo",
+          responses: {
+            "200": {
+              description: "Pin request information",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        },
+        post: {
+          tags: ["Network"],
+          summary: "Request pin",
+          description: "Request other relays to pin a CID",
+          operationId: "requestPin",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    cid: { type: "string" },
+                    replicationFactor: { type: "integer", default: 3 },
+                    priority: { type: "string", default: "normal" }
+                  },
+                  required: ["cid"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Pin request published",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/network/pin-requests": {
+        get: {
+          tags: ["Network"],
+          summary: "List pin requests",
+          description: "List pending pin requests from the network",
+          operationId: "listPinRequests",
+          parameters: [
+            {
+              name: "maxAge",
+              in: "query",
+              schema: { type: "integer" },
+              description: "Maximum age in milliseconds"
+            }
+          ],
+          responses: {
+            "200": {
+              description: "List of pin requests",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/network/pin-response": {
+        post: {
+          tags: ["Network"],
+          summary: "Respond to pin request",
+          description: "Respond to a pin request (announce that you pinned it)",
+          operationId: "respondToPinRequest",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    requestId: { type: "string" },
+                    status: { type: "string", default: "completed" }
+                  },
+                  required: ["requestId"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Pin response published",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/network/reputation/record-proof": {
+        post: {
+          tags: ["Network"],
+          summary: "Record proof event",
+          description: "Record a storage proof event for tracking other relays",
+          operationId: "recordProofEvent",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    host: { type: "string" },
+                    success: { type: "boolean" },
+                    responseTimeMs: { type: "number" }
+                  },
+                  required: ["host", "success"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Event recorded",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/network/verified/relays": {
+        get: {
+          tags: ["Network"],
+          summary: "List verified relays",
+          description: "List relay announcements from frozen (signed, immutable) space",
+          operationId: "getVerifiedRelays",
+          parameters: [
+            {
+              name: "verify",
+              in: "query",
+              schema: { type: "boolean", default: true }
+            },
+            {
+              name: "maxAge",
+              in: "query",
+              schema: { type: "integer" }
+            },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", default: 50 }
+            }
+          ],
+          responses: {
+            "200": {
+              description: "List of verified relays",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/network/verified/relay/{host}": {
+        get: {
+          tags: ["Network"],
+          summary: "Get verified relay",
+          description: "Get verified (frozen) announcement for a specific relay",
+          operationId: "getVerifiedRelay",
+          parameters: [
+            {
+              name: "host",
+              in: "path",
+              required: true,
+              schema: { type: "string" }
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Verified relay announcement",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "404": {
+              description: "Relay not found",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/network/verified/observation": {
+        post: {
+          tags: ["Network"],
+          summary: "Create verified observation",
+          description: "Create a signed observation about another relay",
+          operationId: "createVerifiedObservation",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    observedHost: { type: "string" },
+                    observation: { type: "object" }
+                  },
+                  required: ["observedHost", "observation"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Observation created",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/network/verified/observations/{host}": {
+        get: {
+          tags: ["Network"],
+          summary: "Get verified observations",
+          description: "Get all verified observations for a specific relay",
+          operationId: "getVerifiedObservations",
+          parameters: [
+            {
+              name: "host",
+              in: "path",
+              required: true,
+              schema: { type: "string" }
+            },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", default: 50 }
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Observations and aggregated reputation",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/network/verified/entry/{namespace}/{hash}": {
+        get: {
+          tags: ["Network"],
+          summary: "Read verified entry",
+          description: "Read and verify any frozen entry by its content hash",
+          operationId: "readVerifiedEntry",
+          parameters: [
+            {
+              name: "namespace",
+              in: "path",
+              required: true,
+              schema: { type: "string" }
+            },
+            {
+              name: "hash",
+              in: "path",
+              required: true,
+              schema: { type: "string" }
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Verified entry",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "404": {
+              description: "Entry not found",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/network/onchain/deals/relay/{address}": {
+        get: {
+          tags: ["Registry"],
+          summary: "Get relay deals from registry",
+          description: "Get all storage deals for a relay from on-chain registry",
+          operationId: "getOnChainRelayDeals",
+          parameters: [
+            {
+              name: "address",
+              in: "path",
+              required: true,
+              schema: { type: "string" }
+            },
+            {
+              name: "chainId",
+              in: "query",
+              schema: { type: "integer", default: 84532 }
+            }
+          ],
+          responses: {
+            "200": {
+              description: "List of deals",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/registry/balance": {
+        get: {
+          tags: ["Registry"],
+          summary: "Get wallet balances",
+          description: "Get wallet balances (ETH for gas, USDC for staking)",
+          operationId: "getRegistryBalance",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          responses: {
+            "200": {
+              description: "Wallet balances",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/registry/register": {
+        post: {
+          tags: ["Registry"],
+          summary: "Register relay on-chain",
+          description: "Register this relay on-chain",
+          operationId: "registerRelay",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    endpoint: { type: "string" },
+                    gunPubKey: { type: "string" },
+                    stakeAmount: { type: "string" },
+                    griefingRatio: { type: "integer" }
+                  },
+                  required: ["endpoint", "gunPubKey", "stakeAmount"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Relay registered",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/registry/update": {
+        post: {
+          tags: ["Registry"],
+          summary: "Update relay",
+          description: "Update relay endpoint and/or pubkey",
+          operationId: "updateRelay",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    newEndpoint: { type: "string" },
+                    newGunPubKey: { type: "string" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Relay updated",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/registry/stake/increase": {
+        post: {
+          tags: ["Registry"],
+          summary: "Increase stake",
+          description: "Increase stake amount",
+          operationId: "increaseStake",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    amount: { type: "string" }
+                  },
+                  required: ["amount"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Stake increased",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/registry/stake/unstake": {
+        post: {
+          tags: ["Registry"],
+          summary: "Request unstake",
+          description: "Request to unstake (starts delay period)",
+          operationId: "requestUnstake",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          responses: {
+            "200": {
+              description: "Unstake requested",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/registry/stake/withdraw": {
+        post: {
+          tags: ["Registry"],
+          summary: "Withdraw stake",
+          description: "Withdraw stake after unstaking delay",
+          operationId: "withdrawStake",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          responses: {
+            "200": {
+              description: "Stake withdrawn",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/registry/deal/register": {
+        post: {
+          tags: ["Registry"],
+          summary: "Register deal on-chain",
+          description: "Register a storage deal on-chain",
+          operationId: "registerDealOnChain",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    dealId: { type: "string" },
+                    clientAddress: { type: "string" },
+                    cid: { type: "string" },
+                    sizeMB: { type: "number" },
+                    priceUSDC: { type: "string" },
+                    durationDays: { type: "number" },
+                    clientStake: { type: "string" }
+                  },
+                  required: ["clientAddress", "cid", "sizeMB", "priceUSDC", "durationDays"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Deal registered",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/registry/deals": {
+        get: {
+          tags: ["Registry"],
+          summary: "Get relay deals",
+          description: "Get all deals for this relay from StorageDealRegistry",
+          operationId: "getRegistryDeals",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          responses: {
+            "200": {
+              description: "List of deals",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/registry/config": {
+        get: {
+          tags: ["Registry"],
+          summary: "Get registry configuration",
+          description: "Get current registry configuration (addresses, chain info)",
+          operationId: "getRegistryConfig",
+          responses: {
+            "200": {
+              description: "Registry configuration",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/registry/deal/complete": {
+        post: {
+          tags: ["Registry"],
+          summary: "Complete deal",
+          description: "Mark a deal as completed",
+          operationId: "completeDeal",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    dealId: { type: "string" }
+                  },
+                  required: ["dealId"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Deal completed",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/registry/grief/missed-proof": {
+        post: {
+          tags: ["Registry"],
+          summary: "Report missed proof",
+          description: "Report a missed proof",
+          operationId: "reportMissedProof",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    relayAddress: { type: "string" },
+                    dealId: { type: "string" },
+                    evidence: { type: "string" }
+                  },
+                  required: ["relayAddress", "dealId", "evidence"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Missed proof reported",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/registry/grief/data-loss": {
+        post: {
+          tags: ["Registry"],
+          summary: "Report data loss",
+          description: "Report data loss",
+          operationId: "reportDataLoss",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    relayAddress: { type: "string" },
+                    dealId: { type: "string" },
+                    evidence: { type: "string" }
+                  },
+                  required: ["relayAddress", "dealId", "evidence"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Data loss reported",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/registry/deal/grief": {
+        post: {
+          tags: ["Registry"],
+          summary: "Grief storage deal",
+          description: "Grief a storage deal",
+          operationId: "griefDeal",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    dealId: { type: "string" },
+                    slashAmount: { type: "string" },
+                    reason: { type: "string" }
+                  },
+                  required: ["dealId", "slashAmount", "reason"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Deal griefed",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/deals/upload": {
+        post: {
+          tags: ["Storage Deals"],
+          summary: "Upload file for deal",
+          description: "Upload a file to IPFS for deal creation",
+          operationId: "uploadDealFile",
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    file: {
+                      type: "string",
+                      format: "binary"
+                    },
+                    walletAddress: { type: "string" }
+                  },
+                  required: ["file"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "File uploaded",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/deals/relay/active": {
+        get: {
+          tags: ["Storage Deals"],
+          summary: "Get active deals for relay",
+          description: "Get active deals for this relay (admin only)",
+          operationId: "getRelayActiveDeals",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          responses: {
+            "200": {
+              description: "Active deals",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/deals/{dealId}/verify-proof": {
+        get: {
+          tags: ["Storage Deals"],
+          summary: "Verify deal proof",
+          description: "Challenge the relay to provide a storage proof for a deal",
+          operationId: "verifyDealProof",
+          parameters: [
+            {
+              name: "dealId",
+              in: "path",
+              required: true,
+              schema: { type: "string" }
+            },
+            {
+              name: "challenge",
+              in: "query",
+              schema: { type: "string" }
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Storage proof",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "404": {
+              description: "Deal not found",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/x402/can-upload-verified/{userAddress}": {
+        get: {
+          tags: ["x402 Subscriptions"],
+          summary: "Check upload permission (verified)",
+          description: "Check if user can upload with verified storage check",
+          operationId: "checkX402UploadVerified",
+          parameters: [
+            {
+              name: "userAddress",
+              in: "path",
+              required: true,
+              schema: { type: "string" }
+            },
+            {
+              name: "size",
+              in: "query",
+              schema: { type: "number" },
+              description: "File size in MB"
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Upload permission status",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/x402/storage/sync/{userAddress}": {
+        post: {
+          tags: ["x402 Subscriptions"],
+          summary: "Sync storage usage",
+          description: "Sync storage usage - verify IPFS and update GunDB (admin only)",
+          operationId: "syncX402Storage",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          parameters: [
+            {
+              name: "userAddress",
+              in: "path",
+              required: true,
+              schema: { type: "string" }
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Storage synced",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/x402/update-usage/{userAddress}": {
+        post: {
+          tags: ["x402 Subscriptions"],
+          summary: "Update storage usage",
+          description: "Update storage usage after successful upload (admin only)",
+          operationId: "updateX402Usage",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          parameters: [
+            {
+              name: "userAddress",
+              in: "path",
+              required: true,
+              schema: { type: "string" }
+            }
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    addMB: { type: "number" }
+                  },
+                  required: ["addMB"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Usage updated",
+              content: {
+                "application/json": {
+                  schema: { type: "object" }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
       }
     }
   };

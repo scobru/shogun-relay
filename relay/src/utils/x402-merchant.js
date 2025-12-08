@@ -10,7 +10,7 @@ import { baseSepolia, base, polygon, polygonAmoy } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { ipfsRequest } from './ipfs-client.js';
 import * as RelayUser from './relay-user.js';
-import { USDC_EIP3009_ABI } from 'shogun-contracts';
+import { USDC_EIP3009_ABI } from 'shogun-contracts-sdk';
 import httpModule from 'http';
 import httpsModule from 'https';
 

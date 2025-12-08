@@ -30,7 +30,7 @@ const RELAY_PRIVATE_KEY = process.env.RELAY_PRIVATE_KEY;
  */
 router.get('/status', async (req, res) => {
   try {
-    const { getConfigByChainId } = await import('shogun-contracts');
+    const { getConfigByChainId } = await import('shogun-contracts-sdk');
     const config = getConfigByChainId(REGISTRY_CHAIN_ID);
     
     if (!RELAY_PRIVATE_KEY) {

@@ -1048,7 +1048,7 @@ See docs/RELAY_KEYS.md for more information.
   // Contracts configuration endpoint
   app.get("/api/v1/contracts", async (req, res) => {
     try {
-      const { CONTRACTS_CONFIG, getConfigByChainId } = await import('shogun-contracts');
+      const { CONTRACTS_CONFIG, getConfigByChainId } = await import('shogun-contracts-sdk');
       const chainIdParam = req.query.chainId;
       
       if (chainIdParam) {
@@ -1185,7 +1185,7 @@ See docs/RELAY_KEYS.md for more information.
   // Blockchain RPC status endpoint
   app.get("/rpc-status", async (req, res) => {
     try {
-      const { CONTRACTS_CONFIG, getConfigByChainId } = await import('shogun-contracts');
+      const { CONTRACTS_CONFIG, getConfigByChainId } = await import('shogun-contracts-sdk');
       const { ethers } = await import('ethers');
       const { RPC_URLS } = await import('./utils/registry-client.js');
       

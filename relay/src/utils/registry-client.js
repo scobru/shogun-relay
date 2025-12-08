@@ -1,7 +1,7 @@
 /**
  * Registry Client - On-chain relay registry interaction using SDK
  * 
- * This module uses the Shogun Contracts SDK (shogun-contracts/sdk) to interact
+ * This module uses the Shogun Contracts SDK (shogun-contracts-sdk) to interact
  * with smart contracts. It maintains backward compatibility with the previous
  * implementation while using the SDK under the hood.
  * 
@@ -19,11 +19,11 @@
  */
 
 import { ethers } from 'ethers';
-import { ShogunSDK } from 'shogun-contracts/sdk';
 import { 
+  ShogunSDK,
   CONTRACTS_CONFIG, 
   ERC20_ABI 
-} from 'shogun-contracts';
+} from 'shogun-contracts-sdk';
 
 // Generate contract address mappings from centralized config
 // This maintains backward compatibility while using the centralized configuration
