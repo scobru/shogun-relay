@@ -13,11 +13,11 @@ import { loggers } from './logger';
 const log = loggers.relayUser;
 
 // Module state
-let relayUser: mb<GunUser> = und;
-let relayPub: mb<str> = und;
-let relayKeyPair: mb<ISEAPair> = und;
+let relayUser: mb<GunUser> = undefined;
+let relayPub: mb<str> = undefined;
+let relayKeyPair: mb<ISEAPair> = undefined;
 let isInitialized: bool = false;
-let initPromise: mb<prm<RelayUserResult>> = und;
+let initPromise: mb<prm<RelayUserResult>> = undefined;
 
 // Interfaces - Import native Gun types
 import type { IGunChain, GunCallbackPut, GunMessagePut } from 'gun/types/gun';
@@ -163,7 +163,7 @@ export function getRelayKeyPair(): mb<ISEAPair> {
  * @returns True if initialized
  */
 export function isRelayUserInitialized(): bool {
-  return isInitialized && relayUser !== und;
+  return isInitialized && relayUser !== undefined;
 }
 
 /**
@@ -173,7 +173,7 @@ export function isRelayUserInitialized(): bool {
 export function getSubscriptionsNode(): mb<GunNode> {
   if (!relayUser) {
     log.warn('Relay user not initialized, cannot access subscriptions node');
-    return und;
+    return undefined;
   }
   return relayUser.get('x402').get('subscriptions');
 }
@@ -191,14 +191,14 @@ export async function getSubscription(userAddress: str): prm<mb<SubscriptionData
   return new Promise((resolve) => {
     const timeout = setTimeout(() => {
       log.debug({ userAddress }, 'Timeout reading subscription');
-      resolve(und);
+      resolve(undefined);
     }, 10000);
 
     relayUser!.get('x402').get('subscriptions').get(userAddress).once((data: mb<obj>) => {
       clearTimeout(timeout);
 
       if (!data || typeof data !== 'object') {
-        resolve(und);
+        resolve(undefined);
         return;
       }
 
@@ -279,7 +279,7 @@ export async function updateSubscriptionField(userAddress: str, field: str, valu
 export function getUserUploadsNode(userAddress: str): mb<GunNode> {
   if (!relayUser) {
     log.warn('Relay user not initialized, cannot access uploads node');
-    return und;
+    return undefined;
   }
   return relayUser.get('x402').get('uploads').get(userAddress);
 }
