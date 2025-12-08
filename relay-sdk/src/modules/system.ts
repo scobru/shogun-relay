@@ -18,7 +18,8 @@ export class SystemModule {
   }
 
   public async getHealth(): Promise<HealthResponse> {
-    return this.client.get<HealthResponse>('/api/v1/health');
+    // Use /api/v1/system/health (the correct endpoint in the relay)
+    return this.client.get<HealthResponse>('/api/v1/system/health');
   }
 
   public async getStats(): Promise<any> {

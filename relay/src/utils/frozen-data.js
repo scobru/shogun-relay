@@ -108,7 +108,8 @@ export async function readFrozenEntry(gun, namespace, hash) {
       }
 
       try {
-        // Verify signature
+        // IMPORTANT: Calculate dataString BEFORE any modifications to preserve hash integrity
+        // The hash was calculated on the original data, so we must verify against the original data
         const dataString = JSON.stringify(entry.data);
         let pub = entry.data._meta?.pub;
         
@@ -133,18 +134,13 @@ export async function readFrozenEntry(gun, namespace, hash) {
           
           pub = await indexLookup;
           
-          // If we found pub from index, update the entry data and re-store it
+          // If we found pub from index, use it for verification but DO NOT modify the stored entry
+          // Modifying the entry would change the data and break hash verification
+          // The pub is only used for signature verification, not stored back
           if (pub) {
             console.log(`✅ Recovered pub for frozen entry ${hash.substring(0, 16)}... from index`);
-            if (!entry.data._meta) {
-              entry.data._meta = {};
-            }
-            entry.data._meta.pub = pub;
-            // Re-store with pub included
-            gun.get('frozen-' + namespace).get(hash).put({
-              ...entry,
-              data: entry.data
-            });
+            // Note: We intentionally do NOT re-store the entry with pub added, as that would
+            // change the data and invalidate the hash. The pub is only used for verification.
           }
         }
         
@@ -170,7 +166,7 @@ export async function readFrozenEntry(gun, namespace, hash) {
         const verifyResult = await SEA.verify(entry.sig, pub);
         const signatureValid = verifyResult !== undefined && verifyResult !== false;
 
-        // Also verify hash matches content
+        // Verify hash matches content (using original dataString, before any modifications)
         const expectedHash = await SEA.work(dataString, null, null, { name: 'SHA-256' });
         const hashValid = expectedHash === hash;
         const verified = signatureValid && hashValid;
@@ -182,7 +178,7 @@ export async function readFrozenEntry(gun, namespace, hash) {
             signatureValid,
             hashValid,
           },
-          pub: entry.data._meta?.pub,
+          pub: pub, // Use recovered pub if it was found, otherwise use the one from _meta
           timestamp: entry.data._meta?.timestamp,
           hash,
         });
