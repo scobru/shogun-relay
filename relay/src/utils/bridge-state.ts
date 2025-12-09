@@ -1277,37 +1277,89 @@ export async function getBatch(
     const timeout = setTimeout(() => {
       log.warn({ batchPath }, "Timeout waiting for GunDB response in getBatch");
       resolve(null);
-    }, 10000);
+    }, 15000); // Increased timeout to 15 seconds
 
-    gun.get(batchPath).once(async (data: any) => {
+    let batchMetadata: any = null;
+    const withdrawalsObj: Record<number, PendingWithdrawal> = {};
+    const collectedKeys = new Set<string>();
+    let resolved = false;
+    let lastUpdateTime = Date.now();
+
+    const cleanup = () => {
       clearTimeout(timeout);
+      resolved = true;
+    };
+
+    // First, read the batch metadata
+    gun.get(batchPath).once((data: any) => {
+      if (resolved) return;
+      
       if (!data || !data.batchId) {
+        log.warn({ batchPath }, "No batch metadata found");
+        cleanup();
         resolve(null);
         return;
       }
 
-      // Read withdrawals from separate nodes
-      const withdrawals: PendingWithdrawal[] = [];
-      const withdrawalsObj: Record<number, PendingWithdrawal> = {};
-      let withdrawalsResolved = false;
+      batchMetadata = data;
+      lastUpdateTime = Date.now();
+      
+      log.info(
+        { batchId, withdrawalsCount: data.withdrawalsCount || 0 },
+        "Batch metadata retrieved, reading withdrawals"
+      );
 
-      const withdrawalsTimeout = setTimeout(() => {
-        if (!withdrawalsResolved) {
-          withdrawalsResolved = true;
-          log.warn({ withdrawalsPath }, "Timeout reading withdrawals in getBatch");
+      // Also try reading the parent withdrawals node directly (for backward compatibility)
+      gun.get(withdrawalsPath).once((parentData: any) => {
+        if (resolved) return;
+        
+        if (parentData && typeof parentData === 'object') {
+          Object.keys(parentData).forEach(key => {
+            if (key === '_' || key.startsWith('_')) return;
+            if (collectedKeys.has(key)) return;
+            
+            const withdrawal = parentData[key];
+            if (
+              withdrawal &&
+              typeof withdrawal === 'object' &&
+              typeof withdrawal.user === 'string' &&
+              typeof withdrawal.amount === 'string' &&
+              typeof withdrawal.nonce === 'string' &&
+              typeof withdrawal.timestamp === 'number'
+            ) {
+              const index = parseInt(key, 10);
+              if (!isNaN(index)) {
+                collectedKeys.add(key);
+                withdrawalsObj[index] = withdrawal as PendingWithdrawal;
+                lastUpdateTime = Date.now();
+                log.info(
+                  { batchId, index, user: withdrawal.user, amount: withdrawal.amount, nonce: withdrawal.nonce, source: 'direct-read' },
+                  "Added withdrawal from direct read in getBatch"
+                );
+              }
+            }
+          });
         }
-      }, 5000);
+      });
 
-      gun.get(withdrawalsPath).map().once((withdrawal: PendingWithdrawal | null, key: string) => {
-        if (withdrawalsResolved) return;
+      // Use map().on() to collect withdrawals (more reliable than .once() for new data)
+      const parentNode = gun.get(withdrawalsPath);
+      parentNode.map().on((withdrawal: PendingWithdrawal | null, key: string) => {
+        if (resolved) return;
 
-        if (key === '_' || key.startsWith('_')) {
+        if (key === '_' || key.startsWith('_') || !key) {
           return;
         }
 
+        if (collectedKeys.has(key)) {
+          return;
+        }
+
+        lastUpdateTime = Date.now();
+
         log.info(
           { batchId, key, withdrawal, withdrawalType: typeof withdrawal },
-          "Reading withdrawal from batch in getBatch"
+          "Reading withdrawal from batch in getBatch (map)"
         );
 
         if (
@@ -1320,10 +1372,11 @@ export async function getBatch(
         ) {
           const index = parseInt(key, 10);
           if (!isNaN(index)) {
+            collectedKeys.add(key);
             withdrawalsObj[index] = withdrawal as PendingWithdrawal;
             log.info(
-              { batchId, index, user: withdrawal.user, amount: withdrawal.amount, nonce: withdrawal.nonce },
-              "Added withdrawal to batch object in getBatch"
+              { batchId, index, user: withdrawal.user, amount: withdrawal.amount, nonce: withdrawal.nonce, source: 'map' },
+              "Added withdrawal from map in getBatch"
             );
           } else {
             log.warn(
@@ -1339,66 +1392,128 @@ export async function getBatch(
         }
       });
 
-      // After a delay, resolve with collected withdrawals
-      setTimeout(() => {
-        if (withdrawalsResolved) {
-          resolve(null);
-          return;
-        }
-
-        withdrawalsResolved = true;
-        clearTimeout(withdrawalsTimeout);
-
-        // Convert object to sorted array
-        const sortedIndices = Object.keys(withdrawalsObj)
-          .map(k => parseInt(k, 10))
-          .sort((a, b) => a - b);
+      // If we know the withdrawalsCount, try reading individual nodes directly
+      const withdrawalsCount = batchMetadata.withdrawalsCount || 0;
+      if (withdrawalsCount > 0) {
+        log.info(
+          { batchId, withdrawalsCount },
+          "Attempting to read withdrawals directly by index"
+        );
         
-        sortedIndices.forEach(index => {
-          withdrawals.push(withdrawalsObj[index]);
-        });
-
-        // Backward compatibility: try to read from old format if no withdrawals found
-        if (withdrawals.length === 0 && data.withdrawals) {
-          if (Array.isArray(data.withdrawals)) {
-            withdrawals.push(...data.withdrawals);
-          } else if (typeof data.withdrawals === 'object') {
-            const oldWithdrawalsObj = data.withdrawals;
-            const indices = Object.keys(oldWithdrawalsObj)
-              .filter(key => /^\d+$/.test(key))
-              .map(key => parseInt(key, 10))
-              .sort((a, b) => a - b);
+        for (let i = 0; i < withdrawalsCount; i++) {
+          gun.get(`${withdrawalsPath}/${i}`).once((withdrawal: PendingWithdrawal | null) => {
+            if (resolved) return;
             
-            indices.forEach(index => {
-              const w = oldWithdrawalsObj[index.toString()];
-              if (w) withdrawals.push(w);
-            });
-          }
+            if (
+              withdrawal &&
+              typeof withdrawal === 'object' &&
+              typeof withdrawal.user === 'string' &&
+              typeof withdrawal.amount === 'string' &&
+              typeof withdrawal.nonce === 'string' &&
+              typeof withdrawal.timestamp === 'number'
+            ) {
+              const key = i.toString();
+              if (!collectedKeys.has(key)) {
+                collectedKeys.add(key);
+                withdrawalsObj[i] = withdrawal as PendingWithdrawal;
+                lastUpdateTime = Date.now();
+                log.info(
+                  { batchId, index: i, user: withdrawal.user, amount: withdrawal.amount, nonce: withdrawal.nonce, source: 'direct-index' },
+                  "Added withdrawal from direct index read in getBatch"
+                );
+              }
+            }
+          });
         }
+      }
 
-        const batch: Batch = {
-          batchId: data.batchId,
-          root: data.root,
-          withdrawals,
-          timestamp: data.timestamp,
-          blockNumber: data.blockNumber,
-          txHash: data.txHash,
-        };
+      // Check and resolve at multiple intervals
+      const checkAndResolve = () => {
+        if (resolved) return;
+
+        const timeSinceLastUpdate = Date.now() - lastUpdateTime;
+        const expectedCount = withdrawalsCount || Object.keys(withdrawalsObj).length;
 
         log.info(
           { 
-            batchId: data.batchId, 
-            withdrawalCount: withdrawals.length,
-            withdrawals: withdrawals.map(w => ({
-              user: w.user,
-              amount: w.amount,
-              nonce: w.nonce,
-            })),
+            batchId, 
+            withdrawalsFound: Object.keys(withdrawalsObj).length, 
+            expectedCount,
+            timeSinceLastUpdate 
           },
-          "Batch retrieved from GunDB"
+          "Checking withdrawals collection status in getBatch"
         );
-        resolve(batch);
-      }, 500);
+
+        // If we have withdrawals or we've waited long enough
+        if (Object.keys(withdrawalsObj).length > 0 || timeSinceLastUpdate > 3000) {
+          // If we expected withdrawals but haven't found any, wait a bit more
+          if (expectedCount > 0 && Object.keys(withdrawalsObj).length === 0 && timeSinceLastUpdate < 5000) {
+            return; // Wait more
+          }
+
+          cleanup();
+          parentNode.off(); // Unsubscribe from map events
+
+          // Convert object to sorted array
+          const sortedIndices = Object.keys(withdrawalsObj)
+            .map(k => parseInt(k, 10))
+            .sort((a, b) => a - b);
+          
+          const withdrawals: PendingWithdrawal[] = [];
+          sortedIndices.forEach(index => {
+            withdrawals.push(withdrawalsObj[index]);
+          });
+
+          // Backward compatibility: try to read from old format if no withdrawals found
+          if (withdrawals.length === 0 && batchMetadata.withdrawals) {
+            if (Array.isArray(batchMetadata.withdrawals)) {
+              withdrawals.push(...batchMetadata.withdrawals);
+              log.info({ batchId, source: 'old-array-format' }, "Using old array format for withdrawals");
+            } else if (typeof batchMetadata.withdrawals === 'object') {
+              const oldWithdrawalsObj = batchMetadata.withdrawals;
+              const indices = Object.keys(oldWithdrawalsObj)
+                .filter(key => /^\d+$/.test(key))
+                .map(key => parseInt(key, 10))
+                .sort((a, b) => a - b);
+              
+              indices.forEach(index => {
+                const w = oldWithdrawalsObj[index.toString()];
+                if (w) withdrawals.push(w);
+              });
+              log.info({ batchId, source: 'old-object-format' }, "Using old object format for withdrawals");
+            }
+          }
+
+          const batch: Batch = {
+            batchId: batchMetadata.batchId,
+            root: batchMetadata.root,
+            withdrawals,
+            timestamp: batchMetadata.timestamp,
+            blockNumber: batchMetadata.blockNumber,
+            txHash: batchMetadata.txHash,
+          };
+
+          log.info(
+            { 
+              batchId: batchMetadata.batchId, 
+              withdrawalCount: withdrawals.length,
+              withdrawals: withdrawals.map(w => ({
+                user: w.user,
+                amount: w.amount,
+                nonce: w.nonce,
+              })),
+            },
+            "Batch retrieved from GunDB"
+          );
+          resolve(batch);
+        }
+      };
+
+      // Check at multiple intervals to balance speed and completeness
+      setTimeout(checkAndResolve, 500);
+      setTimeout(checkAndResolve, 1500);
+      setTimeout(checkAndResolve, 3000);
+      setTimeout(checkAndResolve, 5000);
     });
   });
 }
