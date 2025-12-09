@@ -102,16 +102,41 @@ export async function startBridgeListener(
           const alreadyProcessed = await isDepositProcessed(gun, depositKey);
           
           if (alreadyProcessed) {
-            log.warn(
-              {
-                txHash: event.txHash,
-                user: normalizedUser,
-                amount: event.amount.toString(),
-                depositKey,
-              },
-              "Deposit already processed, skipping"
-            );
-            return;
+            // CRITICAL: Verify that the balance was actually written
+            // If deposit is marked as processed but balance doesn't exist, reprocess it
+            const currentBalance = await getUserBalance(gun, normalizedUser);
+            const balanceBefore = currentBalance;
+            const expectedBalance = balanceBefore + event.amount;
+            
+            // Check if we need to reprocess (balance might be missing due to previous failure)
+            // We check if the balance is less than expected, which means the deposit wasn't fully processed
+            // Note: This is a heuristic - if user made other transactions, balance might be different
+            // But if balance is 0 and deposit should have credited, we definitely need to reprocess
+            if (currentBalance === 0n && event.amount > 0n) {
+              log.warn(
+                {
+                  txHash: event.txHash,
+                  user: normalizedUser,
+                  amount: event.amount.toString(),
+                  depositKey,
+                  currentBalance: currentBalance.toString(),
+                },
+                "Deposit marked as processed but balance is 0 - reprocessing"
+              );
+              // Continue processing instead of returning
+            } else {
+              log.warn(
+                {
+                  txHash: event.txHash,
+                  user: normalizedUser,
+                  amount: event.amount.toString(),
+                  depositKey,
+                  currentBalance: currentBalance.toString(),
+                },
+                "Deposit already processed, skipping"
+              );
+              return;
+            }
           }
           
           log.info(
@@ -202,7 +227,7 @@ export async function startBridgeListener(
           }
 
           // All security checks passed - credit balance (with signature if relay keypair available)
-          // SECURITY: Only mark as processed AFTER successful credit to ensure idempotency
+          // SECURITY: Only mark as processed AFTER successful credit AND verification to ensure idempotency
           // If creditBalance fails, the deposit will be retried (which is correct behavior)
           
           log.info(
@@ -214,18 +239,59 @@ export async function startBridgeListener(
             "Crediting balance to L2"
           );
           
+          // Get balance before credit to calculate expected balance
+          const balanceBefore = await getUserBalance(gun, normalizedUser);
+          const expectedBalance = balanceBefore + event.amount;
+          
           await creditBalance(gun, normalizedUser, event.amount, config.relayKeyPair);
+          
+          // CRITICAL: Wait and verify balance was actually written before marking as processed
+          // GunDB is eventually consistent, so we need to poll until the balance appears
+          let verifyBalance = await getUserBalance(gun, normalizedUser);
+          let retries = 0;
+          const maxRetries = 10;
+          const retryDelay = 500; // 500ms between retries
+          
+          while (verifyBalance < expectedBalance && retries < maxRetries) {
+            log.info(
+              {
+                user: normalizedUser,
+                expected: expectedBalance.toString(),
+                current: verifyBalance.toString(),
+                retry: retries + 1,
+              },
+              "Waiting for balance to be written to GunDB"
+            );
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            verifyBalance = await getUserBalance(gun, normalizedUser);
+            retries++;
+          }
+          
+          if (verifyBalance < expectedBalance) {
+            log.error(
+              {
+                user: normalizedUser,
+                expected: expectedBalance.toString(),
+                actual: verifyBalance.toString(),
+                txHash: event.txHash,
+              },
+              "Balance verification failed - balance not written correctly"
+            );
+            throw new Error(`Balance verification failed: expected ${expectedBalance.toString()}, got ${verifyBalance.toString()}`);
+          }
           
           log.info(
             {
               user: normalizedUser,
               amount: event.amount.toString(),
               txHash: event.txHash,
+              balanceBefore: balanceBefore.toString(),
+              balanceAfter: verifyBalance.toString(),
             },
-            "Balance credited successfully, marking deposit as processed"
+            "Balance credited and verified, marking deposit as processed"
           );
           
-          // Mark as processed (idempotency) - only if creditBalance succeeded
+          // Mark as processed (idempotency) - only if creditBalance succeeded AND verified
           await markDepositProcessed(gun, depositKey, {
             txHash: event.txHash,
             user: normalizedUser,
@@ -234,8 +300,6 @@ export async function startBridgeListener(
             timestamp: Date.now(),
           });
 
-          // Verify balance was actually written
-          const verifyBalance = await getUserBalance(gun, normalizedUser);
           log.info(
             {
               user: normalizedUser,
@@ -245,7 +309,7 @@ export async function startBridgeListener(
               newBalance: ethers.formatEther(verifyBalance),
               balance: "credited",
             },
-            "Deposit credited to L2 balance - verified"
+            "Deposit credited to L2 balance - verified and marked as processed"
           );
         } catch (error) {
           log.error(
