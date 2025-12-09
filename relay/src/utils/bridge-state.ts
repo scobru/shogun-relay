@@ -173,57 +173,141 @@ export async function creditBalance(
       "Crediting balance"
     );
 
-    // Get current balance (by Ethereum address)
-    const currentBalance = await getUserBalance(gun, ethereumAddress);
-    const newBalance = currentBalance + amount;
-    
-    log.info(
-      {
-        user: ethereumAddress,
-        currentBalance: currentBalance.toString(),
-        amount: amount.toString(),
-        newBalance: newBalance.toString(),
-      },
-      "Balance calculation"
-    );
+    // Retry loop to handle race conditions and eventual consistency
+    // If multiple deposits are processed simultaneously, we need to ensure
+    // we read the latest balance before creating a new entry
+    const maxRetries = 5;
+    let retryCount = 0;
+    let success = false;
+    let initialBalance = 0n; // Capture initial balance for final verification
 
-    // Create balance data
-    const balanceData: any = {
-      balance: newBalance.toString(),
-      ethereumAddress: ethereumAddress,
-      updatedAt: Date.now(),
-      type: "bridge-balance",
-    };
+    while (retryCount < maxRetries && !success) {
+      // Get current balance (by Ethereum address)
+      // Wait a bit if retrying to allow GunDB to propagate previous updates
+      if (retryCount > 0) {
+        await new Promise(resolve => setTimeout(resolve, 100 * retryCount)); // Exponential backoff
+      }
 
-    // If GunDB pub key is provided, include it in the balance data
-    if (gunPubKey) {
-      balanceData.gunPubKey = gunPubKey;
+      const currentBalance = await getUserBalance(gun, ethereumAddress);
+      if (retryCount === 0) {
+        initialBalance = currentBalance; // Capture initial balance on first attempt
+      }
+      const newBalance = currentBalance + amount;
+      
+      log.info(
+        {
+          user: ethereumAddress,
+          currentBalance: currentBalance.toString(),
+          amount: amount.toString(),
+          newBalance: newBalance.toString(),
+          retryAttempt: retryCount + 1,
+        },
+        "Balance calculation"
+      );
+
+      // Create balance data
+      const balanceData: any = {
+        balance: newBalance.toString(),
+        ethereumAddress: ethereumAddress,
+        updatedAt: Date.now(),
+        type: "bridge-balance",
+      };
+
+      // If GunDB pub key is provided, include it in the balance data
+      if (gunPubKey) {
+        balanceData.gunPubKey = gunPubKey;
+      }
+
+      log.info(
+        { user: ethereumAddress, balanceData },
+        "Creating frozen entry"
+      );
+
+      // Create frozen entry (immutable, signed)
+      // Use Ethereum address as index key (deposits come with Ethereum address)
+      const indexKey = ethereumAddress;
+      await FrozenData.createFrozenEntry(
+        gun,
+        balanceData,
+        relayKeyPair,
+        "bridge-balances",
+        indexKey
+      );
+      
+      log.info({ user: indexKey }, "Frozen entry created successfully");
+      
+      // Verify the entry was created and balance is correct
+      // Wait a bit for GunDB to propagate the update
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      const verifyBalance = await getUserBalance(gun, ethereumAddress);
+      log.info(
+        { 
+          user: ethereumAddress, 
+          expectedBalance: newBalance.toString(),
+          actualBalance: verifyBalance.toString(),
+          retryAttempt: retryCount + 1,
+        },
+        "Balance verification after credit"
+      );
+
+      // Check if the balance matches what we expected
+      // Allow for small differences due to concurrent updates (as long as balance increased)
+      if (verifyBalance >= newBalance) {
+        // Balance is correct or higher (another deposit was processed concurrently)
+        success = true;
+      } else if (verifyBalance < currentBalance) {
+        // Balance decreased - something went wrong, retry
+        log.warn(
+          {
+            user: ethereumAddress,
+            expectedBalance: newBalance.toString(),
+            actualBalance: verifyBalance.toString(),
+            previousBalance: currentBalance.toString(),
+            retryAttempt: retryCount + 1,
+          },
+          "Balance decreased after credit, retrying"
+        );
+        retryCount++;
+      } else {
+        // Balance increased but not as much as expected - concurrent update, retry to get latest
+        log.info(
+          {
+            user: ethereumAddress,
+            expectedBalance: newBalance.toString(),
+            actualBalance: verifyBalance.toString(),
+            previousBalance: currentBalance.toString(),
+            retryAttempt: retryCount + 1,
+          },
+          "Balance partially updated (concurrent deposit), retrying to ensure consistency"
+        );
+        retryCount++;
+      }
     }
 
-    log.info(
-      { user: ethereumAddress, balanceData },
-      "Creating frozen entry"
-    );
-
-    // Create frozen entry (immutable, signed)
-    // Use Ethereum address as index key (deposits come with Ethereum address)
-    const indexKey = ethereumAddress;
-    await FrozenData.createFrozenEntry(
-      gun,
-      balanceData,
-      relayKeyPair,
-      "bridge-balances",
-      indexKey
-    );
-    
-    log.info({ user: indexKey }, "Frozen entry created successfully");
-    
-    // Verify the entry was created
-    const verifyBalance = await getUserBalance(gun, ethereumAddress);
-    log.info(
-      { user: ethereumAddress, balance: verifyBalance.toString() },
-      "Balance verification after credit"
-    );
+    if (!success) {
+      // Final verification after all retries
+      // Check if balance increased at least by the amount we're crediting
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const finalBalance = await getUserBalance(gun, ethereumAddress);
+      
+      if (finalBalance >= initialBalance + amount) {
+        // Balance was eventually updated correctly (might be higher due to concurrent deposits)
+        success = true;
+        log.info(
+          {
+            user: ethereumAddress,
+            initialBalance: initialBalance.toString(),
+            finalBalance: finalBalance.toString(),
+            amount: amount.toString(),
+            expectedMinBalance: (initialBalance + amount).toString(),
+          },
+          "Balance eventually updated correctly after retries"
+        );
+      } else {
+        throw new Error(`Failed to credit balance after ${maxRetries} retries. Initial: ${initialBalance.toString()}, Final: ${finalBalance.toString()}, Expected at least: ${(initialBalance + amount).toString()}`);
+      }
+    }
   } catch (error) {
     log.error({ error, user: userAddress, amount: amount.toString() }, "Error crediting balance");
     throw new Error(`Failed to credit balance: ${error}`);

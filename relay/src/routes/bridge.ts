@@ -771,6 +771,18 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
       errors: [] as string[],
     };
 
+    // If user is specified, calculate expected total balance from all deposits
+    // This allows us to verify and correct the balance if there were race conditions
+    let expectedTotalBalance = 0n;
+    let userDepositsMap = new Map<string, bigint>(); // user -> total deposits
+    
+    // Calculate expected balances for all users
+    for (const deposit of depositsToCheck) {
+      const normalizedUser = deposit.user.toLowerCase();
+      const currentTotal = userDepositsMap.get(normalizedUser) || 0n;
+      userDepositsMap.set(normalizedUser, currentTotal + deposit.amount);
+    }
+
     // Process each deposit
     for (const deposit of depositsToCheck) {
       try {
@@ -906,6 +918,92 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
         );
         results.failed++;
         results.errors.push(`${deposit.txHash}: ${errorMsg}`);
+      }
+    }
+
+    // Final verification and correction: Check if actual balances match expected totals
+    // This fixes cases where race conditions caused incorrect balances
+    if (userDepositsMap.size > 0) {
+      log.info(
+        { userCount: userDepositsMap.size },
+        "Verifying and correcting balances for all users"
+      );
+
+      for (const [normalizedUser, expectedTotal] of userDepositsMap.entries()) {
+        try {
+          const actualBalance = await getUserBalance(gun, normalizedUser);
+          
+          if (actualBalance !== expectedTotal) {
+            log.warn(
+              {
+                user: normalizedUser,
+                expectedBalance: expectedTotal.toString(),
+                actualBalance: actualBalance.toString(),
+                difference: (expectedTotal - actualBalance).toString(),
+              },
+              "Balance mismatch detected, correcting to expected total"
+            );
+
+            // Create a new frozen entry with the correct balance
+            // This overwrites any incorrect entries due to race conditions
+            const balanceData: any = {
+              balance: expectedTotal.toString(),
+              ethereumAddress: normalizedUser,
+              updatedAt: Date.now(),
+              type: "bridge-balance",
+              corrected: true, // Flag to indicate this was a correction
+            };
+
+            await FrozenData.createFrozenEntry(
+              gun,
+              balanceData,
+              relayKeyPair,
+              "bridge-balances",
+              normalizedUser
+            );
+
+            // Verify the correction
+            await new Promise(resolve => setTimeout(resolve, 300));
+            const correctedBalance = await getUserBalance(gun, normalizedUser);
+            
+            if (correctedBalance === expectedTotal) {
+              log.info(
+                {
+                  user: normalizedUser,
+                  correctedBalance: correctedBalance.toString(),
+                },
+                "Balance corrected successfully"
+              );
+              results.processed++; // Count corrections as processed
+            } else {
+              log.error(
+                {
+                  user: normalizedUser,
+                  expectedBalance: expectedTotal.toString(),
+                  correctedBalance: correctedBalance.toString(),
+                },
+                "Failed to correct balance"
+              );
+              results.failed++;
+              results.errors.push(`Balance correction failed for ${normalizedUser}`);
+            }
+          } else {
+            log.info(
+              {
+                user: normalizedUser,
+                balance: actualBalance.toString(),
+              },
+              "Balance verified correct"
+            );
+          }
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          log.error(
+            { error, user: normalizedUser },
+            "Error verifying/correcting balance"
+          );
+          results.errors.push(`Balance verification failed for ${normalizedUser}: ${errorMsg}`);
+        }
       }
     }
 
