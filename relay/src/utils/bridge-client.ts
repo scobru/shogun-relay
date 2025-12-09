@@ -543,8 +543,9 @@ export function createBridgeClient(config: BridgeConfig) {
           toBlockNumber = toBlock;
         }
         
+        const contractAddr = bridge.getAddress();
         log.info(
-          { fromBlock, toBlock: toBlockNumber, contractAddress, userAddress },
+          { fromBlock, toBlock: toBlockNumber, contractAddress: contractAddr, userAddress },
           "Querying deposit events"
         );
 
