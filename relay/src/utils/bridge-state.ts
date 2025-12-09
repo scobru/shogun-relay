@@ -823,40 +823,116 @@ export async function getPendingWithdrawals(
       reject(new Error("Timeout waiting for GunDB response"));
     }, 10000);
 
-    // Read all individual nodes under bridge/withdrawals/pending
-    gun.get(withdrawalsPath).once((data: Record<string, PendingWithdrawal> | PendingWithdrawal[] | { list?: PendingWithdrawal[] } | null | undefined) => {
+    const withdrawals: PendingWithdrawal[] = [];
+    let checkCount = 0;
+    let resolved = false;
+
+    const cleanup = () => {
       clearTimeout(timeout);
-      const withdrawals: PendingWithdrawal[] = [];
+      resolved = true;
+    };
+
+    // First, try reading as an object to get all child nodes
+    const parentNode = gun.get(withdrawalsPath);
+    
+    // Use map to iterate through all child nodes
+    parentNode.map().on((withdrawal: PendingWithdrawal | null, key: string) => {
+      if (resolved) return;
+      
+      // Skip metadata keys
+      if (key === '_' || key.startsWith('_')) {
+        return;
+      }
+
+      // Skip 'list' key (old format)
+      if (key === 'list') {
+        return;
+      }
+
+      // Validate withdrawal object
+      if (
+        withdrawal &&
+        typeof withdrawal === 'object' &&
+        typeof withdrawal.user === 'string' &&
+        typeof withdrawal.amount === 'string' &&
+        typeof withdrawal.nonce === 'string' &&
+        typeof withdrawal.timestamp === 'number'
+      ) {
+        // Check if already added (deduplicate)
+        const exists = withdrawals.some(
+          (w) =>
+            w.user.toLowerCase() === withdrawal.user.toLowerCase() &&
+            w.nonce === withdrawal.nonce
+        );
+
+        if (!exists) {
+          withdrawals.push(withdrawal as PendingWithdrawal);
+          log.info(
+            { key, withdrawal, total: withdrawals.length },
+            "Found pending withdrawal node"
+          );
+        }
+      }
+
+      checkCount++;
+    });
+
+    // Also try reading the parent node directly (for backward compatibility)
+    parentNode.once((data: Record<string, PendingWithdrawal> | PendingWithdrawal[] | { list?: PendingWithdrawal[] } | null | undefined) => {
+      if (resolved) return;
 
       try {
-        if (!data) {
-          resolve([]);
-          return;
-        }
-
         // Handle different data formats for backward compatibility
         if (Array.isArray(data)) {
           // Old format: direct array
-          withdrawals.push(...data);
-        } else if (typeof data === 'object') {
+          data.forEach((w) => {
+            if (
+              w &&
+              typeof w === 'object' &&
+              typeof w.user === 'string' &&
+              typeof w.amount === 'string' &&
+              typeof w.nonce === 'string' &&
+              typeof w.timestamp === 'number'
+            ) {
+              const exists = withdrawals.some(
+                (w2) =>
+                  w2.user.toLowerCase() === w.user.toLowerCase() &&
+                  w2.nonce === w.nonce
+              );
+              if (!exists) {
+                withdrawals.push(w as PendingWithdrawal);
+              }
+            }
+          });
+        } else if (data && typeof data === 'object') {
           // Check for old format: { list: [...] }
           if ('list' in data && Array.isArray(data.list)) {
-            withdrawals.push(...data.list);
+            data.list.forEach((w) => {
+              if (
+                w &&
+                typeof w === 'object' &&
+                typeof w.user === 'string' &&
+                typeof w.amount === 'string' &&
+                typeof w.nonce === 'string' &&
+                typeof w.timestamp === 'number'
+              ) {
+                const exists = withdrawals.some(
+                  (w2) =>
+                    w2.user.toLowerCase() === w.user.toLowerCase() &&
+                    w2.nonce === w.nonce
+                );
+                if (!exists) {
+                  withdrawals.push(w as PendingWithdrawal);
+                }
+              }
+            });
           } else {
             // New format: individual nodes { "user:nonce": withdrawal, ... }
-            // Iterate through all keys
             for (const [key, value] of Object.entries(data)) {
-              // Skip special keys like _ (GunDB metadata)
-              if (key === '_' || key.startsWith('_')) {
-                continue;
-              }
-              
-              // Skip if it's the 'list' key (old format)
-              if (key === 'list') {
+              if (key === '_' || key.startsWith('_') || key === 'list') {
                 continue;
               }
 
-              // Check if value is a valid PendingWithdrawal
               if (
                 value &&
                 typeof value === 'object' &&
@@ -865,30 +941,45 @@ export async function getPendingWithdrawals(
                 typeof value.nonce === 'string' &&
                 typeof value.timestamp === 'number'
               ) {
-                withdrawals.push(value as PendingWithdrawal);
+                const exists = withdrawals.some(
+                  (w) =>
+                    w.user.toLowerCase() === value.user.toLowerCase() &&
+                    w.nonce === value.nonce
+                );
+                if (!exists) {
+                  withdrawals.push(value as PendingWithdrawal);
+                }
               }
             }
           }
         }
 
-        // Normalize and filter withdrawals
-        const normalized = withdrawals.filter(
-          (w): w is PendingWithdrawal =>
-            w &&
-            typeof w === 'object' &&
-            typeof w.user === 'string' &&
-            typeof w.amount === 'string' &&
-            typeof w.nonce === 'string' &&
-            typeof w.timestamp === 'number'
-        );
+        // Wait a bit to let .map() collect all nodes, then resolve
+        setTimeout(() => {
+          if (resolved) return;
 
-        log.info(
-          { totalFound: withdrawals.length, normalized: normalized.length },
-          "Retrieved pending withdrawals"
-        );
+          // Normalize and filter withdrawals
+          const normalized = withdrawals.filter(
+            (w): w is PendingWithdrawal =>
+              w &&
+              typeof w === 'object' &&
+              typeof w.user === 'string' &&
+              typeof w.amount === 'string' &&
+              typeof w.nonce === 'string' &&
+              typeof w.timestamp === 'number'
+          );
 
-        resolve(normalized);
+          log.info(
+            { totalFound: withdrawals.length, normalized: normalized.length, checkCount },
+            "Retrieved pending withdrawals"
+          );
+
+          cleanup();
+          resolve(normalized);
+        }, 500); // Give GunDB time to propagate
       } catch (error) {
+        if (resolved) return;
+        cleanup();
         log.error(
           { error, data },
           "Error retrieving pending withdrawals"
