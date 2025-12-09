@@ -256,28 +256,48 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
   return new Promise((resolve) => {
     const timeout = setTimeout(() => resolve(undefined), 10000);
 
-    gun.get('frozen-' + namespace).get(hash).once(async (entry: mb<FrozenEntry>) => {
+    gun.get('frozen-' + namespace).get(hash).once(async (entry: mb<FrozenEntry & { dataJson?: str }>) => {
       clearTimeout(timeout);
 
-      if (!entry || !entry.data || !entry.sig) {
+      if (!entry || !entry.sig) {
         resolve(undefined);
         return;
       }
 
       try {
-        // IMPORTANT: Calculate dataString BEFORE any modifications to preserve hash integrity
-        // The hash was calculated on the original data, so we must verify against the original data
+        // IMPORTANT: Use dataJson if available (more reliable), otherwise fall back to entry.data
+        // The dataJson was stored as a JSON string to ensure GunDB persists all fields correctly
+        let entryData: FrozenEntryData;
         
-        // Log the entry structure to debug metadata issues
-        log.info({
-          hash: hash.substring(0, 16),
-          hasData: !!entry.data,
-          hasMeta: !!entry.data._meta,
-          hasMetaAlt: !!entry.data.meta,
-          metaKeys: entry.data._meta ? Object.keys(entry.data._meta) : [],
-          metaAltKeys: entry.data.meta ? Object.keys(entry.data.meta) : [],
-          dataKeys: entry.data ? Object.keys(entry.data).filter(k => k !== '_meta' && k !== 'meta') : [],
-        }, 'Reading frozen entry');
+        if (entry.dataJson && typeof entry.dataJson === 'string') {
+          // Parse the JSON string to get the original data structure
+          try {
+            entryData = JSON.parse(entry.dataJson);
+            log.info({
+              hash: hash.substring(0, 16),
+              source: 'dataJson',
+              hasMeta: !!entryData._meta,
+              hasMetaAlt: !!entryData.meta,
+            }, 'Reading frozen entry from dataJson');
+          } catch (parseError) {
+            log.warn({
+              hash: hash.substring(0, 16),
+              error: parseError,
+            }, 'Failed to parse dataJson, falling back to entry.data');
+            entryData = entry.data || {};
+          }
+        } else {
+          // Fall back to entry.data if dataJson is not available
+          entryData = entry.data || {};
+          log.info({
+            hash: hash.substring(0, 16),
+            source: 'entry.data',
+            hasData: !!entry.data,
+            hasMeta: !!entry.data?._meta,
+            hasMetaAlt: !!entry.data?.meta,
+            dataKeys: entry.data ? Object.keys(entry.data).filter(k => k !== '_meta' && k !== 'meta') : [],
+          }, 'Reading frozen entry from entry.data');
+        }
         
         // Normalize the data for verification
         // When creating, we store both _meta and meta with the same content
@@ -285,7 +305,7 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
         // matches what was signed. Since we store both, we'll use the one that exists.
         // If both exist, we'll use _meta (the original format).
         // If only meta exists, we'll remove _meta (if present) to match what GunDB persisted.
-        const normalizedData = { ...entry.data };
+        const normalizedData = { ...entryData };
         
         // If only meta exists (GunDB didn't persist _meta), remove _meta from normalizedData
         // to match what GunDB actually stored
@@ -302,7 +322,7 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
         
         const dataString = JSON.stringify(normalizedData);
         // Try _meta first, then meta as fallback
-        let pub = entry.data._meta?.pub || entry.data.meta?.pub;
+        let pub = entryData._meta?.pub || entryData.meta?.pub;
 
         // If pub is missing, try to get it from the index
         if (!pub) {
@@ -381,14 +401,14 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
         }, 'Frozen entry verification result');
 
         resolve({
-          data: entry.data,
+          data: entryData, // Use the parsed/retrieved data
           verified,
           verificationDetails: {
             signatureValid,
             hashValid,
           },
-          pub: pub, // Use recovered pub if it was foundefined, otherwise use the one from _meta
-          timestamp: entry.data._meta?.timestamp,
+          pub: pub, // Use recovered pub if it was found, otherwise use the one from _meta
+          timestamp: entryData._meta?.timestamp || entryData.meta?.timestamp,
           hash,
         });
       } catch (error) {
