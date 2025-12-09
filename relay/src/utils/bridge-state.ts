@@ -1305,6 +1305,11 @@ export async function getBatch(
           return;
         }
 
+        log.info(
+          { batchId, key, withdrawal, withdrawalType: typeof withdrawal },
+          "Reading withdrawal from batch in getBatch"
+        );
+
         if (
           withdrawal &&
           typeof withdrawal === 'object' &&
@@ -1316,7 +1321,21 @@ export async function getBatch(
           const index = parseInt(key, 10);
           if (!isNaN(index)) {
             withdrawalsObj[index] = withdrawal as PendingWithdrawal;
+            log.info(
+              { batchId, index, user: withdrawal.user, amount: withdrawal.amount, nonce: withdrawal.nonce },
+              "Added withdrawal to batch object in getBatch"
+            );
+          } else {
+            log.warn(
+              { batchId, key, withdrawal },
+              "Invalid index key for withdrawal in getBatch"
+            );
           }
+        } else {
+          log.warn(
+            { batchId, key, withdrawal, withdrawalType: typeof withdrawal },
+            "Invalid withdrawal format in getBatch"
+          );
         }
       });
 
@@ -1367,7 +1386,15 @@ export async function getBatch(
         };
 
         log.info(
-          { batchId: data.batchId, withdrawalCount: withdrawals.length },
+          { 
+            batchId: data.batchId, 
+            withdrawalCount: withdrawals.length,
+            withdrawals: withdrawals.map(w => ({
+              user: w.user,
+              amount: w.amount,
+              nonce: w.nonce,
+            })),
+          },
           "Batch retrieved from GunDB"
         );
         resolve(batch);
@@ -1520,22 +1547,57 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
       let latest: Batch | null = null;
       let latestId = -1;
 
+      log.info(
+        { 
+          validBatchesCount: validBatches.length,
+          batchSummaries: validBatches.map(b => ({
+            batchId: b.batchId,
+            batchIdNum: parseInt(b.batchId, 10),
+            withdrawalCount: b.withdrawals.length,
+            root: b.root,
+          })),
+        },
+        "Analyzing batches to find latest"
+      );
+
       validBatches.forEach(batch => {
         const batchIdNum = parseInt(batch.batchId, 10);
         if (!isNaN(batchIdNum) && batchIdNum > latestId) {
           latestId = batchIdNum;
           latest = batch;
+          log.info(
+            { 
+              batchId: batch.batchId, 
+              batchIdNum, 
+              withdrawalCount: batch.withdrawals.length,
+              withdrawals: batch.withdrawals.map(w => ({
+                user: w.user,
+                amount: w.amount,
+                nonce: w.nonce,
+              })),
+            },
+            "Updated latest batch candidate"
+          );
         }
       });
 
       if (latest) {
         const latestBatch: Batch = latest;
         log.info(
-          { latestBatchId: latestBatch.batchId, latestBatchRoot: latestBatch.root, withdrawalCount: latestBatch.withdrawals.length },
+          { 
+            latestBatchId: latestBatch.batchId, 
+            latestBatchRoot: latestBatch.root, 
+            withdrawalCount: latestBatch.withdrawals.length,
+            withdrawals: latestBatch.withdrawals.map(w => ({
+              user: w.user,
+              amount: w.amount,
+              nonce: w.nonce,
+            })),
+          },
           "Resolved latest batch from GunDB"
         );
       } else {
-        log.warn({ batchesPath }, "Could not determine latest batch");
+        log.warn({ batchesPath, validBatchesCount: validBatches.length }, "Could not determine latest batch");
       }
       resolve(latest);
     };

@@ -734,13 +734,49 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
       "Proof request received"
     );
 
-    // Get latest batch
-    const batch = await getLatestBatch(gun);
+    // Try multiple strategies to find the batch containing this withdrawal
+    let batch: Awaited<ReturnType<typeof getLatestBatch>> = null;
+
+    // Strategy 1: Get latest batch from GunDB
+    batch = await getLatestBatch(gun);
+
+    // Strategy 2: If not found or withdrawal not in latest batch, try getting batch from contract's current batch ID
+    if (!batch) {
+      log.info(
+        { user: userAddress, amount: amountBigInt.toString(), nonce: nonceBigInt.toString() },
+        "Latest batch not found in GunDB, trying contract's current batch ID"
+      );
+      
+      try {
+        const client = getBridgeClient();
+        const currentBatchId = await client.getCurrentBatchId();
+        log.info(
+          { currentBatchId: currentBatchId.toString() },
+          "Retrieved current batch ID from contract"
+        );
+        
+        // Try to get this specific batch
+        if (currentBatchId > 0n) {
+          batch = await getBatch(gun, currentBatchId.toString());
+          if (batch) {
+            log.info(
+              { batchId: batch.batchId, withdrawalCount: batch.withdrawals.length },
+              "Found batch using contract's current batch ID"
+            );
+          }
+        }
+      } catch (error) {
+        log.warn(
+          { error, user: userAddress },
+          "Failed to get batch from contract's current batch ID"
+        );
+      }
+    }
 
     if (!batch) {
       log.warn(
         { user: userAddress, amount: amountBigInt.toString(), nonce: nonceBigInt.toString() },
-        "No batches found in GunDB"
+        "No batches found in GunDB after trying multiple strategies"
       );
       return res.status(404).json({
         success: false,
@@ -755,16 +791,45 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
         requestedUser: userAddress,
         requestedAmount: amountBigInt.toString(),
         requestedNonce: nonceBigInt.toString(),
+        batchWithdrawals: batch.withdrawals.map(w => ({
+          user: w.user,
+          userLower: w.user?.toLowerCase(),
+          amount: w.amount,
+          amountType: typeof w.amount,
+          nonce: w.nonce,
+          nonceType: typeof w.nonce,
+        })),
       },
       "Latest batch retrieved, checking for withdrawal"
     );
 
     // Check if withdrawal is in this batch
+    // Normalize comparison: ensure we're comparing strings and lowercase addresses
     const withdrawalInBatch = batch.withdrawals.find(
-      (w) =>
-        w.user.toLowerCase() === userAddress.toLowerCase() &&
-        w.amount === amountBigInt.toString() &&
-        w.nonce === nonceBigInt.toString()
+      (w) => {
+        const userMatch = w.user?.toLowerCase() === userAddress.toLowerCase();
+        const amountMatch = w.amount === amountBigInt.toString();
+        const nonceMatch = w.nonce === nonceBigInt.toString();
+        
+        log.info(
+          {
+            batchId: batch.batchId,
+            requestedUser: userAddress.toLowerCase(),
+            requestedAmount: amountBigInt.toString(),
+            requestedNonce: nonceBigInt.toString(),
+            withdrawalUser: w.user?.toLowerCase(),
+            withdrawalAmount: w.amount,
+            withdrawalNonce: w.nonce,
+            userMatch,
+            amountMatch,
+            nonceMatch,
+            allMatch: userMatch && amountMatch && nonceMatch,
+          },
+          "Comparing withdrawal for proof request"
+        );
+        
+        return userMatch && amountMatch && nonceMatch;
+      }
     );
 
     if (!withdrawalInBatch) {
@@ -772,13 +837,18 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
         {
           batchId: batch.batchId,
           requestedUser: userAddress,
+          requestedUserLower: userAddress.toLowerCase(),
           requestedAmount: amountBigInt.toString(),
           requestedNonce: nonceBigInt.toString(),
           batchWithdrawals: batch.withdrawals.map(w => ({
             user: w.user,
+            userLower: w.user?.toLowerCase(),
             amount: w.amount,
+            amountType: typeof w.amount,
             nonce: w.nonce,
+            nonceType: typeof w.nonce,
           })),
+          batchWithdrawalCount: batch.withdrawals.length,
         },
         "Withdrawal not found in latest batch"
       );
