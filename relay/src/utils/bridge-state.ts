@@ -796,24 +796,29 @@ export async function addPendingWithdrawal(
             withdrawals.push(withdrawal);
 
             // Save back to list sub-node
-            listNode.put(withdrawals, (ack: GunMessagePut) => {
-              if (ack && "err" in ack && ack.err) {
-                const errorMsg =
-                  typeof ack.err === "string" ? ack.err : String(ack.err);
-                log.error(
-                  { error: errorMsg, withdrawalsPath, withdrawal, withdrawalsCount: withdrawals.length },
-                  "Error saving pending withdrawal list"
-                );
-                cleanup();
-                reject(new Error(errorMsg));
-              } else {
-                log.info(
-                  { withdrawalsCount: withdrawals.length, withdrawal },
-                  "Pending withdrawal added successfully"
-                );
-                cleanup();
-                resolve();
-              }
+            // Clear first to handle any inconsistent state
+            listNode.put(null, (clearAck: GunMessagePut) => {
+              setTimeout(() => {
+                listNode.put(withdrawals, (ack: GunMessagePut) => {
+                  if (ack && "err" in ack && ack.err) {
+                    const errorMsg =
+                      typeof ack.err === "string" ? ack.err : String(ack.err);
+                    log.error(
+                      { error: errorMsg, withdrawalsPath, withdrawal, withdrawalsCount: withdrawals.length },
+                      "Error saving pending withdrawal list"
+                    );
+                    cleanup();
+                    reject(new Error(errorMsg));
+                  } else {
+                    log.info(
+                      { withdrawalsCount: withdrawals.length, withdrawal },
+                      "Pending withdrawal added successfully"
+                    );
+                    cleanup();
+                    resolve();
+                  }
+                });
+              }, 50);
             });
             return;
           } catch (innerError) {
@@ -921,40 +926,46 @@ export async function addPendingWithdrawal(
               withdrawals.push(withdrawal);
 
               // Always save to 'list' sub-node to avoid conflicts with existing array formats
-              // This works whether the parent node is array, object, or null
+              // Clear any existing data first, then save new array
               const withdrawalsNode = gun.get(withdrawalsPath);
               const listNodeForSave = withdrawalsNode.get('list');
               
               log.info(
                 { withdrawalsCount: withdrawals.length, wasArray, wasObject },
-                "Saving withdrawals to list sub-node"
+                "Clearing existing list data, then saving withdrawals to list sub-node"
               );
               
-              listNodeForSave.put(withdrawals, (ack: GunMessagePut) => {
-                if (ack && "err" in ack && ack.err) {
-                  const errorMsg =
-                    typeof ack.err === "string" ? ack.err : String(ack.err);
-                  log.error(
-                    { 
-                      error: errorMsg, 
-                      withdrawalsPath, 
-                      withdrawal, 
-                      withdrawalsCount: withdrawals.length,
-                      wasArray,
-                      wasObject 
-                    },
-                    "Error saving pending withdrawal list"
-                  );
-                  cleanup();
-                  reject(new Error(errorMsg));
-                } else {
-                  log.info(
-                    { withdrawalsCount: withdrawals.length, withdrawal },
-                    "Pending withdrawal added successfully"
-                  );
-                  cleanup();
-                  resolve();
-                }
+              // First clear any existing data in the list sub-node
+              listNodeForSave.put(null, (clearAck: GunMessagePut) => {
+                // Wait a bit for the clear to propagate, then save
+                setTimeout(() => {
+                  listNodeForSave.put(withdrawals, (ack: GunMessagePut) => {
+                    if (ack && "err" in ack && ack.err) {
+                      const errorMsg =
+                        typeof ack.err === "string" ? ack.err : String(ack.err);
+                      log.error(
+                        { 
+                          error: errorMsg, 
+                          withdrawalsPath, 
+                          withdrawal, 
+                          withdrawalsCount: withdrawals.length,
+                          wasArray,
+                          wasObject 
+                        },
+                        "Error saving pending withdrawal list"
+                      );
+                      cleanup();
+                      reject(new Error(errorMsg));
+                    } else {
+                      log.info(
+                        { withdrawalsCount: withdrawals.length, withdrawal },
+                        "Pending withdrawal added successfully"
+                      );
+                      cleanup();
+                      resolve();
+                    }
+                  });
+                }, 50); // Small delay to ensure clear propagates
               });
             } catch (innerError) {
               cleanup();
