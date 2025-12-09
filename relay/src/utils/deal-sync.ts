@@ -148,7 +148,7 @@ const CACHE_CLEANUP_INTERVAL_MS = 30 * 60 * 1000; // Cleanup every 30 minutes
 const CACHE_MAX_AGE_MS = 4 * 60 * 60 * 1000; // Remove entries older than 4 hours
 
 // Periodic cleanup of stale cache entries to prevent memory leaks
-let cleanupIntervalId: mb<ReturnType<typeof setInterval>> = und;
+let cleanupIntervalId: mb<ReturnType<typeof setInterval>> = undefined;
 
 function startCacheCleanup(): void {
   if (cleanupIntervalId) return;
@@ -156,7 +156,7 @@ function startCacheCleanup(): void {
   cleanupIntervalId = setInterval(() => {
     if (isShuttingDown) {
       clearInterval(cleanupIntervalId!);
-      cleanupIntervalId = und;
+      cleanupIntervalId = undefined;
       return;
     }
 
@@ -570,11 +570,11 @@ async function convertOnChainDealToGunDB(
     expiresAt,
     // Payment
     paymentRequired: parseFloat(onChainDeal.priceUSDC),
-    paymentTx: und, // On-chain deals don't have a single payment TX
+    paymentTx: undefined, // On-chain deals don't have a single payment TX
     paymentVerified: true, // On-chain deals are verified by contract
     // Storage
     erasureCoding: false,
-    erasureMetadata: und,
+    erasureMetadata: undefined,
     replicationFactor: 1,
     replicas: {},
     replicaCount: 0,
@@ -604,8 +604,8 @@ export async function syncDealsWithIPFS(
   const {
     onlyActive = true,
     dryRun = false,
-    gun = und,
-    relayKeyPair = und,
+    gun = undefined,
+    relayKeyPair = undefined,
     fastSync = false,
   } = options;
 
@@ -661,7 +661,7 @@ export async function syncDealsWithIPFS(
     };
 
     // Get relay pub key if GunDB sync is enabled
-    let relayPub: mb<str> = und;
+    let relayPub: mb<str> = undefined;
     if (gun && relayKeyPair) {
       relayPub = relayKeyPair.pub;
     }

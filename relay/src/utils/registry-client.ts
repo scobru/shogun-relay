@@ -117,11 +117,11 @@ const generateAddressMappings = (): {
   // Iterate through all network configs
   for (const config of Object.values(CONTRACTS_CONFIG) as arr<NetworkConfig>) {
     if (config && config.chainId) {
-      registryAddresses[config.chainId] = config.relayRegistry || und;
+      registryAddresses[config.chainId] = config.relayRegistry || undefined;
       storageDealRegistryAddresses[config.chainId] =
-        config.storageDealRegistry || und;
-      usdcAddresses[config.chainId] = config.usdc || und;
-      rpcUrls[config.chainId] = config.rpc || und;
+        config.storageDealRegistry || undefined;
+      usdcAddresses[config.chainId] = config.usdc || undefined;
+      rpcUrls[config.chainId] = config.rpc || undefined;
     }
   }
 
@@ -186,10 +186,10 @@ function formatRelayInfo(
     unstakeRequestedAt:
       info.unstakeRequestedAt > 0n
         ? new Date(Number(info.unstakeRequestedAt) * 1000).toISOString()
-        : und,
+        : undefined,
     status: RelayStatus[info.status] || "Unknown",
     totalSlashed: ethers.formatUnits(info.totalSlashed, 6),
-    griefingRatio: info.griefingRatio ? Number(info.griefingRatio) : und,
+    griefingRatio: info.griefingRatio ? Number(info.griefingRatio) : undefined,
   };
 }
 
@@ -201,7 +201,7 @@ function formatRelayInfo(
  */
 export function createRegistryClient(
   chainId: num = 84532,
-  rpcUrl: mb<str> = und
+  rpcUrl: mb<str> = undefined
 ): obj {
   const registryAddress = REGISTRY_ADDRESSES[chainId];
   if (!registryAddress) {
@@ -261,12 +261,12 @@ export function createRegistryClient(
       try {
         const info: RelayInfo = await relayRegistry.getRelayInfo(relayAddress);
         if (info.owner === ethers.ZeroAddress) {
-          return und;
+          return undefined;
         }
         return formatRelayInfo(info, relayAddress);
       } catch (e) {
         log.error({ err: e }, `Error fetching relay info`);
-        return und;
+        return undefined;
       }
     },
 
@@ -398,7 +398,7 @@ export function createRegistryClient(
 export function createRegistryClientWithSigner(
   privateKey: str,
   chainId: num = 84532,
-  rpcUrl: mb<str> = und
+  rpcUrl: mb<str> = undefined
 ): obj {
   const client = createRegistryClient(chainId, rpcUrl);
   const wallet = new ethers.Wallet(privateKey, client.provider);
@@ -705,7 +705,7 @@ export function dealIdToBytes32(dealId: str): str {
  */
 export function createStorageDealRegistryClient(
   chainId: num = 84532,
-  rpcUrl: mb<str> = und
+  rpcUrl: mb<str> = undefined
 ): obj {
   const registryAddress = STORAGE_DEAL_REGISTRY_ADDRESSES[chainId];
   if (!registryAddress) {
@@ -746,7 +746,7 @@ export function createStorageDealRegistryClient(
         const deal = await storageDealRegistry.getDeal(dealIdBytes32);
 
         if (!deal || deal.createdAt === 0n || deal.createdAt === 0) {
-          return und;
+          return undefined;
         }
 
         return {
@@ -781,7 +781,7 @@ export function createStorageDealRegistryClient(
         ) {
           log.error({ error: e, dealId }, `Error fetching deal`);
         }
-        return und;
+        return undefined;
       }
     },
 
@@ -862,7 +862,7 @@ export function createStorageDealRegistryClient(
 export function createStorageDealRegistryClientWithSigner(
   privateKey: str,
   chainId: num = 84532,
-  rpcUrl: mb<str> = und
+  rpcUrl: mb<str> = undefined
 ): obj {
   const client = createStorageDealRegistryClient(chainId, rpcUrl);
   const wallet = new ethers.Wallet(privateKey, client.provider);

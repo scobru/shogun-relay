@@ -11,10 +11,6 @@ declare global {
   // --- Il cuore del sistema ---
   // 1. Definiamo il TIPO 'und'
   type und = undefined; 
-  
-  // 2. Diciamo che esiste una VARIABILE globale 'und'
-  // Nota: Per tsx, dobbiamo inizializzarla come costante runtime
-  var und: undefined; 
 
   // --- Async & Utility ---
   type prm<T> = Promise<T>;

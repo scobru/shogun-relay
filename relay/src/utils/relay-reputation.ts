@@ -211,7 +211,7 @@ export function calculateReputationScore(metrics: ReputationMetrics): Reputation
 
   // 1. Uptime Score (0-100)
   // Based on pulse consistency in last 24h
-  if (metrics.uptimePercent !== und) {
+  if (metrics.uptimePercent !== undefined) {
     scores.uptime = Math.min(100, metrics.uptimePercent);
   } else if (metrics.expectedPulses && metrics.receivedPulses) {
     scores.uptime = Math.min(100, (metrics.receivedPulses / metrics.expectedPulses) * 100);
@@ -228,7 +228,7 @@ export function calculateReputationScore(metrics: ReputationMetrics): Reputation
 
   // 3. Response Time Score (0-100)
   // Inverse scale: faster = higher score
-  if (metrics.avgResponseTimeMs !== und) {
+  if (metrics.avgResponseTimeMs !== undefined) {
     if (metrics.avgResponseTimeMs <= THRESHOLDS.idealResponseTimeMs) {
       scores.responseTime = 100;
     } else if (metrics.avgResponseTimeMs >= THRESHOLDS.maxResponseTimeMs) {
@@ -661,13 +661,13 @@ export async function recordPulse(gun: GunInstance, relayHost: str): prm<void> {
  */
 export async function getReputation(gun: GunInstance, relayHost: str): prm<mb<LeaderboardEntry>> {
   return new Promise((resolve) => {
-    const timeout = setTimeout(() => resolve(und), 5000);
+    const timeout = setTimeout(() => resolve(undefined), 5000);
 
     gun.get('shogun-network').get('reputation').get(relayHost).once((data: mb<obj>) => {
       clearTimeout(timeout);
 
       if (!data || typeof data !== 'object') {
-        resolve(und);
+        resolve(undefined);
         return;
       }
 
@@ -700,7 +700,7 @@ export async function getReputationLeaderboard(
   gun: GunInstance,
   options: LeaderboardOptions = {}
 ): prm<arr<LeaderboardEntry>> {
-  const { minScore = 0, tier = und, limit = 50 } = options;
+  const { minScore = 0, tier = undefined, limit = 50 } = options;
 
   return new Promise((resolve) => {
     const relays: arr<LeaderboardEntry> = [];

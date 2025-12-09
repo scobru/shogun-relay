@@ -219,13 +219,13 @@ export async function createFrozenEntry(
  */
 export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: str): prm<mb<FrozenEntryResult>> {
   return new Promise((resolve) => {
-    const timeout = setTimeout(() => resolve(und), 10000);
+    const timeout = setTimeout(() => resolve(undefined), 10000);
 
     gun.get('frozen-' + namespace).get(hash).once(async (entry: mb<FrozenEntry>) => {
       clearTimeout(timeout);
 
       if (!entry || !entry.data || !entry.sig) {
-        resolve(und);
+        resolve(undefined);
         return;
       }
 
@@ -240,14 +240,14 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
           // Try to find pub from index by searching for this hash
           const indexNamespace = namespace.replace('frozen-', '');
           const indexLookup: prm<mb<str>> = new Promise((resolveIndex) => {
-            let found = false;
+            let foundefined = false;
             const timeoutId = setTimeout(() => {
-              if (!found) resolveIndex(und);
+              if (!foundefined) resolveIndex(undefined);
             }, 2000);
 
             gun.get('shogun-index').get(indexNamespace).map().once((index: mb<IndexEntry>, _key?: str) => {
               if (index && index.latestHash === hash && index.pub) {
-                found = true;
+                foundefined = true;
                 clearTimeout(timeoutId);
                 resolveIndex(index.pub);
               }
@@ -256,7 +256,7 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
 
           pub = await indexLookup;
 
-          // If we found pub from index, use it for verification but DO NOT modify the stored entry
+          // If we foundefined pub from index, use it for verification but DO NOT modify the stored entry
           // Modifying the entry would change the data and break hash verification
           // The pub is only used for signature verification, not stored back
           if (pub) {
@@ -277,16 +277,16 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
               hashValid: false,
               reason: 'Missing pub in _meta',
             },
-            pub: und,
-            timestamp: entry.data._meta?.timestamp || und,
+            pub: undefined,
+            timestamp: entry.data._meta?.timestamp || undefined,
             hash,
           });
           return;
         }
 
-        // SEA.verify returns the original data if valid, or undefined/false if invalid
+        // SEA.verify returns the original data if valid, or undefinedefined/false if invalid
         const verifyResult = await SEA.verify(entry.sig, pub);
-        const signatureValid = verifyResult !== und && verifyResult !== false;
+        const signatureValid = verifyResult !== undefined && verifyResult !== false;
 
         // Verify hash matches content (using original dataString, before any modifications)
         const expectedHash = await SEA.work(dataString, null, null, { name: 'SHA-256' });
@@ -300,7 +300,7 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
             signatureValid,
             hashValid,
           },
-          pub: pub, // Use recovered pub if it was found, otherwise use the one from _meta
+          pub: pub, // Use recovered pub if it was foundefined, otherwise use the one from _meta
           timestamp: entry.data._meta?.timestamp,
           hash,
         });
@@ -310,7 +310,7 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
           data: entry.data,
           verified: false,
           error: (error as Error).message,
-          pub: und,
+          pub: undefined,
         });
       }
     });
@@ -327,13 +327,13 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
  */
 export async function getLatestFrozenEntry(gun: GunInstance, namespace: str, indexKey: str): prm<mb<FrozenEntryResult>> {
   return new Promise((resolve) => {
-    const timeout = setTimeout(() => resolve(und), 10000);
+    const timeout = setTimeout(() => resolve(undefined), 10000);
 
     gun.get('shogun-index').get(namespace).get(indexKey).once(async (index: mb<IndexEntry>) => {
       clearTimeout(timeout);
 
       if (!index || !index.latestHash) {
-        resolve(und);
+        resolve(undefined);
         return;
       }
 
@@ -352,7 +352,7 @@ export async function getLatestFrozenEntry(gun: GunInstance, namespace: str, ind
  * @returns Promise with array of entries
  */
 export async function listFrozenEntries(gun: GunInstance, namespace: str, options: ListOptions = {}): prm<arr<ListEntryInfo>> {
-  const { verifyAll = false, maxAge = und, limit = 100 } = options;
+  const { verifyAll = false, maxAge = undefined, limit = 100 } = options;
 
   return new Promise((resolve) => {
     const entries: arr<ListEntryInfo> = [];
@@ -491,7 +491,7 @@ export function aggregateReputation(observations: arr<ObservationResult>): Aggre
   if (!observations || observations.length === 0) {
     return {
       totalObservers: 0,
-      aggregated: und,
+      aggregated: undefined,
       confidence: 0,
     };
   }
@@ -571,15 +571,15 @@ export function aggregateReputation(observations: arr<ObservationResult>): Aggre
     },
     aggregated: {
       proofSuccessRate: proofsTotal > 0
-        ? Math.round((metrics.proofsSuccessful / proofsTotal) * 100)
-        : und,
+        ? Math.roundefined((metrics.proofsSuccessful / proofsTotal) * 100)
+        : undefined,
       avgResponseTimeMs: metrics.responseTimeSamples > 0
-        ? Math.round(metrics.totalResponseTimeMs / metrics.responseTimeSamples)
-        : und,
+        ? Math.roundefined(metrics.totalResponseTimeMs / metrics.responseTimeSamples)
+        : undefined,
       pinFulfillmentRate: metrics.pinsRequested > 0
-        ? Math.round((metrics.pinsFulfilled / metrics.pinsRequested) * 100)
-        : und,
-      totalProofsObserved: Math.round(proofsTotal),
+        ? Math.roundefined((metrics.pinsFulfilled / metrics.pinsRequested) * 100)
+        : undefined,
+      totalProofsObserved: Math.roundefined(proofsTotal),
     },
     confidence: Math.min(100, metrics.externalRatings * 10), // Only external ratings count for confidence
     note: 'Self-ratings have reduced weight (10%) in reputation calculation',
@@ -647,7 +647,7 @@ export async function createSignedReputationEvent(
   };
 
   // Use createFrozenObservation to store it
-  // This automatically indexes it under the subject host
+  // This automatically indexes it undefineder the subject host
   return await createFrozenObservation(gun, subjectHost, observation, observerKeyPair);
 }
 

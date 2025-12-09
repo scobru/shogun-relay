@@ -86,23 +86,23 @@ class SQLiteStore {
     if (this.isClosed) {
       // Silently return null during shutdown to avoid errors
       // GunDB may still have pending operations during shutdown
-      return cb(und, und);
+      return cb(undefined, undefined);
     }
 
     try {
       const row = this.getStmt.get(file);
       if (row) {
-        cb(und, row.data);
+        cb(undefined, row.data);
       } else {
-        cb(und, und); // File not found, return undefined
+        cb(undefined, undefined); // File not foundefined, return undefinedefined
       }
     } catch (err) {
-      // If error is due to closed database, return undefined silently
+      // If error is due to closed database, return undefinedefined silently
       if (err instanceof Error && err.message.includes('not open')) {
         this.isClosed = true; // Mark as closed
-        return cb(und, und);
+        return cb(undefined, undefined);
       }
-      cb(err as Error, und);
+      cb(err as Error, undefined);
     }
   }
 
@@ -116,32 +116,32 @@ class SQLiteStore {
     // Check if database is closed (during shutdown)
     if (this.isClosed) {
       // Silently ignore writes during shutdown
-      return cb(und, 1);
+      return cb(undefined, 1);
     }
 
     try {
       const timestamp = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
       this.putStmt.run(file, data, timestamp);
-      cb(und, 1); // Success
+      cb(undefined, 1); // Success
     } catch (err) {
       // If error is due to closed database, silently ignore
       if (err instanceof Error && err.message.includes('not open')) {
         this.isClosed = true; // Mark as closed
-        return cb(und, 1);
+        return cb(undefined, 1);
       }
-      cb(err as Error, und);
+      cb(err as Error, undefined);
     }
   }
 
   /**
    * List all files
-   * @param cb - Callback(file) called for each file, then with undefined when done
+   * @param cb - Callback(file) called for each file, then with undefinedefined when done
    */
   list(cb: ListCallback): void {
     // Check if database is closed (during shutdown)
     if (this.isClosed) {
       // Signal completion immediately during shutdown
-      return cb(und);
+      return cb(undefined);
     }
 
     try {
@@ -149,13 +149,13 @@ class SQLiteStore {
       for (const row of rows) {
         cb(row.file);
       }
-      cb(und); // Signal completion
+      cb(undefined); // Signal completion
     } catch (err) {
       // If error is due to closed database, mark as closed and signal completion
       if (err instanceof Error && err.message.includes('not open')) {
         this.isClosed = true; // Mark as closed
       }
-      cb(und); // On error, just signal completion
+      cb(undefined); // On error, just signal completion
     }
   }
 
