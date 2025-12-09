@@ -229,7 +229,63 @@ export function createBridgeClient(config: BridgeConfig) {
     ): Promise<() => void> {
       const filter = contract.filters.Deposit();
 
-      const listener = async (user: string, amount: bigint, timestamp: bigint, event: ethers.Log) => {
+      // Helper to extract event data from either parsed EventLog or raw args
+      const extractEventData = (eventOrArgs: any): { user: string; amount: bigint; timestamp: bigint; log: ethers.Log } | null => {
+        // If it's a parsed EventLog with args
+        if (eventOrArgs && typeof eventOrArgs === 'object' && 'args' in eventOrArgs && eventOrArgs.args) {
+          const args = eventOrArgs.args;
+          if (Array.isArray(args) && args.length >= 3) {
+            return {
+              user: args[0],
+              amount: args[1],
+              timestamp: args[2],
+              log: eventOrArgs as ethers.Log,
+            };
+          }
+        }
+        // If it's the raw log event (from contract.on with multiple args)
+        // This case is handled by the listener signature below
+        return null;
+      };
+
+      const listener = async (...args: any[]) => {
+        // Handle different event formats from ethers
+        let user: string;
+        let amount: bigint;
+        let timestamp: bigint;
+        let event: ethers.Log;
+
+        // Check if first arg is a parsed EventLog
+        const extracted = extractEventData(args[0]);
+        if (extracted) {
+          user = extracted.user;
+          amount = extracted.amount;
+          timestamp = extracted.timestamp;
+          event = extracted.log;
+        } else if (args.length >= 4) {
+          // Standard format: (user, amount, timestamp, event)
+          [user, amount, timestamp, event] = args;
+          // Validate event is a Log object
+          if (!event || typeof event !== 'object' || !('transactionHash' in event)) {
+            log.error({ args }, "Invalid event log object in deposit listener");
+            return;
+          }
+        } else if (args.length === 1 && args[0] && typeof args[0] === 'object') {
+          // Single EventLog object
+          const logEvent = args[0] as any;
+          if (logEvent.args && Array.isArray(logEvent.args) && logEvent.args.length >= 3) {
+            user = logEvent.args[0];
+            amount = logEvent.args[1];
+            timestamp = logEvent.args[2];
+            event = logEvent;
+          } else {
+            log.error({ event: logEvent }, "Invalid event format in deposit listener");
+            return;
+          }
+        } else {
+          log.error({ args }, "Unexpected event format in deposit listener");
+          return;
+        }
         try {
           // Validate user address before processing
           if (!user || typeof user !== 'string') {
@@ -265,6 +321,23 @@ export function createBridgeClient(config: BridgeConfig) {
             log.error(
               { user: normalizedUser, amount: amount.toString(), timestamp, txHash: event.transactionHash },
               "Invalid timestamp in deposit event"
+            );
+            return;
+          }
+
+          // Validate event has required fields
+          if (!event.blockNumber || event.blockNumber === null) {
+            log.error(
+              { user: normalizedUser, amount: amount.toString(), txHash: event.transactionHash },
+              "Invalid blockNumber in deposit event"
+            );
+            return;
+          }
+
+          if (!event.transactionHash || typeof event.transactionHash !== 'string') {
+            log.error(
+              { user: normalizedUser, amount: amount.toString(), blockNumber: event.blockNumber },
+              "Invalid transactionHash in deposit event"
             );
             return;
           }
