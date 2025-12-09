@@ -1157,43 +1157,87 @@ export async function saveBatch(
   gun: IGunInstance,
   batch: Batch
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const batchPath = `bridge/batches/${batch.batchId}`;
+    const withdrawalsPath = `${batchPath}/withdrawals`;
 
-    // Convert withdrawals array to object for GunDB compatibility
-    // GunDB has issues with arrays, so we store as { "0": withdrawal0, "1": withdrawal1, ... }
-    const withdrawalsObj: Record<string, PendingWithdrawal> = {};
-    batch.withdrawals.forEach((w, index) => {
-      withdrawalsObj[index.toString()] = w;
-    });
+    try {
+      // First, save the batch metadata (without withdrawals array)
+      const batchData = {
+        batchId: batch.batchId,
+        root: batch.root,
+        withdrawalsCount: batch.withdrawals.length,
+        timestamp: batch.timestamp,
+        blockNumber: batch.blockNumber,
+        txHash: batch.txHash,
+      };
 
-    const batchData = {
-      batchId: batch.batchId,
-      root: batch.root,
-      withdrawals: withdrawalsObj,
-      withdrawalsCount: batch.withdrawals.length, // Store count for easy retrieval
-      timestamp: batch.timestamp,
-      blockNumber: batch.blockNumber,
-      txHash: batch.txHash,
-    };
+      await new Promise<void>((res, rej) => {
+        gun.get(batchPath).put(batchData, (ack: GunMessagePut) => {
+          if (ack && "err" in ack && ack.err) {
+            const errorMsg =
+              typeof ack.err === "string" ? ack.err : String(ack.err);
+            log.error(
+              { error: errorMsg, batchPath, batchId: batch.batchId },
+              "Error saving batch metadata to GunDB"
+            );
+            rej(new Error(errorMsg));
+          } else {
+            log.info(
+              { batchId: batch.batchId, withdrawalCount: batch.withdrawals.length },
+              "Batch metadata saved to GunDB"
+            );
+            res();
+          }
+        });
+      });
 
-    gun.get(batchPath).put(batchData, (ack: GunMessagePut) => {
-      if (ack && "err" in ack && ack.err) {
-        const errorMsg =
-          typeof ack.err === "string" ? ack.err : String(ack.err);
-        log.error(
-          { error: errorMsg, batchPath, batchId: batch.batchId },
-          "Error saving batch to GunDB"
+      // Then, save each withdrawal as a separate node
+      const savePromises: Promise<void>[] = [];
+      batch.withdrawals.forEach((withdrawal, index) => {
+        savePromises.push(
+          new Promise((res, rej) => {
+            const withdrawalKey = `${index}`;
+            const withdrawalNodePath = `${withdrawalsPath}/${withdrawalKey}`;
+            const timeout = setTimeout(() => {
+              rej(new Error("Timeout waiting for GunDB response"));
+            }, 10000);
+
+            gun.get(withdrawalNodePath).put(withdrawal, (ack: GunMessagePut) => {
+              clearTimeout(timeout);
+              if (ack && "err" in ack && ack.err) {
+                const errorMsg =
+                  typeof ack.err === "string" ? ack.err : String(ack.err);
+                log.error(
+                  { error: errorMsg, withdrawalNodePath, index },
+                  "Error saving withdrawal to batch in GunDB"
+                );
+                rej(new Error(errorMsg));
+              } else {
+                log.info(
+                  { withdrawalNodePath, index, user: withdrawal.user, amount: withdrawal.amount },
+                  "Withdrawal saved to batch in GunDB"
+                );
+                res();
+              }
+            });
+          })
         );
-        reject(new Error(errorMsg));
-      } else {
-        log.info(
-          { batchId: batch.batchId, withdrawalCount: batch.withdrawals.length },
-          "Batch saved to GunDB"
-        );
-        resolve();
-      }
-    });
+      });
+
+      await Promise.all(savePromises);
+      log.info(
+        { batchId: batch.batchId, withdrawalCount: batch.withdrawals.length },
+        "Batch saved successfully to GunDB"
+      );
+      resolve();
+    } catch (error) {
+      log.error(
+        { error, batchId: batch.batchId, withdrawalCount: batch.withdrawals.length },
+        "Error saving batch to GunDB"
+      );
+      reject(error instanceof Error ? error : new Error(String(error)));
+    }
   });
 }
 
@@ -1206,46 +1250,105 @@ export async function getBatch(
 ): Promise<Batch | null> {
   return new Promise((resolve) => {
     const batchPath = `bridge/batches/${batchId}`;
+    const withdrawalsPath = `${batchPath}/withdrawals`;
     const timeout = setTimeout(() => {
       log.warn({ batchPath }, "Timeout waiting for GunDB response in getBatch");
       resolve(null);
     }, 10000);
 
-    gun.get(batchPath).once((data: any) => {
+    gun.get(batchPath).once(async (data: any) => {
       clearTimeout(timeout);
-      if (!data) {
+      if (!data || !data.batchId) {
         resolve(null);
         return;
       }
 
-      // Convert withdrawals object back to array
-      let withdrawals: PendingWithdrawal[] = [];
-      if (data.withdrawals) {
-        if (Array.isArray(data.withdrawals)) {
-          // Backward compatibility: if it's already an array, use it
-          withdrawals = data.withdrawals;
-        } else if (typeof data.withdrawals === 'object') {
-          // Convert object { "0": w0, "1": w1, ... } to array
-          const withdrawalsObj = data.withdrawals;
-          const indices = Object.keys(withdrawalsObj)
-            .filter(key => /^\d+$/.test(key)) // Only numeric keys
-            .map(key => parseInt(key, 10))
-            .sort((a, b) => a - b);
-          
-          withdrawals = indices.map(index => withdrawalsObj[index.toString()]).filter(Boolean);
+      // Read withdrawals from separate nodes
+      const withdrawals: PendingWithdrawal[] = [];
+      const withdrawalsObj: Record<number, PendingWithdrawal> = {};
+      let withdrawalsResolved = false;
+
+      const withdrawalsTimeout = setTimeout(() => {
+        if (!withdrawalsResolved) {
+          withdrawalsResolved = true;
+          log.warn({ withdrawalsPath }, "Timeout reading withdrawals in getBatch");
         }
-      }
+      }, 5000);
 
-      const batch: Batch = {
-        batchId: data.batchId,
-        root: data.root,
-        withdrawals,
-        timestamp: data.timestamp,
-        blockNumber: data.blockNumber,
-        txHash: data.txHash,
-      };
+      gun.get(withdrawalsPath).map().once((withdrawal: PendingWithdrawal | null, key: string) => {
+        if (withdrawalsResolved) return;
 
-      resolve(batch);
+        if (key === '_' || key.startsWith('_')) {
+          return;
+        }
+
+        if (
+          withdrawal &&
+          typeof withdrawal === 'object' &&
+          typeof withdrawal.user === 'string' &&
+          typeof withdrawal.amount === 'string' &&
+          typeof withdrawal.nonce === 'string' &&
+          typeof withdrawal.timestamp === 'number'
+        ) {
+          const index = parseInt(key, 10);
+          if (!isNaN(index)) {
+            withdrawalsObj[index] = withdrawal as PendingWithdrawal;
+          }
+        }
+      });
+
+      // After a delay, resolve with collected withdrawals
+      setTimeout(() => {
+        if (withdrawalsResolved) {
+          resolve(null);
+          return;
+        }
+
+        withdrawalsResolved = true;
+        clearTimeout(withdrawalsTimeout);
+
+        // Convert object to sorted array
+        const sortedIndices = Object.keys(withdrawalsObj)
+          .map(k => parseInt(k, 10))
+          .sort((a, b) => a - b);
+        
+        sortedIndices.forEach(index => {
+          withdrawals.push(withdrawalsObj[index]);
+        });
+
+        // Backward compatibility: try to read from old format if no withdrawals found
+        if (withdrawals.length === 0 && data.withdrawals) {
+          if (Array.isArray(data.withdrawals)) {
+            withdrawals.push(...data.withdrawals);
+          } else if (typeof data.withdrawals === 'object') {
+            const oldWithdrawalsObj = data.withdrawals;
+            const indices = Object.keys(oldWithdrawalsObj)
+              .filter(key => /^\d+$/.test(key))
+              .map(key => parseInt(key, 10))
+              .sort((a, b) => a - b);
+            
+            indices.forEach(index => {
+              const w = oldWithdrawalsObj[index.toString()];
+              if (w) withdrawals.push(w);
+            });
+          }
+        }
+
+        const batch: Batch = {
+          batchId: data.batchId,
+          root: data.root,
+          withdrawals,
+          timestamp: data.timestamp,
+          blockNumber: data.blockNumber,
+          txHash: data.txHash,
+        };
+
+        log.info(
+          { batchId: data.batchId, withdrawalCount: withdrawals.length },
+          "Batch retrieved from GunDB"
+        );
+        resolve(batch);
+      }, 500);
     });
   });
 }
@@ -1261,7 +1364,7 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
       resolve(null);
     }, 10000); // 10 second timeout
 
-    const batches: Batch[] = [];
+    const batchIds: string[] = [];
     let resolved = false;
 
     const cleanup = () => {
@@ -1271,8 +1374,8 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
 
     const parentNode = gun.get(batchesPath);
 
-    // Use map().once() for a one-time read of all child nodes
-    parentNode.map().once((batch: Batch | null, key: string) => {
+    // Use map().once() to collect batch IDs
+    parentNode.map().once((batch: any, key: string) => {
       if (resolved) return;
 
       // Skip metadata keys
@@ -1286,47 +1389,20 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
         typeof batch.batchId === 'string' &&
         typeof batch.root === 'string'
       ) {
-        // Convert withdrawals object back to array if needed
-        let withdrawals: PendingWithdrawal[] = [];
-        if (batch.withdrawals) {
-          if (Array.isArray(batch.withdrawals)) {
-            // Backward compatibility: if it's already an array, use it
-            withdrawals = batch.withdrawals;
-          } else if (typeof batch.withdrawals === 'object') {
-            // Convert object { "0": w0, "1": w1, ... } to array
-            const withdrawalsObj = batch.withdrawals;
-            const indices = Object.keys(withdrawalsObj)
-              .filter(key => /^\d+$/.test(key)) // Only numeric keys
-              .map(key => parseInt(key, 10))
-              .sort((a, b) => a - b);
-            
-            withdrawals = indices.map(index => withdrawalsObj[index.toString()]).filter(Boolean);
-          }
-        }
-
-        const normalizedBatch: Batch = {
-          batchId: batch.batchId,
-          root: batch.root,
-          withdrawals,
-          timestamp: batch.timestamp,
-          blockNumber: batch.blockNumber,
-          txHash: batch.txHash,
-        };
-
-        batches.push(normalizedBatch);
+        batchIds.push(batch.batchId);
         log.info(
-          { key, batchId: batch.batchId, withdrawalCount: withdrawals.length },
-          "Found batch node"
+          { key, batchId: batch.batchId },
+          "Found batch ID"
         );
       }
     });
 
     // After a short delay, resolve the promise to ensure all .once() callbacks have fired
-    setTimeout(() => {
+    setTimeout(async () => {
       if (resolved) return;
       cleanup();
 
-      if (batches.length === 0) {
+      if (batchIds.length === 0) {
         log.info({ batchesPath }, "No batches found in GunDB");
         resolve(null);
         return;
