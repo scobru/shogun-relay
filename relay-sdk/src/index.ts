@@ -6,6 +6,7 @@ import { NetworkModule } from './modules/network';
 import { DealsModule } from './modules/deals';
 import { RegistryModule } from './modules/registry';
 import { UploadsModule } from './modules/uploads';
+import { BridgeModule } from './modules/bridge';
 
 export class ShogunRelaySDK {
   private client: ApiClient;
@@ -17,6 +18,7 @@ export class ShogunRelaySDK {
   public deals: DealsModule;
   public registry: RegistryModule;
   public uploads: UploadsModule;
+  public bridge: BridgeModule;
 
   constructor(config: ApiClientConfig) {
     this.client = new ApiClient(config);
@@ -28,6 +30,7 @@ export class ShogunRelaySDK {
     this.deals = new DealsModule(this.client);
     this.registry = new RegistryModule(this.client);
     this.uploads = new UploadsModule(this.client);
+    this.bridge = new BridgeModule(this.client);
   }
 
   public setToken(token: string) {

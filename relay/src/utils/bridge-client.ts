@@ -235,11 +235,22 @@ export function createBridgeClient(config: BridgeConfig) {
         if (eventOrArgs && typeof eventOrArgs === 'object' && 'args' in eventOrArgs && eventOrArgs.args) {
           const args = eventOrArgs.args;
           if (Array.isArray(args) && args.length >= 3) {
+            // Check if there's a nested log object (from contract.on format)
+            // Use nested log if it exists and has transactionHash, otherwise use event itself
+            let log: ethers.Log;
+            if (eventOrArgs.log && typeof eventOrArgs.log === 'object' && 'transactionHash' in eventOrArgs.log) {
+              log = eventOrArgs.log as ethers.Log;
+            } else if ('transactionHash' in eventOrArgs) {
+              log = eventOrArgs as ethers.Log;
+            } else {
+              // Fallback: try to find log in the object
+              log = eventOrArgs as ethers.Log;
+            }
             return {
               user: args[0],
               amount: args[1],
               timestamp: args[2],
-              log: eventOrArgs as ethers.Log,
+              log,
             };
           }
         }
@@ -271,13 +282,16 @@ export function createBridgeClient(config: BridgeConfig) {
             return;
           }
         } else if (args.length === 1 && args[0] && typeof args[0] === 'object') {
-          // Single EventLog object
+          // Single EventLog object - may have nested log structure
           const logEvent = args[0] as any;
           if (logEvent.args && Array.isArray(logEvent.args) && logEvent.args.length >= 3) {
             user = logEvent.args[0];
             amount = logEvent.args[1];
             timestamp = logEvent.args[2];
-            event = logEvent;
+            // Use nested log if available, otherwise use the event itself
+            event = (logEvent.log && typeof logEvent.log === 'object' && 'transactionHash' in logEvent.log) 
+              ? logEvent.log 
+              : logEvent;
           } else {
             log.error({ event: logEvent }, "Invalid event format in deposit listener");
             return;
@@ -286,11 +300,30 @@ export function createBridgeClient(config: BridgeConfig) {
           log.error({ args }, "Unexpected event format in deposit listener");
           return;
         }
+        
+        // Normalize event - ensure we have the actual log object with transactionHash
+        // Some event formats have nested log structure: { args: [...], log: { transactionHash, ... } }
+        if (event && typeof event === 'object' && !('transactionHash' in event)) {
+          // Try to find log in nested structure
+          const eventAny = event as any;
+          if (eventAny.log && typeof eventAny.log === 'object' && 'transactionHash' in eventAny.log) {
+            event = eventAny.log as ethers.Log;
+          } else if (eventAny.event && typeof eventAny.event === 'object' && 'log' in eventAny.event) {
+            const nestedLog = eventAny.event.log;
+            if (nestedLog && typeof nestedLog === 'object' && 'transactionHash' in nestedLog) {
+              event = nestedLog as ethers.Log;
+            }
+          }
+        }
+        
         try {
           // Validate user address before processing
           if (!user || typeof user !== 'string') {
+            const txHash = event && typeof event === 'object' && 'transactionHash' in event 
+              ? (event as any).transactionHash 
+              : 'unknown';
             log.error(
-              { user, amount: amount?.toString(), timestamp: timestamp?.toString(), txHash: event.transactionHash },
+              { user, amount: amount?.toString(), timestamp: timestamp?.toString(), txHash },
               "Invalid user address in deposit event: user is missing or not a string"
             );
             return;
@@ -325,11 +358,17 @@ export function createBridgeClient(config: BridgeConfig) {
             return;
           }
 
-          // Validate transactionHash
-          if (!event.transactionHash || typeof event.transactionHash !== 'string') {
+          // Validate transactionHash - should be available after normalization
+          if (!event || typeof event !== 'object' || !('transactionHash' in event) || typeof event.transactionHash !== 'string') {
             log.error(
-              { user: normalizedUser, amount: amount.toString(), event },
-              "Invalid transactionHash in deposit event"
+              { 
+                user: normalizedUser, 
+                amount: amount.toString(), 
+                eventKeys: event ? Object.keys(event) : [],
+                eventType: event ? typeof event : 'null',
+                event 
+              },
+              "Invalid transactionHash in deposit event - event does not have transactionHash after normalization"
             );
             return;
           }
@@ -419,16 +458,9 @@ export function createBridgeClient(config: BridgeConfig) {
         try {
           const events = await contract.queryFilter(filter, fromBlock);
           for (const event of events) {
-            if ('args' in event && event.args && Array.isArray(event.args) && event.args.length >= 3) {
-              // Parse the event properly - args should be [user, amount, timestamp]
-              const [user, amount, timestamp] = event.args;
-              await listener(user, amount, timestamp, event);
-            } else {
-              log.warn(
-                { event },
-                "Skipping deposit event with invalid args structure"
-              );
-            }
+            // For queryFilter results, pass the event object directly to listener
+            // The listener will handle extracting args and log
+            await listener(event);
           }
         } catch (error) {
           log.error(
