@@ -230,18 +230,60 @@ export function createBridgeClient(config: BridgeConfig) {
       const filter = contract.filters.Deposit();
 
       const listener = async (user: string, amount: bigint, timestamp: bigint, event: ethers.Log) => {
-        const depositEvent: DepositEvent = {
-          user: ethers.getAddress(user),
-          amount,
-          timestamp,
-          blockNumber: event.blockNumber,
-          txHash: event.transactionHash,
-        };
-
         try {
+          // Validate user address before processing
+          if (!user || typeof user !== 'string') {
+            log.error(
+              { user, amount: amount?.toString(), timestamp: timestamp?.toString(), txHash: event.transactionHash },
+              "Invalid user address in deposit event: user is missing or not a string"
+            );
+            return;
+          }
+
+          // Validate and normalize address
+          let normalizedUser: string;
+          try {
+            normalizedUser = ethers.getAddress(user);
+          } catch (error) {
+            log.error(
+              { user, amount: amount?.toString(), timestamp: timestamp?.toString(), txHash: event.transactionHash, error },
+              "Invalid user address format in deposit event"
+            );
+            return;
+          }
+
+          // Validate amount and timestamp
+          if (amount === undefined || amount === null || typeof amount !== 'bigint') {
+            log.error(
+              { user: normalizedUser, amount, timestamp: timestamp?.toString(), txHash: event.transactionHash },
+              "Invalid amount in deposit event"
+            );
+            return;
+          }
+
+          if (timestamp === undefined || timestamp === null || typeof timestamp !== 'bigint') {
+            log.error(
+              { user: normalizedUser, amount: amount.toString(), timestamp, txHash: event.transactionHash },
+              "Invalid timestamp in deposit event"
+            );
+            return;
+          }
+
+          const depositEvent: DepositEvent = {
+            user: normalizedUser,
+            amount,
+            timestamp,
+            blockNumber: event.blockNumber,
+            txHash: event.transactionHash,
+          };
+
           await callback(depositEvent);
         } catch (error) {
-          log.error({ error, depositEvent }, "Error processing deposit event");
+          log.error(
+            { error, user, amount: amount?.toString(), timestamp: timestamp?.toString(), txHash: event.transactionHash },
+            "Error processing deposit event"
+          );
+          // Don't throw - continue processing other events
         }
       };
 
@@ -250,11 +292,26 @@ export function createBridgeClient(config: BridgeConfig) {
 
       // Also query historical events if fromBlock is specified
       if (fromBlock !== "latest") {
-        const events = await contract.queryFilter(filter, fromBlock);
-        for (const event of events) {
-          if ('args' in event && event.args) {
-            await listener(event.args[0], event.args[1], event.args[2], event);
+        try {
+          const events = await contract.queryFilter(filter, fromBlock);
+          for (const event of events) {
+            if ('args' in event && event.args && Array.isArray(event.args) && event.args.length >= 3) {
+              // Parse the event properly - args should be [user, amount, timestamp]
+              const [user, amount, timestamp] = event.args;
+              await listener(user, amount, timestamp, event);
+            } else {
+              log.warn(
+                { event },
+                "Skipping deposit event with invalid args structure"
+              );
+            }
           }
+        } catch (error) {
+          log.error(
+            { error, fromBlock },
+            "Error querying historical deposit events"
+          );
+          // Don't throw - continue with live listener
         }
       }
 
