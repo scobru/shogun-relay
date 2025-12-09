@@ -397,6 +397,7 @@ export async function verifyDualSignatures(
     // SEA.verify returns the original data if signature is valid
     const seaVerified = await SEA.verify(seaSignature, gunPubKey);
     if (!seaVerified) {
+      log.warn({ ethAddress }, "SEA signature verification failed");
       return null;
     }
 
@@ -410,16 +411,40 @@ export async function verifyDualSignatures(
       : JSON.stringify(message);
     
     if (seaData !== normalizedMessage) {
+      log.warn(
+        {
+          ethAddress,
+          seaDataLength: seaData.length,
+          messageLength: normalizedMessage.length,
+          seaDataPreview: seaData.substring(0, 200),
+          messagePreview: normalizedMessage.substring(0, 200),
+        },
+        "SEA verified data does not match message"
+      );
       return null;
     }
 
     // 2. Verify Ethereum signature (wallet)
     // Use ethers to recover the signer from the signature
     const { ethers } = await import("ethers");
-    const recoveredAddress = ethers.verifyMessage(message, ethSignature);
+    let recoveredAddress: string;
+    try {
+      recoveredAddress = ethers.verifyMessage(message, ethSignature);
+    } catch (error) {
+      log.warn({ ethAddress, error }, "Ethereum signature verification failed");
+      return null;
+    }
     
     // Check that recovered address matches the provided address
     if (recoveredAddress.toLowerCase() !== ethAddress.toLowerCase()) {
+      log.warn(
+        {
+          ethAddress,
+          recoveredAddress,
+          messagePreview: normalizedMessage.substring(0, 200),
+        },
+        "Recovered Ethereum address does not match provided address"
+      );
       return null;
     }
 
@@ -443,22 +468,45 @@ export async function verifyDualSignatures(
     // 4. Validate expected fields (if provided)
     if (expectedFields) {
       if (expectedFields.to && messageData.to?.toLowerCase() !== expectedFields.to.toLowerCase()) {
+        log.warn(
+          { expectedTo: expectedFields.to, actualTo: messageData.to },
+          "To field mismatch"
+        );
         return null;
       }
       if (expectedFields.amount && messageData.amount !== expectedFields.amount) {
+        log.warn(
+          { expectedAmount: expectedFields.amount, actualAmount: messageData.amount },
+          "Amount field mismatch"
+        );
         return null;
       }
       if (expectedFields.nonce && messageData.nonce !== expectedFields.nonce) {
+        log.warn(
+          { expectedNonce: expectedFields.nonce, actualNonce: messageData.nonce },
+          "Nonce field mismatch"
+        );
         return null;
       }
       // Timestamp validation: must be recent (within 1 hour) to prevent replay
+      // Use the message timestamp as the reference point, not the server time
       if (expectedFields.timestamp !== undefined && messageData.timestamp) {
         const messageTime = typeof messageData.timestamp === 'number' 
           ? messageData.timestamp 
           : parseInt(messageData.timestamp);
-        const now = Date.now();
+        const now = expectedFields.timestamp; // Use provided timestamp (server time) as reference
         const maxAge = 60 * 60 * 1000; // 1 hour
-        if (Math.abs(now - messageTime) > maxAge) {
+        const timeDiff = Math.abs(now - messageTime);
+        if (timeDiff > maxAge) {
+          log.warn(
+            {
+              messageTime,
+              serverTime: now,
+              timeDiff,
+              maxAge,
+            },
+            "Message timestamp too old or from future"
+          );
           return null; // Message too old or from future
         }
       }
