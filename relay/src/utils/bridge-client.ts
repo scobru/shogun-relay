@@ -229,19 +229,185 @@ export function createBridgeClient(config: BridgeConfig) {
     ): Promise<() => void> {
       const filter = contract.filters.Deposit();
 
-      const listener = async (user: string, amount: bigint, timestamp: bigint, event: ethers.Log) => {
-        const depositEvent: DepositEvent = {
-          user: ethers.getAddress(user),
-          amount,
-          timestamp,
-          blockNumber: event.blockNumber,
-          txHash: event.transactionHash,
-        };
+      // Helper to extract event data from either parsed EventLog or raw args
+      const extractEventData = (eventOrArgs: any): { user: string; amount: bigint; timestamp: bigint; log: ethers.Log } | null => {
+        // If it's a parsed EventLog with args
+        if (eventOrArgs && typeof eventOrArgs === 'object' && 'args' in eventOrArgs && eventOrArgs.args) {
+          const args = eventOrArgs.args;
+          if (Array.isArray(args) && args.length >= 3) {
+            return {
+              user: args[0],
+              amount: args[1],
+              timestamp: args[2],
+              log: eventOrArgs as ethers.Log,
+            };
+          }
+        }
+        // If it's the raw log event (from contract.on with multiple args)
+        // This case is handled by the listener signature below
+        return null;
+      };
 
+      const listener = async (...args: any[]) => {
+        // Handle different event formats from ethers
+        let user: string;
+        let amount: bigint;
+        let timestamp: bigint;
+        let event: ethers.Log;
+
+        // Check if first arg is a parsed EventLog
+        const extracted = extractEventData(args[0]);
+        if (extracted) {
+          user = extracted.user;
+          amount = extracted.amount;
+          timestamp = extracted.timestamp;
+          event = extracted.log;
+        } else if (args.length >= 4) {
+          // Standard format: (user, amount, timestamp, event)
+          [user, amount, timestamp, event] = args;
+          // Validate event is a Log object
+          if (!event || typeof event !== 'object' || !('transactionHash' in event)) {
+            log.error({ args }, "Invalid event log object in deposit listener");
+            return;
+          }
+        } else if (args.length === 1 && args[0] && typeof args[0] === 'object') {
+          // Single EventLog object
+          const logEvent = args[0] as any;
+          if (logEvent.args && Array.isArray(logEvent.args) && logEvent.args.length >= 3) {
+            user = logEvent.args[0];
+            amount = logEvent.args[1];
+            timestamp = logEvent.args[2];
+            event = logEvent;
+          } else {
+            log.error({ event: logEvent }, "Invalid event format in deposit listener");
+            return;
+          }
+        } else {
+          log.error({ args }, "Unexpected event format in deposit listener");
+          return;
+        }
         try {
+          // Validate user address before processing
+          if (!user || typeof user !== 'string') {
+            log.error(
+              { user, amount: amount?.toString(), timestamp: timestamp?.toString(), txHash: event.transactionHash },
+              "Invalid user address in deposit event: user is missing or not a string"
+            );
+            return;
+          }
+
+          // Validate and normalize address
+          let normalizedUser: string;
+          try {
+            normalizedUser = ethers.getAddress(user);
+          } catch (error) {
+            log.error(
+              { user, amount: amount?.toString(), timestamp: timestamp?.toString(), txHash: event.transactionHash, error },
+              "Invalid user address format in deposit event"
+            );
+            return;
+          }
+
+          // Validate amount and timestamp
+          if (amount === undefined || amount === null || typeof amount !== 'bigint') {
+            log.error(
+              { user: normalizedUser, amount, timestamp: timestamp?.toString(), txHash: event.transactionHash },
+              "Invalid amount in deposit event"
+            );
+            return;
+          }
+
+          if (timestamp === undefined || timestamp === null || typeof timestamp !== 'bigint') {
+            log.error(
+              { user: normalizedUser, amount: amount.toString(), timestamp, txHash: event.transactionHash },
+              "Invalid timestamp in deposit event"
+            );
+            return;
+          }
+
+          // Validate transactionHash
+          if (!event.transactionHash || typeof event.transactionHash !== 'string') {
+            log.error(
+              { user: normalizedUser, amount: amount.toString(), event },
+              "Invalid transactionHash in deposit event"
+            );
+            return;
+          }
+
+          // Get blockNumber - may be null for pending events, try to get from receipt
+          let blockNumber: number | null = event.blockNumber ?? null;
+          
+          // Log if blockNumber is missing for debugging
+          if (blockNumber === null || blockNumber === undefined) {
+            log.debug(
+              { 
+                user: normalizedUser, 
+                txHash: event.transactionHash,
+                eventBlockNumber: event.blockNumber,
+                eventKeys: Object.keys(event)
+              },
+              "Event blockNumber is null/undefined, attempting to retrieve from receipt"
+            );
+          }
+          
+          // If blockNumber is null or undefined, try to get it from the transaction receipt
+          if (blockNumber === null || blockNumber === undefined) {
+            try {
+              const receipt = await provider.getTransactionReceipt(event.transactionHash);
+              if (receipt && receipt.blockNumber !== null) {
+                blockNumber = receipt.blockNumber;
+                log.info(
+                  { user: normalizedUser, txHash: event.transactionHash, blockNumber },
+                  "Retrieved blockNumber from transaction receipt"
+                );
+              } else {
+                log.warn(
+                  { user: normalizedUser, txHash: event.transactionHash },
+                  "Transaction receipt found but blockNumber is null (transaction may be pending)"
+                );
+              }
+            } catch (error) {
+              log.warn(
+                { user: normalizedUser, txHash: event.transactionHash, error },
+                "Could not retrieve blockNumber from receipt, event may be pending"
+              );
+            }
+          }
+
+          // If still no blockNumber, this might be a pending event - skip it for now
+          // It will be processed again when the block is confirmed
+          if (blockNumber === null || blockNumber === undefined) {
+            log.info(
+              { user: normalizedUser, amount: amount.toString(), txHash: event.transactionHash },
+              "Skipping deposit event with no blockNumber (likely pending)"
+            );
+            return;
+          }
+
+          // Validate blockNumber is a valid number
+          if (typeof blockNumber !== 'number' || isNaN(blockNumber) || blockNumber < 0) {
+            log.error(
+              { user: normalizedUser, amount: amount.toString(), txHash: event.transactionHash, blockNumber },
+              "Invalid blockNumber value in deposit event"
+            );
+            return;
+          }
+
+          const depositEvent: DepositEvent = {
+            user: normalizedUser,
+            amount,
+            timestamp,
+            blockNumber,
+            txHash: event.transactionHash,
+          };
+
           await callback(depositEvent);
         } catch (error) {
-          log.error({ error, depositEvent }, "Error processing deposit event");
+          log.error(
+            { error, user, amount: amount?.toString(), timestamp: timestamp?.toString(), txHash: event.transactionHash },
+            "Error processing deposit event"
+          );
+          // Don't throw - continue processing other events
         }
       };
 
@@ -250,11 +416,26 @@ export function createBridgeClient(config: BridgeConfig) {
 
       // Also query historical events if fromBlock is specified
       if (fromBlock !== "latest") {
-        const events = await contract.queryFilter(filter, fromBlock);
-        for (const event of events) {
-          if ('args' in event && event.args) {
-            await listener(event.args[0], event.args[1], event.args[2], event);
+        try {
+          const events = await contract.queryFilter(filter, fromBlock);
+          for (const event of events) {
+            if ('args' in event && event.args && Array.isArray(event.args) && event.args.length >= 3) {
+              // Parse the event properly - args should be [user, amount, timestamp]
+              const [user, amount, timestamp] = event.args;
+              await listener(user, amount, timestamp, event);
+            } else {
+              log.warn(
+                { event },
+                "Skipping deposit event with invalid args structure"
+              );
+            }
           }
+        } catch (error) {
+          log.error(
+            { error, fromBlock },
+            "Error querying historical deposit events"
+          );
+          // Don't throw - continue with live listener
         }
       }
 
