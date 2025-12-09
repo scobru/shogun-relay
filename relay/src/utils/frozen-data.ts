@@ -213,18 +213,44 @@ export async function createFrozenEntry(
   // We manage immutability via content-addressing (hash) and SEA signatures instead
   // This approach is functionally equivalent but avoids the annoying warnings
   
-  // Store the entry - ensure all fields are explicitly set
-  // GunDB may not preserve nested structures correctly, so we store data and sig separately
+  // Store the entry - GunDB may not preserve nested structures correctly when using .put() with nested objects
+  // So we store each field separately to ensure they're all persisted
   const frozenNode = gun.get('frozen-' + namespace).get(hash);
-  frozenNode.put({
-    data: entry,
-    sig: signature,
-    hash: hash,
-  } as unknown as obj);
   
-  // Also explicitly set data._meta to ensure it's persisted
-  // GunDB sometimes doesn't persist fields starting with '_', so we ensure it's there
-  frozenNode.get('data').put(entry as unknown as obj);
+  // Store signature and hash at the root level
+  frozenNode.get('sig').put(signature);
+  frozenNode.get('hash').put(hash);
+  
+  // Store data fields individually to ensure GunDB persists them correctly
+  // Store the entire entry object as a JSON string first, then parse it back
+  // This ensures all nested fields are preserved
+  const dataNode = frozenNode.get('data');
+  
+  // Store each top-level field of entry individually
+  for (const [key, value] of Object.entries(entry)) {
+    if (value !== undefined && value !== null) {
+      dataNode.get(key).put(value as unknown as obj);
+    }
+  }
+  
+  // Explicitly ensure _meta and meta are stored
+  if (entry._meta) {
+    const metaNode = dataNode.get('_meta');
+    for (const [key, value] of Object.entries(entry._meta)) {
+      if (value !== undefined && value !== null) {
+        metaNode.get(key).put(value as unknown as obj);
+      }
+    }
+  }
+  
+  if (entry.meta) {
+    const metaAltNode = dataNode.get('meta');
+    for (const [key, value] of Object.entries(entry.meta)) {
+      if (value !== undefined && value !== null) {
+        metaAltNode.get(key).put(value as unknown as obj);
+      }
+    }
+  }
 
   // Update index to point to latest hash
   if (indexKey) {
