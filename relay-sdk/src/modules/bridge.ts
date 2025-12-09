@@ -181,5 +181,53 @@ export class BridgeModule {
   }> {
     return this.client.post('/api/v1/bridge/deposit', { amount });
   }
+
+  /**
+   * Retroactively sync missed deposits from a block range
+   * Useful if the relay missed some deposits due to downtime or errors
+   * @param params Sync parameters
+   * @returns Sync results
+   */
+  public async syncDeposits(params?: {
+    fromBlock?: number;
+    toBlock?: number | 'latest';
+    user?: string;
+  }): Promise<{
+    success: boolean;
+    results: {
+      total: number;
+      processed: number;
+      skipped: number;
+      failed: number;
+      errors: string[];
+    };
+  }> {
+    return this.client.post('/api/v1/bridge/sync-deposits', params || {});
+  }
+
+  /**
+   * Force process a specific deposit by transaction hash
+   * Useful for manually recovering a missed deposit
+   * @param txHash Transaction hash of the deposit
+   * @returns Deposit processing result
+   */
+  public async processDeposit(txHash: string): Promise<{
+    success: boolean;
+    deposit?: {
+      txHash: string;
+      user: string;
+      amount: string;
+      amountEth: string;
+      blockNumber: number;
+    };
+    balance?: {
+      wei: string;
+      eth: string;
+    };
+    message?: string;
+    error?: string;
+  }> {
+    return this.client.post('/api/v1/bridge/process-deposit', { txHash });
+  }
 }
 

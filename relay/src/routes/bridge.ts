@@ -726,13 +726,15 @@ router.post("/sync-deposits", express.json(), async (req, res) => {
       "Starting retroactive deposit sync"
     );
 
-    // Query all deposits in the range
-    const allDeposits = await client.queryDeposits(fromBlockNumber, toBlockNumber);
+    // Query deposits in the range (with optional user filter)
+    const allDeposits = await client.queryDeposits(
+      fromBlockNumber, 
+      toBlockNumber,
+      user ? ethers.getAddress(user) : undefined
+    );
 
-    // Filter by user if specified
-    const depositsToCheck = user 
-      ? allDeposits.filter(d => d.user.toLowerCase() === user.toLowerCase())
-      : allDeposits;
+    // All deposits are already filtered by user if user was specified
+    const depositsToCheck = allDeposits;
 
     log.info(
       { total: allDeposits.length, toCheck: depositsToCheck.length, user },

@@ -526,20 +526,32 @@ export function createBridgeClient(config: BridgeConfig) {
      */
     async queryDeposits(
       fromBlock: number,
-      toBlock: number | "latest"
+      toBlock: number | "latest",
+      userAddress?: string
     ): Promise<DepositEvent[]> {
       try {
-        const filter = contract.filters.Deposit();
-        const toBlockNumber = toBlock === "latest" 
-          ? await provider.getBlockNumber() 
-          : toBlock;
+        // Create filter - if userAddress is provided, filter by user
+        const filter = userAddress 
+          ? contract.filters.Deposit(userAddress)
+          : contract.filters.Deposit();
+        
+        // Resolve "latest" to actual block number
+        let toBlockNumber: number;
+        if (toBlock === "latest") {
+          toBlockNumber = await provider.getBlockNumber();
+        } else {
+          toBlockNumber = toBlock;
+        }
         
         log.info(
-          { fromBlock, toBlock: toBlockNumber, contractAddress },
+          { fromBlock, toBlock: toBlockNumber, contractAddress, userAddress },
           "Querying deposit events"
         );
 
-        const events = await contract.queryFilter(filter, fromBlock, toBlockNumber);
+        // Ensure fromBlock is not negative
+        const safeFromBlock = Math.max(0, fromBlock);
+        
+        const events = await contract.queryFilter(filter, safeFromBlock, toBlockNumber);
         const depositEvents: DepositEvent[] = [];
 
         for (const event of events) {
@@ -581,19 +593,29 @@ export function createBridgeClient(config: BridgeConfig) {
               txHash,
             });
           } catch (error) {
-            log.error({ error, event }, "Error parsing deposit event");
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            log.error({ error: errorMsg, event }, "Error parsing deposit event");
             // Continue with other events
           }
         }
 
         log.info(
-          { fromBlock, toBlock: toBlockNumber, count: depositEvents.length },
+          { fromBlock: safeFromBlock, toBlock: toBlockNumber, count: depositEvents.length },
           "Deposit events queried"
         );
 
         return depositEvents;
       } catch (error) {
-        log.error({ error, fromBlock, toBlock }, "Error querying deposits");
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        log.error({ 
+          error: errorMsg, 
+          errorStack,
+          fromBlock, 
+          toBlock,
+          fromBlockType: typeof fromBlock,
+          toBlockType: typeof toBlock
+        }, "Error querying deposits");
         throw error;
       }
     },
