@@ -10,6 +10,8 @@
  * - GET /api/v1/bridge/pending-withdrawals - Get pending withdrawals
  * - GET /api/v1/bridge/proof/:user/:amount/:nonce - Generate Merkle proof for withdrawal
  * - GET /api/v1/bridge/state - Get current bridge state (root, batchId, etc.)
+ * - POST /api/v1/bridge/sync-deposits - Retroactively sync missed deposits (admin/relay only)
+ * - POST /api/v1/bridge/process-deposit - Force process a specific deposit by txHash (admin/relay only)
  */
 
 import express, { Request, Response } from "express";
@@ -25,6 +27,8 @@ import {
   removePendingWithdrawals,
   saveBatch,
   getLatestBatch,
+  isDepositProcessed,
+  markDepositProcessed,
   type PendingWithdrawal,
 } from "../utils/bridge-state";
 import {
@@ -670,6 +674,317 @@ router.get("/state", async (req, res) => {
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log.error({ error }, "Error getting bridge state");
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+});
+
+/**
+ * POST /api/v1/bridge/sync-deposits
+ * 
+ * Retroactively sync missed deposits from a block range.
+ * This is useful if the relay missed some deposits due to downtime or errors.
+ * 
+ * SECURITY: Should be restricted to relay operators only (add auth middleware if needed)
+ * 
+ * Body: { fromBlock?: number, toBlock?: number | "latest", user?: string }
+ * - fromBlock: Block to start from (default: contract deployment block or 0)
+ * - toBlock: Block to end at (default: "latest")
+ * - user: Optional - only sync deposits for this specific user
+ */
+router.post("/sync-deposits", express.json(), async (req, res) => {
+  try {
+    const gun = req.app.get("gunInstance");
+    if (!gun) {
+      return res.status(503).json({
+        success: false,
+        error: "GunDB not initialized",
+      });
+    }
+
+    const { fromBlock, toBlock, user } = req.body;
+    const client = getBridgeClient();
+    const relayKeyPair = req.app.get("relayKeyPair");
+
+    if (!relayKeyPair) {
+      return res.status(500).json({
+        success: false,
+        error: "Relay keypair not configured",
+      });
+    }
+
+    // Determine block range
+    const fromBlockNumber = fromBlock !== undefined ? Number(fromBlock) : 0;
+    const toBlockNumber = toBlock !== "latest" && toBlock !== undefined 
+      ? Number(toBlock) 
+      : "latest";
+
+    log.info(
+      { fromBlock: fromBlockNumber, toBlock: toBlockNumber, user },
+      "Starting retroactive deposit sync"
+    );
+
+    // Query all deposits in the range
+    const allDeposits = await client.queryDeposits(fromBlockNumber, toBlockNumber);
+
+    // Filter by user if specified
+    const depositsToCheck = user 
+      ? allDeposits.filter(d => d.user.toLowerCase() === user.toLowerCase())
+      : allDeposits;
+
+    log.info(
+      { total: allDeposits.length, toCheck: depositsToCheck.length, user },
+      "Deposits found in range"
+    );
+
+    const results = {
+      total: depositsToCheck.length,
+      processed: 0,
+      skipped: 0,
+      failed: 0,
+      errors: [] as string[],
+    };
+
+    // Process each deposit
+    for (const deposit of depositsToCheck) {
+      try {
+        const normalizedUser = deposit.user.toLowerCase();
+        const depositKey = `${deposit.txHash}:${normalizedUser}:${deposit.amount}`;
+
+        // Check if already processed
+        const alreadyProcessed = await isDepositProcessed(gun, depositKey);
+        
+        if (alreadyProcessed) {
+          log.info(
+            { txHash: deposit.txHash, user: normalizedUser },
+            "Deposit already processed, skipping"
+          );
+          results.skipped++;
+          continue;
+        }
+
+        // Verify transaction receipt
+        const provider = client.provider;
+        const receipt = await provider.getTransactionReceipt(deposit.txHash);
+        
+        if (!receipt) {
+          log.warn(
+            { txHash: deposit.txHash },
+            "Transaction receipt not found, skipping"
+          );
+          results.skipped++;
+          continue;
+        }
+
+        if (receipt.status !== 1) {
+          log.warn(
+            { txHash: deposit.txHash, status: receipt.status },
+            "Transaction failed, skipping"
+          );
+          results.skipped++;
+          continue;
+        }
+
+        // Credit balance
+        await creditBalance(gun, normalizedUser, deposit.amount, relayKeyPair);
+
+        // Mark as processed
+        await markDepositProcessed(gun, depositKey, {
+          txHash: deposit.txHash,
+          user: normalizedUser,
+          amount: deposit.amount.toString(),
+          blockNumber: deposit.blockNumber,
+          timestamp: Date.now(),
+        });
+
+        log.info(
+          {
+            txHash: deposit.txHash,
+            user: normalizedUser,
+            amount: ethers.formatEther(deposit.amount),
+          },
+          "Deposit synced successfully"
+        );
+
+        results.processed++;
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        log.error(
+          { error, txHash: deposit.txHash, user: deposit.user },
+          "Error syncing deposit"
+        );
+        results.failed++;
+        results.errors.push(`${deposit.txHash}: ${errorMsg}`);
+      }
+    }
+
+    log.info(results, "Retroactive deposit sync completed");
+
+    res.json({
+      success: true,
+      results,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log.error({ error }, "Error in sync-deposits endpoint");
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+});
+
+/**
+ * POST /api/v1/bridge/process-deposit
+ * 
+ * Force process a specific deposit by transaction hash.
+ * Useful for manually recovering a missed deposit.
+ * 
+ * SECURITY: Should be restricted to relay operators only (add auth middleware if needed)
+ * 
+ * Body: { txHash: string }
+ */
+router.post("/process-deposit", express.json(), async (req, res) => {
+  try {
+    const gun = req.app.get("gunInstance");
+    if (!gun) {
+      return res.status(503).json({
+        success: false,
+        error: "GunDB not initialized",
+      });
+    }
+
+    const { txHash } = req.body;
+
+    if (!txHash || typeof txHash !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "txHash is required",
+      });
+    }
+
+    const client = getBridgeClient();
+    const relayKeyPair = req.app.get("relayKeyPair");
+
+    if (!relayKeyPair) {
+      return res.status(500).json({
+        success: false,
+        error: "Relay keypair not configured",
+      });
+    }
+
+    log.info({ txHash }, "Processing specific deposit");
+
+    // Get transaction receipt
+    const provider = client.provider;
+    const receipt = await provider.getTransactionReceipt(txHash);
+
+    if (!receipt) {
+      return res.status(404).json({
+        success: false,
+        error: "Transaction not found",
+      });
+    }
+
+    if (receipt.status !== 1) {
+      return res.status(400).json({
+        success: false,
+        error: "Transaction failed",
+      });
+    }
+
+    // Find Deposit event in the receipt
+    const contractAddress = client.contractAddress.toLowerCase();
+    const depositLog = receipt.logs.find(
+      (log) => log.address.toLowerCase() === contractAddress
+    );
+
+    if (!depositLog) {
+      return res.status(400).json({
+        success: false,
+        error: "Deposit event not found in transaction",
+      });
+    }
+
+    // Parse event
+    const contract = client.contract;
+    const parsedLog = contract.interface.parseLog({
+      topics: depositLog.topics as string[],
+      data: depositLog.data,
+    });
+
+    if (!parsedLog || parsedLog.name !== "Deposit") {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid deposit event",
+      });
+    }
+
+    const user = parsedLog.args[0] as string;
+    const amount = parsedLog.args[1] as bigint;
+    const normalizedUser = user.toLowerCase();
+    const depositKey = `${txHash}:${normalizedUser}:${amount}`;
+
+    // Check if already processed
+    const alreadyProcessed = await isDepositProcessed(gun, depositKey);
+    
+    if (alreadyProcessed) {
+      return res.json({
+        success: true,
+        message: "Deposit already processed",
+        deposit: {
+          txHash,
+          user: normalizedUser,
+          amount: amount.toString(),
+          amountEth: ethers.formatEther(amount),
+        },
+      });
+    }
+
+    // Credit balance
+    await creditBalance(gun, normalizedUser, amount, relayKeyPair);
+
+    // Mark as processed
+    await markDepositProcessed(gun, depositKey, {
+      txHash,
+      user: normalizedUser,
+      amount: amount.toString(),
+      blockNumber: receipt.blockNumber,
+      timestamp: Date.now(),
+    });
+
+    // Verify balance
+    const balance = await getUserBalance(gun, normalizedUser);
+
+    log.info(
+      {
+        txHash,
+        user: normalizedUser,
+        amount: ethers.formatEther(amount),
+        balance: ethers.formatEther(balance),
+      },
+      "Deposit processed successfully"
+    );
+
+    res.json({
+      success: true,
+      deposit: {
+        txHash,
+        user: normalizedUser,
+        amount: amount.toString(),
+        amountEth: ethers.formatEther(amount),
+        blockNumber: receipt.blockNumber,
+      },
+      balance: {
+        wei: balance.toString(),
+        eth: ethers.formatEther(balance),
+      },
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log.error({ error, txHash: req.body.txHash }, "Error in process-deposit endpoint");
     res.status(500).json({
       success: false,
       error: errorMessage,

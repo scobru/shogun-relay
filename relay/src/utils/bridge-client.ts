@@ -521,6 +521,84 @@ export function createBridgeClient(config: BridgeConfig) {
     },
 
     /**
+     * Query all Deposit events in a block range
+     * Useful for retroactive synchronization of missed deposits
+     */
+    async queryDeposits(
+      fromBlock: number,
+      toBlock: number | "latest"
+    ): Promise<DepositEvent[]> {
+      try {
+        const filter = contract.filters.Deposit();
+        const toBlockNumber = toBlock === "latest" 
+          ? await provider.getBlockNumber() 
+          : toBlock;
+        
+        log.info(
+          { fromBlock, toBlock: toBlockNumber, contractAddress },
+          "Querying deposit events"
+        );
+
+        const events = await contract.queryFilter(filter, fromBlock, toBlockNumber);
+        const depositEvents: DepositEvent[] = [];
+
+        for (const event of events) {
+          try {
+            // Extract event data
+            let user: string;
+            let amount: bigint;
+            let timestamp: bigint;
+            let blockNumber: number;
+            let txHash: string;
+
+            if (event.args && Array.isArray(event.args) && event.args.length >= 3) {
+              user = event.args[0];
+              amount = event.args[1];
+              timestamp = event.args[2];
+            } else {
+              log.warn({ event }, "Invalid event args format");
+              continue;
+            }
+
+            // Get block number and transaction hash
+            if (event.log) {
+              blockNumber = event.log.blockNumber;
+              txHash = event.log.transactionHash;
+            } else if (event.blockNumber !== undefined && event.transactionHash) {
+              blockNumber = event.blockNumber;
+              txHash = event.transactionHash;
+            } else {
+              log.warn({ event }, "Missing block number or transaction hash");
+              continue;
+            }
+
+            const normalizedUser = user.toLowerCase();
+            depositEvents.push({
+              user: normalizedUser,
+              amount,
+              timestamp,
+              blockNumber,
+              txHash,
+            });
+          } catch (error) {
+            log.error({ error, event }, "Error parsing deposit event");
+            // Continue with other events
+          }
+        }
+
+        log.info(
+          { fromBlock, toBlock: toBlockNumber, count: depositEvents.length },
+          "Deposit events queried"
+        );
+
+        return depositEvents;
+      } catch (error) {
+        log.error({ error, fromBlock, toBlock }, "Error querying deposits");
+        throw error;
+      }
+    },
+
+    /**
      * Listen to BatchSubmitted events
      */
     async listenToBatches(
