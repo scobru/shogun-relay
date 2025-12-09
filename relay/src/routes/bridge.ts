@@ -436,9 +436,11 @@ router.post("/withdraw", express.json(), async (req, res) => {
  * 5. Removes processed withdrawals from pending queue
  */
 router.post("/submit-batch", express.json(), async (req, res) => {
+  let pending: PendingWithdrawal[] = [];
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
+      log.error({}, "GunDB not initialized in submit-batch");
       return res.status(503).json({
         success: false,
         error: "GunDB not initialized",
@@ -449,11 +451,17 @@ router.post("/submit-batch", express.json(), async (req, res) => {
 
     // Verify wallet is configured (required for batch submission)
     if (!client.wallet) {
+      log.error({}, "Wallet not configured in submit-batch");
       return res.status(403).json({
         success: false,
         error: "Wallet required for batch submission",
       });
     }
+
+    log.info(
+      { walletAddress: client.wallet.address },
+      "Starting batch submission"
+    );
 
     // Note: The contract's onlySequencerOrRelay modifier will enforce:
     // - If sequencer is set (non-zero), only sequencer can submit
@@ -461,9 +469,15 @@ router.post("/submit-batch", express.json(), async (req, res) => {
     // We don't need to duplicate this logic here - let the contract enforce it
 
     // Get pending withdrawals
-    const pending = await getPendingWithdrawals(gun);
+    log.info({}, "Fetching pending withdrawals");
+    pending = await getPendingWithdrawals(gun);
+    log.info(
+      { pendingCount: pending.length, withdrawals: pending },
+      "Retrieved pending withdrawals"
+    );
 
     if (pending.length === 0) {
+      log.warn({}, "No pending withdrawals to batch");
       return res.status(400).json({
         success: false,
         error: "No pending withdrawals to batch",
@@ -477,16 +491,33 @@ router.post("/submit-batch", express.json(), async (req, res) => {
       nonce: BigInt(w.nonce),
     }));
 
+    log.info(
+      { withdrawalCount: withdrawals.length },
+      "Converting withdrawals to leaves"
+    );
+
     // Build Merkle tree
+    log.info({}, "Building Merkle tree");
     const { root, getProof } = buildMerkleTreeFromWithdrawals(withdrawals);
+    log.info({ root, leafCount: withdrawals.length }, "Merkle tree built");
 
     // Submit batch to contract
+    log.info({ root }, "Submitting batch to contract");
     const result = await client.submitBatch(root);
+    log.info(
+      { txHash: result.txHash, blockNumber: result.blockNumber, batchId: result.batchId.toString() },
+      "Batch submitted to contract successfully"
+    );
 
     // Get current batch ID (should match result.batchId)
     const batchId = await client.getCurrentBatchId();
+    log.info(
+      { batchIdFromResult: result.batchId.toString(), batchIdFromContract: batchId.toString() },
+      "Retrieved batch ID"
+    );
 
     // Save batch to GunDB
+    log.info({ batchId: batchId.toString(), withdrawalCount: pending.length }, "Saving batch to GunDB");
     const batch = {
       batchId: batchId.toString(),
       root,
@@ -497,12 +528,15 @@ router.post("/submit-batch", express.json(), async (req, res) => {
     };
 
     await saveBatch(gun, batch);
+    log.info({ batchId: batchId.toString() }, "Batch saved to GunDB");
 
     // Remove processed withdrawals from pending queue
+    log.info({ withdrawalCount: pending.length }, "Removing processed withdrawals from pending queue");
     await removePendingWithdrawals(gun, pending);
+    log.info({}, "Processed withdrawals removed from pending queue");
 
     log.info(
-      { batchId: batchId.toString(), root, withdrawalCount: pending.length },
+      { batchId: batchId.toString(), root, withdrawalCount: pending.length, txHash: result.txHash },
       "Batch submitted successfully"
     );
 
@@ -519,15 +553,34 @@ router.post("/submit-batch", express.json(), async (req, res) => {
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
-    log.error(
-      { 
-        error, 
-        errorMessage, 
-        errorStack,
-        pendingCount: pending?.length || 0,
-      },
-      "Error in submit-batch endpoint"
-    );
+    
+    // Enhanced error logging
+    if (error && typeof error === 'object' && 'code' in error) {
+      log.error(
+        { 
+          error, 
+          errorMessage, 
+          errorStack,
+          errorCode: (error as any).code,
+          errorReason: (error as any).reason,
+          pendingCount: pending?.length || 0,
+          pendingWithdrawals: pending,
+        },
+        "Error in submit-batch endpoint (with error code)"
+      );
+    } else {
+      log.error(
+        { 
+          error, 
+          errorMessage, 
+          errorStack,
+          pendingCount: pending?.length || 0,
+          pendingWithdrawals: pending,
+        },
+        "Error in submit-batch endpoint"
+      );
+    }
+    
     res.status(500).json({
       success: false,
       error: errorMessage,
