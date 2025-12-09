@@ -778,15 +778,34 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
         const depositKey = `${deposit.txHash}:${normalizedUser}:${deposit.amount}`;
 
         // Check if already processed
-        const alreadyProcessed = await isDepositProcessed(gun, depositKey);
+        let alreadyProcessed = await isDepositProcessed(gun, depositKey);
         
+        // If marked as processed, verify the balance was actually credited
         if (alreadyProcessed) {
-          log.info(
-            { txHash: deposit.txHash, user: normalizedUser },
-            "Deposit already processed, skipping"
-          );
-          results.skipped++;
-          continue;
+          const currentL2Balance = await getUserBalance(gun, normalizedUser);
+          
+          // If balance is 0, the deposit was marked as processed but not actually credited
+          // This can happen if creditBalance failed silently or was interrupted
+          if (currentL2Balance === 0n) {
+            log.warn(
+              {
+                txHash: deposit.txHash,
+                user: normalizedUser,
+                amount: deposit.amount.toString(),
+                depositKey,
+                currentL2Balance: currentL2Balance.toString(),
+              },
+              "Deposit marked as processed but L2 balance is 0. Reprocessing to ensure funds are credited."
+            );
+            alreadyProcessed = false; // Force reprocessing
+          } else {
+            log.info(
+              { txHash: deposit.txHash, user: normalizedUser },
+              "Deposit already processed, skipping"
+            );
+            results.skipped++;
+            continue;
+          }
         }
 
         // Verify transaction receipt
@@ -814,7 +833,51 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
         // Credit balance
         await creditBalance(gun, normalizedUser, deposit.amount, relayKeyPair);
 
-        // Mark as processed
+        // Poll to verify balance was actually written
+        let balanceVerified = false;
+        let attempts = 0;
+        const maxAttempts = 10; // 10 attempts * 500ms = 5 seconds
+        const pollInterval = 500;
+
+        while (!balanceVerified && attempts < maxAttempts) {
+          const verifyBalance = await getUserBalance(gun, normalizedUser);
+          log.info(
+            {
+              user: normalizedUser,
+              expectedAmount: ethers.formatEther(deposit.amount),
+              currentL2Balance: ethers.formatEther(verifyBalance),
+              txHash: deposit.txHash,
+              attempt: attempts + 1,
+            },
+            "Polling for L2 balance update after credit (sync)"
+          );
+
+          // Check if the balance is at least the deposited amount (or more if previous deposits exist)
+          if (verifyBalance >= deposit.amount) {
+            balanceVerified = true;
+          } else {
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
+            attempts++;
+          }
+        }
+
+        if (!balanceVerified) {
+          log.error(
+            {
+              user: normalizedUser,
+              amount: deposit.amount.toString(),
+              txHash: deposit.txHash,
+              currentL2Balance: ethers.formatEther(await getUserBalance(gun, normalizedUser)),
+            },
+            "Failed to verify L2 balance update after credit within timeout during sync. Deposit will be retried."
+          );
+          // DO NOT mark as processed, so it can be retried
+          results.failed++;
+          results.errors.push(`${deposit.txHash}: Balance verification failed`);
+          continue;
+        }
+
+        // Mark as processed only after balance is verified
         await markDepositProcessed(gun, depositKey, {
           txHash: deposit.txHash,
           user: normalizedUser,
@@ -823,13 +886,15 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
           timestamp: Date.now(),
         });
 
+        const finalVerifyBalance = await getUserBalance(gun, normalizedUser);
         log.info(
           {
             txHash: deposit.txHash,
             user: normalizedUser,
             amount: ethers.formatEther(deposit.amount),
+            newBalance: ethers.formatEther(finalVerifyBalance),
           },
-          "Deposit synced successfully"
+          "Deposit synced successfully and balance verified"
         );
 
         results.processed++;
