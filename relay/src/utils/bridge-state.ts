@@ -403,6 +403,7 @@ export async function verifyDualSignatures(
 
     // Check that the verified data matches the message
     // SEA can return string or object, so we normalize and compare by parsing both
+    // CRITICAL: JSON.stringify may produce different key order, so we compare parsed objects
     let seaDataObj: any;
     let messageObj: any;
     
@@ -424,19 +425,44 @@ export async function verifyDualSignatures(
       messageObj = message;
     }
     
-    // Compare objects by stringifying (order might differ, so we compare parsed objects)
-    // First try direct comparison if both are objects
-    if (typeof seaDataObj === 'object' && typeof messageObj === 'object') {
-      const seaStr = JSON.stringify(seaDataObj);
-      const msgStr = JSON.stringify(messageObj);
-      if (seaStr !== msgStr) {
+    // Compare objects by deep equality (not string comparison)
+    // This handles cases where JSON.stringify produces different key orders
+    function deepEqual(obj1: any, obj2: any): boolean {
+      if (obj1 === obj2) return true;
+      
+      if (obj1 == null || obj2 == null) return false;
+      if (typeof obj1 !== typeof obj2) return false;
+      
+      if (typeof obj1 !== 'object') {
+        return obj1 === obj2;
+      }
+      
+      // Both are objects - compare keys and values
+      const keys1 = Object.keys(obj1).sort();
+      const keys2 = Object.keys(obj2).sort();
+      
+      if (keys1.length !== keys2.length) return false;
+      
+      for (let i = 0; i < keys1.length; i++) {
+        if (keys1[i] !== keys2[i]) return false;
+        if (!deepEqual(obj1[keys1[i]], obj2[keys2[i]])) return false;
+      }
+      
+      return true;
+    }
+    
+    // Compare objects using deep equality
+    if (typeof seaDataObj === 'object' && typeof messageObj === 'object' && 
+        seaDataObj !== null && messageObj !== null && 
+        !Array.isArray(seaDataObj) && !Array.isArray(messageObj)) {
+      if (!deepEqual(seaDataObj, messageObj)) {
         log.warn(
           {
             ethAddress,
-            seaDataPreview: seaStr.substring(0, 200),
-            messagePreview: msgStr.substring(0, 200),
+            seaDataPreview: JSON.stringify(seaDataObj).substring(0, 200),
+            messagePreview: JSON.stringify(messageObj).substring(0, 200),
           },
-          "SEA verified data does not match message (object comparison)"
+          "SEA verified data does not match message (deep comparison)"
         );
         return null;
       }
