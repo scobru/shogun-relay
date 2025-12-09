@@ -31,6 +31,7 @@ import {
   isDepositProcessed,
   markDepositProcessed,
   type PendingWithdrawal,
+  type Batch,
 } from "../utils/bridge-state";
 import {
   buildMerkleTreeFromWithdrawals,
@@ -734,49 +735,107 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
       "Proof request received"
     );
 
-    // Try multiple strategies to find the batch containing this withdrawal
-    let batch: Awaited<ReturnType<typeof getLatestBatch>> = null;
+    // Collect all batch IDs from GunDB (similar to getLatestBatch but we'll search all)
+    const batchesPath = "bridge/batches";
+    const batchIdsMap = new Map<string, string>(); // key -> batchId
+    const collectedKeys = new Set<string>();
+    let lastUpdateTime = Date.now();
 
-    // Strategy 1: Get latest batch from GunDB
-    batch = await getLatestBatch(gun);
+    const parentNode = gun.get(batchesPath);
 
-    // Strategy 2: If not found or withdrawal not in latest batch, try getting batch from contract's current batch ID
-    if (!batch) {
+    // Use map().on() to collect all batch IDs
+    parentNode.map().on((batch: any, key: string) => {
+      // Skip metadata keys
+      if (key === '_' || key.startsWith('_') || !key) {
+        return;
+      }
+
+      lastUpdateTime = Date.now();
+
+      if (
+        batch &&
+        typeof batch === 'object' &&
+        typeof batch.batchId === 'string' &&
+        typeof batch.root === 'string'
+      ) {
+        if (!collectedKeys.has(key)) {
+          collectedKeys.add(key);
+          batchIdsMap.set(key, batch.batchId);
+          log.info(
+            { key, batchId: batch.batchId, totalFound: batchIdsMap.size },
+            "Found batch ID in GunDB for proof search"
+          );
+        }
+      }
+    });
+
+    // Also try reading the parent node directly
+    parentNode.once((parentData: any) => {
+      if (parentData && typeof parentData === 'object') {
+        Object.keys(parentData).forEach(key => {
+          if (key === '_' || key.startsWith('_')) return;
+          
+          const batch = parentData[key];
+          if (
+            batch &&
+            typeof batch === 'object' &&
+            typeof batch.batchId === 'string' &&
+            typeof batch.root === 'string'
+          ) {
+            if (!collectedKeys.has(key)) {
+              collectedKeys.add(key);
+              batchIdsMap.set(key, batch.batchId);
+              log.info(
+                { key, batchId: batch.batchId, source: 'direct-read', totalFound: batchIdsMap.size },
+                "Found batch ID via direct read for proof search"
+              );
+            }
+          }
+        });
+      }
+    });
+
+    // Wait a bit for batch IDs to be collected
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Also try getting batch from contract's current batch ID as fallback
+    try {
+      const client = getBridgeClient();
+      const currentBatchId = await client.getCurrentBatchId();
       log.info(
-        { user: userAddress, amount: amountBigInt.toString(), nonce: nonceBigInt.toString() },
-        "Latest batch not found in GunDB, trying contract's current batch ID"
+        { currentBatchId: currentBatchId.toString() },
+        "Retrieved current batch ID from contract"
       );
       
-      try {
-        const client = getBridgeClient();
-        const currentBatchId = await client.getCurrentBatchId();
-        log.info(
-          { currentBatchId: currentBatchId.toString() },
-          "Retrieved current batch ID from contract"
-        );
-        
-        // Try to get this specific batch
-        if (currentBatchId > 0n) {
-          batch = await getBatch(gun, currentBatchId.toString());
-          if (batch) {
-            log.info(
-              { batchId: batch.batchId, withdrawalCount: batch.withdrawals.length },
-              "Found batch using contract's current batch ID"
-            );
-          }
+      if (currentBatchId > 0n) {
+        const batchIdStr = currentBatchId.toString();
+        // Add to map if not already present
+        if (!Array.from(batchIdsMap.values()).includes(batchIdStr)) {
+          // Use batchId as both key and value for contract-fetched batch
+          batchIdsMap.set(batchIdStr, batchIdStr);
+          log.info(
+            { batchId: batchIdStr, source: 'contract' },
+            "Added batch ID from contract for proof search"
+          );
         }
-      } catch (error) {
-        log.warn(
-          { error, user: userAddress },
-          "Failed to get batch from contract's current batch ID"
-        );
       }
+    } catch (error) {
+      log.warn(
+        { error, user: userAddress },
+        "Failed to get batch from contract's current batch ID (non-critical)"
+      );
     }
 
-    if (!batch) {
+    const batchIds = Array.from(batchIdsMap.values());
+    log.info(
+      { batchIdsCount: batchIds.length, batchIds },
+      "Collected batch IDs for proof search"
+    );
+
+    if (batchIds.length === 0) {
       log.warn(
         { user: userAddress, amount: amountBigInt.toString(), nonce: nonceBigInt.toString() },
-        "No batches found in GunDB after trying multiple strategies"
+        "No batches found in GunDB"
       );
       return res.status(404).json({
         success: false,
@@ -784,101 +843,148 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
       });
     }
 
+    // Fetch all batches and search for the withdrawal
     log.info(
-      {
-        batchId: batch.batchId,
-        withdrawalCount: batch.withdrawals.length,
-        requestedUser: userAddress,
-        requestedAmount: amountBigInt.toString(),
-        requestedNonce: nonceBigInt.toString(),
-        batchWithdrawals: batch.withdrawals.map(w => ({
-          user: w.user,
-          userLower: w.user?.toLowerCase(),
-          amount: w.amount,
-          amountType: typeof w.amount,
-          nonce: w.nonce,
-          nonceType: typeof w.nonce,
-        })),
-      },
-      "Latest batch retrieved, checking for withdrawal"
+      { batchIdsCount: batchIds.length },
+      "Fetching all batches to search for withdrawal"
     );
 
-    // Check if withdrawal is in this batch
-    // Normalize comparison: ensure we're comparing strings and lowercase addresses
-    const withdrawalInBatch = batch.withdrawals.find(
-      (w) => {
-        const userMatch = w.user?.toLowerCase() === userAddress.toLowerCase();
-        const amountMatch = w.amount === amountBigInt.toString();
-        const nonceMatch = w.nonce === nonceBigInt.toString();
-        
-        log.info(
-          {
-            batchId: batch.batchId,
-            requestedUser: userAddress.toLowerCase(),
-            requestedAmount: amountBigInt.toString(),
-            requestedNonce: nonceBigInt.toString(),
-            withdrawalUser: w.user?.toLowerCase(),
-            withdrawalAmount: w.amount,
-            withdrawalNonce: w.nonce,
-            userMatch,
-            amountMatch,
-            nonceMatch,
-            allMatch: userMatch && amountMatch && nonceMatch,
-          },
-          "Comparing withdrawal for proof request"
-        );
-        
-        return userMatch && amountMatch && nonceMatch;
-      }
+    const batchPromises = batchIds.map(id => getBatch(gun, id));
+    const batches = await Promise.all(batchPromises);
+    const validBatches = batches.filter((b): b is Batch => b !== null);
+
+    log.info(
+      { requestedCount: batchIds.length, validCount: validBatches.length },
+      "Fetched batch data from GunDB"
     );
 
-    if (!withdrawalInBatch) {
+    if (validBatches.length === 0) {
       log.warn(
-        {
-          batchId: batch.batchId,
-          requestedUser: userAddress,
-          requestedUserLower: userAddress.toLowerCase(),
-          requestedAmount: amountBigInt.toString(),
-          requestedNonce: nonceBigInt.toString(),
-          batchWithdrawals: batch.withdrawals.map(w => ({
-            user: w.user,
-            userLower: w.user?.toLowerCase(),
-            amount: w.amount,
-            amountType: typeof w.amount,
-            nonce: w.nonce,
-            nonceType: typeof w.nonce,
-          })),
-          batchWithdrawalCount: batch.withdrawals.length,
-        },
-        "Withdrawal not found in latest batch"
+        { user: userAddress, amount: amountBigInt.toString(), nonce: nonceBigInt.toString() },
+        "No valid batches found after fetching"
       );
       return res.status(404).json({
         success: false,
-        error: "Withdrawal not found in latest batch",
+        error: "No valid batches found",
+      });
+    }
+
+    // Search for the withdrawal in all batches
+    // Normalize comparison: ensure we're comparing strings and lowercase addresses
+    const normalizedUserAddress = userAddress.toLowerCase();
+    const normalizedAmount = amountBigInt.toString();
+    const normalizedNonce = nonceBigInt.toString();
+
+    let foundBatch: Batch | null = null;
+    let foundWithdrawal: PendingWithdrawal | null = null;
+
+    for (const batch of validBatches) {
+      log.info(
+        {
+          batchId: batch.batchId,
+          withdrawalCount: batch.withdrawals.length,
+          requestedUser: normalizedUserAddress,
+          requestedAmount: normalizedAmount,
+          requestedNonce: normalizedNonce,
+        },
+        "Searching batch for withdrawal"
+      );
+
+      const withdrawal = batch.withdrawals.find((w: PendingWithdrawal) => {
+        // Robust matching: handle both string and number types
+        const withdrawalUser = (typeof w.user === 'string' ? w.user : String(w.user || '')).toLowerCase();
+        const withdrawalAmount = typeof w.amount === 'string' ? w.amount : String(w.amount || '0');
+        const withdrawalNonce = typeof w.nonce === 'string' ? w.nonce : String(w.nonce || '0');
+
+        const userMatch = withdrawalUser === normalizedUserAddress;
+        const amountMatch = withdrawalAmount === normalizedAmount;
+        const nonceMatch = withdrawalNonce === normalizedNonce;
+
+        if (userMatch && amountMatch && nonceMatch) {
+          log.info(
+            {
+              batchId: batch.batchId,
+              requestedUser: normalizedUserAddress,
+              requestedAmount: normalizedAmount,
+              requestedNonce: normalizedNonce,
+              withdrawalUser,
+              withdrawalAmount,
+              withdrawalNonce,
+            },
+            "Found matching withdrawal in batch"
+          );
+        }
+
+        return userMatch && amountMatch && nonceMatch;
+      });
+
+      if (withdrawal) {
+        foundBatch = batch;
+        foundWithdrawal = withdrawal;
+        break;
+      }
+    }
+
+    if (!foundBatch || !foundWithdrawal) {
+      log.warn(
+        {
+          requestedUser: normalizedUserAddress,
+          requestedAmount: normalizedAmount,
+          requestedNonce: normalizedNonce,
+          searchedBatchesCount: validBatches.length,
+          searchedBatches: validBatches.map(b => ({
+            batchId: b.batchId,
+            withdrawalCount: b.withdrawals.length,
+            withdrawals: b.withdrawals.map((w: PendingWithdrawal) => ({
+              user: w.user?.toLowerCase(),
+              amount: typeof w.amount === 'string' ? w.amount : String(w.amount),
+              nonce: typeof w.nonce === 'string' ? w.nonce : String(w.nonce),
+            })),
+          })),
+        },
+        "Withdrawal not found in any batch"
+      );
+      return res.status(404).json({
+        success: false,
+        error: "Withdrawal not found in any submitted batch",
       });
     }
 
     // Generate proof
-    const withdrawals: WithdrawalLeaf[] = batch.withdrawals.map((w) => ({
+    const withdrawals: WithdrawalLeaf[] = foundBatch.withdrawals.map((w: PendingWithdrawal) => ({
       user: w.user,
-      amount: BigInt(w.amount),
-      nonce: BigInt(w.nonce),
+      amount: BigInt(typeof w.amount === 'string' ? w.amount : String(w.amount)),
+      nonce: BigInt(typeof w.nonce === 'string' ? w.nonce : String(w.nonce)),
     }));
+
+    log.info(
+      { batchId: foundBatch.batchId, withdrawalCount: withdrawals.length },
+      "Generating Merkle proof"
+    );
 
     const proof = generateProof(withdrawals, userAddress, amountBigInt, nonceBigInt);
 
     if (!proof) {
+      log.error(
+        { batchId: foundBatch.batchId, user: userAddress, amount: normalizedAmount, nonce: normalizedNonce },
+        "Failed to generate proof"
+      );
       return res.status(500).json({
         success: false,
         error: "Failed to generate proof",
       });
     }
 
+    log.info(
+      { batchId: foundBatch.batchId, user: userAddress, amount: normalizedAmount, nonce: normalizedNonce },
+      "Proof generated successfully"
+    );
+
     res.json({
       success: true,
       proof,
-      batchId: batch.batchId,
-      root: batch.root,
+      batchId: foundBatch.batchId,
+      root: foundBatch.root,
       withdrawal: {
         user: userAddress,
         amount: amountBigInt.toString(),
@@ -887,7 +993,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    log.error({ error }, "Error generating proof");
+    log.error({ error, user: req.params.user, amount: req.params.amount, nonce: req.params.nonce }, "Error generating proof");
     res.status(500).json({
       success: false,
       error: errorMessage,
