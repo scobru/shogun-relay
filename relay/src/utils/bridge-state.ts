@@ -754,9 +754,82 @@ export async function addPendingWithdrawal(
     const cleanup = () => clearTimeout(timeout);
 
     try {
-      gun
-        .get(withdrawalsPath)
-        .once((data: { list?: PendingWithdrawal[] } | PendingWithdrawal[] | null | undefined) => {
+      // Try reading from 'list' sub-node first (new format)
+      // Then fall back to parent node (old format: array or { list: [...] })
+      const listPath = `${withdrawalsPath}/list`;
+      const listNode = gun.get(withdrawalsPath).get('list');
+      
+      listNode.once((listData: PendingWithdrawal[] | null | undefined) => {
+        // If list sub-node exists and is an array, use it
+        if (Array.isArray(listData) && listData.length >= 0) {
+          try {
+            let withdrawals: PendingWithdrawal[] = listData;
+
+            // Normalize withdrawals array
+            withdrawals = withdrawals.filter(
+              (w): w is PendingWithdrawal =>
+                w &&
+                typeof w === 'object' &&
+                typeof w.user === 'string' &&
+                typeof w.amount === 'string' &&
+                typeof w.nonce === 'string' &&
+                typeof w.timestamp === 'number'
+            );
+
+            log.info(
+              { normalizedCount: withdrawals.length, source: 'list-subnode' },
+              "Reading withdrawals from list sub-node"
+            );
+
+            // Check if withdrawal with same nonce already exists
+            const exists = withdrawals.some(
+              (w) =>
+                w.user.toLowerCase() === withdrawal.user.toLowerCase() &&
+                w.nonce === withdrawal.nonce
+            );
+
+            if (exists) {
+              cleanup();
+              reject(new Error("Withdrawal with this nonce already exists"));
+              return;
+            }
+
+            withdrawals.push(withdrawal);
+
+            // Save back to list sub-node
+            listNode.put(withdrawals, (ack: GunMessagePut) => {
+              if (ack && "err" in ack && ack.err) {
+                const errorMsg =
+                  typeof ack.err === "string" ? ack.err : String(ack.err);
+                log.error(
+                  { error: errorMsg, withdrawalsPath, withdrawal, withdrawalsCount: withdrawals.length },
+                  "Error saving pending withdrawal list"
+                );
+                cleanup();
+                reject(new Error(errorMsg));
+              } else {
+                log.info(
+                  { withdrawalsCount: withdrawals.length, withdrawal },
+                  "Pending withdrawal added successfully"
+                );
+                cleanup();
+                resolve();
+              }
+            });
+            return;
+          } catch (innerError) {
+            log.warn(
+              { error: innerError, listData },
+              "Error processing list sub-node, falling back to parent node"
+            );
+            // Fall through to parent node reading
+          }
+        }
+        
+        // Fall back to reading from parent node (old format or empty)
+        gun
+          .get(withdrawalsPath)
+          .once((data: { list?: PendingWithdrawal[] } | PendingWithdrawal[] | null | undefined) => {
           try {
             // GunDB can return data in different formats:
             // 1. Array directly: [withdrawal1, withdrawal2, ...]
@@ -764,12 +837,38 @@ export async function addPendingWithdrawal(
             // 3. null/undefined: no data yet
             // 4. Object with other structure
             let withdrawals: PendingWithdrawal[] = [];
+            const wasArray = Array.isArray(data);
+            const wasObject = data && typeof data === 'object' && !Array.isArray(data);
+            
+            log.info(
+              {
+                dataType: Array.isArray(data) ? 'array' : typeof data,
+                dataIsNull: data === null || data === undefined,
+                wasArray,
+                wasObject,
+                hasList: wasObject && 'list' in data,
+                dataPreview: Array.isArray(data) 
+                  ? `Array[${data.length}]` 
+                  : typeof data === 'object' && data !== null
+                  ? JSON.stringify(data).substring(0, 200)
+                  : String(data),
+              },
+              "Reading pending withdrawals data"
+            );
             
             if (Array.isArray(data)) {
               withdrawals = data;
+              log.info(
+                { arrayLength: data.length },
+                "Found withdrawals as array"
+              );
             } else if (data && typeof data === 'object') {
               if ('list' in data && Array.isArray(data.list)) {
                 withdrawals = data.list;
+                log.info(
+                  { listLength: data.list.length },
+                  "Found withdrawals in object.list"
+                );
               } else {
                 // Try to convert object to array if it has numeric keys
                 const entries = Object.values(data).filter(
@@ -782,6 +881,10 @@ export async function addPendingWithdrawal(
                 );
                 if (entries.length > 0) {
                   withdrawals = entries;
+                  log.info(
+                    { entriesLength: entries.length },
+                    "Found withdrawals as object entries"
+                  );
                 }
               }
             }
@@ -798,6 +901,11 @@ export async function addPendingWithdrawal(
                 typeof w.timestamp === 'number'
             );
 
+            log.info(
+              { normalizedCount: withdrawals.length },
+              "Normalized withdrawals array"
+            );
+
             // Check if withdrawal with same nonce already exists
             const exists = withdrawals.some(
               (w) =>
@@ -806,33 +914,49 @@ export async function addPendingWithdrawal(
             );
 
             if (exists) {
+              cleanup();
               reject(new Error("Withdrawal with this nonce already exists"));
               return;
             }
 
             withdrawals.push(withdrawal);
 
-            // Use set() instead of put() to ensure we're setting the entire object
-            // This prevents conflicts with existing data structures
+            // Always save to 'list' sub-node to avoid conflicts with existing array formats
+            // This works whether the parent node is array, object, or null
             const withdrawalsNode = gun.get(withdrawalsPath);
-            withdrawalsNode.put({ list: withdrawals }, (ack: GunMessagePut) => {
-                if (ack && "err" in ack && ack.err) {
-                  const errorMsg =
-                    typeof ack.err === "string" ? ack.err : String(ack.err);
-                  log.error(
-                    { error: errorMsg, withdrawalsPath, withdrawal },
-                    "Error saving pending withdrawal"
-                  );
-                  reject(new Error(errorMsg));
-                } else {
-                  log.info(
-                    { withdrawalsCount: withdrawals.length, withdrawal },
-                    "Pending withdrawal added successfully"
-                  );
-                  cleanup();
-                  resolve();
-                }
-              });
+            const listNode = withdrawalsNode.get('list');
+            
+            log.info(
+              { withdrawalsCount: withdrawals.length, wasArray, wasObject },
+              "Saving withdrawals to list sub-node"
+            );
+            
+            listNode.put(withdrawals, (ack: GunMessagePut) => {
+              if (ack && "err" in ack && ack.err) {
+                const errorMsg =
+                  typeof ack.err === "string" ? ack.err : String(ack.err);
+                log.error(
+                  { 
+                    error: errorMsg, 
+                    withdrawalsPath, 
+                    withdrawal, 
+                    withdrawalsCount: withdrawals.length,
+                    wasArray,
+                    wasObject 
+                  },
+                  "Error saving pending withdrawal list"
+                );
+                cleanup();
+                reject(new Error(errorMsg));
+              } else {
+                log.info(
+                  { withdrawalsCount: withdrawals.length, withdrawal },
+                  "Pending withdrawal added successfully"
+                );
+                cleanup();
+                resolve();
+              }
+            });
           } catch (innerError) {
             cleanup();
             log.error(
@@ -862,23 +986,55 @@ export async function getPendingWithdrawals(
   return new Promise((resolve, reject) => {
     const withdrawalsPath = "bridge/withdrawals/pending";
 
-    gun
-      .get(withdrawalsPath)
-      .once((data: { list?: PendingWithdrawal[] } | PendingWithdrawal[] | null) => {
-        // GunDB can return data in different formats:
-        // 1. Array directly: [withdrawal1, withdrawal2, ...]
-        // 2. Object with list property: { list: [withdrawal1, withdrawal2, ...] }
-        // 3. null/undefined: no data yet
-        let withdrawals: PendingWithdrawal[] = [];
-        
-        if (Array.isArray(data)) {
-          withdrawals = data;
-        } else if (data && typeof data === 'object' && 'list' in data && Array.isArray(data.list)) {
-          withdrawals = data.list;
-        }
-        
+    // Try reading from 'list' sub-node first (new format)
+    const listNode = gun.get(withdrawalsPath).get('list');
+    
+    listNode.once((listData: PendingWithdrawal[] | null | undefined) => {
+      // If list sub-node exists and is an array, use it
+      if (Array.isArray(listData) && listData.length >= 0) {
+        const withdrawals = listData.filter(
+          (w): w is PendingWithdrawal =>
+            w &&
+            typeof w === 'object' &&
+            typeof w.user === 'string' &&
+            typeof w.amount === 'string' &&
+            typeof w.nonce === 'string' &&
+            typeof w.timestamp === 'number'
+        );
         resolve(withdrawals);
-      });
+        return;
+      }
+      
+      // Fall back to reading from parent node (old format)
+      gun
+        .get(withdrawalsPath)
+        .once((data: { list?: PendingWithdrawal[] } | PendingWithdrawal[] | null | undefined) => {
+          // GunDB can return data in different formats:
+          // 1. Array directly: [withdrawal1, withdrawal2, ...]
+          // 2. Object with list property: { list: [withdrawal1, withdrawal2, ...] }
+          // 3. null/undefined: no data yet
+          let withdrawals: PendingWithdrawal[] = [];
+          
+          if (Array.isArray(data)) {
+            withdrawals = data;
+          } else if (data && typeof data === 'object' && 'list' in data && Array.isArray(data.list)) {
+            withdrawals = data.list;
+          }
+          
+          // Normalize withdrawals array
+          withdrawals = withdrawals.filter(
+            (w): w is PendingWithdrawal =>
+              w &&
+              typeof w === 'object' &&
+              typeof w.user === 'string' &&
+              typeof w.amount === 'string' &&
+              typeof w.nonce === 'string' &&
+              typeof w.timestamp === 'number'
+          );
+          
+          resolve(withdrawals);
+        });
+    });
   });
 }
 
@@ -892,20 +1048,46 @@ export async function removePendingWithdrawals(
   return new Promise((resolve, reject) => {
     const withdrawalsPath = "bridge/withdrawals/pending";
 
-    gun
-      .get(withdrawalsPath)
-      .once((data: { list?: PendingWithdrawal[] } | PendingWithdrawal[] | null) => {
-        // GunDB can return data in different formats:
-        // 1. Array directly: [withdrawal1, withdrawal2, ...]
-        // 2. Object with list property: { list: [withdrawal1, withdrawal2, ...] }
-        // 3. null/undefined: no data yet
-        let withdrawals: PendingWithdrawal[] = [];
-        
-        if (Array.isArray(data)) {
-          withdrawals = data;
-        } else if (data && typeof data === 'object' && 'list' in data && Array.isArray(data.list)) {
-          withdrawals = data.list;
-        }
+    // Try reading from 'list' sub-node first (new format)
+    const listNode = gun.get(withdrawalsPath).get('list');
+    
+    listNode.once((listData: PendingWithdrawal[] | null | undefined) => {
+      let withdrawals: PendingWithdrawal[] = [];
+      let useSubNode = false;
+      
+      // If list sub-node exists and is an array, use it
+      if (Array.isArray(listData) && listData.length >= 0) {
+        withdrawals = listData;
+        useSubNode = true;
+      } else {
+        // Fall back to reading from parent node (old format)
+        gun
+          .get(withdrawalsPath)
+          .once((data: { list?: PendingWithdrawal[] } | PendingWithdrawal[] | null | undefined) => {
+            if (Array.isArray(data)) {
+              withdrawals = data;
+            } else if (data && typeof data === 'object' && 'list' in data && Array.isArray(data.list)) {
+              withdrawals = data.list;
+            }
+            
+            processWithdrawals();
+          });
+        return;
+      }
+      
+      processWithdrawals();
+      
+      function processWithdrawals() {
+        // Normalize withdrawals array
+        withdrawals = withdrawals.filter(
+          (w): w is PendingWithdrawal =>
+            w &&
+            typeof w === 'object' &&
+            typeof w.user === 'string' &&
+            typeof w.amount === 'string' &&
+            typeof w.nonce === 'string' &&
+            typeof w.timestamp === 'number'
+        );
 
         // Create a set of withdrawal keys (user+nonce) to remove
         const toRemove = new Set(
@@ -917,18 +1099,21 @@ export async function removePendingWithdrawals(
           (w) => !toRemove.has(`${w.user.toLowerCase()}:${w.nonce}`)
         );
 
-        gun
-          .get(withdrawalsPath)
-          .put({ list: remaining }, (ack: GunMessagePut) => {
-            if (ack && "err" in ack && ack.err) {
-              const errorMsg =
-                typeof ack.err === "string" ? ack.err : String(ack.err);
-              reject(new Error(errorMsg));
-            } else {
-              resolve();
-            }
-          });
-      });
+        // Always save to 'list' sub-node (new format)
+        const withdrawalsNode = gun.get(withdrawalsPath);
+        const listNodeForSave = withdrawalsNode.get('list');
+        
+        listNodeForSave.put(remaining, (ack: GunMessagePut) => {
+          if (ack && "err" in ack && ack.err) {
+            const errorMsg =
+              typeof ack.err === "string" ? ack.err : String(ack.err);
+            reject(new Error(errorMsg));
+          } else {
+            resolve();
+          }
+        });
+      }
+    });
   });
 }
 
