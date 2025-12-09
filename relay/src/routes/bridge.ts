@@ -648,15 +648,35 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     const amountBigInt = BigInt(amount);
     const nonceBigInt = BigInt(nonce);
 
+    log.info(
+      { user: userAddress, amount: amountBigInt.toString(), nonce: nonceBigInt.toString() },
+      "Proof request received"
+    );
+
     // Get latest batch
     const batch = await getLatestBatch(gun);
 
     if (!batch) {
+      log.warn(
+        { user: userAddress, amount: amountBigInt.toString(), nonce: nonceBigInt.toString() },
+        "No batches found in GunDB"
+      );
       return res.status(404).json({
         success: false,
         error: "No batches found",
       });
     }
+
+    log.info(
+      {
+        batchId: batch.batchId,
+        withdrawalCount: batch.withdrawals.length,
+        requestedUser: userAddress,
+        requestedAmount: amountBigInt.toString(),
+        requestedNonce: nonceBigInt.toString(),
+      },
+      "Latest batch retrieved, checking for withdrawal"
+    );
 
     // Check if withdrawal is in this batch
     const withdrawalInBatch = batch.withdrawals.find(
@@ -667,6 +687,20 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     );
 
     if (!withdrawalInBatch) {
+      log.warn(
+        {
+          batchId: batch.batchId,
+          requestedUser: userAddress,
+          requestedAmount: amountBigInt.toString(),
+          requestedNonce: nonceBigInt.toString(),
+          batchWithdrawals: batch.withdrawals.map(w => ({
+            user: w.user,
+            amount: w.amount,
+            nonce: w.nonce,
+          })),
+        },
+        "Withdrawal not found in latest batch"
+      );
       return res.status(404).json({
         success: false,
         error: "Withdrawal not found in latest batch",

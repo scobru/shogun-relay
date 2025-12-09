@@ -1193,12 +1193,53 @@ export async function getBatch(
  */
 export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
   return new Promise((resolve) => {
-    // This is a simplified version - in production you might want to maintain
-    // a separate index of batch IDs sorted by timestamp
     const batchesPath = "bridge/batches";
+    const timeout = setTimeout(() => {
+      log.warn({ batchesPath }, "Timeout waiting for GunDB response in getLatestBatch");
+      resolve(null);
+    }, 10000); // 10 second timeout
 
-    gun.get(batchesPath).once((data: Record<string, Batch> | null) => {
-      if (!data) {
+    const batches: Batch[] = [];
+    let resolved = false;
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      resolved = true;
+    };
+
+    const parentNode = gun.get(batchesPath);
+
+    // Use map().once() for a one-time read of all child nodes
+    parentNode.map().once((batch: Batch | null, key: string) => {
+      if (resolved) return;
+
+      // Skip metadata keys
+      if (key === '_' || key.startsWith('_')) {
+        return;
+      }
+
+      if (
+        batch &&
+        typeof batch === 'object' &&
+        typeof batch.batchId === 'string' &&
+        typeof batch.root === 'string' &&
+        Array.isArray(batch.withdrawals)
+      ) {
+        batches.push(batch as Batch);
+        log.info(
+          { key, batchId: batch.batchId, withdrawalCount: batch.withdrawals.length },
+          "Found batch node"
+        );
+      }
+    });
+
+    // After a short delay, resolve the promise to ensure all .once() callbacks have fired
+    setTimeout(() => {
+      if (resolved) return;
+      cleanup();
+
+      if (batches.length === 0) {
+        log.info({ batchesPath }, "No batches found in GunDB");
         resolve(null);
         return;
       }
@@ -1207,16 +1248,21 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
       let latest: Batch | null = null;
       let latestId = -1;
 
-      for (const [id, batch] of Object.entries(data)) {
-        const batchIdNum = parseInt(id, 10);
+      for (const batch of batches) {
+        const batchIdNum = parseInt(batch.batchId, 10);
         if (!isNaN(batchIdNum) && batchIdNum > latestId) {
           latestId = batchIdNum;
           latest = batch;
         }
       }
 
+      log.info(
+        { totalBatches: batches.length, latestBatchId: latest?.batchId, latestWithdrawalCount: latest?.withdrawals.length },
+        "Retrieved latest batch"
+      );
+
       resolve(latest);
-    });
+    }, 500); // Small delay to allow GunDB to propagate and .once() to complete
   });
 }
 
