@@ -162,6 +162,21 @@ export async function startBridgeListener(
             return;
           }
 
+          // SECURITY: Double-check pattern to prevent race conditions
+          // Another listener instance might have processed this deposit while we were verifying
+          const stillNotProcessed = !(await isDepositProcessed(gun, depositKey));
+          if (!stillNotProcessed) {
+            log.warn(
+              {
+                txHash: event.txHash,
+                user: event.user,
+                amount: event.amount.toString(),
+              },
+              "Deposit was processed by another instance, skipping"
+            );
+            return;
+          }
+
           // All security checks passed - credit balance (with signature if relay keypair available)
           // SECURITY: Only mark as processed AFTER successful credit to ensure idempotency
           // If creditBalance fails, the deposit will be retried (which is correct behavior)

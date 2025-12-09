@@ -298,6 +298,22 @@ router.post("/withdraw", express.json(), async (req, res) => {
       });
     }
 
+    // SECURITY: Check if withdrawal with this nonce is already processed on-chain
+    // This prevents users from losing balance if they try to reuse a nonce
+    const client = getBridgeClient();
+    const isProcessed = await client.isWithdrawalProcessed(
+      userAddress,
+      amountBigInt,
+      nonceBigInt
+    );
+
+    if (isProcessed) {
+      return res.status(400).json({
+        success: false,
+        error: "Withdrawal with this nonce has already been processed on-chain",
+      });
+    }
+
     // Get relay keypair for signing (if available)
     const relayKeyPair = req.app.get("relayKeyPair") || null;
     
@@ -362,14 +378,18 @@ router.post("/submit-batch", express.json(), async (req, res) => {
 
     const client = getBridgeClient();
 
-    // Verify caller is sequencer (optional check, contract also enforces this)
-    const sequencer = await client.getSequencer();
-    if (client.wallet && client.wallet.address.toLowerCase() !== sequencer.toLowerCase()) {
+    // Verify wallet is configured (required for batch submission)
+    if (!client.wallet) {
       return res.status(403).json({
         success: false,
-        error: "Only sequencer can submit batches",
+        error: "Wallet required for batch submission",
       });
     }
+
+    // Note: The contract's onlySequencerOrRelay modifier will enforce:
+    // - If sequencer is set (non-zero), only sequencer can submit
+    // - If sequencer is zero address, any registered active relay can submit
+    // We don't need to duplicate this logic here - let the contract enforce it
 
     // Get pending withdrawals
     const pending = await getPendingWithdrawals(gun);
