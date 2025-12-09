@@ -402,26 +402,66 @@ export async function verifyDualSignatures(
     }
 
     // Check that the verified data matches the message
-    // SEA can return string or object, so we normalize
-    const seaData = typeof seaVerified === 'string' 
-      ? seaVerified 
-      : JSON.stringify(seaVerified);
-    const normalizedMessage = typeof message === 'string' 
-      ? message 
-      : JSON.stringify(message);
+    // SEA can return string or object, so we normalize and compare by parsing both
+    let seaDataObj: any;
+    let messageObj: any;
     
-    if (seaData !== normalizedMessage) {
-      log.warn(
-        {
-          ethAddress,
-          seaDataLength: seaData.length,
-          messageLength: normalizedMessage.length,
-          seaDataPreview: seaData.substring(0, 200),
-          messagePreview: normalizedMessage.substring(0, 200),
-        },
-        "SEA verified data does not match message"
-      );
-      return null;
+    try {
+      seaDataObj = typeof seaVerified === 'string' 
+        ? JSON.parse(seaVerified) 
+        : seaVerified;
+    } catch {
+      // If not JSON, treat as plain string
+      seaDataObj = seaVerified;
+    }
+    
+    try {
+      messageObj = typeof message === 'string' 
+        ? JSON.parse(message) 
+        : message;
+    } catch {
+      // If not JSON, treat as plain string
+      messageObj = message;
+    }
+    
+    // Compare objects by stringifying (order might differ, so we compare parsed objects)
+    // First try direct comparison if both are objects
+    if (typeof seaDataObj === 'object' && typeof messageObj === 'object') {
+      const seaStr = JSON.stringify(seaDataObj);
+      const msgStr = JSON.stringify(messageObj);
+      if (seaStr !== msgStr) {
+        log.warn(
+          {
+            ethAddress,
+            seaDataPreview: seaStr.substring(0, 200),
+            messagePreview: msgStr.substring(0, 200),
+          },
+          "SEA verified data does not match message (object comparison)"
+        );
+        return null;
+      }
+    } else {
+      // If one is not an object, compare as strings
+      const seaData = typeof seaVerified === 'string' 
+        ? seaVerified 
+        : JSON.stringify(seaVerified);
+      const normalizedMessage = typeof message === 'string' 
+        ? message 
+        : JSON.stringify(message);
+      
+      if (seaData !== normalizedMessage) {
+        log.warn(
+          {
+            ethAddress,
+            seaDataLength: seaData.length,
+            messageLength: normalizedMessage.length,
+            seaDataPreview: seaData.substring(0, 200),
+            messagePreview: normalizedMessage.substring(0, 200),
+          },
+          "SEA verified data does not match message (string comparison)"
+        );
+        return null;
+      }
     }
 
     // 2. Verify Ethereum signature (wallet)

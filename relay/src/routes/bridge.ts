@@ -274,6 +274,21 @@ router.post("/withdraw", express.json(), async (req, res) => {
 
     // SECURITY: Verify dual signatures before processing withdrawal
     const { verifyDualSignatures } = await import("../utils/bridge-state");
+    
+    log.info(
+      {
+        user: userAddress,
+        amount: amountBigInt.toString(),
+        nonce: nonceBigInt.toString(),
+        messageLength: message?.length,
+        messagePreview: message?.substring(0, 200),
+        hasSeaSignature: !!seaSignature,
+        hasEthSignature: !!ethSignature,
+        hasGunPubKey: !!gunPubKey,
+      },
+      "Verifying dual signatures for withdrawal"
+    );
+    
     const verifiedMessage = await verifyDualSignatures(
       message,
       seaSignature,
@@ -288,11 +303,28 @@ router.post("/withdraw", express.json(), async (req, res) => {
     );
 
     if (!verifiedMessage) {
+      log.warn(
+        {
+          user: userAddress,
+          amount: amountBigInt.toString(),
+          nonce: nonceBigInt.toString(),
+        },
+        "Dual signature verification failed for withdrawal"
+      );
       return res.status(401).json({
         success: false,
         error: "Invalid signatures: must provide valid SEA and Ethereum signatures with correct message content",
       });
     }
+    
+    log.info(
+      {
+        user: userAddress,
+        amount: amountBigInt.toString(),
+        nonce: nonceBigInt.toString(),
+      },
+      "Dual signatures verified successfully"
+    );
 
     // Check balance
     const balance = await getUserBalance(gun, userAddress);
