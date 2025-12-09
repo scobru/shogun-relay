@@ -103,37 +103,44 @@ export async function startBridgeListener(
           
           if (alreadyProcessed) {
             // CRITICAL: Verify that the balance was actually written
-            // If deposit is marked as processed but balance doesn't exist, reprocess it
+            // If deposit is marked as processed but balance is less than deposit amount,
+            // it's likely the deposit wasn't fully credited (due to race conditions or failures)
             const currentBalance = await getUserBalance(gun, normalizedUser);
-            const balanceBefore = currentBalance;
-            const expectedBalance = balanceBefore + event.amount;
             
-            // Check if we need to reprocess (balance might be missing due to previous failure)
-            // We check if the balance is less than expected, which means the deposit wasn't fully processed
-            // Note: This is a heuristic - if user made other transactions, balance might be different
-            // But if balance is 0 and deposit should have credited, we definitely need to reprocess
-            if (currentBalance === 0n && event.amount > 0n) {
+            // Conservative check: if balance is less than the deposit amount, reprocess
+            // This handles cases where:
+            // 1. Balance is 0 but deposit should have credited (obvious failure)
+            // 2. Balance is less than deposit amount (partial failure or race condition)
+            // Note: This is a heuristic - if user made withdrawals/transfers, balance might be lower,
+            // but if balance is less than this single deposit amount, it's very likely the deposit
+            // wasn't credited correctly
+            if (currentBalance < event.amount) {
               log.warn(
                 {
                   txHash: event.txHash,
                   user: normalizedUser,
                   amount: event.amount.toString(),
+                  amountEth: ethers.formatEther(event.amount),
                   depositKey,
                   currentBalance: currentBalance.toString(),
+                  currentBalanceEth: ethers.formatEther(currentBalance),
+                  difference: (event.amount - currentBalance).toString(),
                 },
-                "Deposit marked as processed but balance is 0 - reprocessing"
+                "Deposit marked as processed but balance is less than deposit amount - reprocessing to ensure funds are credited"
               );
               // Continue processing instead of returning
             } else {
-              log.warn(
+              log.info(
                 {
                   txHash: event.txHash,
                   user: normalizedUser,
                   amount: event.amount.toString(),
+                  amountEth: ethers.formatEther(event.amount),
                   depositKey,
                   currentBalance: currentBalance.toString(),
+                  currentBalanceEth: ethers.formatEther(currentBalance),
                 },
-                "Deposit already processed, skipping"
+                "Deposit already processed and balance verified, skipping"
               );
               return;
             }
