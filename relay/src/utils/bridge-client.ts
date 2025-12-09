@@ -337,6 +337,19 @@ export function createBridgeClient(config: BridgeConfig) {
           // Get blockNumber - may be null for pending events, try to get from receipt
           let blockNumber: number | null = event.blockNumber ?? null;
           
+          // Log if blockNumber is missing for debugging
+          if (blockNumber === null || blockNumber === undefined) {
+            log.debug(
+              { 
+                user: normalizedUser, 
+                txHash: event.transactionHash,
+                eventBlockNumber: event.blockNumber,
+                eventKeys: Object.keys(event)
+              },
+              "Event blockNumber is null/undefined, attempting to retrieve from receipt"
+            );
+          }
+          
           // If blockNumber is null or undefined, try to get it from the transaction receipt
           if (blockNumber === null || blockNumber === undefined) {
             try {
@@ -346,6 +359,11 @@ export function createBridgeClient(config: BridgeConfig) {
                 log.info(
                   { user: normalizedUser, txHash: event.transactionHash, blockNumber },
                   "Retrieved blockNumber from transaction receipt"
+                );
+              } else {
+                log.warn(
+                  { user: normalizedUser, txHash: event.transactionHash },
+                  "Transaction receipt found but blockNumber is null (transaction may be pending)"
                 );
               }
             } catch (error) {
