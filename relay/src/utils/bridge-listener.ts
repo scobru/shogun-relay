@@ -21,7 +21,7 @@
 import type { IGunInstance } from "gun";
 import { ethers } from "ethers";
 import { createBridgeClient, type BridgeClient } from "./bridge-client";
-import { creditBalance, isDepositProcessed, markDepositProcessed } from "./bridge-state";
+import { creditBalance, isDepositProcessed, markDepositProcessed, getUserBalance } from "./bridge-state";
 import { loggers } from "./logger";
 
 const log = loggers.bridge || {
@@ -85,20 +85,44 @@ export async function startBridgeListener(
       async (event) => {
         try {
           // SECURITY: Check if deposit already processed (idempotency)
-          const depositKey = `${event.txHash}:${event.user}:${event.amount}`;
+          // Normalize user address to ensure consistent key
+          const normalizedUser = event.user.toLowerCase();
+          const depositKey = `${event.txHash}:${normalizedUser}:${event.amount}`;
+          
+          log.info(
+            {
+              txHash: event.txHash,
+              user: normalizedUser,
+              amount: event.amount.toString(),
+              depositKey,
+            },
+            "Received deposit event, checking if already processed"
+          );
+          
           const alreadyProcessed = await isDepositProcessed(gun, depositKey);
           
           if (alreadyProcessed) {
             log.warn(
               {
                 txHash: event.txHash,
-                user: event.user,
+                user: normalizedUser,
                 amount: event.amount.toString(),
+                depositKey,
               },
               "Deposit already processed, skipping"
             );
             return;
           }
+          
+          log.info(
+            {
+              txHash: event.txHash,
+              user: normalizedUser,
+              amount: event.amount.toString(),
+              depositKey,
+            },
+            "Deposit not yet processed, proceeding with verification"
+          );
 
           log.info(
             {
@@ -180,26 +204,48 @@ export async function startBridgeListener(
           // All security checks passed - credit balance (with signature if relay keypair available)
           // SECURITY: Only mark as processed AFTER successful credit to ensure idempotency
           // If creditBalance fails, the deposit will be retried (which is correct behavior)
-          await creditBalance(gun, event.user, event.amount, config.relayKeyPair);
+          
+          log.info(
+            {
+              user: normalizedUser,
+              amount: event.amount.toString(),
+              txHash: event.txHash,
+            },
+            "Crediting balance to L2"
+          );
+          
+          await creditBalance(gun, normalizedUser, event.amount, config.relayKeyPair);
+          
+          log.info(
+            {
+              user: normalizedUser,
+              amount: event.amount.toString(),
+              txHash: event.txHash,
+            },
+            "Balance credited successfully, marking deposit as processed"
+          );
           
           // Mark as processed (idempotency) - only if creditBalance succeeded
           await markDepositProcessed(gun, depositKey, {
             txHash: event.txHash,
-            user: event.user,
+            user: normalizedUser,
             amount: event.amount.toString(),
             blockNumber: event.blockNumber,
             timestamp: Date.now(),
           });
 
+          // Verify balance was actually written
+          const verifyBalance = await getUserBalance(gun, normalizedUser);
           log.info(
             {
-              user: event.user,
+              user: normalizedUser,
               amount: ethers.formatEther(event.amount),
               txHash: event.txHash,
               confirmations,
+              newBalance: ethers.formatEther(verifyBalance),
               balance: "credited",
             },
-            "Deposit credited to L2 balance"
+            "Deposit credited to L2 balance - verified"
           );
         } catch (error) {
           log.error(

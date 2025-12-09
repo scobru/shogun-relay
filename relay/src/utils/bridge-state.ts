@@ -31,8 +31,14 @@ import type { IGunInstance, GunMessagePut } from "gun";
 import Gun from "gun";
 import "gun/sea";
 import * as FrozenData from "./frozen-data";
+import { loggers } from "./logger";
 
 const SEA = (Gun as any).SEA;
+const log = loggers.bridge || {
+  info: console.log,
+  error: console.error,
+  warn: console.warn,
+};
 
 export interface UserBalance {
   balance: string; // BigInt as string (wei)
@@ -74,6 +80,8 @@ export async function getUserBalance(
 ): Promise<bigint> {
   try {
     const indexKey = userAddress.toLowerCase();
+    
+    log.info({ user: indexKey }, "Looking up balance");
 
     // Get latest frozen entry for this user
     const entry = await FrozenData.getLatestFrozenEntry(
@@ -82,27 +90,49 @@ export async function getUserBalance(
       indexKey
     );
 
+    log.info(
+      {
+        user: indexKey,
+        hasEntry: !!entry,
+        verified: entry?.verified,
+        hasData: !!entry?.data,
+      },
+      "Balance entry lookup result"
+    );
+
     if (!entry || !entry.verified) {
       // If no verified entry found, return 0
       // Unverified entries are ignored for security
+      log.info({ user: indexKey }, "No verified entry found, returning 0");
       return 0n;
     }
 
-    const balanceData = entry.data as { balance?: string; user?: string };
+    const balanceData = entry.data as { balance?: string; user?: string; ethereumAddress?: string };
+
+    log.info(
+      {
+        user: indexKey,
+        balance: balanceData?.balance,
+        ethereumAddress: balanceData?.ethereumAddress,
+      },
+      "Balance data retrieved"
+    );
 
     if (!balanceData || !balanceData.balance) {
+      log.info({ user: indexKey }, "No balance in data, returning 0");
       return 0n;
     }
 
     try {
       const balance = BigInt(balanceData.balance);
+      log.info({ user: indexKey, balance: balance.toString() }, "Balance retrieved successfully");
       return balance;
     } catch (error) {
       throw new Error(`Invalid balance format: ${error}`);
     }
   } catch (error) {
     // On error, return 0 (fail-safe)
-    console.warn("Error getting user balance:", error);
+    log.warn({ error, user: userAddress }, "Error getting user balance");
     return 0n;
   }
 }
@@ -137,10 +167,25 @@ export async function creditBalance(
   try {
     // Normalize Ethereum address
     const ethereumAddress = userAddress.toLowerCase();
+    
+    log.info(
+      { user: ethereumAddress, amount: amount.toString() },
+      "Crediting balance"
+    );
 
     // Get current balance (by Ethereum address)
     const currentBalance = await getUserBalance(gun, ethereumAddress);
     const newBalance = currentBalance + amount;
+    
+    log.info(
+      {
+        user: ethereumAddress,
+        currentBalance: currentBalance.toString(),
+        amount: amount.toString(),
+        newBalance: newBalance.toString(),
+      },
+      "Balance calculation"
+    );
 
     // Create balance data
     const balanceData: any = {
@@ -155,6 +200,11 @@ export async function creditBalance(
       balanceData.gunPubKey = gunPubKey;
     }
 
+    log.info(
+      { user: ethereumAddress, balanceData },
+      "Creating frozen entry"
+    );
+
     // Create frozen entry (immutable, signed)
     // Use Ethereum address as index key (deposits come with Ethereum address)
     const indexKey = ethereumAddress;
@@ -165,7 +215,17 @@ export async function creditBalance(
       "bridge-balances",
       indexKey
     );
+    
+    log.info({ user: indexKey }, "Frozen entry created successfully");
+    
+    // Verify the entry was created
+    const verifyBalance = await getUserBalance(gun, ethereumAddress);
+    log.info(
+      { user: ethereumAddress, balance: verifyBalance.toString() },
+      "Balance verification after credit"
+    );
   } catch (error) {
+    log.error({ error, user: userAddress, amount: amount.toString() }, "Error crediting balance");
     throw new Error(`Failed to credit balance: ${error}`);
   }
 }

@@ -484,7 +484,21 @@ router.get("/balance/:user", async (req, res) => {
       });
     }
 
+    log.info(
+      { user: userAddress, normalizedUser: userAddress.toLowerCase() },
+      "Getting user balance"
+    );
+    
     const balance = await getUserBalance(gun, userAddress);
+    
+    log.info(
+      { 
+        user: userAddress, 
+        balance: balance.toString(), 
+        balanceEth: ethers.formatEther(balance) 
+      },
+      "Balance retrieved"
+    );
 
     res.json({
       success: true,
