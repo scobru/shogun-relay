@@ -186,27 +186,30 @@ export async function createFrozenEntry(
     dataKeys: Object.keys(entry).filter(k => k !== '_meta' && k !== 'meta'),
   }, 'Creating frozen entry with metadata');
 
-  // Create signature
+  // Create dataString - this exact string will be used for signing, hashing, and storing as dataJson
+  // IMPORTANT: We must use the same dataString for all three operations to ensure consistency
   const dataString = JSON.stringify(entry);
+  
+  log.info({
+    namespace,
+    indexKey,
+    dataStringLength: dataString.length,
+    dataStringPreview: dataString.substring(0, 300),
+  }, 'Creating frozen entry - dataString created');
+  
+  // Create signature using the dataString
   const signature = await SEA.sign(dataString, keyPair);
 
   if (!signature) {
     throw new Error('Failed to sign data');
   }
 
-  // Create content hash for addressing
+  // Create content hash for addressing using the same dataString
   const hash = await SEA.work(dataString, null, null, { name: 'SHA-256' });
 
   if (!hash) {
     throw new Error('Failed to create content hash');
   }
-
-  // Store in frozen space (content-addressed)
-  const frozenEntry: FrozenEntry = {
-    data: entry,
-    sig: signature,
-    hash: hash,
-  };
 
   // Use 'frozen-' namespace instead of '#' to avoid GunDB auto-verification warnings
   // The '#' namespace triggers automatic hash verification which causes "Data hash not same as hash!" warnings
@@ -214,20 +217,19 @@ export async function createFrozenEntry(
   // This approach is functionally equivalent but avoids the annoying warnings
   
   // Store the entry - GunDB may not preserve nested structures correctly when using .put() with nested objects
-  // So we store the data as a JSON string to ensure all fields are preserved correctly
+  // So we store the dataString directly as dataJson to ensure all fields are preserved correctly
   const frozenNode = gun.get('frozen-' + namespace).get(hash);
   
   // Store signature and hash at the root level
   frozenNode.get('sig').put(signature);
   frozenNode.get('hash').put(hash);
   
-  // Store data as JSON string to ensure GunDB persists it correctly
-  // This avoids issues with nested object serialization
-  const dataJson = JSON.stringify(entry);
-  frozenNode.get('dataJson').put(dataJson);
+  // Store dataString as dataJson - this is the EXACT string used for signing and hashing
+  // When we read it back, we'll use it directly for verification without re-serialization
+  frozenNode.get('dataJson').put(dataString);
   
   // Also store data as nested object for backward compatibility and easier reading
-  // But we'll prioritize dataJson when reading
+  // But we'll prioritize dataJson when reading for verification
   frozenNode.get('data').put(entry as unknown as obj);
 
   // Update index to point to latest hash
@@ -267,28 +269,39 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
       try {
         // IMPORTANT: Use dataJson if available (more reliable), otherwise fall back to entry.data
         // The dataJson was stored as a JSON string to ensure GunDB persists all fields correctly
+        // When using dataJson, we use it directly as the dataString for verification
+        // because it's the exact string that was used to create the hash and signature
         let entryData: FrozenEntryData;
+        let dataString: string;
+        let pub: string | undefined;
         
         if (entry.dataJson && typeof entry.dataJson === 'string') {
-          // Parse the JSON string to get the original data structure
+          // Use dataJson directly as dataString - this is the exact string used for signing/hashing
+          dataString = entry.dataJson;
           try {
-            entryData = JSON.parse(entry.dataJson);
+            entryData = JSON.parse(dataString);
+            pub = entryData._meta?.pub || entryData.meta?.pub;
             log.info({
               hash: hash.substring(0, 16),
               source: 'dataJson',
               hasMeta: !!entryData._meta,
               hasMetaAlt: !!entryData.meta,
-            }, 'Reading frozen entry from dataJson');
+              dataStringLength: dataString.length,
+            }, 'Reading frozen entry from dataJson (using dataJson directly for verification)');
           } catch (parseError) {
             log.warn({
               hash: hash.substring(0, 16),
               error: parseError,
             }, 'Failed to parse dataJson, falling back to entry.data');
             entryData = entry.data || {};
+            dataString = JSON.stringify(entryData);
+            pub = entryData._meta?.pub || entryData.meta?.pub;
           }
         } else {
           // Fall back to entry.data if dataJson is not available
           entryData = entry.data || {};
+          dataString = JSON.stringify(entryData);
+          pub = entryData._meta?.pub || entryData.meta?.pub;
           log.info({
             hash: hash.substring(0, 16),
             source: 'entry.data',
@@ -296,33 +309,9 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
             hasMeta: !!entry.data?._meta,
             hasMetaAlt: !!entry.data?.meta,
             dataKeys: entry.data ? Object.keys(entry.data).filter(k => k !== '_meta' && k !== 'meta') : [],
+            dataStringLength: dataString.length,
           }, 'Reading frozen entry from entry.data');
         }
-        
-        // Normalize the data for verification
-        // When creating, we store both _meta and meta with the same content
-        // But GunDB may only persist one of them. We need to ensure the dataString
-        // matches what was signed. Since we store both, we'll use the one that exists.
-        // If both exist, we'll use _meta (the original format).
-        // If only meta exists, we'll remove _meta (if present) to match what GunDB persisted.
-        const normalizedData = { ...entryData };
-        
-        // If only meta exists (GunDB didn't persist _meta), remove _meta from normalizedData
-        // to match what GunDB actually stored
-        if (normalizedData.meta && !normalizedData._meta) {
-          // GunDB persisted only meta, so we verify against that format
-          delete normalizedData._meta;
-        } else if (normalizedData._meta && !normalizedData.meta) {
-          // GunDB persisted only _meta, so we verify against that format
-          delete normalizedData.meta;
-        } else if (normalizedData._meta && normalizedData.meta) {
-          // Both exist, use _meta (original format) and remove meta for consistency
-          delete normalizedData.meta;
-        }
-        
-        const dataString = JSON.stringify(normalizedData);
-        // Try _meta first, then meta as fallback
-        let pub = entryData._meta?.pub || entryData.meta?.pub;
 
         // If pub is missing, try to get it from the index
         if (!pub) {
@@ -392,12 +381,16 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
         // Log verification details for debugging
         log.info({
           hash: hash.substring(0, 16),
+          expectedHash: expectedHash?.substring(0, 16),
+          hashMatch: hashValid,
           signatureValid,
-          hashValid,
           verified,
           pub: pub.substring(0, 16),
           dataStringLength: dataString.length,
-          hasMetaInData: !!entry.data._meta,
+          dataStringPreview: dataString.substring(0, 300),
+          hasMetaInData: !!entryData._meta,
+          hasMetaAltInData: !!entryData.meta,
+          usingDataJson: !!entry.dataJson,
         }, 'Frozen entry verification result');
 
         resolve({
