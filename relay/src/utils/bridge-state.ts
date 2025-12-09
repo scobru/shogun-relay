@@ -80,7 +80,7 @@ export async function getUserBalance(
 ): Promise<bigint> {
   try {
     const indexKey = userAddress.toLowerCase();
-    
+
     log.info({ user: indexKey }, "Looking up balance");
 
     // Get latest frozen entry for this user
@@ -107,7 +107,11 @@ export async function getUserBalance(
       return 0n;
     }
 
-    const balanceData = entry.data as { balance?: string; user?: string; ethereumAddress?: string };
+    const balanceData = entry.data as {
+      balance?: string;
+      user?: string;
+      ethereumAddress?: string;
+    };
 
     log.info(
       {
@@ -125,7 +129,10 @@ export async function getUserBalance(
 
     try {
       const balance = BigInt(balanceData.balance);
-      log.info({ user: indexKey, balance: balance.toString() }, "Balance retrieved successfully");
+      log.info(
+        { user: indexKey, balance: balance.toString() },
+        "Balance retrieved successfully"
+      );
       return balance;
     } catch (error) {
       throw new Error(`Invalid balance format: ${error}`);
@@ -167,7 +174,7 @@ export async function creditBalance(
   try {
     // Normalize Ethereum address
     const ethereumAddress = userAddress.toLowerCase();
-    
+
     log.info(
       { user: ethereumAddress, amount: amount.toString() },
       "Crediting balance"
@@ -185,7 +192,7 @@ export async function creditBalance(
       // Get current balance (by Ethereum address)
       // Wait a bit if retrying to allow GunDB to propagate previous updates
       if (retryCount > 0) {
-        await new Promise(resolve => setTimeout(resolve, 100 * retryCount)); // Exponential backoff
+        await new Promise((resolve) => setTimeout(resolve, 100 * retryCount)); // Exponential backoff
       }
 
       const currentBalance = await getUserBalance(gun, ethereumAddress);
@@ -193,7 +200,7 @@ export async function creditBalance(
         initialBalance = currentBalance; // Capture initial balance on first attempt
       }
       const newBalance = currentBalance + amount;
-      
+
       log.info(
         {
           user: ethereumAddress,
@@ -218,10 +225,7 @@ export async function creditBalance(
         balanceData.gunPubKey = gunPubKey;
       }
 
-      log.info(
-        { user: ethereumAddress, balanceData },
-        "Creating frozen entry"
-      );
+      log.info({ user: ethereumAddress, balanceData }, "Creating frozen entry");
 
       // Create frozen entry (immutable, signed)
       // Use Ethereum address as index key (deposits come with Ethereum address)
@@ -233,17 +237,17 @@ export async function creditBalance(
         "bridge-balances",
         indexKey
       );
-      
+
       log.info({ user: indexKey }, "Frozen entry created successfully");
-      
+
       // Verify the entry was created and balance is correct
       // Wait a bit for GunDB to propagate the update
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
       const verifyBalance = await getUserBalance(gun, ethereumAddress);
       log.info(
-        { 
-          user: ethereumAddress, 
+        {
+          user: ethereumAddress,
           expectedBalance: newBalance.toString(),
           actualBalance: verifyBalance.toString(),
           retryAttempt: retryCount + 1,
@@ -288,9 +292,9 @@ export async function creditBalance(
     if (!success) {
       // Final verification after all retries
       // Check if balance increased at least by the amount we're crediting
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
       const finalBalance = await getUserBalance(gun, ethereumAddress);
-      
+
       if (finalBalance >= initialBalance + amount) {
         // Balance was eventually updated correctly (might be higher due to concurrent deposits)
         success = true;
@@ -305,11 +309,16 @@ export async function creditBalance(
           "Balance eventually updated correctly after retries"
         );
       } else {
-        throw new Error(`Failed to credit balance after ${maxRetries} retries. Initial: ${initialBalance.toString()}, Final: ${finalBalance.toString()}, Expected at least: ${(initialBalance + amount).toString()}`);
+        throw new Error(
+          `Failed to credit balance after ${maxRetries} retries. Initial: ${initialBalance.toString()}, Final: ${finalBalance.toString()}, Expected at least: ${(initialBalance + amount).toString()}`
+        );
       }
     }
   } catch (error) {
-    log.error({ error, user: userAddress, amount: amount.toString() }, "Error crediting balance");
+    log.error(
+      { error, user: userAddress, amount: amount.toString() },
+      "Error crediting balance"
+    );
     throw new Error(`Failed to credit balance: ${error}`);
   }
 }
@@ -368,14 +377,14 @@ export async function debitBalance(
 
 /**
  * Verify dual signatures: SEA (GunDB) + Ethereum (Wallet)
- * 
+ *
  * SECURITY: This ensures the user controls both:
  * 1. The GunDB keypair (derived from Ethereum address)
  * 2. The Ethereum wallet (that owns the balance)
- * 
+ *
  * The message must include: ethereumAddress, to (if transfer), amount, timestamp, nonce
  * to prevent replay attacks and ensure message integrity.
- * 
+ *
  * @param message - The plain message that was signed (must be JSON string with required fields)
  * @param seaSignature - SEA signature from GunDB keypair (signs the message)
  * @param ethSignature - Ethereum signature (EIP-191) from wallet (signs the message)
@@ -390,7 +399,12 @@ export async function verifyDualSignatures(
   ethSignature: string,
   ethAddress: string,
   gunPubKey: string,
-  expectedFields?: { to?: string; amount?: string; timestamp?: number; nonce?: string }
+  expectedFields?: {
+    to?: string;
+    amount?: string;
+    timestamp?: number;
+    nonce?: string;
+  }
 ): Promise<{ ethereumAddress: string; [key: string]: any } | null> {
   try {
     // 1. Verify SEA signature (GunDB keypair)
@@ -406,55 +420,57 @@ export async function verifyDualSignatures(
     // CRITICAL: JSON.stringify may produce different key order, so we compare parsed objects
     let seaDataObj: any;
     let messageObj: any;
-    
+
     try {
-      seaDataObj = typeof seaVerified === 'string' 
-        ? JSON.parse(seaVerified) 
-        : seaVerified;
+      seaDataObj =
+        typeof seaVerified === "string" ? JSON.parse(seaVerified) : seaVerified;
     } catch {
       // If not JSON, treat as plain string
       seaDataObj = seaVerified;
     }
-    
+
     try {
-      messageObj = typeof message === 'string' 
-        ? JSON.parse(message) 
-        : message;
+      messageObj = typeof message === "string" ? JSON.parse(message) : message;
     } catch {
       // If not JSON, treat as plain string
       messageObj = message;
     }
-    
+
     // Compare objects by deep equality (not string comparison)
     // This handles cases where JSON.stringify produces different key orders
     function deepEqual(obj1: any, obj2: any): boolean {
       if (obj1 === obj2) return true;
-      
+
       if (obj1 == null || obj2 == null) return false;
       if (typeof obj1 !== typeof obj2) return false;
-      
-      if (typeof obj1 !== 'object') {
+
+      if (typeof obj1 !== "object") {
         return obj1 === obj2;
       }
-      
+
       // Both are objects - compare keys and values
       const keys1 = Object.keys(obj1).sort();
       const keys2 = Object.keys(obj2).sort();
-      
+
       if (keys1.length !== keys2.length) return false;
-      
+
       for (let i = 0; i < keys1.length; i++) {
         if (keys1[i] !== keys2[i]) return false;
         if (!deepEqual(obj1[keys1[i]], obj2[keys2[i]])) return false;
       }
-      
+
       return true;
     }
-    
+
     // Compare objects using deep equality
-    if (typeof seaDataObj === 'object' && typeof messageObj === 'object' && 
-        seaDataObj !== null && messageObj !== null && 
-        !Array.isArray(seaDataObj) && !Array.isArray(messageObj)) {
+    if (
+      typeof seaDataObj === "object" &&
+      typeof messageObj === "object" &&
+      seaDataObj !== null &&
+      messageObj !== null &&
+      !Array.isArray(seaDataObj) &&
+      !Array.isArray(messageObj)
+    ) {
       if (!deepEqual(seaDataObj, messageObj)) {
         log.warn(
           {
@@ -468,13 +484,13 @@ export async function verifyDualSignatures(
       }
     } else {
       // If one is not an object, compare as strings
-      const seaData = typeof seaVerified === 'string' 
-        ? seaVerified 
-        : JSON.stringify(seaVerified);
-      const normalizedMessage = typeof message === 'string' 
-        ? message 
-        : JSON.stringify(message);
-      
+      const seaData =
+        typeof seaVerified === "string"
+          ? seaVerified
+          : JSON.stringify(seaVerified);
+      const normalizedMessage =
+        typeof message === "string" ? message : JSON.stringify(message);
+
       if (seaData !== normalizedMessage) {
         log.warn(
           {
@@ -500,7 +516,7 @@ export async function verifyDualSignatures(
       log.warn({ ethAddress, error }, "Ethereum signature verification failed");
       return null;
     }
-    
+
     // Check that recovered address matches the provided address
     if (recoveredAddress.toLowerCase() !== ethAddress.toLowerCase()) {
       log.warn(
@@ -517,39 +533,52 @@ export async function verifyDualSignatures(
     // 3. Parse and validate message content
     let messageData: { ethereumAddress?: string; [key: string]: any };
     try {
-      messageData = typeof seaVerified === 'string' 
-        ? JSON.parse(seaVerified) 
-        : seaVerified;
+      messageData =
+        typeof seaVerified === "string" ? JSON.parse(seaVerified) : seaVerified;
     } catch {
       // If not JSON, treat as plain string (less secure, but backward compatible)
       messageData = { ethereumAddress: ethAddress };
     }
 
     // Verify ethereumAddress in message matches
-    if (!messageData.ethereumAddress || 
-        messageData.ethereumAddress.toLowerCase() !== ethAddress.toLowerCase()) {
+    if (
+      !messageData.ethereumAddress ||
+      messageData.ethereumAddress.toLowerCase() !== ethAddress.toLowerCase()
+    ) {
       return null;
     }
 
     // 4. Validate expected fields (if provided)
     if (expectedFields) {
-      if (expectedFields.to && messageData.to?.toLowerCase() !== expectedFields.to.toLowerCase()) {
+      if (
+        expectedFields.to &&
+        messageData.to?.toLowerCase() !== expectedFields.to.toLowerCase()
+      ) {
         log.warn(
           { expectedTo: expectedFields.to, actualTo: messageData.to },
           "To field mismatch"
         );
         return null;
       }
-      if (expectedFields.amount && messageData.amount !== expectedFields.amount) {
+      if (
+        expectedFields.amount &&
+        messageData.amount !== expectedFields.amount
+      ) {
         log.warn(
-          { expectedAmount: expectedFields.amount, actualAmount: messageData.amount },
+          {
+            expectedAmount: expectedFields.amount,
+            actualAmount: messageData.amount,
+          },
           "Amount field mismatch"
         );
         return null;
       }
       if (expectedFields.nonce && messageData.nonce !== expectedFields.nonce) {
         log.warn(
-          { expectedNonce: expectedFields.nonce, actualNonce: messageData.nonce },
+          {
+            expectedNonce: expectedFields.nonce,
+            actualNonce: messageData.nonce,
+          },
           "Nonce field mismatch"
         );
         return null;
@@ -557,9 +586,10 @@ export async function verifyDualSignatures(
       // Timestamp validation: must be recent (within 1 hour) to prevent replay
       // Use the message timestamp as the reference point, not the server time
       if (expectedFields.timestamp !== undefined && messageData.timestamp) {
-        const messageTime = typeof messageData.timestamp === 'number' 
-          ? messageData.timestamp 
-          : parseInt(messageData.timestamp);
+        const messageTime =
+          typeof messageData.timestamp === "number"
+            ? messageData.timestamp
+            : parseInt(messageData.timestamp);
         const now = expectedFields.timestamp; // Use provided timestamp (server time) as reference
         const maxAge = 60 * 60 * 1000; // 1 hour
         const timeDiff = Math.abs(now - messageTime);
@@ -645,7 +675,9 @@ export async function transferBalance(
     );
 
     if (!verifiedMessage) {
-      throw new Error("Invalid signatures or message content mismatch: must provide valid SEA and Ethereum signatures with correct message content");
+      throw new Error(
+        "Invalid signatures or message content mismatch: must provide valid SEA and Ethereum signatures with correct message content"
+      );
     }
 
     // Get current balances (by Ethereum address)
@@ -749,8 +781,10 @@ export async function addPendingWithdrawal(
     // Use individual nodes: bridge/withdrawals/pending/{userAddress}:{nonce}
     // This avoids GunDB array handling issues
     const withdrawalKey = `${withdrawal.user.toLowerCase()}:${withdrawal.nonce}`;
-    const withdrawalNode = gun.get("bridge/withdrawals/pending").get(withdrawalKey);
-    
+    const withdrawalNode = gun
+      .get("bridge/withdrawals/pending")
+      .get(withdrawalKey);
+
     const timeout = setTimeout(() => {
       reject(new Error("Timeout waiting for GunDB response"));
     }, 10000); // 10 second timeout
@@ -761,7 +795,12 @@ export async function addPendingWithdrawal(
       // Check if withdrawal already exists
       withdrawalNode.once((existing: PendingWithdrawal | null | undefined) => {
         try {
-          if (existing && typeof existing === 'object' && existing.user && existing.nonce) {
+          if (
+            existing &&
+            typeof existing === "object" &&
+            existing.user &&
+            existing.nonce
+          ) {
             log.warn(
               { withdrawal, existing },
               "Withdrawal with this nonce already exists"
@@ -797,7 +836,11 @@ export async function addPendingWithdrawal(
             { error: innerError, withdrawal },
             "Error processing pending withdrawal"
           );
-          reject(innerError instanceof Error ? innerError : new Error(String(innerError)));
+          reject(
+            innerError instanceof Error
+              ? innerError
+              : new Error(String(innerError))
+          );
         }
       });
     } catch (outerError) {
@@ -806,7 +849,9 @@ export async function addPendingWithdrawal(
         { error: outerError, withdrawal },
         "Error setting up pending withdrawal listener"
       );
-      reject(outerError instanceof Error ? outerError : new Error(String(outerError)));
+      reject(
+        outerError instanceof Error ? outerError : new Error(String(outerError))
+      );
     }
   });
 }
@@ -820,101 +865,118 @@ export async function getPendingWithdrawals(
   return new Promise((resolve, reject) => {
     const withdrawalsPath = "bridge/withdrawals/pending";
     const timeout = setTimeout(() => {
-      reject(new Error("Timeout waiting for GunDB response"));
+      if (!resolved) {
+        resolved = true;
+        // Resolve with whatever we collected so far
+        const normalized = withdrawals.filter(
+          (w): w is PendingWithdrawal =>
+            w &&
+            typeof w === "object" &&
+            typeof w.user === "string" &&
+            typeof w.amount === "string" &&
+            typeof w.nonce === "string" &&
+            typeof w.timestamp === "number"
+        );
+        log.info(
+          { totalFound: withdrawals.length, normalized: normalized.length },
+          "Retrieved pending withdrawals (timeout)"
+        );
+        resolve(normalized);
+      }
     }, 10000);
 
     const withdrawals: PendingWithdrawal[] = [];
-    let checkCount = 0;
     let resolved = false;
+    let mapSubscription: any = null;
 
     const cleanup = () => {
       clearTimeout(timeout);
+      if (mapSubscription) {
+        try {
+          gun.get(withdrawalsPath).map().off();
+        } catch (e) {
+          // Ignore unsubscribe errors
+        }
+      }
       resolved = true;
     };
 
-    // First, try reading as an object to get all child nodes
+    // First, try reading the parent node directly (for backward compatibility and immediate data)
     const parentNode = gun.get(withdrawalsPath);
-    
-    // Use map to iterate through all child nodes
-    parentNode.map().on((withdrawal: PendingWithdrawal | null, key: string) => {
-      if (resolved) return;
-      
-      // Skip metadata keys
-      if (key === '_' || key.startsWith('_')) {
-        return;
-      }
 
-      // Skip 'list' key (old format)
-      if (key === 'list') {
-        return;
-      }
+    // Use map to iterate through all child nodes (one-time collection)
+    const collectedKeys = new Set<string>();
+    mapSubscription = parentNode
+      .map()
+      .on((withdrawal: PendingWithdrawal | null, key: string) => {
+        if (resolved) return;
 
-      // Validate withdrawal object
-      if (
-        withdrawal &&
-        typeof withdrawal === 'object' &&
-        typeof withdrawal.user === 'string' &&
-        typeof withdrawal.amount === 'string' &&
-        typeof withdrawal.nonce === 'string' &&
-        typeof withdrawal.timestamp === 'number'
-      ) {
-        // Check if already added (deduplicate)
-        const exists = withdrawals.some(
-          (w) =>
-            w.user.toLowerCase() === withdrawal.user.toLowerCase() &&
-            w.nonce === withdrawal.nonce
-        );
-
-        if (!exists) {
-          withdrawals.push(withdrawal as PendingWithdrawal);
-          log.info(
-            { key, withdrawal, total: withdrawals.length },
-            "Found pending withdrawal node"
-          );
+        // Skip metadata keys
+        if (key === "_" || key.startsWith("_")) {
+          return;
         }
-      }
 
-      checkCount++;
-    });
+        // Skip 'list' key (old format)
+        if (key === "list") {
+          return;
+        }
+
+        // Skip if we've already processed this key
+        if (collectedKeys.has(key)) {
+          return;
+        }
+        collectedKeys.add(key);
+
+        // Validate withdrawal object
+        if (
+          withdrawal &&
+          typeof withdrawal === "object" &&
+          typeof withdrawal.user === "string" &&
+          typeof withdrawal.amount === "string" &&
+          typeof withdrawal.nonce === "string" &&
+          typeof withdrawal.timestamp === "number"
+        ) {
+          // Check if already added (deduplicate)
+          const exists = withdrawals.some(
+            (w) =>
+              w.user.toLowerCase() === withdrawal.user.toLowerCase() &&
+              w.nonce === withdrawal.nonce
+          );
+
+          if (!exists) {
+            withdrawals.push(withdrawal as PendingWithdrawal);
+            log.info(
+              { key, withdrawal, total: withdrawals.length },
+              "Found pending withdrawal node"
+            );
+          }
+        }
+      });
 
     // Also try reading the parent node directly (for backward compatibility)
-    parentNode.once((data: Record<string, PendingWithdrawal> | PendingWithdrawal[] | { list?: PendingWithdrawal[] } | null | undefined) => {
-      if (resolved) return;
+    parentNode.once(
+      (
+        data:
+          | Record<string, PendingWithdrawal>
+          | PendingWithdrawal[]
+          | { list?: PendingWithdrawal[] }
+          | null
+          | undefined
+      ) => {
+        if (resolved) return;
 
-      try {
-        // Handle different data formats for backward compatibility
-        if (Array.isArray(data)) {
-          // Old format: direct array
-          data.forEach((w) => {
-            if (
-              w &&
-              typeof w === 'object' &&
-              typeof w.user === 'string' &&
-              typeof w.amount === 'string' &&
-              typeof w.nonce === 'string' &&
-              typeof w.timestamp === 'number'
-            ) {
-              const exists = withdrawals.some(
-                (w2) =>
-                  w2.user.toLowerCase() === w.user.toLowerCase() &&
-                  w2.nonce === w.nonce
-              );
-              if (!exists) {
-                withdrawals.push(w as PendingWithdrawal);
-              }
-            }
-          });
-        } else if (data && typeof data === 'object') {
-          // Check for old format: { list: [...] }
-          if ('list' in data && Array.isArray(data.list)) {
-            data.list.forEach((w) => {
+        try {
+          // Handle different data formats for backward compatibility
+          if (Array.isArray(data)) {
+            // Old format: direct array
+            data.forEach((w) => {
               if (
                 w &&
-                typeof w === 'object' &&
-                typeof w.user === 'string' &&
-                typeof w.amount === 'string' &&
-                typeof w.nonce === 'string' &&
-                typeof w.timestamp === 'number'
+                typeof w === "object" &&
+                typeof w.user === "string" &&
+                typeof w.amount === "string" &&
+                typeof w.nonce === "string" &&
+                typeof w.timestamp === "number"
               ) {
                 const exists = withdrawals.some(
                   (w2) =>
@@ -926,67 +988,87 @@ export async function getPendingWithdrawals(
                 }
               }
             });
-          } else {
-            // New format: individual nodes { "user:nonce": withdrawal, ... }
-            for (const [key, value] of Object.entries(data)) {
-              if (key === '_' || key.startsWith('_') || key === 'list') {
-                continue;
-              }
+          } else if (data && typeof data === "object") {
+            // Check for old format: { list: [...] }
+            if ("list" in data && Array.isArray(data.list)) {
+              data.list.forEach((w) => {
+                if (
+                  w &&
+                  typeof w === "object" &&
+                  typeof w.user === "string" &&
+                  typeof w.amount === "string" &&
+                  typeof w.nonce === "string" &&
+                  typeof w.timestamp === "number"
+                ) {
+                  const exists = withdrawals.some(
+                    (w2) =>
+                      w2.user.toLowerCase() === w.user.toLowerCase() &&
+                      w2.nonce === w.nonce
+                  );
+                  if (!exists) {
+                    withdrawals.push(w as PendingWithdrawal);
+                  }
+                }
+              });
+            } else {
+              // New format: individual nodes { "user:nonce": withdrawal, ... }
+              for (const [key, value] of Object.entries(data)) {
+                if (key === "_" || key.startsWith("_") || key === "list") {
+                  continue;
+                }
 
-              if (
-                value &&
-                typeof value === 'object' &&
-                typeof value.user === 'string' &&
-                typeof value.amount === 'string' &&
-                typeof value.nonce === 'string' &&
-                typeof value.timestamp === 'number'
-              ) {
-                const exists = withdrawals.some(
-                  (w) =>
-                    w.user.toLowerCase() === value.user.toLowerCase() &&
-                    w.nonce === value.nonce
-                );
-                if (!exists) {
-                  withdrawals.push(value as PendingWithdrawal);
+                if (
+                  value &&
+                  typeof value === "object" &&
+                  typeof value.user === "string" &&
+                  typeof value.amount === "string" &&
+                  typeof value.nonce === "string" &&
+                  typeof value.timestamp === "number"
+                ) {
+                  const exists = withdrawals.some(
+                    (w) =>
+                      w.user.toLowerCase() === value.user.toLowerCase() &&
+                      w.nonce === value.nonce
+                  );
+                  if (!exists) {
+                    withdrawals.push(value as PendingWithdrawal);
+                  }
                 }
               }
             }
           }
-        }
 
-        // Wait a bit to let .map() collect all nodes, then resolve
-        setTimeout(() => {
+          // Wait a bit to let .map() collect all nodes, then resolve
+          setTimeout(() => {
+            if (resolved) return;
+
+            // Normalize and filter withdrawals
+            const normalized = withdrawals.filter(
+              (w): w is PendingWithdrawal =>
+                w &&
+                typeof w === "object" &&
+                typeof w.user === "string" &&
+                typeof w.amount === "string" &&
+                typeof w.nonce === "string" &&
+                typeof w.timestamp === "number"
+            );
+
+            log.info(
+              { totalFound: withdrawals.length, normalized: normalized.length },
+              "Retrieved pending withdrawals"
+            );
+
+            cleanup();
+            resolve(normalized);
+          }, 1000); // Give GunDB time to propagate (increased from 500ms)
+        } catch (error) {
           if (resolved) return;
-
-          // Normalize and filter withdrawals
-          const normalized = withdrawals.filter(
-            (w): w is PendingWithdrawal =>
-              w &&
-              typeof w === 'object' &&
-              typeof w.user === 'string' &&
-              typeof w.amount === 'string' &&
-              typeof w.nonce === 'string' &&
-              typeof w.timestamp === 'number'
-          );
-
-          log.info(
-            { totalFound: withdrawals.length, normalized: normalized.length, checkCount },
-            "Retrieved pending withdrawals"
-          );
-
           cleanup();
-          resolve(normalized);
-        }, 500); // Give GunDB time to propagate
-      } catch (error) {
-        if (resolved) return;
-        cleanup();
-        log.error(
-          { error, data },
-          "Error retrieving pending withdrawals"
-        );
-        reject(error instanceof Error ? error : new Error(String(error)));
+          log.error({ error, data }, "Error retrieving pending withdrawals");
+          reject(error instanceof Error ? error : new Error(String(error)));
+        }
       }
-    });
+    );
   });
 }
 
@@ -1014,10 +1096,11 @@ export async function removePendingWithdrawals(
 
     const deleteNode = (key: string, index: number) => {
       const withdrawalNode = gun.get(withdrawalsPath).get(key);
-      
+
       withdrawalNode.put(null, (ack: GunMessagePut) => {
         if (ack && "err" in ack && ack.err) {
-          const errorMsg = typeof ack.err === "string" ? ack.err : String(ack.err);
+          const errorMsg =
+            typeof ack.err === "string" ? ack.err : String(ack.err);
           errors.push(`Error deleting ${key}: ${errorMsg}`);
         } else {
           deleted++;
@@ -1031,15 +1114,14 @@ export async function removePendingWithdrawals(
         if (deleted + errors.length === toRemoveKeys.size) {
           clearTimeout(timeout);
           if (errors.length > 0) {
-            log.warn(
-              { errors, deleted },
-              "Some withdrawals failed to delete"
-            );
+            log.warn({ errors, deleted }, "Some withdrawals failed to delete");
             // Still resolve if at least some were deleted
             if (deleted > 0) {
               resolve();
             } else {
-              reject(new Error(`Failed to delete withdrawals: ${errors.join(', ')}`));
+              reject(
+                new Error(`Failed to delete withdrawals: ${errors.join(", ")}`)
+              );
             }
           } else {
             log.info(
