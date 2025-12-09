@@ -231,31 +231,48 @@ export function createBridgeClient(config: BridgeConfig) {
 
       // Helper to extract event data from either parsed EventLog or raw args
       const extractEventData = (eventOrArgs: any): { user: string; amount: bigint; timestamp: bigint; log: ethers.Log } | null => {
-        // If it's a parsed EventLog with args
-        if (eventOrArgs && typeof eventOrArgs === 'object' && 'args' in eventOrArgs && eventOrArgs.args) {
-          const args = eventOrArgs.args;
-          if (Array.isArray(args) && args.length >= 3) {
-            // Check if there's a nested log object (from contract.on format)
-            // Use nested log if it exists and has transactionHash, otherwise use event itself
-            let log: ethers.Log;
-            if (eventOrArgs.log && typeof eventOrArgs.log === 'object' && 'transactionHash' in eventOrArgs.log) {
-              log = eventOrArgs.log as ethers.Log;
-            } else if ('transactionHash' in eventOrArgs) {
-              log = eventOrArgs as ethers.Log;
-            } else {
-              // Fallback: try to find log in the object
-              log = eventOrArgs as ethers.Log;
-            }
-            return {
-              user: args[0],
-              amount: args[1],
-              timestamp: args[2],
-              log,
-            };
+        if (!eventOrArgs || typeof eventOrArgs !== 'object') {
+          return null;
+        }
+
+        // First, try to find the actual log object with transactionHash
+        let actualLog: ethers.Log | null = null;
+        
+        // Check if eventOrArgs itself is a log object
+        if ('transactionHash' in eventOrArgs && typeof eventOrArgs.transactionHash === 'string') {
+          actualLog = eventOrArgs as ethers.Log;
+        }
+        // Check if there's a nested log property
+        else if (eventOrArgs.log && typeof eventOrArgs.log === 'object' && 'transactionHash' in eventOrArgs.log) {
+          actualLog = eventOrArgs.log as ethers.Log;
+        }
+        // Check if there's a nested event.log structure
+        else if (eventOrArgs.event && typeof eventOrArgs.event === 'object' && eventOrArgs.event.log) {
+          const nestedLog = eventOrArgs.event.log;
+          if (nestedLog && typeof nestedLog === 'object' && 'transactionHash' in nestedLog) {
+            actualLog = nestedLog as ethers.Log;
           }
         }
-        // If it's the raw log event (from contract.on with multiple args)
-        // This case is handled by the listener signature below
+
+        // Now extract args - could be in args property or directly in eventOrArgs
+        let args: any[] | null = null;
+        
+        if (eventOrArgs.args && Array.isArray(eventOrArgs.args) && eventOrArgs.args.length >= 3) {
+          args = eventOrArgs.args;
+        } else if (Array.isArray(eventOrArgs) && eventOrArgs.length >= 3) {
+          args = eventOrArgs;
+        }
+
+        // If we have both args and log, return the extracted data
+        if (args && actualLog) {
+          return {
+            user: args[0],
+            amount: args[1],
+            timestamp: args[2],
+            log: actualLog,
+          };
+        }
+
         return null;
       };
 
@@ -313,6 +330,19 @@ export function createBridgeClient(config: BridgeConfig) {
             if (nestedLog && typeof nestedLog === 'object' && 'transactionHash' in nestedLog) {
               event = nestedLog as ethers.Log;
             }
+          } else {
+            // Last resort: check if the original args[0] has a log property we missed
+            if (args.length > 0 && args[0] && typeof args[0] === 'object') {
+              const firstArg = args[0] as any;
+              if (firstArg.log && typeof firstArg.log === 'object' && 'transactionHash' in firstArg.log) {
+                event = firstArg.log as ethers.Log;
+              } else if (firstArg.event && typeof firstArg.event === 'object' && firstArg.event.log) {
+                const nestedLog = firstArg.event.log;
+                if (nestedLog && typeof nestedLog === 'object' && 'transactionHash' in nestedLog) {
+                  event = nestedLog as ethers.Log;
+                }
+              }
+            }
           }
         }
         
@@ -358,6 +388,17 @@ export function createBridgeClient(config: BridgeConfig) {
             return;
           }
 
+          // Final check: if transactionHash is still not found, try one more time to extract from nested structure
+          if (!event || typeof event !== 'object' || !('transactionHash' in event)) {
+            // Last resort: check if args[0] has the log we need
+            if (args.length > 0 && args[0] && typeof args[0] === 'object') {
+              const firstArg = args[0] as any;
+              if (firstArg.log && typeof firstArg.log === 'object' && 'transactionHash' in firstArg.log) {
+                event = firstArg.log as ethers.Log;
+              }
+            }
+          }
+
           // Validate transactionHash - should be available after normalization
           if (!event || typeof event !== 'object' || !('transactionHash' in event) || typeof event.transactionHash !== 'string') {
             log.error(
@@ -366,6 +407,8 @@ export function createBridgeClient(config: BridgeConfig) {
                 amount: amount.toString(), 
                 eventKeys: event ? Object.keys(event) : [],
                 eventType: event ? typeof event : 'null',
+                argsLength: args.length,
+                firstArgKeys: args.length > 0 && args[0] && typeof args[0] === 'object' ? Object.keys(args[0]) : [],
                 event 
               },
               "Invalid transactionHash in deposit event - event does not have transactionHash after normalization"
