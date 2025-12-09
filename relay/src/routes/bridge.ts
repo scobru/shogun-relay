@@ -518,7 +518,16 @@ router.post("/submit-batch", express.json(), async (req, res) => {
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    log.error({ error }, "Error in submit-batch endpoint");
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    log.error(
+      { 
+        error, 
+        errorMessage, 
+        errorStack,
+        pendingCount: pending?.length || 0,
+      },
+      "Error in submit-batch endpoint"
+    );
     res.status(500).json({
       success: false,
       error: errorMessage,

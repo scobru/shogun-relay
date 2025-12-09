@@ -1160,12 +1160,37 @@ export async function saveBatch(
   return new Promise((resolve, reject) => {
     const batchPath = `bridge/batches/${batch.batchId}`;
 
-    gun.get(batchPath).put(batch, (ack: GunMessagePut) => {
+    // Convert withdrawals array to object for GunDB compatibility
+    // GunDB has issues with arrays, so we store as { "0": withdrawal0, "1": withdrawal1, ... }
+    const withdrawalsObj: Record<string, PendingWithdrawal> = {};
+    batch.withdrawals.forEach((w, index) => {
+      withdrawalsObj[index.toString()] = w;
+    });
+
+    const batchData = {
+      batchId: batch.batchId,
+      root: batch.root,
+      withdrawals: withdrawalsObj,
+      withdrawalsCount: batch.withdrawals.length, // Store count for easy retrieval
+      timestamp: batch.timestamp,
+      blockNumber: batch.blockNumber,
+      txHash: batch.txHash,
+    };
+
+    gun.get(batchPath).put(batchData, (ack: GunMessagePut) => {
       if (ack && "err" in ack && ack.err) {
         const errorMsg =
           typeof ack.err === "string" ? ack.err : String(ack.err);
+        log.error(
+          { error: errorMsg, batchPath, batchId: batch.batchId },
+          "Error saving batch to GunDB"
+        );
         reject(new Error(errorMsg));
       } else {
+        log.info(
+          { batchId: batch.batchId, withdrawalCount: batch.withdrawals.length },
+          "Batch saved to GunDB"
+        );
         resolve();
       }
     });
@@ -1181,9 +1206,46 @@ export async function getBatch(
 ): Promise<Batch | null> {
   return new Promise((resolve) => {
     const batchPath = `bridge/batches/${batchId}`;
+    const timeout = setTimeout(() => {
+      log.warn({ batchPath }, "Timeout waiting for GunDB response in getBatch");
+      resolve(null);
+    }, 10000);
 
-    gun.get(batchPath).once((data: Batch | null) => {
-      resolve(data);
+    gun.get(batchPath).once((data: any) => {
+      clearTimeout(timeout);
+      if (!data) {
+        resolve(null);
+        return;
+      }
+
+      // Convert withdrawals object back to array
+      let withdrawals: PendingWithdrawal[] = [];
+      if (data.withdrawals) {
+        if (Array.isArray(data.withdrawals)) {
+          // Backward compatibility: if it's already an array, use it
+          withdrawals = data.withdrawals;
+        } else if (typeof data.withdrawals === 'object') {
+          // Convert object { "0": w0, "1": w1, ... } to array
+          const withdrawalsObj = data.withdrawals;
+          const indices = Object.keys(withdrawalsObj)
+            .filter(key => /^\d+$/.test(key)) // Only numeric keys
+            .map(key => parseInt(key, 10))
+            .sort((a, b) => a - b);
+          
+          withdrawals = indices.map(index => withdrawalsObj[index.toString()]).filter(Boolean);
+        }
+      }
+
+      const batch: Batch = {
+        batchId: data.batchId,
+        root: data.root,
+        withdrawals,
+        timestamp: data.timestamp,
+        blockNumber: data.blockNumber,
+        txHash: data.txHash,
+      };
+
+      resolve(batch);
     });
   });
 }
@@ -1222,12 +1284,38 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
         batch &&
         typeof batch === 'object' &&
         typeof batch.batchId === 'string' &&
-        typeof batch.root === 'string' &&
-        Array.isArray(batch.withdrawals)
+        typeof batch.root === 'string'
       ) {
-        batches.push(batch as Batch);
+        // Convert withdrawals object back to array if needed
+        let withdrawals: PendingWithdrawal[] = [];
+        if (batch.withdrawals) {
+          if (Array.isArray(batch.withdrawals)) {
+            // Backward compatibility: if it's already an array, use it
+            withdrawals = batch.withdrawals;
+          } else if (typeof batch.withdrawals === 'object') {
+            // Convert object { "0": w0, "1": w1, ... } to array
+            const withdrawalsObj = batch.withdrawals;
+            const indices = Object.keys(withdrawalsObj)
+              .filter(key => /^\d+$/.test(key)) // Only numeric keys
+              .map(key => parseInt(key, 10))
+              .sort((a, b) => a - b);
+            
+            withdrawals = indices.map(index => withdrawalsObj[index.toString()]).filter(Boolean);
+          }
+        }
+
+        const normalizedBatch: Batch = {
+          batchId: batch.batchId,
+          root: batch.root,
+          withdrawals,
+          timestamp: batch.timestamp,
+          blockNumber: batch.blockNumber,
+          txHash: batch.txHash,
+        };
+
+        batches.push(normalizedBatch);
         log.info(
-          { key, batchId: batch.batchId, withdrawalCount: batch.withdrawals.length },
+          { key, batchId: batch.batchId, withdrawalCount: withdrawals.length },
           "Found batch node"
         );
       }
