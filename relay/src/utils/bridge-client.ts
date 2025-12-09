@@ -325,19 +325,52 @@ export function createBridgeClient(config: BridgeConfig) {
             return;
           }
 
-          // Validate event has required fields
-          if (!event.blockNumber || event.blockNumber === null) {
+          // Validate transactionHash
+          if (!event.transactionHash || typeof event.transactionHash !== 'string') {
             log.error(
-              { user: normalizedUser, amount: amount.toString(), txHash: event.transactionHash },
-              "Invalid blockNumber in deposit event"
+              { user: normalizedUser, amount: amount.toString(), event },
+              "Invalid transactionHash in deposit event"
             );
             return;
           }
 
-          if (!event.transactionHash || typeof event.transactionHash !== 'string') {
+          // Get blockNumber - may be null for pending events, try to get from receipt
+          let blockNumber: number | null = event.blockNumber ?? null;
+          
+          // If blockNumber is null or undefined, try to get it from the transaction receipt
+          if (blockNumber === null || blockNumber === undefined) {
+            try {
+              const receipt = await provider.getTransactionReceipt(event.transactionHash);
+              if (receipt && receipt.blockNumber !== null) {
+                blockNumber = receipt.blockNumber;
+                log.info(
+                  { user: normalizedUser, txHash: event.transactionHash, blockNumber },
+                  "Retrieved blockNumber from transaction receipt"
+                );
+              }
+            } catch (error) {
+              log.warn(
+                { user: normalizedUser, txHash: event.transactionHash, error },
+                "Could not retrieve blockNumber from receipt, event may be pending"
+              );
+            }
+          }
+
+          // If still no blockNumber, this might be a pending event - skip it for now
+          // It will be processed again when the block is confirmed
+          if (blockNumber === null || blockNumber === undefined) {
+            log.info(
+              { user: normalizedUser, amount: amount.toString(), txHash: event.transactionHash },
+              "Skipping deposit event with no blockNumber (likely pending)"
+            );
+            return;
+          }
+
+          // Validate blockNumber is a valid number
+          if (typeof blockNumber !== 'number' || isNaN(blockNumber) || blockNumber < 0) {
             log.error(
-              { user: normalizedUser, amount: amount.toString(), blockNumber: event.blockNumber },
-              "Invalid transactionHash in deposit event"
+              { user: normalizedUser, amount: amount.toString(), txHash: event.transactionHash, blockNumber },
+              "Invalid blockNumber value in deposit event"
             );
             return;
           }
@@ -346,7 +379,7 @@ export function createBridgeClient(config: BridgeConfig) {
             user: normalizedUser,
             amount,
             timestamp,
-            blockNumber: event.blockNumber,
+            blockNumber,
             txHash: event.transactionHash,
           };
 
