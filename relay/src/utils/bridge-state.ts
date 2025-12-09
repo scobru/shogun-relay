@@ -1362,26 +1362,32 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
     const timeout = setTimeout(() => {
       log.warn({ batchesPath }, "Timeout waiting for GunDB response in getLatestBatch");
       resolve(null);
-    }, 10000); // 10 second timeout
+    }, 15000); // 15 second timeout
 
-    const batchIds: string[] = [];
+    const batchIdsMap = new Map<string, string>(); // key -> batchId
+    const collectedKeys = new Set<string>();
     let resolved = false;
+    let lastUpdateTime = Date.now();
 
     const cleanup = () => {
       clearTimeout(timeout);
       resolved = true;
     };
 
+    log.info({ batchesPath }, "Starting to read batches from GunDB");
+
     const parentNode = gun.get(batchesPath);
 
-    // Use map().once() to collect batch IDs
-    parentNode.map().once((batch: any, key: string) => {
+    // Use map().on() with a timeout to collect batch IDs more reliably
+    parentNode.map().on((batch: any, key: string) => {
       if (resolved) return;
 
       // Skip metadata keys
-      if (key === '_' || key.startsWith('_')) {
+      if (key === '_' || key.startsWith('_') || !key) {
         return;
       }
+
+      lastUpdateTime = Date.now();
 
       if (
         batch &&
@@ -1389,32 +1395,100 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
         typeof batch.batchId === 'string' &&
         typeof batch.root === 'string'
       ) {
-        batchIds.push(batch.batchId);
-        log.info(
-          { key, batchId: batch.batchId },
-          "Found batch ID"
-        );
+        if (!collectedKeys.has(key)) {
+          collectedKeys.add(key);
+          batchIdsMap.set(key, batch.batchId);
+          log.info(
+            { key, batchId: batch.batchId, totalFound: batchIdsMap.size },
+            "Found batch ID in GunDB"
+          );
+        }
       }
     });
 
-    // After a short delay, resolve the promise to ensure all .once() callbacks have fired
-    setTimeout(async () => {
+    // Also try reading the parent node directly to get immediate data
+    parentNode.once((parentData: any) => {
       if (resolved) return;
-      cleanup();
+      
+      log.info({ batchesPath, hasData: !!parentData, keys: parentData ? Object.keys(parentData).filter(k => !k.startsWith('_')) : [] }, "Read parent node directly");
+      
+      if (parentData && typeof parentData === 'object') {
+        Object.keys(parentData).forEach(key => {
+          if (key === '_' || key.startsWith('_')) return;
+          
+          const batch = parentData[key];
+          if (
+            batch &&
+            typeof batch === 'object' &&
+            typeof batch.batchId === 'string' &&
+            typeof batch.root === 'string'
+          ) {
+            if (!collectedKeys.has(key)) {
+              collectedKeys.add(key);
+              batchIdsMap.set(key, batch.batchId);
+              log.info(
+                { key, batchId: batch.batchId, source: 'direct-read', totalFound: batchIdsMap.size },
+                "Found batch ID via direct read"
+              );
+            }
+          }
+        });
+      }
+    });
+
+    // Wait for data to accumulate, with multiple checkpoints
+    const checkAndResolve = async () => {
+      if (resolved) return;
+
+      const timeSinceLastUpdate = Date.now() - lastUpdateTime;
+      const batchIds = Array.from(batchIdsMap.values());
+      
+      log.info(
+        { batchesPath, batchIdsCount: batchIds.length, batchIds, timeSinceLastUpdate },
+        "Checking batches collection status"
+      );
 
       if (batchIds.length === 0) {
-        log.info({ batchesPath }, "No batches found in GunDB");
+        // No batches found yet, wait a bit more
+        if (timeSinceLastUpdate < 3000) {
+          // Still actively receiving data, wait more
+          return;
+        }
+        // No batches found and no updates for 3 seconds
+        log.info({ batchesPath }, "No batches found in GunDB after waiting");
+        cleanup();
+        parentNode.off(); // Unsubscribe from all events
         resolve(null);
         return;
       }
+
+      // We have some batches, but wait a bit more to ensure we got them all
+      if (timeSinceLastUpdate < 2000) {
+        // Still receiving data, wait more
+        return;
+      }
+
+      // Data collection seems complete
+      cleanup();
+      parentNode.off(); // Unsubscribe from all events
+
+      log.info(
+        { batchesPath, batchIdsCount: batchIds.length, batchIds },
+        "Finished collecting batch IDs, fetching full batch data"
+      );
 
       // Fetch all batches using getBatch to properly read withdrawals
       const batchPromises = batchIds.map(id => getBatch(gun, id));
       const batches = await Promise.all(batchPromises);
       const validBatches = batches.filter((b): b is Batch => b !== null);
 
+      log.info(
+        { batchesPath, requestedCount: batchIds.length, validCount: validBatches.length },
+        "Fetched batch data from GunDB"
+      );
+
       if (validBatches.length === 0) {
-        log.info({ batchesPath }, "No valid batches found after fetching");
+        log.warn({ batchesPath }, "No valid batches found after fetching");
         resolve(null);
         return;
       }
@@ -1441,7 +1515,13 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
         log.warn({ batchesPath }, "Could not determine latest batch");
       }
       resolve(latest);
-    }, 500); // Small delay to allow GunDB to propagate and .once() to complete
+    };
+
+    // Check at multiple intervals to balance speed and completeness
+    setTimeout(checkAndResolve, 500);
+    setTimeout(checkAndResolve, 1500);
+    setTimeout(checkAndResolve, 3000);
+    setTimeout(checkAndResolve, 5000);
   });
 }
 
