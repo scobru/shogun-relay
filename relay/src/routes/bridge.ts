@@ -16,7 +16,7 @@
 
 import express, { Request, Response } from "express";
 import { loggers } from "../utils/logger";
-import { createBridgeClient, type BridgeClient } from "../utils/bridge-client";
+import { createBridgeClient, type BridgeClient, type DepositEvent } from "../utils/bridge-client";
 import {
   getUserBalance,
   creditBalance,
@@ -694,13 +694,21 @@ router.get("/state", async (req, res) => {
  * - toBlock: Block to end at (default: "latest")
  * - user: Optional - only sync deposits for this specific user
  */
-router.post("/sync-deposits", express.json(), async (req, res) => {
+router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
       return res.status(503).json({
         success: false,
         error: "GunDB not initialized",
+      });
+    }
+
+    // Validate request body
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid request body",
       });
     }
 
@@ -727,11 +735,25 @@ router.post("/sync-deposits", express.json(), async (req, res) => {
     );
 
     // Query deposits in the range (with optional user filter)
-    const allDeposits = await client.queryDeposits(
-      fromBlockNumber, 
-      toBlockNumber,
-      user ? ethers.getAddress(user) : undefined
-    );
+    let allDeposits: DepositEvent[];
+    try {
+      allDeposits = await client.queryDeposits(
+        fromBlockNumber, 
+        toBlockNumber,
+        user ? ethers.getAddress(user) : undefined
+      );
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      log.error({ 
+        error: errorMsg, 
+        errorStack,
+        fromBlock: fromBlockNumber, 
+        toBlock: toBlockNumber,
+        user 
+      }, "Error querying deposits");
+      throw error;
+    }
 
     // All deposits are already filtered by user if user was specified
     const depositsToCheck = allDeposits;
@@ -848,13 +870,21 @@ router.post("/sync-deposits", express.json(), async (req, res) => {
  * 
  * Body: { txHash: string }
  */
-router.post("/process-deposit", express.json(), async (req, res) => {
+router.post("/process-deposit", express.json({ limit: '10mb' }), async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
       return res.status(503).json({
         success: false,
         error: "GunDB not initialized",
+      });
+    }
+
+    // Validate request body
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid request body",
       });
     }
 
