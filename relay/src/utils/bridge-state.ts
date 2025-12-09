@@ -1392,16 +1392,20 @@ export async function getBatch(
         }
       });
 
-      // If we know the withdrawalsCount, try reading individual nodes directly
+      // If we know the withdrawalsCount, try reading individual nodes directly (with retries)
       const withdrawalsCount = batchMetadata.withdrawalsCount || 0;
-      if (withdrawalsCount > 0) {
-        log.info(
-          { batchId, withdrawalsCount },
-          "Attempting to read withdrawals directly by index"
-        );
+      
+      // Helper function to read a withdrawal by index with retries
+      const readWithdrawalByIndex = (index: number, retries = 5, delay = 500) => {
+        if (resolved) return;
         
-        for (let i = 0; i < withdrawalsCount; i++) {
-          gun.get(`${withdrawalsPath}/${i}`).once((withdrawal: PendingWithdrawal | null) => {
+        const attemptRead = (attempt: number) => {
+          if (resolved || attempt > retries) return;
+          
+          const withdrawalNode = gun.get(`${withdrawalsPath}/${index}`);
+          
+          // Try .once() first
+          withdrawalNode.once((withdrawal: PendingWithdrawal | null) => {
             if (resolved) return;
             
             if (
@@ -1412,18 +1416,59 @@ export async function getBatch(
               typeof withdrawal.nonce === 'string' &&
               typeof withdrawal.timestamp === 'number'
             ) {
-              const key = i.toString();
+              const key = index.toString();
               if (!collectedKeys.has(key)) {
                 collectedKeys.add(key);
-                withdrawalsObj[i] = withdrawal as PendingWithdrawal;
+                withdrawalsObj[index] = withdrawal as PendingWithdrawal;
                 lastUpdateTime = Date.now();
                 log.info(
-                  { batchId, index: i, user: withdrawal.user, amount: withdrawal.amount, nonce: withdrawal.nonce, source: 'direct-index' },
+                  { batchId, index, user: withdrawal.user, amount: withdrawal.amount, nonce: withdrawal.nonce, source: 'direct-index', attempt },
                   "Added withdrawal from direct index read in getBatch"
+                );
+              }
+            } else if (attempt < retries) {
+              // Retry if withdrawal not found
+              setTimeout(() => attemptRead(attempt + 1), delay * attempt);
+            }
+          });
+          
+          // Also try .on() for real-time updates
+          withdrawalNode.on((withdrawal: PendingWithdrawal | null) => {
+            if (resolved) return;
+            
+            if (
+              withdrawal &&
+              typeof withdrawal === 'object' &&
+              typeof withdrawal.user === 'string' &&
+              typeof withdrawal.amount === 'string' &&
+              typeof withdrawal.nonce === 'string' &&
+              typeof withdrawal.timestamp === 'number'
+            ) {
+              const key = index.toString();
+              if (!collectedKeys.has(key)) {
+                collectedKeys.add(key);
+                withdrawalsObj[index] = withdrawal as PendingWithdrawal;
+                lastUpdateTime = Date.now();
+                log.info(
+                  { batchId, index, user: withdrawal.user, amount: withdrawal.amount, nonce: withdrawal.nonce, source: 'direct-index-realtime' },
+                  "Added withdrawal from direct index read (realtime) in getBatch"
                 );
               }
             }
           });
+        };
+        
+        attemptRead(1);
+      };
+      
+      if (withdrawalsCount > 0) {
+        log.info(
+          { batchId, withdrawalsCount },
+          "Attempting to read withdrawals directly by index with retries"
+        );
+        
+        for (let i = 0; i < withdrawalsCount; i++) {
+          readWithdrawalByIndex(i, 5, 500);
         }
       }
 
@@ -1433,21 +1478,67 @@ export async function getBatch(
 
         const timeSinceLastUpdate = Date.now() - lastUpdateTime;
         const expectedCount = withdrawalsCount || Object.keys(withdrawalsObj).length;
+        const foundCount = Object.keys(withdrawalsObj).length;
 
         log.info(
           { 
             batchId, 
-            withdrawalsFound: Object.keys(withdrawalsObj).length, 
+            withdrawalsFound: foundCount, 
             expectedCount,
-            timeSinceLastUpdate 
+            timeSinceLastUpdate,
+            metadataReadTime: lastUpdateTime 
           },
           "Checking withdrawals collection status in getBatch"
         );
 
-        // If we have withdrawals or we've waited long enough
-        if (Object.keys(withdrawalsObj).length > 0 || timeSinceLastUpdate > 3000) {
-          // If we expected withdrawals but haven't found any, wait a bit more
-          if (expectedCount > 0 && Object.keys(withdrawalsObj).length === 0 && timeSinceLastUpdate < 5000) {
+        // If we have all expected withdrawals, resolve immediately
+        if (expectedCount > 0 && foundCount >= expectedCount) {
+          cleanup();
+          parentNode.off(); // Unsubscribe from map events
+
+          // Convert object to sorted array
+          const sortedIndices = Object.keys(withdrawalsObj)
+            .map(k => parseInt(k, 10))
+            .sort((a, b) => a - b);
+          
+          const withdrawals: PendingWithdrawal[] = [];
+          sortedIndices.forEach(index => {
+            withdrawals.push(withdrawalsObj[index]);
+          });
+
+          const batch: Batch = {
+            batchId: batchMetadata.batchId,
+            root: batchMetadata.root,
+            withdrawals,
+            timestamp: batchMetadata.timestamp,
+            blockNumber: batchMetadata.blockNumber,
+            txHash: batchMetadata.txHash,
+          };
+
+          log.info(
+            { 
+              batchId: batchMetadata.batchId, 
+              withdrawalCount: withdrawals.length,
+              withdrawals: withdrawals.map(w => ({
+                user: w.user,
+                amount: w.amount,
+                nonce: w.nonce,
+              })),
+            },
+            "Batch retrieved from GunDB (all withdrawals found)"
+          );
+          resolve(batch);
+          return;
+        }
+
+        // If we have some withdrawals or we've waited long enough (increased timeout)
+        if (foundCount > 0 || timeSinceLastUpdate > 8000) {
+          // If we expected withdrawals but haven't found any, wait even more
+          if (expectedCount > 0 && foundCount === 0 && timeSinceLastUpdate < 10000) {
+            log.info(
+              { batchId, expectedCount, timeSinceLastUpdate },
+              "Still waiting for withdrawals in getBatch"
+            );
             return; // Wait more
           }
 
@@ -1497,6 +1588,7 @@ export async function getBatch(
             { 
               batchId: batchMetadata.batchId, 
               withdrawalCount: withdrawals.length,
+              expectedCount,
               withdrawals: withdrawals.map(w => ({
                 user: w.user,
                 amount: w.amount,
@@ -1509,11 +1601,13 @@ export async function getBatch(
         }
       };
 
-      // Check at multiple intervals to balance speed and completeness
-      setTimeout(checkAndResolve, 500);
-      setTimeout(checkAndResolve, 1500);
-      setTimeout(checkAndResolve, 3000);
-      setTimeout(checkAndResolve, 5000);
+      // Check at multiple intervals to balance speed and completeness (longer intervals)
+      setTimeout(checkAndResolve, 1000);
+      setTimeout(checkAndResolve, 2000);
+      setTimeout(checkAndResolve, 4000);
+      setTimeout(checkAndResolve, 6000);
+      setTimeout(checkAndResolve, 8000);
+      setTimeout(checkAndResolve, 10000);
     });
   });
 }
