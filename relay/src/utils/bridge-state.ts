@@ -462,6 +462,10 @@ export async function verifyDualSignatures(
       return true;
     }
 
+    // Normalize message for logging and signature verification
+    const normalizedMessage =
+      typeof message === "string" ? message : JSON.stringify(message);
+
     // Compare objects using deep equality
     if (
       typeof seaDataObj === "object" &&
@@ -488,8 +492,6 @@ export async function verifyDualSignatures(
         typeof seaVerified === "string"
           ? seaVerified
           : JSON.stringify(seaVerified);
-      const normalizedMessage =
-        typeof message === "string" ? message : JSON.stringify(message);
 
       if (seaData !== normalizedMessage) {
         log.warn(
