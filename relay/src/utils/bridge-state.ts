@@ -1408,23 +1408,38 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
         return;
       }
 
-      // Find batch with highest batchId (assuming numeric)
+      // Fetch all batches using getBatch to properly read withdrawals
+      const batchPromises = batchIds.map(id => getBatch(gun, id));
+      const batches = await Promise.all(batchPromises);
+      const validBatches = batches.filter((b): b is Batch => b !== null);
+
+      if (validBatches.length === 0) {
+        log.info({ batchesPath }, "No valid batches found after fetching");
+        resolve(null);
+        return;
+      }
+
+      // Find the batch with the highest batchId
       let latest: Batch | null = null;
       let latestId = -1;
 
-      for (const batch of batches) {
+      validBatches.forEach(batch => {
         const batchIdNum = parseInt(batch.batchId, 10);
         if (!isNaN(batchIdNum) && batchIdNum > latestId) {
           latestId = batchIdNum;
           latest = batch;
         }
+      });
+
+      if (latest) {
+        const latestBatch: Batch = latest;
+        log.info(
+          { latestBatchId: latestBatch.batchId, latestBatchRoot: latestBatch.root, withdrawalCount: latestBatch.withdrawals.length },
+          "Resolved latest batch from GunDB"
+        );
+      } else {
+        log.warn({ batchesPath }, "Could not determine latest batch");
       }
-
-      log.info(
-        { totalBatches: batches.length, latestBatchId: latest?.batchId, latestWithdrawalCount: latest?.withdrawals.length },
-        "Retrieved latest batch"
-      );
-
       resolve(latest);
     }, 500); // Small delay to allow GunDB to propagate and .once() to complete
   });
