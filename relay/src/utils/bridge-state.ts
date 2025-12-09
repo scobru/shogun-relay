@@ -750,8 +750,18 @@ export async function addPendingWithdrawal(
 
     gun
       .get(withdrawalsPath)
-      .once((data: { list?: PendingWithdrawal[] } | null) => {
-        const withdrawals = data?.list || [];
+      .once((data: { list?: PendingWithdrawal[] } | PendingWithdrawal[] | null) => {
+        // GunDB can return data in different formats:
+        // 1. Array directly: [withdrawal1, withdrawal2, ...]
+        // 2. Object with list property: { list: [withdrawal1, withdrawal2, ...] }
+        // 3. null/undefined: no data yet
+        let withdrawals: PendingWithdrawal[] = [];
+        
+        if (Array.isArray(data)) {
+          withdrawals = data;
+        } else if (data && typeof data === 'object' && 'list' in data && Array.isArray(data.list)) {
+          withdrawals = data.list;
+        }
 
         // Check if withdrawal with same nonce already exists
         const exists = withdrawals.some(
@@ -793,8 +803,19 @@ export async function getPendingWithdrawals(
 
     gun
       .get(withdrawalsPath)
-      .once((data: { list?: PendingWithdrawal[] } | null) => {
-        const withdrawals = data?.list || [];
+      .once((data: { list?: PendingWithdrawal[] } | PendingWithdrawal[] | null) => {
+        // GunDB can return data in different formats:
+        // 1. Array directly: [withdrawal1, withdrawal2, ...]
+        // 2. Object with list property: { list: [withdrawal1, withdrawal2, ...] }
+        // 3. null/undefined: no data yet
+        let withdrawals: PendingWithdrawal[] = [];
+        
+        if (Array.isArray(data)) {
+          withdrawals = data;
+        } else if (data && typeof data === 'object' && 'list' in data && Array.isArray(data.list)) {
+          withdrawals = data.list;
+        }
+        
         resolve(withdrawals);
       });
   });
@@ -812,8 +833,18 @@ export async function removePendingWithdrawals(
 
     gun
       .get(withdrawalsPath)
-      .once((data: { list?: PendingWithdrawal[] } | null) => {
-        const withdrawals = data?.list || [];
+      .once((data: { list?: PendingWithdrawal[] } | PendingWithdrawal[] | null) => {
+        // GunDB can return data in different formats:
+        // 1. Array directly: [withdrawal1, withdrawal2, ...]
+        // 2. Object with list property: { list: [withdrawal1, withdrawal2, ...] }
+        // 3. null/undefined: no data yet
+        let withdrawals: PendingWithdrawal[] = [];
+        
+        if (Array.isArray(data)) {
+          withdrawals = data;
+        } else if (data && typeof data === 'object' && 'list' in data && Array.isArray(data.list)) {
+          withdrawals = data.list;
+        }
 
         // Create a set of withdrawal keys (user+nonce) to remove
         const toRemove = new Set(
