@@ -365,26 +365,58 @@ router.post("/withdraw", express.json(), async (req, res) => {
       timestamp: Date.now(),
     };
 
-    await addPendingWithdrawal(gun, withdrawal);
+    try {
+      await addPendingWithdrawal(gun, withdrawal);
+      
+      log.info(
+        { user: userAddress, amount: amountBigInt.toString(), nonce: nonceBigInt.toString() },
+        "Withdrawal requested successfully"
+      );
 
-    log.info(
-      { user: userAddress, amount: amountBigInt.toString(), nonce: nonceBigInt.toString() },
-      "Withdrawal requested"
-    );
-
-    res.json({
-      success: true,
-      withdrawal: {
-        user: userAddress,
-        amount: amountBigInt.toString(),
-        nonce: nonceBigInt.toString(),
-        timestamp: withdrawal.timestamp,
-      },
-      message: "Withdrawal queued. Wait for batch submission to generate proof.",
-    });
+      res.json({
+        success: true,
+        withdrawal: {
+          user: userAddress,
+          amount: amountBigInt.toString(),
+          nonce: nonceBigInt.toString(),
+          timestamp: withdrawal.timestamp,
+        },
+        message: "Withdrawal queued. Wait for batch submission to generate proof.",
+      });
+    } catch (addError) {
+      const addErrorMessage = addError instanceof Error ? addError.message : String(addError);
+      log.error(
+        { 
+          error: addError, 
+          errorMessage: addErrorMessage,
+          user: userAddress, 
+          amount: amountBigInt.toString(), 
+          nonce: nonceBigInt.toString() 
+        },
+        "Error adding pending withdrawal (balance already debited)"
+      );
+      // Balance was already debited, so this is a critical error
+      // We should still return success to avoid double-debiting on retry
+      // The withdrawal can be manually recovered from the balance history
+      res.status(500).json({
+        success: false,
+        error: `Withdrawal balance debited but failed to queue: ${addErrorMessage}. Please contact support.`,
+      });
+    }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    log.error({ error }, "Error in withdraw endpoint");
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    log.error(
+      { 
+        error, 
+        errorMessage, 
+        errorStack,
+        user: req.body?.user,
+        amount: req.body?.amount,
+        nonce: req.body?.nonce,
+      },
+      "Error in withdraw endpoint"
+    );
     res.status(500).json({
       success: false,
       error: errorMessage,
