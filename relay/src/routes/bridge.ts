@@ -26,6 +26,7 @@ import {
   getPendingWithdrawals,
   removePendingWithdrawals,
   saveBatch,
+  getBatch,
   getLatestBatch,
   isDepositProcessed,
   markDepositProcessed,
@@ -528,7 +529,25 @@ router.post("/submit-batch", express.json(), async (req, res) => {
     };
 
     await saveBatch(gun, batch);
-    log.info({ batchId: batchId.toString() }, "Batch saved to GunDB");
+    log.info({ batchId: batchId.toString(), root, txHash: result.txHash }, "Batch saved to GunDB");
+
+    // Wait a bit for GunDB to propagate the data
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Verify the batch was saved correctly by trying to read it back
+    try {
+      const savedBatch = await getBatch(gun, batchId.toString());
+      if (savedBatch) {
+        log.info(
+          { batchId: savedBatch.batchId, withdrawalCount: savedBatch.withdrawals.length },
+          "Batch verification: Successfully read back saved batch"
+        );
+      } else {
+        log.warn({ batchId: batchId.toString() }, "Batch verification: Could not read back saved batch (may need more time to propagate)");
+      }
+    } catch (error) {
+      log.warn({ error, batchId: batchId.toString() }, "Batch verification: Error reading back saved batch");
+    }
 
     // Remove processed withdrawals from pending queue
     log.info({ withdrawalCount: pending.length }, "Removing processed withdrawals from pending queue");

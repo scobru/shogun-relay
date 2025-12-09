@@ -1159,6 +1159,7 @@ export async function saveBatch(
 ): Promise<void> {
   return new Promise(async (resolve, reject) => {
     const batchPath = `bridge/batches/${batch.batchId}`;
+    const batchesParentPath = `bridge/batches`;
     const withdrawalsPath = `${batchPath}/withdrawals`;
 
     try {
@@ -1186,6 +1187,28 @@ export async function saveBatch(
             log.info(
               { batchId: batch.batchId, withdrawalCount: batch.withdrawals.length },
               "Batch metadata saved to GunDB"
+            );
+            res();
+          }
+        });
+      });
+
+      // Also save a reference in the parent node so it's immediately visible
+      await new Promise<void>((res, rej) => {
+        gun.get(batchesParentPath).get(batch.batchId).put(batchData, (ack: GunMessagePut) => {
+          if (ack && "err" in ack && ack.err) {
+            const errorMsg =
+              typeof ack.err === "string" ? ack.err : String(ack.err);
+            log.warn(
+              { error: errorMsg, batchId: batch.batchId },
+              "Warning: Error saving batch reference in parent node (non-critical)"
+            );
+            // Don't fail the whole operation if this fails
+            res();
+          } else {
+            log.info(
+              { batchId: batch.batchId },
+              "Batch reference saved in parent node"
             );
             res();
           }
