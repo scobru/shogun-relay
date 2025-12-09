@@ -36,6 +36,7 @@ import {
   generateProof,
   type WithdrawalLeaf,
 } from "../utils/merkle-tree";
+import * as FrozenData from "../utils/frozen-data";
 import { ethers } from "ethers";
 
 const router = express.Router();
