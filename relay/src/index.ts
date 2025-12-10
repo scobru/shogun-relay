@@ -43,6 +43,7 @@ import {
   loggingConfig,
   packageConfig,
 } from "./config/env-config";
+import { startBatchScheduler } from "./utils/batch-scheduler";
 
 dotenv.config();
 
@@ -523,6 +524,9 @@ async function initializeServer() {
 
   const gun = (Gun as any)(gunConfig);
 
+  // Start batch scheduler for automated L2 -> L1 submission
+  startBatchScheduler(gun);
+
   // Note: "Data hash not same as hash!" warnings from GunDB are benign
   // They occur when using content-addressed storage with # namespace
   // The data is still saved correctly - this is just GunDB's internal verification
@@ -852,10 +856,10 @@ See docs/RELAY_KEYS.md for more information.
             return;
           }
 
-                // Pin the content
-                if (loggingConfig.debug) {
-                    loggers.server.debug({ cid: data.cid }, `📌 Pinning`);
-                }
+          // Pin the content
+          if (loggingConfig.debug) {
+            loggers.server.debug({ cid: data.cid }, `📌 Pinning`);
+          }
           const pinResult: any = await new Promise((resolve, reject) => {
             const timeout = setTimeout(
               () => reject(new Error("Pin timeout")),
@@ -1857,7 +1861,7 @@ See docs/RELAY_KEYS.md for more information.
   if (BRIDGE_ENABLED && BRIDGE_RPC_URL) {
     try {
       const { startBridgeListener } = await import("./utils/bridge-listener");
-      
+
       await startBridgeListener(gun, {
         rpcUrl: BRIDGE_RPC_URL,
         chainId: BRIDGE_CHAIN_ID,
@@ -1905,8 +1909,8 @@ See docs/RELAY_KEYS.md for more information.
         const sequencer = await bridgeClient.getSequencer();
         const relayAddress = bridgeClient.wallet?.address;
 
-        if (sequencer === "0x0000000000000000000000000000000000000000" || 
-            (relayAddress && relayAddress.toLowerCase() === sequencer.toLowerCase())) {
+        if (sequencer === "0x0000000000000000000000000000000000000000" ||
+          (relayAddress && relayAddress.toLowerCase() === sequencer.toLowerCase())) {
           loggers.server.info(
             {
               interval: BRIDGE_AUTO_BATCH_INTERVAL_MS / 1000,

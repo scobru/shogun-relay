@@ -159,7 +159,7 @@ export const config = {
     startBlock: process.env.BRIDGE_START_BLOCK ? parseInt(process.env.BRIDGE_START_BLOCK) : undefined,
     minConfirmations: parseInt(process.env.BRIDGE_MIN_CONFIRMATIONS || '3') || 3, // Security: wait for 3 block confirmations
     // Auto batch submission (if relay can act as sequencer)
-    autoBatchEnabled: process.env.BRIDGE_AUTO_BATCH_ENABLED === 'true',
+    autoBatchEnabled: process.env.BRIDGE_AUTO_BATCH_ENABLED !== 'false',
     autoBatchIntervalMs: parseInt(process.env.BRIDGE_AUTO_BATCH_INTERVAL_MS || '300000') || 5 * 60 * 1000, // 5 minutes
     autoBatchMinWithdrawals: parseInt(process.env.BRIDGE_AUTO_BATCH_MIN_WITHDRAWALS || '1') || 1,
   },

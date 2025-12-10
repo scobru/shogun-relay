@@ -40,6 +40,7 @@ import {
 } from "../utils/merkle-tree";
 import * as FrozenData from "../utils/frozen-data";
 import { ethers } from "ethers";
+import { submitBatch } from "../utils/batch-submitter";
 
 const router = express.Router();
 const log = loggers.server || console;
@@ -173,7 +174,7 @@ router.post("/transfer", express.json(), async (req, res) => {
 
     // Get relay keypair for signing
     const relayKeyPair = req.app.get("relayKeyPair") || null;
-    
+
     if (!relayKeyPair) {
       return res.status(503).json({
         success: false,
@@ -276,7 +277,7 @@ router.post("/withdraw", express.json(), async (req, res) => {
 
     // SECURITY: Verify dual signatures before processing withdrawal
     const { verifyDualSignatures } = await import("../utils/bridge-state");
-    
+
     log.info(
       {
         user: userAddress,
@@ -290,7 +291,7 @@ router.post("/withdraw", express.json(), async (req, res) => {
       },
       "Verifying dual signatures for withdrawal"
     );
-    
+
     const verifiedMessage = await verifyDualSignatures(
       message,
       seaSignature,
@@ -318,7 +319,7 @@ router.post("/withdraw", express.json(), async (req, res) => {
         error: "Invalid signatures: must provide valid SEA and Ethereum signatures with correct message content",
       });
     }
-    
+
     log.info(
       {
         user: userAddress,
@@ -355,7 +356,7 @@ router.post("/withdraw", express.json(), async (req, res) => {
 
     // Get relay keypair for signing (if available)
     const relayKeyPair = req.app.get("relayKeyPair") || null;
-    
+
     // Debit balance (requires relay keypair for security)
     await debitBalance(gun, userAddress, amountBigInt, relayKeyPair);
 
@@ -369,7 +370,7 @@ router.post("/withdraw", express.json(), async (req, res) => {
 
     try {
       await addPendingWithdrawal(gun, withdrawal);
-      
+
       log.info(
         { user: userAddress, amount: amountBigInt.toString(), nonce: nonceBigInt.toString() },
         "Withdrawal requested successfully"
@@ -388,12 +389,12 @@ router.post("/withdraw", express.json(), async (req, res) => {
     } catch (addError) {
       const addErrorMessage = addError instanceof Error ? addError.message : String(addError);
       log.error(
-        { 
-          error: addError, 
+        {
+          error: addError,
           errorMessage: addErrorMessage,
-          user: userAddress, 
-          amount: amountBigInt.toString(), 
-          nonce: nonceBigInt.toString() 
+          user: userAddress,
+          amount: amountBigInt.toString(),
+          nonce: nonceBigInt.toString()
         },
         "Error adding pending withdrawal (balance already debited)"
       );
@@ -409,9 +410,9 @@ router.post("/withdraw", express.json(), async (req, res) => {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
     log.error(
-      { 
-        error, 
-        errorMessage, 
+      {
+        error,
+        errorMessage,
         errorStack,
         user: req.body?.user,
         amount: req.body?.amount,
@@ -438,7 +439,6 @@ router.post("/withdraw", express.json(), async (req, res) => {
  * 5. Removes processed withdrawals from pending queue
  */
 router.post("/submit-batch", express.json(), async (req, res) => {
-  let pending: PendingWithdrawal[] = [];
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
@@ -449,158 +449,30 @@ router.post("/submit-batch", express.json(), async (req, res) => {
       });
     }
 
-    const client = getBridgeClient();
+    const result = await submitBatch(gun);
 
-    // Verify wallet is configured (required for batch submission)
-    if (!client.wallet) {
-      log.error({}, "Wallet not configured in submit-batch");
-      return res.status(403).json({
+    if (result.success) {
+      res.json({
+        success: true,
+        batch: {
+          batchId: result.batchId,
+          root: result.root,
+          withdrawalCount: result.withdrawalCount,
+          txHash: result.txHash,
+          blockNumber: result.blockNumber,
+        },
+      });
+    } else {
+      res.status(result.error === "No pending withdrawals to batch" ? 400 : 500).json({
         success: false,
-        error: "Wallet required for batch submission",
+        error: result.error,
+        errorCode: (result as any).errorCode,
+        errorReason: (result as any).errorReason,
       });
     }
-
-    log.info(
-      { walletAddress: client.wallet.address },
-      "Starting batch submission"
-    );
-
-    // Note: The contract's onlySequencerOrRelay modifier will enforce:
-    // - If sequencer is set (non-zero), only sequencer can submit
-    // - If sequencer is zero address, any registered active relay can submit
-    // We don't need to duplicate this logic here - let the contract enforce it
-
-    // Get pending withdrawals
-    log.info({}, "Fetching pending withdrawals");
-    pending = await getPendingWithdrawals(gun);
-    log.info(
-      { pendingCount: pending.length, withdrawals: pending },
-      "Retrieved pending withdrawals"
-    );
-
-    if (pending.length === 0) {
-      log.warn({}, "No pending withdrawals to batch");
-      return res.status(400).json({
-        success: false,
-        error: "No pending withdrawals to batch",
-      });
-    }
-
-    // Convert to withdrawal leaves
-    const withdrawals: WithdrawalLeaf[] = pending.map((w) => ({
-      user: w.user,
-      amount: BigInt(w.amount),
-      nonce: BigInt(w.nonce),
-    }));
-
-    log.info(
-      { withdrawalCount: withdrawals.length },
-      "Converting withdrawals to leaves"
-    );
-
-    // Build Merkle tree
-    log.info({}, "Building Merkle tree");
-    const { root, getProof } = buildMerkleTreeFromWithdrawals(withdrawals);
-    log.info({ root, leafCount: withdrawals.length }, "Merkle tree built");
-
-    // Submit batch to contract
-    log.info({ root }, "Submitting batch to contract");
-    const result = await client.submitBatch(root);
-    log.info(
-      { txHash: result.txHash, blockNumber: result.blockNumber, batchId: result.batchId.toString() },
-      "Batch submitted to contract successfully"
-    );
-
-    // Get current batch ID (should match result.batchId)
-    const batchId = await client.getCurrentBatchId();
-    log.info(
-      { batchIdFromResult: result.batchId.toString(), batchIdFromContract: batchId.toString() },
-      "Retrieved batch ID"
-    );
-
-    // Save batch to GunDB
-    log.info({ batchId: batchId.toString(), withdrawalCount: pending.length }, "Saving batch to GunDB");
-    const batch = {
-      batchId: batchId.toString(),
-      root,
-      withdrawals: pending,
-      timestamp: Date.now(),
-      blockNumber: result.blockNumber,
-      txHash: result.txHash,
-    };
-
-    await saveBatch(gun, batch);
-    log.info({ batchId: batchId.toString(), root, txHash: result.txHash }, "Batch saved to GunDB");
-
-    // Wait a bit for GunDB to propagate the data
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Verify the batch was saved correctly by trying to read it back
-    try {
-      const savedBatch = await getBatch(gun, batchId.toString());
-      if (savedBatch) {
-        log.info(
-          { batchId: savedBatch.batchId, withdrawalCount: savedBatch.withdrawals.length },
-          "Batch verification: Successfully read back saved batch"
-        );
-      } else {
-        log.warn({ batchId: batchId.toString() }, "Batch verification: Could not read back saved batch (may need more time to propagate)");
-      }
-    } catch (error) {
-      log.warn({ error, batchId: batchId.toString() }, "Batch verification: Error reading back saved batch");
-    }
-
-    // Remove processed withdrawals from pending queue
-    log.info({ withdrawalCount: pending.length }, "Removing processed withdrawals from pending queue");
-    await removePendingWithdrawals(gun, pending);
-    log.info({}, "Processed withdrawals removed from pending queue");
-
-    log.info(
-      { batchId: batchId.toString(), root, withdrawalCount: pending.length, txHash: result.txHash },
-      "Batch submitted successfully"
-    );
-
-    res.json({
-      success: true,
-      batch: {
-        batchId: batchId.toString(),
-        root,
-        withdrawalCount: pending.length,
-        txHash: result.txHash,
-        blockNumber: result.blockNumber,
-      },
-    });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorStack = error instanceof Error ? error.stack : undefined;
-    
-    // Enhanced error logging
-    if (error && typeof error === 'object' && 'code' in error) {
-      log.error(
-        { 
-          error, 
-          errorMessage, 
-          errorStack,
-          errorCode: (error as any).code,
-          errorReason: (error as any).reason,
-          pendingCount: pending?.length || 0,
-          pendingWithdrawals: pending,
-        },
-        "Error in submit-batch endpoint (with error code)"
-      );
-    } else {
-      log.error(
-        { 
-          error, 
-          errorMessage, 
-          errorStack,
-          pendingCount: pending?.length || 0,
-          pendingWithdrawals: pending,
-        },
-        "Error in submit-batch endpoint"
-      );
-    }
-    
+    log.error({ error: errorMessage }, "Error in submit-batch endpoint");
     res.status(500).json({
       success: false,
       error: errorMessage,
@@ -639,14 +511,14 @@ router.get("/balance/:user", async (req, res) => {
       { user: userAddress, normalizedUser: userAddress.toLowerCase() },
       "Getting user balance"
     );
-    
+
     const balance = await getUserBalance(gun, userAddress);
-    
+
     log.info(
-      { 
-        user: userAddress, 
-        balance: balance.toString(), 
-        balanceEth: ethers.formatEther(balance) 
+      {
+        user: userAddress,
+        balance: balance.toString(),
+        balanceEth: ethers.formatEther(balance)
       },
       "Balance retrieved"
     );
@@ -774,7 +646,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
       if (parentData && typeof parentData === 'object') {
         Object.keys(parentData).forEach(key => {
           if (key === '_' || key.startsWith('_')) return;
-          
+
           const batch = parentData[key];
           if (
             batch &&
@@ -797,7 +669,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
 
     // Wait a bit for batch IDs to be collected
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     // Also try getting batch from contract's current batch ID as fallback
     try {
       const client = getBridgeClient();
@@ -806,7 +678,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
         { currentBatchId: currentBatchId.toString() },
         "Retrieved current batch ID from contract"
       );
-      
+
       if (currentBatchId > 0n) {
         const batchIdStr = currentBatchId.toString();
         // Add to map if not already present
@@ -1081,8 +953,8 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
 
     // Determine block range
     const fromBlockNumber = fromBlock !== undefined ? Number(fromBlock) : 0;
-    const toBlockNumber = toBlock !== "latest" && toBlock !== undefined 
-      ? Number(toBlock) 
+    const toBlockNumber = toBlock !== "latest" && toBlock !== undefined
+      ? Number(toBlock)
       : "latest";
 
     log.info(
@@ -1094,19 +966,19 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
     let allDeposits: DepositEvent[];
     try {
       allDeposits = await client.queryDeposits(
-        fromBlockNumber, 
+        fromBlockNumber,
         toBlockNumber,
         user ? ethers.getAddress(user) : undefined
       );
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
-      log.error({ 
-        error: errorMsg, 
+      log.error({
+        error: errorMsg,
         errorStack,
-        fromBlock: fromBlockNumber, 
+        fromBlock: fromBlockNumber,
         toBlock: toBlockNumber,
-        user 
+        user
       }, "Error querying deposits");
       throw error;
     }
@@ -1131,7 +1003,7 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
     // This allows us to verify and correct the balance if there were race conditions
     let expectedTotalBalance = 0n;
     let userDepositsMap = new Map<string, bigint>(); // user -> total deposits
-    
+
     // Calculate expected balances for all users
     for (const deposit of depositsToCheck) {
       const normalizedUser = deposit.user.toLowerCase();
@@ -1147,11 +1019,11 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
 
         // Check if already processed
         let alreadyProcessed = await isDepositProcessed(gun, depositKey);
-        
+
         // If marked as processed, verify the balance was actually credited
         if (alreadyProcessed) {
           const currentL2Balance = await getUserBalance(gun, normalizedUser);
-          
+
           // If balance is 0, the deposit was marked as processed but not actually credited
           // This can happen if creditBalance failed silently or was interrupted
           if (currentL2Balance === 0n) {
@@ -1179,7 +1051,7 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
         // Verify transaction receipt
         const provider = client.provider;
         const receipt = await provider.getTransactionReceipt(deposit.txHash);
-        
+
         if (!receipt) {
           log.warn(
             { txHash: deposit.txHash },
@@ -1288,7 +1160,7 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
       for (const [normalizedUser, expectedTotal] of userDepositsMap.entries()) {
         try {
           const actualBalance = await getUserBalance(gun, normalizedUser);
-          
+
           if (actualBalance !== expectedTotal) {
             log.warn(
               {
@@ -1321,7 +1193,7 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
             // Verify the correction
             await new Promise(resolve => setTimeout(resolve, 300));
             const correctedBalance = await getUserBalance(gun, normalizedUser);
-            
+
             if (correctedBalance === expectedTotal) {
               log.info(
                 {
@@ -1480,7 +1352,7 @@ router.post("/process-deposit", express.json({ limit: '10mb' }), async (req, res
 
     // Check if already processed
     const alreadyProcessed = await isDepositProcessed(gun, depositKey);
-    
+
     if (alreadyProcessed) {
       return res.json({
         success: true,
