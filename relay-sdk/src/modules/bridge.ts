@@ -6,6 +6,7 @@ export interface PendingWithdrawal {
   nonce: string;
   timestamp: number;
   txHash?: string;
+  debitHash?: string; // Hash of debit frozen entry (proof of balance deduction)
 }
 
 export interface BridgeState {
@@ -47,6 +48,8 @@ export interface BatchResult {
   batchId: string;
   root: string;
   withdrawalCount: number;
+  verifiedCount?: number; // Number of verified withdrawals (security check passed)
+  excludedCount?: number; // Number of excluded withdrawals (security check failed)
   txHash: string;
   blockNumber: number;
 }

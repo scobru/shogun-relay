@@ -51,6 +51,7 @@ export interface PendingWithdrawal {
   nonce: string; // BigInt as string
   timestamp: number;
   txHash?: string; // L2 transaction hash (if applicable)
+  debitHash?: string; // Hash of the debit frozen entry (proof of balance deduction)
 }
 
 export interface Batch {
@@ -73,21 +74,28 @@ export interface ProcessedDeposit {
 /**
  * Get user balance from GunDB
  * Uses frozen-data pattern for secure, verifiable balance storage
+ * 
+ * @param gun - GunDB instance
+ * @param userAddress - User's Ethereum address
+ * @param relayPub - Optional: Relay's public key. If provided, only trusts balances signed by this relay.
  */
 export async function getUserBalance(
   gun: IGunInstance,
-  userAddress: string
+  userAddress: string,
+  relayPub?: string
 ): Promise<bigint> {
   try {
     const indexKey = userAddress.toLowerCase();
 
-    log.info({ user: indexKey }, "Looking up balance");
+    log.info({ user: indexKey, enforceRelayPub: !!relayPub }, "Looking up balance");
 
     // Get latest frozen entry for this user
+    // If relayPub is provided, only trust entries signed by the relay
     const entry = await FrozenData.getLatestFrozenEntry(
       gun,
       "bridge-balances",
-      indexKey
+      indexKey,
+      relayPub // Pass expectedSigner to enforce authority
     );
 
     log.info(
@@ -326,6 +334,8 @@ export async function creditBalance(
 /**
  * Debit user balance (for withdrawal request)
  * Uses frozen-data pattern for secure, verifiable balance updates
+ * 
+ * @returns The hash of the debit frozen entry (proof of balance deduction)
  */
 export async function debitBalance(
   gun: IGunInstance,
@@ -336,15 +346,16 @@ export async function debitBalance(
     priv: string;
     epub?: string;
     epriv?: string;
-  } | null
-): Promise<void> {
+  } | null,
+  nonce?: string // Optional nonce to include in the debit entry for linking
+): Promise<string> {
   if (!relayKeyPair) {
     throw new Error("Relay keypair required for secure balance updates");
   }
 
   try {
-    // Get current balance
-    const currentBalance = await getUserBalance(gun, userAddress);
+    // Get current balance (enforcing relay signature)
+    const currentBalance = await getUserBalance(gun, userAddress, relayKeyPair.pub);
 
     if (currentBalance < amount) {
       throw new Error("Insufficient balance");
@@ -352,8 +363,8 @@ export async function debitBalance(
 
     const newBalance = currentBalance - amount;
 
-    // Create balance data
-    const balanceData = {
+    // Create balance data with debit tracking
+    const balanceData: any = {
       balance: newBalance.toString(),
       user: userAddress.toLowerCase(),
       updatedAt: Date.now(),
@@ -361,17 +372,158 @@ export async function debitBalance(
       debit: amount.toString(), // Track what was debited
     };
 
-    // Create frozen entry (immutable, signed)
+    // Include nonce if provided (for withdrawal linking)
+    if (nonce) {
+      balanceData.withdrawalNonce = nonce;
+    }
+
+    // Create frozen entry (immutable, signed) and return the hash
     const indexKey = userAddress.toLowerCase();
-    await FrozenData.createFrozenEntry(
+    const result = await FrozenData.createFrozenEntry(
       gun,
       balanceData,
       relayKeyPair,
       "bridge-balances",
       indexKey
     );
+
+    log.info({
+      user: indexKey,
+      amount: amount.toString(),
+      newBalance: newBalance.toString(),
+      debitHash: result.hash,
+    }, "Balance debited successfully");
+
+    return result.hash; // Return the debit proof hash
   } catch (error) {
     throw new Error(`Failed to debit balance: ${error}`);
+  }
+}
+
+/**
+ * Verify that a pending withdrawal is backed by a valid debit entry
+ * 
+ * SECURITY: This ensures that every withdrawal in a batch is legitimate:
+ * 1. The debit hash exists in frozen-data
+ * 2. The debit entry is signed by the relay (not spoofed)
+ * 3. The debit amount and user match the withdrawal
+ * 4. The withdrawal nonce matches the debit entry (if present)
+ * 
+ * @param gun - GunDB instance
+ * @param withdrawal - The pending withdrawal to verify
+ * @param relayPub - The relay's public key (required for signature verification)
+ * @returns true if the withdrawal is backed by a valid debit, false otherwise
+ */
+export async function verifyWithdrawalDebit(
+  gun: IGunInstance,
+  withdrawal: PendingWithdrawal,
+  relayPub: string
+): Promise<{ valid: boolean; reason?: string }> {
+  try {
+    // If no debitHash, this is an old-style withdrawal (pre-security hardening)
+    // TODO: After migration, make debitHash mandatory
+    if (!withdrawal.debitHash) {
+      log.warn({
+        user: withdrawal.user,
+        amount: withdrawal.amount,
+        nonce: withdrawal.nonce,
+      }, "Withdrawal missing debitHash - cannot verify");
+      return {
+        valid: false,
+        reason: "Missing debitHash - withdrawal was not properly created"
+      };
+    }
+
+    // Read the debit frozen entry, enforcing relay signature
+    const debitEntry = await FrozenData.readFrozenEntry(
+      gun,
+      "bridge-balances",
+      withdrawal.debitHash,
+      relayPub // Only trust entries signed by the relay
+    );
+
+    if (!debitEntry) {
+      log.warn({
+        user: withdrawal.user,
+        debitHash: withdrawal.debitHash,
+      }, "Debit entry not found");
+      return {
+        valid: false,
+        reason: "Debit entry not found in frozen-data"
+      };
+    }
+
+    if (!debitEntry.verified) {
+      log.warn({
+        user: withdrawal.user,
+        debitHash: withdrawal.debitHash,
+        verificationDetails: debitEntry.verificationDetails,
+      }, "Debit entry verification failed");
+      return {
+        valid: false,
+        reason: debitEntry.verificationDetails?.reason || "Debit entry signature/hash verification failed"
+      };
+    }
+
+    // Verify the debit entry matches the withdrawal
+    const debitData = debitEntry.data as {
+      user?: string;
+      debit?: string;
+      withdrawalNonce?: string;
+      type?: string;
+    };
+
+    // Check type
+    if (debitData.type !== "bridge-balance") {
+      return {
+        valid: false,
+        reason: `Invalid entry type: expected 'bridge-balance', got '${debitData.type}'`
+      };
+    }
+
+    // Check user matches
+    if (debitData.user?.toLowerCase() !== withdrawal.user.toLowerCase()) {
+      return {
+        valid: false,
+        reason: `User mismatch: debit=${debitData.user}, withdrawal=${withdrawal.user}`
+      };
+    }
+
+    // Check debit amount matches withdrawal amount
+    if (debitData.debit !== withdrawal.amount) {
+      return {
+        valid: false,
+        reason: `Amount mismatch: debit=${debitData.debit}, withdrawal=${withdrawal.amount}`
+      };
+    }
+
+    // Check nonce if present in debit entry
+    if (debitData.withdrawalNonce && debitData.withdrawalNonce !== withdrawal.nonce) {
+      return {
+        valid: false,
+        reason: `Nonce mismatch: debit=${debitData.withdrawalNonce}, withdrawal=${withdrawal.nonce}`
+      };
+    }
+
+    log.info({
+      user: withdrawal.user,
+      amount: withdrawal.amount,
+      nonce: withdrawal.nonce,
+      debitHash: withdrawal.debitHash,
+    }, "Withdrawal debit verified successfully");
+
+    return { valid: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log.error({
+      error,
+      user: withdrawal.user,
+      debitHash: withdrawal.debitHash,
+    }, "Error verifying withdrawal debit");
+    return {
+      valid: false,
+      reason: `Verification error: ${errorMessage}`
+    };
   }
 }
 
@@ -405,7 +557,7 @@ export async function verifyDualSignatures(
     timestamp?: number;
     nonce?: string;
   }
-): Promise<{ ethereumAddress: string; [key: string]: any } | null> {
+): Promise<{ ethereumAddress: string;[key: string]: any } | null> {
   try {
     // 1. Verify SEA signature (GunDB keypair)
     // SEA.verify returns the original data if signature is valid
@@ -533,7 +685,7 @@ export async function verifyDualSignatures(
     }
 
     // 3. Parse and validate message content
-    let messageData: { ethereumAddress?: string; [key: string]: any };
+    let messageData: { ethereumAddress?: string;[key: string]: any };
     try {
       messageData =
         typeof seaVerified === "string" ? JSON.parse(seaVerified) : seaVerified;
@@ -614,7 +766,7 @@ export async function verifyDualSignatures(
     return {
       ...messageData,
       ethereumAddress: messageData.ethereumAddress,
-    } as { ethereumAddress: string; [key: string]: any };
+    } as { ethereumAddress: string;[key: string]: any };
   } catch (error) {
     return null;
   }
@@ -682,9 +834,10 @@ export async function transferBalance(
       );
     }
 
-    // Get current balances (by Ethereum address)
-    const fromBalance = await getUserBalance(gun, fromAddress);
-    const toBalance = await getUserBalance(gun, toAddress);
+    // SECURITY: Get current balances with relay signature enforcement
+    // Only trust balances that were signed by the relay to prevent spoofed balance attacks
+    const fromBalance = await getUserBalance(gun, fromAddress, relayKeyPair.pub);
+    const toBalance = await getUserBalance(gun, toAddress, relayKeyPair.pub);
 
     // Check sufficient balance
     if (fromBalance < amount) {
@@ -1293,7 +1446,7 @@ export async function getBatch(
     // First, read the batch metadata
     gun.get(batchPath).once((data: any) => {
       if (resolved) return;
-      
+
       if (!data || !data.batchId) {
         log.warn({ batchPath }, "No batch metadata found");
         cleanup();
@@ -1303,7 +1456,7 @@ export async function getBatch(
 
       batchMetadata = data;
       lastUpdateTime = Date.now();
-      
+
       log.info(
         { batchId, withdrawalsCount: data.withdrawalsCount || 0 },
         "Batch metadata retrieved, reading withdrawals"
@@ -1312,12 +1465,12 @@ export async function getBatch(
       // Also try reading the parent withdrawals node directly (for backward compatibility)
       gun.get(withdrawalsPath).once((parentData: any) => {
         if (resolved) return;
-        
+
         if (parentData && typeof parentData === 'object') {
           Object.keys(parentData).forEach(key => {
             if (key === '_' || key.startsWith('_')) return;
             if (collectedKeys.has(key)) return;
-            
+
             const withdrawal = parentData[key];
             if (
               withdrawal &&
@@ -1394,20 +1547,20 @@ export async function getBatch(
 
       // If we know the withdrawalsCount, try reading individual nodes directly (with retries)
       const withdrawalsCount = batchMetadata.withdrawalsCount || 0;
-      
+
       // Helper function to read a withdrawal by index with retries
       const readWithdrawalByIndex = (index: number, retries = 5, delay = 500) => {
         if (resolved) return;
-        
+
         const attemptRead = (attempt: number) => {
           if (resolved || attempt > retries) return;
-          
+
           const withdrawalNode = gun.get(`${withdrawalsPath}/${index}`);
-          
+
           // Try .once() first
           withdrawalNode.once((withdrawal: PendingWithdrawal | null) => {
             if (resolved) return;
-            
+
             if (
               withdrawal &&
               typeof withdrawal === 'object' &&
@@ -1431,11 +1584,11 @@ export async function getBatch(
               setTimeout(() => attemptRead(attempt + 1), delay * attempt);
             }
           });
-          
+
           // Also try .on() for real-time updates
           withdrawalNode.on((withdrawal: PendingWithdrawal | null) => {
             if (resolved) return;
-            
+
             if (
               withdrawal &&
               typeof withdrawal === 'object' &&
@@ -1457,16 +1610,16 @@ export async function getBatch(
             }
           });
         };
-        
+
         attemptRead(1);
       };
-      
+
       if (withdrawalsCount > 0) {
         log.info(
           { batchId, withdrawalsCount },
           "Attempting to read withdrawals directly by index with retries"
         );
-        
+
         for (let i = 0; i < withdrawalsCount; i++) {
           readWithdrawalByIndex(i, 5, 500);
         }
@@ -1481,12 +1634,12 @@ export async function getBatch(
         const foundCount = Object.keys(withdrawalsObj).length;
 
         log.info(
-          { 
-            batchId, 
-            withdrawalsFound: foundCount, 
+          {
+            batchId,
+            withdrawalsFound: foundCount,
             expectedCount,
             timeSinceLastUpdate,
-            metadataReadTime: lastUpdateTime 
+            metadataReadTime: lastUpdateTime
           },
           "Checking withdrawals collection status in getBatch"
         );
@@ -1500,7 +1653,7 @@ export async function getBatch(
           const sortedIndices = Object.keys(withdrawalsObj)
             .map(k => parseInt(k, 10))
             .sort((a, b) => a - b);
-          
+
           const withdrawals: PendingWithdrawal[] = [];
           sortedIndices.forEach(index => {
             withdrawals.push(withdrawalsObj[index]);
@@ -1516,8 +1669,8 @@ export async function getBatch(
           };
 
           log.info(
-            { 
-              batchId: batchMetadata.batchId, 
+            {
+              batchId: batchMetadata.batchId,
               withdrawalCount: withdrawals.length,
               withdrawals: withdrawals.map(w => ({
                 user: w.user,
@@ -1549,7 +1702,7 @@ export async function getBatch(
           const sortedIndices = Object.keys(withdrawalsObj)
             .map(k => parseInt(k, 10))
             .sort((a, b) => a - b);
-          
+
           const withdrawals: PendingWithdrawal[] = [];
           sortedIndices.forEach(index => {
             withdrawals.push(withdrawalsObj[index]);
@@ -1566,7 +1719,7 @@ export async function getBatch(
                 .filter(key => /^\d+$/.test(key))
                 .map(key => parseInt(key, 10))
                 .sort((a, b) => a - b);
-              
+
               indices.forEach(index => {
                 const w = oldWithdrawalsObj[index.toString()];
                 if (w) withdrawals.push(w);
@@ -1585,8 +1738,8 @@ export async function getBatch(
           };
 
           log.info(
-            { 
-              batchId: batchMetadata.batchId, 
+            {
+              batchId: batchMetadata.batchId,
               withdrawalCount: withdrawals.length,
               expectedCount,
               withdrawals: withdrawals.map(w => ({
@@ -1668,13 +1821,13 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
     // Also try reading the parent node directly to get immediate data
     parentNode.once((parentData: any) => {
       if (resolved) return;
-      
+
       log.info({ batchesPath, hasData: !!parentData, keys: parentData ? Object.keys(parentData).filter(k => !k.startsWith('_')) : [] }, "Read parent node directly");
-      
+
       if (parentData && typeof parentData === 'object') {
         Object.keys(parentData).forEach(key => {
           if (key === '_' || key.startsWith('_')) return;
-          
+
           const batch = parentData[key];
           if (
             batch &&
@@ -1701,7 +1854,7 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
 
       const timeSinceLastUpdate = Date.now() - lastUpdateTime;
       const batchIds = Array.from(batchIdsMap.values());
-      
+
       log.info(
         { batchesPath, batchIdsCount: batchIds.length, batchIds, timeSinceLastUpdate },
         "Checking batches collection status"
@@ -1757,7 +1910,7 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
       let latestId = -1;
 
       log.info(
-        { 
+        {
           validBatchesCount: validBatches.length,
           batchSummaries: validBatches.map(b => ({
             batchId: b.batchId,
@@ -1775,9 +1928,9 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
           latestId = batchIdNum;
           latest = batch;
           log.info(
-            { 
-              batchId: batch.batchId, 
-              batchIdNum, 
+            {
+              batchId: batch.batchId,
+              batchIdNum,
               withdrawalCount: batch.withdrawals.length,
               withdrawals: batch.withdrawals.map(w => ({
                 user: w.user,
@@ -1793,9 +1946,9 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
       if (latest) {
         const latestBatch: Batch = latest;
         log.info(
-          { 
-            latestBatchId: latestBatch.batchId, 
-            latestBatchRoot: latestBatch.root, 
+          {
+            latestBatchId: latestBatch.batchId,
+            latestBatchRoot: latestBatch.root,
             withdrawalCount: latestBatch.withdrawals.length,
             withdrawals: latestBatch.withdrawals.map(w => ({
               user: w.user,

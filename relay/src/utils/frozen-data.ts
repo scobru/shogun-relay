@@ -161,7 +161,7 @@ export async function createFrozenEntry(
     timestamp: Date.now(),
     version: 1,
   };
-  
+
   const entry: FrozenEntryData = {
     ...data,
     _meta: metaData,
@@ -175,7 +175,7 @@ export async function createFrozenEntry(
   if (!entry.meta!.pub) {
     entry.meta!.pub = keyPair.pub;
   }
-  
+
   // Log entry structure before signing to ensure metadata is present
   log.info({
     namespace,
@@ -189,14 +189,14 @@ export async function createFrozenEntry(
   // Create dataString - this exact string will be used for signing, hashing, and storing as dataJson
   // IMPORTANT: We must use the same dataString for all three operations to ensure consistency
   const dataString = JSON.stringify(entry);
-  
+
   log.info({
     namespace,
     indexKey,
     dataStringLength: dataString.length,
     dataStringPreview: dataString.substring(0, 300),
   }, 'Creating frozen entry - dataString created');
-  
+
   // Create signature using the dataString
   const signature = await SEA.sign(dataString, keyPair);
 
@@ -215,19 +215,19 @@ export async function createFrozenEntry(
   // The '#' namespace triggers automatic hash verification which causes "Data hash not same as hash!" warnings
   // We manage immutability via content-addressing (hash) and SEA signatures instead
   // This approach is functionally equivalent but avoids the annoying warnings
-  
+
   // Store the entry - GunDB may not preserve nested structures correctly when using .put() with nested objects
   // So we store the dataString directly as dataJson to ensure all fields are preserved correctly
   const frozenNode = gun.get('frozen-' + namespace).get(hash);
-  
+
   // Store signature and hash at the root level
   frozenNode.get('sig').put(signature);
   frozenNode.get('hash').put(hash);
-  
+
   // Store dataString as dataJson - this is the EXACT string used for signing and hashing
   // When we read it back, we'll use it directly for verification without re-serialization
   frozenNode.get('dataJson').put(dataString);
-  
+
   // Also store data as nested object for backward compatibility and easier reading
   // But we'll prioritize dataJson when reading for verification
   frozenNode.get('data').put(entry as unknown as obj);
@@ -252,9 +252,10 @@ export async function createFrozenEntry(
  * @param gun - GunDB instance
  * @param namespace - Index namespace
  * @param hash - Content hash
+ * @param expectedSigner - Optional: if provided, verify that the entry's pub matches this value
  * @returns Promise with data, verified status, and pub
  */
-export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: str): prm<mb<FrozenEntryResult>> {
+export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: str, expectedSigner?: str): prm<mb<FrozenEntryResult>> {
   return new Promise((resolve) => {
     const timeout = setTimeout(() => resolve(undefined), 10000);
 
@@ -274,7 +275,7 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
         let entryData: FrozenEntryData;
         let dataString: string;
         let pub: string | undefined;
-        
+
         if (entry.dataJson && typeof entry.dataJson === 'string') {
           // Use dataJson directly as dataString - this is the exact string used for signing/hashing
           dataString = entry.dataJson;
@@ -369,6 +370,28 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
           return;
         }
 
+        // SECURITY: If expectedSigner is provided, verify that the entry's pub matches
+        if (expectedSigner && pub !== expectedSigner) {
+          log.warn({
+            hash: hash.substring(0, 16),
+            expectedSigner: expectedSigner.substring(0, 16),
+            actualPub: pub.substring(0, 16),
+          }, 'Frozen entry signer mismatch - rejecting untrusted entry');
+          resolve({
+            data: entry.data,
+            verified: false,
+            verificationDetails: {
+              signatureValid: false,
+              hashValid: false,
+              reason: `Signer mismatch: expected ${expectedSigner.substring(0, 16)}..., got ${pub.substring(0, 16)}...`,
+            },
+            pub: pub,
+            timestamp: entry.data._meta?.timestamp || undefined,
+            hash,
+          });
+          return;
+        }
+
         // SEA.verify returns the original data if valid, or undefined/false if invalid
         const verifyResult = await SEA.verify(entry.sig, pub);
         const signatureValid = verifyResult !== undefined && verifyResult !== false;
@@ -377,7 +400,7 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
         const expectedHash = await SEA.work(dataString, null, null, { name: 'SHA-256' });
         const hashValid = expectedHash === hash;
         const verified = signatureValid && hashValid;
-        
+
         // Log verification details for debugging
         log.info({
           hash: hash.substring(0, 16),
@@ -423,9 +446,10 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
  * @param gun - GunDB instance
  * @param namespace - Index namespace
  * @param indexKey - Key to look up
+ * @param expectedSigner - Optional: if provided, verify that the entry's pub matches this value
  * @returns Promise with data and verified status
  */
-export async function getLatestFrozenEntry(gun: GunInstance, namespace: str, indexKey: str): prm<mb<FrozenEntryResult>> {
+export async function getLatestFrozenEntry(gun: GunInstance, namespace: str, indexKey: str, expectedSigner?: str): prm<mb<FrozenEntryResult>> {
   return new Promise((resolve) => {
     const timeout = setTimeout(() => resolve(undefined), 10000);
 
@@ -437,7 +461,7 @@ export async function getLatestFrozenEntry(gun: GunInstance, namespace: str, ind
         return;
       }
 
-      const entry = await readFrozenEntry(gun, namespace, index.latestHash);
+      const entry = await readFrozenEntry(gun, namespace, index.latestHash, expectedSigner);
       resolve(entry);
     });
   });

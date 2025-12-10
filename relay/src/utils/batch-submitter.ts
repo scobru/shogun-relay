@@ -5,6 +5,7 @@ import {
     saveBatch,
     removePendingWithdrawals,
     getBatch,
+    verifyWithdrawalDebit,
     type PendingWithdrawal,
     type Batch,
 } from "./bridge-state";
@@ -46,6 +47,8 @@ export interface BatchSubmissionResult {
     batchId?: string;
     root?: string;
     withdrawalCount: number;
+    verifiedCount?: number;
+    excludedCount?: number;
     txHash?: string;
     blockNumber?: number;
     error?: string;
@@ -58,13 +61,15 @@ export interface BatchSubmissionResult {
  * 
  * This function:
  * 1. Gets all pending withdrawals from GunDB
- * 2. Builds a Merkle tree
- * 3. Submits the root to the L1 contract
- * 4. Saves the batch metadata to GunDB
- * 5. Removes processed withdrawals from the pending queue
+ * 2. SECURITY: Verifies each withdrawal has a valid debit entry signed by relay
+ * 3. Builds a Merkle tree (only from verified withdrawals)
+ * 4. Submits the root to the L1 contract
+ * 5. Saves the batch metadata to GunDB
+ * 6. Removes processed withdrawals from the pending queue
  */
-export async function submitBatch(gun: IGunInstance): Promise<BatchSubmissionResult> {
+export async function submitBatch(gun: IGunInstance, relayPub?: string): Promise<BatchSubmissionResult> {
     let pending: PendingWithdrawal[] = [];
+    let verifiedWithdrawals: PendingWithdrawal[] = [];
 
     try {
         const client = getBridgeClient();
@@ -101,8 +106,52 @@ export async function submitBatch(gun: IGunInstance): Promise<BatchSubmissionRes
             };
         }
 
-        // Convert to withdrawal leaves
-        const withdrawals: WithdrawalLeaf[] = pending.map((w) => ({
+        // SECURITY: Verify each withdrawal before including in batch
+        // Only withdrawals with valid debit entries signed by the relay are included
+        if (relayPub) {
+            log.info({ relayPub: relayPub.substring(0, 16) }, "Verifying withdrawals with relay signature enforcement");
+
+            for (const withdrawal of pending) {
+                const verification = await verifyWithdrawalDebit(gun, withdrawal, relayPub);
+
+                if (verification.valid) {
+                    verifiedWithdrawals.push(withdrawal);
+                } else {
+                    // SECURITY WARNING: This withdrawal is suspicious
+                    log.warn({
+                        user: withdrawal.user,
+                        amount: withdrawal.amount,
+                        nonce: withdrawal.nonce,
+                        debitHash: withdrawal.debitHash,
+                        reason: verification.reason,
+                    }, "SECURITY WARNING: Excluding unverified withdrawal from batch");
+                }
+            }
+
+            log.info({
+                totalPending: pending.length,
+                verified: verifiedWithdrawals.length,
+                excluded: pending.length - verifiedWithdrawals.length,
+            }, "Withdrawal verification complete");
+
+            if (verifiedWithdrawals.length === 0) {
+                log.warn({}, "No verified withdrawals to batch after security checks");
+                return {
+                    success: false,
+                    withdrawalCount: pending.length,
+                    verifiedCount: 0,
+                    excludedCount: pending.length,
+                    error: "No verified withdrawals to batch - all withdrawals failed security checks",
+                };
+            }
+        } else {
+            // No relayPub provided - skip verification (backward compatibility)
+            log.warn({}, "No relayPub provided - skipping withdrawal verification (less secure)");
+            verifiedWithdrawals = pending;
+        }
+
+        // Convert to withdrawal leaves (only verified withdrawals)
+        const withdrawals: WithdrawalLeaf[] = verifiedWithdrawals.map((w) => ({
             user: w.user,
             amount: BigInt(w.amount),
             nonce: BigInt(w.nonce),
@@ -125,12 +174,12 @@ export async function submitBatch(gun: IGunInstance): Promise<BatchSubmissionRes
         // Use the batch ID from the transaction event to ensure we match the specific batch submitted
         const batchId = result.batchId.toString();
 
-        // Save batch to GunDB
-        log.info({ batchId: batchId.toString(), withdrawalCount: pending.length }, "Saving batch to GunDB");
+        // Save batch to GunDB (only verified withdrawals)
+        log.info({ batchId: batchId.toString(), withdrawalCount: verifiedWithdrawals.length }, "Saving batch to GunDB");
         const batch: Batch = {
             batchId: batchId.toString(),
             root,
-            withdrawals: pending,
+            withdrawals: verifiedWithdrawals,
             timestamp: Date.now(),
             blockNumber: result.blockNumber,
             txHash: result.txHash,
@@ -157,16 +206,18 @@ export async function submitBatch(gun: IGunInstance): Promise<BatchSubmissionRes
             log.warn({ error, batchId: batchId.toString() }, "Batch verification: Error reading back saved batch");
         }
 
-        // Remove processed withdrawals from pending queue
-        log.info({ withdrawalCount: pending.length }, "Removing processed withdrawals from pending queue");
-        await removePendingWithdrawals(gun, pending);
+        // Remove processed withdrawals from pending queue (only verified ones)
+        log.info({ withdrawalCount: verifiedWithdrawals.length }, "Removing processed withdrawals from pending queue");
+        await removePendingWithdrawals(gun, verifiedWithdrawals);
         log.info({}, "Processed withdrawals removed from pending queue");
 
         return {
             success: true,
             batchId: batchId.toString(),
             root,
-            withdrawalCount: pending.length,
+            withdrawalCount: verifiedWithdrawals.length,
+            verifiedCount: verifiedWithdrawals.length,
+            excludedCount: pending.length - verifiedWithdrawals.length,
             txHash: result.txHash,
             blockNumber: result.blockNumber,
         };

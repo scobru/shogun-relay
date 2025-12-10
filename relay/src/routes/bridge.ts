@@ -358,14 +358,16 @@ router.post("/withdraw", express.json(), async (req, res) => {
     const relayKeyPair = req.app.get("relayKeyPair") || null;
 
     // Debit balance (requires relay keypair for security)
-    await debitBalance(gun, userAddress, amountBigInt, relayKeyPair);
+    // Pass the nonce so the debit entry can be linked to this specific withdrawal
+    const debitHash = await debitBalance(gun, userAddress, amountBigInt, relayKeyPair, nonceBigInt.toString());
 
-    // Add pending withdrawal
+    // Add pending withdrawal with debitHash for verification during batch submission
     const withdrawal: PendingWithdrawal = {
       user: userAddress,
       amount: amountBigInt.toString(),
       nonce: nonceBigInt.toString(),
       timestamp: Date.now(),
+      debitHash, // Include debit proof for batch verification
     };
 
     try {
@@ -449,7 +451,11 @@ router.post("/submit-batch", express.json(), async (req, res) => {
       });
     }
 
-    const result = await submitBatch(gun);
+    // Get relay keypair for withdrawal verification
+    const relayKeyPair = req.app.get("relayKeyPair");
+    const relayPub = relayKeyPair?.pub;
+
+    const result = await submitBatch(gun, relayPub);
 
     if (result.success) {
       res.json({
