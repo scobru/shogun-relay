@@ -54,10 +54,19 @@ export interface PendingWithdrawal {
   debitHash?: string; // Hash of the debit frozen entry (proof of balance deduction)
 }
 
+export interface ForceWithdrawal {
+  withdrawalHash: string;
+  user: string;
+  amount: string;
+  deadline: number;
+  timestamp: number;
+}
+
 export interface Batch {
   batchId: string;
   root: string;
   withdrawals: PendingWithdrawal[];
+  forceWithdrawals?: ForceWithdrawal[]; // Add force withdrawals to batch
   timestamp: number;
   blockNumber?: number;
   txHash?: string;
@@ -2103,4 +2112,63 @@ export async function markDepositProcessed(
       }
     });
   });
+}
+
+/**
+ * Add a pending force withdrawal to the queue
+ */
+export async function addPendingForceWithdrawal(
+  gun: IGunInstance,
+  forceWithdrawal: ForceWithdrawal
+): Promise<void> {
+  log.info({ forceWithdrawal }, "Adding pending force withdrawal");
+
+  // Store in simple list/set structure
+  // Keyed by withdrawalHash
+  gun.get("bridge").get("force-withdrawals").get("pending").get(forceWithdrawal.withdrawalHash).put(forceWithdrawal as any);
+}
+
+/**
+ * Get all pending force withdrawals
+ */
+export async function getPendingForceWithdrawals(gun: IGunInstance): Promise<ForceWithdrawal[]> {
+  return new Promise((resolve) => {
+    // const minTimestamp = Date.now() - 24 * 60 * 60 * 1000 * 7; // Last 7 days to be safe
+    const withdrawals: ForceWithdrawal[] = [];
+
+    gun.get("bridge").get("force-withdrawals").get("pending").once((data: any) => {
+      if (!data) {
+        resolve([]);
+        return;
+      }
+
+      // Iterate through keys
+      Object.keys(data).forEach((key) => {
+        if (key === "_" || !data[key]) return;
+
+        const w = data[key];
+        // Basic validation
+        if (w.withdrawalHash && w.user && w.amount && w.deadline) {
+          withdrawals.push(w);
+        }
+      });
+
+      resolve(withdrawals);
+    });
+  });
+}
+
+/**
+ * Remove pending force withdrawals (after batching)
+ */
+export async function removePendingForceWithdrawals(
+  gun: IGunInstance,
+  withdrawals: ForceWithdrawal[]
+): Promise<void> {
+  log.info({ count: withdrawals.length }, "Removing pending force withdrawals");
+
+  for (const w of withdrawals) {
+    // Nullify entry to remove
+    gun.get("bridge").get("force-withdrawals").get("pending").get(w.withdrawalHash).put(null as any);
+  }
 }

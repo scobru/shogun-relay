@@ -46,6 +46,16 @@ export interface WithdrawalEvent {
   txHash: string;
 }
 
+export interface ForceWithdrawalEvent {
+  withdrawalHash: string;
+  user: string;
+  amount: bigint;
+  deadline: bigint;
+  timestamp: bigint;
+  blockNumber: number;
+  txHash: string;
+}
+
 /**
  * Create a bridge client using Shogun SDK
  */
@@ -112,14 +122,14 @@ export function createBridgeClient(config: BridgeConfig) {
     /**
      * Submit a batch (sequencer only)
      */
-    async submitBatch(stateRoot: string): Promise<{ txHash: string; blockNumber: number; batchId: bigint }> {
+    async submitBatch(stateRoot: string, handledForceWithdrawals: string[] = []): Promise<{ txHash: string; blockNumber: number; batchId: bigint }> {
       if (!wallet) {
         throw new Error("BridgeClient: Private key required for batch submission");
       }
 
-      log.info({ stateRoot }, "Submitting batch to bridge");
+      log.info({ stateRoot, forceWithdrawalCount: handledForceWithdrawals.length }, "Submitting batch to bridge");
 
-      const tx = await bridge.submitBatch(stateRoot);
+      const tx = await (bridge.submitBatch as any)(stateRoot, handledForceWithdrawals);
       const receipt = await tx.wait();
 
       if (!receipt) {
@@ -754,6 +764,54 @@ export function createBridgeClient(config: BridgeConfig) {
           if ('args' in event && event.args) {
             await listener(event.args[0], event.args[1], event);
           }
+        }
+      }
+
+      return () => {
+        contract.off(filter, listener);
+      };
+    },
+
+    /**
+     * Listen to ForceWithdrawalInitiated events
+     */
+    async listenToForceWithdrawals(
+      fromBlock: number | "latest",
+      callback: (event: ForceWithdrawalEvent) => void | Promise<void>
+    ): Promise<() => void> {
+      const filter = contract.filters.ForceWithdrawalInitiated();
+
+      // event ForceWithdrawalInitiated(bytes32 indexed withdrawalHash, address indexed user, uint256 amount, uint256 deadline)
+      const listener = async (withdrawalHash: string, user: string, amount: bigint, deadline: bigint, event: ethers.Log) => {
+        const forceEvent: ForceWithdrawalEvent = {
+          withdrawalHash,
+          user,
+          amount,
+          deadline,
+          timestamp: BigInt(Date.now()), // Approximate, or get from block
+          blockNumber: event.blockNumber,
+          txHash: event.transactionHash,
+        };
+
+        try {
+          await callback(forceEvent);
+        } catch (error) {
+          log.error({ error, forceEvent }, "Error processing force withdrawal event");
+        }
+      };
+
+      contract.on(filter, listener);
+
+      if (fromBlock !== "latest") {
+        try {
+          const events = await contract.queryFilter(filter, fromBlock);
+          for (const event of events) {
+            if ('args' in event && event.args) {
+              await listener(event.args[0], event.args[1], event.args[2], event.args[3], event);
+            }
+          }
+        } catch (error) {
+          log.error({ error, fromBlock }, "Error querying historical force withdrawal events");
         }
       }
 

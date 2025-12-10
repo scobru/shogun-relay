@@ -21,7 +21,7 @@
 import type { IGunInstance } from "gun";
 import { ethers } from "ethers";
 import { createBridgeClient, type BridgeClient } from "./bridge-client";
-import { creditBalance, isDepositProcessed, markDepositProcessed, getUserBalance } from "./bridge-state";
+import { creditBalance, isDepositProcessed, markDepositProcessed, getUserBalance, addPendingForceWithdrawal } from "./bridge-state";
 import { loggers } from "./logger";
 
 const log = loggers.bridge || {
@@ -328,7 +328,46 @@ export async function startBridgeListener(
       }
     );
 
-    listenerCleanup = cleanup;
+
+    // Start listening to ForceWithdrawalInitiated events
+    const forceCleanup = await client.listenToForceWithdrawals(
+      config.startBlock || "latest",
+      async (event) => {
+        try {
+          // Normalize user address
+          const normalizedUser = event.user.toLowerCase();
+
+          log.info(
+            {
+              // withdrawalHash: event.withdrawalHash, // Use event.withdrawalHash directly
+              user: normalizedUser,
+              amount: event.amount.toString(),
+              deadline: event.deadline.toString(),
+              txHash: event.txHash
+            },
+            "Received force withdrawal event"
+          );
+
+          await addPendingForceWithdrawal(gun, {
+            withdrawalHash: event.withdrawalHash,
+            user: normalizedUser,
+            amount: event.amount.toString(),
+            deadline: Number(event.deadline), // Convert BigInt to number for storage (timestamp)
+            timestamp: Date.now()
+          });
+
+          log.info({ withdrawalHash: event.withdrawalHash }, "Force withdrawal added to pending queue");
+
+        } catch (error) {
+          log.error({ error, event }, "Error processing force withdrawal event");
+        }
+      }
+    );
+
+    listenerCleanup = () => {
+      cleanup();
+      forceCleanup();
+    };
     isListening = true;
 
     log.info("Bridge deposit listener started successfully");

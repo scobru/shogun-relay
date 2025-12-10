@@ -7,7 +7,10 @@ import {
     getBatch,
     verifyWithdrawalDebit,
     type PendingWithdrawal,
+    type ForceWithdrawal,
     type Batch,
+    getPendingForceWithdrawals,
+    removePendingForceWithdrawals,
 } from "./bridge-state";
 import {
     buildMerkleTreeFromWithdrawals,
@@ -97,7 +100,14 @@ export async function submitBatch(gun: IGunInstance, relayPub?: string): Promise
             "Retrieved pending withdrawals"
         );
 
-        if (pending.length === 0) {
+        // Get pending force withdrawals
+        const pendingForceWithdrawals = await getPendingForceWithdrawals(gun);
+        log.info(
+            { forceCount: pendingForceWithdrawals.length },
+            "Retrieved pending force withdrawals"
+        );
+
+        if (pending.length === 0 && pendingForceWithdrawals.length === 0) {
             log.info({}, "No pending withdrawals to batch");
             return {
                 success: false,
@@ -134,8 +144,8 @@ export async function submitBatch(gun: IGunInstance, relayPub?: string): Promise
                 excluded: pending.length - verifiedWithdrawals.length,
             }, "Withdrawal verification complete");
 
-            if (verifiedWithdrawals.length === 0) {
-                log.warn({}, "No verified withdrawals to batch after security checks");
+            if (verifiedWithdrawals.length === 0 && pendingForceWithdrawals.length === 0) {
+                log.warn({}, "No verified withdrawals or force withdrawals to batch");
                 return {
                     success: false,
                     withdrawalCount: pending.length,
@@ -163,8 +173,11 @@ export async function submitBatch(gun: IGunInstance, relayPub?: string): Promise
         log.info({ root, leafCount: withdrawals.length }, "Merkle tree built");
 
         // Submit batch to contract
-        log.info({ root }, "Submitting batch to contract");
-        const result = await client.submitBatch(root);
+        log.info({ root, forceCount: pendingForceWithdrawals.length }, "Submitting batch to contract");
+
+        const forceWithdrawalHashes = pendingForceWithdrawals.map(w => w.withdrawalHash);
+
+        const result = await client.submitBatch(root, forceWithdrawalHashes);
         log.info(
             { txHash: result.txHash, blockNumber: result.blockNumber, batchId: result.batchId.toString() },
             "Batch submitted to contract successfully"
@@ -180,6 +193,7 @@ export async function submitBatch(gun: IGunInstance, relayPub?: string): Promise
             batchId: batchId.toString(),
             root,
             withdrawals: verifiedWithdrawals,
+            forceWithdrawals: pendingForceWithdrawals,
             timestamp: Date.now(),
             blockNumber: result.blockNumber,
             txHash: result.txHash,
@@ -209,6 +223,12 @@ export async function submitBatch(gun: IGunInstance, relayPub?: string): Promise
         // Remove processed withdrawals from pending queue (only verified ones)
         log.info({ withdrawalCount: verifiedWithdrawals.length }, "Removing processed withdrawals from pending queue");
         await removePendingWithdrawals(gun, verifiedWithdrawals);
+
+        if (pendingForceWithdrawals.length > 0) {
+            await removePendingForceWithdrawals(gun, pendingForceWithdrawals);
+            log.info({ count: pendingForceWithdrawals.length }, "Removed processed force withdrawals");
+        }
+
         log.info({}, "Processed withdrawals removed from pending queue");
 
         return {
