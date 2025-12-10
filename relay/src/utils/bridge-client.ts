@@ -38,6 +38,14 @@ export interface BatchSubmittedEvent {
   txHash: string;
 }
 
+export interface WithdrawalEvent {
+  user: string;
+  amount: bigint;
+  nonce: bigint;
+  blockNumber: number;
+  txHash: string;
+}
+
 /**
  * Create a bridge client using Shogun SDK
  */
@@ -558,29 +566,30 @@ export function createBridgeClient(config: BridgeConfig) {
 
         for (const event of events) {
           try {
-            // Extract event data
+            // Extract event data - cast to any since ethers types are Log | EventLog
+            const eventAny = event as any;
             let user: string;
             let amount: bigint;
             let timestamp: bigint;
             let blockNumber: number;
             let txHash: string;
 
-            if (event.args && Array.isArray(event.args) && event.args.length >= 3) {
-              user = event.args[0];
-              amount = event.args[1];
-              timestamp = event.args[2];
+            if (eventAny.args && Array.isArray(eventAny.args) && eventAny.args.length >= 3) {
+              user = eventAny.args[0];
+              amount = eventAny.args[1];
+              timestamp = eventAny.args[2];
             } else {
               log.warn({ event }, "Invalid event args format");
               continue;
             }
 
             // Get block number and transaction hash
-            if (event.log) {
-              blockNumber = event.log.blockNumber;
-              txHash = event.log.transactionHash;
-            } else if (event.blockNumber !== undefined && event.transactionHash) {
-              blockNumber = event.blockNumber;
-              txHash = event.transactionHash;
+            if (eventAny.log) {
+              blockNumber = eventAny.log.blockNumber;
+              txHash = eventAny.log.transactionHash;
+            } else if (eventAny.blockNumber !== undefined && eventAny.transactionHash) {
+              blockNumber = eventAny.blockNumber;
+              txHash = eventAny.transactionHash;
             } else {
               log.warn({ event }, "Missing block number or transaction hash");
               continue;
@@ -618,6 +627,97 @@ export function createBridgeClient(config: BridgeConfig) {
           fromBlockType: typeof fromBlock,
           toBlockType: typeof toBlock
         }, "Error querying deposits");
+        throw error;
+      }
+    },
+
+    /**
+     * Query all Withdrawal events in a block range
+     * Useful for calculating net balance (deposits - withdrawals)
+     */
+    async queryWithdrawals(
+      fromBlock: number,
+      toBlock: number | "latest",
+      userAddress?: string
+    ): Promise<WithdrawalEvent[]> {
+      try {
+        // Create filter - if userAddress is provided, filter by user
+        const filter = userAddress
+          ? contract.filters.Withdrawal(userAddress)
+          : contract.filters.Withdrawal();
+
+        // Resolve "latest" to actual block number
+        let toBlockNumber: number;
+        if (toBlock === "latest") {
+          toBlockNumber = await provider.getBlockNumber();
+        } else {
+          toBlockNumber = toBlock;
+        }
+
+        const contractAddr = bridge.getAddress();
+        log.info(
+          { fromBlock, toBlock: toBlockNumber, contractAddress: contractAddr, userAddress },
+          "Querying withdrawal events"
+        );
+
+        const safeFromBlock = Math.max(0, fromBlock);
+        const events = await contract.queryFilter(filter, safeFromBlock, toBlockNumber);
+        const withdrawalEvents: WithdrawalEvent[] = [];
+
+        for (const event of events) {
+          try {
+            // Cast to any since ethers types are Log | EventLog
+            const eventAny = event as any;
+            let user: string;
+            let amount: bigint;
+            let nonce: bigint;
+            let blockNumber: number;
+            let txHash: string;
+
+            // Withdrawal event signature: Withdrawal(address indexed user, uint256 amount, uint256 nonce)
+            if (eventAny.args && Array.isArray(eventAny.args) && eventAny.args.length >= 3) {
+              user = eventAny.args[0];
+              amount = eventAny.args[1];
+              nonce = eventAny.args[2];
+            } else {
+              log.warn({ event }, "Invalid withdrawal event args format");
+              continue;
+            }
+
+            if (eventAny.log) {
+              blockNumber = eventAny.log.blockNumber;
+              txHash = eventAny.log.transactionHash;
+            } else if (eventAny.blockNumber !== undefined && eventAny.transactionHash) {
+              blockNumber = eventAny.blockNumber;
+              txHash = eventAny.transactionHash;
+            } else {
+              log.warn({ event }, "Missing block number or transaction hash in withdrawal event");
+              continue;
+            }
+
+            const normalizedUser = user.toLowerCase();
+            withdrawalEvents.push({
+              user: normalizedUser,
+              amount,
+              nonce,
+              blockNumber,
+              txHash,
+            });
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            log.error({ error: errorMsg, event }, "Error parsing withdrawal event");
+          }
+        }
+
+        log.info(
+          { fromBlock: safeFromBlock, toBlock: toBlockNumber, count: withdrawalEvents.length },
+          "Withdrawal events queried"
+        );
+
+        return withdrawalEvents;
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        log.error({ error: errorMsg, fromBlock, toBlock }, "Error querying withdrawals");
         throw error;
       }
     },

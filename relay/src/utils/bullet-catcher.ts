@@ -2,21 +2,21 @@ import Gun from "gun/gun.js";
 
 // Interfaces for Gun context and messages
 interface GunContext {
-  once?: bool;
+  once?: boolean;
   opt: {
-    isValid: (msg: obj) => bool | Error;
+    isValid: (msg: Record<string, any>) => boolean | Error;
   };
-  on: (event: str, handler: (msg: obj) => void) => void;
+  on: (event: string, handler: (msg: Record<string, any>) => void) => void;
 }
 
 interface GunMessage {
-  put?: obj;
-  "#"?: str;
+  put?: Record<string, any>;
+  "#"?: string;
 }
 
 interface GunMessageHandler {
   to: {
-    next: (msg: obj) => void;
+    next: (msg: Record<string, any>) => void;
   };
 }
 
@@ -26,7 +26,7 @@ interface GunMessageHandler {
     return;
   }
   // Pass to subsequent opt handlers
-  this.to.next(context as unknown as obj);
+  this.to.next(context as unknown as Record<string, any>);
 
   const { isValid } = context.opt;
 

@@ -13,11 +13,11 @@ import { loggers } from './logger';
 const log = loggers.relayUser;
 
 // Module state
-let relayUser: mb<GunUser> = undefined;
-let relayPub: mb<str> = undefined;
-let relayKeyPair: mb<ISEAPair> = undefined;
-let isInitialized: bool = false;
-let initPromise: mb<prm<RelayUserResult>> = undefined;
+let relayUser: GunUser | undefined = undefined;
+let relayPub: string | undefined = undefined;
+let relayKeyPair: ISEAPair | undefined = undefined;
+let isInitialized: boolean = false;
+let initPromise: Promise<RelayUserResult> | undefined = undefined;
 
 // Interfaces - Import native Gun types
 import type { IGunChain, GunCallbackPut, GunMessagePut } from 'gun/types/gun';
@@ -34,35 +34,35 @@ type GunAck = GunMessagePut;
 
 interface RelayUserResult {
   user: GunUser;
-  pub: str;
+  pub: string;
   keyPair: ISEAPair;
 }
 
 interface SubscriptionData {
-  userAddress?: str;
-  updatedAt?: num;
-  updatedBy?: str;
-  [key: str]: unknown;
+  userAddress?: string;
+  updatedAt?: number;
+  updatedBy?: string;
+  [key: string]: unknown;
 }
 
 interface UploadData {
-  hash?: str;
-  name?: str;
-  size?: num;
-  sizeMB?: num;
-  uploadedAt?: num;
-  savedAt?: num;
-  userAddress?: str;
-  savedBy?: str;
-  [key: str]: unknown;
+  hash?: string;
+  name?: string;
+  size?: number;
+  sizeMB?: number;
+  uploadedAt?: number;
+  savedAt?: number;
+  userAddress?: string;
+  savedBy?: string;
+  [key: string]: unknown;
 }
 
 interface UploadInfo {
-  hash: str;
-  name?: str;
-  size: num;
-  sizeMB: num;
-  uploadedAt?: num;
+  hash: string;
+  name?: string;
+  size: number;
+  sizeMB: number;
+  uploadedAt?: number;
 }
 
 /**
@@ -71,7 +71,7 @@ interface UploadInfo {
  * @param keyPair - SEA keypair object {pub, priv, epub, epriv}
  * @returns Promise with user, pub, and keyPair
  */
-async function initRelayUserWithKeyPair(gun: GunInstance, keyPair: ISEAPair): prm<RelayUserResult> {
+async function initRelayUserWithKeyPair(gun: GunInstance, keyPair: ISEAPair): Promise<RelayUserResult> {
   if (isInitialized && relayUser && relayKeyPair) {
     return { user: relayUser, pub: relayPub!, keyPair: relayKeyPair };
   }
@@ -106,7 +106,7 @@ async function initRelayUserWithKeyPair(gun: GunInstance, keyPair: ISEAPair): pr
  * @param keyPair - SEA keypair object {pub, priv, epub, epriv}
  * @returns Promise with user, pub, and keyPair
  */
-export async function initRelayUser(gun: GunInstance, keyPair: ISEAPair): prm<RelayUserResult> {
+export async function initRelayUser(gun: GunInstance, keyPair: ISEAPair): Promise<RelayUserResult> {
   if (isInitialized && relayUser) {
     return {
       user: relayUser,
@@ -138,7 +138,7 @@ export async function initRelayUser(gun: GunInstance, keyPair: ISEAPair): prm<Re
  * Get the relay user instance
  * @returns GunUser or undefined
  */
-export function getRelayUser(): mb<GunUser> {
+export function getRelayUser(): GunUser | undefined {
   return relayUser;
 }
 
@@ -146,7 +146,7 @@ export function getRelayUser(): mb<GunUser> {
  * Get the relay user's public key
  * @returns Public key or undefined
  */
-export function getRelayPub(): mb<str> {
+export function getRelayPub(): string | undefined {
   return relayPub;
 }
 
@@ -154,7 +154,7 @@ export function getRelayPub(): mb<str> {
  * Get the relay user's SEA keypair
  * @returns SEA keypair or undefined
  */
-export function getRelayKeyPair(): mb<ISEAPair> {
+export function getRelayKeyPair(): ISEAPair | undefined {
   return relayKeyPair;
 }
 
@@ -162,7 +162,7 @@ export function getRelayKeyPair(): mb<ISEAPair> {
  * Check if relay user is initialized
  * @returns True if initialized
  */
-export function isRelayUserInitialized(): bool {
+export function isRelayUserInitialized(): boolean {
   return isInitialized && relayUser !== undefined;
 }
 
@@ -170,7 +170,7 @@ export function isRelayUserInitialized(): bool {
  * Get the subscriptions node in the relay user's space
  * @returns GunNode or undefined
  */
-export function getSubscriptionsNode(): mb<GunNode> {
+export function getSubscriptionsNode(): GunNode | undefined {
   if (!relayUser) {
     log.warn('Relay user not initialized, cannot access subscriptions node');
     return undefined;
@@ -183,7 +183,7 @@ export function getSubscriptionsNode(): mb<GunNode> {
  * @param userAddress - The user's wallet address
  * @returns Promise with subscription data or undefined
  */
-export async function getSubscription(userAddress: str): prm<mb<SubscriptionData>> {
+export async function getSubscription(userAddress: string): Promise<SubscriptionData | undefined> {
   if (!relayUser) {
     throw new Error('Relay user not initialized');
   }
@@ -194,7 +194,7 @@ export async function getSubscription(userAddress: str): prm<mb<SubscriptionData
       resolve(undefined);
     }, 10000);
 
-    relayUser!.get('x402').get('subscriptions').get(userAddress).once((data: mb<obj>) => {
+    relayUser!.get('x402').get('subscriptions').get(userAddress).once((data: Record<string, any>) => {
       clearTimeout(timeout);
 
       if (!data || typeof data !== 'object') {
@@ -221,7 +221,7 @@ export async function getSubscription(userAddress: str): prm<mb<SubscriptionData
  * @param subscriptionData - The subscription data to save
  * @returns Promise
  */
-export async function saveSubscription(userAddress: str, subscriptionData: SubscriptionData): prm<void> {
+export async function saveSubscription(userAddress: string, subscriptionData: SubscriptionData): Promise<void> {
   if (!relayUser) {
     throw new Error('Relay user not initialized');
   }
@@ -229,7 +229,7 @@ export async function saveSubscription(userAddress: str, subscriptionData: Subsc
   return new Promise((resolve, reject) => {
     // Clean and serialize data for GunDB
     // GunDB doesn't handle null values well, convert them to undefined
-    const cleanedData: obj = {};
+    const cleanedData: Record<string, any> = {};
     for (const [key, value] of Object.entries(subscriptionData)) {
       // Skip internal GunDB keys
       if (['_', '#', '>', '<'].includes(key)) {
@@ -255,7 +255,7 @@ export async function saveSubscription(userAddress: str, subscriptionData: Subsc
       reject(new Error('Timeout saving subscription to GunDB'));
     }, 10000);
 
-    relayUser?.get('x402').get('subscriptions').get(userAddress).put(dataToSave as obj, (ack: GunAck) => {
+    relayUser?.get('x402').get('subscriptions').get(userAddress).put(dataToSave as Record<string, any>, (ack: GunAck) => {
       clearTimeout(timeout);
       if (ack && 'err' in ack && ack.err) {
         const errorMsg = typeof ack.err === 'string' ? ack.err : String(ack.err);
@@ -276,13 +276,13 @@ export async function saveSubscription(userAddress: str, subscriptionData: Subsc
  * @param value - The new value
  * @returns Promise
  */
-export async function updateSubscriptionField(userAddress: str, field: str, value: unknown): prm<void> {
+export async function updateSubscriptionField(userAddress: string, field: string, value: unknown): Promise<void> {
   if (!relayUser) {
     throw new Error('Relay user not initialized');
   }
 
   return new Promise((resolve, reject) => {
-    relayUser!.get('x402').get('subscriptions').get(userAddress).get(field).put(value as obj, (ack: GunAck) => {
+    relayUser!.get('x402').get('subscriptions').get(userAddress).get(field).put(value as Record<string, any>, (ack: GunAck) => {
       if ('err' in ack) {
         log.error({ userAddress, field, err: ack.err }, 'Error updating subscription field');
         reject(new Error(ack.err));
@@ -299,7 +299,7 @@ export async function updateSubscriptionField(userAddress: str, field: str, valu
  * @param userAddress - The user's wallet address
  * @returns GunNode or undefined
  */
-export function getUserUploadsNode(userAddress: str): mb<GunNode> {
+export function getUserUploadsNode(userAddress: string): GunNode | undefined {
   if (!relayUser) {
     log.warn('Relay user not initialized, cannot access uploads node');
     return undefined;
@@ -314,7 +314,7 @@ export function getUserUploadsNode(userAddress: str): mb<GunNode> {
  * @param uploadData - The upload metadata
  * @returns Promise
  */
-export async function saveUpload(userAddress: str, hash: str, uploadData: UploadData): prm<void> {
+export async function saveUpload(userAddress: string, hash: string, uploadData: UploadData): Promise<void> {
   if (!relayUser) {
     throw new Error('Relay user not initialized');
   }
@@ -328,7 +328,7 @@ export async function saveUpload(userAddress: str, hash: str, uploadData: Upload
       savedBy: relayPub!,
     };
 
-    relayUser!.get('x402').get('uploads').get(userAddress).get(hash).put(dataToSave as obj, (ack: GunAck) => {
+    relayUser!.get('x402').get('uploads').get(userAddress).get(hash).put(dataToSave as Record<string, any>, (ack: GunAck) => {
       if ('err' in ack) {
         log.error({ userAddress, hash, err: ack.err }, 'Error saving upload');
         reject(new Error(ack.err));
@@ -345,7 +345,7 @@ export async function saveUpload(userAddress: str, hash: str, uploadData: Upload
  * @param userAddress - The user's wallet address
  * @returns Promise with array of uploads
  */
-export async function getUserUploads(userAddress: str): prm<arr<UploadInfo>> {
+export async function getUserUploads(userAddress: string): Promise<Array<UploadInfo>> {
   if (!relayUser) {
     throw new Error('Relay user not initialized');
   }
@@ -358,7 +358,7 @@ export async function getUserUploads(userAddress: str): prm<arr<UploadInfo>> {
 
     const uploadsNode = relayUser!.get('x402').get('uploads').get(userAddress);
 
-    uploadsNode.once((parentData: mb<obj>) => {
+    uploadsNode.once((parentData: Record<string, any>) => {
       clearTimeout(timeout);
 
       if (!parentData || typeof parentData !== 'object') {
@@ -375,12 +375,12 @@ export async function getUserUploads(userAddress: str): prm<arr<UploadInfo>> {
         return;
       }
 
-      const uploads: arr<UploadInfo> = [];
+      const uploads: Array<UploadInfo> = [];
       let completedReads = 0;
       const totalReads = hashKeys.length;
 
       hashKeys.forEach((hash) => {
-        uploadsNode.get(hash).once((uploadData: mb<UploadData>) => {
+        uploadsNode.get(hash).once((uploadData: UploadData) => {
           completedReads++;
 
           if (uploadData && uploadData.hash) {
@@ -408,7 +408,7 @@ export async function getUserUploads(userAddress: str): prm<arr<UploadInfo>> {
  * @param hash - The IPFS hash to delete
  * @returns Promise
  */
-export async function deleteUpload(userAddress: str, hash: str): prm<void> {
+export async function deleteUpload(userAddress: string, hash: string): Promise<void> {
   if (!relayUser) {
     throw new Error('Relay user not initialized');
   }

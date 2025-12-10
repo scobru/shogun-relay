@@ -25,9 +25,9 @@ const port = parseInt(url.port) || (isHttps ? 443 : 80);
 
 // Cache for IPFS readiness status
 interface IpfsReadyCache {
-  isReady: bool;
-  lastCheck: num;
-  checkInterval: num;
+  isReady: boolean;
+  lastCheck: number;
+  checkInterval: number;
 }
 
 let ipfsReadyCache: IpfsReadyCache = {
@@ -41,7 +41,7 @@ let ipfsReadyCache: IpfsReadyCache = {
  * @param timeout - Timeout in milliseconds
  * @returns Promise<boolean>
  */
-async function checkIpfsReady(timeout: num = 2000): prm<bool> {
+async function checkIpfsReady(timeout: number = 2000): Promise<boolean> {
   return new Promise((resolve) => {
     const options: http.RequestOptions = {
       hostname,
@@ -88,9 +88,9 @@ async function checkIpfsReady(timeout: num = 2000): prm<bool> {
  * @returns Promise<boolean> True if IPFS is ready, false if timeout
  */
 async function waitForIpfs(
-  maxWaitTime: num = 30000,
-  initialDelay: num = 500
-): prm<bool> {
+  maxWaitTime: number = 30000,
+  initialDelay: number = 500
+): Promise<boolean> {
   const startTime = Date.now();
   let delay = initialDelay;
   const maxDelay = 2000; // Max 2 seconds between retries
@@ -112,12 +112,12 @@ async function waitForIpfs(
 }
 
 interface IpfsRequestOptions {
-  method?: str;
-  headers?: Record<str, str>;
-  timeout?: num;
-  maxRetries?: num;
-  retryDelay?: num;
-  waitForReady?: bool;
+  method?: string;
+  headers?: Record<string, string>;
+  timeout?: number;
+  maxRetries?: number;
+  retryDelay?: number;
+  waitForReady?: boolean;
   responseType?: "arraybuffer" | "json" | "text";
 }
 
@@ -128,9 +128,9 @@ interface IpfsRequestOptions {
  * @returns Promise<Object|string|Buffer> Response data (parsed JSON or raw string)
  */
 async function ipfsRequest(
-  path: str,
+  path: string,
   options: IpfsRequestOptions = {}
-): prm<obj | str | Buffer> {
+): Promise<Record<string, any> | string | Buffer> {
   const {
     method = "POST",
     headers = {},
@@ -163,7 +163,7 @@ async function ipfsRequest(
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const result = await new Promise<obj | str | Buffer>(
+      const result = await new Promise<Record<string, any> | string | Buffer>(
         (resolve, reject) => {
           const requestOptions: http.RequestOptions = {
             hostname,
@@ -181,12 +181,12 @@ async function ipfsRequest(
             const reqHeaders = requestOptions.headers || {};
             if (Array.isArray(reqHeaders)) {
               requestOptions.headers = {
-                ...(reqHeaders as unknown as Record<str, str>),
+                ...(reqHeaders as unknown as Record<string, string>),
                 Authorization: `Bearer ${IPFS_API_TOKEN}`,
               };
             } else {
               requestOptions.headers = {
-                ...(reqHeaders as Record<str, str>),
+                ...(reqHeaders as Record<string, string>),
                 Authorization: `Bearer ${IPFS_API_TOKEN}`,
               };
             }
@@ -211,8 +211,7 @@ async function ipfsRequest(
               } else {
                 reject(
                   new Error(
-                    `IPFS API returned status ${
-                      res.statusCode
+                    `IPFS API returned status ${res.statusCode
                     }: ${buffer.toString()}`
                   )
                 );
@@ -256,8 +255,7 @@ async function ipfsRequest(
 
       log.warn(
         { err: error },
-        `IPFS request failed (attempt ${attempt + 1}/${
-          maxRetries + 1
+        `IPFS request failed (attempt ${attempt + 1}/${maxRetries + 1
         }). Retrying in ${currentDelay}ms...`
       );
 
@@ -271,9 +269,9 @@ async function ipfsRequest(
 }
 
 interface IpfsUploadOptions {
-  timeout?: num;
-  maxRetries?: num;
-  retryDelay?: num;
+  timeout?: number;
+  maxRetries?: number;
+  retryDelay?: number;
 }
 
 /**
@@ -284,10 +282,10 @@ interface IpfsUploadOptions {
  * @returns Promise<Object> Response data
  */
 async function ipfsUpload(
-  path: str,
+  path: string,
   formData: FormData,
   options: IpfsUploadOptions = {}
-): prm<obj> {
+): Promise<Record<string, any>> {
   const { timeout = 60000, maxRetries = 3, retryDelay = 1000 } = options;
 
   // Wait for IPFS to be ready first
@@ -309,7 +307,7 @@ async function ipfsUpload(
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const result = await new Promise<obj>((resolve, reject) => {
+      const result = await new Promise<Record<string, any>>((resolve, reject) => {
         const requestOptions: http.RequestOptions = {
           hostname,
           port,
@@ -336,7 +334,7 @@ async function ipfsUpload(
 
         const req = httpModule.request(requestOptions, (res) => {
           let data = "";
-          res.on("data", (chunk: str) => (data += chunk));
+          res.on("data", (chunk: string) => (data += chunk));
           res.on("end", () => {
             if (res.statusCode === 200) {
               try {

@@ -5,15 +5,15 @@
 
 // OpenAPI types - using obj for the complex nested structure
 interface OpenAPISpec {
-  openapi: str;
-  info: obj;
-  servers: arr<obj>;
-  components: obj;
-  security: arr<obj>;
-  paths: obj;
+  openapi: string;
+  info: Record<string, any>;
+  servers: Array<Record<string, any>>;
+  components: Record<string, any>;
+  security: Array<Record<string, any>>;
+  paths: Record<string, any>;
 }
 
-export function generateOpenAPISpec(baseUrl: str = 'http://localhost:8765'): OpenAPISpec {
+export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): OpenAPISpec {
   return {
     openapi: "3.0.0",
     info: {

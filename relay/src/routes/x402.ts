@@ -859,7 +859,7 @@ router.get("/relay-storage", async (req, res) => {
         warning: relayStorage.warning,
         warningThreshold: relayStorage.warningThreshold,
         full: relayStorage.full,
-        numObjects: relayStorage.numObjects,
+        numObjects: relayStorage.numberObjects ,
       },
       message: relayStorage.full
         ? "Relay storage is FULL - no new subscriptions can be accepted"

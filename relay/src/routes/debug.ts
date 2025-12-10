@@ -9,7 +9,7 @@ const getGunInstance = (req: Request): any => {
 };
 
 // Funzione helper per ottenere l'utilizzo MB off-chain
-async function getOffChainMBUsage(userAddress: str, req: Request): prm<num> {
+async function getOffChainMBUsage(userAddress: string, req: Request): Promise<number> {
   const gun = getGunInstance(req);
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => {
@@ -38,7 +38,7 @@ router.get("/mb-usage/:userAddress", async (req: Request, res: Response) => {
     // Get MB usage data
     const mbUsageNode = gun.get("shogun").get("mbUsage").get(userAddress);
 
-    const getDebugData = (): prm<any> => {
+    const getDebugData = (): Promise<any> => {
       return new Promise((resolve, reject) => {
         let timeoutId: NodeJS.Timeout;
         let dataReceived = false;
@@ -109,7 +109,7 @@ router.get("/user-mb-usage/:identifier", async (req: Request, res: Response) => 
 
     const mbUsageNode = gun.get("shogun").get("mbUsage").get(identifier);
 
-    const getMBUsage = (): prm<num> => {
+    const getMBUsage = (): Promise<number> => {
       return new Promise((resolve, reject) => {
         let timeoutId: NodeJS.Timeout;
         let dataReceived = false;
@@ -171,7 +171,7 @@ router.get("/user-uploads/:identifier", async (req: Request, res: Response) => {
 
     const uploadsNode = gun.get("shogun").get("uploads").get(identifier);
 
-    const getDebugData = (): prm<any> => {
+    const getDebugData = (): Promise<any> => {
       return new Promise((resolve, reject) => {
         let timeoutId: NodeJS.Timeout;
         let dataReceived = false;

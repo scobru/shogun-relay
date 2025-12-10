@@ -444,14 +444,14 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
         }
 
-        function formatNumber(num) {
-            if (num === null || num === undefined) return '-';
-            if (typeof num === 'number') {
-                if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M';
-                if (num >= 1000) return (num / 1000).toFixed(2) + 'K';
-                return num.toLocaleString();
+        function formatNumber(number) {
+            if (number === null || number === undefined) return '-';
+            if (typeof number === 'number') {
+                if (number >= 1000000) return (number / 1000000).toFixed(2) + 'M';
+                if (number >= 1000) return (number / 1000).toFixed(2) + 'K';
+                return number.toLocaleString();
             }
-            return num;
+            return number;
         }
 
         function getTierClass(score) {

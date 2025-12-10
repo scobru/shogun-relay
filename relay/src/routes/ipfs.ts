@@ -25,33 +25,33 @@ import {
 // Extended Request interface with custom properties
 interface CustomRequest extends Request {
   authType?: "admin" | "user";
-  userAddress?: str;
-  isDealUpload?: bool;
+  userAddress?: string;
+  isDealUpload?: boolean;
   subscription?: {
-    active: bool;
-    tier?: str;
-    storageMB?: num;
-    storageUsedMB?: num;
-    storageRemainingMB?: num;
-    reason?: str;
+    active: boolean;
+    tier?: string;
+    storageMB?: number;
+    storageUsedMB?: number;
+    storageRemainingMB?: number;
+    reason?: string;
   };
   verifiedStorage?: {
-    allowed: bool;
-    reason?: str;
-    storageUsedMB?: num;
-    storageRemainingMB?: num;
-    storageTotalMB?: num;
-    currentTier?: str;
-    verified?: bool;
-    requiresUpgrade?: bool;
+    allowed: boolean;
+    reason?: string;
+    storageUsedMB?: number;
+    storageRemainingMB?: number;
+    storageTotalMB?: number;
+    currentTier?: string;
+    verified?: boolean;
+    requiresUpgrade?: boolean;
   };
 }
 
 const router: Router = express.Router();
 
 // Configurazione IPFS
-const IPFS_API_URL: str = ipfsConfig.apiUrl;
-const IPFS_API_TOKEN: str | undefined = ipfsConfig.apiToken;
+const IPFS_API_URL: string = ipfsConfig.apiUrl;
+const IPFS_API_TOKEN: string | undefined = ipfsConfig.apiToken;
 
 // Configurazione multer per upload
 const upload = multer({
@@ -80,21 +80,21 @@ function getIpfsAuthHeader() {
 
 // Helper function to create request options with proper typing
 function createIpfsRequestOptions(
-  path: str,
-  method: str = "POST"
+  path: string,
+  method: string = "POST"
 ): {
-  hostname: str;
-  port: num;
-  path: str;
-  method: str;
-  headers: Record<str, str>;
+  hostname: string;
+  port: number;
+  path: string;
+  method: string;
+  headers: Record<string, string>;
 } {
   const options: {
-    hostname: str;
-    port: num;
-    path: str;
-    method: str;
-    headers: Record<str, str>;
+    hostname: string;
+    port: number;
+    path: string;
+    method: string;
+    headers: Record<string, string>;
   } = {
     hostname: "127.0.0.1",
     port: 5001,
@@ -220,11 +220,11 @@ router.post("/api/:endpoint(*)", async (req: CustomRequest, res: Response) => {
   try {
     const endpoint = req.params.endpoint;
     const requestOptions: {
-      hostname: str;
-      port: num;
-      path: str;
-      method: str;
-      headers: Record<string, str>;
+      hostname: string;
+      port: number;
+      path: string;
+      method: string;
+      headers: Record<string, string>;
     } = {
       hostname: "127.0.0.1",
       port: 5001,
@@ -360,7 +360,7 @@ router.post(
         loggers.server.info({ userAddress }, `Upload allowed for storage deal`);
         req.isDealUpload = true;
         next();
-      } else if (x402Config.payToAddress as str) {
+      } else if (x402Config.payToAddress as string) {
         // For subscription-based uploads, check subscription status
         const gun = req.app.get("gunInstance");
         if (!gun) {
@@ -530,14 +530,14 @@ router.post(
       loggers.server.debug({ fileResult }, "📤 IPFS Upload response");
 
       const uploadData: {
-        name: str;
-        size: num;
-        mimetype: str;
+        name: string;
+        size: number;
+        mimetype: string;
         hash: any;
         sizeBytes: any;
-        uploadedAt: num;
-        sizeMB?: num;
-        userAddress?: str;
+        uploadedAt: number;
+        sizeMB?: number;
+        userAddress?: string;
       } = {
         name: req.file.originalname,
         size: req.file.size,
@@ -784,16 +784,16 @@ router.post(
               mbUsage:
                 customReq.authType === "user"
                   ? {
-                      actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
-                      sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
-                      verified: true,
-                    }
+                    actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                    sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
+                    verified: true,
+                  }
                   : undefined,
               subscription: subscriptionResult
                 ? {
-                    storageUsedMB: subscriptionResult.storageUsedMB,
-                    storageRemainingMB: subscriptionResult.storageRemainingMB,
-                  }
+                  storageUsedMB: subscriptionResult.storageUsedMB,
+                  storageRemainingMB: subscriptionResult.storageRemainingMB,
+                }
                 : undefined,
             });
           })
@@ -810,12 +810,12 @@ router.post(
               mbUsage:
                 customReq.authType === "user" && req.file
                   ? {
-                      actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
-                      sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
-                      verified: false,
-                      error:
-                        error instanceof Error ? error.message : String(error),
-                    }
+                    actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                    sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
+                    verified: false,
+                    error:
+                      error instanceof Error ? error.message : String(error),
+                  }
                   : undefined,
             });
           });
@@ -849,7 +849,7 @@ router.get("/status", async (req: Request, res: Response) => {
       method: "POST",
       headers: {
         "Content-Length": "0",
-      } as Record<string, str>,
+      } as Record<string, string>,
     };
 
     if (IPFS_API_TOKEN) {
@@ -916,11 +916,11 @@ router.get("/cat/:cid", async (req, res) => {
     loggers.server.debug({ cid }, `📄 IPFS Content request`);
 
     const requestOptions: {
-      hostname: str;
-      port: num;
-      path: str;
-      method: str;
-      headers: Record<string, str>;
+      hostname: string;
+      port: number;
+      path: string;
+      method: string;
+      headers: Record<string, string>;
     } = {
       hostname: "127.0.0.1",
       port: 5001,
@@ -928,7 +928,7 @@ router.get("/cat/:cid", async (req, res) => {
       method: "POST",
       headers: {
         "Content-Length": "0",
-      } as Record<string, str>,
+      } as Record<string, string>,
     };
 
     if (IPFS_API_TOKEN) {
@@ -1099,7 +1099,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
       };
 
       if (IPFS_API_TOKEN) {
-        (requestOptions.headers as Record<string, str>)["Authorization"] =
+        (requestOptions.headers as Record<string, string>)["Authorization"] =
           `Bearer ${IPFS_API_TOKEN}`;
       }
     } else {
@@ -1208,7 +1208,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
           ) {
             loggers.server.warn(
               { cid },
-              `⚠️ Detected "[object Object]"str- file was uploaded incorrectly`
+              `⚠️ Detected "[object Object]"string- file was uploaded incorrectly`
             );
             // Cannot decrypt this, return error
             if (!res.headersSent) {
@@ -1433,7 +1433,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
             );
             const SEA = await import("gun/sea.js");
             // Decrypt using the token (signature, password, or key)
-            // Token can be:str(password), signature (hex), or keypair object
+            // Token can be:string(password), signature (hex), or keypair object
             // Note: SEA.decrypt expects the encrypted object and the key/password
             let decrypted;
             try {
@@ -1803,11 +1803,11 @@ router.get("/cat/:cid/json", async (req: Request, res: Response) => {
     loggers.server.debug({ cid }, `📄 IPFS Content JSON request`);
 
     const requestOptions: {
-      hostname: str;
-      port: num;
-      path: str;
-      method: str;
-      headers: Record<string, str>;
+      hostname: string;
+      port: number;
+      path: string;
+      method: string;
+      headers: Record<string, string>;
     } = {
       hostname: "127.0.0.1",
       port: 5001,
@@ -1815,7 +1815,7 @@ router.get("/cat/:cid/json", async (req: Request, res: Response) => {
       method: "POST",
       headers: {
         "Content-Length": "0",
-      } as Record<string, str>,
+      } as Record<string, string>,
     };
 
     if (IPFS_API_TOKEN) {
@@ -1918,11 +1918,11 @@ router.post(
       }
 
       const requestOptions: {
-        hostname: str;
-        port: num;
-        path: str;
-        method: str;
-        headers: Record<string, str>;
+        hostname: string;
+        port: number;
+        path: string;
+        method: string;
+        headers: Record<string, string>;
       } = {
         hostname: "127.0.0.1",
         port: 5001,
@@ -1930,7 +1930,7 @@ router.post(
         method: "POST",
         headers: {
           "Content-Length": "0",
-        } as Record<string, str>,
+        } as Record<string, string>,
       };
 
       if (IPFS_API_TOKEN) {
@@ -2029,7 +2029,7 @@ router.post(
       };
 
       if (IPFS_API_TOKEN) {
-        (requestOptions.headers as Record<string, str>)["Authorization"] =
+        (requestOptions.headers as Record<string, string>)["Authorization"] =
           `Bearer ${IPFS_API_TOKEN}`;
         loggers.server.debug(
           "🔐 IPFS API token found, adding authorization header"
@@ -2179,11 +2179,11 @@ router.post(
       }
 
       const requestOptions: {
-        hostname: str;
-        port: num;
-        path: str;
-        method: str;
-        headers: Record<string, str>;
+        hostname: string;
+        port: number;
+        path: string;
+        method: string;
+        headers: Record<string, string>;
       } = {
         hostname: "127.0.0.1",
         port: 5001,
@@ -2306,11 +2306,11 @@ router.get(
   async (req, res) => {
     try {
       const requestOptions: {
-        hostname: str;
-        port: num;
-        path: str;
-        method: str;
-        headers: Record<string, str>;
+        hostname: string;
+        port: number;
+        path: string;
+        method: string;
+        headers: Record<string, string>;
       } = {
         hostname: "127.0.0.1",
         port: 5001,
@@ -2318,7 +2318,7 @@ router.get(
         method: "POST",
         headers: {
           "Content-Length": "0",
-        } as Record<string, str>,
+        } as Record<string, string>,
       };
 
       if (IPFS_API_TOKEN) {
@@ -2396,11 +2396,11 @@ router.post(
   async (req, res) => {
     try {
       const requestOptions: {
-        hostname: str;
-        port: num;
-        path: str;
-        method: str;
-        headers: Record<string, str>;
+        hostname: string;
+        port: number;
+        path: string;
+        method: string;
+        headers: Record<string, string>;
       } = {
         hostname: "127.0.0.1",
         port: 5001,
@@ -2408,7 +2408,7 @@ router.post(
         method: "POST",
         headers: {
           "Content-Length": "0",
-        } as Record<string, str>,
+        } as Record<string, string>,
       };
 
       if (IPFS_API_TOKEN) {
@@ -2512,7 +2512,7 @@ router.get(
         method: "POST",
         headers: {
           "Content-Length": "0",
-        } as Record<string, str>,
+        } as Record<string, string>,
       };
 
       if (IPFS_API_TOKEN) {
@@ -2593,11 +2593,11 @@ router.get("/stat/:cid", async (req: Request, res: Response) => {
   try {
     // Try object/stat first (works for most CIDs)
     const objectStatOptions: {
-      hostname: str;
-      port: num;
-      path: str;
-      method: str;
-      headers: Record<string, str>;
+      hostname: string;
+      port: number;
+      path: string;
+      method: string;
+      headers: Record<string, string>;
     } = {
       hostname: "127.0.0.1",
       port: 5001,
@@ -2655,11 +2655,11 @@ router.get("/stat/:cid", async (req: Request, res: Response) => {
     // Fallback to block/stat
     try {
       const blockStatOptions: {
-        hostname: str;
-        port: num;
-        path: str;
-        method: str;
-        headers: Record<string, str>;
+        hostname: string;
+        port: number;
+        path: string;
+        method: string;
+        headers: Record<string, string>;
       } = {
         hostname: "127.0.0.1",
         port: 5001,
@@ -2757,7 +2757,7 @@ router.get(
         method: "POST",
         headers: {
           "Content-Length": "0",
-        } as Record<string, str>,
+        } as Record<string, string>,
       };
 
       if (IPFS_API_TOKEN) {
@@ -2793,11 +2793,11 @@ router.get(
 
       // Get storage info from files/stat
       const storageRequestOptions: {
-        hostname: str;
-        port: num;
-        path: str;
-        method: str;
-        headers: Record<string, str>;
+        hostname: string;
+        port: number;
+        path: string;
+        method: string;
+        headers: Record<string, string>;
       } = {
         hostname: "127.0.0.1",
         port: 5001,
@@ -2841,11 +2841,11 @@ router.get(
 
       // Get version info
       const versionRequestOptions: {
-        hostname: str;
-        port: num;
-        path: str;
-        method: str;
-        headers: Record<string, str>;
+        hostname: string;
+        port: number;
+        path: string;
+        method: string;
+        headers: Record<string, string>;
       } = {
         hostname: "127.0.0.1",
         port: 5001,
@@ -2853,7 +2853,7 @@ router.get(
         method: "POST",
         headers: {
           "Content-Length": "0",
-        } as Record<string, str>,
+        } as Record<string, string>,
       };
 
       if (IPFS_API_TOKEN) {
@@ -2950,7 +2950,7 @@ router.get("/version", async (req, res) => {
       method: "POST",
       headers: {
         "Content-Length": "0",
-      } as Record<string, str>,
+      } as Record<string, string>,
     };
 
     if (IPFS_API_TOKEN) {
@@ -3071,11 +3071,11 @@ router.get("/user-uploads/:userAddress", async (req, res) => {
       count: uploads.length,
       subscription: subscription.active
         ? {
-            tier: subscription.tier,
-            storageMB: subscription.storageMB,
-            storageUsedMB: subscription.storageUsedMB,
-            storageRemainingMB: subscription.storageRemainingMB,
-          }
+          tier: subscription.tier,
+          storageMB: subscription.storageMB,
+          storageUsedMB: subscription.storageUsedMB,
+          storageRemainingMB: subscription.storageRemainingMB,
+        }
         : null,
     });
   } catch (error: unknown) {
@@ -3130,11 +3130,11 @@ router.get("/user-uploads/:userAddress/:hash/view", async (req, res) => {
     const filename = uploadRecord.name || hash;
 
     const requestOptions: {
-      hostname: str;
-      port: num;
-      path: str;
-      method: str;
-      headers: Record<string, str>;
+      hostname: string;
+      port: number;
+      path: string;
+      method: string;
+      headers: Record<string, string>;
     } = {
       hostname: "127.0.0.1",
       port: 5001,
@@ -3293,7 +3293,7 @@ router.get(
       );
 
       // Redirect to the cat decrypt endpoint with same query params
-      const queryParams: Record<string, str> = {};
+      const queryParams: Record<string, string> = {};
       for (const [key, value] of Object.entries(req.query)) {
         if (typeof value === "string") {
           queryParams[key] = value;
@@ -3394,7 +3394,7 @@ router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
         method: "POST",
         headers: {
           "Content-Length": "0",
-        } as Record<string, str>,
+        } as Record<string, string>,
       };
 
       if (IPFS_API_TOKEN) {
@@ -3497,9 +3497,9 @@ router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
       unpin: unpinResult,
       subscription: updatedSubscription.active
         ? {
-            storageUsedMB: updatedSubscription.storageUsedMB,
-            storageRemainingMB: updatedSubscription.storageRemainingMB,
-          }
+          storageUsedMB: updatedSubscription.storageUsedMB,
+          storageRemainingMB: updatedSubscription.storageRemainingMB,
+        }
         : null,
     });
   } catch (error: unknown) {

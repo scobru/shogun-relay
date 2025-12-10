@@ -102,8 +102,8 @@ export default (app: express.Application) => {
 
   // --- IPFS Desktop Proxy Configuration ---
   const IPFS_GATEWAY_URL = ipfsConfig.gatewayUrl;
-  const IPFS_API_TOKEN = ipfsConfig.apiToken as str | undefined;
-  const IPFS_API_URL = ipfsConfig.apiUrl as str;
+  const IPFS_API_TOKEN = ipfsConfig.apiToken as string | undefined;
+  const IPFS_API_URL = ipfsConfig.apiUrl as string;
 
   loggers.server.info(
     { IPFS_API_URL, IPFS_GATEWAY_URL, authConfigured: !!IPFS_API_TOKEN },
@@ -354,10 +354,10 @@ export default (app: express.Application) => {
           details: err.message,
           fallback: hash
             ? {
-                publicGateway: `https://ipfs.io/ipfs/${hash}`,
-                cloudflareGateway: `https://cloudflare-ipfs.com/ipfs/${hash}`,
-                dweb: `https://dweb.link/ipfs/${hash}`,
-              }
+              publicGateway: `https://ipfs.io/ipfs/${hash}`,
+              cloudflareGateway: `https://cloudflare-ipfs.com/ipfs/${hash}`,
+              dweb: `https://dweb.link/ipfs/${hash}`,
+            }
             : undefined,
         });
       },
@@ -423,9 +423,8 @@ export default (app: express.Application) => {
             <html>
                <head>
                   <title>${post.title || "Blog Post"}</title>
-                  <meta name="description" content="${
-                    post.description || ""
-                  }" />
+                  <meta name="description" content="${post.description || ""
+          }" />
                </head>
                <body>
                   ${post.content}
@@ -447,12 +446,12 @@ export default (app: express.Application) => {
       req.query?.auth_token ||
       req.query?._auth_token ||
       (req.headers["authorization"] &&
-        (req.headers["authorization"] as str).split(" ")[1]) ||
+        (req.headers["authorization"] as string).split(" ")[1]) ||
       req.headers["token"];
 
     if (token === authConfig.adminPassword) {
       res.redirect(
-        "/api/v1/ipfs/webui/?auth_token=" + encodeURIComponent(token as str)
+        "/api/v1/ipfs/webui/?auth_token=" + encodeURIComponent(token as string)
       );
       return;
     }
@@ -661,10 +660,10 @@ export default (app: express.Application) => {
         : 0,
       adminPasswordPreview: authConfig.adminPassword
         ? authConfig.adminPassword.substring(0, 4) +
-          "..." +
-          authConfig.adminPassword.substring(
-            authConfig.adminPassword.length - 4
-          )
+        "..." +
+        authConfig.adminPassword.substring(
+          authConfig.adminPassword.length - 4
+        )
         : "N/A",
       timestamp: Date.now(),
     });

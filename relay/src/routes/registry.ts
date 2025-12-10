@@ -22,8 +22,8 @@ import { loggers } from '../utils/logger';
 const router: Router = express.Router();
 
 // Get chain configuration from environment
-const REGISTRY_CHAIN_ID: num = blockchainConfig.registryChainId;
-const RELAY_PRIVATE_KEY: mb<str> = blockchainConfig.relayPrivateKey;
+const REGISTRY_CHAIN_ID: number = blockchainConfig.registryChainId;
+const RELAY_PRIVATE_KEY: string | undefined = blockchainConfig.relayPrivateKey;
 
 /**
  * GET /api/v1/registry/status
@@ -47,7 +47,7 @@ router.get('/status', async (req: Request, res: Response) => {
         }
 
         const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
-        const relayAddress: str = client.wallet.address;
+        const relayAddress: string = client.wallet.address;
         const info = await client.getRelayInfo(relayAddress);
 
         if (!info) {
@@ -63,7 +63,7 @@ router.get('/status', async (req: Request, res: Response) => {
         }
 
         // Get total deals count from StorageDealRegistry
-        let totalDeals: num = 0;
+        let totalDeals: number = 0;
         try {
             const { createStorageDealRegistryClient } = await import('../utils/registry-client.js');
             const storageDealRegistryClient = createStorageDealRegistryClient(REGISTRY_CHAIN_ID);
@@ -105,7 +105,7 @@ router.get('/balance', async (req: Request, res: Response) => {
         }
 
         const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
-        const relayAddress: str = client.wallet.address;
+        const relayAddress: string = client.wallet.address;
 
         const [ethBalance, usdcBalance] = await Promise.all([
             client.provider.getBalance(relayAddress),
@@ -189,7 +189,7 @@ router.post('/register', async (req: Request, res: Response) => {
         }
 
         // Use provided griefingRatio or default to 0 (contract will use default)
-        const finalGriefingRatio: num = griefingRatio !== undefined ? parseInt(griefingRatio) : 0;
+        const finalGriefingRatio: number = griefingRatio !== undefined ? parseInt(griefingRatio) : 0;
 
         loggers.registry.info({ endpoint }, 'Registering relay on-chain');
         const result = await client.registerRelay(endpoint, gunPubKey, stakeAmount, finalGriefingRatio);
@@ -390,10 +390,10 @@ router.post('/deal/register', async (req: Request, res: Response) => {
         const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
 
         // Generate deal ID if not provided
-        const finalDealId: str = dealId || generateDealId(cid, clientAddress);
+        const finalDealId: string = dealId || generateDealId(cid, clientAddress);
 
         // Use provided clientStake or default to '0'
-        const finalClientStake: str = clientStake || '0';
+        const finalClientStake: string = clientStake || '0';
 
         const result = await client.registerDeal(
             finalDealId,
@@ -471,7 +471,7 @@ router.get('/deals', async (req: Request, res: Response) => {
         const { createStorageDealRegistryClient } = await import('../utils/registry-client.js');
         const storageDealRegistryClient = createStorageDealRegistryClient(REGISTRY_CHAIN_ID);
         const registryClient = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
-        const relayAddress: str = registryClient.wallet.address;
+        const relayAddress: string = registryClient.wallet.address;
 
         // Get deals from StorageDealRegistry (not from RelayRegistry)
         const deals = await storageDealRegistryClient.getRelayDeals(relayAddress);
@@ -521,8 +521,8 @@ router.get('/config', async (req: Request, res: Response) => {
         }
 
         // Get network name
-        const networkName: str = Object.keys(CONTRACTS_CONFIG).find(
-            (key: str) => (CONTRACTS_CONFIG as any)[key].chainId === REGISTRY_CHAIN_ID
+        const networkName: string = Object.keys(CONTRACTS_CONFIG).find(
+            (key: string) => (CONTRACTS_CONFIG as any)[key].chainId === REGISTRY_CHAIN_ID
         ) || 'Unknown';
 
         res.json({

@@ -3,19 +3,19 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { loggers } from '../utils/logger';
-const __filename: str = fileURLToPath(import.meta.url);
-const __dirname: str = path.dirname(__filename);
+const __filename: string = fileURLToPath(import.meta.url);
+const __dirname: string = path.dirname(__filename);
 
 const router: Router = express.Router();
 
 
 // Get the public path
-const publicPath: str = path.resolve(__dirname, '../public');
+const publicPath: string = path.resolve(__dirname, '../public');
 
 // Main visual graph interface
 router.get('/', (req: Request, res: Response): void => {
     loggers.visualGraph.info('Visual Graph route accessed');
-    const filePath: str = path.resolve(publicPath, 'visualGraph/visualGraph.html');
+    const filePath: string = path.resolve(publicPath, 'visualGraph/visualGraph.html');
     loggers.visualGraph.info({ filePath }, 'Serving visualGraph.html');
 
     if (fs.existsSync(filePath)) {
@@ -28,7 +28,7 @@ router.get('/', (req: Request, res: Response): void => {
 
 // Serve specific static files first
 router.get('/visualGraph.js', (req: Request, res: Response): void => {
-    const filePath: str = path.resolve(publicPath, 'visualGraph/visualGraph.js');
+    const filePath: string = path.resolve(publicPath, 'visualGraph/visualGraph.js');
     loggers.visualGraph.info({ filePath }, 'Serving visualGraph.js');
 
     if (fs.existsSync(filePath)) {
@@ -41,7 +41,7 @@ router.get('/visualGraph.js', (req: Request, res: Response): void => {
 });
 
 router.get('/abstraction.js', (req: Request, res: Response): void => {
-    const filePath: str = path.resolve(publicPath, 'visualGraph/abstraction.js');
+    const filePath: string = path.resolve(publicPath, 'visualGraph/abstraction.js');
     loggers.visualGraph.info({ filePath }, 'Serving abstraction.js');
 
     if (fs.existsSync(filePath)) {
@@ -54,7 +54,7 @@ router.get('/abstraction.js', (req: Request, res: Response): void => {
 });
 
 router.get('/vGmain.css', (req: Request, res: Response): void => {
-    const filePath: str = path.resolve(publicPath, 'visualGraph/vGmain.css');
+    const filePath: string = path.resolve(publicPath, 'visualGraph/vGmain.css');
     loggers.visualGraph.info({ filePath }, 'Serving vGmain.css');
 
     if (fs.existsSync(filePath)) {
@@ -67,7 +67,7 @@ router.get('/vGmain.css', (req: Request, res: Response): void => {
 });
 
 router.get('/visualGraphIcon.svg', (req: Request, res: Response): void => {
-    const filePath: str = path.resolve(publicPath, 'visualGraph/visualGraphIcon.svg');
+    const filePath: string = path.resolve(publicPath, 'visualGraph/visualGraphIcon.svg');
     loggers.visualGraph.info({ filePath }, 'Serving visualGraphIcon.svg');
 
     if (fs.existsSync(filePath)) {
@@ -81,8 +81,8 @@ router.get('/visualGraphIcon.svg', (req: Request, res: Response): void => {
 
 // Catch-all route for other static files
 router.get('/*', (req: Request, res: Response): void => {
-    const requestedPath: str = req.path;
-    const filePath: str = path.resolve(publicPath, 'visualGraph' + requestedPath);
+    const requestedPath: string = req.path;
+    const filePath: string = path.resolve(publicPath, 'visualGraph' + requestedPath);
 
     loggers.visualGraph.info({ requestedPath }, 'Visual Graph static file requested');
     loggers.visualGraph.info({ filePath }, 'Resolved file path');
@@ -91,8 +91,8 @@ router.get('/*', (req: Request, res: Response): void => {
         loggers.visualGraph.info({ filePath }, 'File found, serving');
 
         // Set appropriate MIME types
-        const ext: str = path.extname(filePath).toLowerCase();
-        const mimeTypes: obj = {
+        const ext: string = path.extname(filePath).toLowerCase();
+        const mimeTypes: Record<string, string> = {
             '.js': 'application/javascript',
             '.css': 'text/css',
             '.svg': 'image/svg+xml',

@@ -232,10 +232,10 @@ router.get("/stats.json", (req, res) => {
 router.get("/node/*", async (req, res) => {
   try {
     // @ts-ignore - req.params is an array for wildcard routes
-    const path: str = req.params[0] as str;
+    const path: string = req.params[0] as string;
     const gun = getGunInstance(req);
 
-    const getGunNodeFromPath = (pathString: str): any => {
+    const getGunNodeFromPath = (pathString: string): any => {
       const pathParts = pathString.split("/").filter(Boolean);
       let node = gun;
 
@@ -268,7 +268,7 @@ router.get("/node/*", async (req, res) => {
 router.post("/node/*", async (req, res) => {
   try {
     // @ts-ignore - req.params is an array for wildcard routes
-    const path: str = req.params[0] as str;
+    const path: string = req.params[0] as string;
     const { data } = req.body;
     const gun = getGunInstance(req);
 
@@ -289,7 +289,7 @@ router.post("/node/*", async (req, res) => {
 
     loggers.server.debug({ path, data }, `📝 Creating node`);
 
-    const getGunNodeFromPath = (pathString: str): any => {
+    const getGunNodeFromPath = (pathString: string): any => {
       const pathParts = pathString.split("/").filter(Boolean);
       let node = gun;
 
@@ -352,7 +352,7 @@ router.post("/node/*", async (req, res) => {
 router.delete("/node/*", async (req, res) => {
   try {
     // @ts-ignore - req.params is an array for wildcard routes
-    const path: str = req.params[0] as str;
+    const path: string = req.params[0] as string;
     const gun = getGunInstance(req);
 
     if (!path || path.trim() === "") {
@@ -363,7 +363,7 @@ router.delete("/node/*", async (req, res) => {
 
     loggers.server.debug({ path }, `🗑️ Deleting node`);
 
-    const getGunNodeFromPath = (pathString: str): any => {
+    const getGunNodeFromPath = (pathString: string): any => {
       const pathParts = pathString.split("/").filter(Boolean);
       let node = gun;
 
@@ -433,8 +433,8 @@ router.delete("/node/*", async (req, res) => {
 // Logs endpoint for real-time relay logs from file
 router.get("/logs", (req, res) => {
   try {
-    const limit: num = parseInt(req.query.limit as str) || 100;
-    const tail: num = parseInt(req.query.tail as str) || 100; // Number of lines to read from end
+    const limit: number = parseInt(req.query.limit as string) || 100;
+    const tail: number = parseInt(req.query.tail as string) || 100; // Number of lines to read from end
 
     // Read relay log file directly
     const logFilePath = "/var/log/supervisor/relay.log";

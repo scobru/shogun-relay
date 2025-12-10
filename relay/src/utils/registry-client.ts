@@ -25,97 +25,97 @@ const log = loggers.registry;
 
 // Interfaces
 interface NetworkConfig {
-  chainId: num;
-  relayRegistry?: str;
-  storageDealRegistry?: str;
-  usdc?: str;
-  rpc?: str;
+  chainId: number;
+  relayRegistry?: string;
+  storageDealRegistry?: string;
+  usdc?: string;
+  rpc?: string;
 }
 
 interface RelayInfo {
-  owner: str;
-  endpoint: str;
-  pubkey: Uint8Array | str;
-  epub: Uint8Array | str;
+  owner: string;
+  endpoint: string;
+  pubkey: Uint8Array | string;
+  epub: Uint8Array | string;
   stakedAmount: bigint;
   registeredAt: bigint;
   updatedAt: bigint;
   unstakeRequestedAt: bigint;
-  status: num;
+  status: number;
   totalSlashed: bigint;
-  griefingRatio?: num;
+  griefingRatio?: number;
 }
 
 interface FormattedRelayInfo {
-  address: str;
-  owner: str;
-  endpoint: str;
-  gunPubKey: str;
-  epub: str;
-  stakedAmount: str;
-  stakedAmountRaw: str;
-  registeredAt: str;
-  updatedAt: str;
-  unstakeRequestedAt: mb<str>;
-  status: str;
-  totalSlashed: str;
-  griefingRatio: mb<num>;
+  address: string;
+  owner: string;
+  endpoint: string;
+  gunPubKey: string;
+  epub: string;
+  stakedAmount: string;
+  stakedAmountRaw: string;
+  registeredAt: string;
+  updatedAt: string;
+  unstakeRequestedAt: string | undefined;
+  status: string;
+  totalSlashed: string;
+  griefingRatio: number | undefined;
 }
 
 interface RegistryParams {
-  minStake: str;
-  minStakeRaw: str;
-  unstakingDelay: num;
-  unstakingDelayDays: num;
+  minStake: string;
+  minStakeRaw: string;
+  unstakingDelay: number;
+  unstakingDelayDays: number;
 }
 
 interface GriefingCost {
-  slashAmount: str;
-  slashAmountRaw: str;
-  cost: str;
-  costRaw: str;
+  slashAmount: string;
+  slashAmountRaw: string;
+  cost: string;
+  costRaw: string;
 }
 
 interface TransactionResult {
-  success: bool;
-  txHash: str;
-  blockNumber?: num;
-  relayAddress?: str;
-  dealIdBytes32?: str;
+  success: boolean;
+  txHash: string;
+  blockNumber?: number;
+  relayAddress?: string;
+  dealIdBytes32?: string;
 }
 
 interface DealInfo {
-  dealId: str;
-  relay: str;
-  client: str;
-  cid: str;
-  sizeMB: num;
-  priceUSDC: str;
-  createdAt: str;
-  expiresAt: str;
-  active: bool;
-  clientStake: str;
-  clientStakeRaw: str;
-  griefed: bool;
+  dealId: string;
+  relay: string;
+  client: string;
+  cid: string;
+  sizeMB: number;
+  priceUSDC: string;
+  createdAt: string;
+  expiresAt: string;
+  active: boolean;
+  clientStake: string;
+  clientStakeRaw: string;
+  griefed: boolean;
 }
 
 // Generate contract address mappings from centralized config
 // This maintains backward compatibility while using the centralized configuration
 const generateAddressMappings = (): {
-  registryAddresses: Record<num, mb<str>>;
-  storageDealRegistryAddresses: Record<num, mb<str>>;
-  usdcAddresses: Record<num, mb<str>>;
-  rpcUrls: Record<num, mb<str>>;
+  registryAddresses: Record<number, string | undefined>;
+  storageDealRegistryAddresses: Record<number, string | undefined>;
+  usdcAddresses: Record<number, string | undefined>;
+  rpcUrls: Record<number, string | undefined>;
 } => {
-  const registryAddresses: Record<num, mb<str>> = Object.create(null);
-  const storageDealRegistryAddresses: Record<num, mb<str>> = Object.create(
+  const registryAddresses: Record<number, string | undefined> = Object.create(null);
+  const storageDealRegistryAddresses: Record<number, string | undefined> = Object.create(
     null
   );
-  const usdcAddresses: Record<num, mb<str>> = Object.create(null);
-  const rpcUrls: Record<num, mb<str>> = Object.create(null);
+  const usdcAddresses: Record<number, string | undefined> = Object.create(null);
+  const rpcUrls: Record<number, string | undefined> = Object.create(null);
 
   // Iterate through all network configs
-  for (const config of Object.values(CONTRACTS_CONFIG) as arr<NetworkConfig>) {
+  for (const config of Object.values(CONTRACTS_CONFIG) as Array<NetworkConfig>) {
     if (config && config.chainId) {
       registryAddresses[config.chainId] = config.relayRegistry || undefined;
       storageDealRegistryAddresses[config.chainId] =
@@ -147,7 +147,7 @@ export const USDC_ADDRESSES = usdcAddresses;
 export const RPC_URLS = rpcUrls;
 
 // Relay status enum
-const RelayStatus: Record<num, str> = {
+const RelayStatus: Record<number, string> = {
   0: "Inactive",
   1: "Active",
   2: "Unstaking",
@@ -157,7 +157,7 @@ const RelayStatus: Record<num, str> = {
 /**
  * Helper to convert bytes to string
  */
-function bytesToString(bytes: Uint8Array | str): str {
+function bytesToString(bytes: Uint8Array | string): string {
   if (!bytes || (Array.isArray(bytes) && bytes.length === 0)) return "";
   try {
     return ethers.toUtf8String(bytes as Uint8Array);
@@ -171,7 +171,7 @@ function bytesToString(bytes: Uint8Array | str): str {
  */
 function formatRelayInfo(
   info: RelayInfo,
-  relayAddress: str
+  relayAddress: string
 ): FormattedRelayInfo {
   return {
     address: relayAddress,
@@ -200,9 +200,9 @@ function formatRelayInfo(
  * @returns Registry client
  */
 export function createRegistryClient(
-  chainId: num = 84532,
-  rpcUrl: mb<str> = undefined
-): obj {
+  chainId: number = 84532,
+  rpcUrl: string | undefined = undefined
+): any {
   const registryAddress = REGISTRY_ADDRESSES[chainId];
   if (!registryAddress) {
     throw new Error(`Registry not deployed on chain ${chainId}`);
@@ -226,9 +226,9 @@ export function createRegistryClient(
      * Get all active relays with their info
      * @returns List of active relays
      */
-    async getActiveRelays(): prm<arr<FormattedRelayInfo>> {
-      const addresses: arr<str> = await relayRegistry.getActiveRelays();
-      const relays: arr<FormattedRelayInfo> = [];
+    async getActiveRelays(): Promise<Array<FormattedRelayInfo>> {
+      const addresses: Array<string> = await relayRegistry.getActiveRelays();
+      const relays: Array<FormattedRelayInfo> = [];
 
       for (const addr of addresses) {
         try {
@@ -247,7 +247,7 @@ export function createRegistryClient(
      * Get count of active relays
      * @returns Number of active relays
      */
-    async getActiveRelayCount(): prm<num> {
+    async getActiveRelayCount(): Promise<number> {
       const count = await relayRegistry.getContract().getActiveRelayCount();
       return Number(count);
     },
@@ -257,7 +257,7 @@ export function createRegistryClient(
      * @param relayAddress - Relay address
      * @returns Relay info or undefined
      */
-    async getRelayInfo(relayAddress: str): prm<mb<FormattedRelayInfo>> {
+    async getRelayInfo(relayAddress: string): Promise<FormattedRelayInfo | undefined> {
       try {
         const info: RelayInfo = await relayRegistry.getRelayInfo(relayAddress);
         if (info.owner === ethers.ZeroAddress) {
@@ -275,7 +275,7 @@ export function createRegistryClient(
      * @param relayAddress - Relay address
      * @returns True if active
      */
-    async isActiveRelay(relayAddress: str): prm<bool> {
+    async isActiveRelay(relayAddress: string): Promise<boolean> {
       return await relayRegistry.isActiveRelay(relayAddress);
     },
 
@@ -284,7 +284,7 @@ export function createRegistryClient(
      * @param dealId - bytes32 deal ID
      * @returns Deal info or undefined
      */
-    async getDeal(dealId: str): prm<mb<DealInfo>> {
+    async getDeal(dealId: string): Promise<DealInfo | undefined> {
       // This method should use StorageDealRegistry, not RelayRegistry
       // Keeping for backward compatibility but delegating to StorageDealRegistry
       const storageDealClient = createStorageDealRegistryClient(this.chainId);
@@ -296,7 +296,7 @@ export function createRegistryClient(
      * @param relayAddress - Relay address
      * @returns Array of deals
      */
-    async getRelayDeals(relayAddress: str): prm<arr<DealInfo>> {
+    async getRelayDeals(relayAddress: string): Promise<Array<DealInfo>> {
       const storageDealClient = createStorageDealRegistryClient(this.chainId);
       return await storageDealClient.getRelayDeals(relayAddress);
     },
@@ -306,7 +306,7 @@ export function createRegistryClient(
      * @param clientAddress - Client address
      * @returns Array of deals
      */
-    async getClientDeals(clientAddress: str): prm<arr<DealInfo>> {
+    async getClientDeals(clientAddress: string): Promise<Array<DealInfo>> {
       const storageDealClient = createStorageDealRegistryClient(this.chainId);
       return await storageDealClient.getClientDeals(clientAddress);
     },
@@ -315,7 +315,7 @@ export function createRegistryClient(
      * Get registry parameters
      * @returns Registry params
      */
-    async getRegistryParams(): prm<RegistryParams> {
+    async getRegistryParams(): Promise<RegistryParams> {
       const contract = relayRegistry.getContract();
       const [minStake, unstakingDelay] = await Promise.all([
         contract.minStake(),
@@ -337,12 +337,12 @@ export function createRegistryClient(
      * @returns Griefing cost info
      */
     async calculateGriefingCost(
-      relayAddress: str,
-      slashBps: num,
-      dealId: str
-    ): prm<GriefingCost> {
+      relayAddress: string,
+      slashBps: number,
+      dealId: string
+    ): Promise<GriefingCost> {
       try {
-        let dealIdBytes32: str;
+        let dealIdBytes32: string;
         if (typeof dealId === "string") {
           dealIdBytes32 = dealId.startsWith("0x") ? dealId : ethers.id(dealId);
         } else {
@@ -396,10 +396,10 @@ export function createRegistryClient(
  * @returns Registry client with signer
  */
 export function createRegistryClientWithSigner(
-  privateKey: str,
-  chainId: num = 84532,
-  rpcUrl: mb<str> = undefined
-): obj {
+  privateKey: string,
+  chainId: number = 84532,
+  rpcUrl: string | undefined = undefined
+): any {
   const client = createRegistryClient(chainId, rpcUrl);
   const wallet = new ethers.Wallet(privateKey, client.provider);
   const sdkWithSigner = new ShogunSDK({
@@ -428,12 +428,12 @@ export function createRegistryClientWithSigner(
      * @returns Transaction receipt
      */
     async registerRelay(
-      endpoint: str,
-      gunPubKey: str,
-      stakeAmount: str,
-      griefingRatio: num = 0,
-      epub: str = ""
-    ): prm<TransactionResult> {
+      endpoint: string,
+      gunPubKey: string,
+      stakeAmount: string,
+      griefingRatio: number = 0,
+      epub: string = ""
+    ): Promise<TransactionResult> {
       const stakeWei = ethers.parseUnits(stakeAmount, 6);
 
       // Check USDC balance
@@ -526,10 +526,10 @@ export function createRegistryClientWithSigner(
      * @returns Transaction result
      */
     async updateRelay(
-      newEndpoint: str = "",
-      newGunPubKey: str = "",
-      newEpub: str = ""
-    ): prm<TransactionResult> {
+      newEndpoint: string = "",
+      newGunPubKey: string = "",
+      newEpub: string = ""
+    ): Promise<TransactionResult> {
       if (newEndpoint) {
         const tx = await relayRegistry.updateRelay(newEndpoint);
         const receipt = await tx.wait();
@@ -567,7 +567,7 @@ export function createRegistryClientWithSigner(
      * @param amount - Additional USDC to stake
      * @returns Transaction result
      */
-    async increaseStake(amount: str): prm<TransactionResult> {
+    async increaseStake(amount: string): Promise<TransactionResult> {
       const amountWei = ethers.parseUnits(amount, 6);
 
       // Check/set allowance
@@ -592,7 +592,7 @@ export function createRegistryClientWithSigner(
      * Request unstake (start delay)
      * @returns Transaction result
      */
-    async requestUnstake(): prm<TransactionResult> {
+    async requestUnstake(): Promise<TransactionResult> {
       const tx = await relayRegistry.requestUnstake();
       const receipt = await tx.wait();
       return {
@@ -605,7 +605,7 @@ export function createRegistryClientWithSigner(
      * Withdraw stake after delay period
      * @returns Transaction result
      */
-    async withdrawStake(): prm<TransactionResult> {
+    async withdrawStake(): Promise<TransactionResult> {
       const tx = await relayRegistry.withdrawStake();
       const receipt = await tx.wait();
       return {
@@ -622,10 +622,10 @@ export function createRegistryClientWithSigner(
      * @returns Transaction result
      */
     async griefMissedProof(
-      relayAddress: str,
-      dealId: str,
-      evidence: str
-    ): prm<TransactionResult> {
+      relayAddress: string,
+      dealId: string,
+      evidence: string
+    ): Promise<TransactionResult> {
       // This should be handled by StorageDealRegistry
       const storageDealClient = createStorageDealRegistryClientWithSigner(
         privateKey,
@@ -633,7 +633,7 @@ export function createRegistryClientWithSigner(
         rpcUrl
       );
       const slashBps = 100; // 1%
-      const relayInfo = await this.getRelayInfo(relayAddress);
+      const relayInfo = await (this as any).getRelayInfo(relayAddress);
       const stakedAmount = BigInt(relayInfo!.stakedAmountRaw);
       const slashAmount = (stakedAmount * BigInt(slashBps)) / BigInt(10000);
       return await storageDealClient.grief(
@@ -651,17 +651,17 @@ export function createRegistryClientWithSigner(
      * @returns Transaction result
      */
     async griefDataLoss(
-      relayAddress: str,
-      dealId: str,
-      evidence: str
-    ): prm<TransactionResult> {
+      relayAddress: string,
+      dealId: string,
+      evidence: string
+    ): Promise<TransactionResult> {
       const storageDealClient = createStorageDealRegistryClientWithSigner(
         privateKey,
         chainId,
         rpcUrl
       );
       const slashBps = 1000; // 10%
-      const relayInfo = await this.getRelayInfo(relayAddress);
+      const relayInfo = await (this as any).getRelayInfo(relayAddress);
       const stakedAmount = BigInt(relayInfo!.stakedAmountRaw);
       const slashAmount = (stakedAmount * BigInt(slashBps)) / BigInt(10000);
       return await storageDealClient.grief(
@@ -681,10 +681,10 @@ export function createRegistryClientWithSigner(
  * @returns Deal ID string
  */
 export function generateDealId(
-  cid: str,
-  clientAddress: str,
-  timestamp: num = Date.now()
-): str {
+  cid: string,
+  clientAddress: string,
+  timestamp: number = Date.now()
+): string {
   return `deal-${cid}-${clientAddress}-${timestamp}`;
 }
 
@@ -693,7 +693,7 @@ export function generateDealId(
  * @param dealId - Deal ID
  * @returns bytes32 hash
  */
-export function dealIdToBytes32(dealId: str): str {
+export function dealIdToBytes32(dealId: string): string {
   return ethers.id(dealId);
 }
 
@@ -704,9 +704,9 @@ export function dealIdToBytes32(dealId: str): str {
  * @returns StorageDealRegistry client
  */
 export function createStorageDealRegistryClient(
-  chainId: num = 84532,
-  rpcUrl: mb<str> = undefined
-): obj {
+  chainId: number = 84532,
+  rpcUrl: string | undefined = undefined
+): any {
   const registryAddress = STORAGE_DEAL_REGISTRY_ADDRESSES[chainId];
   if (!registryAddress) {
     throw new Error(`StorageDealRegistry not deployed on chain ${chainId}`);
@@ -731,9 +731,9 @@ export function createStorageDealRegistryClient(
      * @param dealId - bytes32 deal ID (or string to hash)
      * @returns Deal info or undefined
      */
-    async getDeal(dealId: str): prm<mb<DealInfo>> {
+    async getDeal(dealId: string): Promise<DealInfo | undefined> {
       try {
-        let dealIdBytes32: str;
+        let dealIdBytes32: string;
         if (typeof dealId === "string") {
           dealIdBytes32 =
             dealId.startsWith("0x") && dealId.length === 66
@@ -790,27 +790,27 @@ export function createStorageDealRegistryClient(
      * @param clientAddress - Client address
      * @returns Array of deals
      */
-    async getClientDeals(clientAddress: str): prm<arr<DealInfo>> {
+    async getClientDeals(clientAddress: string): Promise<Array<DealInfo>> {
       try {
         const normalizedAddress = ethers.getAddress(clientAddress);
-        const dealIds: arr<str> =
+        const dealIds: Array<string> =
           await storageDealRegistry.getClientDeals(normalizedAddress);
 
         if (!dealIds || dealIds.length === 0) {
           return [];
         }
 
-        const deals: arr<DealInfo> = [];
+        const deals: Array<DealInfo> = [];
         for (const id of dealIds) {
           try {
-            let dealIdBytes32: str;
+            let dealIdBytes32: string;
             if (typeof id === "string") {
               dealIdBytes32 = id.startsWith("0x") ? id : ethers.id(id);
             } else {
               dealIdBytes32 = ethers.hexlify(id);
             }
 
-            const deal = await this.getDeal(dealIdBytes32);
+            const deal = await (this as any).getDeal(dealIdBytes32);
             if (deal) {
               deals.push(deal);
             }
@@ -832,15 +832,15 @@ export function createStorageDealRegistryClient(
      * @param relayAddress - Relay address
      * @returns Array of deals
      */
-    async getRelayDeals(relayAddress: str): prm<arr<DealInfo>> {
+    async getRelayDeals(relayAddress: string): Promise<Array<DealInfo>> {
       try {
         const normalizedAddress = ethers.getAddress(relayAddress);
-        const dealIds: arr<str> =
+        const dealIds: Array<string> =
           await storageDealRegistry.getRelayDeals(normalizedAddress);
 
-        const deals: arr<DealInfo> = [];
+        const deals: Array<DealInfo> = [];
         for (const id of dealIds) {
-          const deal = await this.getDeal(id);
+          const deal = await (this as any).getDeal(id);
           if (deal) deals.push(deal);
         }
         return deals;
@@ -860,10 +860,10 @@ export function createStorageDealRegistryClient(
  * @returns StorageDealRegistry client with signer
  */
 export function createStorageDealRegistryClientWithSigner(
-  privateKey: str,
-  chainId: num = 84532,
-  rpcUrl: mb<str> = undefined
-): obj {
+  privateKey: string,
+  chainId: number = 84532,
+  rpcUrl: string | undefined = undefined
+): any {
   const client = createStorageDealRegistryClient(chainId, rpcUrl);
   const wallet = new ethers.Wallet(privateKey, client.provider);
   const sdkWithSigner = new ShogunSDK({
@@ -892,14 +892,14 @@ export function createStorageDealRegistryClientWithSigner(
      * @returns Transaction result
      */
     async registerDeal(
-      dealId: str,
-      clientAddress: str,
-      cid: str,
-      sizeMB: num,
-      priceUSDC: str,
-      durationDays: num,
-      clientStake: str = "0"
-    ): prm<TransactionResult> {
+      dealId: string,
+      clientAddress: string,
+      cid: string,
+      sizeMB: number,
+      priceUSDC: string,
+      durationDays: number,
+      clientStake: string = "0"
+    ): Promise<TransactionResult> {
       const dealIdBytes32 = ethers.id(dealId); // keccak256 hash
       const priceWei = ethers.parseUnits(priceUSDC, 6);
       const clientStakeWei = ethers.parseUnits(clientStake, 6);
@@ -930,7 +930,7 @@ export function createStorageDealRegistryClientWithSigner(
      * @param dealId - Deal ID (string, will be hashed)
      * @returns Transaction result
      */
-    async completeDeal(dealId: str): prm<TransactionResult> {
+    async completeDeal(dealId: string): Promise<TransactionResult> {
       const dealIdBytes32 = ethers.id(dealId);
       const tx = await storageDealRegistry.completeDeal(dealIdBytes32);
       const receipt = await tx.wait();
@@ -948,10 +948,10 @@ export function createStorageDealRegistryClientWithSigner(
      * @returns Transaction result
      */
     async grief(
-      dealId: str,
-      slashAmount: str,
-      reason: str
-    ): prm<TransactionResult> {
+      dealId: string,
+      slashAmount: string,
+      reason: string
+    ): Promise<TransactionResult> {
       const dealIdBytes32 = ethers.id(dealId);
       const slashAmountWei = ethers.parseUnits(slashAmount, 6);
       const tx = await storageDealRegistry.grief(

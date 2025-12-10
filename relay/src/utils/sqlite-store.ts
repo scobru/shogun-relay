@@ -14,25 +14,25 @@ import fs from 'fs';
 
 const log = loggers.sqlite;
 
-type GetCallback = (err: mb<Error>, data: mb<str>) => void;
-type PutCallback = (err: mb<Error>, ok: mb<num>) => void;
-type ListCallback = (file: mb<str>) => void;
+type GetCallback = (err: Error | null, data: string | null) => void;
+type PutCallback = (err: Error | null, ok: number | null) => void;
+type ListCallback = (file: string | null) => void;
 
 interface SQLiteStoreOptions {
-  dbPath?: str;
-  file?: str;
+  dbPath?: string;
+  file?: string;
 }
 
 interface PreparedStatement {
-  get: (file: str) => mb<{ data: str }>;
-  run: (...args: arr<unknown>) => void;
-  all: () => arr<{ file: str }>;
+  get: (file: string) => { data: string } | null;
+  run: (...args: Array<unknown>) => void;
+  all: () => Array<{ file: string }>;
 }
 
 class SQLiteStore {
-  private dbPath: str;
-  private file: str;
-  private isClosed: bool;
+  private dbPath: string;
+  private file: string;
+  private isClosed: boolean;
   private db: Database.Database;
   private getStmt: PreparedStatement;
   private putStmt: PreparedStatement;
@@ -81,28 +81,28 @@ class SQLiteStore {
    * @param file - File name (encoded)
    * @param cb - Callback(err, data)
    */
-  get(file: str, cb: GetCallback): void {
+  get(file: string, cb: GetCallback): void {
     // Check if database is closed (during shutdown)
     if (this.isClosed) {
       // Silently return null during shutdown to avoid errors
       // GunDB may still have pending operations during shutdown
-      return cb(undefined, undefined);
+      return cb(null, null);
     }
 
     try {
       const row = this.getStmt.get(file);
       if (row) {
-        cb(undefined, row.data);
+        cb(null, row.data);
       } else {
-        cb(undefined, undefined); // File not foundefined, return undefinedefined
+        cb(null, null); // File not foundefined, return undefinedefined
       }
     } catch (err) {
-      // If error is due to closed database, return undefinedefined silently
+      // If error is due to closed database, return undefinedined silently
       if (err instanceof Error && err.message.includes('not open')) {
         this.isClosed = true; // Mark as closed
-        return cb(undefined, undefined);
+        return cb(null, null);
       }
-      cb(err as Error, undefined);
+      cb(err as Error, null);
     }
   }
 
@@ -112,24 +112,24 @@ class SQLiteStore {
    * @param data - Data to store (JSON string)
    * @param cb - Callback(err, ok)
    */
-  put(file: str, data: str, cb: PutCallback): void {
+  put(file: string, data: string, cb: PutCallback): void {
     // Check if database is closed (during shutdown)
     if (this.isClosed) {
       // Silently ignore writes during shutdown
-      return cb(undefined, 1);
+      return cb(null, 1);
     }
 
     try {
       const timestamp = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
       this.putStmt.run(file, data, timestamp);
-      cb(undefined, 1); // Success
+      cb(null, 1); // Success
     } catch (err) {
       // If error is due to closed database, silently ignore
       if (err instanceof Error && err.message.includes('not open')) {
         this.isClosed = true; // Mark as closed
-        return cb(undefined, 1);
+        return cb(null, 1);
       }
-      cb(err as Error, undefined);
+      cb(err as Error, null);
     }
   }
 
@@ -141,7 +141,7 @@ class SQLiteStore {
     // Check if database is closed (during shutdown)
     if (this.isClosed) {
       // Signal completion immediately during shutdown
-      return cb(undefined);
+      return cb(null);
     }
 
     try {
@@ -149,13 +149,13 @@ class SQLiteStore {
       for (const row of rows) {
         cb(row.file);
       }
-      cb(undefined); // Signal completion
+      cb(null); // Signal completion
     } catch (err) {
       // If error is due to closed database, mark as closed and signal completion
       if (err instanceof Error && err.message.includes('not open')) {
         this.isClosed = true; // Mark as closed
       }
-      cb(undefined); // On error, just signal completion
+      cb(null); // On error, just signal completion
     }
   }
 

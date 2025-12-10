@@ -5,7 +5,7 @@ import { authConfig } from "../config";
 
 // Extended Request interface with custom properties
 interface CustomRequest extends Request {
-  authType?: str;
+  authType?: string;
 }
 
 const router: Router = express.Router();
@@ -23,7 +23,7 @@ function normalizeGunRecord(record: any): any {
   }
 
   const normalized: any = {};
-  Object.entries(record).forEach(([key, value]: [str, any]) => {
+  Object.entries(record).forEach(([key, value]: [string, any]) => {
     // Skip Gun metadata keys
     if (GUN_META_KEYS.includes(key)) {
       return;
@@ -49,7 +49,7 @@ function normalizeGunRecord(record: any): any {
 }
 
 // Funzione helper per ottenere tutti gli hash del sistema
-async function getAllSystemHashes(req: any): prm<arr<str>> {
+async function getAllSystemHashes(req: any): Promise<Array<string>> {
   const gun = getGunInstance(req);
   if (!gun) {
     loggers.uploads.warn("Gun instance not available for system hashes");
@@ -85,7 +85,7 @@ async function getAllSystemHashes(req: any): prm<arr<str>> {
         return;
       }
 
-      let allHashes: arr<str> = [];
+      let allHashes: Array<string> = [];
       let completedUsers = 0;
       const totalUsers = userAddresses.length;
 
@@ -117,11 +117,11 @@ async function getAllSystemHashes(req: any): prm<arr<str>> {
 
 // Funzione helper per eliminare upload e aggiornare MB
 async function deleteUploadAndUpdateMB(
-  userAddress: str,
-  fileHash: str,
-  fileSizeMB: num,
+  userAddress: string,
+  fileHash: string,
+  fileSizeMB: number,
   req: any
-): prm<any> {
+): Promise<any> {
   const gun = getGunInstance(req);
   return new Promise(async (resolve, reject) => {
     try {
@@ -195,7 +195,7 @@ router.get("/system-hashes-map", async (req, res) => {
       });
     }
 
-    const systemHashesMap = await new Promise<obj>((resolve) => {
+    const systemHashesMap = await new Promise<Record<string, any>>((resolve) => {
       const timeoutId = setTimeout(() => {
         loggers.uploads.warn("Timeout for system hashes map retrieval");
         resolve({});
@@ -550,7 +550,7 @@ router.get("/:identifier", async (req, res) => {
             return;
           }
 
-          let uploadsArray: arr<any> = [];
+          let uploadsArray: Array<any> = [];
           let completedReads = 0;
           const totalReads = hashKeys.length;
 
@@ -575,7 +575,7 @@ router.get("/:identifier", async (req, res) => {
       });
     };
 
-    const uploadsArray = (await getUploads()) as arr<any>;
+    const uploadsArray = (await getUploads()) as Array<any>;
 
     const response = {
       success: true,
@@ -583,7 +583,7 @@ router.get("/:identifier", async (req, res) => {
       identifier,
       count: uploadsArray.length,
       totalSizeMB: uploadsArray.reduce(
-        (sum: num, upload: any) => sum + (upload.sizeMB || 0),
+        (sum: number, upload: any) => sum + (upload.sizeMB || 0),
         0
       ),
     };

@@ -1117,7 +1117,7 @@ router.get("/reputation/:host", async (req, res) => {
         error: "Relay not found or no reputation data",
         host: normalizedHost,
         searchedHosts: [normalizedHost, host].filter(
-          (h, i, arr) => arr.indexOf(h) === i
+          (h, i, Array) => Array.indexOf(h) === i
         ),
         hint: "Reputation may not be initialized yet. The relay needs to send pulses to build reputation data.",
       });
@@ -1130,8 +1130,8 @@ router.get("/reputation/:host", async (req, res) => {
     ) {
       reputation.uptimePercent =
         reputation.receivedPulses &&
-        reputation.expectedPulses &&
-        reputation.expectedPulses > 0
+          reputation.expectedPulses &&
+          reputation.expectedPulses > 0
           ? (reputation.receivedPulses / reputation.expectedPulses) * 100
           : undefined;
     }
@@ -1142,8 +1142,8 @@ router.get("/reputation/:host", async (req, res) => {
     ) {
       reputation.proofSuccessRate =
         reputation.proofsTotal &&
-        reputation.proofsTotal > 0 &&
-        reputation.proofsSuccessful !== undefined
+          reputation.proofsTotal > 0 &&
+          reputation.proofsSuccessful !== undefined
           ? (reputation.proofsSuccessful / reputation.proofsTotal) * 100
           : undefined;
     }

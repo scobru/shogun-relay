@@ -1069,24 +1069,77 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
       "Deposits found in range"
     );
 
+    // Query L1 withdrawals to calculate correct net balance
+    let allWithdrawals: { user: string; amount: bigint; nonce: bigint }[] = [];
+    try {
+      // Get unique users from deposits to query their withdrawals
+      const usersToCheck = user
+        ? [user.toLowerCase()]
+        : [...new Set(depositsToCheck.map(d => d.user.toLowerCase()))];
+
+      for (const userAddr of usersToCheck) {
+        const userWithdrawals = await client.queryWithdrawals(
+          fromBlockNumber,
+          toBlockNumber,
+          userAddr
+        );
+        allWithdrawals.push(...userWithdrawals.map(w => ({
+          user: w.user.toLowerCase(),
+          amount: w.amount,
+          nonce: w.nonce,
+        })));
+      }
+
+      log.info(
+        { withdrawals: allWithdrawals.length },
+        "L1 withdrawals found for balance calculation"
+      );
+    } catch (error) {
+      log.warn(
+        { error },
+        "Failed to query L1 withdrawals - will calculate balance from deposits only"
+      );
+    }
+
     const results = {
       total: depositsToCheck.length,
       processed: 0,
       skipped: 0,
       failed: 0,
+      withdrawals: allWithdrawals.length,
       errors: [] as string[],
     };
 
-    // If user is specified, calculate expected total balance from all deposits
-    // This allows us to verify and correct the balance if there were race conditions
-    let expectedTotalBalance = 0n;
+    // Calculate expected balances for all users: deposits - withdrawals
+    // Note: L2 transfers are handled atomically and don't need recalculation
     let userDepositsMap = new Map<string, bigint>(); // user -> total deposits
+    let userWithdrawalsMap = new Map<string, bigint>(); // user -> total withdrawals
 
-    // Calculate expected balances for all users
+    // Sum deposits by user
     for (const deposit of depositsToCheck) {
       const normalizedUser = deposit.user.toLowerCase();
       const currentTotal = userDepositsMap.get(normalizedUser) || 0n;
       userDepositsMap.set(normalizedUser, currentTotal + deposit.amount);
+    }
+
+    // Sum withdrawals by user
+    for (const withdrawal of allWithdrawals) {
+      const normalizedUser = withdrawal.user.toLowerCase();
+      const currentTotal = userWithdrawalsMap.get(normalizedUser) || 0n;
+      userWithdrawalsMap.set(normalizedUser, currentTotal + withdrawal.amount);
+    }
+
+    // Calculate net expected balance (deposits - withdrawals) for each user
+    let userExpectedBalanceMap = new Map<string, bigint>();
+    for (const [user, deposits] of userDepositsMap.entries()) {
+      const withdrawals = userWithdrawalsMap.get(user) || 0n;
+      const netBalance = deposits - withdrawals;
+      userExpectedBalanceMap.set(user, netBalance > 0n ? netBalance : 0n);
+
+      log.info(
+        { user, deposits: deposits.toString(), withdrawals: withdrawals.toString(), netBalance: netBalance.toString() },
+        "Calculated expected net balance for user"
+      );
     }
 
     // Process each deposit
@@ -1228,14 +1281,14 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
     }
 
     // Final verification and correction: Check if actual balances match expected totals
-    // This fixes cases where race conditions caused incorrect balances
-    if (userDepositsMap.size > 0) {
+    // Expected = deposits - withdrawals (L2 transfers are already reflected in balance)
+    if (userExpectedBalanceMap.size > 0) {
       log.info(
-        { userCount: userDepositsMap.size },
-        "Verifying and correcting balances for all users"
+        { userCount: userExpectedBalanceMap.size },
+        "Verifying and correcting balances for all users (deposits - withdrawals)"
       );
 
-      for (const [normalizedUser, expectedTotal] of userDepositsMap.entries()) {
+      for (const [normalizedUser, expectedTotal] of userExpectedBalanceMap.entries()) {
         try {
           const actualBalance = await getUserBalance(gun, normalizedUser);
 
@@ -1247,7 +1300,7 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
                 actualBalance: actualBalance.toString(),
                 difference: (expectedTotal - actualBalance).toString(),
               },
-              "Balance mismatch detected, correcting to expected total"
+              "Balance mismatch detected, correcting to expected net balance (deposits - withdrawals)"
             );
 
             // Create a new frozen entry with the correct balance

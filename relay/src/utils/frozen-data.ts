@@ -18,117 +18,117 @@ const log = loggers.frozenData;
 
 // Interfaces
 export interface SEAKeyPair {
-  pub: str;
-  priv: str;
-  epub?: str;
-  epriv?: str;
+  pub: string;
+  priv: string;
+  epub?: string;
+  epriv?: string;
 }
 
 interface GunInstance {
-  get: (path: str) => GunNode;
+  get: (path: string) => GunNode;
 }
 
 interface GunNode {
-  get: (path: str) => GunNode;
-  put: (data: obj) => void;
-  once: (cb: (data: any, key?: str) => void | prm<void>) => void;
+  get: (path: string) => GunNode;
+  put: (data: object) => void;
+  once: (cb: (data: any, key?: string) => void | Promise<void>) => void;
   map: () => GunNode;
 }
 
 interface FrozenEntryMeta {
-  pub: str;
-  timestamp: num;
-  version: num;
+  pub: string;
+  timestamp: number;
+  version: number;
 }
 
 interface FrozenEntryData {
-  _meta?: opt<FrozenEntryMeta>;
-  meta?: opt<FrozenEntryMeta>; // Alternative name in case _meta is not persisted by GunDB
-  [key: str]: unknown;
+  _meta?: Partial<FrozenEntryMeta>;
+  meta?: Partial<FrozenEntryMeta>; // Alternative name in case _meta is not persisted by GunDB
+  [key: string]: unknown;
 }
 
 export interface FrozenEntry {
   data: FrozenEntryData;
-  sig: str;
-  hash: str;
+  sig: string;
+  hash: string;
 }
 
 interface VerificationDetails {
-  signatureValid: bool;
-  hashValid: bool;
-  reason?: str;
+  signatureValid: boolean;
+  hashValid: boolean;
+  reason?: string;
 }
 
 interface FrozenEntryResult {
   data: FrozenEntryData;
-  verified: bool;
+  verified: boolean;
   verificationDetails?: VerificationDetails;
-  pub: mb<str>;
-  timestamp?: mb<num>;
-  hash?: str;
-  error?: str;
+  pub: string | undefined;
+  timestamp?: number | undefined;
+  hash?: string;
+  error?: string;
 }
 
 interface IndexEntry {
-  latestHash: str;
-  pub: str;
-  updatedAt: num;
+  latestHash: string;
+  pub: string;
+  updatedAt: number;
 }
 
 export interface ListEntryInfo {
-  key: str;
-  hash: str;
-  pub: str;
-  updatedAt: num;
+  key: string;
+  hash: string;
+  pub: string;
+  updatedAt: number;
   data?: FrozenEntryData;
-  verified?: bool;
+  verified?: boolean;
 }
 
 interface ListOptions {
-  verifyAll?: bool;
-  maxAge?: mb<num>;
-  limit?: num;
+  verifyAll?: boolean;
+  maxAge?: number | undefined;
+  limit?: number;
 }
 
 interface ObservationResult {
-  observer: str;
-  observation?: obj;
-  timestamp?: num;
-  verified?: bool;
-  hash?: str;
-  updatedAt?: num;
+  observer: string;
+  observation?: object;
+  timestamp?: number;
+  verified?: boolean;
+  hash?: string;
+  updatedAt?: number;
 }
 
 interface ReputationMetrics {
-  proofsSuccessful: num;
-  proofsFailed: num;
-  totalResponseTimeMs: num;
-  responseTimeSamples: num;
-  pinsFulfilled: num;
-  pinsRequested: num;
-  selfRatings: num;
-  externalRatings: num;
+  proofsSuccessful: number;
+  proofsFailed: number;
+  totalResponseTimeMs: number;
+  responseTimeSamples: number;
+  pinsFulfilled: number;
+  pinsRequested: number;
+  selfRatings: number;
+  externalRatings: number;
 }
 
 interface AggregatedReputation {
-  totalObservers: num;
+  totalObservers: number;
   observerBreakdown?: {
-    self: num;
-    external: num;
+    self: number;
+    external: number;
   };
-  aggregated: mb<{
-    proofSuccessRate: mb<num>;
-    avgResponseTimeMs: mb<num>;
-    pinFulfillmentRate: mb<num>;
-    totalProofsObserved: num;
-  }>;
-  confidence: num;
-  note?: str;
+  aggregated: {
+    proofSuccessRate: number | undefined;
+    avgResponseTimeMs: number | undefined;
+    pinFulfillmentRate: number | undefined;
+    totalProofsObserved: number;
+  } | undefined;
+  confidence: number;
+  note?: string;
 }
 
 interface FrozenEntryCreateResult {
-  hash: str;
-  signature: str;
+  hash: string;
+  signature: string;
 }
 
 /**
@@ -143,20 +143,18 @@ interface FrozenEntryCreateResult {
  */
 export async function createFrozenEntry(
   gun: GunInstance,
-  data: obj,
+  data: object,
   keyPair: SEAKeyPair,
-  namespace: str,
-  indexKey?: str
-): prm<FrozenEntryCreateResult> {
+  namespace: string,
+  indexKey?: string
+): Promise<FrozenEntryCreateResult> {
   if (!gun || !data || !keyPair) {
     throw new Error('gun, data, and keyPair are required');
   }
 
   // Add metadata - merge with existing _meta if present
-  // Use both _meta and meta to ensure GunDB persists at least one
-  // GunDB may not persist fields starting with '_', so we also use 'meta'
   const metaData: FrozenEntryMeta = {
-    ...(data._meta || data.meta || {}),
+    ...((data as any)._meta || (data as any).meta || {}),
     pub: keyPair.pub,
     timestamp: Date.now(),
     version: 1,
@@ -187,7 +185,6 @@ export async function createFrozenEntry(
   }, 'Creating frozen entry with metadata');
 
   // Create dataString - this exact string will be used for signing, hashing, and storing as dataJson
-  // IMPORTANT: We must use the same dataString for all three operations to ensure consistency
   const dataString = JSON.stringify(entry);
 
   log.info({
@@ -211,26 +208,18 @@ export async function createFrozenEntry(
     throw new Error('Failed to create content hash');
   }
 
-  // Use 'frozen-' namespace instead of '#' to avoid GunDB auto-verification warnings
-  // The '#' namespace triggers automatic hash verification which causes "Data hash not same as hash!" warnings
-  // We manage immutability via content-addressing (hash) and SEA signatures instead
-  // This approach is functionally equivalent but avoids the annoying warnings
-
-  // Store the entry - GunDB may not preserve nested structures correctly when using .put() with nested objects
-  // So we store the dataString directly as dataJson to ensure all fields are preserved correctly
+  // Store the entry
   const frozenNode = gun.get('frozen-' + namespace).get(hash);
 
   // Store signature and hash at the root level
-  frozenNode.get('sig').put(signature);
-  frozenNode.get('hash').put(hash);
+  frozenNode.get('sig').put(signature as any);
+  frozenNode.get('hash').put(hash as any);
 
-  // Store dataString as dataJson - this is the EXACT string used for signing and hashing
-  // When we read it back, we'll use it directly for verification without re-serialization
-  frozenNode.get('dataJson').put(dataString);
+  // Store dataString as dataJson
+  frozenNode.get('dataJson').put(dataString as any);
 
-  // Also store data as nested object for backward compatibility and easier reading
-  // But we'll prioritize dataJson when reading for verification
-  frozenNode.get('data').put(entry as unknown as obj);
+  // Also store data as nested object for backward compatibility
+  frozenNode.get('data').put(entry as unknown as object);
 
   // Update index to point to latest hash
   if (indexKey) {
@@ -255,11 +244,11 @@ export async function createFrozenEntry(
  * @param expectedSigner - Optional: if provided, verify that the entry's pub matches this value
  * @returns Promise with data, verified status, and pub
  */
-export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: str, expectedSigner?: str): prm<mb<FrozenEntryResult>> {
+export async function readFrozenEntry(gun: GunInstance, namespace: string, hash: string, expectedSigner?: string): Promise<FrozenEntryResult | undefined> {
   return new Promise((resolve) => {
     const timeout = setTimeout(() => resolve(undefined), 10000);
 
-    gun.get('frozen-' + namespace).get(hash).once(async (entry: mb<FrozenEntry & { dataJson?: str }>) => {
+    gun.get('frozen-' + namespace).get(hash).once(async (entry: (FrozenEntry & { dataJson?: string }) | undefined) => {
       clearTimeout(timeout);
 
       if (!entry || !entry.sig) {
@@ -268,16 +257,11 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
       }
 
       try {
-        // IMPORTANT: Use dataJson if available (more reliable), otherwise fall back to entry.data
-        // The dataJson was stored as a JSON string to ensure GunDB persists all fields correctly
-        // When using dataJson, we use it directly as the dataString for verification
-        // because it's the exact string that was used to create the hash and signature
         let entryData: FrozenEntryData;
         let dataString: string;
         let pub: string | undefined;
 
         if (entry.dataJson && typeof entry.dataJson === 'string') {
-          // Use dataJson directly as dataString - this is the exact string used for signing/hashing
           dataString = entry.dataJson;
           try {
             entryData = JSON.parse(dataString);
@@ -288,7 +272,7 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
               hasMeta: !!entryData._meta,
               hasMetaAlt: !!entryData.meta,
               dataStringLength: dataString.length,
-            }, 'Reading frozen entry from dataJson (using dataJson directly for verification)');
+            }, 'Reading frozen entry from dataJson');
           } catch (parseError) {
             log.warn({
               hash: hash.substring(0, 16),
@@ -299,7 +283,6 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
             pub = entryData._meta?.pub || entryData.meta?.pub;
           }
         } else {
-          // Fall back to entry.data if dataJson is not available
           entryData = entry.data || {};
           dataString = JSON.stringify(entryData);
           pub = entryData._meta?.pub || entryData.meta?.pub;
@@ -323,17 +306,17 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
             metaContent: entry.data._meta,
             metaAltContent: entry.data.meta,
           }, 'Pub missing from metadata, attempting index lookup');
-          // Try to find pub from index by searching for this hash
+
           const indexNamespace = namespace.replace('frozen-', '');
-          const indexLookup: prm<mb<str>> = new Promise((resolveIndex) => {
-            let foundefined = false;
+          const indexLookup: Promise<string | undefined> = new Promise((resolveIndex) => {
+            let found = false;
             const timeoutId = setTimeout(() => {
-              if (!foundefined) resolveIndex(undefined);
+              if (!found) resolveIndex(undefined);
             }, 2000);
 
-            gun.get('shogun-index').get(indexNamespace).map().once((index: mb<IndexEntry>, _key?: str) => {
+            gun.get('shogun-index').get(indexNamespace).map().once((index: IndexEntry | undefined, _key?: string) => {
               if (index && index.latestHash === hash && index.pub) {
-                foundefined = true;
+                found = true;
                 clearTimeout(timeoutId);
                 resolveIndex(index.pub);
               }
@@ -342,13 +325,8 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
 
           pub = await indexLookup;
 
-          // If we foundefined pub from index, use it for verification but DO NOT modify the stored entry
-          // Modifying the entry would change the data and break hash verification
-          // The pub is only used for signature verification, not stored back
           if (pub) {
             log.info(`Recovered pub for frozen entry ${hash.substring(0, 16)}... from index`);
-            // Note: We intentionally do NOT re-store the entry with pub added, as that would
-            // change the data and invalidate the hash. The pub is only used for verification.
           }
         }
 
@@ -396,7 +374,7 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
         const verifyResult = await SEA.verify(entry.sig, pub);
         const signatureValid = verifyResult !== undefined && verifyResult !== false;
 
-        // Verify hash matches content (using original dataString, before any modifications)
+        // Verify hash matches content
         const expectedHash = await SEA.work(dataString, null, null, { name: 'SHA-256' });
         const hashValid = expectedHash === hash;
         const verified = signatureValid && hashValid;
@@ -417,13 +395,13 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
         }, 'Frozen entry verification result');
 
         resolve({
-          data: entryData, // Use the parsed/retrieved data
+          data: entryData,
           verified,
           verificationDetails: {
             signatureValid,
             hashValid,
           },
-          pub: pub, // Use recovered pub if it was found, otherwise use the one from _meta
+          pub: pub,
           timestamp: entryData._meta?.timestamp || entryData.meta?.timestamp,
           hash,
         });
@@ -442,18 +420,12 @@ export async function readFrozenEntry(gun: GunInstance, namespace: str, hash: st
 
 /**
  * Get latest frozen entry for an index key
- * 
- * @param gun - GunDB instance
- * @param namespace - Index namespace
- * @param indexKey - Key to look up
- * @param expectedSigner - Optional: if provided, verify that the entry's pub matches this value
- * @returns Promise with data and verified status
  */
-export async function getLatestFrozenEntry(gun: GunInstance, namespace: str, indexKey: str, expectedSigner?: str): prm<mb<FrozenEntryResult>> {
+export async function getLatestFrozenEntry(gun: GunInstance, namespace: string, indexKey: string, expectedSigner?: string): Promise<FrozenEntryResult | undefined> {
   return new Promise((resolve) => {
     const timeout = setTimeout(() => resolve(undefined), 10000);
 
-    gun.get('shogun-index').get(namespace).get(indexKey).once(async (index: mb<IndexEntry>) => {
+    gun.get('shogun-index').get(namespace).get(indexKey).once(async (index: IndexEntry | undefined) => {
       clearTimeout(timeout);
 
       if (!index || !index.latestHash) {
@@ -469,22 +441,17 @@ export async function getLatestFrozenEntry(gun: GunInstance, namespace: str, ind
 
 /**
  * List all entries in a namespace index
- * 
- * @param gun - GunDB instance
- * @param namespace - Index namespace
- * @param options - Filter options
- * @returns Promise with array of entries
  */
-export async function listFrozenEntries(gun: GunInstance, namespace: str, options: ListOptions = {}): prm<arr<ListEntryInfo>> {
+export async function listFrozenEntries(gun: GunInstance, namespace: string, options: ListOptions = {}): Promise<ListEntryInfo[]> {
   const { verifyAll = false, maxAge = undefined, limit = 100 } = options;
 
   return new Promise((resolve) => {
-    const entries: arr<ListEntryInfo> = [];
+    const entries: ListEntryInfo[] = [];
     const timeout = setTimeout(() => {
       resolve(entries.slice(0, limit));
     }, 5000);
 
-    gun.get('shogun-index').get(namespace).map().once(async (index: mb<IndexEntry>, key?: str) => {
+    gun.get('shogun-index').get(namespace).map().once(async (index: IndexEntry | undefined, key?: string) => {
       if (!index || typeof index !== 'object' || !index.latestHash) return;
 
       // Filter by age if specified
@@ -519,19 +486,13 @@ export async function listFrozenEntries(gun: GunInstance, namespace: str, option
 
 /**
  * Create a frozen observation (one relay observing another)
- * 
- * @param gun - GunDB instance
- * @param observedHost - Host being observed
- * @param observation - Observation data
- * @param observerKeyPair - Observer's SEA key pair
- * @returns Promise with hash
  */
 export async function createFrozenObservation(
   gun: GunInstance,
-  observedHost: str,
-  observation: obj,
+  observedHost: string,
+  observation: object,
   observerKeyPair: SEAKeyPair
-): prm<FrozenEntryCreateResult> {
+): Promise<FrozenEntryCreateResult> {
   const data = {
     type: 'observation',
     observedHost,
@@ -558,24 +519,19 @@ export async function createFrozenObservation(
 
 /**
  * Get all observations for a specific host
- * 
- * @param gun - GunDB instance
- * @param observedHost - Host to get observations for
- * @param options - Options
- * @returns Promise with array of observations
  */
 export async function getObservationsForHost(
   gun: GunInstance,
-  observedHost: str,
-  options: { verifyAll?: bool; limit?: num } = {}
-): prm<arr<ObservationResult>> {
+  observedHost: string,
+  options: { verifyAll?: boolean; limit?: number } = {}
+): Promise<ObservationResult[]> {
   const { verifyAll = true, limit = 50 } = options;
 
   return new Promise((resolve) => {
-    const observations: arr<ObservationResult> = [];
+    const observations: ObservationResult[] = [];
     const timeout = setTimeout(() => resolve(observations), 5000);
 
-    gun.get('shogun-index').get('observations-by-host').get(observedHost).map().once(async (index: mb<{ hash: str; updatedAt: num }>, observerPub?: str) => {
+    gun.get('shogun-index').get('observations-by-host').get(observedHost).map().once(async (index: { hash: string; updatedAt: number } | undefined, observerPub?: string) => {
       if (!index || !index.hash) return;
 
       if (verifyAll) {
@@ -583,7 +539,7 @@ export async function getObservationsForHost(
         if (entry && entry.verified) {
           observations.push({
             observer: observerPub || '',
-            observation: (entry.data as { observation: obj }).observation,
+            observation: (entry.data as { observation: object }).observation,
             timestamp: entry.timestamp,
             verified: true,
           });
@@ -606,12 +562,8 @@ export async function getObservationsForHost(
 
 /**
  * Aggregate reputation from verified observations
- * Applies different weights to self-rating vs external observations
- * 
- * @param observations - Array of verified observations
- * @returns Aggregated reputation metrics
  */
-export function aggregateReputation(observations: arr<ObservationResult>): AggregatedReputation {
+export function aggregateReputation(observations: ObservationResult[]): AggregatedReputation {
   if (!observations || observations.length === 0) {
     return {
       totalObservers: 0,
@@ -620,10 +572,9 @@ export function aggregateReputation(observations: arr<ObservationResult>): Aggre
     };
   }
 
-  // Observer type weights (self-rating has reduced weight)
-  const OBSERVER_WEIGHTS: Record<str, num> = {
-    self: 0.1,      // Self-rating has only 10% weight
-    external: 0.9,  // External observations have 90% weight
+  const OBSERVER_WEIGHTS: Record<string, number> = {
+    self: 0.1,
+    external: 0.9,
   };
 
   const metrics: ReputationMetrics = {
@@ -638,34 +589,29 @@ export function aggregateReputation(observations: arr<ObservationResult>): Aggre
   };
 
   observations.forEach(obs => {
-    const o: obj = obs.observation || obs;
+    const o: any = obs.observation || obs;
 
-    // Determine observer type from observation details
-    // Check if this is a reputation event with observerType field
-    const observerType: str = o.details?.observerType ||
-      (obs as unknown as { observerType?: str }).observerType ||
-      'external'; // Default to external if unknown
+    const observerType: string = o.details?.observerType ||
+      (obs as unknown as { observerType?: string }).observerType ||
+      'external';
 
     const weight = OBSERVER_WEIGHTS[observerType] || OBSERVER_WEIGHTS.external;
 
-    // Count observer types
     if (observerType === 'self') {
       metrics.selfRatings += 1;
     } else {
       metrics.externalRatings += 1;
     }
 
-    // Apply weights to metrics
-    // For reputation events, check the event type
     if (o.type === 'reputation_event') {
       if (o.event === 'proof_success') {
-        metrics.proofsSuccessful += weight; // Weighted count
+        metrics.proofsSuccessful += weight;
         if (o.details?.responseTimeMs) {
           metrics.totalResponseTimeMs += o.details.responseTimeMs * weight;
           metrics.responseTimeSamples += weight;
         }
       } else if (o.event === 'proof_failure') {
-        metrics.proofsFailed += weight; // Weighted count
+        metrics.proofsFailed += weight;
       } else if (o.event === 'pin_fulfillment') {
         metrics.pinsRequested += weight;
         if (o.details?.fulfilled) {
@@ -673,7 +619,6 @@ export function aggregateReputation(observations: arr<ObservationResult>): Aggre
         }
       }
     } else {
-      // Legacy format - aggregate as before but with reduced weight for self-rating
       metrics.proofsSuccessful += (o.proofsSuccessful || 0) * weight;
       metrics.proofsFailed += (o.proofsFailed || 0) * weight;
       if (o.avgResponseTimeMs) {
@@ -695,40 +640,33 @@ export function aggregateReputation(observations: arr<ObservationResult>): Aggre
     },
     aggregated: {
       proofSuccessRate: proofsTotal > 0
-        ? Math.roundefined((metrics.proofsSuccessful / proofsTotal) * 100)
+        ? Math.round((metrics.proofsSuccessful / proofsTotal) * 100)
         : undefined,
       avgResponseTimeMs: metrics.responseTimeSamples > 0
-        ? Math.roundefined(metrics.totalResponseTimeMs / metrics.responseTimeSamples)
+        ? Math.round(metrics.totalResponseTimeMs / metrics.responseTimeSamples)
         : undefined,
       pinFulfillmentRate: metrics.pinsRequested > 0
-        ? Math.roundefined((metrics.pinsFulfilled / metrics.pinsRequested) * 100)
+        ? Math.round((metrics.pinsFulfilled / metrics.pinsRequested) * 100)
         : undefined,
-      totalProofsObserved: Math.roundefined(proofsTotal),
+      totalProofsObserved: Math.round(proofsTotal),
     },
-    confidence: Math.min(100, metrics.externalRatings * 10), // Only external ratings count for confidence
+    confidence: Math.min(100, metrics.externalRatings * 10),
     note: 'Self-ratings have reduced weight (10%) in reputation calculation',
   };
 }
 
 /**
- * Create a signed acknowledgment (receipt) for a previous entry
- * Implements the "ACK" concept: a = σ'(Φ'(m), p)
- * 
- * @param gun - GunDB instance
- * @param originalHash - Hash of the entry being acknowledged
- * @param message - Acknowledgment message (e.g., "Received and verified")
- * @param keyPair - Signer's SEA key pair
- * @returns Promise with hash
+ * Create a signed acknowledgment
  */
 export async function createSignedAcknowledgment(
   gun: GunInstance,
-  originalHash: str,
-  message: str,
+  originalHash: string,
+  message: string,
   keyPair: SEAKeyPair
-): prm<FrozenEntryCreateResult> {
+): Promise<FrozenEntryCreateResult> {
   const data = {
     type: 'ack',
-    re: originalHash, // Reference to original entry
+    re: originalHash,
     msg: message,
     signer: keyPair.pub,
   };
@@ -738,7 +676,7 @@ export async function createSignedAcknowledgment(
     data,
     keyPair,
     'acks',
-    originalHash // Index by the original hash so we can find ACKs for it
+    originalHash
   );
 
   log.info(`Signed ACK created for ${originalHash.substring(0, 8)}...`);
@@ -747,21 +685,14 @@ export async function createSignedAcknowledgment(
 
 /**
  * Create a signed reputation event
- * This replaces mutable metrics with immutable signed observations
- * 
- * @param gun - GunDB instance
- * @param subjectHost - The relay being rated
- * @param eventType - 'proof_success', 'proof_failure', 'pin_fulfillment'
- * @param details - Extra details (e.g. responseTimeMs)
- * @param observerKeyPair - Observer's SEA key pair
  */
 export async function createSignedReputationEvent(
   gun: GunInstance,
-  subjectHost: str,
-  eventType: str,
-  details: mb<obj>,
+  subjectHost: string,
+  eventType: string,
+  details: object | undefined,
   observerKeyPair: SEAKeyPair
-): prm<FrozenEntryCreateResult> {
+): Promise<FrozenEntryCreateResult> {
   const observation = {
     type: 'reputation_event',
     event: eventType,
@@ -770,8 +701,6 @@ export async function createSignedReputationEvent(
     timestamp: Date.now()
   };
 
-  // Use createFrozenObservation to store it
-  // This automatically indexes it undefineder the subject host
   return await createFrozenObservation(gun, subjectHost, observation, observerKeyPair);
 }
 

@@ -31,69 +31,69 @@ type GunInstance = IGunInstanceRoot<any, any>;
 type GunNode = IGunChain<any, any, any, any>;
 
 interface SEAKeyPair {
-  pub: str;
-  priv: str;
-  epub?: str;
-  epriv?: str;
+  pub: string;
+  priv: string;
+  epub?: string;
+  epriv?: string;
 }
 
 interface GunAck {
-  err?: str;
-  ok?: bool;
+  err?: string;
+  ok?: boolean;
 }
 
 interface ReputationWeights {
-  uptime: num;
-  proofSuccess: num;
-  responseTime: num;
-  pinFulfillment: num;
-  longevity: num;
+  uptime: number;
+  proofSuccess: number;
+  responseTime: number;
+  pinFulfillment: number;
+  longevity: number;
 }
 
 interface ReputationThresholds {
-  minDataPoints: num;
-  maxResponseTimeMs: num;
-  idealResponseTimeMs: num;
-  uptimeWindowMs: num;
-  maxLongevityDays: num;
+  minDataPoints: number;
+  maxResponseTimeMs: number;
+  idealResponseTimeMs: number;
+  uptimeWindowMs: number;
+  maxLongevityDays: number;
 }
 
 interface ReputationMetrics {
-  host?: str;
-  firstSeenTimestamp?: num;
-  lastSeenTimestamp?: num;
-  dataPoints?: num;
-  proofsTotal?: num;
-  proofsSuccessful?: num;
-  proofsFailed?: num;
-  avgResponseTimeMs?: num;
-  responseTimeSamples?: num;
-  pinRequestsReceived?: num;
-  pinRequestsFulfilled?: num;
-  expectedPulses?: num;
-  receivedPulses?: num;
-  uptimePercent?: num;
-  score?: num;
-  tier?: str;
-  lastScoreUpdate?: num;
-  _lastUpdateId?: str;
-  [key: str]: unknown;
+  host?: string;
+  firstSeenTimestamp?: number;
+  lastSeenTimestamp?: number;
+  dataPoints?: number;
+  proofsTotal?: number;
+  proofsSuccessful?: number;
+  proofsFailed?: number;
+  avgResponseTimeMs?: number;
+  responseTimeSamples?: number;
+  pinRequestsReceived?: number;
+  pinRequestsFulfilled?: number;
+  expectedPulses?: number;
+  receivedPulses?: number;
+  uptimePercent?: number;
+  score?: number;
+  tier?: string;
+  lastScoreUpdate?: number;
+  _lastUpdateId?: string;
+  [key: string]: unknown;
 }
 
 interface ScoreBreakdown {
-  uptime: num;
-  proofSuccess: num;
-  responseTime: num;
-  pinFulfillment: num;
-  longevity: num;
+  uptime: number;
+  proofSuccess: number;
+  responseTime: number;
+  pinFulfillment: number;
+  longevity: number;
 }
 
 interface ReputationScore {
-  total: num;
-  tier: str;
+  total: number;
+  tier: string;
   breakdown: ScoreBreakdown;
   weights: ReputationWeights;
-  hasEnoughData: bool;
+  hasEnoughData: boolean;
 }
 
 interface LeaderboardEntry extends ReputationMetrics {
@@ -101,9 +101,9 @@ interface LeaderboardEntry extends ReputationMetrics {
 }
 
 interface LeaderboardOptions {
-  minScore?: num;
-  tier?: mb<str>;
-  limit?: num;
+  minScore?: number;
+  tier?: string;
+  limit?: number;
 }
 
 // Reputation weights (must sum to 1.0)
@@ -126,7 +126,7 @@ const THRESHOLDS: ReputationThresholds = {
 
 // Simple mutex-like lock for preventing concurrent counter updates
 // Key = relayHost, Value = timestamp of lock acquisition
-const updateLocks = new Map<str, num>();
+const updateLocks = new Map<string, number>();
 const LOCK_TIMEOUT_MS = 5000;
 
 /**
@@ -134,7 +134,7 @@ const LOCK_TIMEOUT_MS = 5000;
  * @param relayHost - Host identifier
  * @returns True if lock acquired
  */
-function acquireLock(relayHost: str): bool {
+function acquireLock(relayHost: string): boolean {
   const now = Date.now();
   const existingLock = updateLocks.get(relayHost);
 
@@ -151,7 +151,7 @@ function acquireLock(relayHost: str): bool {
  * Release a lock for a relay
  * @param relayHost - Host identifier
  */
-function releaseLock(relayHost: str): void {
+function releaseLock(relayHost: string): void {
   updateLocks.delete(relayHost);
 }
 
@@ -163,7 +163,7 @@ export const OBSERVER_TYPE = {
 
 // Reputation calculation weights for different observer types
 // Self-ratings have reduced weight to prevent manipulation
-export const OBSERVER_WEIGHTS: Record<str, num> = {
+export const OBSERVER_WEIGHTS: Record<string, number> = {
   self: 0.1,      // Self-rating has only 10% weight
   external: 0.9,  // External observations have 90% weight
 };
@@ -174,7 +174,7 @@ export const OBSERVER_WEIGHTS: Record<str, num> = {
  * @param observerKeyPair - Observer's keypair
  * @returns True if this is self-rating
  */
-export function isSelfRating(relayHost: str, observerKeyPair: mb<SEAKeyPair>): bool {
+export function isSelfRating(relayHost: string, observerKeyPair: SEAKeyPair): boolean {
   if (!observerKeyPair || !observerKeyPair.pub) {
     return false; // Can't determine without keypair
   }
@@ -195,7 +195,7 @@ export function isSelfRating(relayHost: str, observerKeyPair: mb<SEAKeyPair>): b
  * @param observerKeyPair - Observer's keypair
  * @returns 'self' or 'external'
  */
-export function getObserverType(relayHost: str, observerKeyPair: mb<SEAKeyPair>): str {
+export function getObserverType(relayHost: string, observerKeyPair: SEAKeyPair): string {
   return isSelfRating(relayHost, observerKeyPair)
     ? OBSERVER_TYPE.SELF
     : OBSERVER_TYPE.EXTERNAL;
@@ -268,7 +268,7 @@ export function calculateReputationScore(metrics: ReputationMetrics): Reputation
     (scores.longevity || 0) * WEIGHTS.longevity;
 
   // Determine tier
-  let tier: str;
+  let tier: string;
   if (totalScore >= 90) tier = 'excellent';
   else if (totalScore >= 75) tier = 'good';
   else if (totalScore >= 50) tier = 'average';
@@ -295,11 +295,11 @@ export function calculateReputationScore(metrics: ReputationMetrics): Reputation
  * @param gun - GunDB instance
  * @param relayHost - Host identifier
  */
-export function initReputationTracking(gun: GunInstance, relayHost: str): GunNode {
+export function initReputationTracking(gun: GunInstance, relayHost: string): GunNode {
   const reputationNode = gun.get('shogun-network').get('reputation').get(relayHost);
 
   // Check if already initialized
-  reputationNode.once((data: mb<ReputationMetrics>) => {
+  reputationNode.once((data: ReputationMetrics | undefined) => {
     if (!data || !data.firstSeenTimestamp) {
       // Initialize with default metrics
       reputationNode.put({
@@ -343,10 +343,10 @@ export function initReputationTracking(gun: GunInstance, relayHost: str): GunNod
  */
 export async function recordProofSuccess(
   gun: GunInstance,
-  relayHost: str,
-  responseTimeMs: num = 0,
+  relayHost: string,
+  responseTimeMs: number = 0,
   observerKeyPair?: SEAKeyPair
-): prm<void> {
+): Promise<void> {
   // SECURITY: Prevent self-rating (relay rating itself)
   if (observerKeyPair && isSelfRating(relayHost, observerKeyPair)) {
     log.warn(`Blocked self-rating attempt: relay ${relayHost} attempted to rate itself`);
@@ -370,7 +370,7 @@ export async function recordProofSuccess(
       // Legacy fallback (mutable counter)
       const node = gun.get('shogun-network').get('reputation').get(relayHost);
       return new Promise((resolve) => {
-        node.once((data: mb<ReputationMetrics>) => {
+        node.once((data: ReputationMetrics | undefined) => {
           const current = data || {};
           const now = Date.now();
           const newAvgResponseTime = (current.responseTimeSamples || 0) > 0
@@ -410,7 +410,7 @@ export async function recordProofSuccess(
     // Update local optimistic cache/index for backward compatibility
     const node = gun.get('shogun-network').get('reputation').get(relayHost);
     await new Promise<void>((resolve) => {
-      node.once((data: mb<ReputationMetrics>) => {
+      node.once((data: ReputationMetrics | undefined) => {
         const current = data || {};
         const now = Date.now();
         const newAvgResponseTime = (current.responseTimeSamples || 0) > 0
@@ -443,9 +443,9 @@ export async function recordProofSuccess(
  */
 export async function recordProofFailure(
   gun: GunInstance,
-  relayHost: str,
+  relayHost: string,
   observerKeyPair?: SEAKeyPair
-): prm<void> {
+): Promise<void> {
   // SECURITY: Prevent self-rating (relay rating itself)
   if (observerKeyPair && isSelfRating(relayHost, observerKeyPair)) {
     log.warn({ relayHost }, `Blocked self-rating attempt: relay ${relayHost} attempted to rate itself`);
@@ -467,7 +467,7 @@ export async function recordProofFailure(
       log.warn({ relayHost }, 'recordProofFailure called without keyPair - falling back to unsigned');
       const node = gun.get('shogun-network').get('reputation').get(relayHost);
       return new Promise((resolve) => {
-        node.once((data: mb<ReputationMetrics>) => {
+        node.once((data: ReputationMetrics | undefined) => {
           const current = data || {};
           const now = Date.now();
           node.put({
@@ -500,7 +500,7 @@ export async function recordProofFailure(
     // Optimistic update
     const node = gun.get('shogun-network').get('reputation').get(relayHost);
     await new Promise<void>((resolve) => {
-      node.once((data: mb<ReputationMetrics>) => {
+      node.once((data: ReputationMetrics | undefined) => {
         const current = data || {};
         const now = Date.now();
         node.put({
@@ -528,10 +528,10 @@ export async function recordProofFailure(
  */
 export async function recordPinFulfillment(
   gun: GunInstance,
-  relayHost: str,
-  fulfilled: bool,
+  relayHost: string,
+  fulfilled: boolean,
   observerKeyPair?: SEAKeyPair
-): prm<void> {
+): Promise<void> {
   // Acquire lock to prevent concurrent updates
   const maxWaitMs = 3000;
   const startWait = Date.now();
@@ -548,10 +548,10 @@ export async function recordPinFulfillment(
       log.warn({ relayHost }, 'recordPinFulfillment called without keyPair - falling back to unsigned');
       const node = gun.get('shogun-network').get('reputation').get(relayHost);
       return new Promise((resolve) => {
-        node.once((data: mb<ReputationMetrics>) => {
+        node.once((data: ReputationMetrics | undefined) => {
           const current = data || {};
           const now = Date.now();
-          const update: obj = {
+          const update: Record<string, any> = {
             pinRequestsReceived: (current.pinRequestsReceived || 0) + 1,
             dataPoints: (current.dataPoints || 0) + 1,
             lastSeenTimestamp: now,
@@ -579,10 +579,10 @@ export async function recordPinFulfillment(
     // Optimistic update
     const node = gun.get('shogun-network').get('reputation').get(relayHost);
     await new Promise<void>((resolve) => {
-      node.once((data: mb<ReputationMetrics>) => {
+      node.once((data: ReputationMetrics | undefined) => {
         const current = data || {};
         const now = Date.now();
-        const update: obj = {
+        const update: Record<string, any> = {
           pinRequestsReceived: (current.pinRequestsReceived || 0) + 1,
           dataPoints: (current.dataPoints || 0) + 1,
           lastSeenTimestamp: now,
@@ -606,7 +606,7 @@ export async function recordPinFulfillment(
  * @param gun - GunDB instance
  * @param relayHost - Host that sent the pulse
  */
-export async function recordPulse(gun: GunInstance, relayHost: str): prm<void> {
+export async function recordPulse(gun: GunInstance, relayHost: string): Promise<void> {
   // Acquire lock to prevent concurrent updates
   const maxWaitMs = 2000;
   const startWait = Date.now();
@@ -622,7 +622,7 @@ export async function recordPulse(gun: GunInstance, relayHost: str): prm<void> {
 
   try {
     return new Promise((resolve) => {
-      node.once((data: mb<ReputationMetrics>) => {
+      node.once((data: ReputationMetrics | undefined) => {
         const current = data || {};
         const now = Date.now();
         const received = (current.receivedPulses || 0) + 1;
@@ -659,11 +659,11 @@ export async function recordPulse(gun: GunInstance, relayHost: str): prm<void> {
  * @param relayHost - Host to query
  * @returns Reputation data with calculated score
  */
-export async function getReputation(gun: GunInstance, relayHost: str): prm<mb<LeaderboardEntry>> {
+export async function getReputation(gun: GunInstance, relayHost: string): Promise<LeaderboardEntry | undefined> {
   return new Promise((resolve) => {
     const timeout = setTimeout(() => resolve(undefined), 5000);
 
-    gun.get('shogun-network').get('reputation').get(relayHost).once((data: mb<obj>) => {
+    gun.get('shogun-network').get('reputation').get(relayHost).once((data: Record<string, any> | undefined) => {
       clearTimeout(timeout);
 
       if (!data || typeof data !== 'object') {
@@ -699,11 +699,11 @@ export async function getReputation(gun: GunInstance, relayHost: str): prm<mb<Le
 export async function getReputationLeaderboard(
   gun: GunInstance,
   options: LeaderboardOptions = {}
-): prm<arr<LeaderboardEntry>> {
+): Promise<Array<LeaderboardEntry>> {
   const { minScore = 0, tier = undefined, limit = 50 } = options;
 
   return new Promise((resolve) => {
-    const relays: arr<LeaderboardEntry> = [];
+    const relays: Array<LeaderboardEntry> = [];
     let resolved = false; // Flag to prevent double resolution
 
     const finalize = (): void => {
@@ -716,7 +716,7 @@ export async function getReputationLeaderboard(
     // Timeout as safety net
     const timeout = setTimeout(finalize, 3000);
 
-    gun.get('shogun-network').get('reputation').map().once((data: mb<obj>, host: str) => {
+    gun.get('shogun-network').get('reputation').map().once((data: Record<string, any> | undefined, host: string) => {
       if (!data || typeof data !== 'object') return;
 
       // Filter GunDB metadata
@@ -754,7 +754,7 @@ export async function getReputationLeaderboard(
  * @param gun - GunDB instance
  * @param relayHost - Host to update
  */
-export async function updateStoredScore(gun: GunInstance, relayHost: str): prm<void> {
+export async function updateStoredScore(gun: GunInstance, relayHost: string): Promise<void> {
   const reputation = await getReputation(gun, relayHost);
 
   if (reputation) {

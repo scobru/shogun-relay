@@ -34,177 +34,177 @@ export type NetworkKey = "base" | "base-sepolia" | "polygon" | "polygon-amoy";
 
 interface NetworkConfigType {
   chain: any;
-  usdc: str;
-  explorer: str;
-  usdcName: str;
-  usdcVersion: str;
+  usdc: string;
+  explorer: string;
+  usdcName: string;
+  usdcVersion: string;
 }
 
 export type PricingTier = {
-  name: str;
-  priceUSDC: num;
-  storageMB: num;
-  durationDays: num;
+  name: string;
+  priceUSDC: number;
+  storageMB: number;
+  durationDays: number;
 };
 
 interface SubscriptionTiersMap {
-  [tier: str]: PricingTier;
+  [tier: string]: PricingTier;
 }
 
 // Use official x402 types
 // PaymentPayload is now imported from "x402/types"
 
 interface PaymentVerificationResult {
-  isValid: bool;
-  invalidReason?: str;
-  payer?: str;
-  amount?: str;
-  tier?: str;
-  amountAtomic?: str;
+  isValid: boolean;
+  invalidReason?: string;
+  payer?: string;
+  amount?: string;
+  tier?: string;
+  amountAtomic?: string;
 }
 
 interface PaymentSettlementResult {
-  success: bool;
-  transaction?: str;
-  network?: str;
-  explorer?: str;
-  blockNumber?: str;
-  errorReason?: str;
+  success: boolean;
+  transaction?: string;
+  network?: string;
+  explorer?: string;
+  blocknumberber?: string;
+  errorReason?: string;
 }
 
 interface FacilitatorVerifyResult {
-  isValid: bool;
-  payer?: str;
-  invalidReason?: str;
+  isValid: boolean;
+  payer?: string;
+  invalidReason?: string;
 }
 
 interface FacilitatorSettleResult {
-  success: bool;
-  transaction?: str;
-  network?: str;
-  explorer?: str;
-  errorReason?: str;
+  success: boolean;
+  transaction?: string;
+  network?: string;
+  explorer?: string;
+  errorReason?: string;
 }
 
 export interface SubscriptionStatus {
-  active: bool;
-  reason?: str;
-  tier?: str;
-  storageMB?: num;
-  storageUsedMB?: num;
-  storageRemainingMB?: num;
-  expiresAt?: str;
-  purchasedAt?: str | null;
-  ownedBy?: str;
-  expiredAt?: str;
+  active: boolean;
+  reason?: string;
+  tier?: string;
+  storageMB?: number;
+  storageUsedMB?: number;
+  storageRemainingMB?: number;
+  expiresAt?: string;
+  purchasedAt?: string | null;
+  ownedBy?: string;
+  expiredAt?: string;
 }
 
 interface Subscription {
-  tier: str;
-  storageMB: num;
-  storageUsedMB: num;
-  priceUSDC: num;
-  purchasedAt: num;
-  expiresAt: num;
-  paymentTx: str | null | undefined;
-  paymentNetwork: str | null | undefined;
-  userAddress: str;
+  tier: string;
+  storageMB: number;
+  storageUsedMB: number;
+  priceUSDC: number;
+  purchasedAt: number;
+  expiresAt: number;
+  paymentTx: string | null | undefined;
+  paymentNetwork: string | null | undefined;
+  userAddress: string;
 }
 
 interface StorageUsageResult {
-  storageUsedMB: num;
-  storageRemainingMB: num;
+  storageUsedMB: number;
+  storageRemainingMB: number;
 }
 
 export interface CanUploadResult {
-  allowed: bool;
-  reason?: str;
-  requiresPayment?: bool;
-  requiresUpgrade?: bool;
-  currentTier?: str;
-  storageAfterUpload?: num;
+  allowed: boolean;
+  reason?: string;
+  requiresPayment?: boolean;
+  requiresUpgrade?: boolean;
+  currentTier?: string;
+  storageAfterUpload?: number;
   x402?: any; // Payment requirements when requiresPayment is true
 }
 
 export interface CanUploadVerifiedResult extends CanUploadResult {
-  storageUsedMB?: num;
-  storageRemainingMB?: num;
-  storageTotalMB?: num;
-  verified?: bool;
+  storageUsedMB?: number;
+  storageRemainingMB?: number;
+  storageTotalMB?: number;
+  verified?: boolean;
 }
 
 interface IpfsObjectSize {
-  cid: str;
-  size: num;
-  numLinks: num;
-  blockSize: num;
+  cid: string;
+  size: number;
+  numberLinks: number;
+  blockSize: number;
 }
 
 interface IpfsRepoStats {
-  repoSize: num;
-  storageMax: num;
-  numObjects: num;
-  repoPath: str;
-  version: str;
+  repoSize: number;
+  storageMax: number;
+  numberObjects: number;
+  repoPath: string;
+  version: string;
 }
 
 interface PinsSizeResult {
-  totalBytes: num;
-  totalMB?: num;
-  totalGB?: num;
-  pinCount: num;
-  pins: arr<{ cid: str; size: num; sizeMB: num }>;
+  totalBytes: number;
+  totalMB?: number;
+  totalGB?: number;
+  pinCount: number;
+  pins: Array<{ cid: string; size: number; sizeMB: number }>;
 }
 
 export interface RelayStorageStatus {
-  available: bool;
-  unlimited?: bool;
-  usedBytes?: num;
-  usedMB?: num;
-  usedGB?: num;
-  maxStorageGB?: num | null;
-  remainingGB?: num | null;
-  percentUsed?: num | null;
-  warning?: bool;
-  numObjects?: num;
-  maxStorageMB?: num;
-  remainingBytes?: num;
-  remainingMB?: num;
-  full?: bool;
-  warningThreshold?: num;
-  error?: str;
+  available: boolean;
+  unlimited?: boolean;
+  usedBytes?: number;
+  usedMB?: number;
+  usedGB?: number;
+  maxStorageGB?: number | null;
+  remainingGB?: number | null;
+  percentUsed?: number | null;
+  warning?: boolean;
+  numberObjects?: number;
+  maxStorageMB?: number;
+  remainingBytes?: number;
+  remainingMB?: number;
+  full?: boolean;
+  warningThreshold?: number;
+  error?: string;
 }
 
 interface CanAcceptSubscriptionResult {
-  allowed: bool;
-  reason?: str;
+  allowed: boolean;
+  reason?: string;
   relayStorage?: RelayStorageStatus;
-  relayFull?: bool;
-  warning?: str;
-  error?: str;
+  relayFull?: boolean;
+  warning?: string;
+  error?: string;
 }
 
 interface CanAcceptUploadResult extends CanAcceptSubscriptionResult {
-  warning?: str;
+  warning?: string;
 }
 
 interface CalculateRealStorageUsageResult {
-  totalBytes: num;
-  totalMB: num;
-  fileCount: num;
-  files: arr<any>;
-  verified: bool;
+  totalBytes: number;
+  totalMB: number;
+  fileCount: number;
+  files: Array<any>;
+  verified: boolean;
 }
 
 interface SyncStorageUsageResult {
-  success: bool;
-  previousMB?: num;
-  currentMB?: num;
-  discrepancy?: num;
-  corrected?: bool;
+  success: boolean;
+  previousMB?: number;
+  currentMB?: number;
+  discrepancy?: number;
+  corrected?: boolean;
   realUsage?: CalculateRealStorageUsageResult;
-  storageRemainingMB?: num;
-  error?: str;
+  storageRemainingMB?: number;
+  error?: string;
 }
 
 const USDC_ABI = USDC_EIP3009_ABI;
@@ -250,23 +250,23 @@ export const SUBSCRIPTION_TIERS: SubscriptionTiersMap =
   PRICING_CONFIG.subscriptions;
 
 interface X402MerchantOptions {
-  payToAddress: str;
+  payToAddress: string;
   network?: NetworkKey;
-  facilitatorUrl?: str;
-  facilitatorApiKey?: str;
+  facilitatorUrl?: string;
+  facilitatorApiKey?: string;
   settlementMode?: "facilitator" | "direct";
-  privateKey?: str;
-  rpcUrl?: str;
+  privateKey?: string;
+  rpcUrl?: string;
 }
 
 export class X402Merchant {
-  payToAddress: str;
+  payToAddress: string;
   network: NetworkKey;
-  facilitatorUrl: str;
-  facilitatorApiKey?: str;
+  facilitatorUrl: string;
+  facilitatorApiKey: string;
   settlementMode: "facilitator" | "direct";
-  privateKey?: str;
-  rpcUrl?: str;
+  privateKey: string;
+  rpcUrl: string;
   networkConfig: NetworkConfigType;
   publicClient?: any;
   walletClient?: any;
@@ -276,10 +276,10 @@ export class X402Merchant {
     this.network = options.network || "base-sepolia";
     this.facilitatorUrl =
       options.facilitatorUrl || "https://x402.org/facilitator";
-    this.facilitatorApiKey = options.facilitatorApiKey;
+    this.facilitatorApiKey = options.facilitatorApiKey as string;
     this.settlementMode = options.settlementMode || "facilitator";
-    this.privateKey = options.privateKey;
-    this.rpcUrl = options.rpcUrl;
+    this.privateKey = options.privateKey as string;
+    this.rpcUrl = options.rpcUrl as string;
 
     // Get network config
     this.networkConfig = NETWORK_CONFIG[this.network];
@@ -332,7 +332,7 @@ export class X402Merchant {
   /**
    * Create payment requirements for a subscription tier
    */
-  createPaymentRequirements(tier: str = "basic"): PaymentRequirements {
+  createPaymentRequirements(tier: string = "basic"): PaymentRequirements {
     const tierConfig = SUBSCRIPTION_TIERS[tier];
     if (!tierConfig) {
       throw new Error(`Invalid subscription tier: ${tier}`);
@@ -368,13 +368,13 @@ export class X402Merchant {
   /**
    * Create a payment-required response following x402 protocol
    */
-  createPaymentRequiredResponse(tier: str = "basic"): X402Response {
+  createPaymentRequiredResponse(tier: string = "basic"): X402Response {
     const requirements = this.createPaymentRequirements(tier);
 
     return {
       x402Version: 1,
       accepts: [requirements],
-      error: "Payment required for IPFS storage subscription" as any, // Using 'as any' since ErrorReason enum doesn't include this string, but x402 spec allows custom error messages
+      error: "Payment required for IPFS storage subscription" as any, // Using 'as any' since ErrorReason enumber doesn't include this string, but x402 spec allows custom error messages
     };
   }
 
@@ -383,8 +383,8 @@ export class X402Merchant {
    */
   async verifyPayment(
     paymentPayload: PaymentPayload,
-    expectedTier: str = "basic"
-  ): prm<PaymentVerificationResult> {
+    expectedTier: string = "basic"
+  ): Promise<PaymentVerificationResult> {
     if (!paymentPayload) {
       return { isValid: false, invalidReason: "No payment payload provided" };
     }
@@ -497,12 +497,12 @@ export class X402Merchant {
   /**
    * Verify payment for a deal (custom amount instead of tier)
    * @param {object} paymentPayload - The x402 payment payload
-   * @param {number} requiredAmountAtomic - Required amount in atomic units (6 decimals for USDC)
+   * @param {numberber} requiredAmountAtomic - Required amount in atomic units (6 decimals for USDC)
    */
   async verifyDealPayment(
     paymentPayload: PaymentPayload,
-    requiredAmountAtomic: num | str
-  ): prm<PaymentVerificationResult> {
+    requiredAmountAtomic: number | string
+  ): Promise<PaymentVerificationResult> {
     if (!paymentPayload) {
       return { isValid: false, invalidReason: "No payment payload provided" };
     }
@@ -594,7 +594,7 @@ export class X402Merchant {
    */
   async verifyWithFacilitator(
     paymentPayload: PaymentPayload
-  ): prm<FacilitatorVerifyResult> {
+  ): Promise<FacilitatorVerifyResult> {
     try {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -614,7 +614,7 @@ export class X402Merchant {
       });
 
       if (!response.ok) {
-        const errorData = (await response.json().catch(() => ({}))) as { error?: str };
+        const errorData = (await response.json().catch(() => ({}))) as { error?: string };
         return {
           isValid: false,
           invalidReason:
@@ -622,7 +622,7 @@ export class X402Merchant {
         };
       }
 
-      const result = (await response.json()) as { isValid?: bool; payer?: str };
+      const result = (await response.json()) as { isValid?: boolean; payer?: string };
       return { isValid: result.isValid ?? false, payer: result.payer };
     } catch (error: any) {
       log.error({ err: error }, "Facilitator verification error");
@@ -639,7 +639,7 @@ export class X402Merchant {
    */
   async settlePayment(
     paymentPayload: PaymentPayload
-  ): prm<PaymentSettlementResult> {
+  ): Promise<PaymentSettlementResult> {
     // If direct mode is explicitly set, use direct only
     if (this.settlementMode === "direct") {
       log.info("Using direct settlement mode");
@@ -692,7 +692,7 @@ export class X402Merchant {
    */
   async settleWithFacilitator(
     paymentPayload: PaymentPayload
-  ): prm<FacilitatorSettleResult> {
+  ): Promise<FacilitatorSettleResult> {
     try {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -713,9 +713,9 @@ export class X402Merchant {
         }),
       });
 
-      let result: { error?: str; message?: str; reason?: str; transactionHash?: str };
+      let result: { error?: string; message?: string; reason?: string; transactionHash?: string };
       try {
-        result = (await response.json()) as { error?: str; message?: str; reason?: str; transactionHash?: str };
+        result = (await response.json()) as { error?: string; message?: string; reason?: string; transactionHash?: string };
       } catch (parseError: any) {
         log.error({ err: parseError }, "Failed to parse facilitator response");
         return {
@@ -764,7 +764,7 @@ export class X402Merchant {
    */
   async settleDirectly(
     paymentPayload: PaymentPayload
-  ): prm<PaymentSettlementResult> {
+  ): Promise<PaymentSettlementResult> {
     if (!this.walletClient || !this.publicClient) {
       return {
         success: false,
@@ -861,7 +861,7 @@ export class X402Merchant {
         transaction: hash,
         network: this.network,
         explorer: `${this.networkConfig.explorer}/tx/${hash}`,
-        blockNumber: receipt.blockNumber?.toString(),
+        blocknumberber: receipt.blocknumberber?.toString(),
       };
     } catch (error: any) {
       log.error({ err: error }, "Direct settlement error");
@@ -874,8 +874,8 @@ export class X402Merchant {
    */
   static async getSubscriptionStatus(
     gun: any,
-    userAddress: str
-  ): prm<SubscriptionStatus> {
+    userAddress: string
+  ): Promise<SubscriptionStatus> {
     // Check if relay user is initialized
     if (!RelayUser.isRelayUserInitialized()) {
       log.warn("Relay user not initialized, cannot read subscription");
@@ -891,7 +891,7 @@ export class X402Merchant {
 
       const now = Date.now();
       const subData = data as unknown as Subscription;
-      const expiresAt = (subData.expiresAt as num) || 0;
+      const expiresAt = (subData.expiresAt as number) || 0;
 
       if (now > expiresAt) {
         return {
@@ -902,20 +902,20 @@ export class X402Merchant {
       }
 
       const tierConfig =
-        SUBSCRIPTION_TIERS[subData.tier as str] || SUBSCRIPTION_TIERS.basic;
+        SUBSCRIPTION_TIERS[subData.tier as string] || SUBSCRIPTION_TIERS.basic;
 
       return {
         active: true,
-        tier: subData.tier as str,
+        tier: subData.tier as string,
         storageMB: tierConfig.storageMB,
-        storageUsedMB: (subData.storageUsedMB as num) || 0,
+        storageUsedMB: (subData.storageUsedMB as number) || 0,
         storageRemainingMB: Math.max(
           0,
-          tierConfig.storageMB - ((subData.storageUsedMB as num) || 0)
+          tierConfig.storageMB - ((subData.storageUsedMB as number) || 0)
         ),
         expiresAt: new Date(expiresAt).toISOString(),
         purchasedAt: subData.purchasedAt
-          ? new Date(subData.purchasedAt as num).toISOString()
+          ? new Date(subData.purchasedAt as number).toISOString()
           : null,
         ownedBy: RelayUser.getRelayPub() || undefined,
       };
@@ -956,14 +956,14 @@ export class X402Merchant {
     // If renewing same or higher tier and subscription is still active, extend expiry
     if (currentSub.active && currentSub.tier) {
       const currentTierConfig = SUBSCRIPTION_TIERS[currentSub.tier as string];
-      
+
       // Prevent downgrade: new tier must have storageMB >= current tier
       if (currentTierConfig && tierConfig.storageMB < currentTierConfig.storageMB) {
         throw new Error(
           `Cannot downgrade from ${currentSub.tier} (${currentTierConfig.storageMB}MB) to ${tier} (${tierConfig.storageMB}MB). You can only upgrade to a higher or equal tier.`
         );
       }
-      
+
       // If same or higher tier, extend expiry and keep storage usage
       if (tierConfig.storageMB >= (currentTierConfig?.storageMB ?? 0)) {
         // Add remaining time from current subscription
@@ -990,7 +990,7 @@ export class X402Merchant {
       userAddress,
     };
 
-    await RelayUser.saveSubscription(userAddress, subscription as unknown as obj);
+    await RelayUser.saveSubscription(userAddress, subscription as unknown as Record<string, any>);
 
     return {
       ...subscription,
@@ -1003,9 +1003,9 @@ export class X402Merchant {
    */
   static async updateStorageUsage(
     gun: any,
-    userAddress: str,
-    addMB: num
-  ): prm<StorageUsageResult> {
+    userAddress: string,
+    addMB: number
+  ): Promise<StorageUsageResult> {
     // Check if relay user is initialized
     if (!RelayUser.isRelayUserInitialized()) {
       throw new Error("Relay user not initialized, cannot update storage");
@@ -1042,9 +1042,9 @@ export class X402Merchant {
    */
   static async canUpload(
     gun: any,
-    userAddress: str,
-    fileSizeMB: num
-  ): prm<CanUploadResult> {
+    userAddress: string,
+    fileSizeMB: number
+  ): Promise<CanUploadResult> {
     const sub = await this.getSubscriptionStatus(gun, userAddress);
 
     if (!sub.active) {
@@ -1073,7 +1073,7 @@ export class X402Merchant {
   /**
    * Get all uploads for a user from GunDB (relay user space)
    */
-  static async getUserUploads(gun: any, userAddress: str): prm<arr<any>> {
+  static async getUserUploads(gun: any, userAddress: string): Promise<Array<any>> {
     // Check if relay user is initialized
     if (!RelayUser.isRelayUserInitialized()) {
       log.warn("Relay user not initialized, cannot read uploads");
@@ -1107,12 +1107,12 @@ export class X402Merchant {
 
       if (!result) return null;
 
-      const statResult = result as { CumulativeSize?: num; DataSize?: num; NumLinks?: num; BlockSize?: num };
+      const statResult = result as { CumulativeSize?: number; DataSize?: number; numberLinks?: number; BlockSize?: number };
 
       return {
         cid,
         size: statResult.CumulativeSize || statResult.DataSize || 0,
-        numLinks: statResult.NumLinks || 0,
+        numberLinks: statResult.numberLinks || 0,
         blockSize: statResult.BlockSize || 0,
       };
     } catch (error: any) {
@@ -1127,10 +1127,10 @@ export class X402Merchant {
    */
   static async calculateRealStorageUsage(
     gun: any,
-    userAddress: str,
-    ipfsApiUrl?: str,
-    ipfsApiToken?: str
-  ): prm<CalculateRealStorageUsageResult> {
+    userAddress: string,
+    ipfsApiUrl?: string,
+    ipfsApiToken?: string
+  ): Promise<CalculateRealStorageUsageResult> {
     log.info(`Calculating real IPFS storage for ${userAddress}...`);
 
     // Get all uploads from GunDB
@@ -1151,7 +1151,7 @@ export class X402Merchant {
     );
 
     // Get actual sizes from IPFS
-    const filesWithSizes: arr<any> = [];
+    const filesWithSizes: Array<any> = [];
     let totalBytes = 0;
 
     for (const upload of uploads) {
@@ -1205,10 +1205,10 @@ export class X402Merchant {
    */
   static async syncStorageUsage(
     gun: any,
-    userAddress: str,
-    ipfsApiUrl?: str,
-    ipfsApiToken?: str
-  ): prm<SyncStorageUsageResult> {
+    userAddress: string,
+    ipfsApiUrl?: string,
+    ipfsApiToken?: string
+  ): Promise<SyncStorageUsageResult> {
     // Check if relay user is initialized
     if (!RelayUser.isRelayUserInitialized()) {
       return {
@@ -1301,11 +1301,11 @@ export class X402Merchant {
    */
   static async canUploadVerified(
     gun: any,
-    userAddress: str,
-    fileSizeMB: num,
-    ipfsApiUrl?: str,
-    ipfsApiToken?: str
-  ): prm<CanUploadVerifiedResult> {
+    userAddress: string,
+    fileSizeMB: number,
+    ipfsApiUrl?: string,
+    ipfsApiToken?: string
+  ): Promise<CanUploadVerifiedResult> {
     // Check if relay user is initialized
     if (!RelayUser.isRelayUserInitialized()) {
       return {
@@ -1383,10 +1383,10 @@ export class X402Merchant {
    * Save upload record for a user (relay user space)
    */
   static async saveUploadRecord(
-    userAddress: str,
-    hash: str,
+    userAddress: string,
+    hash: string,
     uploadData: any
-  ): prm<void> {
+  ): Promise<void> {
     if (!RelayUser.isRelayUserInitialized()) {
       throw new Error("Relay user not initialized");
     }
@@ -1397,7 +1397,7 @@ export class X402Merchant {
   /**
    * Delete upload record for a user (relay user space)
    */
-  static async deleteUploadRecord(userAddress: str, hash: str): prm<void> {
+  static async deleteUploadRecord(userAddress: string, hash: string): Promise<void> {
     if (!RelayUser.isRelayUserInitialized()) {
       throw new Error("Relay user not initialized");
     }
@@ -1410,9 +1410,9 @@ export class X402Merchant {
    * This uses the IPFS repo/stat API to get actual disk usage
    */
   static async getIpfsRepoStats(
-    ipfsApiUrl: str = "http://127.0.0.1:5001",
-    ipfsApiToken: str | null = null
-  ): prm<IpfsRepoStats | null> {
+    ipfsApiUrl: string = "http://127.0.0.1:5001",
+    ipfsApiToken: string | null = null
+  ): Promise<IpfsRepoStats | null> {
     return new Promise((resolve) => {
       const timeout = setTimeout(() => {
         log.error("Timeout getting IPFS repo stats");
@@ -1439,7 +1439,7 @@ export class X402Merchant {
 
       const req = protocolModule.request(requestOptions, (res: any) => {
         let data = "";
-        res.on("data", (chunk: str) => (data += chunk));
+        res.on("data", (chunk: string) => (data += chunk));
         res.on("end", () => {
           clearTimeout(timeout);
           try {
@@ -1447,7 +1447,7 @@ export class X402Merchant {
             resolve({
               repoSize: result.RepoSize || 0,
               storageMax: result.StorageMax || 0,
-              numObjects: result.NumObjects || 0,
+              numberObjects: result.numberObjects || 0,
               repoPath: result.RepoPath || "",
               version: result.Version || "",
             });
@@ -1473,9 +1473,9 @@ export class X402Merchant {
    * Returns total size of all pins
    */
   static async getAllPinsSize(
-    ipfsApiUrl: str = "http://127.0.0.1:5001",
-    ipfsApiToken: str | null = null
-  ): prm<PinsSizeResult> {
+    ipfsApiUrl: string = "http://127.0.0.1:5001",
+    ipfsApiToken: string | null = null
+  ): Promise<PinsSizeResult> {
     return new Promise((resolve) => {
       const timeout = setTimeout(() => {
         log.error("Timeout getting IPFS pins");
@@ -1502,7 +1502,7 @@ export class X402Merchant {
 
       const req = protocolModule.request(requestOptions, (res: any) => {
         let data = "";
-        res.on("data", (chunk: str) => (data += chunk));
+        res.on("data", (chunk: string) => (data += chunk));
         res.on("end", async () => {
           clearTimeout(timeout);
           try {
@@ -1516,7 +1516,7 @@ export class X402Merchant {
 
             // Get sizes for each pin (batch processing)
             let totalBytes = 0;
-            const pinsWithSizes: arr<{ cid: str; size: num; sizeMB: num }> = [];
+            const pinsWithSizes: Array<{ cid: string; size: number; sizeMB: number }> = [];
 
             for (const cid of pins) {
               const stats = await X402Merchant.getIpfsObjectSize(
@@ -1563,9 +1563,9 @@ export class X402Merchant {
    * Combines IPFS repo stats with configured limits
    */
   static async getRelayStorageStatus(
-    ipfsApiUrl?: str,
-    ipfsApiToken?: str
-  ): prm<RelayStorageStatus> {
+    ipfsApiUrl?: string,
+    ipfsApiToken?: string
+  ): Promise<RelayStorageStatus> {
     const maxStorageGB =
       parseFloat(storageConfig.maxStorageGB.toString()) || 0;
     const warningThreshold =
@@ -1599,7 +1599,7 @@ export class X402Merchant {
         remainingGB: null,
         percentUsed: null,
         warning: false,
-        numObjects: repoStats.numObjects,
+        numberObjects: repoStats.numberObjects,
       };
     }
 
@@ -1624,7 +1624,7 @@ export class X402Merchant {
       warning: percentUsed >= warningThreshold,
       warningThreshold,
       full: percentUsed >= 100,
-      numObjects: repoStats.numObjects,
+      numberObjects: repoStats.numberObjects,
     };
   }
 
@@ -1633,10 +1633,10 @@ export class X402Merchant {
    * Returns availability status and any warnings
    */
   static async canAcceptSubscription(
-    tier: str,
-    ipfsApiUrl?: str,
-    ipfsApiToken?: str
-  ): prm<CanAcceptSubscriptionResult> {
+    tier: string,
+    ipfsApiUrl?: string,
+    ipfsApiToken?: string
+  ): Promise<CanAcceptSubscriptionResult> {
     const tierConfig = SUBSCRIPTION_TIERS[tier];
     if (!tierConfig) {
       return {
@@ -1702,10 +1702,10 @@ export class X402Merchant {
    * Check if relay has enough space for a file upload (global check)
    */
   static async canAcceptUpload(
-    fileSizeMB: num,
-    ipfsApiUrl?: str,
-    ipfsApiToken?: str
-  ): prm<CanAcceptUploadResult> {
+    fileSizeMB: number,
+    ipfsApiUrl?: string,
+    ipfsApiToken?: string
+  ): Promise<CanAcceptUploadResult> {
     const relayStorage = await this.getRelayStorageStatus(
       ipfsApiUrl,
       ipfsApiToken

@@ -18,7 +18,6 @@
     "types": ["node"]
   },
   "include": [
-    "src/global.ts",
     "src/**/*.ts"
   ],
   "exclude": [

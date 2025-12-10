@@ -11,12 +11,12 @@ router.post("/:service/restart", async (req: Request, res: Response) => {
         loggers.services.info({ service }, 'Requesting service restart');
 
         // Verifica autenticazione
-        const authHeader: mb<str> = req.headers["authorization"] as mb<str>;
-        const bearerToken: mb<str> = authHeader && authHeader.split(" ")[1];
-        const customToken: mb<str> = req.headers["token"] as mb<str>;
-        const token: mb<str> = bearerToken || customToken;
+        const authHeader: string | undefined = req.headers["authorization"];
+        const bearerToken: string | undefined = authHeader && authHeader.split(" ")[1];
+        const customToken: string | string[] | undefined = req.headers["token"];
+        const token: string | string[] | undefined = bearerToken || customToken;
 
-        if (token !== authConfig.adminPassword) {
+        if (token && token !== authConfig.adminPassword) {
             return res.status(401).json({
                 success: false,
                 error: "Unauthorized",
@@ -24,7 +24,7 @@ router.post("/:service/restart", async (req: Request, res: Response) => {
         }
 
         // Lista dei servizi supportati
-        const supportedServices: arr<str> = [
+        const supportedServices: Array<string> = [
             "ipfs",
             "gun",
             "relay",
@@ -67,7 +67,7 @@ router.get("/status", async (req: Request, res: Response) => {
 
         // Per ora restituiamo lo stato mock dei servizi
         // In futuro potremmo controllare lo stato reale dei servizi
-        const servicesStatus: obj = {
+        const servicesStatus: Record<string, any> = {
             ipfs: {
                 status: "running",
                 uptime: "2h 15m",

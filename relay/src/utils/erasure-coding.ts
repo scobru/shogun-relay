@@ -1,12 +1,12 @@
 /**
  * Erasure Coding Utility for Shogun Relay
  * 
- * Provides data redundefinedancy through chunk splitting and parity generation.
+ * Provides data redundancy through chunk splitting and parity generation.
  * Uses XOR-based parity for simplicity (can be upgraded to Reed-Solomon).
  * 
  * Features:
  * - Split files into data chunks
- * - Generate parity chunks for redundefinedancy
+ * - Generate parity chunks for redundancy
  * - Recover data from partial chunks
  * - Track chunk distribution across relays
  */
@@ -18,82 +18,82 @@ const log = loggers.erasure;
 
 // Configuration interface
 interface ErasureCodingConfig {
-  chunkSize: num;
-  dataChunks: num;
-  parityChunks: num;
-  minChunksForRecovery: num;
+  chunkSize: number;
+  dataChunks: number;
+  parityChunks: number;
+  minChunksForRecovery: number;
 }
 
 // Default configuration
 const DEFAULT_CONFIG: ErasureCodingConfig = {
   chunkSize: 256 * 1024,      // 256KB per chunk
   dataChunks: 10,              // Number of data chunks
-  parityChunks: 4,             // Number of parity chunks (40% redundefinedancy)
+  parityChunks: 4,             // Number of parity chunks (40% redundancy)
   minChunksForRecovery: 10,    // Need at least this many to recover
 };
 
 // Chunk info interface
 interface ChunkInfo {
-  index: num;
+  index: number;
   type: 'data' | 'parity';
-  hash: str;
-  size: num;
+  hash: string;
+  size: number;
 }
 
 // Encode result interface
 interface EncodeResult {
-  originalSize: num;
-  chunkSize: num;
-  dataChunkCount: num;
-  parityChunkCount: num;
-  totalChunks: num;
-  minChunksForRecovery: num;
-  redundefinedancyPercent: num;
-  chunks: arr<ChunkInfo>;
-  dataChunks: arr<Buffer>;
-  parityChunks: arr<Buffer>;
+  originalSize: number;
+  chunkSize: number;
+  dataChunkCount: number;
+  parityChunkCount: number;
+  totalChunks: number;
+  minChunksForRecovery: number;
+  redundancyPercent: number;
+  chunks: ChunkInfo[];
+  dataChunks: Buffer[];
+  parityChunks: Buffer[];
 }
 
 // Distribution plan interfaces
 interface ChunkAssignment extends ChunkInfo {
-  assignedRelays: arr<str>;
+  assignedRelays: string[];
 }
 
 interface DistributionPlan {
-  chunks: arr<ChunkAssignment>;
-  relayAssignments: Record<str, arr<num>>;
+  chunks: ChunkAssignment[];
+  relayAssignments: Record<string, number[]>;
 }
 
 // Erasure metadata interface
 interface ErasureMetadata {
-  version: num;
-  algorithm: str;
-  originalSize: num;
-  chunkSize: num;
-  dataChunkCount: num;
-  parityChunkCount: num;
-  redundefinedancyPercent: num;
-  chunks: arr<{
-    index: num;
-    type: str;
-    hash: str;
-    assignedRelays: arr<str>;
-  }>;
-  createdAt: num;
+  version: number;
+  algorithm: string;
+  originalSize: number;
+  chunkSize: number;
+  dataChunkCount: number;
+  parityChunkCount: number;
+  redundancyPercent: number;
+  chunks: {
+    index: number;
+    type: string;
+    hash: string;
+    assignedRelays: string[];
+  }[];
+  createdAt: number;
 }
 
 // Overhead calculation interface
 interface OverheadResult {
-  originalSize: num;
-  dataChunks: num;
-  parityChunks: num;
-  totalChunks: num;
-  dataSize: num;
-  paritySize: num;
-  totalSize: num;
-  overheadBytes: num;
-  overheadPercent: num;
-  redundefinedancyPercent: num;
+  originalSize: number;
+  dataChunks: number;
+  parityChunks: number;
+  totalChunks: number;
+  dataSize: number;
+  paritySize: number;
+  totalSize: number;
+  overheadBytes: number;
+  overheadPercent: number;
+  redundancyPercent: number;
 }
 
 /**
@@ -103,8 +103,8 @@ interface OverheadResult {
  * @param chunkSize - Size of each chunk in bytes
  * @returns Array of chunks
  */
-export function splitIntoChunks(data: Buffer, chunkSize: num = DEFAULT_CONFIG.chunkSize): arr<Buffer> {
-  const chunks: arr<Buffer> = [];
+export function splitIntoChunks(data: Buffer, chunkSize: number = DEFAULT_CONFIG.chunkSize): Buffer[] {
+  const chunks: Buffer[] = [];
   let offset = 0;
 
   while (offset < data.length) {
@@ -125,7 +125,7 @@ export function splitIntoChunks(data: Buffer, chunkSize: num = DEFAULT_CONFIG.ch
  * @param b - Second buffer
  * @returns XOR result
  */
-function xorBuffers(a: Buffer, b: Buffer): Buffer<ArrayBufferLike> {
+function xorBuffers(a: Buffer, b: Buffer): Buffer {
   const length = Math.max(a.length, b.length);
   const result = Buffer.alloc(length);
 
@@ -149,42 +149,42 @@ function xorBuffers(a: Buffer, b: Buffer): Buffer<ArrayBufferLike> {
  * @param parityCount - Number of parity chunks to generate
  * @returns Array of parity chunks
  */
-export function generateParityChunks(dataChunks: arr<Buffer>, parityCount: num = DEFAULT_CONFIG.parityChunks): arr<Buffer> {
+export function generateParityChunks(dataChunks: Buffer[], parityCount: number = DEFAULT_CONFIG.parityChunks): Buffer[] {
   if (dataChunks.length === 0) {
     return [];
   }
 
   const chunkSize = dataChunks[0].length;
-  const parityChunks: arr<Buffer> = [];
+  const parityChunks: Buffer[] = [];
 
   // P0: XOR of all chunks
-  let p0: Buffer<ArrayBufferLike> = Buffer.alloc(chunkSize, 0);
+  let p0: Buffer = Buffer.alloc(chunkSize, 0);
   for (const chunk of dataChunks) {
-    p0 = xorBuffers(p0, chunk) as Buffer;
+    p0 = xorBuffers(p0, chunk);
   }
   parityChunks.push(p0);
 
   if (parityCount >= 2) {
     // P1: XOR of even-indexed chunks
-    let p1: Buffer<ArrayBufferLike> = Buffer.alloc(chunkSize, 0);
+    let p1: Buffer = Buffer.alloc(chunkSize, 0);
     for (let i = 0; i < dataChunks.length; i += 2) {
-      p1 = xorBuffers(p1, dataChunks[i]) as Buffer;
+      p1 = xorBuffers(p1, dataChunks[i]);
     }
     parityChunks.push(p1);
   }
 
   if (parityCount >= 3) {
     // P2: XOR of odd-indexed chunks
-    let p2: Buffer<ArrayBufferLike> = Buffer.alloc(chunkSize, 0);
+    let p2: Buffer = Buffer.alloc(chunkSize, 0);
     for (let i = 1; i < dataChunks.length; i += 2) {
-      p2 = xorBuffers(p2, dataChunks[i]) as Buffer;
+      p2 = xorBuffers(p2, dataChunks[i]);
     }
     parityChunks.push(p2);
   }
 
   if (parityCount >= 4) {
     // P3: Rotated XOR (each chunk shifted by index)
-    let p3: Buffer<ArrayBufferLike> = Buffer.alloc(chunkSize, 0);
+    let p3: Buffer = Buffer.alloc(chunkSize, 0);
     for (let i = 0; i < dataChunks.length; i++) {
       const rotated = Buffer.alloc(chunkSize);
       const shift = i % chunkSize;
@@ -194,7 +194,7 @@ export function generateParityChunks(dataChunks: arr<Buffer>, parityCount: num =
       if (shift > 0) {
         dataChunks[i].copy(rotated, 0, chunkSize - shift, chunkSize);
       }
-      p3 = xorBuffers(p3, rotated) as Buffer;
+      p3 = xorBuffers(p3, rotated);
     }
     parityChunks.push(p3);
   }
@@ -209,7 +209,7 @@ export function generateParityChunks(dataChunks: arr<Buffer>, parityCount: num =
  * @param config - Configuration options
  * @returns Erasure coding result
  */
-export function encodeData(data: Buffer, config: opt<ErasureCodingConfig> = {}): EncodeResult {
+export function encodeData(data: Buffer, config: Partial<ErasureCodingConfig> = {}): EncodeResult {
   const opts = { ...DEFAULT_CONFIG, ...config };
 
   // Split into chunks
@@ -220,7 +220,7 @@ export function encodeData(data: Buffer, config: opt<ErasureCodingConfig> = {}):
 
   // Generate hashes for each chunk
   const allChunks = [...dataChunks, ...parityChunks];
-  const chunkInfos: arr<ChunkInfo> = allChunks.map((chunk, index) => {
+  const chunkInfos: ChunkInfo[] = allChunks.map((chunk, index) => {
     const hash = crypto.createHash('sha256').update(chunk).digest('hex');
     return {
       index,
@@ -237,7 +237,7 @@ export function encodeData(data: Buffer, config: opt<ErasureCodingConfig> = {}):
     parityChunkCount: parityChunks.length,
     totalChunks: allChunks.length,
     minChunksForRecovery: dataChunks.length, // Need all data chunks OR use parity
-    redundefinedancyPercent: Math.roundefined((parityChunks.length / dataChunks.length) * 100),
+    redundancyPercent: Math.round((parityChunks.length / dataChunks.length) * 100),
     chunks: chunkInfos,
     dataChunks,
     parityChunks,
@@ -251,7 +251,7 @@ export function encodeData(data: Buffer, config: opt<ErasureCodingConfig> = {}):
  * @param originalSize - Original data size
  * @returns Reconstructed data
  */
-export function reconstructData(chunks: arr<Buffer>, originalSize: num): Buffer {
+export function reconstructData(chunks: Buffer[], originalSize: number): Buffer {
   const combined = Buffer.concat(chunks);
   return combined.slice(0, originalSize);
 }
@@ -262,13 +262,13 @@ export function reconstructData(chunks: arr<Buffer>, originalSize: num): Buffer 
  * @param availableChunks - Map of index -> chunk
  * @param missingIndex - Index of missing chunk
  * @param totalDataChunks - Total number of data chunks
- * @returns Recovered chunk or undefinedefined
+ * @returns Recovered chunk or undefined
  */
 export function recoverMissingChunk(
-  availableChunks: Map<num, Buffer>,
-  missingIndex: num,
-  totalDataChunks: num
-): mb<Buffer> {
+  availableChunks: Map<number, Buffer>,
+  missingIndex: number,
+  totalDataChunks: number
+): Buffer | undefined {
   // Get P0 (XOR of all data chunks)
   const p0Index = totalDataChunks; // First parity chunk
   const p0 = availableChunks.get(p0Index);
@@ -293,10 +293,10 @@ export function recoverMissingChunk(
   }
 
   // Recover: missing = P0 XOR all_other_data_chunks
-  let recovered: Buffer<ArrayBufferLike> = Buffer.from(p0);
+  let recovered: Buffer = Buffer.from(p0);
   for (let i = 0; i < totalDataChunks; i++) {
     if (i !== missingIndex) {
-      recovered = xorBuffers(recovered, availableChunks.get(i)!) as Buffer;
+      recovered = xorBuffers(recovered, availableChunks.get(i)!);
     }
   }
 
@@ -313,8 +313,8 @@ export function recoverMissingChunk(
  */
 export function createDistributionPlan(
   encoded: EncodeResult,
-  relayHosts: arr<str>,
-  replicationFactor: num = 2
+  relayHosts: string[],
+  replicationFactor: number = 2
 ): DistributionPlan {
   if (relayHosts.length === 0) {
     throw new Error('No relays available for distribution');
@@ -330,9 +330,9 @@ export function createDistributionPlan(
     plan.relayAssignments[host] = [];
   });
 
-  // Distribute chunks roundefined-robin with replication
+  // Distribute chunks round-robin with replication
   encoded.chunks.forEach((chunk, index) => {
-    const assignments: arr<str> = [];
+    const assignments: string[] = [];
 
     for (let r = 0; r < replicationFactor; r++) {
       const relayIndex = (index + r) % relayHosts.length;
@@ -360,7 +360,7 @@ export function createDistributionPlan(
  * @param expectedHash - Expected SHA-256 hash
  * @returns True if valid
  */
-export function verifyChunk(chunk: Buffer, expectedHash: str): bool {
+export function verifyChunk(chunk: Buffer, expectedHash: string): boolean {
   const actualHash = crypto.createHash('sha256').update(chunk).digest('hex');
   return actualHash === expectedHash;
 }
@@ -372,7 +372,7 @@ export function verifyChunk(chunk: Buffer, expectedHash: str): bool {
  * @param distributionPlan - Result from createDistributionPlan()
  * @returns Metadata for storage
  */
-export function createErasureMetadata(encoded: EncodeResult, distributionPlan: mb<DistributionPlan> = undefined): ErasureMetadata {
+export function createErasureMetadata(encoded: EncodeResult, distributionPlan?: DistributionPlan): ErasureMetadata {
   return {
     version: 1,
     algorithm: 'xor-parity',
@@ -380,7 +380,7 @@ export function createErasureMetadata(encoded: EncodeResult, distributionPlan: m
     chunkSize: encoded.chunkSize,
     dataChunkCount: encoded.dataChunkCount,
     parityChunkCount: encoded.parityChunkCount,
-    redundefinedancyPercent: encoded.redundefinedancyPercent,
+    redundancyPercent: encoded.redundancyPercent,
     chunks: encoded.chunks.map(c => ({
       index: c.index,
       type: c.type,
@@ -398,7 +398,7 @@ export function createErasureMetadata(encoded: EncodeResult, distributionPlan: m
  * @param config - Erasure coding configuration
  * @returns Size calculations
  */
-export function calculateOverhead(originalSize: num, config: ErasureCodingConfig = DEFAULT_CONFIG): OverheadResult {
+export function calculateOverhead(originalSize: number, config: ErasureCodingConfig = DEFAULT_CONFIG): OverheadResult {
   const dataChunks = Math.ceil(originalSize / config.chunkSize);
   const parityChunks = config.parityChunks;
   const totalChunks = dataChunks + parityChunks;
@@ -416,8 +416,8 @@ export function calculateOverhead(originalSize: num, config: ErasureCodingConfig
     paritySize,
     totalSize,
     overheadBytes: totalSize - originalSize,
-    overheadPercent: Math.roundefined(((totalSize - originalSize) / originalSize) * 100),
-    redundefinedancyPercent: Math.roundefined((parityChunks / dataChunks) * 100),
+    overheadPercent: Math.round(((totalSize - originalSize) / originalSize) * 100),
+    redundancyPercent: Math.round((parityChunks / dataChunks) * 100),
   };
 }
 
