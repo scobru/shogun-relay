@@ -329,8 +329,11 @@ router.post("/withdraw", express.json(), async (req, res) => {
       "Dual signatures verified successfully"
     );
 
-    // Check balance
-    const balance = await getUserBalance(gun, userAddress);
+    // Get relay keypair for signing and signature verification
+    const relayKeyPair = req.app.get("relayKeyPair") || null;
+
+    // Check balance - enforce relay signature verification
+    const balance = await getUserBalance(gun, userAddress, relayKeyPair?.pub);
     if (balance < amountBigInt) {
       return res.status(400).json({
         success: false,
@@ -353,9 +356,6 @@ router.post("/withdraw", express.json(), async (req, res) => {
         error: "Withdrawal with this nonce has already been processed on-chain",
       });
     }
-
-    // Get relay keypair for signing (if available)
-    const relayKeyPair = req.app.get("relayKeyPair") || null;
 
     // Debit balance (requires relay keypair for security)
     // Pass the nonce so the debit entry can be linked to this specific withdrawal
@@ -513,12 +513,16 @@ router.get("/balance/:user", async (req, res) => {
       });
     }
 
+    // Get relay keypair for signature verification
+    const relayKeyPair = req.app.get("relayKeyPair");
+
     log.info(
-      { user: userAddress, normalizedUser: userAddress.toLowerCase() },
+      { user: userAddress, normalizedUser: userAddress.toLowerCase(), hasRelayPub: !!relayKeyPair?.pub },
       "Getting user balance"
     );
 
-    const balance = await getUserBalance(gun, userAddress);
+    // SECURITY: Enforce relay signature verification - only trust balances signed by this relay
+    const balance = await getUserBalance(gun, userAddress, relayKeyPair?.pub);
 
     log.info(
       {
@@ -1153,7 +1157,7 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
 
         // If marked as processed, verify the balance was actually credited
         if (alreadyProcessed) {
-          const currentL2Balance = await getUserBalance(gun, normalizedUser);
+          const currentL2Balance = await getUserBalance(gun, normalizedUser, relayKeyPair?.pub);
 
           // If balance is 0, the deposit was marked as processed but not actually credited
           // This can happen if creditBalance failed silently or was interrupted
@@ -1211,7 +1215,7 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
         const pollInterval = 500;
 
         while (!balanceVerified && attempts < maxAttempts) {
-          const verifyBalance = await getUserBalance(gun, normalizedUser);
+          const verifyBalance = await getUserBalance(gun, normalizedUser, relayKeyPair?.pub);
           log.info(
             {
               user: normalizedUser,
@@ -1238,7 +1242,7 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
               user: normalizedUser,
               amount: deposit.amount.toString(),
               txHash: deposit.txHash,
-              currentL2Balance: ethers.formatEther(await getUserBalance(gun, normalizedUser)),
+              currentL2Balance: ethers.formatEther(await getUserBalance(gun, normalizedUser, relayKeyPair?.pub)),
             },
             "Failed to verify L2 balance update after credit within timeout during sync. Deposit will be retried."
           );
@@ -1257,7 +1261,7 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
           timestamp: Date.now(),
         });
 
-        const finalVerifyBalance = await getUserBalance(gun, normalizedUser);
+        const finalVerifyBalance = await getUserBalance(gun, normalizedUser, relayKeyPair?.pub);
         log.info(
           {
             txHash: deposit.txHash,
@@ -1290,7 +1294,7 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
 
       for (const [normalizedUser, expectedTotal] of userExpectedBalanceMap.entries()) {
         try {
-          const actualBalance = await getUserBalance(gun, normalizedUser);
+          const actualBalance = await getUserBalance(gun, normalizedUser, relayKeyPair?.pub);
 
           if (actualBalance !== expectedTotal) {
             log.warn(
@@ -1323,7 +1327,7 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
 
             // Verify the correction
             await new Promise(resolve => setTimeout(resolve, 300));
-            const correctedBalance = await getUserBalance(gun, normalizedUser);
+            const correctedBalance = await getUserBalance(gun, normalizedUser, relayKeyPair?.pub);
 
             if (correctedBalance === expectedTotal) {
               log.info(
@@ -1510,7 +1514,7 @@ router.post("/process-deposit", express.json({ limit: '10mb' }), async (req, res
     });
 
     // Verify balance
-    const balance = await getUserBalance(gun, normalizedUser);
+    const balance = await getUserBalance(gun, normalizedUser, relayKeyPair?.pub);
 
     log.info(
       {

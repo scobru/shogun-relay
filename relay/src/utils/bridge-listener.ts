@@ -88,7 +88,7 @@ export async function startBridgeListener(
           // Normalize user address to ensure consistent key
           const normalizedUser = event.user.toLowerCase();
           const depositKey = `${event.txHash}:${normalizedUser}:${event.amount}`;
-          
+
           log.info(
             {
               txHash: event.txHash,
@@ -98,15 +98,15 @@ export async function startBridgeListener(
             },
             "Received deposit event, checking if already processed"
           );
-          
+
           const alreadyProcessed = await isDepositProcessed(gun, depositKey);
-          
+
           if (alreadyProcessed) {
             // CRITICAL: Verify that the balance was actually written
             // If deposit is marked as processed but balance is less than deposit amount,
             // it's likely the deposit wasn't fully credited (due to race conditions or failures)
-            const currentBalance = await getUserBalance(gun, normalizedUser);
-            
+            const currentBalance = await getUserBalance(gun, normalizedUser, config.relayKeyPair?.pub);
+
             // Conservative check: if balance is less than the deposit amount, reprocess
             // This handles cases where:
             // 1. Balance is 0 but deposit should have credited (obvious failure)
@@ -145,7 +145,7 @@ export async function startBridgeListener(
               return;
             }
           }
-          
+
           log.info(
             {
               txHash: event.txHash,
@@ -236,7 +236,7 @@ export async function startBridgeListener(
           // All security checks passed - credit balance (with signature if relay keypair available)
           // SECURITY: Only mark as processed AFTER successful credit AND verification to ensure idempotency
           // If creditBalance fails, the deposit will be retried (which is correct behavior)
-          
+
           log.info(
             {
               user: normalizedUser,
@@ -245,20 +245,20 @@ export async function startBridgeListener(
             },
             "Crediting balance to L2"
           );
-          
+
           // Get balance before credit to calculate expected balance
-          const balanceBefore = await getUserBalance(gun, normalizedUser);
+          const balanceBefore = await getUserBalance(gun, normalizedUser, config.relayKeyPair?.pub);
           const expectedBalance = balanceBefore + event.amount;
-          
+
           await creditBalance(gun, normalizedUser, event.amount, config.relayKeyPair);
-          
+
           // CRITICAL: Wait and verify balance was actually written before marking as processed
           // GunDB is eventually consistent, so we need to poll until the balance appears
-          let verifyBalance = await getUserBalance(gun, normalizedUser);
+          let verifyBalance = await getUserBalance(gun, normalizedUser, config.relayKeyPair?.pub);
           let retries = 0;
           const maxRetries = 10;
           const retryDelay = 500; // 500ms between retries
-          
+
           while (verifyBalance < expectedBalance && retries < maxRetries) {
             log.info(
               {
@@ -270,10 +270,10 @@ export async function startBridgeListener(
               "Waiting for balance to be written to GunDB"
             );
             await new Promise(resolve => setTimeout(resolve, retryDelay));
-            verifyBalance = await getUserBalance(gun, normalizedUser);
+            verifyBalance = await getUserBalance(gun, normalizedUser, config.relayKeyPair?.pub);
             retries++;
           }
-          
+
           if (verifyBalance < expectedBalance) {
             log.error(
               {
@@ -286,7 +286,7 @@ export async function startBridgeListener(
             );
             throw new Error(`Balance verification failed: expected ${expectedBalance.toString()}, got ${verifyBalance.toString()}`);
           }
-          
+
           log.info(
             {
               user: normalizedUser,
@@ -297,7 +297,7 @@ export async function startBridgeListener(
             },
             "Balance credited and verified, marking deposit as processed"
           );
-          
+
           // Mark as processed (idempotency) - only if creditBalance succeeded AND verified
           await markDepositProcessed(gun, depositKey, {
             txHash: event.txHash,
