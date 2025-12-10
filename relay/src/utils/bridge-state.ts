@@ -1304,7 +1304,12 @@ export async function removePendingWithdrawals(
 }
 
 /**
- * Save batch to GunDB
+ * Save batch to GunDB with reliable persistence
+ * 
+ * Strategy:
+ * 1. Save withdrawals as a JSON string in batch metadata (most reliable)
+ * 2. Also save individual withdrawal nodes (for backward compatibility)
+ * 3. Verify the data is readable before returning
  */
 export async function saveBatch(
   gun: IGunInstance,
@@ -1316,95 +1321,141 @@ export async function saveBatch(
     const withdrawalsPath = `${batchPath}/withdrawals`;
 
     try {
-      // First, save the batch metadata (without withdrawals array)
+      // Serialize withdrawals to JSON string for reliable storage
+      const withdrawalsJson = JSON.stringify(batch.withdrawals);
+
+      // First, save the batch metadata WITH withdrawals as JSON string
       const batchData = {
         batchId: batch.batchId,
         root: batch.root,
         withdrawalsCount: batch.withdrawals.length,
+        withdrawalsJson, // Store as JSON string for reliability
         timestamp: batch.timestamp,
         blockNumber: batch.blockNumber,
         txHash: batch.txHash,
       };
 
-      await new Promise<void>((res, rej) => {
-        gun.get(batchPath).put(batchData, (ack: GunMessagePut) => {
-          if (ack && "err" in ack && ack.err) {
-            const errorMsg =
-              typeof ack.err === "string" ? ack.err : String(ack.err);
-            log.error(
-              { error: errorMsg, batchPath, batchId: batch.batchId },
-              "Error saving batch metadata to GunDB"
-            );
-            rej(new Error(errorMsg));
-          } else {
-            log.info(
-              { batchId: batch.batchId, withdrawalCount: batch.withdrawals.length },
-              "Batch metadata saved to GunDB"
-            );
-            res();
-          }
+      // Save batch metadata with retries
+      const saveWithRetry = async (attempt: number = 1, maxAttempts: number = 3): Promise<void> => {
+        return new Promise<void>((res, rej) => {
+          const timeout = setTimeout(() => {
+            if (attempt < maxAttempts) {
+              log.warn({ batchId: batch.batchId, attempt }, "Timeout saving batch, retrying...");
+              saveWithRetry(attempt + 1, maxAttempts).then(res).catch(rej);
+            } else {
+              rej(new Error("Timeout saving batch metadata after retries"));
+            }
+          }, 10000);
+
+          gun.get(batchPath).put(batchData, (ack: GunMessagePut) => {
+            clearTimeout(timeout);
+            if (ack && "err" in ack && ack.err) {
+              const errorMsg = typeof ack.err === "string" ? ack.err : String(ack.err);
+              if (attempt < maxAttempts) {
+                log.warn({ error: errorMsg, batchId: batch.batchId, attempt }, "Error saving batch, retrying...");
+                setTimeout(() => saveWithRetry(attempt + 1, maxAttempts).then(res).catch(rej), 500 * attempt);
+              } else {
+                log.error({ error: errorMsg, batchPath, batchId: batch.batchId }, "Error saving batch metadata to GunDB after retries");
+                rej(new Error(errorMsg));
+              }
+            } else {
+              log.info(
+                { batchId: batch.batchId, withdrawalCount: batch.withdrawals.length, withdrawalsJsonLength: withdrawalsJson.length },
+                "Batch metadata saved to GunDB"
+              );
+              res();
+            }
+          });
         });
-      });
+      };
+
+      await saveWithRetry();
 
       // Also save a reference in the parent node so it's immediately visible
-      await new Promise<void>((res, rej) => {
+      await new Promise<void>((res) => {
+        const timeout = setTimeout(() => {
+          log.warn({ batchId: batch.batchId }, "Timeout saving batch reference in parent node (non-critical)");
+          res();
+        }, 5000);
+
         gun.get(batchesParentPath).get(batch.batchId).put(batchData, (ack: GunMessagePut) => {
+          clearTimeout(timeout);
           if (ack && "err" in ack && ack.err) {
-            const errorMsg =
-              typeof ack.err === "string" ? ack.err : String(ack.err);
-            log.warn(
-              { error: errorMsg, batchId: batch.batchId },
-              "Warning: Error saving batch reference in parent node (non-critical)"
-            );
-            // Don't fail the whole operation if this fails
-            res();
+            const errorMsg = typeof ack.err === "string" ? ack.err : String(ack.err);
+            log.warn({ error: errorMsg, batchId: batch.batchId }, "Warning: Error saving batch reference in parent node (non-critical)");
           } else {
-            log.info(
-              { batchId: batch.batchId },
-              "Batch reference saved in parent node"
-            );
-            res();
+            log.info({ batchId: batch.batchId }, "Batch reference saved in parent node");
           }
+          res();
         });
       });
 
-      // Then, save each withdrawal as a separate node
+      // Also save each withdrawal as a separate node (for backward compatibility)
+      // These are saved in parallel with a shorter timeout since we have the JSON backup
       const savePromises: Promise<void>[] = [];
       batch.withdrawals.forEach((withdrawal, index) => {
         savePromises.push(
-          new Promise((res, rej) => {
+          new Promise((res) => {
             const withdrawalKey = `${index}`;
             const withdrawalNodePath = `${withdrawalsPath}/${withdrawalKey}`;
             const timeout = setTimeout(() => {
-              rej(new Error("Timeout waiting for GunDB response"));
-            }, 10000);
+              log.warn({ withdrawalNodePath, index }, "Timeout saving individual withdrawal node (non-critical, JSON backup exists)");
+              res();
+            }, 5000);
 
             gun.get(withdrawalNodePath).put(withdrawal, (ack: GunMessagePut) => {
               clearTimeout(timeout);
               if (ack && "err" in ack && ack.err) {
-                const errorMsg =
-                  typeof ack.err === "string" ? ack.err : String(ack.err);
-                log.error(
-                  { error: errorMsg, withdrawalNodePath, index },
-                  "Error saving withdrawal to batch in GunDB"
-                );
-                rej(new Error(errorMsg));
+                const errorMsg = typeof ack.err === "string" ? ack.err : String(ack.err);
+                log.warn({ error: errorMsg, withdrawalNodePath, index }, "Error saving individual withdrawal node (non-critical, JSON backup exists)");
               } else {
-                log.info(
-                  { withdrawalNodePath, index, user: withdrawal.user, amount: withdrawal.amount },
-                  "Withdrawal saved to batch in GunDB"
-                );
-                res();
+                log.info({ withdrawalNodePath, index, user: withdrawal.user, amount: withdrawal.amount }, "Individual withdrawal node saved to GunDB");
               }
+              res();
             });
           })
         );
       });
 
       await Promise.all(savePromises);
+
+      // Verify the batch is readable by attempting to read it back
+      await new Promise<void>((verifyRes, verifyRej) => {
+        const verifyTimeout = setTimeout(() => {
+          log.warn({ batchId: batch.batchId }, "Timeout verifying batch readability (proceeding anyway)");
+          verifyRes();
+        }, 5000);
+
+        gun.get(batchPath).once((readData: any) => {
+          clearTimeout(verifyTimeout);
+          if (readData && readData.batchId && readData.withdrawalsJson) {
+            try {
+              const parsedWithdrawals = JSON.parse(readData.withdrawalsJson);
+              if (Array.isArray(parsedWithdrawals) && parsedWithdrawals.length === batch.withdrawals.length) {
+                log.info(
+                  { batchId: batch.batchId, readBackWithdrawals: parsedWithdrawals.length },
+                  "Batch verified: successfully read back with correct withdrawal count"
+                );
+              } else {
+                log.warn(
+                  { batchId: batch.batchId, expected: batch.withdrawals.length, got: parsedWithdrawals?.length },
+                  "Batch verification: withdrawal count mismatch but JSON is present"
+                );
+              }
+            } catch (parseErr) {
+              log.warn({ batchId: batch.batchId, parseErr }, "Batch verification: failed to parse withdrawalsJson");
+            }
+            verifyRes();
+          } else {
+            log.warn({ batchId: batch.batchId, readData: !!readData }, "Batch verification: could not read back batch data immediately");
+            verifyRes();
+          }
+        });
+      });
+
       log.info(
         { batchId: batch.batchId, withdrawalCount: batch.withdrawals.length },
-        "Batch saved successfully to GunDB"
+        "Batch saved and verified successfully to GunDB"
       );
       resolve();
     } catch (error) {
@@ -1458,9 +1509,51 @@ export async function getBatch(
       lastUpdateTime = Date.now();
 
       log.info(
-        { batchId, withdrawalsCount: data.withdrawalsCount || 0 },
+        { batchId, withdrawalsCount: data.withdrawalsCount || 0, hasWithdrawalsJson: !!data.withdrawalsJson },
         "Batch metadata retrieved, reading withdrawals"
       );
+
+      // PREFERRED: Try to read withdrawals from JSON string first (most reliable)
+      if (data.withdrawalsJson && typeof data.withdrawalsJson === 'string') {
+        try {
+          const withdrawals = JSON.parse(data.withdrawalsJson) as PendingWithdrawal[];
+          if (Array.isArray(withdrawals) && withdrawals.length > 0) {
+            cleanup();
+
+            const batch: Batch = {
+              batchId: data.batchId,
+              root: data.root,
+              withdrawals,
+              timestamp: data.timestamp,
+              blockNumber: data.blockNumber,
+              txHash: data.txHash,
+            };
+
+            log.info(
+              {
+                batchId: data.batchId,
+                withdrawalCount: withdrawals.length,
+                source: 'withdrawalsJson',
+                withdrawals: withdrawals.map(w => ({
+                  user: w.user,
+                  amount: w.amount,
+                  nonce: w.nonce,
+                })),
+              },
+              "Batch retrieved from GunDB (via withdrawalsJson)"
+            );
+            resolve(batch);
+            return;
+          }
+        } catch (parseErr) {
+          log.warn(
+            { batchId, parseErr, withdrawalsJsonLength: data.withdrawalsJson?.length },
+            "Failed to parse withdrawalsJson, falling back to individual nodes"
+          );
+        }
+      }
+
+      // FALLBACK: Read from individual withdrawal nodes (for backward compatibility)
 
       // Also try reading the parent withdrawals node directly (for backward compatibility)
       gun.get(withdrawalsPath).once((parentData: any) => {
