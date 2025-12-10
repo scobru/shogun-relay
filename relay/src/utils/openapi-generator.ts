@@ -356,6 +356,43 @@ export function generateOpenAPISpec(baseUrl: str = 'http://localhost:8765'): Ope
           }
         }
       },
+      "/api/v1/system/contracts": {
+        get: {
+          tags: ["System"],
+          summary: "Get contract addresses",
+          description: "Get the addresses of all protocol contracts for the current chain",
+          operationId: "getContracts",
+          responses: {
+            "200": {
+              description: "Contract addresses",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      chainId: { type: "number" },
+                      contracts: {
+                        type: "object",
+                        additionalProperties: { type: "string" }
+                      },
+                      timestamp: { type: "number" }
+                    }
+                  }
+                }
+              }
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
       "/api/v1/network/stats": {
         get: {
           tags: ["Network"],
