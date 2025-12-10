@@ -240,6 +240,71 @@ export function createBridgeClient(config: BridgeConfig) {
     },
 
     /**
+     * Finalize a batch after challenge period (Fraud Proofs)
+     */
+    async finalizeBatch(batchId: bigint): Promise<{ txHash: string; blockNumber: number }> {
+      if (!wallet) {
+        throw new Error("BridgeClient: Private key required for finalization");
+      }
+
+      log.info({ batchId: batchId.toString() }, "Finalizing batch");
+
+      const tx = await (bridge as any).finalizeBatch(batchId);
+      const receipt = await tx.wait();
+
+      if (!receipt) {
+        throw new Error("BridgeClient: Transaction receipt not found");
+      }
+
+      log.info(
+        { txHash: receipt.hash, blockNumber: receipt.blockNumber, batchId: batchId.toString() },
+        "Batch finalized successfully"
+      );
+
+      return {
+        txHash: receipt.hash,
+        blockNumber: receipt.blockNumber,
+      };
+    },
+
+    /**
+     * Get batch info (Fraud Proofs)
+     */
+    async getBatchInfo(batchId: bigint): Promise<{
+      root: string;
+      dataHash: string;
+      submittedAt: bigint;
+      finalized: boolean;
+      challenged: boolean;
+      challenger: string;
+    }> {
+      const info = await (bridge as any).batchInfo(batchId);
+      return {
+        root: info.root,
+        dataHash: info.dataHash,
+        submittedAt: info.submittedAt,
+        finalized: info.finalized,
+        challenged: info.challenged,
+        challenger: info.challenger,
+      };
+    },
+
+    /**
+     * Get challenge period constant
+     */
+    async getChallengePeriod(): Promise<bigint> {
+      return await (bridge as any).CHALLENGE_PERIOD();
+    },
+
+    /**
+     * Check if a batch is finalized
+     */
+    async isBatchFinalized(batchId: bigint): Promise<boolean> {
+      const info = await (bridge as any).batchInfo(batchId);
+      return info.finalized;
+    },
+
+    /**
      * Listen to Deposit events
      */
     async listenToDeposits(
