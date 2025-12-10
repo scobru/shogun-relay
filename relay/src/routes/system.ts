@@ -2,6 +2,7 @@ import express, { Request, Response, Router } from "express";
 import fs from "fs";
 import { loggers } from "../utils/logger";
 import { packageConfig } from "../config";
+import { config } from "../config/env-config";
 
 const router: Router = express.Router();
 
@@ -640,10 +641,9 @@ router.post("/rpc/execute", async (req, res) => {
 
 
 // Contracts endpoint
-router.get("/contracts", (req, res) => {
+router.get("/contracts", async (req, res) => {
   try {
-    const { getConfigByChainId } = require("shogun-contracts-sdk");
-    const { config } = require("../config/env-config");
+    const { getConfigByChainId } = await import("shogun-contracts-sdk");
 
     const chainId = config.bridge.chainId;
     const contractsConfig = getConfigByChainId(chainId);
