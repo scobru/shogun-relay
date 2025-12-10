@@ -613,6 +613,43 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
       "Proof request received"
     );
 
+    // FIRST: Check if this withdrawal is still in the pending queue (not yet batched)
+    const pendingWithdrawals = await getPendingWithdrawals(gun);
+    const normalizedUserAddressForPending = userAddress.toLowerCase();
+    const pendingWithdrawal = pendingWithdrawals.find((w: PendingWithdrawal) => {
+      const wUser = (typeof w.user === 'string' ? w.user : String(w.user || '')).toLowerCase();
+      const wAmount = typeof w.amount === 'string' ? w.amount : String(w.amount || '0');
+      const wNonce = typeof w.nonce === 'string' ? w.nonce : String(w.nonce || '0');
+      return wUser === normalizedUserAddressForPending &&
+        wAmount === amountBigInt.toString() &&
+        wNonce === nonceBigInt.toString();
+    });
+
+    if (pendingWithdrawal) {
+      log.info(
+        {
+          user: userAddress,
+          amount: amountBigInt.toString(),
+          nonce: nonceBigInt.toString(),
+          timestamp: pendingWithdrawal.timestamp
+        },
+        "Withdrawal is pending batching - not yet included in a batch"
+      );
+      // Return 202 Accepted to indicate the withdrawal is valid but pending
+      return res.status(202).json({
+        success: false,
+        status: "pending",
+        message: "Withdrawal is queued but not yet included in a batch. Please wait for the next batch submission.",
+        withdrawal: {
+          user: userAddress,
+          amount: amountBigInt.toString(),
+          nonce: nonceBigInt.toString(),
+          timestamp: pendingWithdrawal.timestamp,
+        },
+        estimatedWaitTime: "Up to 5 minutes (batch interval)",
+      });
+    }
+
     // Collect all batch IDs from GunDB (similar to getLatestBatch but we'll search all)
     const batchesPath = "bridge/batches";
     const batchIdsMap = new Map<string, string>(); // key -> batchId
@@ -822,9 +859,44 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
         },
         "Withdrawal not found in any batch"
       );
+
+      // FALLBACK: Check if the withdrawal was already processed on-chain
+      // This can happen if the relay was restarted and GunDB has stale data
+      try {
+        const client = getBridgeClient();
+        const isProcessedOnChain = await client.isWithdrawalProcessed(
+          userAddress,
+          amountBigInt,
+          nonceBigInt
+        );
+
+        if (isProcessedOnChain) {
+          log.info(
+            { user: userAddress, amount: amountBigInt.toString(), nonce: nonceBigInt.toString() },
+            "Withdrawal already processed on-chain (detected via fallback check)"
+          );
+          return res.status(200).json({
+            success: true,
+            status: "already_processed",
+            message: "This withdrawal has already been processed on-chain. Check your wallet for the funds.",
+            withdrawal: {
+              user: userAddress,
+              amount: amountBigInt.toString(),
+              nonce: nonceBigInt.toString(),
+            },
+          });
+        }
+      } catch (onChainError) {
+        log.warn(
+          { error: onChainError, user: userAddress },
+          "Failed to check on-chain withdrawal status (non-critical)"
+        );
+      }
+
       return res.status(404).json({
         success: false,
-        error: "Withdrawal not found in any submitted batch",
+        error: "Withdrawal not found in any submitted batch. It may still be pending batch submission.",
+        suggestion: "Please wait for the next batch submission (every 5 minutes) or check your pending withdrawals.",
       });
     }
 
