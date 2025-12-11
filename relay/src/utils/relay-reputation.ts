@@ -4,11 +4,19 @@
  * Tracks and calculates reputation scores for relays in the network.
  * Scores are based on:
  * - Uptime consistency
- * - Storage proof success rate
- * - Response times
+ * - Storage proof success rate (deals)
+ * - Bridge proof success rate (withdrawal proofs)
+ * - Batch submission success rate (bridge)
+ * - Response times (combined: storage proofs + bridge proofs)
  * - Pin request fulfillment
+ * - Longevity (time in network)
  * 
  * Data is stored in GunDB and synced across the network.
+ * 
+ * Bridge Operations Tracking:
+ * - Bridge proof generation (for withdrawals) is tracked separately but included in overall proof success rate
+ * - Batch submissions (success/failure) are tracked for sequencer reputation
+ * - Response times for bridge proofs are combined with storage proof response times
  * 
  * SECURITY: Anti-Self-Rating Protection
  * - Self-ratings (relay rating itself) are detected and marked with observerType='self'
@@ -73,6 +81,15 @@ interface ReputationMetrics {
   expectedPulses?: number;
   receivedPulses?: number;
   uptimePercent?: number;
+  // Bridge-specific metrics
+  bridgeBatchSubmissionsTotal?: number;
+  bridgeBatchSubmissionsSuccessful?: number;
+  bridgeBatchSubmissionsFailed?: number;
+  bridgeProofsTotal?: number;
+  bridgeProofsSuccessful?: number;
+  bridgeProofsFailed?: number;
+  bridgeAvgProofResponseTimeMs?: number;
+  bridgeProofResponseTimeSamples?: number;
   score?: number;
   tier?: string;
   lastScoreUpdate?: number;
@@ -220,23 +237,45 @@ export function calculateReputationScore(metrics: ReputationMetrics): Reputation
   }
 
   // 2. Proof Success Score (0-100)
-  if (metrics.proofsTotal && metrics.proofsTotal > 0) {
-    scores.proofSuccess = ((metrics.proofsSuccessful || 0) / metrics.proofsTotal) * 100;
+  // Combine storage proofs and bridge proofs
+  const totalProofs = (metrics.proofsTotal || 0) + (metrics.bridgeProofsTotal || 0);
+  const totalSuccessfulProofs = (metrics.proofsSuccessful || 0) + (metrics.bridgeProofsSuccessful || 0);
+  
+  if (totalProofs > 0) {
+    scores.proofSuccess = (totalSuccessfulProofs / totalProofs) * 100;
   } else {
     scores.proofSuccess = 50; // Default for no data
   }
 
   // 3. Response Time Score (0-100)
+  // Combine storage proof response time and bridge proof response time (weighted average)
   // Inverse scale: faster = higher score
-  if (metrics.avgResponseTimeMs !== undefined) {
-    if (metrics.avgResponseTimeMs <= THRESHOLDS.idealResponseTimeMs) {
+  const storageSamples = metrics.responseTimeSamples || 0;
+  const bridgeSamples = metrics.bridgeProofResponseTimeSamples || 0;
+  const totalSamples = storageSamples + bridgeSamples;
+  
+  let avgResponseTime: number | undefined;
+  if (totalSamples > 0) {
+    const storageWeight = storageSamples / totalSamples;
+    const bridgeWeight = bridgeSamples / totalSamples;
+    const storageAvg = metrics.avgResponseTimeMs || 0;
+    const bridgeAvg = metrics.bridgeAvgProofResponseTimeMs || 0;
+    avgResponseTime = (storageAvg * storageWeight) + (bridgeAvg * bridgeWeight);
+  } else if (metrics.avgResponseTimeMs !== undefined) {
+    avgResponseTime = metrics.avgResponseTimeMs;
+  } else if (metrics.bridgeAvgProofResponseTimeMs !== undefined) {
+    avgResponseTime = metrics.bridgeAvgProofResponseTimeMs;
+  }
+  
+  if (avgResponseTime !== undefined) {
+    if (avgResponseTime <= THRESHOLDS.idealResponseTimeMs) {
       scores.responseTime = 100;
-    } else if (metrics.avgResponseTimeMs >= THRESHOLDS.maxResponseTimeMs) {
+    } else if (avgResponseTime >= THRESHOLDS.maxResponseTimeMs) {
       scores.responseTime = 0;
     } else {
       // Linear interpolation
       const range = THRESHOLDS.maxResponseTimeMs - THRESHOLDS.idealResponseTimeMs;
-      const excess = metrics.avgResponseTimeMs - THRESHOLDS.idealResponseTimeMs;
+      const excess = avgResponseTime - THRESHOLDS.idealResponseTimeMs;
       scores.responseTime = 100 - (excess / range) * 100;
     }
   } else {
@@ -307,16 +346,25 @@ export function initReputationTracking(gun: GunInstance, relayHost: string): Gun
         firstSeenTimestamp: Date.now(),
         lastSeenTimestamp: Date.now(),
         dataPoints: 0,
-        // Proof metrics
+        // Proof metrics (storage)
         proofsTotal: 0,
         proofsSuccessful: 0,
         proofsFailed: 0,
-        // Response time (rolling average)
+        // Response time (rolling average) - storage proofs
         avgResponseTimeMs: 0,
         responseTimeSamples: 0,
         // Pin fulfillment
         pinRequestsReceived: 0,
         pinRequestsFulfilled: 0,
+        // Bridge-specific metrics
+        bridgeProofsTotal: 0,
+        bridgeProofsSuccessful: 0,
+        bridgeProofsFailed: 0,
+        bridgeAvgProofResponseTimeMs: 0,
+        bridgeProofResponseTimeSamples: 0,
+        bridgeBatchSubmissionsTotal: 0,
+        bridgeBatchSubmissionsSuccessful: 0,
+        bridgeBatchSubmissionsFailed: 0,
         // Uptime tracking
         expectedPulses: 0,
         receivedPulses: 0,
@@ -750,6 +798,345 @@ export async function getReputationLeaderboard(
 
 
 /**
+ * Record a successful bridge proof generation (withdrawal proof) (Signed)
+ * @param gun - GunDB instance
+ * @param relayHost - Host that provided the proof
+ * @param responseTimeMs - Time to generate proof
+ * @param observerKeyPair - Observer's SEA key pair (REQUIRED)
+ */
+export async function recordBridgeProofSuccess(
+  gun: GunInstance,
+  relayHost: string,
+  responseTimeMs: number = 0,
+  observerKeyPair?: SEAKeyPair
+): Promise<void> {
+  // SECURITY: Prevent self-rating
+  if (observerKeyPair && isSelfRating(relayHost, observerKeyPair)) {
+    log.warn(`Blocked self-rating attempt: relay ${relayHost} attempted to rate itself for bridge proof`);
+  }
+
+  const maxWaitMs = 3000;
+  const startWait = Date.now();
+  while (!acquireLock(relayHost)) {
+    if (Date.now() - startWait > maxWaitMs) {
+      log.warn(`recordBridgeProofSuccess: timeout waiting for lock on ${relayHost}`);
+      break;
+    }
+    await new Promise(r => setTimeout(r, 50));
+  }
+
+  try {
+    if (!observerKeyPair) {
+      log.warn('recordBridgeProofSuccess called without keyPair - falling back to unsigned');
+      const node = gun.get('shogun-network').get('reputation').get(relayHost);
+      return new Promise((resolve) => {
+        node.once((data: ReputationMetrics | undefined) => {
+          const current = data || {};
+          const now = Date.now();
+          const newAvgResponseTime = (current.bridgeProofResponseTimeSamples || 0) > 0
+            ? (((current.bridgeAvgProofResponseTimeMs || 0) * (current.bridgeProofResponseTimeSamples || 0)) + responseTimeMs) / ((current.bridgeProofResponseTimeSamples || 0) + 1)
+            : responseTimeMs;
+
+          node.put({
+            bridgeProofsTotal: (current.bridgeProofsTotal || 0) + 1,
+            bridgeProofsSuccessful: (current.bridgeProofsSuccessful || 0) + 1,
+            bridgeAvgProofResponseTimeMs: Math.round(newAvgResponseTime),
+            bridgeProofResponseTimeSamples: (current.bridgeProofResponseTimeSamples || 0) + 1,
+            dataPoints: (current.dataPoints || 0) + 1,
+            lastSeenTimestamp: now,
+            _lastUpdateId: `${now}-${Math.random().toString(36).substr(2, 9)}`,
+          });
+          releaseLock(relayHost);
+          resolve();
+        });
+      });
+    }
+
+    const observerType = getObserverType(relayHost, observerKeyPair);
+
+    // Create signed reputation event for bridge proof
+    await FrozenData.createSignedReputationEvent(
+      gun as any,
+      relayHost,
+      'bridge_proof_success',
+      {
+        responseTimeMs,
+        observerType,
+      },
+      observerKeyPair as SEAKeyPair
+    );
+
+    // Update optimistic cache
+    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    await new Promise<void>((resolve) => {
+      node.once((data: ReputationMetrics | undefined) => {
+        const current = data || {};
+        const now = Date.now();
+        const newAvgResponseTime = (current.bridgeProofResponseTimeSamples || 0) > 0
+          ? (((current.bridgeAvgProofResponseTimeMs || 0) * (current.bridgeProofResponseTimeSamples || 0)) + responseTimeMs) / ((current.bridgeProofResponseTimeSamples || 0) + 1)
+          : responseTimeMs;
+
+        node.put({
+          bridgeProofsTotal: (current.bridgeProofsTotal || 0) + 1,
+          bridgeProofsSuccessful: (current.bridgeProofsSuccessful || 0) + 1,
+          bridgeAvgProofResponseTimeMs: Math.round(newAvgResponseTime),
+          bridgeProofResponseTimeSamples: (current.bridgeProofResponseTimeSamples || 0) + 1,
+          dataPoints: (current.dataPoints || 0) + 1,
+          lastSeenTimestamp: now,
+          _lastUpdateId: `${now}-${Math.random().toString(36).substr(2, 9)}`,
+        });
+        resolve();
+      });
+    });
+  } finally {
+    releaseLock(relayHost);
+  }
+}
+
+/**
+ * Record a failed bridge proof generation (Signed)
+ * @param gun - GunDB instance
+ * @param relayHost - Host that failed the proof
+ * @param observerKeyPair - Observer's SEA key pair (REQUIRED)
+ */
+export async function recordBridgeProofFailure(
+  gun: GunInstance,
+  relayHost: string,
+  observerKeyPair?: SEAKeyPair
+): Promise<void> {
+  // SECURITY: Prevent self-rating
+  if (observerKeyPair && isSelfRating(relayHost, observerKeyPair)) {
+    log.warn(`Blocked self-rating attempt: relay ${relayHost} attempted to rate itself for bridge proof failure`);
+  }
+
+  const maxWaitMs = 3000;
+  const startWait = Date.now();
+  while (!acquireLock(relayHost)) {
+    if (Date.now() - startWait > maxWaitMs) {
+      log.warn(`recordBridgeProofFailure: timeout waiting for lock on ${relayHost}`);
+      break;
+    }
+    await new Promise(r => setTimeout(r, 50));
+  }
+
+  try {
+    if (!observerKeyPair) {
+      log.warn('recordBridgeProofFailure called without keyPair - falling back to unsigned');
+      const node = gun.get('shogun-network').get('reputation').get(relayHost);
+      return new Promise((resolve) => {
+        node.once((data: ReputationMetrics | undefined) => {
+          const current = data || {};
+          const now = Date.now();
+          node.put({
+            bridgeProofsTotal: (current.bridgeProofsTotal || 0) + 1,
+            bridgeProofsFailed: (current.bridgeProofsFailed || 0) + 1,
+            dataPoints: (current.dataPoints || 0) + 1,
+            lastSeenTimestamp: now,
+            _lastUpdateId: `${now}-${Math.random().toString(36).substr(2, 9)}`,
+          });
+          releaseLock(relayHost);
+          resolve();
+        });
+      });
+    }
+
+    const observerType = getObserverType(relayHost, observerKeyPair);
+
+    await FrozenData.createSignedReputationEvent(
+      gun as any,
+      relayHost,
+      'bridge_proof_failure',
+      {
+        observerType,
+      },
+      observerKeyPair as SEAKeyPair
+    );
+
+    // Optimistic update
+    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    await new Promise<void>((resolve) => {
+      node.once((data: ReputationMetrics | undefined) => {
+        const current = data || {};
+        const now = Date.now();
+        node.put({
+          bridgeProofsTotal: (current.bridgeProofsTotal || 0) + 1,
+          bridgeProofsFailed: (current.bridgeProofsFailed || 0) + 1,
+          dataPoints: (current.dataPoints || 0) + 1,
+          lastSeenTimestamp: now,
+          _lastUpdateId: `${now}-${Math.random().toString(36).substr(2, 9)}`,
+        });
+        resolve();
+      });
+    });
+  } finally {
+    releaseLock(relayHost);
+  }
+}
+
+/**
+ * Record a successful batch submission (Signed)
+ * @param gun - GunDB instance
+ * @param relayHost - Host that submitted the batch
+ * @param withdrawalCount - Number of withdrawals in the batch
+ * @param observerKeyPair - Observer's SEA key pair (REQUIRED)
+ */
+export async function recordBatchSubmissionSuccess(
+  gun: GunInstance,
+  relayHost: string,
+  withdrawalCount: number = 0,
+  observerKeyPair?: SEAKeyPair
+): Promise<void> {
+  // SECURITY: Prevent self-rating
+  if (observerKeyPair && isSelfRating(relayHost, observerKeyPair)) {
+    log.warn(`Blocked self-rating attempt: relay ${relayHost} attempted to rate itself for batch submission`);
+  }
+
+  const maxWaitMs = 3000;
+  const startWait = Date.now();
+  while (!acquireLock(relayHost)) {
+    if (Date.now() - startWait > maxWaitMs) {
+      log.warn(`recordBatchSubmissionSuccess: timeout waiting for lock on ${relayHost}`);
+      break;
+    }
+    await new Promise(r => setTimeout(r, 50));
+  }
+
+  try {
+    if (!observerKeyPair) {
+      log.warn('recordBatchSubmissionSuccess called without keyPair - falling back to unsigned');
+      const node = gun.get('shogun-network').get('reputation').get(relayHost);
+      return new Promise((resolve) => {
+        node.once((data: ReputationMetrics | undefined) => {
+          const current = data || {};
+          const now = Date.now();
+          node.put({
+            bridgeBatchSubmissionsTotal: (current.bridgeBatchSubmissionsTotal || 0) + 1,
+            bridgeBatchSubmissionsSuccessful: (current.bridgeBatchSubmissionsSuccessful || 0) + 1,
+            dataPoints: (current.dataPoints || 0) + 1,
+            lastSeenTimestamp: now,
+            _lastUpdateId: `${now}-${Math.random().toString(36).substr(2, 9)}`,
+          });
+          releaseLock(relayHost);
+          resolve();
+        });
+      });
+    }
+
+    const observerType = getObserverType(relayHost, observerKeyPair);
+
+    await FrozenData.createSignedReputationEvent(
+      gun as any,
+      relayHost,
+      'bridge_batch_success',
+      {
+        withdrawalCount,
+        observerType,
+      },
+      observerKeyPair as SEAKeyPair
+    );
+
+    // Optimistic update
+    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    await new Promise<void>((resolve) => {
+      node.once((data: ReputationMetrics | undefined) => {
+        const current = data || {};
+        const now = Date.now();
+        node.put({
+          bridgeBatchSubmissionsTotal: (current.bridgeBatchSubmissionsTotal || 0) + 1,
+          bridgeBatchSubmissionsSuccessful: (current.bridgeBatchSubmissionsSuccessful || 0) + 1,
+          dataPoints: (current.dataPoints || 0) + 1,
+          lastSeenTimestamp: now,
+          _lastUpdateId: `${now}-${Math.random().toString(36).substr(2, 9)}`,
+        });
+        resolve();
+      });
+    });
+  } finally {
+    releaseLock(relayHost);
+  }
+}
+
+/**
+ * Record a failed batch submission (Signed)
+ * @param gun - GunDB instance
+ * @param relayHost - Host that failed to submit the batch
+ * @param observerKeyPair - Observer's SEA key pair (REQUIRED)
+ */
+export async function recordBatchSubmissionFailure(
+  gun: GunInstance,
+  relayHost: string,
+  observerKeyPair?: SEAKeyPair
+): Promise<void> {
+  // SECURITY: Prevent self-rating
+  if (observerKeyPair && isSelfRating(relayHost, observerKeyPair)) {
+    log.warn(`Blocked self-rating attempt: relay ${relayHost} attempted to rate itself for batch submission failure`);
+  }
+
+  const maxWaitMs = 3000;
+  const startWait = Date.now();
+  while (!acquireLock(relayHost)) {
+    if (Date.now() - startWait > maxWaitMs) {
+      log.warn(`recordBatchSubmissionFailure: timeout waiting for lock on ${relayHost}`);
+      break;
+    }
+    await new Promise(r => setTimeout(r, 50));
+  }
+
+  try {
+    if (!observerKeyPair) {
+      log.warn('recordBatchSubmissionFailure called without keyPair - falling back to unsigned');
+      const node = gun.get('shogun-network').get('reputation').get(relayHost);
+      return new Promise((resolve) => {
+        node.once((data: ReputationMetrics | undefined) => {
+          const current = data || {};
+          const now = Date.now();
+          node.put({
+            bridgeBatchSubmissionsTotal: (current.bridgeBatchSubmissionsTotal || 0) + 1,
+            bridgeBatchSubmissionsFailed: (current.bridgeBatchSubmissionsFailed || 0) + 1,
+            dataPoints: (current.dataPoints || 0) + 1,
+            lastSeenTimestamp: now,
+            _lastUpdateId: `${now}-${Math.random().toString(36).substr(2, 9)}`,
+          });
+          releaseLock(relayHost);
+          resolve();
+        });
+      });
+    }
+
+    const observerType = getObserverType(relayHost, observerKeyPair);
+
+    await FrozenData.createSignedReputationEvent(
+      gun as any,
+      relayHost,
+      'bridge_batch_failure',
+      {
+        observerType,
+      },
+      observerKeyPair as SEAKeyPair
+    );
+
+    // Optimistic update
+    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    await new Promise<void>((resolve) => {
+      node.once((data: ReputationMetrics | undefined) => {
+        const current = data || {};
+        const now = Date.now();
+        node.put({
+          bridgeBatchSubmissionsTotal: (current.bridgeBatchSubmissionsTotal || 0) + 1,
+          bridgeBatchSubmissionsFailed: (current.bridgeBatchSubmissionsFailed || 0) + 1,
+          dataPoints: (current.dataPoints || 0) + 1,
+          lastSeenTimestamp: now,
+          _lastUpdateId: `${now}-${Math.random().toString(36).substr(2, 9)}`,
+        });
+        resolve();
+      });
+    });
+  } finally {
+    releaseLock(relayHost);
+  }
+}
+
+/**
  * Update stored score (call periodically)
  * @param gun - GunDB instance
  * @param relayHost - Host to update
@@ -773,6 +1160,10 @@ export default {
   recordProofFailure,
   recordPinFulfillment,
   recordPulse,
+  recordBridgeProofSuccess,
+  recordBridgeProofFailure,
+  recordBatchSubmissionSuccess,
+  recordBatchSubmissionFailure,
   getReputation,
   getReputationLeaderboard,
   updateStoredScore,

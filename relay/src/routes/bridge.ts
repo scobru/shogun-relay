@@ -49,9 +49,22 @@ import { submitBatch } from "../utils/batch-submitter";
 import { adminAuthMiddleware } from "../middleware/admin-auth";
 import rateLimit from "express-rate-limit";
 import { isValidEthereumAddress, isValidAmount, validateString, isValidSignatureFormat, sanitizeForLog } from "../utils/security";
+import * as Reputation from "../utils/relay-reputation";
+import { getRelayKeyPair } from "../utils/relay-user";
+import { relayConfig } from "../config/env-config";
 
 const router = express.Router();
 const log = loggers.server || console;
+
+// Helper to get relay host identifier
+function getRelayHost(req: Request): string {
+  return relayConfig.endpoint || req.headers.host || "localhost";
+}
+
+// Helper to get signing keypair for reputation tracking
+function getSigningKeyPair(): any {
+  return getRelayKeyPair() || null;
+}
 
 // Rate limiting for bridge endpoints
 const bridgeLimiter = rateLimit({
@@ -542,6 +555,22 @@ router.post("/submit-batch", express.json(), async (req, res) => {
     const result = await submitBatch(gun, relayPub);
 
     if (result.success) {
+      // Record batch submission success for reputation tracking
+      try {
+        const relayHost = getRelayHost(req);
+        const keyPair = getSigningKeyPair();
+        if (keyPair) {
+          await Reputation.recordBatchSubmissionSuccess(
+            gun,
+            relayHost,
+            result.withdrawalCount || 0,
+            keyPair
+          );
+        }
+      } catch (e) {
+        log.warn({ err: e }, "Failed to record batch submission success for reputation");
+      }
+
       res.json({
         success: true,
         batch: {
@@ -553,6 +582,19 @@ router.post("/submit-batch", express.json(), async (req, res) => {
         },
       });
     } else {
+      // Record batch submission failure for reputation tracking (except for "no withdrawals" case)
+      if (result.error !== "No pending withdrawals to batch") {
+        try {
+          const relayHost = getRelayHost(req);
+          const keyPair = getSigningKeyPair();
+          if (keyPair) {
+            await Reputation.recordBatchSubmissionFailure(gun, relayHost, keyPair);
+          }
+        } catch (e) {
+          log.warn({ err: e }, "Failed to record batch submission failure for reputation");
+        }
+      }
+
       res.status(result.error === "No pending withdrawals to batch" ? 400 : 500).json({
         success: false,
         error: result.error,
@@ -563,6 +605,21 @@ router.post("/submit-batch", express.json(), async (req, res) => {
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log.error({ error: errorMessage }, "Error in submit-batch endpoint");
+    
+    // Record batch submission failure for reputation tracking
+    try {
+      const gun = req.app.get("gunInstance");
+      if (gun) {
+        const relayHost = getRelayHost(req);
+        const keyPair = getSigningKeyPair();
+        if (keyPair) {
+          await Reputation.recordBatchSubmissionFailure(gun, relayHost, keyPair);
+        }
+      }
+    } catch (e) {
+      log.warn({ err: e }, "Failed to record batch submission failure for reputation");
+    }
+    
     res.status(500).json({
       success: false,
       error: errorMessage,
@@ -710,6 +767,9 @@ router.get("/nonce/:user", async (req, res) => {
  * The withdrawal must be included in the latest batch.
  */
 router.get("/proof/:user/:amount/:nonce", async (req, res) => {
+  const startTime = Date.now();
+  let proofGenerated = false;
+  
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
@@ -1045,16 +1105,42 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
         { batchId: foundBatch.batchId, user: userAddress, amount: normalizedAmount, nonce: normalizedNonce },
         "Failed to generate proof"
       );
+      
+      // Record proof failure for reputation tracking
+      try {
+        const relayHost = getRelayHost(req);
+        const keyPair = getSigningKeyPair();
+        if (keyPair) {
+          await Reputation.recordBridgeProofFailure(gun, relayHost, keyPair);
+        }
+      } catch (e) {
+        log.warn({ err: e }, "Failed to record bridge proof failure for reputation");
+      }
+      
       return res.status(500).json({
         success: false,
         error: "Failed to generate proof",
       });
     }
 
+    proofGenerated = true;
+    const responseTime = Date.now() - startTime;
+
     log.debug(
       { batchId: foundBatch.batchId, user: userAddress, amount: normalizedAmount, nonce: normalizedNonce },
       "Proof generated successfully"
     );
+
+    // Record proof success for reputation tracking
+    try {
+      const relayHost = getRelayHost(req);
+      const keyPair = getSigningKeyPair();
+      if (keyPair) {
+        await Reputation.recordBridgeProofSuccess(gun, relayHost, responseTime, keyPair);
+      }
+    } catch (e) {
+      log.warn({ err: e }, "Failed to record bridge proof success for reputation");
+    }
 
     res.json({
       success: true,
@@ -1070,6 +1156,23 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log.error({ error, user: req.params.user, amount: req.params.amount, nonce: req.params.nonce }, "Error generating proof");
+    
+    // Record proof failure for reputation tracking (if not already recorded)
+    if (!proofGenerated) {
+      try {
+        const gun = req.app.get("gunInstance");
+        if (gun) {
+          const relayHost = getRelayHost(req);
+          const keyPair = getSigningKeyPair();
+          if (keyPair) {
+            await Reputation.recordBridgeProofFailure(gun, relayHost, keyPair);
+          }
+        }
+      } catch (e) {
+        log.warn({ err: e }, "Failed to record bridge proof failure for reputation");
+      }
+    }
+    
     res.status(500).json({
       success: false,
       error: errorMessage,

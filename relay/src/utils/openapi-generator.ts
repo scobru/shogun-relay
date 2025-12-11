@@ -2640,6 +2640,717 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
             }
           }
         }
+      },
+      "/api/v1/bridge/deposit": {
+        post: {
+          tags: ["Bridge"],
+          summary: "Get deposit instructions",
+          description: "Get instructions for depositing ETH to the bridge contract",
+          operationId: "getDepositInstructions",
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    amount: { type: "string", description: "Amount in wei" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Deposit instructions",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      message: { type: "string" },
+                      contractAddress: { type: "string" },
+                      amount: { type: "string" },
+                      instructions: { type: "string" }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              description: "Bad request",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/bridge/transfer": {
+        post: {
+          tags: ["Bridge"],
+          summary: "Transfer balance (L2 -> L2)",
+          description: "Transfer balance from one user to another on L2",
+          operationId: "transferBalance",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    from: { type: "string", description: "Sender Ethereum address" },
+                    to: { type: "string", description: "Receiver Ethereum address" },
+                    amount: { type: "string", description: "Amount in wei" },
+                    message: { type: "string", description: "Message that was signed" },
+                    seaSignature: { type: "string", description: "SEA signature" },
+                    ethSignature: { type: "string", description: "Ethereum signature" },
+                    gunPubKey: { type: "string", description: "GunDB public key" }
+                  },
+                  required: ["from", "to", "amount", "message", "seaSignature", "ethSignature", "gunPubKey"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Transfer successful",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      transfer: { type: "object" }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              description: "Bad request",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized - invalid signatures",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/bridge/withdraw": {
+        post: {
+          tags: ["Bridge"],
+          summary: "Request withdrawal",
+          description: "Request withdrawal from L2 to L1",
+          operationId: "requestWithdrawal",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    user: { type: "string", description: "User Ethereum address" },
+                    amount: { type: "string", description: "Amount in wei" },
+                    nonce: { type: "string", description: "Withdrawal nonce (optional, auto-generated if omitted)" },
+                    message: { type: "string", description: "Message that was signed (must include nonce if provided)" },
+                    seaSignature: { type: "string", description: "SEA signature" },
+                    ethSignature: { type: "string", description: "Ethereum signature" },
+                    gunPubKey: { type: "string", description: "GunDB public key" }
+                  },
+                  required: ["user", "amount", "message", "seaSignature", "ethSignature", "gunPubKey"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Withdrawal requested",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      withdrawal: {
+                        type: "object",
+                        properties: {
+                          user: { type: "string" },
+                          amount: { type: "string" },
+                          nonce: { type: "string" },
+                          timestamp: { type: "number" }
+                        }
+                      },
+                      message: { type: "string" }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              description: "Bad request",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized - invalid signatures",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/bridge/submit-batch": {
+        post: {
+          tags: ["Bridge"],
+          summary: "Submit batch",
+          description: "Submit a batch with Merkle root (sequencer only)",
+          operationId: "submitBatch",
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object"
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Batch submitted",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      batch: {
+                        type: "object",
+                        properties: {
+                          batchId: { type: "string" },
+                          root: { type: "string" },
+                          txHash: { type: "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              description: "Bad request",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            },
+            "403": {
+              description: "Forbidden - not authorized to submit batches",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/bridge/balance/{user}": {
+        get: {
+          tags: ["Bridge"],
+          summary: "Get user balance",
+          description: "Get user's L2 balance",
+          operationId: "getUserBalance",
+          parameters: [
+            {
+              name: "user",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "User Ethereum address"
+            }
+          ],
+          responses: {
+            "200": {
+              description: "User balance",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      user: { type: "string" },
+                      balance: { type: "string" },
+                      balanceEth: { type: "string" }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              description: "Bad request",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/bridge/pending-withdrawals": {
+        get: {
+          tags: ["Bridge"],
+          summary: "Get pending withdrawals",
+          description: "Get all pending withdrawals waiting for batch submission",
+          operationId: "getPendingWithdrawals",
+          responses: {
+            "200": {
+              description: "Pending withdrawals",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      withdrawals: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            user: { type: "string" },
+                            amount: { type: "string" },
+                            nonce: { type: "string" },
+                            timestamp: { type: "number" }
+                          }
+                        }
+                      },
+                      count: { type: "number" }
+                    }
+                  }
+                }
+              }
+            },
+            "503": {
+              description: "Service unavailable",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/bridge/nonce/{user}": {
+        get: {
+          tags: ["Bridge"],
+          summary: "Get next nonce",
+          description: "Get the next nonce for a user (for withdrawal requests). This allows clients to include the nonce in their signed message.",
+          operationId: "getNextNonce",
+          parameters: [
+            {
+              name: "user",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "User Ethereum address"
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Nonce information",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      lastNonce: { type: "string" },
+                      nextNonce: { type: "string" }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              description: "Invalid user address",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/bridge/proof/{user}/{amount}/{nonce}": {
+        get: {
+          tags: ["Bridge"],
+          summary: "Get withdrawal proof",
+          description: "Generate Merkle proof for a withdrawal. The withdrawal must be included in a batch.",
+          operationId: "getWithdrawalProof",
+          parameters: [
+            {
+              name: "user",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "User Ethereum address"
+            },
+            {
+              name: "amount",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "Withdrawal amount in wei"
+            },
+            {
+              name: "nonce",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "Withdrawal nonce"
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Merkle proof",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      proof: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Merkle proof array"
+                      },
+                      batchId: { type: "string" },
+                      root: { type: "string" },
+                      withdrawal: {
+                        type: "object",
+                        properties: {
+                          user: { type: "string" },
+                          amount: { type: "string" },
+                          nonce: { type: "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "202": {
+              description: "Withdrawal pending - not yet in a batch",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      status: { type: "string", example: "pending" },
+                      message: { type: "string" }
+                    }
+                  }
+                }
+              }
+            },
+            "404": {
+              description: "Proof not found",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            },
+            "410": {
+              description: "Withdrawal already processed on-chain",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      status: { type: "string", example: "already_processed" },
+                      message: { type: "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/bridge/state": {
+        get: {
+          tags: ["Bridge"],
+          summary: "Get bridge state",
+          description: "Get current bridge state (root, batchId, sequencer, contract balance)",
+          operationId: "getBridgeState",
+          responses: {
+            "200": {
+              description: "Bridge state",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      state: {
+                        type: "object",
+                        properties: {
+                          currentStateRoot: { type: "string" },
+                          currentBatchId: { type: "string" },
+                          sequencer: { type: "string" },
+                          contractBalance: { type: "string" },
+                          contractBalanceEth: { type: "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/bridge/sync-deposits": {
+        post: {
+          tags: ["Bridge"],
+          summary: "Sync deposits",
+          description: "Retroactively sync missed deposits from a block range (admin only)",
+          operationId: "syncDeposits",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    fromBlock: { type: "number", description: "Block to start from (default: 0)" },
+                    toBlock: { type: ["number", "string"], description: 'Block to end at (default: "latest")' },
+                    user: { type: "string", description: "Optional - only sync deposits for this user" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Sync completed",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      results: {
+                        type: "object",
+                        properties: {
+                          total: { type: "number" },
+                          processed: { type: "number" },
+                          skipped: { type: "number" },
+                          failed: { type: "number" },
+                          errors: {
+                            type: "array",
+                            items: { type: "string" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            },
+            "503": {
+              description: "Service unavailable",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/bridge/reconcile-balance": {
+        post: {
+          tags: ["Bridge"],
+          summary: "Reconcile balance",
+          description: "Recalculate and fix user balance if it doesn't match deposits/withdrawals/transfers",
+          operationId: "reconcileBalance",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    user: { type: "string", description: "User Ethereum address" }
+                  },
+                  required: ["user"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Balance reconciled",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      user: { type: "string" },
+                      currentBalance: { type: "string" },
+                      calculatedBalance: { type: "string" },
+                      corrected: { type: "boolean" },
+                      message: { type: "string" }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              description: "Bad request",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/bridge/process-deposit": {
+        post: {
+          tags: ["Bridge"],
+          summary: "Process specific deposit",
+          description: "Force process a specific deposit by transaction hash (admin only)",
+          operationId: "processDeposit",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    txHash: { type: "string", description: "Transaction hash of the deposit" }
+                  },
+                  required: ["txHash"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Deposit processed",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      message: { type: "string" },
+                      deposit: {
+                        type: "object",
+                        properties: {
+                          user: { type: "string" },
+                          amountEth: { type: "string" },
+                          blockNumber: { type: "number" }
+                        }
+                      },
+                      balance: {
+                        type: "object",
+                        properties: {
+                          eth: { type: "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              description: "Bad request",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            },
+            "404": {
+              description: "Transaction not found",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
       }
     }
   };
