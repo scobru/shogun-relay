@@ -39,23 +39,24 @@ In practice, instead of orchestrating 3-4 different services, you start a single
 7. [Admin Interfaces](#admin-interfaces)
 8. [API Overview](#api-overview)
 9. [Key Tools](#key-tools)
-10. [Development Notes](#development-notes)
-11. [Troubleshooting](#troubleshooting)
-12. [Contributing](#contributing)
-13. [License](#license)
+10. [Roadmap](#roadmap)
+11. [Development Notes](#development-notes)
+12. [Troubleshooting](#troubleshooting)
+13. [Contributing](#contributing)
+14. [License](#license)
 
 ---
 
-## Provider Guide
+## Node Operator Guide
 
 **Want to run your own relay and earn revenue?**
 
-See the complete **[Provider Guide](./PROVIDER_GUIDE.md)** for:
-- Step-by-step setup instructions
-- On-chain registration walkthrough
-- Payment configuration
-- Security best practices
-- Economics and earnings potential
+See the complete **[Node Operator Guide](./docs/NODE_OPERATOR_GUIDE.md)** for:
+- Quick start setup (Docker & manual)
+- Configuration essentials
+- On-chain registration
+- Payment setup
+- Security and monitoring
 
 ---
 
@@ -73,6 +74,7 @@ See the complete **[Provider Guide](./PROVIDER_GUIDE.md)** for:
 - **Integrated IPFS Control**
   - Authenticated API proxy (JWT support) and content preview.
   - Upload files, manage pins, run garbage collection.
+  - Full compatibility with [shogun-ipfs](https://github.com/scobru/shogun-ipfs) for unified IPFS operations.
 
 - **Operational Dashboards**
   - Admin panel with stats, service status, charts, and a Gun visual explorer.
@@ -180,6 +182,10 @@ Create a `.env` file or export environment variables. For a complete reference o
 - SQLite database is stored at `DATA_DIR/gun.db`
 - RADISK files are stored in `DATA_DIR/radata/` directory
 
+**Relay Keypair Configuration:**
+- `RELAY_SEA_KEYPAIR` or `RELAY_SEA_KEYPAIR_PATH` - Required for proper operation (prevents "Signature did not match" errors)
+- See [RELAY_KEYS.md](./docs/RELAY_KEYS.md) for detailed configuration guide
+
 **See [Environment Variables Documentation](./relay/docs/ENVIRONMENT_VARIABLES.md) for complete reference including:**
 - All pricing configuration variables (deals and subscriptions)
 - Storage limits configuration
@@ -239,9 +245,12 @@ The admin dashboards rely on `lib/admin-auth.js` to sync the token across tabs. 
 - `GET /api/v1/ipfs/cat/:cid` – Stream IPFS content (aligned with Kubo's `/api/v0/cat`).
 - `GET /api/v1/ipfs/cat/:cid/json` – Get IPFS content as JSON (automatically parses JSON).
 - `GET /api/v1/ipfs/cat/:cid/decrypt` – Get and decrypt SEA-encrypted IPFS content (requires token query param).
+- `GET /api/v1/ipfs/content/:cid` – Compatibility endpoint for shogun-ipfs (streams IPFS content).
+- `GET /api/v1/ipfs/ipfs/:cid` – Compatibility endpoint for shogun-ipfs (streams IPFS content with auto content-type detection).
+- `POST /api/v1/ipfs/api/v0/cat` – Compatibility endpoint for shogun-ipfs (supports `?arg=CID` query parameter).
 - `POST /api/v1/ipfs/pin/add` – Pin content to IPFS (admin, aligned with Kubo's `/api/v0/pin/add`).
 - `POST /api/v1/ipfs/pin/rm` – Remove a pin from IPFS (admin, aligned with Kubo's `/api/v0/pin/rm`).
-- `POST /api/v1/ipfs/pins/rm` – Batch remove multiple pins from IPFS (admin).
+- `POST /api/v1/ipfs/pins/rm` – Batch remove multiple pins from IPFS (admin, compatibility endpoint for shogun-ipfs).
 - `GET /api/v1/ipfs/pin/ls` – List all pinned content (admin, aligned with Kubo's `/api/v0/pin/ls`).
 - `GET /api/v1/ipfs/stat/:cid` – Get IPFS object/block statistics for a CID (public).
 - `GET /api/v1/ipfs/test` – Test IPFS API connectivity (admin).
@@ -255,6 +264,8 @@ The admin dashboards rely on `lib/admin-auth.js` to sync the token across tabs. 
 - `GET /ipfs/:cid` – IPFS Gateway proxy (public, direct access via CID).
 - `GET /ipns/:name` – IPNS Gateway proxy (public, resolve IPNS names).
 - `POST /api/v0/*` – Raw Kubo IPFS API proxy (admin, forwards requests to IPFS node API).
+
+**Note:** The relay is fully compatible with [shogun-ipfs](https://github.com/scobru/shogun-ipfs). Configure shogun-ipfs with `service: "CUSTOM"` and `url: "https://your-relay.com/api/v1/ipfs"` to use all IPFS operations (upload, download, unpin) seamlessly.
 
 ### System & Debug
 - `GET /health` – Simple health check (public).
@@ -1323,147 +1334,19 @@ If chunks are lost:
 
 ---
 
-## Roadmap: Version 2.0
+## Roadmap
 
-The next major version will introduce tokenomics and decentralized governance.
+See the complete **[Roadmap](./docs/ROADMAP.md)** for detailed evolution path:
 
-### Native Token: $SHOGUN
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          $SHOGUN TOKEN UTILITY                               │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐           │
-│  │    STAKING      │   │   GOVERNANCE    │   │   FEE PAYMENT   │           │
-│  ├─────────────────┤   ├─────────────────┤   ├─────────────────┤           │
-│  │                 │   │                 │   │                 │           │
-│  │ Relay operators │   │ Vote on:        │   │ Pay fees in     │           │
-│  │ stake $SHOGUN   │   │ - Parameters    │   │ $SHOGUN for     │           │
-│  │ instead of USDC │   │ - Upgrades      │   │ discount        │           │
-│  │                 │   │ - Treasury      │   │                 │           │
-│  │ Benefits:       │   │                 │   │ Or pay in USDC  │           │
-│  │ - Lower slash % │   │ Voting power =  │   │ (auto-convert)  │           │
-│  │ - Fee discounts │   │ staked tokens   │   │                 │           │
-│  │ - Boost rewards │   │                 │   │                 │           │
-│  │                 │   │                 │   │                 │           │
-│  └─────────────────┘   └─────────────────┘   └─────────────────┘           │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Token Distribution (Proposed)
-
-| Allocation | Percentage | Vesting |
-|------------|------------|---------|
-| Community & Ecosystem | 40% | 4 years linear |
-| Early Relay Operators | 15% | 2 years linear |
-| Team | 15% | 4 years, 1 year cliff |
-| Treasury (DAO) | 20% | Controlled by governance |
-| Liquidity | 10% | At launch |
-
-### Protocol Fee Structure (v2)
-
-```
-User pays for storage
-        │
-        ▼
-┌───────────────────┐
-│   Protocol Fee    │ ──► 5% to DAO Treasury
-│      (5%)         │
-└───────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│   Relay Revenue   │ ──► 95% to Relay Operator
-│      (95%)        │
-└───────────────────┘
-```
-
-| Fee Type | Rate | Destination |
-|----------|------|-------------|
-| Storage subscription | 5% | DAO Treasury |
-| Storage deals | 5% | DAO Treasury |
-| Deal registration | 0.1 USDC | DAO Treasury |
-| Slashing penalties | 100% | DAO Treasury |
-
-### DAO Governance
-
-**Controlled Parameters:**
-- Minimum stake requirements
-- Slashing percentages
-- Protocol fee rates
-- Relay tier thresholds
-- Treasury spending
-
-**Governance Process:**
-1. Create proposal (requires 100k $SHOGUN)
-2. Discussion period (7 days)
-3. Voting period (7 days)
-4. Timelock (2 days)
-5. Execution
-
-### Staking Rewards
-
-```
-┌─────────────────────────────────────────┐
-│           RELAY STAKING v2              │
-├─────────────────────────────────────────┤
-│                                         │
-│  Stake $SHOGUN → Earn rewards from:     │
-│                                         │
-│  1. Protocol fees (proportional)        │
-│  2. Inflation rewards (APY ~5-15%)      │
-│  3. Slashing penalties redistribution   │
-│                                         │
-│  Higher stake = Higher tier:            │
-│  ┌─────────────────────────────────┐   │
-│  │ Bronze:   10k $SHOGUN  (1x)     │   │
-│  │ Silver:   50k $SHOGUN  (1.5x)   │   │
-│  │ Gold:    100k $SHOGUN  (2x)     │   │
-│  │ Diamond: 500k $SHOGUN  (3x)     │   │
-│  └─────────────────────────────────┘   │
-│                                         │
-└─────────────────────────────────────────┘
-```
-
-### Smart Contracts (v2)
-
-| Contract | Purpose |
-|----------|---------|
-| `ShogunToken.sol` | ERC-20 token with voting |
-| `ShogunStaking.sol` | Stake tokens, earn rewards |
-| `ShogunGovernor.sol` | DAO governance (OpenZeppelin) |
-| `ShogunTreasury.sol` | Protocol fee collection |
-| `ShogunRelayRegistry.sol` | Updated for token staking |
-
-### Migration Path
-
-**Phase 1: Testnet (Current)**
-- USDC staking
-- No protocol fees
-- Centralized parameters
-
-**Phase 2: Token Launch**
-- $SHOGUN token deployed
-- Dual staking (USDC or $SHOGUN)
-- Protocol fees activated
-- DAO treasury live
-
-**Phase 3: Full Decentralization**
-- USDC staking deprecated
-- $SHOGUN-only staking
-- Full DAO control
-- Multi-chain expansion
-
-### Timeline (Estimated)
-
-| Milestone | Target |
-|-----------|--------|
-| Token design finalized | Q1 2025 |
-| Testnet with token | Q2 2025 |
-| Mainnet token launch | Q3 2025 |
-| DAO governance live | Q4 2025 |
+- **Alabasta** 
+  - Testnet (Current) - Foundation phase with storage deals and L2 bridge testing
+  - Mainnet (Planned) - Production deployment
+- **Dressrosa**
+  - Testnet - Token launch and DAO governance testing
+  - Mainnet - Tokenomics and governance go live
+- **Egghead**
+  - Testnet - Full decentralization testing
+  - Mainnet - Complete autonomous ecosystem
 
 ---
 

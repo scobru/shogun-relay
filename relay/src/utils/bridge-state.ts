@@ -2282,6 +2282,34 @@ export async function markDepositProcessed(
 }
 
 /**
+ * Get all processed deposits for a user from GunDB
+ */
+export async function getProcessedDepositsForUser(
+  gun: IGunInstance,
+  userAddress: string
+): Promise<ProcessedDeposit[]> {
+  return new Promise((resolve) => {
+    const deposits: ProcessedDeposit[] = [];
+    const normalizedUser = userAddress.toLowerCase();
+    const timeout = setTimeout(() => resolve(deposits), 10000);
+
+    gun.get("bridge").get("processed-deposits").map().once((deposit: ProcessedDeposit | null, key?: string) => {
+      if (!deposit || !key) return;
+      
+      const depositUser = (deposit.user || "").toLowerCase();
+      if (depositUser === normalizedUser) {
+        deposits.push(deposit);
+      }
+    });
+
+    setTimeout(() => {
+      clearTimeout(timeout);
+      resolve(deposits);
+    }, 5000);
+  });
+}
+
+/**
  * Add a pending force withdrawal to the queue
  */
 export async function addPendingForceWithdrawal(
@@ -2474,7 +2502,7 @@ export async function reconcileUserBalance(
 /**
  * List all L2 transfers from frozen entries
  */
-async function listL2Transfers(
+export async function listL2Transfers(
   gun: IGunInstance,
   relayPub: string
 ): Promise<Array<{ from: string; to: string; amount: string; transferHash: string; timestamp: number }>> {

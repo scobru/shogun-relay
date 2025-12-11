@@ -264,5 +264,63 @@ export class BridgeModule {
   }> {
     return this.client.post('/api/v1/bridge/reconcile-balance', { user: userAddress });
   }
+
+  /**
+   * Get all transactions (deposits, withdrawals, transfers) for a user
+   * Returns a unified list of all transaction types sorted by timestamp
+   * @param userAddress User's Ethereum address
+   * @returns Transaction history
+   */
+  public async getTransactions(userAddress: string): Promise<{
+    success: boolean;
+    user: string;
+    transactions: Array<{
+      type: 'deposit' | 'withdrawal' | 'transfer';
+      txHash: string;
+      from?: string;
+      to?: string;
+      amount: string;
+      amountEth: string;
+      timestamp: number;
+      blockNumber?: number;
+      nonce?: string;
+      batchId?: string;
+      status: 'pending' | 'completed' | 'batched';
+    }>;
+    count: number;
+    summary: {
+      deposits: number;
+      withdrawals: number;
+      transfers: number;
+    };
+  }> {
+    return this.client.get(`/api/v1/bridge/transactions/${userAddress}`);
+  }
+
+  /**
+   * Get detailed information about a specific transaction by hash
+   * Searches across deposits, withdrawals, and transfers
+   * @param txHash Transaction hash
+   * @returns Transaction details
+   */
+  public async getTransaction(txHash: string): Promise<{
+    success: boolean;
+    transaction?: {
+      type: 'deposit' | 'withdrawal' | 'transfer';
+      txHash: string;
+      from?: string;
+      to?: string;
+      amount: string;
+      amountEth: string;
+      timestamp: number;
+      blockNumber?: number;
+      nonce?: string;
+      status: 'pending' | 'completed' | 'batched';
+    };
+    source?: 'deposit' | 'withdrawal' | 'transfer';
+    error?: string;
+  }> {
+    return this.client.get(`/api/v1/bridge/transaction/${txHash}`);
+  }
 }
 

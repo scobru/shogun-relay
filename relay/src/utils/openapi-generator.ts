@@ -3351,6 +3351,251 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
             }
           }
         }
+      },
+      "/api/v1/bridge/transactions/{user}": {
+        get: {
+          tags: ["Bridge"],
+          summary: "Get user transaction history",
+          description: "Get all transactions (deposits, withdrawals, transfers) for a user. Returns a unified list of all transaction types sorted by timestamp.",
+          operationId: "getUserTransactions",
+          parameters: [
+            {
+              name: "user",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "User Ethereum address"
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Transaction history",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      user: { type: "string" },
+                      transactions: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            type: {
+                              type: "string",
+                              enum: ["deposit", "withdrawal", "transfer"],
+                              description: "Transaction type"
+                            },
+                            txHash: {
+                              type: "string",
+                              description: "Transaction hash"
+                            },
+                            from: {
+                              type: "string",
+                              description: "Sender address (for withdrawals and transfers)"
+                            },
+                            to: {
+                              type: "string",
+                              description: "Receiver address (for deposits and transfers)"
+                            },
+                            amount: {
+                              type: "string",
+                              description: "Amount in wei"
+                            },
+                            amountEth: {
+                              type: "string",
+                              description: "Amount in ETH"
+                            },
+                            timestamp: {
+                              type: "number",
+                              description: "Transaction timestamp (milliseconds)"
+                            },
+                            blockNumber: {
+                              type: "number",
+                              description: "Block number (for on-chain transactions)"
+                            },
+                            nonce: {
+                              type: "string",
+                              description: "Withdrawal nonce (for withdrawals)"
+                            },
+                            batchId: {
+                              type: "string",
+                              description: "Batch ID (for batched withdrawals)"
+                            },
+                            status: {
+                              type: "string",
+                              enum: ["pending", "completed", "batched"],
+                              description: "Transaction status"
+                            }
+                          }
+                        }
+                      },
+                      count: {
+                        type: "number",
+                        description: "Total number of transactions"
+                      },
+                      summary: {
+                        type: "object",
+                        properties: {
+                          deposits: { type: "number" },
+                          withdrawals: { type: "number" },
+                          transfers: { type: "number" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              description: "Bad request - invalid user address",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            },
+            "503": {
+              description: "Service unavailable - GunDB not initialized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/bridge/transaction/{txHash}": {
+        get: {
+          tags: ["Bridge"],
+          summary: "Get transaction details",
+          description: "Get detailed information about a specific transaction by hash. Searches across deposits, withdrawals, and transfers.",
+          operationId: "getTransactionDetails",
+          parameters: [
+            {
+              name: "txHash",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "Transaction hash"
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Transaction details",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      transaction: {
+                        type: "object",
+                        properties: {
+                          type: {
+                            type: "string",
+                            enum: ["deposit", "withdrawal", "transfer"],
+                            description: "Transaction type"
+                          },
+                          txHash: {
+                            type: "string",
+                            description: "Transaction hash"
+                          },
+                          from: {
+                            type: "string",
+                            description: "Sender address"
+                          },
+                          to: {
+                            type: "string",
+                            description: "Receiver address"
+                          },
+                          amount: {
+                            type: "string",
+                            description: "Amount in wei"
+                          },
+                          amountEth: {
+                            type: "string",
+                            description: "Amount in ETH"
+                          },
+                          timestamp: {
+                            type: "number",
+                            description: "Transaction timestamp"
+                          },
+                          blockNumber: {
+                            type: "number",
+                            description: "Block number"
+                          },
+                          nonce: {
+                            type: "string",
+                            description: "Withdrawal nonce"
+                          },
+                          status: {
+                            type: "string",
+                            enum: ["pending", "completed", "batched"],
+                            description: "Transaction status"
+                          }
+                        }
+                      },
+                      source: {
+                        type: "string",
+                        enum: ["deposit", "withdrawal", "transfer"],
+                        description: "Source where the transaction was found"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              description: "Bad request - invalid transaction hash",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            },
+            "404": {
+              description: "Transaction not found",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean", example: false },
+                      error: { type: "string", example: "Transaction not found" }
+                    }
+                  }
+                }
+              }
+            },
+            "503": {
+              description: "Service unavailable - GunDB not initialized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
       }
     }
   };

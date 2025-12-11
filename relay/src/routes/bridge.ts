@@ -35,6 +35,8 @@ import {
   validateNonceIncremental,
   setLastNonce,
   getLastNonce,
+  listL2Transfers,
+  getProcessedDepositsForUser,
   type PendingWithdrawal,
   type Batch,
 } from "../utils/bridge-state";
@@ -1820,6 +1822,339 @@ router.post("/process-deposit", adminAuthMiddleware, express.json({ limit: '10mb
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log.error({ error, txHash: req.body.txHash }, "Error in process-deposit endpoint");
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+});
+
+/**
+ * GET /api/v1/bridge/transactions/:user
+ * 
+ * Get all transactions (deposits, withdrawals, transfers) for a user.
+ * Returns a unified list of all transaction types sorted by timestamp.
+ */
+router.get("/transactions/:user", async (req, res) => {
+  try {
+    const gun = req.app.get("gunInstance");
+    if (!gun) {
+      return res.status(503).json({
+        success: false,
+        error: "GunDB not initialized",
+      });
+    }
+
+    const { user } = req.params;
+
+    let userAddress: string;
+    try {
+      userAddress = ethers.getAddress(user);
+    } catch {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid user address",
+      });
+    }
+
+    const normalizedUser = userAddress.toLowerCase();
+    const relayKeyPair = req.app.get("relayKeyPair");
+    const client = getBridgeClient();
+
+    log.debug({ user: normalizedUser }, "Fetching transaction history");
+
+    // Fetch all transaction types in parallel
+    const [onChainDeposits, onChainWithdrawals, l2Transfers, processedDeposits] = await Promise.all([
+      // On-chain deposits (from contract events)
+      client.queryDeposits(0, "latest", normalizedUser).catch((err) => {
+        log.warn({ error: err }, "Failed to query on-chain deposits");
+        return [];
+      }),
+      // On-chain withdrawals (from contract events)
+      client.queryWithdrawals(0, "latest", normalizedUser).catch((err) => {
+        log.warn({ error: err }, "Failed to query on-chain withdrawals");
+        return [];
+      }),
+      // L2 transfers (from GunDB frozen entries)
+      listL2Transfers(gun, relayKeyPair?.pub || "").catch((err) => {
+        log.warn({ error: err }, "Failed to query L2 transfers");
+        return [];
+      }),
+      // Processed deposits (from GunDB)
+      getProcessedDepositsForUser(gun, normalizedUser).catch((err) => {
+        log.warn({ error: err }, "Failed to query processed deposits");
+        return [];
+      }),
+    ]);
+
+    // Build unified transaction list
+    const transactions: Array<{
+      type: "deposit" | "withdrawal" | "transfer";
+      txHash: string;
+      from?: string;
+      to?: string;
+      amount: string;
+      amountEth: string;
+      timestamp: number;
+      blockNumber?: number;
+      nonce?: string;
+      batchId?: string;
+      status: "pending" | "completed" | "batched";
+    }> = [];
+
+    // Add deposits
+    for (const deposit of onChainDeposits) {
+      const processed = processedDeposits.find(
+        (p) => p.txHash === deposit.txHash && p.user.toLowerCase() === normalizedUser
+      );
+      
+      transactions.push({
+        type: "deposit",
+        txHash: deposit.txHash,
+        to: deposit.user,
+        amount: deposit.amount.toString(),
+        amountEth: ethers.formatEther(deposit.amount),
+        timestamp: processed?.timestamp || deposit.blockNumber * 1000 || Date.now(),
+        blockNumber: deposit.blockNumber,
+        status: processed ? "completed" : "pending",
+      });
+    }
+
+    // Add withdrawals
+    for (const withdrawal of onChainWithdrawals) {
+      transactions.push({
+        type: "withdrawal",
+        txHash: withdrawal.txHash || "",
+        from: withdrawal.user,
+        amount: withdrawal.amount.toString(),
+        amountEth: ethers.formatEther(withdrawal.amount),
+        timestamp: withdrawal.blockNumber * 1000 || Date.now(),
+        blockNumber: withdrawal.blockNumber,
+        nonce: withdrawal.nonce.toString(),
+        status: "completed",
+      });
+    }
+
+    // Add L2 transfers (filter by user)
+    for (const transfer of l2Transfers) {
+      const from = transfer.from?.toLowerCase();
+      const to = transfer.to?.toLowerCase();
+      
+      if (from === normalizedUser || to === normalizedUser) {
+        transactions.push({
+          type: "transfer",
+          txHash: transfer.transferHash,
+          from: transfer.from,
+          to: transfer.to,
+          amount: transfer.amount,
+          amountEth: ethers.formatEther(BigInt(transfer.amount)),
+          timestamp: transfer.timestamp || Date.now(),
+          status: "completed",
+        });
+      }
+    }
+
+    // Also check pending withdrawals
+    const pendingWithdrawals = await getPendingWithdrawals(gun).catch(() => []);
+    for (const withdrawal of pendingWithdrawals) {
+      const wUser = (typeof withdrawal.user === 'string' ? withdrawal.user : String(withdrawal.user || '')).toLowerCase();
+      if (wUser === normalizedUser) {
+        // Check if already in transactions (from on-chain)
+        const exists = transactions.some(
+          (t) => t.type === "withdrawal" && t.nonce === withdrawal.nonce
+        );
+        
+        if (!exists) {
+          transactions.push({
+            type: "withdrawal",
+            txHash: "",
+            from: withdrawal.user,
+            amount: typeof withdrawal.amount === 'string' ? withdrawal.amount : String(withdrawal.amount || '0'),
+            amountEth: ethers.formatEther(BigInt(typeof withdrawal.amount === 'string' ? withdrawal.amount : String(withdrawal.amount || '0'))),
+            timestamp: withdrawal.timestamp || Date.now(),
+            nonce: typeof withdrawal.nonce === 'string' ? withdrawal.nonce : String(withdrawal.nonce || '0'),
+            status: "pending",
+          });
+        }
+      }
+    }
+
+    // Sort by timestamp (newest first)
+    transactions.sort((a, b) => b.timestamp - a.timestamp);
+
+    log.debug(
+      { user: normalizedUser, count: transactions.length },
+      "Transaction history retrieved"
+    );
+
+    res.json({
+      success: true,
+      user: userAddress,
+      transactions,
+      count: transactions.length,
+      summary: {
+        deposits: transactions.filter((t) => t.type === "deposit").length,
+        withdrawals: transactions.filter((t) => t.type === "withdrawal").length,
+        transfers: transactions.filter((t) => t.type === "transfer").length,
+      },
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log.error({ error }, "Error getting transaction history");
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+});
+
+/**
+ * GET /api/v1/bridge/transaction/:txHash
+ * 
+ * Get detailed information about a specific transaction by hash.
+ * Searches across deposits, withdrawals, and transfers.
+ */
+router.get("/transaction/:txHash", async (req, res) => {
+  try {
+    const gun = req.app.get("gunInstance");
+    if (!gun) {
+      return res.status(503).json({
+        success: false,
+        error: "GunDB not initialized",
+      });
+    }
+
+    const { txHash } = req.params;
+
+    if (!txHash || typeof txHash !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid transaction hash",
+      });
+    }
+
+    const relayKeyPair = req.app.get("relayKeyPair");
+    const client = getBridgeClient();
+
+    log.debug({ txHash }, "Fetching transaction details");
+
+    // Try to find in different sources
+    let transaction: any = null;
+    let source: "deposit" | "withdrawal" | "transfer" | null = null;
+
+    // 1. Check on-chain deposits
+    try {
+      const deposits = await client.queryDeposits(0, "latest");
+      const deposit = deposits.find((d) => d.txHash.toLowerCase() === txHash.toLowerCase());
+      
+      if (deposit) {
+        const processed = await getProcessedDepositsForUser(gun, deposit.user).catch(() => []);
+        const processedDeposit = processed.find((p) => p.txHash.toLowerCase() === txHash.toLowerCase());
+        
+        transaction = {
+          type: "deposit",
+          txHash: deposit.txHash,
+          from: null,
+          to: deposit.user,
+          amount: deposit.amount.toString(),
+          amountEth: ethers.formatEther(deposit.amount),
+          timestamp: processedDeposit?.timestamp || deposit.blockNumber * 1000 || Date.now(),
+          blockNumber: deposit.blockNumber,
+          status: processedDeposit ? "completed" : "pending",
+        };
+        source = "deposit";
+      }
+    } catch (err) {
+      log.warn({ error: err }, "Error querying deposits");
+    }
+
+    // 2. Check on-chain withdrawals
+    if (!transaction) {
+      try {
+        const withdrawals = await client.queryWithdrawals(0, "latest");
+        const withdrawal = withdrawals.find((w) => w.txHash?.toLowerCase() === txHash.toLowerCase());
+        
+        if (withdrawal) {
+          transaction = {
+            type: "withdrawal",
+            txHash: withdrawal.txHash || txHash,
+            from: withdrawal.user,
+            to: null,
+            amount: withdrawal.amount.toString(),
+            amountEth: ethers.formatEther(withdrawal.amount),
+            timestamp: withdrawal.blockNumber * 1000 || Date.now(),
+            blockNumber: withdrawal.blockNumber,
+            nonce: withdrawal.nonce.toString(),
+            status: "completed",
+          };
+          source = "withdrawal";
+        }
+      } catch (err) {
+        log.warn({ error: err }, "Error querying withdrawals");
+      }
+    }
+
+    // 3. Check L2 transfers
+    if (!transaction) {
+      try {
+        const transfers = await listL2Transfers(gun, relayKeyPair?.pub || "");
+        const transfer = transfers.find(
+          (t) => t.transferHash.toLowerCase() === txHash.toLowerCase()
+        );
+        
+        if (transfer) {
+          transaction = {
+            type: "transfer",
+            txHash: transfer.transferHash,
+            from: transfer.from,
+            to: transfer.to,
+            amount: transfer.amount,
+            amountEth: ethers.formatEther(BigInt(transfer.amount)),
+            timestamp: transfer.timestamp || Date.now(),
+            status: "completed",
+          };
+          source = "transfer";
+        }
+      } catch (err) {
+        log.warn({ error: err }, "Error querying transfers");
+      }
+    }
+
+    // 4. Check pending withdrawals (by checking all batches)
+    if (!transaction) {
+      try {
+        const pendingWithdrawals = await getPendingWithdrawals(gun);
+        // Note: pending withdrawals don't have txHash yet, so we can't match by hash
+        // But we can check if this might be a batch submission tx
+        const batches = await Promise.all([
+          getLatestBatch(gun).catch(() => null),
+        ]);
+        
+        // Check if txHash matches a batch submission
+        // This would require checking the contract for batch submission events
+        // For now, we'll skip this as it's more complex
+      } catch (err) {
+        log.warn({ error: err }, "Error checking pending withdrawals");
+      }
+    }
+
+    if (!transaction) {
+      return res.status(404).json({
+        success: false,
+        error: "Transaction not found",
+      });
+    }
+
+    log.debug({ txHash, type: transaction.type }, "Transaction found");
+
+    res.json({
+      success: true,
+      transaction,
+      source,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log.error({ error, txHash: req.params.txHash }, "Error getting transaction details");
     res.status(500).json({
       success: false,
       error: errorMessage,

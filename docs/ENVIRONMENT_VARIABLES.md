@@ -17,6 +17,11 @@ This document provides a comprehensive reference of all environment variables th
 9. [Network Federation](#network-federation)
 10. [Holster Relay](#holster-relay)
 11. [Advanced Options](#advanced-options)
+12. [Quick Reference Table](#quick-reference-table)
+13. [Environment File Setup](#environment-file-setup)
+14. [Validation](#validation)
+15. [Security Considerations](#security-considerations)
+16. [Related Documentation](#related-documentation)
 
 ---
 
@@ -92,6 +97,20 @@ This document provides a comprehensive reference of all environment variables th
 - **Default**: None
 - **Description**: Optional JWT token for IPFS API authentication. Required if IPFS node has authentication enabled.
 - **Example**: `IPFS_API_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+
+### `IPFS_API_KEY`
+- **Type**: String
+- **Required**: No
+- **Default**: None
+- **Description**: Optional API key for IPFS API authentication. Legacy option; prefer `IPFS_API_TOKEN` for JWT authentication.
+- **Example**: `IPFS_API_KEY=your_api_key_here`
+
+### `IPFS_PATH`
+- **Type**: String (Directory Path)
+- **Required**: No
+- **Default**: `/data/ipfs` (Docker) or `~/.ipfs` (manual)
+- **Description**: IPFS repository path. Used internally by IPFS daemon. Typically only set in Docker containers.
+- **Example**: `IPFS_PATH=/data/ipfs`
 
 ### `IPFS_PIN_TIMEOUT_MS`
 - **Type**: Integer
@@ -559,6 +578,46 @@ This document provides a comprehensive reference of all environment variables th
 - **Description**: Custom welcome message displayed on server startup. Overrides the default ASCII art welcome message.
 - **Example**: `WELCOME_MESSAGE="My Custom Relay Starting..."`
 
+### `NODE_OPTIONS`
+- **Type**: String
+- **Required**: No
+- **Default**: None
+- **Description**: Node.js runtime options. Useful for memory tuning in containers.
+- **Example**: `NODE_OPTIONS=--max-old-space-size=512` (sets max heap size to 512MB)
+
+### `VERBOSE_LOGGING`
+- **Type**: Boolean (String)
+- **Required**: No
+- **Default**: `false`
+- **Description**: Enable verbose logging output. When enabled, more detailed log messages are printed.
+- **Values**: `"true"` or `"false"`
+- **Example**: `VERBOSE_LOGGING=true`
+
+### `LOG_LEVEL`
+- **Type**: String
+- **Required**: No
+- **Default**: `info`
+- **Description**: Set the logging level. Controls which log messages are displayed.
+- **Values**: `error`, `warn`, `info`, `debug`, `trace`
+- **Example**: `LOG_LEVEL=debug`
+
+### `BRIDGE_ENABLED`
+- **Type**: Boolean (String)
+- **Required**: No
+- **Default**: Not set (disabled)
+- **Description**: Enable L2 Bridge functionality. When enabled, the relay supports bridge operations for ETH transfers between L1 and L2.
+- **Values**: `"true"` or `"false"`
+- **Example**: `BRIDGE_ENABLED=true`
+- **Note**: See [BRIDGE.md](./BRIDGE.md) for bridge configuration details.
+
+### `BRIDGE_RPC_URL`
+- **Type**: String (URL)
+- **Required**: No (required if `BRIDGE_ENABLED=true`)
+- **Default**: None
+- **Description**: RPC URL for blockchain access for bridge operations. Required when bridge is enabled.
+- **Example**: `BRIDGE_RPC_URL=https://sepolia.base.org`
+- **Note**: See [BRIDGE.md](./BRIDGE.md) for complete bridge configuration.
+
 ---
 
 ## Quick Reference Table
@@ -572,6 +631,8 @@ This document provides a comprehensive reference of all environment variables th
 | `IPFS_API_URL` | No | `http://127.0.0.1:5001` | IPFS |
 | `IPFS_GATEWAY_URL` | No | `http://127.0.0.1:8080` | IPFS |
 | `IPFS_API_TOKEN` | No | - | IPFS |
+| `IPFS_API_KEY` | No | - | IPFS |
+| `IPFS_PIN_TIMEOUT_MS` | No | `120000` | IPFS |
 | `RELAY_SEA_KEYPAIR` | Yes* | - | GunDB |
 | `RELAY_SEA_KEYPAIR_PATH` | Yes* | - | GunDB |
 | `STORAGE_TYPE` | No | `sqlite` | GunDB |
@@ -585,8 +646,18 @@ This document provides a comprehensive reference of all environment variables th
 | `X402_SETTLEMENT_MODE` | No | `facilitator` | x402 |
 | `RELAY_MAX_STORAGE_GB` | No | `0` (unlimited) | Storage |
 | `AUTO_REPLICATION` | No | `true` | Network |
+| `DEAL_SYNC_ENABLED` | No | `true` | Network |
+| `DEAL_SYNC_INTERVAL_MS` | No | `300000` | Network |
+| `DEAL_SYNC_FAST_INTERVAL_MS` | No | `120000` | Network |
 | `HOLSTER_RELAY_HOST` | No | `0.0.0.0` | Holster |
 | `HOLSTER_RELAY_PORT` | No | `RELAY_PORT + 1` | Holster |
+| `HOLSTER_RELAY_STORAGE` | No | `true` | Holster |
+| `NODE_ENV` | No | - | Advanced |
+| `NODE_OPTIONS` | No | - | Advanced |
+| `LOG_LEVEL` | No | `info` | Advanced |
+| `VERBOSE_LOGGING` | No | `false` | Advanced |
+| `BRIDGE_ENABLED` | No | - | Bridge |
+| `BRIDGE_RPC_URL` | No | - | Bridge |
 
 *At least one of `RELAY_SEA_KEYPAIR` or `RELAY_SEA_KEYPAIR_PATH` is required.  
 **Required if using x402 subscriptions or deals.
@@ -610,6 +681,21 @@ For Docker deployments, set environment variables in `docker-compose.yml` or via
 ```bash
 docker run -e ADMIN_PASSWORD=secret -e RELAY_HOST=relay.example.com shogun-relay
 ```
+
+### Docker Build-Time Variables
+
+The following variables are Docker build-time only (ARG) and not runtime environment variables:
+- `IPFS_VERSION` - IPFS Kubo version to install (default: 0.29.0)
+- `GENERATE_RELAY_KEYS` - Generate relay SEA keypair during build (default: false)
+- `CAPROVER_GIT_COMMIT_SHA` - Git commit SHA for CapRover deployments
+
+These are set during `docker build` with `--build-arg`, not in `.env` or runtime environment.
+
+### Docker-Only Variables
+
+These variables are used internally by Docker scripts and typically don't need to be set manually:
+- `IPFS_PATH` - IPFS repository path (default: `/data/ipfs` in Docker)
+- `SKIP_VOLUME_CHECK` - Skip volume verification on container startup (default: false)
 
 ---
 
