@@ -2097,10 +2097,88 @@ router.get("/transaction/:txHash", async (req, res) => {
     // 3. Check L2 transfers
     if (!transaction) {
       try {
-        const transfers = await listL2Transfers(gun, relayKeyPair?.pub || "");
-        const transfer = transfers.find(
-          (t) => t.transferHash.toLowerCase() === txHash.toLowerCase()
-        );
+        // First, try to read directly from frozen entries using the hash as content hash
+        // This handles both transferHash (index key) and latestHash (content hash) cases
+        let transfer: { from: string; to: string; amount: string; transferHash: string; timestamp: number } | null = null;
+        
+        try {
+          const FrozenData = await import("../utils/frozen-data");
+          const entry = await FrozenData.readFrozenEntry(
+            gun,
+            "bridge-transfers",
+            txHash.trim(),
+            relayKeyPair?.pub || ""
+          );
+          
+          if (entry && entry.verified && entry.data) {
+            const transferData = entry.data as {
+              from?: string;
+              to?: string;
+              amount?: string;
+              transferHash?: string;
+              timestamp?: number;
+              type?: string;
+            };
+            
+            if (transferData.type === "bridge-transfer" && transferData.from && transferData.to && transferData.amount) {
+              transfer = {
+                from: transferData.from,
+                to: transferData.to,
+                amount: transferData.amount,
+                transferHash: transferData.transferHash || txHash.trim(),
+                timestamp: transferData.timestamp || Date.now(),
+              };
+            }
+          }
+        } catch (err) {
+          log.debug({ error: err, hash: txHash }, "Error reading frozen entry directly, trying list lookup");
+        }
+        
+        // If direct read didn't work, try searching in the transfer list
+        // This handles cases where the hash is the index key (transferHash)
+        if (!transfer) {
+          const transfers = await listL2Transfers(gun, relayKeyPair?.pub || "");
+          
+          // Try exact match first (case-sensitive for base64)
+          transfer = transfers.find((t) => t.transferHash === txHash.trim()) || null;
+          
+          // If not found, try case-insensitive match (handles hex hashes)
+          if (!transfer) {
+            transfer = transfers.find(
+              (t) => t.transferHash.toLowerCase() === txHash.toLowerCase().trim()
+            ) || null;
+          }
+          
+          // Also check if the hash matches any latestHash by searching the index
+          if (!transfer) {
+            const normalizedTxHash = txHash.trim().toLowerCase();
+            for (const t of transfers) {
+              try {
+                const indexNode = gun.get("shogun-index").get("bridge-transfers").get(t.transferHash);
+                const indexEntry: any = await new Promise((resolve) => {
+                  const timeout = setTimeout(() => resolve(null), 2000);
+                  indexNode.once((data: any) => {
+                    clearTimeout(timeout);
+                    resolve(data);
+                  });
+                });
+                
+                if (indexEntry && indexEntry.latestHash) {
+                  // Compare both as-is and lowercased (base64 might not have case, but we check both)
+                  if (
+                    indexEntry.latestHash === txHash.trim() ||
+                    indexEntry.latestHash.toLowerCase() === normalizedTxHash
+                  ) {
+                    transfer = t;
+                    break;
+                  }
+                }
+              } catch (err) {
+                // Continue to next transfer
+              }
+            }
+          }
+        }
         
         if (transfer) {
           transaction = {
