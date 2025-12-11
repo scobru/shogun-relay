@@ -129,7 +129,7 @@ export function createBridgeClient(config: BridgeConfig) {
 
       log.info({ stateRoot, forceWithdrawalCount: handledForceWithdrawals.length }, "Submitting batch to bridge");
 
-      const tx = await (bridge.submitBatch as any)(stateRoot, handledForceWithdrawals);
+      const tx = await bridge.submitBatch(stateRoot, handledForceWithdrawals);
       const receipt = await tx.wait();
 
       if (!receipt) {

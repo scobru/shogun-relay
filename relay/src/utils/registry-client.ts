@@ -488,25 +488,33 @@ export function createRegistryClientWithSigner(
         log.info(
           `Waiting for approve transaction confirmation: ${approveTx.hash} (approved ${ethers.formatUnits(approvalBuffer, 6)} USDC for ${ethers.formatUnits(stakeWei, 6)} USDC stake)`
         );
-        const approveReceipt = await approveTx.wait();
+        // Wait for approval transaction with at least 1 confirmation
+        const approveReceipt = await approveTx.wait(1);
         log.info(
           `Approve transaction confirmed in block ${approveReceipt.blockNumber}`
         );
         
         // Wait for multiple block confirmations to ensure state propagation across all RPC nodes
         // This is critical because estimateGas may use a different RPC node
+        const approvalBlock = approveReceipt.blockNumber;
         const currentBlock = await client.provider.getBlockNumber();
-        log.info(`Current block: ${currentBlock}, waiting for 2 more blocks for state propagation...`);
-        let blocksToWait = 2;
-        while (blocksToWait > 0) {
+        const blocksToWait = Math.max(3, currentBlock - approvalBlock + 2); // Wait at least 3 blocks after approval
+        log.info(`Approval in block ${approvalBlock}, current block: ${currentBlock}, waiting for ${blocksToWait} more blocks for state propagation...`);
+        
+        let blocksWaited = 0;
+        while (blocksWaited < blocksToWait) {
           await new Promise((resolve) => setTimeout(resolve, 2000)); // Check every 2 seconds
           const newBlock = await client.provider.getBlockNumber();
-          if (newBlock > currentBlock) {
-            blocksToWait--;
-            log.info(`Block ${newBlock} mined, ${blocksToWait} blocks remaining...`);
+          const newBlocksWaited = newBlock - approvalBlock;
+          if (newBlocksWaited > blocksWaited) {
+            blocksWaited = newBlocksWaited;
+            log.info(`Block ${newBlock} mined, ${blocksToWait - blocksWaited} blocks remaining...`);
           }
         }
         log.info("State propagation wait complete");
+        
+        // Additional delay to ensure all RPC nodes have synced
+        await new Promise((resolve) => setTimeout(resolve, 3000));
 
         // Verify allowance was updated with more retries and longer wait
         let retries = 10;
@@ -589,8 +597,26 @@ export function createRegistryClientWithSigner(
       let tx;
       let registrationAttempts = 3;
       
+      // Base gas limit for registerRelay (typical value is around 400k-500k)
+      const BASE_GAS_LIMIT = 600000n; // Use a safe default with buffer
+      
       while (registrationAttempts > 0) {
         try {
+          // Final allowance check using the same provider that will send the transaction
+          const finalAllowanceCheck = await usdc.allowance(
+            wallet.address,
+            registryAddress
+          );
+          log.info(
+            `Final allowance check before transaction: ${ethers.formatUnits(finalAllowanceCheck, 6)} USDC (need ${ethers.formatUnits(stakeWei, 6)} USDC)`
+          );
+          
+          if (finalAllowanceCheck < stakeWei) {
+            throw new Error(
+              `Allowance insufficient before transaction. Have: ${ethers.formatUnits(finalAllowanceCheck, 6)} USDC, Need: ${ethers.formatUnits(stakeWei, 6)} USDC`
+            );
+          }
+          
           // First, try to populate the transaction (this doesn't call estimateGas)
           const populatedTx = await contract.registerRelay.populateTransaction(
             endpoint,
@@ -600,8 +626,8 @@ export function createRegistryClientWithSigner(
             BigInt(griefingRatio)
           );
           
-          // Manually estimate gas with retries
-          let gasEstimate;
+          // Try to estimate gas, but if it fails due to allowance, use a fixed gas limit
+          let gasEstimate: bigint | null = null;
           let gasEstimateAttempts = 5;
           while (gasEstimateAttempts > 0) {
             try {
@@ -610,16 +636,23 @@ export function createRegistryClientWithSigner(
                 from: wallet.address,
               });
               log.info(`Gas estimate successful: ${gasEstimate.toString()}`);
+              // Add 20% buffer to the gas estimate
+              gasEstimate = (gasEstimate * 120n) / 100n;
               break;
             } catch (gasError: any) {
               gasEstimateAttempts--;
-              if (gasError.message && gasError.message.includes("allowance")) {
+              const isAllowanceError = gasError.message && (
+                gasError.message.includes("allowance") ||
+                gasError.message.includes("ERC20: transfer amount exceeds allowance")
+              );
+              
+              if (isAllowanceError) {
                 log.warn(
-                  `Gas estimation failed due to allowance (${gasEstimateAttempts} attempts left). This may be a state propagation issue.`
+                  `Gas estimation failed due to allowance (${gasEstimateAttempts} attempts left). This may be a state propagation issue. Will use fixed gas limit if all retries fail.`
                 );
                 if (gasEstimateAttempts > 0) {
                   // Wait a bit and check allowance again
-                  await new Promise((resolve) => setTimeout(resolve, 2000));
+                  await new Promise((resolve) => setTimeout(resolve, 3000));
                   const retryAllowance = await usdc.allowance(
                     wallet.address,
                     registryAddress
@@ -633,34 +666,46 @@ export function createRegistryClientWithSigner(
                     );
                   }
                   continue;
+                } else {
+                  // Last attempt failed, we'll use fixed gas limit
+                  log.warn("Gas estimation failed after all retries. Using fixed gas limit.");
+                  gasEstimate = null;
+                  break;
                 }
-              }
-              if (gasEstimateAttempts === 0) {
-                throw gasError;
+              } else {
+                // Not an allowance error, throw it
+                if (gasEstimateAttempts === 0) {
+                  throw gasError;
+                }
               }
             }
           }
           
-          if (!gasEstimate) {
-            throw new Error("Failed to estimate gas after all retry attempts");
-          }
+          // Use estimated gas if available, otherwise use base gas limit
+          const gasLimit = gasEstimate || BASE_GAS_LIMIT;
+          log.info(`Using gas limit: ${gasLimit.toString()}`);
           
-          // Send the transaction with the estimated gas
+          // Send the transaction with the gas limit
           tx = await wallet.sendTransaction({
             ...populatedTx,
-            gasLimit: gasEstimate,
+            gasLimit: gasLimit,
           });
           log.info(`Registration transaction sent: ${tx.hash}`);
           break; // Success, exit retry loop
         } catch (error: any) {
           registrationAttempts--;
-          if (error.message && error.message.includes("allowance")) {
+          const isAllowanceError = error.message && (
+            error.message.includes("allowance") ||
+            error.message.includes("ERC20: transfer amount exceeds allowance")
+          );
+          
+          if (isAllowanceError) {
             log.warn(
               `Registration attempt failed due to allowance (${registrationAttempts} attempts left)`
             );
             if (registrationAttempts > 0) {
-              // Wait and verify allowance before retrying
-              await new Promise((resolve) => setTimeout(resolve, 3000));
+              // Wait longer and verify allowance before retrying
+              await new Promise((resolve) => setTimeout(resolve, 5000));
               const retryAllowance = await usdc.allowance(
                 wallet.address,
                 registryAddress
@@ -673,11 +718,19 @@ export function createRegistryClientWithSigner(
                   `Allowance lost during retry. Expected: ${ethers.formatUnits(stakeWei, 6)} USDC, Got: ${ethers.formatUnits(retryAllowance, 6)} USDC`
                 );
               }
+              // Wait for one more block before retrying
+              const currentBlock = await client.provider.getBlockNumber();
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+              const newBlock = await client.provider.getBlockNumber();
+              if (newBlock === currentBlock) {
+                // Block hasn't advanced, wait a bit more
+                await new Promise((resolve) => setTimeout(resolve, 3000));
+              }
               continue;
             }
           }
           // If it's not an allowance error or we're out of attempts, throw
-          if (registrationAttempts === 0 || !error.message?.includes("allowance")) {
+          if (registrationAttempts === 0 || !isAllowanceError) {
             throw error;
           }
         }
