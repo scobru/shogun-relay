@@ -33,6 +33,8 @@ import "gun/sea";
 import * as FrozenData from "./frozen-data";
 import { loggers } from "./logger";
 import { userLockManager } from "./security";
+import { createRegistryClient } from "./registry-client";
+import { getRelayKeyPair } from "./relay-user";
 
 const SEA = (Gun as any).SEA;
 const log = loggers.bridge || {
@@ -244,31 +246,176 @@ export interface ProcessedDeposit {
   timestamp: number;
 }
 
+// Cache for trusted relay public keys (with TTL)
+interface TrustedRelaysCache {
+  pubKeys: string[];
+  timestamp: number;
+  ttl: number; // Cache TTL in milliseconds (default: 5 minutes)
+}
+
+let trustedRelaysCache: TrustedRelaysCache | null = null;
+const DEFAULT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Get trusted relay public keys (from registry + own relay)
+ * 
+ * This function:
+ * 1. Always includes the own relay's pub key
+ * 2. Queries the on-chain registry for active relays
+ * 3. Caches the result with TTL to avoid excessive queries
+ * 4. Falls back to own relay only if registry is unavailable
+ * 
+ * @param chainId - Optional chain ID (defaults to env var REGISTRY_CHAIN_ID)
+ * @param forceRefresh - Force refresh cache (default: false)
+ * @returns Array of trusted relay public keys
+ */
+export async function getTrustedRelayPubKeys(
+  chainId?: number,
+  forceRefresh: boolean = false
+): Promise<string[]> {
+  const now = Date.now();
+  
+  // Check cache validity
+  if (
+    !forceRefresh &&
+    trustedRelaysCache &&
+    (now - trustedRelaysCache.timestamp) < trustedRelaysCache.ttl
+  ) {
+    log.debug(
+      {
+        cachedCount: trustedRelaysCache.pubKeys.length,
+        cacheAge: now - trustedRelaysCache.timestamp,
+      },
+      "Using cached trusted relay pub keys"
+    );
+    return [...trustedRelaysCache.pubKeys]; // Return copy
+  }
+
+  // Start with own relay (always trusted)
+  const trusted = new Set<string>();
+  const ownRelayKeyPair = getRelayKeyPair();
+  if (ownRelayKeyPair?.pub) {
+    trusted.add(ownRelayKeyPair.pub);
+    log.debug(
+      { ownRelayPub: ownRelayKeyPair.pub.substring(0, 16) },
+      "Added own relay to trusted list"
+    );
+  }
+
+  // Try to get active relays from registry
+  try {
+    const registryChainId = chainId || parseInt(process.env.REGISTRY_CHAIN_ID || "84532");
+    const registryClient = createRegistryClient(registryChainId);
+    const activeRelays = await registryClient.getActiveRelays();
+
+    let addedCount = 0;
+    for (const relay of activeRelays) {
+      if (relay.gunPubKey && relay.status === "Active") {
+        trusted.add(relay.gunPubKey);
+        addedCount++;
+      }
+    }
+
+    log.debug(
+      {
+        activeRelaysCount: activeRelays.length,
+        addedCount,
+        totalTrusted: trusted.size,
+      },
+      "Fetched active relays from registry"
+    );
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log.warn(
+      { error: errorMessage, chainId },
+      "Failed to fetch active relays from registry, using own relay only"
+    );
+    // Fallback: continue with own relay only
+  }
+
+  const pubKeys = Array.from(trusted);
+
+  // Update cache
+  trustedRelaysCache = {
+    pubKeys,
+    timestamp: now,
+    ttl: DEFAULT_CACHE_TTL,
+  };
+
+  log.debug(
+    { trustedCount: pubKeys.length },
+    "Updated trusted relay pub keys cache"
+  );
+
+  return pubKeys;
+}
+
+/**
+ * Clear the trusted relays cache (useful for testing or forced refresh)
+ */
+export function clearTrustedRelaysCache(): void {
+  trustedRelaysCache = null;
+  log.debug("Cleared trusted relay pub keys cache");
+}
+
+/**
+ * Force refresh the trusted relays cache
+ * 
+ * @param chainId - Optional chain ID (defaults to env var REGISTRY_CHAIN_ID)
+ * @returns Array of trusted relay public keys
+ */
+export async function refreshTrustedRelaysCache(chainId?: number): Promise<string[]> {
+  log.debug("Forcing refresh of trusted relay pub keys cache");
+  return await getTrustedRelayPubKeys(chainId, true); // forceRefresh = true
+}
+
 /**
  * Get user balance from GunDB
  * Uses frozen-data pattern for secure, verifiable balance storage
  * 
  * @param gun - GunDB instance
  * @param userAddress - User's Ethereum address
- * @param relayPub - Optional: Relay's public key. If provided, only trusts balances signed by this relay.
+ * @param relayPub - Optional: Single relay's public key (backward compatibility).
+ *                   If not provided, uses all trusted relays from registry.
+ * @param chainId - Optional: Chain ID for registry lookup (if relayPub not provided)
  */
 export async function getUserBalance(
   gun: IGunInstance,
   userAddress: string,
-  relayPub?: string
+  relayPub?: string,
+  chainId?: number
 ): Promise<bigint> {
   try {
     const indexKey = userAddress.toLowerCase();
 
-    log.debug({ user: indexKey, enforceRelayPub: !!relayPub }, "Looking up balance");
+    // Determine trusted signers
+    let trustedSigners: string | string[];
+    
+    if (relayPub) {
+      // Backward compatibility: use single relay if provided
+      trustedSigners = relayPub;
+      log.debug({ user: indexKey, enforceRelayPub: relayPub.substring(0, 16) }, "Looking up balance with single relay");
+    } else {
+      // New behavior: use all trusted relays from registry
+      const trustedRelays = await getTrustedRelayPubKeys(chainId);
+      trustedSigners = trustedRelays;
+      log.debug(
+        { 
+          user: indexKey, 
+          trustedRelaysCount: trustedRelays.length,
+          trustedRelays: trustedRelays.map(p => p.substring(0, 16))
+        }, 
+        "Looking up balance with trusted relays from registry"
+      );
+    }
 
     // Get latest frozen entry for this user
-    // If relayPub is provided, only trust entries signed by the relay
+    // Accept entries signed by any trusted relay
     const entry = await FrozenData.getLatestFrozenEntry(
       gun,
       "bridge-balances",
       indexKey,
-      relayPub // Pass expectedSigner to enforce authority
+      trustedSigners // Pass trusted signers (single or array)
     );
 
     log.debug(
@@ -282,6 +429,60 @@ export async function getUserBalance(
     );
 
     if (!entry || !entry.verified) {
+      // If no verified entry found, try refreshing cache and retry once
+      // This handles cases where a new relay was just registered
+      if (!relayPub && Array.isArray(trustedSigners) && trustedSigners.length > 0) {
+        // Only retry if we're using trusted relays (not single relay mode)
+        log.debug(
+          { user: indexKey, trustedCount: trustedSigners.length },
+          "No verified entry found, attempting cache refresh and retry"
+        );
+        
+        try {
+          const refreshedTrusted = await getTrustedRelayPubKeys(chainId, true); // Force refresh
+          if (refreshedTrusted.length > trustedSigners.length) {
+            // New relays found, retry with updated list
+            log.debug(
+              { 
+                user: indexKey, 
+                oldCount: trustedSigners.length, 
+                newCount: refreshedTrusted.length 
+              },
+              "Cache refreshed, retrying balance lookup with updated relay list"
+            );
+            
+            const retryEntry = await FrozenData.getLatestFrozenEntry(
+              gun,
+              "bridge-balances",
+              indexKey,
+              refreshedTrusted
+            );
+            
+            if (retryEntry && retryEntry.verified) {
+              const retryBalanceData = retryEntry.data as {
+                balance?: string;
+                user?: string;
+                ethereumAddress?: string;
+              };
+              
+              if (retryBalanceData?.balance) {
+                const balance = BigInt(retryBalanceData.balance);
+                log.debug(
+                  { user: indexKey, balance: balance.toString() },
+                  "Balance found after cache refresh"
+                );
+                return balance;
+              }
+            }
+          }
+        } catch (refreshError) {
+          log.warn(
+            { error: refreshError, user: indexKey },
+            "Failed to refresh cache and retry, returning 0"
+          );
+        }
+      }
+      
       // If no verified entry found, return 0
       // Unverified entries are ignored for security
       log.debug({ user: indexKey }, "No verified entry found, returning 0");
@@ -599,7 +800,8 @@ export async function debitBalance(
 export async function verifyWithdrawalDebit(
   gun: IGunInstance,
   withdrawal: PendingWithdrawal,
-  relayPub: string
+  relayPub?: string,
+  chainId?: number
 ): Promise<{ valid: boolean; reason?: string }> {
   try {
     // If no debitHash, this is an old-style withdrawal (pre-security hardening)
@@ -616,12 +818,20 @@ export async function verifyWithdrawalDebit(
       };
     }
 
-    // Read the debit frozen entry, enforcing relay signature
+    // Determine trusted signers (same logic as getUserBalance)
+    let trustedSigners: string | string[];
+    if (relayPub) {
+      trustedSigners = relayPub; // Backward compatibility
+    } else {
+      trustedSigners = await getTrustedRelayPubKeys(chainId);
+    }
+
+    // Read the debit frozen entry, accepting entries signed by any trusted relay
     const debitEntry = await FrozenData.readFrozenEntry(
       gun,
       "bridge-balances",
       withdrawal.debitHash,
-      relayPub // Only trust entries signed by the relay
+      trustedSigners
     );
 
     if (!debitEntry) {

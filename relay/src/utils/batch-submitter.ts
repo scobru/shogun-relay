@@ -119,10 +119,14 @@ export async function submitBatch(gun: IGunInstance, relayPub?: string): Promise
         // SECURITY: Verify each withdrawal before including in batch
         // Only withdrawals with valid debit entries signed by the relay are included
         if (relayPub) {
-            log.debug({ relayPub: relayPub.substring(0, 16) }, "Verifying withdrawals with relay signature enforcement");
+            log.debug({ relayPub: relayPub.substring(0, 16) }, "Verifying withdrawals with trusted relays from registry");
+
+            // Get chainId from env if available
+            const chainId = process.env.REGISTRY_CHAIN_ID ? parseInt(process.env.REGISTRY_CHAIN_ID) : undefined;
 
             for (const withdrawal of pending) {
-                const verification = await verifyWithdrawalDebit(gun, withdrawal, relayPub);
+                // Pass undefined for relayPub to use trusted relays from registry
+                const verification = await verifyWithdrawalDebit(gun, withdrawal, undefined, chainId);
 
                 if (verification.valid) {
                     verifiedWithdrawals.push(withdrawal);

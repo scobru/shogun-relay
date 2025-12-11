@@ -241,10 +241,16 @@ export async function createFrozenEntry(
  * @param gun - GunDB instance
  * @param namespace - Index namespace
  * @param hash - Content hash
- * @param expectedSigner - Optional: if provided, verify that the entry's pub matches this value
+ * @param expectedSigner - Optional: if provided as string, verify that the entry's pub matches this value
+ * @param trustedSigners - Optional: if provided as array, verify that the entry's pub is in this list
  * @returns Promise with data, verified status, and pub
  */
-export async function readFrozenEntry(gun: GunInstance, namespace: string, hash: string, expectedSigner?: string): Promise<FrozenEntryResult | undefined> {
+export async function readFrozenEntry(
+  gun: GunInstance, 
+  namespace: string, 
+  hash: string, 
+  expectedSigner?: string | string[]
+): Promise<FrozenEntryResult | undefined> {
   return new Promise((resolve) => {
     const timeout = setTimeout(() => resolve(undefined), 10000);
 
@@ -349,25 +355,31 @@ export async function readFrozenEntry(gun: GunInstance, namespace: string, hash:
         }
 
         // SECURITY: If expectedSigner is provided, verify that the entry's pub matches
-        if (expectedSigner && pub !== expectedSigner) {
-          log.warn({
-            hash: hash.substring(0, 16),
-            expectedSigner: expectedSigner.substring(0, 16),
-            actualPub: pub.substring(0, 16),
-          }, 'Frozen entry signer mismatch - rejecting untrusted entry');
-          resolve({
-            data: entry.data,
-            verified: false,
-            verificationDetails: {
-              signatureValid: false,
-              hashValid: false,
-              reason: `Signer mismatch: expected ${expectedSigner.substring(0, 16)}..., got ${pub.substring(0, 16)}...`,
-            },
-            pub: pub,
-            timestamp: entry.data._meta?.timestamp || undefined,
-            hash,
-          });
-          return;
+        // Support both single signer (string) and multiple trusted signers (array)
+        if (expectedSigner) {
+          const trustedSigners = Array.isArray(expectedSigner) ? expectedSigner : [expectedSigner];
+          const isTrusted = trustedSigners.includes(pub);
+          
+          if (!isTrusted) {
+            log.warn({
+              hash: hash.substring(0, 16),
+              expectedSigners: trustedSigners.map(s => s.substring(0, 16)),
+              actualPub: pub.substring(0, 16),
+            }, 'Frozen entry signer mismatch - rejecting untrusted entry');
+            resolve({
+              data: entry.data,
+              verified: false,
+              verificationDetails: {
+                signatureValid: false,
+                hashValid: false,
+                reason: `Signer mismatch: entry signed by ${pub.substring(0, 16)}..., not in trusted list`,
+              },
+              pub: pub,
+              timestamp: entry.data._meta?.timestamp || undefined,
+              hash,
+            });
+            return;
+          }
         }
 
         // SEA.verify returns the original data if valid, or undefined/false if invalid
@@ -420,8 +432,20 @@ export async function readFrozenEntry(gun: GunInstance, namespace: string, hash:
 
 /**
  * Get latest frozen entry for an index key
+ * 
+ * @param gun - GunDB instance
+ * @param namespace - Index namespace
+ * @param indexKey - Index key
+ * @param expectedSigner - Optional: if provided as string, verify that the entry's pub matches this value
+ *                         If provided as array, verify that the entry's pub is in this list
+ * @returns Promise with data, verified status, and pub
  */
-export async function getLatestFrozenEntry(gun: GunInstance, namespace: string, indexKey: string, expectedSigner?: string): Promise<FrozenEntryResult | undefined> {
+export async function getLatestFrozenEntry(
+  gun: GunInstance, 
+  namespace: string, 
+  indexKey: string, 
+  expectedSigner?: string | string[]
+): Promise<FrozenEntryResult | undefined> {
   return new Promise((resolve) => {
     const timeout = setTimeout(() => resolve(undefined), 10000);
 

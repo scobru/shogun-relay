@@ -37,6 +37,8 @@ import {
   getLastNonce,
   listL2Transfers,
   getProcessedDepositsForUser,
+  refreshTrustedRelaysCache,
+  clearTrustedRelaysCache,
   type PendingWithdrawal,
   type Batch,
 } from "../utils/bridge-state";
@@ -428,8 +430,8 @@ router.post("/withdraw", strictLimiter, express.json(), async (req, res) => {
     // Get relay keypair for signing and signature verification
     const relayKeyPair = req.app.get("relayKeyPair") || null;
 
-    // Check balance - enforce relay signature verification
-    const balance = await getUserBalance(gun, userAddress, relayKeyPair?.pub);
+    // Check balance from any trusted relay
+    const balance = await getUserBalance(gun, userAddress);
     if (balance < amountBigInt) {
       return res.status(400).json({
         success: false,
@@ -656,16 +658,14 @@ router.get("/balance/:user", async (req, res) => {
       });
     }
 
-    // Get relay keypair for signature verification
-    const relayKeyPair = req.app.get("relayKeyPair");
-
     log.debug(
-      { user: userAddress, normalizedUser: userAddress.toLowerCase(), hasRelayPub: !!relayKeyPair?.pub },
+      { user: userAddress, normalizedUser: userAddress.toLowerCase() },
       "Getting user balance"
     );
 
-    // SECURITY: Enforce relay signature verification - only trust balances signed by this relay
-    const balance = await getUserBalance(gun, userAddress, relayKeyPair?.pub);
+    // Get balance from any trusted relay (registry-based trust)
+    // This allows users to use any relay for operations
+    const balance = await getUserBalance(gun, userAddress);
 
     log.debug(
       {
@@ -1185,6 +1185,48 @@ router.get("/state", async (req, res) => {
 });
 
 /**
+ * POST /api/v1/bridge/refresh-trusted-relays
+ * 
+ * Force refresh the trusted relays cache from the on-chain registry.
+ * This is useful when:
+ * - A new relay has been registered
+ * - A relay has been removed/unstaked
+ * - You want to ensure you have the latest relay list
+ * 
+ * SECURITY: Public endpoint (no auth required) - cache refresh is safe
+ * 
+ * Response includes the list of trusted relay public keys.
+ */
+router.post("/refresh-trusted-relays", express.json(), async (req, res) => {
+  try {
+    const chainId = req.body?.chainId 
+      ? parseInt(req.body.chainId) 
+      : parseInt(process.env.REGISTRY_CHAIN_ID || "84532");
+
+    log.debug({ chainId }, "Forcing refresh of trusted relays cache");
+
+    const trustedRelays = await refreshTrustedRelaysCache(chainId);
+
+    res.json({
+      success: true,
+      trustedRelays: trustedRelays.map(pub => ({
+        pubKey: pub.substring(0, 32) + "...", // Truncated for security
+        pubKeyLength: pub.length,
+      })),
+      count: trustedRelays.length,
+      message: "Trusted relays cache refreshed successfully",
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log.error({ error }, "Error refreshing trusted relays cache");
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+});
+
+/**
  * POST /api/v1/bridge/sync-deposits
  * 
  * Retroactively sync missed deposits from a block range.
@@ -1350,7 +1392,7 @@ router.post("/sync-deposits", adminAuthMiddleware, express.json({ limit: '10mb' 
 
         // If marked as processed, verify the balance was actually credited
         if (alreadyProcessed) {
-          const currentL2Balance = await getUserBalance(gun, normalizedUser, relayKeyPair?.pub);
+          const currentL2Balance = await getUserBalance(gun, normalizedUser);
 
           // If balance is 0, the deposit was marked as processed but not actually credited
           // This can happen if creditBalance failed silently or was interrupted
@@ -1408,7 +1450,7 @@ router.post("/sync-deposits", adminAuthMiddleware, express.json({ limit: '10mb' 
         const pollInterval = 500;
 
         while (!balanceVerified && attempts < maxAttempts) {
-          const verifyBalance = await getUserBalance(gun, normalizedUser, relayKeyPair?.pub);
+          const verifyBalance = await getUserBalance(gun, normalizedUser);
           log.debug(
             {
               user: normalizedUser,
@@ -1435,7 +1477,7 @@ router.post("/sync-deposits", adminAuthMiddleware, express.json({ limit: '10mb' 
               user: normalizedUser,
               amount: deposit.amount.toString(),
               txHash: deposit.txHash,
-              currentL2Balance: ethers.formatEther(await getUserBalance(gun, normalizedUser, relayKeyPair?.pub)),
+              currentL2Balance: ethers.formatEther(await getUserBalance(gun, normalizedUser)),
             },
             "Failed to verify L2 balance update after credit within timeout during sync. Deposit will be retried."
           );
@@ -1454,7 +1496,7 @@ router.post("/sync-deposits", adminAuthMiddleware, express.json({ limit: '10mb' 
           timestamp: Date.now(),
         });
 
-        const finalVerifyBalance = await getUserBalance(gun, normalizedUser, relayKeyPair?.pub);
+        const finalVerifyBalance = await getUserBalance(gun, normalizedUser);
         log.debug(
           {
             txHash: deposit.txHash,
@@ -1487,7 +1529,7 @@ router.post("/sync-deposits", adminAuthMiddleware, express.json({ limit: '10mb' 
 
       for (const [normalizedUser, expectedTotal] of userExpectedBalanceMap.entries()) {
         try {
-          const actualBalance = await getUserBalance(gun, normalizedUser, relayKeyPair?.pub);
+          const actualBalance = await getUserBalance(gun, normalizedUser);
 
           if (actualBalance !== expectedTotal) {
             log.warn(
@@ -1520,7 +1562,7 @@ router.post("/sync-deposits", adminAuthMiddleware, express.json({ limit: '10mb' 
 
             // Verify the correction
             await new Promise(resolve => setTimeout(resolve, 300));
-            const correctedBalance = await getUserBalance(gun, normalizedUser, relayKeyPair?.pub);
+            const correctedBalance = await getUserBalance(gun, normalizedUser);
 
             if (correctedBalance === expectedTotal) {
               log.debug(
@@ -1793,7 +1835,7 @@ router.post("/process-deposit", adminAuthMiddleware, express.json({ limit: '10mb
     });
 
     // Verify balance
-    const balance = await getUserBalance(gun, normalizedUser, relayKeyPair?.pub);
+    const balance = await getUserBalance(gun, normalizedUser);
 
     log.debug(
       {
