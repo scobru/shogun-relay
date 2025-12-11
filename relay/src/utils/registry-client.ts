@@ -439,7 +439,7 @@ export function createRegistryClientWithSigner(
       // Get the actual registry address from SDK to ensure we approve the correct contract
       const registryAddressFromSDK = relayRegistry.getAddress();
       const registryAddress = ethers.getAddress(registryAddressFromSDK); // Normalize address
-      
+
       // Verify addresses match (safety check)
       if (ethers.getAddress(client.registryAddress) !== registryAddress) {
         log.warn(
@@ -461,12 +461,12 @@ export function createRegistryClientWithSigner(
         wallet.address,
         registryAddress
       );
-      
+
       if (allowance < stakeWei) {
         log.debug(
           `Current allowance: ${ethers.formatUnits(allowance, 6)} USDC, Need: ${ethers.formatUnits(stakeWei, 6)} USDC`
         );
-        
+
         // If there's an existing non-zero allowance that's less than what we need,
         // reset it to 0 first (some tokens require this to prevent front-running)
         if (allowance > 0n) {
@@ -475,11 +475,11 @@ export function createRegistryClientWithSigner(
           log.debug(`Reset transaction: ${resetTx.hash}`);
           await resetTx.wait();
           log.debug("Allowance reset confirmed");
-          
+
           // Wait a bit for the state to propagate
           await new Promise((resolve) => setTimeout(resolve, 2000));
         }
-        
+
         log.debug("Approving USDC spend...");
         // Approve slightly more than needed (add 1% buffer) to account for any rounding issues
         // Some tokens/contracts have edge cases with exact amounts
@@ -493,14 +493,14 @@ export function createRegistryClientWithSigner(
         log.debug(
           `Approve transaction confirmed in block ${approveReceipt.blockNumber}`
         );
-        
+
         // Wait for multiple block confirmations to ensure state propagation across all RPC nodes
         // This is critical because estimateGas may use a different RPC node
         const approvalBlock = approveReceipt.blockNumber;
         const currentBlock = await client.provider.getBlockNumber();
         const blocksToWait = Math.max(3, currentBlock - approvalBlock + 2); // Wait at least 3 blocks after approval
         log.debug(`Approval in block ${approvalBlock}, current block: ${currentBlock}, waiting for ${blocksToWait} more blocks for state propagation...`);
-        
+
         let blocksWaited = 0;
         while (blocksWaited < blocksToWait) {
           await new Promise((resolve) => setTimeout(resolve, 2000)); // Check every 2 seconds
@@ -512,7 +512,7 @@ export function createRegistryClientWithSigner(
           }
         }
         log.debug("State propagation wait complete");
-        
+
         // Additional delay to ensure all RPC nodes have synced
         await new Promise((resolve) => setTimeout(resolve, 3000));
 
@@ -547,7 +547,7 @@ export function createRegistryClientWithSigner(
             `Allowance not updated after approval. Expected: ${ethers.formatUnits(stakeWei, 6)} USDC, Got: ${ethers.formatUnits(finalAllowance, 6)} USDC. Please try again.`
           );
         }
-        
+
         // Double-check allowance one more time right before the contract call
         const finalCheck = await usdc.allowance(
           wallet.address,
@@ -575,7 +575,7 @@ export function createRegistryClientWithSigner(
       log.debug(
         `Registering relay: ${endpoint}${griefingRatio > 0 ? ` with griefing ratio ${griefingRatio} bps` : ""}`
       );
-      
+
       // Final allowance check right before contract call
       const preCallAllowance = await usdc.allowance(
         wallet.address,
@@ -584,22 +584,22 @@ export function createRegistryClientWithSigner(
       log.debug(
         `Pre-call allowance check: ${ethers.formatUnits(preCallAllowance, 6)} USDC (need ${ethers.formatUnits(stakeWei, 6)} USDC)`
       );
-      
+
       if (preCallAllowance < stakeWei) {
         throw new Error(
           `Allowance insufficient right before contract call. Have: ${ethers.formatUnits(preCallAllowance, 6)} USDC, Need: ${ethers.formatUnits(stakeWei, 6)} USDC. Please try again.`
         );
       }
-      
+
       // Use populateTransaction and manual gas estimation to have better control
       // This allows us to retry gas estimation if it fails due to state propagation issues
       const contract = relayRegistry.getContract();
       let tx;
       let registrationAttempts = 3;
-      
+
       // Base gas limit for registerRelay (typical value is around 400k-500k)
       const BASE_GAS_LIMIT = 600000n; // Use a safe default with buffer
-      
+
       while (registrationAttempts > 0) {
         try {
           // Final allowance check using the same provider that will send the transaction
@@ -610,13 +610,13 @@ export function createRegistryClientWithSigner(
           log.debug(
             `Final allowance check before transaction: ${ethers.formatUnits(finalAllowanceCheck, 6)} USDC (need ${ethers.formatUnits(stakeWei, 6)} USDC)`
           );
-          
+
           if (finalAllowanceCheck < stakeWei) {
             throw new Error(
               `Allowance insufficient before transaction. Have: ${ethers.formatUnits(finalAllowanceCheck, 6)} USDC, Need: ${ethers.formatUnits(stakeWei, 6)} USDC`
             );
           }
-          
+
           // First, try to populate the transaction (this doesn't call estimateGas)
           const populatedTx = await contract.registerRelay.populateTransaction(
             endpoint,
@@ -625,7 +625,7 @@ export function createRegistryClientWithSigner(
             stakeWei,
             BigInt(griefingRatio)
           );
-          
+
           // Try to estimate gas, but if it fails due to allowance, use a fixed gas limit
           let gasEstimate: bigint | null = null;
           let gasEstimateAttempts = 5;
@@ -649,7 +649,7 @@ export function createRegistryClientWithSigner(
                 gasError.message.includes("allowance") ||
                 gasError.message.includes("ERC20: transfer amount exceeds allowance")
               );
-              
+
               if (isAllowanceError) {
                 log.warn(
                   `Gas estimation failed due to allowance (${gasEstimateAttempts} attempts left). This may be a state propagation issue. Will use fixed gas limit if all retries fail.`
@@ -684,11 +684,11 @@ export function createRegistryClientWithSigner(
               }
             }
           }
-          
+
           // Use estimated gas if available, otherwise use base gas limit
           const gasLimit = gasEstimate || BASE_GAS_LIMIT;
           log.debug(`Using gas limit: ${gasLimit.toString()}`);
-          
+
           // Send the transaction with the gas limit
           tx = await wallet.sendTransaction({
             ...populatedTx,
@@ -702,7 +702,7 @@ export function createRegistryClientWithSigner(
             error.message.includes("allowance") ||
             error.message.includes("ERC20: transfer amount exceeds allowance")
           );
-          
+
           if (isAllowanceError) {
             log.warn(
               `Registration attempt failed due to allowance (${registrationAttempts} attempts left)`
@@ -739,11 +739,11 @@ export function createRegistryClientWithSigner(
           }
         }
       }
-      
+
       if (!tx) {
         throw new Error("Failed to send registration transaction after all retry attempts");
       }
-      
+
       const receipt = await tx.wait();
 
       if (!receipt) {

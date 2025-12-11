@@ -44,6 +44,7 @@ import {
 } from "./config/env-config";
 import { startBatchScheduler } from "./utils/batch-scheduler";
 import { secureCompare, hashToken } from "./utils/security";
+import { startPeriodicPeerSync } from "./utils/peer-discovery";
 
 dotenv.config();
 
@@ -2020,6 +2021,20 @@ See docs/RELAY_KEYS.md for more information.
         "⏭️  Bridge disabled (BRIDGE_RPC_URL not configured)"
       );
     }
+  }
+
+  // Start on-chain relay peer discovery
+  // Syncs registered relays from ShogunRelayRegistry as Gun peers
+  try {
+    const chainId = parseInt(process.env.REGISTRY_CHAIN_ID || "84532");
+    const ownEndpoint = process.env.RELAY_HOST
+      ? `https://${process.env.RELAY_HOST}`
+      : `http://localhost:${port}`;
+
+    startPeriodicPeerSync(gun, chainId, ownEndpoint, 5 * 60 * 1000); // Every 5 minutes
+    loggers.server.info({ chainId, excludeEndpoint: ownEndpoint }, "🔗 Started on-chain relay peer discovery");
+  } catch (error: any) {
+    loggers.server.warn({ err: error }, "⚠️ Failed to start peer discovery");
   }
 
   // Shutdown function

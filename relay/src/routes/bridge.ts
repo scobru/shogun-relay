@@ -34,6 +34,7 @@ import {
   reconcileUserBalance,
   validateNonceIncremental,
   setLastNonce,
+  getLastNonce,
   type PendingWithdrawal,
   type Batch,
 } from "../utils/bridge-state";
@@ -278,10 +279,10 @@ router.post("/withdraw", strictLimiter, express.json(), async (req, res) => {
 
     const { user, amount, nonce, message, seaSignature, ethSignature, gunPubKey } = req.body;
 
-    if (!user || !amount || nonce === undefined || !message || !seaSignature || !ethSignature || !gunPubKey) {
+    if (!user || !amount || !message || !seaSignature || !ethSignature || !gunPubKey) {
       return res.status(400).json({
         success: false,
-        error: "user, amount, nonce, message, seaSignature, ethSignature, and gunPubKey required",
+        error: "user, amount, message, seaSignature, ethSignature, and gunPubKey required",
       });
     }
 
@@ -313,16 +314,24 @@ router.post("/withdraw", strictLimiter, express.json(), async (req, res) => {
       });
     }
 
-    const nonceBigInt = BigInt(nonce);
-
-    // Validate nonce is incremental
-    const nonceValidation = validateNonceIncremental(userAddress, nonceBigInt);
-    if (!nonceValidation.valid) {
-      return res.status(400).json({
-        success: false,
-        error: nonceValidation.error,
-        lastNonce: nonceValidation.lastNonce?.toString(),
-      });
+    // Auto-generate nonce if not provided
+    let nonceBigInt: bigint;
+    if (nonce !== undefined && nonce !== null && nonce !== "") {
+      nonceBigInt = BigInt(nonce);
+      // Validate nonce is incremental
+      const nonceValidation = validateNonceIncremental(userAddress, nonceBigInt);
+      if (!nonceValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          error: nonceValidation.error,
+          lastNonce: nonceValidation.lastNonce?.toString(),
+        });
+      }
+    } else {
+      // Auto-generate: lastNonce + 1
+      const lastNonce = getLastNonce(userAddress);
+      nonceBigInt = lastNonce + 1n;
+      log.debug({ user: userAddress, autoNonce: nonceBigInt.toString() }, "Auto-generated nonce for withdrawal");
     }
 
     // Validate message and signatures
