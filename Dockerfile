@@ -47,7 +47,7 @@ ARG DEAL_SYNC_INTERVAL_MS
 ARG WELCOME_MESSAGE
 ARG BRIDGE_ENABLED
 ARG BRIDGE_RPC_URL
-
+ARG LOG_LEVEL
 
 # Install required system packages
 RUN apk add  \
@@ -63,10 +63,10 @@ RUN apk add  \
 RUN set -ex \
     && ARCH=$(uname -m) \
     && case $ARCH in \
-       x86_64) ARCH_NAME="amd64" ;; \
-       aarch64) ARCH_NAME="arm64" ;; \
-       *) echo "Unsupported architecture: $ARCH"; exit 1 ;; \
-       esac \
+    x86_64) ARCH_NAME="amd64" ;; \
+    aarch64) ARCH_NAME="arm64" ;; \
+    *) echo "Unsupported architecture: $ARCH"; exit 1 ;; \
+    esac \
     && IPFS_URL="https://dist.ipfs.tech/kubo/v${IPFS_VERSION}/kubo_v${IPFS_VERSION}_linux-${ARCH_NAME}.tar.gz" \
     && echo "Downloading IPFS Kubo v${IPFS_VERSION} for ${ARCH_NAME}..." \
     && echo "URL: ${IPFS_URL}" \
@@ -74,10 +74,10 @@ RUN set -ex \
     && cd /tmp/ipfs-install \
     # Use curl with retry and better error handling
     && for i in 1 2 3 4 5; do \
-         echo "Download attempt $i..." && \
-         curl -fsSL --retry 3 --retry-delay 5 -o kubo.tar.gz "${IPFS_URL}" && break || \
-         (echo "Attempt $i failed, waiting..." && sleep 10); \
-       done \
+    echo "Download attempt $i..." && \
+    curl -fsSL --retry 3 --retry-delay 5 -o kubo.tar.gz "${IPFS_URL}" && break || \
+    (echo "Attempt $i failed, waiting..." && sleep 10); \
+    done \
     && test -f kubo.tar.gz || (echo "ERROR: Failed to download IPFS after 5 attempts" && exit 1) \
     && ls -lh kubo.tar.gz \
     && echo "Extracting IPFS..." \
@@ -140,9 +140,9 @@ RUN npm install --omit=dev
 # Build shogun-contracts SDK if needed (for local installations)
 # This ensures the SDK is compiled even if shogun-contracts is installed locally
 RUN if [ -d "node_modules/shogun-contracts/sdk" ] && [ ! -f "node_modules/shogun-contracts/sdk/dist/index.js" ]; then \
-      echo "🔨 Building shogun-contracts SDK..." && \
-      cd node_modules/shogun-contracts && \
-      npm run build:sdk 2>/dev/null || echo "⚠️  SDK build skipped (may already be compiled)"; \
+    echo "🔨 Building shogun-contracts SDK..." && \
+    cd node_modules/shogun-contracts && \
+    npm run build:sdk 2>/dev/null || echo "⚠️  SDK build skipped (may already be compiled)"; \
     fi
 
 # Copy the rest of the application
@@ -151,13 +151,13 @@ COPY relay/ /app/relay/
 # Optionally generate relay SEA keypair if requested
 # This creates the keypair during build time
 RUN if [ "$GENERATE_RELAY_KEYS" = "true" ] && [ -z "$RELAY_SEA_KEYPAIR" ] && [ -z "$RELAY_SEA_KEYPAIR_PATH" ]; then \
-      echo "🔑 Generating relay SEA keypair..." && \
-      mkdir -p /app/keys && \
-      node /app/relay/scripts/generate-relay-keys-standalone.cjs /app/keys/relay-keypair.json && \
-      echo "✅ Keypair generated at /app/keys/relay-keypair.json" && \
-      echo "⚠️  IMPORTANT: Mount this file or copy it to a secure location!"; \
+    echo "🔑 Generating relay SEA keypair..." && \
+    mkdir -p /app/keys && \
+    node /app/relay/scripts/generate-relay-keys-standalone.cjs /app/keys/relay-keypair.json && \
+    echo "✅ Keypair generated at /app/keys/relay-keypair.json" && \
+    echo "⚠️  IMPORTANT: Mount this file or copy it to a secure location!"; \
     else \
-      echo "⏭️  Skipping keypair generation (use GENERATE_RELAY_KEYS=true to enable)"; \
+    echo "⏭️  Skipping keypair generation (use GENERATE_RELAY_KEYS=true to enable)"; \
     fi
 
 # Set proper permissions
