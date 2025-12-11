@@ -436,6 +436,17 @@ export function createRegistryClientWithSigner(
     ): Promise<TransactionResult> {
       const stakeWei = ethers.parseUnits(stakeAmount, 6);
 
+      // Get the actual registry address from SDK to ensure we approve the correct contract
+      const registryAddressFromSDK = relayRegistry.getAddress();
+      const registryAddress = ethers.getAddress(registryAddressFromSDK); // Normalize address
+      
+      // Verify addresses match (safety check)
+      if (ethers.getAddress(client.registryAddress) !== registryAddress) {
+        log.warn(
+          `Address mismatch: client.registryAddress=${client.registryAddress}, SDK address=${registryAddress}. Using SDK address.`
+        );
+      }
+
       // Check USDC balance
       const balance = await usdc.balanceOf(wallet.address);
       if (balance < stakeWei) {
@@ -444,11 +455,11 @@ export function createRegistryClientWithSigner(
         );
       }
 
-      // Check/set allowance
+      // Check/set allowance - use SDK address to ensure correctness
       // Some USDC tokens require resetting allowance to 0 before setting a new amount
       const allowance = await usdc.allowance(
         wallet.address,
-        client.registryAddress
+        registryAddress
       );
       
       if (allowance < stakeWei) {
@@ -460,7 +471,7 @@ export function createRegistryClientWithSigner(
         // reset it to 0 first (some tokens require this to prevent front-running)
         if (allowance > 0n) {
           log.info("Resetting existing allowance to 0...");
-          const resetTx = await usdc.approve(client.registryAddress, 0n);
+          const resetTx = await usdc.approve(registryAddress, 0n);
           log.info(`Reset transaction: ${resetTx.hash}`);
           await resetTx.wait();
           log.info("Allowance reset confirmed");
@@ -470,15 +481,32 @@ export function createRegistryClientWithSigner(
         }
         
         log.info("Approving USDC spend...");
-        // Approve the exact amount needed
-        const approveTx = await usdc.approve(client.registryAddress, stakeWei);
+        // Approve slightly more than needed (add 1% buffer) to account for any rounding issues
+        // Some tokens/contracts have edge cases with exact amounts
+        const approvalBuffer = (stakeWei * 101n) / 100n; // 1% buffer
+        const approveTx = await usdc.approve(registryAddress, approvalBuffer);
         log.info(
-          `Waiting for approve transaction confirmation: ${approveTx.hash}`
+          `Waiting for approve transaction confirmation: ${approveTx.hash} (approved ${ethers.formatUnits(approvalBuffer, 6)} USDC for ${ethers.formatUnits(stakeWei, 6)} USDC stake)`
         );
         const approveReceipt = await approveTx.wait();
         log.info(
           `Approve transaction confirmed in block ${approveReceipt.blockNumber}`
         );
+        
+        // Wait for multiple block confirmations to ensure state propagation across all RPC nodes
+        // This is critical because estimateGas may use a different RPC node
+        const currentBlock = await client.provider.getBlockNumber();
+        log.info(`Current block: ${currentBlock}, waiting for 2 more blocks for state propagation...`);
+        let blocksToWait = 2;
+        while (blocksToWait > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 2000)); // Check every 2 seconds
+          const newBlock = await client.provider.getBlockNumber();
+          if (newBlock > currentBlock) {
+            blocksToWait--;
+            log.info(`Block ${newBlock} mined, ${blocksToWait} blocks remaining...`);
+          }
+        }
+        log.info("State propagation wait complete");
 
         // Verify allowance was updated with more retries and longer wait
         let retries = 10;
@@ -486,7 +514,7 @@ export function createRegistryClientWithSigner(
         while (retries > 0) {
           const newAllowance = await usdc.allowance(
             wallet.address,
-            client.registryAddress
+            registryAddress
           );
           if (newAllowance >= stakeWei) {
             log.info(
@@ -505,7 +533,7 @@ export function createRegistryClientWithSigner(
         if (!verified) {
           const finalAllowance = await usdc.allowance(
             wallet.address,
-            client.registryAddress
+            registryAddress
           );
           throw new Error(
             `Allowance not updated after approval. Expected: ${ethers.formatUnits(stakeWei, 6)} USDC, Got: ${ethers.formatUnits(finalAllowance, 6)} USDC. Please try again.`
@@ -515,7 +543,7 @@ export function createRegistryClientWithSigner(
         // Double-check allowance one more time right before the contract call
         const finalCheck = await usdc.allowance(
           wallet.address,
-          client.registryAddress
+          registryAddress
         );
         if (finalCheck < stakeWei) {
           throw new Error(
@@ -539,13 +567,126 @@ export function createRegistryClientWithSigner(
       log.info(
         `Registering relay: ${endpoint}${griefingRatio > 0 ? ` with griefing ratio ${griefingRatio} bps` : ""}`
       );
-      const tx = await relayRegistry.registerRelay(
-        endpoint,
-        ethers.hexlify(pubkeyBytes),
-        typeof epubBytes === "string" ? epubBytes : ethers.hexlify(epubBytes),
-        stakeWei,
-        BigInt(griefingRatio)
+      
+      // Final allowance check right before contract call
+      const preCallAllowance = await usdc.allowance(
+        wallet.address,
+        registryAddress
       );
+      log.info(
+        `Pre-call allowance check: ${ethers.formatUnits(preCallAllowance, 6)} USDC (need ${ethers.formatUnits(stakeWei, 6)} USDC)`
+      );
+      
+      if (preCallAllowance < stakeWei) {
+        throw new Error(
+          `Allowance insufficient right before contract call. Have: ${ethers.formatUnits(preCallAllowance, 6)} USDC, Need: ${ethers.formatUnits(stakeWei, 6)} USDC. Please try again.`
+        );
+      }
+      
+      // Use populateTransaction and manual gas estimation to have better control
+      // This allows us to retry gas estimation if it fails due to state propagation issues
+      const contract = relayRegistry.getContract();
+      let tx;
+      let registrationAttempts = 3;
+      
+      while (registrationAttempts > 0) {
+        try {
+          // First, try to populate the transaction (this doesn't call estimateGas)
+          const populatedTx = await contract.registerRelay.populateTransaction(
+            endpoint,
+            ethers.hexlify(pubkeyBytes),
+            typeof epubBytes === "string" ? epubBytes : ethers.hexlify(epubBytes),
+            stakeWei,
+            BigInt(griefingRatio)
+          );
+          
+          // Manually estimate gas with retries
+          let gasEstimate;
+          let gasEstimateAttempts = 5;
+          while (gasEstimateAttempts > 0) {
+            try {
+              gasEstimate = await client.provider.estimateGas({
+                ...populatedTx,
+                from: wallet.address,
+              });
+              log.info(`Gas estimate successful: ${gasEstimate.toString()}`);
+              break;
+            } catch (gasError: any) {
+              gasEstimateAttempts--;
+              if (gasError.message && gasError.message.includes("allowance")) {
+                log.warn(
+                  `Gas estimation failed due to allowance (${gasEstimateAttempts} attempts left). This may be a state propagation issue.`
+                );
+                if (gasEstimateAttempts > 0) {
+                  // Wait a bit and check allowance again
+                  await new Promise((resolve) => setTimeout(resolve, 2000));
+                  const retryAllowance = await usdc.allowance(
+                    wallet.address,
+                    registryAddress
+                  );
+                  log.info(
+                    `Retry allowance check: ${ethers.formatUnits(retryAllowance, 6)} USDC`
+                  );
+                  if (retryAllowance < stakeWei) {
+                    throw new Error(
+                      `Allowance lost during retry. Expected: ${ethers.formatUnits(stakeWei, 6)} USDC, Got: ${ethers.formatUnits(retryAllowance, 6)} USDC`
+                    );
+                  }
+                  continue;
+                }
+              }
+              if (gasEstimateAttempts === 0) {
+                throw gasError;
+              }
+            }
+          }
+          
+          if (!gasEstimate) {
+            throw new Error("Failed to estimate gas after all retry attempts");
+          }
+          
+          // Send the transaction with the estimated gas
+          tx = await wallet.sendTransaction({
+            ...populatedTx,
+            gasLimit: gasEstimate,
+          });
+          log.info(`Registration transaction sent: ${tx.hash}`);
+          break; // Success, exit retry loop
+        } catch (error: any) {
+          registrationAttempts--;
+          if (error.message && error.message.includes("allowance")) {
+            log.warn(
+              `Registration attempt failed due to allowance (${registrationAttempts} attempts left)`
+            );
+            if (registrationAttempts > 0) {
+              // Wait and verify allowance before retrying
+              await new Promise((resolve) => setTimeout(resolve, 3000));
+              const retryAllowance = await usdc.allowance(
+                wallet.address,
+                registryAddress
+              );
+              log.info(
+                `Retry allowance check: ${ethers.formatUnits(retryAllowance, 6)} USDC`
+              );
+              if (retryAllowance < stakeWei) {
+                throw new Error(
+                  `Allowance lost during retry. Expected: ${ethers.formatUnits(stakeWei, 6)} USDC, Got: ${ethers.formatUnits(retryAllowance, 6)} USDC`
+                );
+              }
+              continue;
+            }
+          }
+          // If it's not an allowance error or we're out of attempts, throw
+          if (registrationAttempts === 0 || !error.message?.includes("allowance")) {
+            throw error;
+          }
+        }
+      }
+      
+      if (!tx) {
+        throw new Error("Failed to send registration transaction after all retry attempts");
+      }
+      
       const receipt = await tx.wait();
 
       return {
