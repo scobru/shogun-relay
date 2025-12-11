@@ -1396,10 +1396,7 @@ export async function getPendingWithdrawals(
                 typeof w.timestamp === "number"
             );
 
-            log.debug(
-              { totalFound: withdrawals.length, normalized: normalized.length },
-              "Retrieved pending withdrawals"
-            );
+            // Retrieved pending withdrawals - only log if count is unusual or for debugging
 
             cleanup();
             resolve(normalized);
@@ -1447,10 +1444,7 @@ export async function removePendingWithdrawals(
           errors.push(`Error deleting ${key}: ${errorMsg}`);
         } else {
           deleted++;
-          log.debug(
-            { key, deleted, total: toRemoveKeys.size },
-            "Deleted pending withdrawal node"
-          );
+          // Deleted pending withdrawal node - too verbose for production
         }
 
         // When all deletions are attempted, resolve/reject
@@ -1467,10 +1461,7 @@ export async function removePendingWithdrawals(
               );
             }
           } else {
-            log.debug(
-              { deleted },
-              "All pending withdrawals removed successfully"
-            );
+            // All pending withdrawals removed successfully - only log if issues occur
             resolve();
           }
         }
@@ -1572,7 +1563,7 @@ export async function saveBatch(
             const errorMsg = typeof ack.err === "string" ? ack.err : String(ack.err);
             log.warn({ error: errorMsg, batchId: batch.batchId }, "Warning: Error saving batch reference in parent node (non-critical)");
           } else {
-            log.debug({ batchId: batch.batchId }, "Batch reference saved in parent node");
+            // Batch reference saved in parent node - too verbose for production
           }
           res();
         });
@@ -1597,7 +1588,7 @@ export async function saveBatch(
                 const errorMsg = typeof ack.err === "string" ? ack.err : String(ack.err);
                 log.warn({ error: errorMsg, withdrawalNodePath, index }, "Error saving individual withdrawal node (non-critical, JSON backup exists)");
               } else {
-                log.debug({ withdrawalNodePath, index, user: withdrawal.user, amount: withdrawal.amount }, "Individual withdrawal node saved to GunDB");
+                // Individual withdrawal node saved to GunDB - too verbose for production
               }
               res();
             });
@@ -1641,10 +1632,7 @@ export async function saveBatch(
         });
       });
 
-      log.debug(
-        { batchId: batch.batchId, withdrawalCount: batch.withdrawals.length },
-        "Batch saved and verified successfully to GunDB"
-      );
+      // Batch saved and verified successfully to GunDB - only log errors
       resolve();
     } catch (error) {
       log.error(

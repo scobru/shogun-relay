@@ -215,6 +215,91 @@ router.use(
 // Note: Kubo WebUI proxy removed for security reasons
 // Access Kubo WebUI directly at http://localhost:5001/webui if needed
 
+// Compatibility endpoint for shogun-ipfs: /api/v0/cat
+router.post("/api/v0/cat", async (req: CustomRequest, res: Response) => {
+  try {
+    const { arg } = req.query; // IPFS API uses ?arg=CID
+    const cid = Array.isArray(arg) ? arg[0] : arg;
+    
+    if (!cid || typeof cid !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: "CID parameter (arg) is required",
+      });
+    }
+
+    loggers.server.debug({ cid }, `📄 IPFS API v0 cat (compatibility endpoint) request`);
+
+    const requestOptions: {
+      hostname: string;
+      port: number;
+      path: string;
+      method: string;
+      headers: Record<string, string>;
+    } = {
+      hostname: "127.0.0.1",
+      port: 5001,
+      path: `/api/v0/cat?arg=${encodeURIComponent(cid)}`,
+      method: "POST",
+      headers: {
+        "Content-Length": "0",
+      } as Record<string, string>,
+    };
+
+    if (IPFS_API_TOKEN) {
+      requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+    }
+
+    const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+      // Set appropriate headers
+      res.setHeader("Content-Type", "application/octet-stream");
+      res.setHeader("Cache-Control", "public, max-age=31536000");
+
+      // Pipe the response directly
+      ipfsRes.pipe(res);
+
+      ipfsRes.on("error", (err) => {
+        loggers.server.error({ err, cid }, `❌ IPFS API v0 cat error`);
+        if (!res.headersSent) {
+          res.status(500).json({
+            success: false,
+            error: err.message,
+          });
+        }
+      });
+    });
+
+    ipfsReq.on("error", (err) => {
+      loggers.server.error({ err, cid }, `❌ IPFS API v0 cat request error`);
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: err.message,
+        });
+      }
+    });
+
+    ipfsReq.setTimeout(30000, () => {
+      ipfsReq.destroy();
+      if (!res.headersSent) {
+        res.status(408).json({
+          success: false,
+          error: "Content retrieval timeout",
+        });
+      }
+    });
+
+    ipfsReq.end();
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    loggers.server.error({ err: error }, `❌ IPFS API v0 cat error`);
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+});
+
 // Custom IPFS API endpoints with better error handling
 router.post("/api/:endpoint(*)", async (req: CustomRequest, res: Response) => {
   try {
@@ -981,6 +1066,198 @@ router.get("/cat/:cid", async (req, res) => {
     loggers.server.error(
       { err: error, cid: req.params.cid },
       `❌ IPFS Content error`
+    );
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+});
+
+// Compatibility endpoint for shogun-ipfs: /content/:cid
+router.get("/content/:cid", async (req, res) => {
+  // Redirect to /cat/:cid endpoint
+  const { cid } = req.params;
+  loggers.server.debug({ cid }, `📄 IPFS Content (compatibility endpoint) request`);
+  
+  // Reuse the same logic as /cat/:cid
+  try {
+    const requestOptions: {
+      hostname: string;
+      port: number;
+      path: string;
+      method: string;
+      headers: Record<string, string>;
+    } = {
+      hostname: "127.0.0.1",
+      port: 5001,
+      path: `/api/v0/cat?arg=${cid}`,
+      method: "POST",
+      headers: {
+        "Content-Length": "0",
+      } as Record<string, string>,
+    };
+
+    if (IPFS_API_TOKEN) {
+      requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+    }
+
+    const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+      // Set appropriate headers
+      res.setHeader("Content-Type", "application/octet-stream");
+      res.setHeader("Content-Disposition", `attachment; filename="${cid}"`);
+      res.setHeader("Cache-Control", "public, max-age=31536000"); // 1 year cache
+
+      // Pipe the response directly
+      ipfsRes.pipe(res);
+
+      ipfsRes.on("error", (err) => {
+        loggers.server.error({ err, cid }, `❌ IPFS Content error`);
+        if (!res.headersSent) {
+          res.status(500).json({
+            success: false,
+            error: err.message,
+          });
+        }
+      });
+    });
+
+    ipfsReq.on("error", (err) => {
+      loggers.server.error({ err, cid }, `❌ IPFS Content request error`);
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: err.message,
+        });
+      }
+    });
+
+    ipfsReq.setTimeout(30000, () => {
+      ipfsReq.destroy();
+      if (!res.headersSent) {
+        res.status(408).json({
+          success: false,
+          error: "Content retrieval timeout",
+        });
+      }
+    });
+
+    ipfsReq.end();
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    loggers.server.error(
+      { err: error, cid: req.params.cid },
+      `❌ IPFS Content error`
+    );
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+});
+
+// Compatibility endpoint for shogun-ipfs: /ipfs/:cid (under /api/v1/ipfs/)
+router.get("/ipfs/:cid", async (req, res) => {
+  // Redirect to /cat/:cid endpoint
+  const { cid } = req.params;
+  loggers.server.debug({ cid }, `📄 IPFS Gateway (compatibility endpoint) request`);
+  
+  // Reuse the same logic as /cat/:cid
+  try {
+    const requestOptions: {
+      hostname: string;
+      port: number;
+      path: string;
+      method: string;
+      headers: Record<string, string>;
+    } = {
+      hostname: "127.0.0.1",
+      port: 5001,
+      path: `/api/v0/cat?arg=${cid}`,
+      method: "POST",
+      headers: {
+        "Content-Length": "0",
+      } as Record<string, string>,
+    };
+
+    if (IPFS_API_TOKEN) {
+      requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+    }
+
+    const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+      // Try to detect content type
+      let contentType = "application/octet-stream";
+      const chunks: Buffer[] = [];
+      
+      ipfsRes.on("data", (chunk: Buffer) => {
+        chunks.push(chunk);
+        // Detect content type from first bytes
+        if (chunks.length === 1 && chunk.length > 0) {
+          const firstBytes = chunk.slice(0, 512);
+          if (firstBytes[0] === 0x89 && firstBytes[1] === 0x50 && firstBytes[2] === 0x4e && firstBytes[3] === 0x47) {
+            contentType = "image/png";
+          } else if (firstBytes[0] === 0xff && firstBytes[1] === 0xd8) {
+            contentType = "image/jpeg";
+          } else if (firstBytes[0] === 0x47 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46) {
+            contentType = "image/gif";
+          } else if (firstBytes[0] === 0x25 && firstBytes[1] === 0x50 && firstBytes[2] === 0x44 && firstBytes[3] === 0x46) {
+            contentType = "application/pdf";
+          } else {
+            try {
+              JSON.parse(chunk.toString());
+              contentType = "application/json";
+            } catch {
+              // Keep default
+            }
+          }
+        }
+      });
+
+      ipfsRes.on("end", () => {
+        const buffer = Buffer.concat(chunks);
+        res.setHeader("Content-Type", contentType);
+        res.setHeader("Content-Length", buffer.length.toString());
+        res.setHeader("Cache-Control", "public, max-age=31536000");
+        res.send(buffer);
+      });
+
+      ipfsRes.on("error", (err) => {
+        loggers.server.error({ err, cid }, `❌ IPFS Gateway error`);
+        if (!res.headersSent) {
+          res.status(500).json({
+            success: false,
+            error: err.message,
+          });
+        }
+      });
+    });
+
+    ipfsReq.on("error", (err) => {
+      loggers.server.error({ err, cid }, `❌ IPFS Gateway request error`);
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: err.message,
+        });
+      }
+    });
+
+    ipfsReq.setTimeout(30000, () => {
+      ipfsReq.destroy();
+      if (!res.headersSent) {
+        res.status(408).json({
+          success: false,
+          error: "Content retrieval timeout",
+        });
+      }
+    });
+
+    ipfsReq.end();
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    loggers.server.error(
+      { err: error, cid: req.params.cid },
+      `❌ IPFS Gateway error`
     );
     res.status(500).json({
       success: false,

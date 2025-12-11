@@ -168,12 +168,9 @@ export async function submitBatch(gun: IGunInstance, relayPub?: string): Promise
         }));
 
         // Build Merkle tree
-        log.debug({}, "Building Merkle tree");
         const { root } = buildMerkleTreeFromWithdrawals(withdrawals);
-        log.debug({ root, leafCount: withdrawals.length }, "Merkle tree built");
-
+        
         // Submit batch to contract
-        log.debug({ root, forceCount: pendingForceWithdrawals.length }, "Submitting batch to contract");
 
         const forceWithdrawalHashes = pendingForceWithdrawals.map(w => w.withdrawalHash);
 
@@ -188,7 +185,6 @@ export async function submitBatch(gun: IGunInstance, relayPub?: string): Promise
         const batchId = result.batchId.toString();
 
         // Save batch to GunDB (only verified withdrawals)
-        log.debug({ batchId: batchId.toString(), withdrawalCount: verifiedWithdrawals.length }, "Saving batch to GunDB");
         const batch: Batch = {
             batchId: batchId.toString(),
             root,
@@ -209,10 +205,7 @@ export async function submitBatch(gun: IGunInstance, relayPub?: string): Promise
         try {
             const savedBatch = await getBatch(gun, batchId.toString());
             if (savedBatch) {
-                log.debug(
-                    { batchId: savedBatch.batchId },
-                    "Batch verification: Successfully read back saved batch"
-                );
+                // Batch verification: Successfully read back saved batch - only log if issues occur
             } else {
                 log.warn({ batchId: batchId.toString() }, "Batch verification: Could not read back saved batch rapidly");
             }
@@ -221,15 +214,14 @@ export async function submitBatch(gun: IGunInstance, relayPub?: string): Promise
         }
 
         // Remove processed withdrawals from pending queue (only verified ones)
-        log.debug({ withdrawalCount: verifiedWithdrawals.length }, "Removing processed withdrawals from pending queue");
         await removePendingWithdrawals(gun, verifiedWithdrawals);
 
         if (pendingForceWithdrawals.length > 0) {
             await removePendingForceWithdrawals(gun, pendingForceWithdrawals);
-            log.debug({ count: pendingForceWithdrawals.length }, "Removed processed force withdrawals");
+            // Removed processed force withdrawals - only log if issues occur
         }
 
-        log.debug({}, "Processed withdrawals removed from pending queue");
+        // Processed withdrawals removed from pending queue - only log if issues occur
 
         return {
             success: true,

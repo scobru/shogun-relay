@@ -794,10 +794,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     const amountBigInt = BigInt(amount);
     const nonceBigInt = BigInt(nonce);
 
-    log.debug(
-      { user: userAddress, amount: amountBigInt.toString(), nonce: nonceBigInt.toString() },
-      "Proof request received"
-    );
+    // Proof request received - only log errors, not every request
 
     // FIRST: Check if this withdrawal is still in the pending queue (not yet batched)
     const pendingWithdrawals = await getPendingWithdrawals(gun);
@@ -812,15 +809,8 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     });
 
     if (pendingWithdrawal) {
-      log.debug(
-        {
-          user: userAddress,
-          amount: amountBigInt.toString(),
-          nonce: nonceBigInt.toString(),
-          timestamp: pendingWithdrawal.timestamp
-        },
-        "Withdrawal is pending batching - not yet included in a batch"
-      );
+      // Withdrawal is pending batching - not yet included in a batch
+      // Only log this as debug if there's an issue, not for every check
       // Return 202 Accepted to indicate the withdrawal is valid but pending
       return res.status(202).json({
         success: false,
@@ -862,10 +852,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
         if (!collectedKeys.has(key)) {
           collectedKeys.add(key);
           batchIdsMap.set(key, batch.batchId);
-          log.debug(
-            { key, batchId: batch.batchId, totalFound: batchIdsMap.size },
-            "Found batch ID in GunDB for proof search"
-          );
+          // Found batch ID in GunDB - too verbose when iterating over many batches
         }
       }
     });
@@ -945,19 +932,13 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     }
 
     // Fetch all batches and search for the withdrawal
-    log.debug(
-      { batchIdsCount: batchIds.length },
-      "Fetching all batches to search for withdrawal"
-    );
+    // Fetching all batches to search for withdrawal - only log if count is unusual
 
     const batchPromises = batchIds.map(id => getBatch(gun, id));
     const batches = await Promise.all(batchPromises);
     const validBatches = batches.filter((b: Batch | null): b is Batch => b !== null);
 
-    log.debug(
-      { requestedCount: batchIds.length, validCount: validBatches.length },
-      "Fetched batch data from GunDB"
-    );
+    // Fetched batch data from GunDB - only log if issues occur
 
     if (validBatches.length === 0) {
       log.warn(
@@ -980,16 +961,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     let foundWithdrawal: PendingWithdrawal | null = null;
 
     for (const batch of validBatches) {
-      log.debug(
-        {
-          batchId: batch.batchId,
-          withdrawalCount: batch.withdrawals.length,
-          requestedUser: normalizedUserAddress,
-          requestedAmount: normalizedAmount,
-          requestedNonce: normalizedNonce,
-        },
-        "Searching batch for withdrawal"
-      );
+      // Searching batch for withdrawal - too verbose for production
 
       const withdrawal = batch.withdrawals.find((w: PendingWithdrawal) => {
         // Robust matching: handle both string and number types
@@ -1093,10 +1065,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
       nonce: BigInt(typeof w.nonce === 'string' ? w.nonce : String(w.nonce)),
     }));
 
-    log.debug(
-      { batchId: foundBatch.batchId, withdrawalCount: withdrawals.length },
-      "Generating Merkle proof"
-    );
+    // Generating Merkle proof - only log errors
 
     const proof = generateProof(withdrawals, userAddress, amountBigInt, nonceBigInt);
 
@@ -1126,10 +1095,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     proofGenerated = true;
     const responseTime = Date.now() - startTime;
 
-    log.debug(
-      { batchId: foundBatch.batchId, user: userAddress, amount: normalizedAmount, nonce: normalizedNonce },
-      "Proof generated successfully"
-    );
+    // Proof generated successfully - only log errors or for significant operations
 
     // Record proof success for reputation tracking
     try {
