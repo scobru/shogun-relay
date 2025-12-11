@@ -853,17 +853,13 @@ export async function transferBalance(
       throw new Error("Insufficient balance");
     }
 
-    // Calculate new balances
-    const newFromBalance = fromBalance - amount;
-    const newToBalance = toBalance + amount;
-
     // Create transfer ID (hash of transfer data for idempotency)
     const transferId = `${fromAddress.toLowerCase()}:${toAddress.toLowerCase()}:${amount}:${Date.now()}`;
     const transferHash = await (Gun as any).SEA.work(transferId, null, null, {
       name: "SHA-256",
     });
 
-    // Create transfer data (frozen entry)
+    // Create transfer data (frozen entry) - do this first for audit trail
     const transferData = {
       type: "bridge-transfer",
       from: fromAddress.toLowerCase(),
@@ -882,52 +878,35 @@ export async function transferBalance(
       transferHash
     );
 
-    // Debit sender balance
-    const fromBalanceData = {
-      balance: newFromBalance.toString(),
-      user: fromAddress.toLowerCase(),
-      updatedAt: Date.now(),
-      type: "bridge-balance",
-      transfer: {
-        to: toAddress.toLowerCase(),
+    // IMPORTANT: Use debitBalance and creditBalance functions instead of creating entries directly
+    // These functions handle race conditions and ensure balance consistency
+    // Debit sender balance first (atomic operation with retry logic)
+    await debitBalance(gun, fromAddress, amount, relayKeyPair);
+
+    // Credit receiver balance (atomic operation with retry logic)
+    // Note: creditBalance expects amount as bigint and handles the addition internally
+    await creditBalance(gun, toAddress, amount, relayKeyPair);
+
+    // Get final balances for return value (after operations complete)
+    const finalFromBalance = await getUserBalance(gun, fromAddress, relayKeyPair.pub);
+    const finalToBalance = await getUserBalance(gun, toAddress, relayKeyPair.pub);
+
+    log.info(
+      {
+        from: fromAddress,
+        to: toAddress,
         amount: amount.toString(),
+        finalFromBalance: finalFromBalance.toString(),
+        finalToBalance: finalToBalance.toString(),
         transferHash,
       },
-    };
-
-    await FrozenData.createFrozenEntry(
-      gun,
-      fromBalanceData,
-      relayKeyPair,
-      "bridge-balances",
-      fromAddress.toLowerCase()
-    );
-
-    // Credit receiver balance
-    const toBalanceData = {
-      balance: newToBalance.toString(),
-      user: toAddress.toLowerCase(),
-      updatedAt: Date.now(),
-      type: "bridge-balance",
-      transfer: {
-        from: fromAddress.toLowerCase(),
-        amount: amount.toString(),
-        transferHash,
-      },
-    };
-
-    await FrozenData.createFrozenEntry(
-      gun,
-      toBalanceData,
-      relayKeyPair,
-      "bridge-balances",
-      toAddress.toLowerCase()
+      "Transfer completed successfully"
     );
 
     return {
       txHash: transferHash,
-      fromBalance: newFromBalance.toString(),
-      toBalance: newToBalance.toString(),
+      fromBalance: finalFromBalance.toString(),
+      toBalance: finalToBalance.toString(),
     };
   } catch (error) {
     throw new Error(`Failed to transfer balance: ${error}`);
