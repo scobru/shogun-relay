@@ -30,6 +30,10 @@ import {
   getLatestBatch,
   isDepositProcessed,
   markDepositProcessed,
+  verifyDualSignatures,
+  reconcileUserBalance,
+  validateNonceIncremental,
+  setLastNonce,
   type PendingWithdrawal,
   type Batch,
 } from "../utils/bridge-state";
@@ -41,9 +45,36 @@ import {
 import * as FrozenData from "../utils/frozen-data";
 import { ethers } from "ethers";
 import { submitBatch } from "../utils/batch-submitter";
+import { adminAuthMiddleware } from "../middleware/admin-auth";
+import rateLimit from "express-rate-limit";
+import { isValidEthereumAddress, isValidAmount, validateString, isValidSignatureFormat, sanitizeForLog } from "../utils/security";
 
 const router = express.Router();
 const log = loggers.server || console;
+
+// Rate limiting for bridge endpoints
+const bridgeLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 20, // 20 requests per minute per IP
+  message: {
+    success: false,
+    error: "Too many requests, please try again later"
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Stricter rate limiting for withdrawal and transfer endpoints
+const strictLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 10, // 10 requests per minute per IP
+  message: {
+    success: false,
+    error: "Too many requests, please try again later"
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Bridge client (lazy initialization)
 let bridgeClient: BridgeClient | null = null;
@@ -124,7 +155,7 @@ router.post("/deposit", express.json(), async (req, res) => {
  * 4. Create transfer record (frozen entry)
  * 5. Return transfer details
  */
-router.post("/transfer", express.json(), async (req, res) => {
+router.post("/transfer", strictLimiter, express.json(), async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
@@ -196,12 +227,12 @@ router.post("/transfer", express.json(), async (req, res) => {
     );
 
     log.info(
-      {
+      sanitizeForLog({
         from: fromAddress,
         to: toAddress,
         amount: amountBigInt.toString(),
         txHash: result.txHash,
-      },
+      }),
       "Balance transferred"
     );
 
@@ -235,7 +266,7 @@ router.post("/transfer", express.json(), async (req, res) => {
  * 3. Adds to pending withdrawals queue
  * 4. Returns withdrawal details (user needs to wait for batch submission to get proof)
  */
-router.post("/withdraw", express.json(), async (req, res) => {
+router.post("/withdraw", strictLimiter, express.json(), async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
@@ -265,18 +296,59 @@ router.post("/withdraw", express.json(), async (req, res) => {
       });
     }
 
-    const amountBigInt = BigInt(amount);
-    const nonceBigInt = BigInt(nonce);
-
-    if (amountBigInt <= 0n) {
+    // Validate input
+    if (!isValidEthereumAddress(user)) {
       return res.status(400).json({
         success: false,
-        error: "Amount must be positive",
+        error: "Invalid user address format",
+      });
+    }
+
+    const amountBigInt = BigInt(amount);
+    const amountValidation = isValidAmount(amountBigInt);
+    if (!amountValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: amountValidation.error || "Invalid amount",
+      });
+    }
+
+    const nonceBigInt = BigInt(nonce);
+
+    // Validate nonce is incremental
+    const nonceValidation = validateNonceIncremental(userAddress, nonceBigInt);
+    if (!nonceValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: nonceValidation.error,
+        lastNonce: nonceValidation.lastNonce?.toString(),
+      });
+    }
+
+    // Validate message and signatures
+    const messageValidation = validateString(message, "message", 10000, 1);
+    if (!messageValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: messageValidation.error,
+      });
+    }
+
+    if (!isValidSignatureFormat(seaSignature, 'sea')) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid SEA signature format",
+      });
+    }
+
+    if (!isValidSignatureFormat(ethSignature, 'eth')) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid Ethereum signature format",
       });
     }
 
     // SECURITY: Verify dual signatures before processing withdrawal
-    const { verifyDualSignatures } = await import("../utils/bridge-state");
 
     log.info(
       {
@@ -301,7 +373,7 @@ router.post("/withdraw", express.json(), async (req, res) => {
       {
         amount: amountBigInt.toString(),
         nonce: nonceBigInt.toString(),
-        timestamp: Date.now(), // Will check message timestamp is recent
+        timestamp: Date.now(), // Will check message timestamp is recent (5 min window)
       }
     );
 
@@ -360,6 +432,9 @@ router.post("/withdraw", express.json(), async (req, res) => {
     // Debit balance (requires relay keypair for security)
     // Pass the nonce so the debit entry can be linked to this specific withdrawal
     const debitHash = await debitBalance(gun, userAddress, amountBigInt, relayKeyPair, nonceBigInt.toString());
+
+    // Update last nonce for this user (only after successful debit)
+    setLastNonce(userAddress, nonceBigInt);
 
     // Add pending withdrawal with debitHash for verification during batch submission
     const withdrawal: PendingWithdrawal = {
@@ -770,7 +845,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
 
     const batchPromises = batchIds.map(id => getBatch(gun, id));
     const batches = await Promise.all(batchPromises);
-    const validBatches = batches.filter((b): b is Batch => b !== null);
+    const validBatches = batches.filter((b: Batch | null): b is Batch => b !== null);
 
     log.info(
       { requestedCount: batchIds.length, validCount: validBatches.length },
@@ -851,7 +926,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
           requestedAmount: normalizedAmount,
           requestedNonce: normalizedNonce,
           searchedBatchesCount: validBatches.length,
-          searchedBatches: validBatches.map(b => ({
+          searchedBatches: validBatches.map((b: Batch) => ({
             batchId: b.batchId,
             withdrawalCount: b.withdrawals.length,
             withdrawals: b.withdrawals.map((w: PendingWithdrawal) => ({
@@ -997,14 +1072,14 @@ router.get("/state", async (req, res) => {
  * Retroactively sync missed deposits from a block range.
  * This is useful if the relay missed some deposits due to downtime or errors.
  * 
- * SECURITY: Should be restricted to relay operators only (add auth middleware if needed)
+ * SECURITY: Restricted to relay operators only (admin auth required)
  * 
  * Body: { fromBlock?: number, toBlock?: number | "latest", user?: string }
  * - fromBlock: Block to start from (default: contract deployment block or 0)
  * - toBlock: Block to end at (default: "latest")
  * - user: Optional - only sync deposits for this specific user
  */
-router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) => {
+router.post("/sync-deposits", adminAuthMiddleware, express.json({ limit: '10mb' }), async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
@@ -1478,11 +1553,11 @@ router.post("/reconcile-balance", express.json(), async (req, res) => {
  * Force process a specific deposit by transaction hash.
  * Useful for manually recovering a missed deposit.
  * 
- * SECURITY: Should be restricted to relay operators only (add auth middleware if needed)
+ * SECURITY: Restricted to relay operators only (admin auth required)
  * 
  * Body: { txHash: string }
  */
-router.post("/process-deposit", express.json({ limit: '10mb' }), async (req, res) => {
+router.post("/process-deposit", adminAuthMiddleware, express.json({ limit: '10mb' }), async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {

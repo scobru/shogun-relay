@@ -232,5 +232,23 @@ export class BridgeModule {
   }> {
     return this.client.post('/api/v1/bridge/process-deposit', { txHash });
   }
+
+  /**
+   * Reconcile user's L2 balance by recalculating from deposits, withdrawals, and L2 transfers
+   * This fixes balance discrepancies caused by old transfer implementations
+   * @param userAddress User's Ethereum address to reconcile
+   * @returns Reconciliation result
+   */
+  public async reconcileBalance(userAddress: string): Promise<{
+    success: boolean;
+    user: string;
+    currentBalance: string;
+    calculatedBalance: string;
+    corrected: boolean;
+    message: string;
+    error?: string;
+  }> {
+    return this.client.post('/api/v1/bridge/reconcile-balance', { user: userAddress });
+  }
 }
 

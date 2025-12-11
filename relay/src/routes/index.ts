@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import multer from "multer";
 import FormData from "form-data";
+import { secureCompare, hashToken } from "../utils/security";
 // http import removed
 
 const __filename = fileURLToPath(import.meta.url);
@@ -14,7 +15,16 @@ const __dirname = path.dirname(__filename);
 // Configurazione multer per upload file
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Middleware di autenticazione
+// Cache admin password hash (computed once)
+let adminPasswordHash: string | null = null;
+function getAdminPasswordHash(): string | null {
+  if (!adminPasswordHash && authConfig.adminPassword) {
+    adminPasswordHash = hashToken(authConfig.adminPassword);
+  }
+  return adminPasswordHash;
+}
+
+// Middleware di autenticazione admin (secure, timing-safe)
 const tokenAuthMiddleware = (
   req: Request,
   res: Response,
@@ -30,13 +40,24 @@ const tokenAuthMiddleware = (
   // Accept either format
   const token = bearerToken || customToken;
 
-  if (token === authConfig.adminPassword) {
-    // Use a more secure token in production
+  if (!token) {
+    loggers.server.warn(
+      { bearerToken: !!bearerToken, customToken: !!customToken },
+      "Auth failed - no token"
+    );
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+
+  // Secure comparison using hash and timing-safe comparison
+  const tokenHash = hashToken(token);
+  const adminHash = getAdminPasswordHash();
+
+  if (adminHash && secureCompare(tokenHash, adminHash)) {
     next();
   } else {
     loggers.server.warn(
       { bearerToken: !!bearerToken, customToken: !!customToken },
-      "Auth failed"
+      "Auth failed - invalid token"
     );
     res.status(401).json({ success: false, error: "Unauthorized" });
   }

@@ -1,7 +1,0 @@
-{
-  "schemaVersion": 2,
-  "dockerfilePath": "./Dockerfile",
-  "containerHttpPort": 8768
-}
-
-

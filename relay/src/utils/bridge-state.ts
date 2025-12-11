@@ -32,6 +32,7 @@ import Gun from "gun";
 import "gun/sea";
 import * as FrozenData from "./frozen-data";
 import { loggers } from "./logger";
+import { userLockManager } from "./security";
 
 const SEA = (Gun as any).SEA;
 const log = loggers.bridge || {
@@ -39,6 +40,169 @@ const log = loggers.bridge || {
   error: console.error,
   warn: console.warn,
 };
+
+// Track last used nonce per user (in-memory cache, backed by GunDB)
+// Uses GunDB for persistence across restarts
+const lastNonceByUser = new Map<string, bigint>();
+
+// Track used nonces for replay attack prevention (in-memory cache)
+// Maps user -> Set of used nonces
+const usedNonces = new Map<string, Set<string>>();
+
+// Reference to GunDB instance for nonce persistence
+let nonceGunInstance: IGunInstance | null = null;
+
+/**
+ * Initialize the nonce persistence system with a GunDB instance.
+ * Should be called at relay startup.
+ */
+export function initNoncePersistence(gun: IGunInstance): void {
+  nonceGunInstance = gun;
+  log.info("Nonce persistence initialized with GunDB instance");
+}
+
+/**
+ * Load persisted nonces from GunDB for known users.
+ * Called during relay startup to restore state.
+ */
+export async function loadPersistedNonces(gun: IGunInstance): Promise<number> {
+  return new Promise((resolve) => {
+    let loadedCount = 0;
+    const timeout = setTimeout(() => {
+      log.info({ loadedCount }, "Nonce loading timed out, continuing with loaded nonces");
+      resolve(loadedCount);
+    }, 5000);
+
+    gun.get("bridge").get("nonces").map().once((data: any, key: string) => {
+      if (key && key !== "_" && data && typeof data.lastNonce === "string") {
+        try {
+          const nonce = BigInt(data.lastNonce);
+          const normalizedKey = key.toLowerCase();
+          lastNonceByUser.set(normalizedKey, nonce);
+          loadedCount++;
+          log.info({ user: normalizedKey, nonce: nonce.toString() }, "Loaded persisted nonce");
+        } catch (err) {
+          log.warn({ key, data, err }, "Failed to parse persisted nonce");
+        }
+      }
+    });
+
+    // Wait a bit for GunDB to stream data, then resolve
+    setTimeout(() => {
+      clearTimeout(timeout);
+      log.info({ loadedCount }, "Completed loading persisted nonces");
+      resolve(loadedCount);
+    }, 2000);
+  });
+}
+
+/**
+ * Persist nonce to GunDB (called after successful withdrawal)
+ */
+async function persistNonce(userAddress: string, nonce: bigint): Promise<void> {
+  if (!nonceGunInstance) {
+    log.warn({ user: userAddress }, "Cannot persist nonce: GunDB instance not initialized");
+    return;
+  }
+
+  return new Promise((resolve, reject) => {
+    const normalizedAddress = userAddress.toLowerCase();
+    const nonceData = {
+      lastNonce: nonce.toString(),
+      updatedAt: Date.now(),
+    };
+
+    const timeoutId = setTimeout(() => {
+      log.warn({ user: normalizedAddress, nonce: nonce.toString() }, "Nonce persist timed out");
+      resolve(); // Don't fail the withdrawal if persistence times out
+    }, 3000);
+
+    nonceGunInstance!.get("bridge").get("nonces").get(normalizedAddress).put(nonceData, (ack: GunMessagePut) => {
+      clearTimeout(timeoutId);
+      if (ack && "err" in ack && ack.err) {
+        log.error({ user: normalizedAddress, err: ack.err }, "Failed to persist nonce");
+        resolve(); // Don't fail the withdrawal if persistence fails
+      } else {
+        log.info({ user: normalizedAddress, nonce: nonce.toString() }, "Nonce persisted to GunDB");
+        resolve();
+      }
+    });
+  });
+}
+
+/**
+ * Get the last used nonce for a user (from cache or GunDB)
+ */
+export function getLastNonce(userAddress: string): bigint {
+  return lastNonceByUser.get(userAddress.toLowerCase()) || 0n;
+}
+
+/**
+ * Get the last used nonce for a user, checking GunDB if not in cache
+ */
+export async function getLastNonceAsync(gun: IGunInstance, userAddress: string): Promise<bigint> {
+  const normalizedAddress = userAddress.toLowerCase();
+
+  // Check cache first
+  const cached = lastNonceByUser.get(normalizedAddress);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  // Fallback to GunDB
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => resolve(0n), 2000);
+
+    gun.get("bridge").get("nonces").get(normalizedAddress).once((data: any) => {
+      clearTimeout(timeout);
+      if (data && typeof data.lastNonce === "string") {
+        try {
+          const nonce = BigInt(data.lastNonce);
+          lastNonceByUser.set(normalizedAddress, nonce); // Update cache
+          resolve(nonce);
+        } catch {
+          resolve(0n);
+        }
+      } else {
+        resolve(0n);
+      }
+    });
+  });
+}
+
+/**
+ * Set the last used nonce for a user (updates cache and persists to GunDB)
+ */
+export function setLastNonce(userAddress: string, nonce: bigint): void {
+  const normalizedAddress = userAddress.toLowerCase();
+  lastNonceByUser.set(normalizedAddress, nonce);
+
+  // Persist asynchronously (don't block the caller)
+  persistNonce(normalizedAddress, nonce).catch((err) => {
+    log.error({ user: normalizedAddress, err }, "Background nonce persistence failed");
+  });
+}
+
+/**
+ * Validate that a nonce is greater than the last used nonce
+ */
+export function validateNonceIncremental(
+  userAddress: string,
+  nonce: bigint
+): { valid: boolean; error?: string; lastNonce?: bigint } {
+  const normalizedAddress = userAddress.toLowerCase();
+  const lastNonce = getLastNonce(normalizedAddress);
+
+  if (nonce <= lastNonce) {
+    return {
+      valid: false,
+      error: `Nonce must be greater than last used nonce: ${lastNonce.toString()}`,
+      lastNonce
+    };
+  }
+
+  return { valid: true, lastNonce };
+}
 
 export interface UserBalance {
   balance: string; // BigInt as string (wei)
@@ -188,156 +352,159 @@ export async function creditBalance(
     throw new Error("Relay keypair required for secure balance updates");
   }
 
-  try {
-    // Normalize Ethereum address
-    const ethereumAddress = userAddress.toLowerCase();
+  // Normalize Ethereum address
+  const ethereumAddress = userAddress.toLowerCase();
 
-    log.info(
-      { user: ethereumAddress, amount: amount.toString() },
-      "Crediting balance"
-    );
-
-    // Retry loop to handle race conditions and eventual consistency
-    // If multiple deposits are processed simultaneously, we need to ensure
-    // we read the latest balance before creating a new entry
-    const maxRetries = 5;
-    let retryCount = 0;
-    let success = false;
-    let initialBalance = 0n; // Capture initial balance for final verification
-
-    while (retryCount < maxRetries && !success) {
-      // Get current balance (by Ethereum address)
-      // Wait a bit if retrying to allow GunDB to propagate previous updates
-      if (retryCount > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 100 * retryCount)); // Exponential backoff
-      }
-
-      const currentBalance = await getUserBalance(gun, ethereumAddress);
-      if (retryCount === 0) {
-        initialBalance = currentBalance; // Capture initial balance on first attempt
-      }
-      const newBalance = currentBalance + amount;
-
+  // Use lock manager to prevent race conditions - only one operation per user at a time
+  return userLockManager.executeWithLock(ethereumAddress, async () => {
+    try {
       log.info(
-        {
-          user: ethereumAddress,
-          currentBalance: currentBalance.toString(),
-          amount: amount.toString(),
-          newBalance: newBalance.toString(),
-          retryAttempt: retryCount + 1,
-        },
-        "Balance calculation"
+        { user: ethereumAddress, amount: amount.toString() },
+        "Crediting balance"
       );
 
-      // Create balance data
-      const balanceData: any = {
-        balance: newBalance.toString(),
-        ethereumAddress: ethereumAddress,
-        updatedAt: Date.now(),
-        type: "bridge-balance",
-      };
+      // Retry loop to handle eventual consistency
+      // If multiple deposits are processed simultaneously, we need to ensure
+      // we read the latest balance before creating a new entry
+      const maxRetries = 5;
+      let retryCount = 0;
+      let success = false;
+      let initialBalance = 0n; // Capture initial balance for final verification
 
-      // If GunDB pub key is provided, include it in the balance data
-      if (gunPubKey) {
-        balanceData.gunPubKey = gunPubKey;
-      }
+      while (retryCount < maxRetries && !success) {
+        // Get current balance (by Ethereum address)
+        // Wait a bit if retrying to allow GunDB to propagate previous updates
+        if (retryCount > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 100 * retryCount)); // Exponential backoff
+        }
 
-      log.info({ user: ethereumAddress, balanceData }, "Creating frozen entry");
+        const currentBalance = await getUserBalance(gun, ethereumAddress, relayKeyPair.pub);
+        if (retryCount === 0) {
+          initialBalance = currentBalance; // Capture initial balance on first attempt
+        }
+        const newBalance = currentBalance + amount;
 
-      // Create frozen entry (immutable, signed)
-      // Use Ethereum address as index key (deposits come with Ethereum address)
-      const indexKey = ethereumAddress;
-      await FrozenData.createFrozenEntry(
-        gun,
-        balanceData,
-        relayKeyPair,
-        "bridge-balances",
-        indexKey
-      );
-
-      log.info({ user: indexKey }, "Frozen entry created successfully");
-
-      // Verify the entry was created and balance is correct
-      // Wait a bit for GunDB to propagate the update
-      await new Promise((resolve) => setTimeout(resolve, 200));
-
-      const verifyBalance = await getUserBalance(gun, ethereumAddress);
-      log.info(
-        {
-          user: ethereumAddress,
-          expectedBalance: newBalance.toString(),
-          actualBalance: verifyBalance.toString(),
-          retryAttempt: retryCount + 1,
-        },
-        "Balance verification after credit"
-      );
-
-      // Check if the balance matches what we expected
-      // Allow for small differences due to concurrent updates (as long as balance increased)
-      if (verifyBalance >= newBalance) {
-        // Balance is correct or higher (another deposit was processed concurrently)
-        success = true;
-      } else if (verifyBalance < currentBalance) {
-        // Balance decreased - something went wrong, retry
-        log.warn(
-          {
-            user: ethereumAddress,
-            expectedBalance: newBalance.toString(),
-            actualBalance: verifyBalance.toString(),
-            previousBalance: currentBalance.toString(),
-            retryAttempt: retryCount + 1,
-          },
-          "Balance decreased after credit, retrying"
-        );
-        retryCount++;
-      } else {
-        // Balance increased but not as much as expected - concurrent update, retry to get latest
         log.info(
           {
             user: ethereumAddress,
-            expectedBalance: newBalance.toString(),
-            actualBalance: verifyBalance.toString(),
-            previousBalance: currentBalance.toString(),
-            retryAttempt: retryCount + 1,
-          },
-          "Balance partially updated (concurrent deposit), retrying to ensure consistency"
-        );
-        retryCount++;
-      }
-    }
-
-    if (!success) {
-      // Final verification after all retries
-      // Check if balance increased at least by the amount we're crediting
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const finalBalance = await getUserBalance(gun, ethereumAddress);
-
-      if (finalBalance >= initialBalance + amount) {
-        // Balance was eventually updated correctly (might be higher due to concurrent deposits)
-        success = true;
-        log.info(
-          {
-            user: ethereumAddress,
-            initialBalance: initialBalance.toString(),
-            finalBalance: finalBalance.toString(),
+            currentBalance: currentBalance.toString(),
             amount: amount.toString(),
-            expectedMinBalance: (initialBalance + amount).toString(),
+            newBalance: newBalance.toString(),
+            retryAttempt: retryCount + 1,
           },
-          "Balance eventually updated correctly after retries"
+          "Balance calculation"
         );
-      } else {
-        throw new Error(
-          `Failed to credit balance after ${maxRetries} retries. Initial: ${initialBalance.toString()}, Final: ${finalBalance.toString()}, Expected at least: ${(initialBalance + amount).toString()}`
+
+        // Create balance data
+        const balanceData: any = {
+          balance: newBalance.toString(),
+          ethereumAddress: ethereumAddress,
+          updatedAt: Date.now(),
+          type: "bridge-balance",
+        };
+
+        // If GunDB pub key is provided, include it in the balance data
+        if (gunPubKey) {
+          balanceData.gunPubKey = gunPubKey;
+        }
+
+        log.info({ user: ethereumAddress, balanceData }, "Creating frozen entry");
+
+        // Create frozen entry (immutable, signed)
+        // Use Ethereum address as index key (deposits come with Ethereum address)
+        const indexKey = ethereumAddress;
+        await FrozenData.createFrozenEntry(
+          gun,
+          balanceData,
+          relayKeyPair,
+          "bridge-balances",
+          indexKey
         );
+
+        log.info({ user: indexKey }, "Frozen entry created successfully");
+
+        // Verify the entry was created and balance is correct
+        // Wait a bit for GunDB to propagate the update
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        const verifyBalance = await getUserBalance(gun, ethereumAddress);
+        log.info(
+          {
+            user: ethereumAddress,
+            expectedBalance: newBalance.toString(),
+            actualBalance: verifyBalance.toString(),
+            retryAttempt: retryCount + 1,
+          },
+          "Balance verification after credit"
+        );
+
+        // Check if the balance matches what we expected
+        // Allow for small differences due to concurrent updates (as long as balance increased)
+        if (verifyBalance >= newBalance) {
+          // Balance is correct or higher (another deposit was processed concurrently)
+          success = true;
+        } else if (verifyBalance < currentBalance) {
+          // Balance decreased - something went wrong, retry
+          log.warn(
+            {
+              user: ethereumAddress,
+              expectedBalance: newBalance.toString(),
+              actualBalance: verifyBalance.toString(),
+              previousBalance: currentBalance.toString(),
+              retryAttempt: retryCount + 1,
+            },
+            "Balance decreased after credit, retrying"
+          );
+          retryCount++;
+        } else {
+          // Balance increased but not as much as expected - concurrent update, retry to get latest
+          log.info(
+            {
+              user: ethereumAddress,
+              expectedBalance: newBalance.toString(),
+              actualBalance: verifyBalance.toString(),
+              previousBalance: currentBalance.toString(),
+              retryAttempt: retryCount + 1,
+            },
+            "Balance partially updated (concurrent deposit), retrying to ensure consistency"
+          );
+          retryCount++;
+        }
       }
+
+      if (!success) {
+        // Final verification after all retries
+        // Check if balance increased at least by the amount we're crediting
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const finalBalance = await getUserBalance(gun, ethereumAddress);
+
+        if (finalBalance >= initialBalance + amount) {
+          // Balance was eventually updated correctly (might be higher due to concurrent deposits)
+          success = true;
+          log.info(
+            {
+              user: ethereumAddress,
+              initialBalance: initialBalance.toString(),
+              finalBalance: finalBalance.toString(),
+              amount: amount.toString(),
+              expectedMinBalance: (initialBalance + amount).toString(),
+            },
+            "Balance eventually updated correctly after retries"
+          );
+        } else {
+          throw new Error(
+            `Failed to credit balance after ${maxRetries} retries. Initial: ${initialBalance.toString()}, Final: ${finalBalance.toString()}, Expected at least: ${(initialBalance + amount).toString()}`
+          );
+        }
+      }
+    } catch (error) {
+      log.error(
+        { error, user: userAddress, amount: amount.toString() },
+        "Error crediting balance"
+      );
+      throw new Error(`Failed to credit balance: ${error}`);
     }
-  } catch (error) {
-    log.error(
-      { error, user: userAddress, amount: amount.toString() },
-      "Error crediting balance"
-    );
-    throw new Error(`Failed to credit balance: ${error}`);
-  }
+  });
 }
 
 /**
@@ -362,51 +529,57 @@ export async function debitBalance(
     throw new Error("Relay keypair required for secure balance updates");
   }
 
-  try {
-    // Get current balance (enforcing relay signature)
-    const currentBalance = await getUserBalance(gun, userAddress, relayKeyPair.pub);
+  // Normalize address
+  const normalizedAddress = userAddress.toLowerCase();
 
-    if (currentBalance < amount) {
-      throw new Error("Insufficient balance");
+  // Use lock manager to prevent race conditions
+  return userLockManager.executeWithLock(normalizedAddress, async () => {
+    try {
+      // Get current balance (enforcing relay signature)
+      const currentBalance = await getUserBalance(gun, normalizedAddress, relayKeyPair.pub);
+
+      if (currentBalance < amount) {
+        throw new Error("Insufficient balance");
+      }
+
+      const newBalance = currentBalance - amount;
+
+      // Create balance data with debit tracking
+      const balanceData: any = {
+        balance: newBalance.toString(),
+        user: normalizedAddress,
+        updatedAt: Date.now(),
+        type: "bridge-balance",
+        debit: amount.toString(), // Track what was debited
+      };
+
+      // Include nonce if provided (for withdrawal linking)
+      if (nonce) {
+        balanceData.withdrawalNonce = nonce;
+      }
+
+      // Create frozen entry (immutable, signed) and return the hash
+      const indexKey = normalizedAddress;
+      const result = await FrozenData.createFrozenEntry(
+        gun,
+        balanceData,
+        relayKeyPair,
+        "bridge-balances",
+        indexKey
+      );
+
+      log.info({
+        user: indexKey,
+        amount: amount.toString(),
+        newBalance: newBalance.toString(),
+        debitHash: result.hash,
+      }, "Balance debited successfully");
+
+      return result.hash; // Return the debit proof hash
+    } catch (error) {
+      throw new Error(`Failed to debit balance: ${error}`);
     }
-
-    const newBalance = currentBalance - amount;
-
-    // Create balance data with debit tracking
-    const balanceData: any = {
-      balance: newBalance.toString(),
-      user: userAddress.toLowerCase(),
-      updatedAt: Date.now(),
-      type: "bridge-balance",
-      debit: amount.toString(), // Track what was debited
-    };
-
-    // Include nonce if provided (for withdrawal linking)
-    if (nonce) {
-      balanceData.withdrawalNonce = nonce;
-    }
-
-    // Create frozen entry (immutable, signed) and return the hash
-    const indexKey = userAddress.toLowerCase();
-    const result = await FrozenData.createFrozenEntry(
-      gun,
-      balanceData,
-      relayKeyPair,
-      "bridge-balances",
-      indexKey
-    );
-
-    log.info({
-      user: indexKey,
-      amount: amount.toString(),
-      newBalance: newBalance.toString(),
-      debitHash: result.hash,
-    }, "Balance debited successfully");
-
-    return result.hash; // Return the debit proof hash
-  } catch (error) {
-    throw new Error(`Failed to debit balance: ${error}`);
-  }
+  });
 }
 
 /**
@@ -746,7 +919,7 @@ export async function verifyDualSignatures(
         );
         return null;
       }
-      // Timestamp validation: must be recent (within 1 hour) to prevent replay
+      // Timestamp validation: must be recent (within 5 minutes) to prevent replay
       // Use the message timestamp as the reference point, not the server time
       if (expectedFields.timestamp !== undefined && messageData.timestamp) {
         const messageTime =
@@ -754,7 +927,7 @@ export async function verifyDualSignatures(
             ? messageData.timestamp
             : parseInt(messageData.timestamp);
         const now = expectedFields.timestamp; // Use provided timestamp (server time) as reference
-        const maxAge = 60 * 60 * 1000; // 1 hour
+        const maxAge = 5 * 60 * 1000; // 5 minutes (reduced from 1 hour)
         const timeDiff = Math.abs(now - messageTime);
         if (timeDiff > maxAge) {
           log.warn(
@@ -767,6 +940,33 @@ export async function verifyDualSignatures(
             "Message timestamp too old or from future"
           );
           return null; // Message too old or from future
+        }
+      }
+
+      // Nonce tracking for replay attack prevention
+      // Check if this nonce has already been used
+      if (expectedFields.nonce && messageData.nonce) {
+        const normalizedAddress = ethAddress.toLowerCase();
+        const userNonces = usedNonces.get(normalizedAddress) || new Set<string>();
+        const nonceStr = String(messageData.nonce);
+
+        if (userNonces.has(nonceStr)) {
+          log.warn(
+            { ethAddress, nonce: nonceStr },
+            "Nonce already used - replay attack detected"
+          );
+          return null; // Replay attack detected
+        }
+
+        // Mark nonce as used
+        userNonces.add(nonceStr);
+        usedNonces.set(normalizedAddress, userNonces);
+
+        // Cleanup old nonces (keep last 1000 per user)
+        if (userNonces.size > 1000) {
+          const noncesArray = Array.from(userNonces);
+          const toRemove = noncesArray.slice(0, noncesArray.length - 1000);
+          toRemove.forEach(n => userNonces.delete(n));
         }
       }
     }
@@ -833,7 +1033,7 @@ export async function transferBalance(
       {
         to: toAddress,
         amount: amount.toString(),
-        timestamp: Date.now(), // Will check message timestamp is recent
+        timestamp: Date.now(), // Will check message timestamp is recent (5 min window)
       }
     );
 
@@ -2167,45 +2367,45 @@ export async function reconcileUserBalance(
   userAddress: string,
   relayKeyPair: { pub: string; priv: string; epub?: string; epriv?: string },
   bridgeClient: any
-): Promise<{ 
-  success: boolean; 
-  currentBalance: string; 
-  calculatedBalance: string; 
+): Promise<{
+  success: boolean;
+  currentBalance: string;
+  calculatedBalance: string;
   corrected: boolean;
   error?: string;
 }> {
   try {
     const normalizedAddress = userAddress.toLowerCase();
-    
+
     // Get current balance from GunDB
     const currentBalance = await getUserBalance(gun, normalizedAddress, relayKeyPair.pub);
-    
+
     log.info(
       { user: normalizedAddress, currentBalance: currentBalance.toString() },
       "Starting balance reconciliation"
     );
-    
+
     // Calculate correct balance from on-chain deposits and withdrawals
     // Query all deposits for this user
     const deposits = await bridgeClient.queryDeposits(0, "latest", normalizedAddress);
     const totalDeposits: bigint = deposits.reduce((sum: bigint, d: any) => sum + BigInt(d.amount), 0n);
-    
+
     // Query all processed withdrawals for this user
     const withdrawals = await bridgeClient.queryWithdrawals(0, "latest", normalizedAddress);
     const totalWithdrawals: bigint = withdrawals.reduce((sum: bigint, w: any) => sum + BigInt(w.amount), 0n);
-    
+
     // Calculate base balance from deposits - withdrawals
     let calculatedBalance: bigint = totalDeposits - totalWithdrawals;
-    
+
     // Now account for L2 transfers
     // Get all transfers where this user is sender (subtract) or receiver (add)
     const allTransfers = await listL2Transfers(gun, relayKeyPair.pub);
-    
+
     for (const transfer of allTransfers) {
       const from = transfer.from?.toLowerCase();
       const to = transfer.to?.toLowerCase();
       const amount = BigInt(transfer.amount || "0");
-      
+
       if (from === normalizedAddress) {
         // User sent this amount - subtract
         calculatedBalance = calculatedBalance - amount;
@@ -2215,7 +2415,7 @@ export async function reconcileUserBalance(
         calculatedBalance = calculatedBalance + amount;
       }
     }
-    
+
     log.info(
       {
         user: normalizedAddress,
@@ -2227,11 +2427,11 @@ export async function reconcileUserBalance(
       },
       "Balance reconciliation calculation complete"
     );
-    
+
     // Compare and correct if needed
     const difference = calculatedBalance - currentBalance;
     const corrected = difference !== 0n;
-    
+
     if (corrected) {
       log.warn(
         {
@@ -2242,7 +2442,7 @@ export async function reconcileUserBalance(
         },
         "Balance discrepancy detected, correcting..."
       );
-      
+
       if (difference > 0n) {
         // Current balance is too low - credit the difference
         await creditBalance(gun, normalizedAddress, difference, relayKeyPair);
@@ -2251,7 +2451,7 @@ export async function reconcileUserBalance(
         const debitAmount = difference * -1n; // Convert negative to positive
         await debitBalance(gun, normalizedAddress, debitAmount, relayKeyPair);
       }
-      
+
       // Verify correction
       const verifiedBalance = await getUserBalance(gun, normalizedAddress, relayKeyPair.pub);
       log.info(
@@ -2263,7 +2463,7 @@ export async function reconcileUserBalance(
         "Balance correction completed"
       );
     }
-    
+
     return {
       success: true,
       currentBalance: currentBalance.toString(),
@@ -2293,11 +2493,11 @@ async function listL2Transfers(
   return new Promise((resolve) => {
     const transfers: Array<{ from: string; to: string; amount: string; transferHash: string; timestamp: number }> = [];
     const timeout = setTimeout(() => resolve(transfers), 10000);
-    
+
     // Get all transfer entries from the index
     gun.get("shogun-index").get("bridge-transfers").map().once(async (index: any, transferHash?: string) => {
       if (!index || !index.latestHash || !transferHash) return;
-      
+
       try {
         const entry = await FrozenData.readFrozenEntry(
           gun,
@@ -2305,7 +2505,7 @@ async function listL2Transfers(
           index.latestHash,
           relayPub
         );
-        
+
         if (entry && entry.verified && entry.data) {
           const transferData = entry.data as {
             from?: string;
@@ -2315,7 +2515,7 @@ async function listL2Transfers(
             timestamp?: number;
             type?: string;
           };
-          
+
           if (transferData.type === "bridge-transfer" && transferData.from && transferData.to && transferData.amount) {
             transfers.push({
               from: transferData.from,
@@ -2330,7 +2530,7 @@ async function listL2Transfers(
         log.warn({ error, transferHash }, "Error reading transfer entry");
       }
     });
-    
+
     setTimeout(() => {
       clearTimeout(timeout);
       resolve(transfers);

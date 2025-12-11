@@ -43,6 +43,7 @@ import {
   packageConfig,
 } from "./config/env-config";
 import { startBatchScheduler } from "./utils/batch-scheduler";
+import { secureCompare, hashToken } from "./utils/security";
 
 dotenv.config();
 
@@ -398,11 +399,11 @@ async function initializeServer() {
         .json({ success: false, error: "Unauthorized - Token required" });
     }
 
-    // Secure token comparison using hash
+    // Secure token comparison using hash and timing-safe comparison
     const tokenHash = hashToken(token);
     const adminHash = getAdminPasswordHash();
 
-    if (adminHash && tokenHash === adminHash) {
+    if (adminHash && secureCompare(tokenHash, adminHash)) {
       // Create session for future requests
       const sessionId = createSession(clientIp);
       res.setHeader("X-Session-Token", sessionId);
@@ -1860,6 +1861,16 @@ See docs/RELAY_KEYS.md for more information.
   if (BRIDGE_ENABLED && BRIDGE_RPC_URL) {
     try {
       const { startBridgeListener } = await import("./utils/bridge-listener");
+      const { initNoncePersistence, loadPersistedNonces } = await import("./utils/bridge-state");
+
+      // Initialize nonce persistence with GunDB instance
+      initNoncePersistence(gun);
+
+      // Load persisted nonces from GunDB (survives relay restarts)
+      const loadedNonces = await loadPersistedNonces(gun);
+      if (loadedNonces > 0) {
+        loggers.server.info({ count: loadedNonces }, "🔢 Loaded persisted nonces from GunDB");
+      }
 
       await startBridgeListener(gun, {
         rpcUrl: BRIDGE_RPC_URL,

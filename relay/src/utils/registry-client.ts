@@ -631,14 +631,18 @@ export function createRegistryClientWithSigner(
           let gasEstimateAttempts = 5;
           while (gasEstimateAttempts > 0) {
             try {
-              gasEstimate = await client.provider.estimateGas({
+              const estimated = await client.provider.estimateGas({
                 ...populatedTx,
                 from: wallet.address,
               });
-              log.info(`Gas estimate successful: ${gasEstimate.toString()}`);
-              // Add 20% buffer to the gas estimate
-              gasEstimate = (gasEstimate * 120n) / 100n;
-              break;
+              if (estimated !== null && estimated !== undefined) {
+                const validEstimate = estimated;
+                gasEstimate = validEstimate;
+                log.info(`Gas estimate successful: ${validEstimate.toString()}`);
+                // Add 20% buffer to the gas estimate
+                gasEstimate = (validEstimate * 120n) / 100n;
+                break;
+              }
             } catch (gasError: any) {
               gasEstimateAttempts--;
               const isAllowanceError = gasError.message && (
@@ -741,6 +745,10 @@ export function createRegistryClientWithSigner(
       }
       
       const receipt = await tx.wait();
+
+      if (!receipt) {
+        throw new Error("Transaction receipt is null");
+      }
 
       return {
         success: true,
