@@ -76,6 +76,20 @@ export class BridgeModule {
   }
 
   /**
+   * Get the next nonce for a user (for withdrawal requests)
+   * This allows clients to include the nonce in their signed message
+   * @param userAddress User's Ethereum address
+   * @returns Last nonce and next nonce
+   */
+  public async getNonce(userAddress: string): Promise<{
+    success: boolean;
+    lastNonce: string;
+    nextNonce: string;
+  }> {
+    return this.client.get(`/api/v1/bridge/nonce/${userAddress}`);
+  }
+
+  /**
    * Transfer balance from one user to another (L2 -> L2)
    * @param params Transfer parameters
    * @returns Transfer result
