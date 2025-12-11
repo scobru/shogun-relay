@@ -445,12 +445,32 @@ export function createRegistryClientWithSigner(
       }
 
       // Check/set allowance
+      // Some USDC tokens require resetting allowance to 0 before setting a new amount
       const allowance = await usdc.allowance(
         wallet.address,
         client.registryAddress
       );
+      
       if (allowance < stakeWei) {
+        log.info(
+          `Current allowance: ${ethers.formatUnits(allowance, 6)} USDC, Need: ${ethers.formatUnits(stakeWei, 6)} USDC`
+        );
+        
+        // If there's an existing non-zero allowance that's less than what we need,
+        // reset it to 0 first (some tokens require this to prevent front-running)
+        if (allowance > 0n) {
+          log.info("Resetting existing allowance to 0...");
+          const resetTx = await usdc.approve(client.registryAddress, 0n);
+          log.info(`Reset transaction: ${resetTx.hash}`);
+          await resetTx.wait();
+          log.info("Allowance reset confirmed");
+          
+          // Wait a bit for the state to propagate
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+        
         log.info("Approving USDC spend...");
+        // Approve the exact amount needed
         const approveTx = await usdc.approve(client.registryAddress, stakeWei);
         log.info(
           `Waiting for approve transaction confirmation: ${approveTx.hash}`
@@ -460,8 +480,9 @@ export function createRegistryClientWithSigner(
           `Approve transaction confirmed in block ${approveReceipt.blockNumber}`
         );
 
-        // Verify allowance was updated
-        let retries = 5;
+        // Verify allowance was updated with more retries and longer wait
+        let retries = 10;
+        let verified = false;
         while (retries > 0) {
           const newAllowance = await usdc.allowance(
             wallet.address,
@@ -471,26 +492,43 @@ export function createRegistryClientWithSigner(
             log.info(
               `USDC allowance confirmed: ${ethers.formatUnits(newAllowance, 6)} USDC`
             );
+            verified = true;
             break;
           }
           log.info(
-            `Waiting for allowance to update... (${retries} retries left)`
+            `Waiting for allowance to update... Current: ${ethers.formatUnits(newAllowance, 6)}, Need: ${ethers.formatUnits(stakeWei, 6)} (${retries} retries left)`
           );
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, 2000));
           retries--;
         }
 
-        if (retries === 0) {
+        if (!verified) {
           const finalAllowance = await usdc.allowance(
             wallet.address,
             client.registryAddress
           );
-          if (finalAllowance < stakeWei) {
-            throw new Error(
-              `Allowance not updated after approval. Expected: ${ethers.formatUnits(stakeWei, 6)}, Got: ${ethers.formatUnits(finalAllowance, 6)}`
-            );
-          }
+          throw new Error(
+            `Allowance not updated after approval. Expected: ${ethers.formatUnits(stakeWei, 6)} USDC, Got: ${ethers.formatUnits(finalAllowance, 6)} USDC. Please try again.`
+          );
         }
+        
+        // Double-check allowance one more time right before the contract call
+        const finalCheck = await usdc.allowance(
+          wallet.address,
+          client.registryAddress
+        );
+        if (finalCheck < stakeWei) {
+          throw new Error(
+            `Allowance verification failed before contract call. Expected: ${ethers.formatUnits(stakeWei, 6)} USDC, Got: ${ethers.formatUnits(finalCheck, 6)} USDC`
+          );
+        }
+        log.info(
+          `Final allowance check passed: ${ethers.formatUnits(finalCheck, 6)} USDC`
+        );
+      } else {
+        log.info(
+          `Sufficient allowance already exists: ${ethers.formatUnits(allowance, 6)} USDC`
+        );
       }
 
       // Convert pubkey and epub strings to bytes
