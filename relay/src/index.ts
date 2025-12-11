@@ -1,11 +1,11 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
-import { fileURLToPath } from "url";
 import cors from "cors";
 import dotenv from "dotenv";
 import setSelfAdjustingInterval from "self-adjusting-interval";
 import crypto from "crypto";
+import { fileURLToPath } from "url";
 import Gun from "gun";
 import "gun/sea";
 import "gun/lib/stats";

@@ -99,7 +99,7 @@ export function createBridgeClient(config: BridgeConfig) {
         throw new Error("BridgeClient: Private key required for deposits");
       }
 
-      log.info({ amount: ethers.formatEther(amount) }, "Depositing ETH to bridge");
+      log.debug({ amount: ethers.formatEther(amount) }, "Depositing ETH to bridge");
 
       const tx = await bridge.deposit(amount);
       const receipt = await tx.wait();
@@ -108,7 +108,7 @@ export function createBridgeClient(config: BridgeConfig) {
         throw new Error("BridgeClient: Transaction receipt not found");
       }
 
-      log.info(
+      log.debug(
         { txHash: receipt.hash, blockNumber: receipt.blockNumber },
         "Deposit successful"
       );
@@ -127,7 +127,7 @@ export function createBridgeClient(config: BridgeConfig) {
         throw new Error("BridgeClient: Private key required for batch submission");
       }
 
-      log.info({ stateRoot, forceWithdrawalCount: handledForceWithdrawals.length }, "Submitting batch to bridge");
+      log.debug({ stateRoot, forceWithdrawalCount: handledForceWithdrawals.length }, "Submitting batch to bridge");
 
       const tx = await bridge.submitBatch(stateRoot, handledForceWithdrawals);
       const receipt = await tx.wait();
@@ -152,7 +152,7 @@ export function createBridgeClient(config: BridgeConfig) {
         batchId = await bridge.getCurrentBatchId();
       }
 
-      log.info(
+      log.debug(
         { txHash: receipt.hash, blockNumber: receipt.blockNumber, batchId: batchId.toString() },
         "Batch submitted successfully"
       );
@@ -177,7 +177,7 @@ export function createBridgeClient(config: BridgeConfig) {
         throw new Error("BridgeClient: Private key required for withdrawals");
       }
 
-      log.info(
+      log.debug(
         { amount: ethers.formatEther(amount), nonce: nonce.toString(), batchId: batchId.toString() },
         "Withdrawing from bridge"
       );
@@ -189,7 +189,7 @@ export function createBridgeClient(config: BridgeConfig) {
         throw new Error("BridgeClient: Transaction receipt not found");
       }
 
-      log.info(
+      log.debug(
         { txHash: receipt.hash, blockNumber: receipt.blockNumber },
         "Withdrawal successful"
       );
@@ -247,7 +247,7 @@ export function createBridgeClient(config: BridgeConfig) {
         throw new Error("BridgeClient: Private key required for finalization");
       }
 
-      log.info({ batchId: batchId.toString() }, "Finalizing batch");
+      log.debug({ batchId: batchId.toString() }, "Finalizing batch");
 
       const tx = await (bridge as any).finalizeBatch(batchId);
       const receipt = await tx.wait();
@@ -256,7 +256,7 @@ export function createBridgeClient(config: BridgeConfig) {
         throw new Error("BridgeClient: Transaction receipt not found");
       }
 
-      log.info(
+      log.debug(
         { txHash: receipt.hash, blockNumber: receipt.blockNumber, batchId: batchId.toString() },
         "Batch finalized successfully"
       );
@@ -522,7 +522,7 @@ export function createBridgeClient(config: BridgeConfig) {
               const receipt = await provider.getTransactionReceipt(event.transactionHash);
               if (receipt && receipt.blockNumber !== null) {
                 blockNumber = receipt.blockNumber;
-                log.info(
+                log.debug(
                   { user: normalizedUser, txHash: event.transactionHash, blockNumber },
                   "Retrieved blockNumber from transaction receipt"
                 );
@@ -543,7 +543,7 @@ export function createBridgeClient(config: BridgeConfig) {
           // If still no blockNumber, this might be a pending event - skip it for now
           // It will be processed again when the block is confirmed
           if (blockNumber === null || blockNumber === undefined) {
-            log.info(
+            log.debug(
               { user: normalizedUser, amount: amount.toString(), txHash: event.transactionHash },
               "Skipping deposit event with no blockNumber (likely pending)"
             );
@@ -628,7 +628,7 @@ export function createBridgeClient(config: BridgeConfig) {
         }
 
         const contractAddr = bridge.getAddress();
-        log.info(
+        log.debug(
           { fromBlock, toBlock: toBlockNumber, contractAddress: contractAddr, userAddress },
           "Querying deposit events"
         );
@@ -685,7 +685,7 @@ export function createBridgeClient(config: BridgeConfig) {
           }
         }
 
-        log.info(
+        log.debug(
           { fromBlock: safeFromBlock, toBlock: toBlockNumber, count: depositEvents.length },
           "Deposit events queried"
         );
@@ -730,7 +730,7 @@ export function createBridgeClient(config: BridgeConfig) {
         }
 
         const contractAddr = bridge.getAddress();
-        log.info(
+        log.debug(
           { fromBlock, toBlock: toBlockNumber, contractAddress: contractAddr, userAddress },
           "Querying withdrawal events"
         );
@@ -784,7 +784,7 @@ export function createBridgeClient(config: BridgeConfig) {
           }
         }
 
-        log.info(
+        log.debug(
           { fromBlock: safeFromBlock, toBlock: toBlockNumber, count: withdrawalEvents.length },
           "Withdrawal events queried"
         );

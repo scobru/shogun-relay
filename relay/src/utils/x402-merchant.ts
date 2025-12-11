@@ -290,12 +290,12 @@ export class X402Merchant {
     // Always initialize clients if privateKey is available (for fallback support)
     if (this.privateKey) {
       this.initializeClients();
-      log.info(
+      log.debug(
         `x402 Merchant initialized with direct settlement ${this.settlementMode === "direct" ? "(primary)" : "(fallback)"
         }`
       );
     } else if (this.settlementMode === "facilitator") {
-      log.info(
+      log.debug(
         `x402 Merchant initialized with facilitator only (no direct settlement fallback)`
       );
     } else {
@@ -472,11 +472,11 @@ export class X402Merchant {
           log.warn(
             `Facilitator verification failed: ${facilitatorResult.invalidReason}`
           );
-          log.info("Attempting local signature verification...");
+          log.debug("Attempting local signature verification...");
 
           // For now, accept the payment if basic validation passed and signature exists
           // The actual signature verification happens on-chain during settlement
-          log.info(
+          log.debug(
             "Local verification: signature present, will verify during settlement"
           );
         }
@@ -572,7 +572,7 @@ export class X402Merchant {
         return { isValid: false, invalidReason: "Payment expired" };
       }
 
-      log.info(
+      log.debug(
         `Deal payment verified: ${formatUnits(paymentAmount, 6)} USDC from ${authorization.from
         }`
       );
@@ -642,16 +642,16 @@ export class X402Merchant {
   ): Promise<PaymentSettlementResult> {
     // If direct mode is explicitly set, use direct only
     if (this.settlementMode === "direct") {
-      log.info("Using direct settlement mode");
+      log.debug("Using direct settlement mode");
       return this.settleDirectly(paymentPayload);
     }
 
     // Try facilitator first
-    log.info("Attempting facilitator settlement...");
+    log.debug("Attempting facilitator settlement...");
     const facilitatorResult = await this.settleWithFacilitator(paymentPayload);
 
     if (facilitatorResult.success) {
-      log.info(
+      log.debug(
         `Facilitator settlement successful: ${facilitatorResult.transaction}`
       );
       return facilitatorResult;
@@ -661,10 +661,10 @@ export class X402Merchant {
 
     // If facilitator failed and we have direct settlement configured, try that
     if (this.walletClient && this.publicClient) {
-      log.info("Falling back to direct settlement...");
+      log.debug("Falling back to direct settlement...");
       const directResult = await this.settleDirectly(paymentPayload);
       if (directResult.success) {
-        log.info(
+        log.debug(
           `Direct settlement successful: ${directResult.transaction}`
         );
       } else {
@@ -702,7 +702,7 @@ export class X402Merchant {
         headers["X-API-Key"] = this.facilitatorApiKey;
       }
 
-      log.info(`Calling facilitator: ${this.facilitatorUrl}/settle`);
+      log.debug(`Calling facilitator: ${this.facilitatorUrl}/settle`);
 
       const response = await fetch(`${this.facilitatorUrl}/settle`, {
         method: "POST",
@@ -724,7 +724,7 @@ export class X402Merchant {
         };
       }
 
-      log.info({ result }, `Facilitator response: ${response.status}`);
+      log.debug({ result }, `Facilitator response: ${response.status}`);
 
       if (!response.ok) {
         return {
@@ -822,7 +822,7 @@ export class X402Merchant {
       }
       const nonceBytes32 = `0x${nonce}`;
 
-      log.info({
+      log.debug({
         from: authorization.from,
         to: authorization.to,
         value: authorization.value,
@@ -1131,7 +1131,7 @@ export class X402Merchant {
     ipfsApiUrl?: string,
     ipfsApiToken?: string
   ): Promise<CalculateRealStorageUsageResult> {
-    log.info(`Calculating real IPFS storage for ${userAddress}...`);
+    log.debug(`Calculating real IPFS storage for ${userAddress}...`);
 
     // Get all uploads from GunDB
     const uploads = await this.getUserUploads(gun, userAddress);
@@ -1146,7 +1146,7 @@ export class X402Merchant {
       };
     }
 
-    log.info(
+    log.debug(
       `Found ${uploads.length} uploads for ${userAddress}, verifying sizes on IPFS...`
     );
 
@@ -1186,7 +1186,7 @@ export class X402Merchant {
 
     const totalMB = totalBytes / (1024 * 1024);
 
-    log.info(
+    log.debug(
       `Real IPFS storage for ${userAddress}: ${totalMB.toFixed(2)}MB across ${filesWithSizes.length
       } files`
     );
@@ -1240,7 +1240,7 @@ export class X402Merchant {
     const realMB = realUsage.totalMB;
     const discrepancy = Math.abs(recordedMB - realMB);
 
-    log.info({
+    log.debug({
       recordedMB: recordedMB.toFixed(2),
       realMB: realMB.toFixed(2),
       discrepancy: discrepancy.toFixed(2)
@@ -1248,7 +1248,7 @@ export class X402Merchant {
 
     // If there's a significant discrepancy (> 0.1MB), update GunDB
     if (discrepancy > 0.1) {
-      log.info(
+      log.debug(
         `Updating storage usage from ${recordedMB.toFixed(
           2
         )}MB to ${realMB.toFixed(2)}MB`

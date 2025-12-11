@@ -87,28 +87,28 @@ export async function submitBatch(gun: IGunInstance, relayPub?: string): Promise
             };
         }
 
-        log.info(
+        log.debug(
             { walletAddress: client.wallet.address },
             "Starting batch submission"
         );
 
         // Get pending withdrawals
-        log.info({}, "Fetching pending withdrawals");
+        log.debug({}, "Fetching pending withdrawals");
         pending = await getPendingWithdrawals(gun);
-        log.info(
+        log.debug(
             { pendingCount: pending.length },
             "Retrieved pending withdrawals"
         );
 
         // Get pending force withdrawals
         const pendingForceWithdrawals = await getPendingForceWithdrawals(gun);
-        log.info(
+        log.debug(
             { forceCount: pendingForceWithdrawals.length },
             "Retrieved pending force withdrawals"
         );
 
         if (pending.length === 0 && pendingForceWithdrawals.length === 0) {
-            log.info({}, "No pending withdrawals to batch");
+            log.debug({}, "No pending withdrawals to batch");
             return {
                 success: false,
                 withdrawalCount: 0,
@@ -119,7 +119,7 @@ export async function submitBatch(gun: IGunInstance, relayPub?: string): Promise
         // SECURITY: Verify each withdrawal before including in batch
         // Only withdrawals with valid debit entries signed by the relay are included
         if (relayPub) {
-            log.info({ relayPub: relayPub.substring(0, 16) }, "Verifying withdrawals with relay signature enforcement");
+            log.debug({ relayPub: relayPub.substring(0, 16) }, "Verifying withdrawals with relay signature enforcement");
 
             for (const withdrawal of pending) {
                 const verification = await verifyWithdrawalDebit(gun, withdrawal, relayPub);
@@ -138,7 +138,7 @@ export async function submitBatch(gun: IGunInstance, relayPub?: string): Promise
                 }
             }
 
-            log.info({
+            log.debug({
                 totalPending: pending.length,
                 verified: verifiedWithdrawals.length,
                 excluded: pending.length - verifiedWithdrawals.length,
@@ -168,19 +168,19 @@ export async function submitBatch(gun: IGunInstance, relayPub?: string): Promise
         }));
 
         // Build Merkle tree
-        log.info({}, "Building Merkle tree");
+        log.debug({}, "Building Merkle tree");
         const { root } = buildMerkleTreeFromWithdrawals(withdrawals);
-        log.info({ root, leafCount: withdrawals.length }, "Merkle tree built");
+        log.debug({ root, leafCount: withdrawals.length }, "Merkle tree built");
 
         // Submit batch to contract
-        log.info({ root, forceCount: pendingForceWithdrawals.length }, "Submitting batch to contract");
+        log.debug({ root, forceCount: pendingForceWithdrawals.length }, "Submitting batch to contract");
 
         const forceWithdrawalHashes = pendingForceWithdrawals.map(w => w.withdrawalHash);
 
         const result = await client.submitBatch(root, forceWithdrawalHashes);
         log.info(
-            { txHash: result.txHash, blockNumber: result.blockNumber, batchId: result.batchId.toString() },
-            "Batch submitted to contract successfully"
+            { txHash: result.txHash, blockNumber: result.blockNumber, batchId: result.batchId.toString(), withdrawalCount: withdrawals.length },
+            "Batch submitted to L1"
         );
 
         // Get current batch ID (should match result.batchId)
@@ -188,7 +188,7 @@ export async function submitBatch(gun: IGunInstance, relayPub?: string): Promise
         const batchId = result.batchId.toString();
 
         // Save batch to GunDB (only verified withdrawals)
-        log.info({ batchId: batchId.toString(), withdrawalCount: verifiedWithdrawals.length }, "Saving batch to GunDB");
+        log.debug({ batchId: batchId.toString(), withdrawalCount: verifiedWithdrawals.length }, "Saving batch to GunDB");
         const batch: Batch = {
             batchId: batchId.toString(),
             root,
@@ -200,7 +200,7 @@ export async function submitBatch(gun: IGunInstance, relayPub?: string): Promise
         };
 
         await saveBatch(gun, batch);
-        log.info({ batchId: batchId.toString() }, "Batch saved to GunDB");
+        log.debug({ batchId: batchId.toString() }, "Batch saved to GunDB");
 
         // Wait a bit for GunDB to propagate the data
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -209,7 +209,7 @@ export async function submitBatch(gun: IGunInstance, relayPub?: string): Promise
         try {
             const savedBatch = await getBatch(gun, batchId.toString());
             if (savedBatch) {
-                log.info(
+                log.debug(
                     { batchId: savedBatch.batchId },
                     "Batch verification: Successfully read back saved batch"
                 );
@@ -221,15 +221,15 @@ export async function submitBatch(gun: IGunInstance, relayPub?: string): Promise
         }
 
         // Remove processed withdrawals from pending queue (only verified ones)
-        log.info({ withdrawalCount: verifiedWithdrawals.length }, "Removing processed withdrawals from pending queue");
+        log.debug({ withdrawalCount: verifiedWithdrawals.length }, "Removing processed withdrawals from pending queue");
         await removePendingWithdrawals(gun, verifiedWithdrawals);
 
         if (pendingForceWithdrawals.length > 0) {
             await removePendingForceWithdrawals(gun, pendingForceWithdrawals);
-            log.info({ count: pendingForceWithdrawals.length }, "Removed processed force withdrawals");
+            log.debug({ count: pendingForceWithdrawals.length }, "Removed processed force withdrawals");
         }
 
-        log.info({}, "Processed withdrawals removed from pending queue");
+        log.debug({}, "Processed withdrawals removed from pending queue");
 
         return {
             success: true,

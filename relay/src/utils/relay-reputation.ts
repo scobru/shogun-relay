@@ -326,7 +326,7 @@ export function initReputationTracking(gun: GunInstance, relayHost: string): Gun
         tier: 'average',
         lastScoreUpdate: Date.now(),
       });
-      log.info(`Reputation tracking initialized for ${relayHost}`);
+      log.debug(`Reputation tracking initialized for ${relayHost}`);
     }
   });
 

@@ -76,7 +76,7 @@ async function initRelayUserWithKeyPair(gun: GunInstance, keyPair: ISEAPair): Pr
     return { user: relayUser, pub: relayPub!, keyPair: relayKeyPair };
   }
 
-  log.info('Initializing relay user with direct SEA keypair...');
+  log.debug('Initializing relay user with direct SEA keypair...');
 
   return new Promise((resolve, reject) => {
     const user = gun.user();
@@ -94,7 +94,7 @@ async function initRelayUserWithKeyPair(gun: GunInstance, keyPair: ISEAPair): Pr
       relayKeyPair = keyPair;
       isInitialized = true;
 
-      log.info({ pub: relayPub?.substring(0, 30) }, 'Relay user authenticated with keypair');
+      log.debug({ pub: relayPub?.substring(0, 30) }, 'Relay user authenticated with keypair');
       resolve({ user: relayUser, pub: relayPub!, keyPair: relayKeyPair });
     });
   });
@@ -262,7 +262,7 @@ export async function saveSubscription(userAddress: string, subscriptionData: Su
         log.error({ userAddress, err: errorMsg, data: dataToSave }, 'Error saving subscription');
         reject(new Error(errorMsg));
       } else {
-        log.info({ userAddress }, 'Subscription saved');
+        log.debug({ userAddress }, 'Subscription saved');
         resolve();
       }
     });
@@ -287,7 +287,7 @@ export async function updateSubscriptionField(userAddress: string, field: string
         log.error({ userAddress, field, err: ack.err }, 'Error updating subscription field');
         reject(new Error(ack.err));
       } else {
-        log.info({ userAddress, field }, 'Subscription field updated');
+        log.debug({ userAddress, field }, 'Subscription field updated');
         resolve();
       }
     });
@@ -333,7 +333,7 @@ export async function saveUpload(userAddress: string, hash: string, uploadData: 
         log.error({ userAddress, hash, err: ack.err }, 'Error saving upload');
         reject(new Error(ack.err));
       } else {
-        log.info({ userAddress, hash }, 'Upload saved');
+        log.debug({ userAddress, hash }, 'Upload saved');
         resolve();
       }
     });
@@ -419,7 +419,7 @@ export async function deleteUpload(userAddress: string, hash: string): Promise<v
         log.error({ userAddress, hash, err: ack.err }, 'Error deleting upload');
         reject(new Error(ack.err));
       } else {
-        log.info({ userAddress, hash }, 'Upload deleted');
+        log.debug({ userAddress, hash }, 'Upload deleted');
         resolve();
       }
     });

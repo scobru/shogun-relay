@@ -58,7 +58,7 @@ let nonceGunInstance: IGunInstance | null = null;
  */
 export function initNoncePersistence(gun: IGunInstance): void {
   nonceGunInstance = gun;
-  log.info("Nonce persistence initialized with GunDB instance");
+  log.debug("Nonce persistence initialized with GunDB instance");
 }
 
 /**
@@ -69,7 +69,7 @@ export async function loadPersistedNonces(gun: IGunInstance): Promise<number> {
   return new Promise((resolve) => {
     let loadedCount = 0;
     const timeout = setTimeout(() => {
-      log.info({ loadedCount }, "Nonce loading timed out, continuing with loaded nonces");
+      log.debug({ loadedCount }, "Nonce loading timed out, continuing with loaded nonces");
       resolve(loadedCount);
     }, 5000);
 
@@ -80,7 +80,7 @@ export async function loadPersistedNonces(gun: IGunInstance): Promise<number> {
           const normalizedKey = key.toLowerCase();
           lastNonceByUser.set(normalizedKey, nonce);
           loadedCount++;
-          log.info({ user: normalizedKey, nonce: nonce.toString() }, "Loaded persisted nonce");
+          log.debug({ user: normalizedKey, nonce: nonce.toString() }, "Loaded persisted nonce");
         } catch (err) {
           log.warn({ key, data, err }, "Failed to parse persisted nonce");
         }
@@ -90,7 +90,7 @@ export async function loadPersistedNonces(gun: IGunInstance): Promise<number> {
     // Wait a bit for GunDB to stream data, then resolve
     setTimeout(() => {
       clearTimeout(timeout);
-      log.info({ loadedCount }, "Completed loading persisted nonces");
+      log.debug({ loadedCount }, "Completed loading persisted nonces");
       resolve(loadedCount);
     }, 2000);
   });
@@ -123,7 +123,7 @@ async function persistNonce(userAddress: string, nonce: bigint): Promise<void> {
         log.error({ user: normalizedAddress, err: ack.err }, "Failed to persist nonce");
         resolve(); // Don't fail the withdrawal if persistence fails
       } else {
-        log.info({ user: normalizedAddress, nonce: nonce.toString() }, "Nonce persisted to GunDB");
+        log.debug({ user: normalizedAddress, nonce: nonce.toString() }, "Nonce persisted to GunDB");
         resolve();
       }
     });
@@ -260,7 +260,7 @@ export async function getUserBalance(
   try {
     const indexKey = userAddress.toLowerCase();
 
-    log.info({ user: indexKey, enforceRelayPub: !!relayPub }, "Looking up balance");
+    log.debug({ user: indexKey, enforceRelayPub: !!relayPub }, "Looking up balance");
 
     // Get latest frozen entry for this user
     // If relayPub is provided, only trust entries signed by the relay
@@ -271,7 +271,7 @@ export async function getUserBalance(
       relayPub // Pass expectedSigner to enforce authority
     );
 
-    log.info(
+    log.debug(
       {
         user: indexKey,
         hasEntry: !!entry,
@@ -284,7 +284,7 @@ export async function getUserBalance(
     if (!entry || !entry.verified) {
       // If no verified entry found, return 0
       // Unverified entries are ignored for security
-      log.info({ user: indexKey }, "No verified entry found, returning 0");
+      log.debug({ user: indexKey }, "No verified entry found, returning 0");
       return 0n;
     }
 
@@ -294,7 +294,7 @@ export async function getUserBalance(
       ethereumAddress?: string;
     };
 
-    log.info(
+    log.debug(
       {
         user: indexKey,
         balance: balanceData?.balance,
@@ -304,13 +304,13 @@ export async function getUserBalance(
     );
 
     if (!balanceData || !balanceData.balance) {
-      log.info({ user: indexKey }, "No balance in data, returning 0");
+      log.debug({ user: indexKey }, "No balance in data, returning 0");
       return 0n;
     }
 
     try {
       const balance = BigInt(balanceData.balance);
-      log.info(
+      log.debug(
         { user: indexKey, balance: balance.toString() },
         "Balance retrieved successfully"
       );
@@ -358,7 +358,7 @@ export async function creditBalance(
   // Use lock manager to prevent race conditions - only one operation per user at a time
   return userLockManager.executeWithLock(ethereumAddress, async () => {
     try {
-      log.info(
+      log.debug(
         { user: ethereumAddress, amount: amount.toString() },
         "Crediting balance"
       );
@@ -384,7 +384,7 @@ export async function creditBalance(
         }
         const newBalance = currentBalance + amount;
 
-        log.info(
+        log.debug(
           {
             user: ethereumAddress,
             currentBalance: currentBalance.toString(),
@@ -408,7 +408,7 @@ export async function creditBalance(
           balanceData.gunPubKey = gunPubKey;
         }
 
-        log.info({ user: ethereumAddress, balanceData }, "Creating frozen entry");
+        log.debug({ user: ethereumAddress, balanceData }, "Creating frozen entry");
 
         // Create frozen entry (immutable, signed)
         // Use Ethereum address as index key (deposits come with Ethereum address)
@@ -421,14 +421,14 @@ export async function creditBalance(
           indexKey
         );
 
-        log.info({ user: indexKey }, "Frozen entry created successfully");
+        log.debug({ user: indexKey }, "Frozen entry created successfully");
 
         // Verify the entry was created and balance is correct
         // Wait a bit for GunDB to propagate the update
         await new Promise((resolve) => setTimeout(resolve, 200));
 
         const verifyBalance = await getUserBalance(gun, ethereumAddress);
-        log.info(
+        log.debug(
           {
             user: ethereumAddress,
             expectedBalance: newBalance.toString(),
@@ -458,7 +458,7 @@ export async function creditBalance(
           retryCount++;
         } else {
           // Balance increased but not as much as expected - concurrent update, retry to get latest
-          log.info(
+          log.debug(
             {
               user: ethereumAddress,
               expectedBalance: newBalance.toString(),
@@ -481,7 +481,7 @@ export async function creditBalance(
         if (finalBalance >= initialBalance + amount) {
           // Balance was eventually updated correctly (might be higher due to concurrent deposits)
           success = true;
-          log.info(
+          log.debug(
             {
               user: ethereumAddress,
               initialBalance: initialBalance.toString(),
@@ -568,7 +568,7 @@ export async function debitBalance(
         indexKey
       );
 
-      log.info({
+      log.debug({
         user: indexKey,
         amount: amount.toString(),
         newBalance: newBalance.toString(),
@@ -687,7 +687,7 @@ export async function verifyWithdrawalDebit(
       };
     }
 
-    log.info({
+    log.debug({
       user: withdrawal.user,
       amount: withdrawal.amount,
       nonce: withdrawal.nonce,
@@ -1091,7 +1091,7 @@ export async function transferBalance(
     const finalFromBalance = await getUserBalance(gun, fromAddress, relayKeyPair.pub);
     const finalToBalance = await getUserBalance(gun, toAddress, relayKeyPair.pub);
 
-    log.info(
+    log.debug(
       {
         from: fromAddress,
         to: toAddress,
@@ -1165,7 +1165,7 @@ export async function addPendingWithdrawal(
               cleanup();
               reject(new Error(errorMsg));
             } else {
-              log.info(
+              log.debug(
                 { withdrawalKey, withdrawal },
                 "Pending withdrawal added successfully"
               );
@@ -1220,7 +1220,7 @@ export async function getPendingWithdrawals(
             typeof w.nonce === "string" &&
             typeof w.timestamp === "number"
         );
-        log.info(
+        log.debug(
           { totalFound: withdrawals.length, normalized: normalized.length },
           "Retrieved pending withdrawals (timeout)"
         );
@@ -1288,7 +1288,7 @@ export async function getPendingWithdrawals(
 
           if (!exists) {
             withdrawals.push(withdrawal as PendingWithdrawal);
-            log.info(
+            log.debug(
               { key, withdrawal, total: withdrawals.length },
               "Found pending withdrawal node"
             );
@@ -1396,7 +1396,7 @@ export async function getPendingWithdrawals(
                 typeof w.timestamp === "number"
             );
 
-            log.info(
+            log.debug(
               { totalFound: withdrawals.length, normalized: normalized.length },
               "Retrieved pending withdrawals"
             );
@@ -1447,7 +1447,7 @@ export async function removePendingWithdrawals(
           errors.push(`Error deleting ${key}: ${errorMsg}`);
         } else {
           deleted++;
-          log.info(
+          log.debug(
             { key, deleted, total: toRemoveKeys.size },
             "Deleted pending withdrawal node"
           );
@@ -1467,7 +1467,7 @@ export async function removePendingWithdrawals(
               );
             }
           } else {
-            log.info(
+            log.debug(
               { deleted },
               "All pending withdrawals removed successfully"
             );
@@ -1547,7 +1547,7 @@ export async function saveBatch(
                 rej(new Error(errorMsg));
               }
             } else {
-              log.info(
+              log.debug(
                 { batchId: batch.batchId, withdrawalCount: batch.withdrawals.length, withdrawalsJsonLength: withdrawalsJson.length },
                 "Batch metadata saved to GunDB"
               );
@@ -1572,7 +1572,7 @@ export async function saveBatch(
             const errorMsg = typeof ack.err === "string" ? ack.err : String(ack.err);
             log.warn({ error: errorMsg, batchId: batch.batchId }, "Warning: Error saving batch reference in parent node (non-critical)");
           } else {
-            log.info({ batchId: batch.batchId }, "Batch reference saved in parent node");
+            log.debug({ batchId: batch.batchId }, "Batch reference saved in parent node");
           }
           res();
         });
@@ -1597,7 +1597,7 @@ export async function saveBatch(
                 const errorMsg = typeof ack.err === "string" ? ack.err : String(ack.err);
                 log.warn({ error: errorMsg, withdrawalNodePath, index }, "Error saving individual withdrawal node (non-critical, JSON backup exists)");
               } else {
-                log.info({ withdrawalNodePath, index, user: withdrawal.user, amount: withdrawal.amount }, "Individual withdrawal node saved to GunDB");
+                log.debug({ withdrawalNodePath, index, user: withdrawal.user, amount: withdrawal.amount }, "Individual withdrawal node saved to GunDB");
               }
               res();
             });
@@ -1620,7 +1620,7 @@ export async function saveBatch(
             try {
               const parsedWithdrawals = JSON.parse(readData.withdrawalsJson);
               if (Array.isArray(parsedWithdrawals) && parsedWithdrawals.length === batch.withdrawals.length) {
-                log.info(
+                log.debug(
                   { batchId: batch.batchId, readBackWithdrawals: parsedWithdrawals.length },
                   "Batch verified: successfully read back with correct withdrawal count"
                 );
@@ -1641,7 +1641,7 @@ export async function saveBatch(
         });
       });
 
-      log.info(
+      log.debug(
         { batchId: batch.batchId, withdrawalCount: batch.withdrawals.length },
         "Batch saved and verified successfully to GunDB"
       );
@@ -1696,7 +1696,7 @@ export async function getBatch(
       batchMetadata = data;
       lastUpdateTime = Date.now();
 
-      log.info(
+      log.debug(
         { batchId, withdrawalsCount: data.withdrawalsCount || 0, hasWithdrawalsJson: !!data.withdrawalsJson },
         "Batch metadata retrieved, reading withdrawals"
       );
@@ -1717,7 +1717,7 @@ export async function getBatch(
               txHash: data.txHash,
             };
 
-            log.info(
+            log.debug(
               {
                 batchId: data.batchId,
                 withdrawalCount: withdrawals.length,
@@ -1766,7 +1766,7 @@ export async function getBatch(
                 collectedKeys.add(key);
                 withdrawalsObj[index] = withdrawal as PendingWithdrawal;
                 lastUpdateTime = Date.now();
-                log.info(
+                log.debug(
                   { batchId, index, user: withdrawal.user, amount: withdrawal.amount, nonce: withdrawal.nonce, source: 'direct-read' },
                   "Added withdrawal from direct read in getBatch"
                 );
@@ -1791,7 +1791,7 @@ export async function getBatch(
 
         lastUpdateTime = Date.now();
 
-        log.info(
+        log.debug(
           { batchId, key, withdrawal, withdrawalType: typeof withdrawal },
           "Reading withdrawal from batch in getBatch (map)"
         );
@@ -1808,7 +1808,7 @@ export async function getBatch(
           if (!isNaN(index)) {
             collectedKeys.add(key);
             withdrawalsObj[index] = withdrawal as PendingWithdrawal;
-            log.info(
+            log.debug(
               { batchId, index, user: withdrawal.user, amount: withdrawal.amount, nonce: withdrawal.nonce, source: 'map' },
               "Added withdrawal from map in getBatch"
             );
@@ -1855,7 +1855,7 @@ export async function getBatch(
                 collectedKeys.add(key);
                 withdrawalsObj[index] = withdrawal as PendingWithdrawal;
                 lastUpdateTime = Date.now();
-                log.info(
+                log.debug(
                   { batchId, index, user: withdrawal.user, amount: withdrawal.amount, nonce: withdrawal.nonce, source: 'direct-index', attempt },
                   "Added withdrawal from direct index read in getBatch"
                 );
@@ -1883,7 +1883,7 @@ export async function getBatch(
                 collectedKeys.add(key);
                 withdrawalsObj[index] = withdrawal as PendingWithdrawal;
                 lastUpdateTime = Date.now();
-                log.info(
+                log.debug(
                   { batchId, index, user: withdrawal.user, amount: withdrawal.amount, nonce: withdrawal.nonce, source: 'direct-index-realtime' },
                   "Added withdrawal from direct index read (realtime) in getBatch"
                 );
@@ -1896,7 +1896,7 @@ export async function getBatch(
       };
 
       if (withdrawalsCount > 0) {
-        log.info(
+        log.debug(
           { batchId, withdrawalsCount },
           "Attempting to read withdrawals directly by index with retries"
         );
@@ -1914,7 +1914,7 @@ export async function getBatch(
         const expectedCount = withdrawalsCount || Object.keys(withdrawalsObj).length;
         const foundCount = Object.keys(withdrawalsObj).length;
 
-        log.info(
+        log.debug(
           {
             batchId,
             withdrawalsFound: foundCount,
@@ -1949,7 +1949,7 @@ export async function getBatch(
             txHash: batchMetadata.txHash,
           };
 
-          log.info(
+          log.debug(
             {
               batchId: batchMetadata.batchId,
               withdrawalCount: withdrawals.length,
@@ -1969,7 +1969,7 @@ export async function getBatch(
         if (foundCount > 0 || timeSinceLastUpdate > 8000) {
           // If we expected withdrawals but haven't found any, wait even more
           if (expectedCount > 0 && foundCount === 0 && timeSinceLastUpdate < 10000) {
-            log.info(
+            log.debug(
               { batchId, expectedCount, timeSinceLastUpdate },
               "Still waiting for withdrawals in getBatch"
             );
@@ -1993,7 +1993,7 @@ export async function getBatch(
           if (withdrawals.length === 0 && batchMetadata.withdrawals) {
             if (Array.isArray(batchMetadata.withdrawals)) {
               withdrawals.push(...batchMetadata.withdrawals);
-              log.info({ batchId, source: 'old-array-format' }, "Using old array format for withdrawals");
+              log.debug({ batchId, source: 'old-array-format' }, "Using old array format for withdrawals");
             } else if (typeof batchMetadata.withdrawals === 'object') {
               const oldWithdrawalsObj = batchMetadata.withdrawals;
               const indices = Object.keys(oldWithdrawalsObj)
@@ -2005,7 +2005,7 @@ export async function getBatch(
                 const w = oldWithdrawalsObj[index.toString()];
                 if (w) withdrawals.push(w);
               });
-              log.info({ batchId, source: 'old-object-format' }, "Using old object format for withdrawals");
+              log.debug({ batchId, source: 'old-object-format' }, "Using old object format for withdrawals");
             }
           }
 
@@ -2018,7 +2018,7 @@ export async function getBatch(
             txHash: batchMetadata.txHash,
           };
 
-          log.info(
+          log.debug(
             {
               batchId: batchMetadata.batchId,
               withdrawalCount: withdrawals.length,
@@ -2067,7 +2067,7 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
       resolved = true;
     };
 
-    log.info({ batchesPath }, "Starting to read batches from GunDB");
+    log.debug({ batchesPath }, "Starting to read batches from GunDB");
 
     const parentNode = gun.get(batchesPath);
 
@@ -2091,7 +2091,7 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
         if (!collectedKeys.has(key)) {
           collectedKeys.add(key);
           batchIdsMap.set(key, batch.batchId);
-          log.info(
+          log.debug(
             { key, batchId: batch.batchId, totalFound: batchIdsMap.size },
             "Found batch ID in GunDB"
           );
@@ -2103,7 +2103,7 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
     parentNode.once((parentData: any) => {
       if (resolved) return;
 
-      log.info({ batchesPath, hasData: !!parentData, keys: parentData ? Object.keys(parentData).filter(k => !k.startsWith('_')) : [] }, "Read parent node directly");
+      log.debug({ batchesPath, hasData: !!parentData, keys: parentData ? Object.keys(parentData).filter(k => !k.startsWith('_')) : [] }, "Read parent node directly");
 
       if (parentData && typeof parentData === 'object') {
         Object.keys(parentData).forEach(key => {
@@ -2119,7 +2119,7 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
             if (!collectedKeys.has(key)) {
               collectedKeys.add(key);
               batchIdsMap.set(key, batch.batchId);
-              log.info(
+              log.debug(
                 { key, batchId: batch.batchId, source: 'direct-read', totalFound: batchIdsMap.size },
                 "Found batch ID via direct read"
               );
@@ -2136,7 +2136,7 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
       const timeSinceLastUpdate = Date.now() - lastUpdateTime;
       const batchIds = Array.from(batchIdsMap.values());
 
-      log.info(
+      log.debug(
         { batchesPath, batchIdsCount: batchIds.length, batchIds, timeSinceLastUpdate },
         "Checking batches collection status"
       );
@@ -2148,7 +2148,7 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
           return;
         }
         // No batches found and no updates for 3 seconds
-        log.info({ batchesPath }, "No batches found in GunDB after waiting");
+        log.debug({ batchesPath }, "No batches found in GunDB after waiting");
         cleanup();
         parentNode.off(); // Unsubscribe from all events
         resolve(null);
@@ -2165,7 +2165,7 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
       cleanup();
       parentNode.off(); // Unsubscribe from all events
 
-      log.info(
+      log.debug(
         { batchesPath, batchIdsCount: batchIds.length, batchIds },
         "Finished collecting batch IDs, fetching full batch data"
       );
@@ -2175,7 +2175,7 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
       const batches = await Promise.all(batchPromises);
       const validBatches = batches.filter((b): b is Batch => b !== null);
 
-      log.info(
+      log.debug(
         { batchesPath, requestedCount: batchIds.length, validCount: validBatches.length },
         "Fetched batch data from GunDB"
       );
@@ -2190,7 +2190,7 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
       let latest: Batch | null = null;
       let latestId = -1;
 
-      log.info(
+      log.debug(
         {
           validBatchesCount: validBatches.length,
           batchSummaries: validBatches.map(b => ({
@@ -2208,7 +2208,7 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
         if (!isNaN(batchIdNum) && batchIdNum > latestId) {
           latestId = batchIdNum;
           latest = batch;
-          log.info(
+          log.debug(
             {
               batchId: batch.batchId,
               batchIdNum,
@@ -2226,7 +2226,7 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
 
       if (latest) {
         const latestBatch: Batch = latest;
-        log.info(
+        log.debug(
           {
             latestBatchId: latestBatch.batchId,
             latestBatchRoot: latestBatch.root,
@@ -2300,7 +2300,7 @@ export async function addPendingForceWithdrawal(
   gun: IGunInstance,
   forceWithdrawal: ForceWithdrawal
 ): Promise<void> {
-  log.info({ forceWithdrawal }, "Adding pending force withdrawal");
+  log.debug({ forceWithdrawal }, "Adding pending force withdrawal");
 
   // Store in simple list/set structure
   // Keyed by withdrawalHash
@@ -2344,7 +2344,7 @@ export async function removePendingForceWithdrawals(
   gun: IGunInstance,
   withdrawals: ForceWithdrawal[]
 ): Promise<void> {
-  log.info({ count: withdrawals.length }, "Removing pending force withdrawals");
+  log.debug({ count: withdrawals.length }, "Removing pending force withdrawals");
 
   for (const w of withdrawals) {
     // Nullify entry to remove
@@ -2380,7 +2380,7 @@ export async function reconcileUserBalance(
     // Get current balance from GunDB
     const currentBalance = await getUserBalance(gun, normalizedAddress, relayKeyPair.pub);
 
-    log.info(
+    log.debug(
       { user: normalizedAddress, currentBalance: currentBalance.toString() },
       "Starting balance reconciliation"
     );
@@ -2416,7 +2416,7 @@ export async function reconcileUserBalance(
       }
     }
 
-    log.info(
+    log.debug(
       {
         user: normalizedAddress,
         currentBalance: currentBalance.toString(),
@@ -2454,7 +2454,7 @@ export async function reconcileUserBalance(
 
       // Verify correction
       const verifiedBalance = await getUserBalance(gun, normalizedAddress, relayKeyPair.pub);
-      log.info(
+      log.debug(
         {
           user: normalizedAddress,
           expectedBalance: calculatedBalance.toString(),

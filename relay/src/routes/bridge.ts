@@ -226,7 +226,7 @@ router.post("/transfer", strictLimiter, express.json(), async (req, res) => {
       gunPubKey
     );
 
-    log.info(
+    log.debug(
       sanitizeForLog({
         from: fromAddress,
         to: toAddress,
@@ -350,7 +350,7 @@ router.post("/withdraw", strictLimiter, express.json(), async (req, res) => {
 
     // SECURITY: Verify dual signatures before processing withdrawal
 
-    log.info(
+    log.debug(
       {
         user: userAddress,
         amount: amountBigInt.toString(),
@@ -392,7 +392,7 @@ router.post("/withdraw", strictLimiter, express.json(), async (req, res) => {
       });
     }
 
-    log.info(
+    log.debug(
       {
         user: userAddress,
         amount: amountBigInt.toString(),
@@ -448,7 +448,7 @@ router.post("/withdraw", strictLimiter, express.json(), async (req, res) => {
     try {
       await addPendingWithdrawal(gun, withdrawal);
 
-      log.info(
+      log.debug(
         { user: userAddress, amount: amountBigInt.toString(), nonce: nonceBigInt.toString() },
         "Withdrawal requested successfully"
       );
@@ -591,7 +591,7 @@ router.get("/balance/:user", async (req, res) => {
     // Get relay keypair for signature verification
     const relayKeyPair = req.app.get("relayKeyPair");
 
-    log.info(
+    log.debug(
       { user: userAddress, normalizedUser: userAddress.toLowerCase(), hasRelayPub: !!relayKeyPair?.pub },
       "Getting user balance"
     );
@@ -599,7 +599,7 @@ router.get("/balance/:user", async (req, res) => {
     // SECURITY: Enforce relay signature verification - only trust balances signed by this relay
     const balance = await getUserBalance(gun, userAddress, relayKeyPair?.pub);
 
-    log.info(
+    log.debug(
       {
         user: userAddress,
         balance: balance.toString(),
@@ -687,7 +687,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     const amountBigInt = BigInt(amount);
     const nonceBigInt = BigInt(nonce);
 
-    log.info(
+    log.debug(
       { user: userAddress, amount: amountBigInt.toString(), nonce: nonceBigInt.toString() },
       "Proof request received"
     );
@@ -705,7 +705,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     });
 
     if (pendingWithdrawal) {
-      log.info(
+      log.debug(
         {
           user: userAddress,
           amount: amountBigInt.toString(),
@@ -755,7 +755,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
         if (!collectedKeys.has(key)) {
           collectedKeys.add(key);
           batchIdsMap.set(key, batch.batchId);
-          log.info(
+          log.debug(
             { key, batchId: batch.batchId, totalFound: batchIdsMap.size },
             "Found batch ID in GunDB for proof search"
           );
@@ -779,7 +779,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
             if (!collectedKeys.has(key)) {
               collectedKeys.add(key);
               batchIdsMap.set(key, batch.batchId);
-              log.info(
+              log.debug(
                 { key, batchId: batch.batchId, source: 'direct-read', totalFound: batchIdsMap.size },
                 "Found batch ID via direct read for proof search"
               );
@@ -796,7 +796,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     try {
       const client = getBridgeClient();
       const currentBatchId = await client.getCurrentBatchId();
-      log.info(
+      log.debug(
         { currentBatchId: currentBatchId.toString() },
         "Retrieved current batch ID from contract"
       );
@@ -807,7 +807,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
         if (!Array.from(batchIdsMap.values()).includes(batchIdStr)) {
           // Use batchId as both key and value for contract-fetched batch
           batchIdsMap.set(batchIdStr, batchIdStr);
-          log.info(
+          log.debug(
             { batchId: batchIdStr, source: 'contract' },
             "Added batch ID from contract for proof search"
           );
@@ -821,7 +821,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     }
 
     const batchIds = Array.from(batchIdsMap.values());
-    log.info(
+    log.debug(
       { batchIdsCount: batchIds.length, batchIds },
       "Collected batch IDs for proof search"
     );
@@ -838,7 +838,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     }
 
     // Fetch all batches and search for the withdrawal
-    log.info(
+    log.debug(
       { batchIdsCount: batchIds.length },
       "Fetching all batches to search for withdrawal"
     );
@@ -847,7 +847,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     const batches = await Promise.all(batchPromises);
     const validBatches = batches.filter((b: Batch | null): b is Batch => b !== null);
 
-    log.info(
+    log.debug(
       { requestedCount: batchIds.length, validCount: validBatches.length },
       "Fetched batch data from GunDB"
     );
@@ -873,7 +873,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     let foundWithdrawal: PendingWithdrawal | null = null;
 
     for (const batch of validBatches) {
-      log.info(
+      log.debug(
         {
           batchId: batch.batchId,
           withdrawalCount: batch.withdrawals.length,
@@ -895,7 +895,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
         const nonceMatch = withdrawalNonce === normalizedNonce;
 
         if (userMatch && amountMatch && nonceMatch) {
-          log.info(
+          log.debug(
             {
               batchId: batch.batchId,
               requestedUser: normalizedUserAddress,
@@ -950,7 +950,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
         );
 
         if (isProcessedOnChain) {
-          log.info(
+          log.debug(
             { user: userAddress, amount: amountBigInt.toString(), nonce: nonceBigInt.toString() },
             "Withdrawal already processed on-chain (detected via fallback check)"
           );
@@ -986,7 +986,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
       nonce: BigInt(typeof w.nonce === 'string' ? w.nonce : String(w.nonce)),
     }));
 
-    log.info(
+    log.debug(
       { batchId: foundBatch.batchId, withdrawalCount: withdrawals.length },
       "Generating Merkle proof"
     );
@@ -1004,7 +1004,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
       });
     }
 
-    log.info(
+    log.debug(
       { batchId: foundBatch.batchId, user: userAddress, amount: normalizedAmount, nonce: normalizedNonce },
       "Proof generated successfully"
     );
@@ -1114,7 +1114,7 @@ router.post("/sync-deposits", adminAuthMiddleware, express.json({ limit: '10mb' 
       ? Number(toBlock)
       : "latest";
 
-    log.info(
+    log.debug(
       { fromBlock: fromBlockNumber, toBlock: toBlockNumber, user },
       "Starting retroactive deposit sync"
     );
@@ -1143,7 +1143,7 @@ router.post("/sync-deposits", adminAuthMiddleware, express.json({ limit: '10mb' 
     // All deposits are already filtered by user if user was specified
     const depositsToCheck = allDeposits;
 
-    log.info(
+    log.debug(
       { total: allDeposits.length, toCheck: depositsToCheck.length, user },
       "Deposits found in range"
     );
@@ -1169,7 +1169,7 @@ router.post("/sync-deposits", adminAuthMiddleware, express.json({ limit: '10mb' 
         })));
       }
 
-      log.info(
+      log.debug(
         { withdrawals: allWithdrawals.length },
         "L1 withdrawals found for balance calculation"
       );
@@ -1215,7 +1215,7 @@ router.post("/sync-deposits", adminAuthMiddleware, express.json({ limit: '10mb' 
       const netBalance = deposits - withdrawals;
       userExpectedBalanceMap.set(user, netBalance > 0n ? netBalance : 0n);
 
-      log.info(
+      log.debug(
         { user, deposits: deposits.toString(), withdrawals: withdrawals.toString(), netBalance: netBalance.toString() },
         "Calculated expected net balance for user"
       );
@@ -1249,7 +1249,7 @@ router.post("/sync-deposits", adminAuthMiddleware, express.json({ limit: '10mb' 
             );
             alreadyProcessed = false; // Force reprocessing
           } else {
-            log.info(
+            log.debug(
               { txHash: deposit.txHash, user: normalizedUser },
               "Deposit already processed, skipping"
             );
@@ -1291,7 +1291,7 @@ router.post("/sync-deposits", adminAuthMiddleware, express.json({ limit: '10mb' 
 
         while (!balanceVerified && attempts < maxAttempts) {
           const verifyBalance = await getUserBalance(gun, normalizedUser, relayKeyPair?.pub);
-          log.info(
+          log.debug(
             {
               user: normalizedUser,
               expectedAmount: ethers.formatEther(deposit.amount),
@@ -1337,7 +1337,7 @@ router.post("/sync-deposits", adminAuthMiddleware, express.json({ limit: '10mb' 
         });
 
         const finalVerifyBalance = await getUserBalance(gun, normalizedUser, relayKeyPair?.pub);
-        log.info(
+        log.debug(
           {
             txHash: deposit.txHash,
             user: normalizedUser,
@@ -1362,7 +1362,7 @@ router.post("/sync-deposits", adminAuthMiddleware, express.json({ limit: '10mb' 
     // Final verification and correction: Check if actual balances match expected totals
     // Expected = deposits - withdrawals (L2 transfers are already reflected in balance)
     if (userExpectedBalanceMap.size > 0) {
-      log.info(
+      log.debug(
         { userCount: userExpectedBalanceMap.size },
         "Verifying and correcting balances for all users (deposits - withdrawals)"
       );
@@ -1405,7 +1405,7 @@ router.post("/sync-deposits", adminAuthMiddleware, express.json({ limit: '10mb' 
             const correctedBalance = await getUserBalance(gun, normalizedUser, relayKeyPair?.pub);
 
             if (correctedBalance === expectedTotal) {
-              log.info(
+              log.debug(
                 {
                   user: normalizedUser,
                   correctedBalance: correctedBalance.toString(),
@@ -1426,7 +1426,7 @@ router.post("/sync-deposits", adminAuthMiddleware, express.json({ limit: '10mb' 
               results.errors.push(`Balance correction failed for ${normalizedUser}`);
             }
           } else {
-            log.info(
+            log.debug(
               {
                 user: normalizedUser,
                 balance: actualBalance.toString(),
@@ -1445,7 +1445,7 @@ router.post("/sync-deposits", adminAuthMiddleware, express.json({ limit: '10mb' 
       }
     }
 
-    log.info(results, "Retroactive deposit sync completed");
+    log.debug(results, "Retroactive deposit sync completed");
 
     res.json({
       success: true,
@@ -1510,7 +1510,7 @@ router.post("/reconcile-balance", express.json(), async (req, res) => {
     // Get bridge client for querying on-chain data
     const client = getBridgeClient();
 
-    log.info({ user: userAddress }, "Starting balance reconciliation");
+    log.debug({ user: userAddress }, "Starting balance reconciliation");
 
     const { reconcileUserBalance } = await import("../utils/bridge-state");
     const result = await reconcileUserBalance(
@@ -1594,7 +1594,7 @@ router.post("/process-deposit", adminAuthMiddleware, express.json({ limit: '10mb
       });
     }
 
-    log.info({ txHash }, "Processing specific deposit");
+    log.debug({ txHash }, "Processing specific deposit");
 
     // Get transaction receipt
     const provider = client.provider;
@@ -1677,7 +1677,7 @@ router.post("/process-deposit", adminAuthMiddleware, express.json({ limit: '10mb
     // Verify balance
     const balance = await getUserBalance(gun, normalizedUser, relayKeyPair?.pub);
 
-    log.info(
+    log.debug(
       {
         txHash,
         user: normalizedUser,

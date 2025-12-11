@@ -73,7 +73,7 @@ class SQLiteStore {
     this.listStmt = this.db.prepare('SELECT file FROM radisk_files ORDER BY file') as unknown as PreparedStatement;
     this.deleteStmt = this.db.prepare('DELETE FROM radisk_files WHERE file = ?') as unknown as PreparedStatement;
 
-    log.info({ path: this.dbPath }, 'SQLite store initialized');
+    log.debug({ path: this.dbPath }, 'SQLite store initialized');
   }
 
   /**
@@ -167,7 +167,7 @@ class SQLiteStore {
       // Mark as closed first to prevent new operations
       this.isClosed = true;
       this.db.close();
-      log.info('SQLite store closed');
+      log.debug('SQLite store closed');
     }
   }
 }

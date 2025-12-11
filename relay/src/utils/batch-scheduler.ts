@@ -11,7 +11,7 @@ let isProcessing = false;
 
 export function startBatchScheduler(gun: IGunInstance) {
     if (!bridgeConfig.autoBatchEnabled) {
-        log.info({}, "Batch scheduler disabled by configuration");
+        log.debug({}, "Batch scheduler disabled by configuration");
         return;
     }
 
@@ -20,7 +20,7 @@ export function startBatchScheduler(gun: IGunInstance) {
         return;
     }
 
-    log.info(
+    log.debug(
         {
             intervalMs: bridgeConfig.autoBatchIntervalMs,
             minWithdrawals: bridgeConfig.autoBatchMinWithdrawals // Note: strictly we should check this before submitting
@@ -43,13 +43,13 @@ export function stopBatchScheduler() {
     if (schedulerInterval) {
         clearInterval(schedulerInterval);
         schedulerInterval = null;
-        log.info({}, "Batch scheduler stopped");
+        log.debug({}, "Batch scheduler stopped");
     }
 }
 
 async function runBatchSubmission(gun: IGunInstance) {
     if (isProcessing) {
-        log.info({}, "Batch submission already in progress, skipping");
+        log.debug({}, "Batch submission already in progress, skipping");
         return;
     }
 
@@ -65,7 +65,7 @@ async function runBatchSubmission(gun: IGunInstance) {
 
         if (pending.length < minWithdrawals) {
             if (pending.length > 0) {
-                log.info(
+                log.debug(
                     { pending: pending.length, min: minWithdrawals },
                     "Not enough pending withdrawals for auto-batch"
                 );
@@ -73,12 +73,12 @@ async function runBatchSubmission(gun: IGunInstance) {
             return; // Skip submission
         }
 
-        log.info({ pending: pending.length }, "Triggering auto-batch submission");
+        log.debug({ pending: pending.length }, "Triggering auto-batch submission");
 
         const result = await submitBatch(gun);
 
         if (result.success) {
-            log.info({ ...result }, "Scheduled batch submission completed successfully");
+            log.debug({ ...result }, "Scheduled batch submission completed successfully");
         } else if (result.error === "No pending withdrawals to batch") {
             // Should be caught by previous check, but just in case
             log.debug({}, "No pending withdrawals to batch");

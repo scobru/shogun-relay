@@ -175,7 +175,7 @@ export async function createFrozenEntry(
   }
 
   // Log entry structure before signing to ensure metadata is present
-  log.info({
+  log.debug({
     namespace,
     indexKey,
     hasMeta: !!entry._meta,
@@ -187,7 +187,7 @@ export async function createFrozenEntry(
   // Create dataString - this exact string will be used for signing, hashing, and storing as dataJson
   const dataString = JSON.stringify(entry);
 
-  log.info({
+  log.debug({
     namespace,
     indexKey,
     dataStringLength: dataString.length,
@@ -230,7 +230,7 @@ export async function createFrozenEntry(
     });
   }
 
-  log.info(`Frozen entry created: ${namespace}/${hash.substring(0, 16)}...`);
+  log.debug(`Frozen entry created: ${namespace}/${hash.substring(0, 16)}...`);
 
   return { hash, signature };
 }
@@ -266,7 +266,7 @@ export async function readFrozenEntry(gun: GunInstance, namespace: string, hash:
           try {
             entryData = JSON.parse(dataString);
             pub = entryData._meta?.pub || entryData.meta?.pub;
-            log.info({
+            log.debug({
               hash: hash.substring(0, 16),
               source: 'dataJson',
               hasMeta: !!entryData._meta,
@@ -286,7 +286,7 @@ export async function readFrozenEntry(gun: GunInstance, namespace: string, hash:
           entryData = entry.data || {};
           dataString = JSON.stringify(entryData);
           pub = entryData._meta?.pub || entryData.meta?.pub;
-          log.info({
+          log.debug({
             hash: hash.substring(0, 16),
             source: 'entry.data',
             hasData: !!entry.data,
@@ -326,7 +326,7 @@ export async function readFrozenEntry(gun: GunInstance, namespace: string, hash:
           pub = await indexLookup;
 
           if (pub) {
-            log.info(`Recovered pub for frozen entry ${hash.substring(0, 16)}... from index`);
+            log.debug(`Recovered pub for frozen entry ${hash.substring(0, 16)}... from index`);
           }
         }
 
@@ -380,7 +380,7 @@ export async function readFrozenEntry(gun: GunInstance, namespace: string, hash:
         const verified = signatureValid && hashValid;
 
         // Log verification details for debugging
-        log.info({
+        log.debug({
           hash: hash.substring(0, 16),
           expectedHash: expectedHash?.substring(0, 16),
           hashMatch: hashValid,
@@ -679,7 +679,7 @@ export async function createSignedAcknowledgment(
     originalHash
   );
 
-  log.info(`Signed ACK created for ${originalHash.substring(0, 8)}...`);
+  log.debug(`Signed ACK created for ${originalHash.substring(0, 8)}...`);
   return result;
 }
 

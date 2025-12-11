@@ -266,7 +266,7 @@ export async function saveDeal(gun: any, deal: Deal, keyPair: any): Promise<void
     try {
         await FrozenData.createFrozenEntry(gun, deal, keyPair, 'storage-deals', deal.id);
 
-        log.info({ dealId: deal.id }, "Saved deal to GunDB");
+        log.debug({ dealId: deal.id }, "Saved deal to GunDB");
     } catch (error: any) {
         log.error({ err: error, dealId: deal.id }, "Failed to save deal");
         throw error;

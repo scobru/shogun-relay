@@ -148,7 +148,7 @@ async function ipfsRequest(
   ) {
     const isReady = await checkIpfsReady(1000);
     if (!isReady) {
-      log.info("IPFS daemon not ready, waiting...");
+      log.debug("IPFS daemon not ready, waiting...");
       const ready = await waitForIpfs(10000); // Wait up to 10 seconds
       if (!ready) {
         log.warn("IPFS daemon not ready after waiting, proceeding anyway...");
@@ -295,7 +295,7 @@ async function ipfsUpload(
   ) {
     const isReady = await checkIpfsReady(1000);
     if (!isReady) {
-      log.info("IPFS daemon not ready, waiting before upload...");
+      log.debug("IPFS daemon not ready, waiting before upload...");
       await waitForIpfs(10000);
     }
     ipfsReadyCache.isReady = isReady;

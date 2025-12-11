@@ -171,7 +171,7 @@ function startCacheCleanup(): void {
     }
 
     if (cleaned > 0) {
-      log.info(`Cleaned ${cleaned} stale entries from pin failure cache`);
+      log.debug(`Cleaned ${cleaned} stale entries from pin failure cache`);
     }
   }, CACHE_CLEANUP_INTERVAL_MS);
 }
@@ -317,13 +317,13 @@ async function pinCid(cid: string, maxRetries: number = 2): Promise<PinResult> {
             if (res.statusCode === 200) {
               try {
                 const parsed = JSON.parse(data);
-                log.info(
+                log.debug(
                   `CID ${cid} pinned successfully${attempt > 0 ? ` (attempt ${attempt + 1})` : ""
                   }`
                 );
                 resolve({ success: true, result: parsed });
               } catch (e) {
-                log.info(
+                log.debug(
                   `CID ${cid} pinned (response: ${data})${attempt > 0 ? ` (attempt ${attempt + 1})` : ""
                   }`
                 );
@@ -335,7 +335,7 @@ async function pinCid(cid: string, maxRetries: number = 2): Promise<PinResult> {
                 data.includes("already pinned") ||
                 data.includes("is already pinned")
               ) {
-                log.info(
+                log.debug(
                   `CID ${cid} was already pinned${attempt > 0 ? ` (attempt ${attempt + 1})` : ""
                   }`
                 );
@@ -403,7 +403,7 @@ async function pinCid(cid: string, maxRetries: number = 2): Promise<PinResult> {
       // If pending (timeout but might still be processing), check if we should retry
       if (result.pending && attempt < maxRetries && !isShuttingDown) {
         const retryDelay = Math.min(5000 * Math.pow(2, attempt), 30000); // Exponential backoff: 5s, 10s, 20s, max 30s
-        log.info(
+        log.debug(
           `CID ${cid} pin may still be processing. Retrying in ${retryDelay / 1000
           }s...`
         );
@@ -423,7 +423,7 @@ async function pinCid(cid: string, maxRetries: number = 2): Promise<PinResult> {
       // If retryable error and we have retries left
       if (result.retryable && attempt < maxRetries && !isShuttingDown) {
         const retryDelay = Math.min(2000 * Math.pow(2, attempt), 10000); // Exponential backoff: 2s, 4s, 8s, max 10s
-        log.info(
+        log.debug(
           `Retrying pin for CID ${cid} in ${retryDelay / 1000}s (attempt ${attempt + 2
           }/${maxRetries + 1})...`
         );
@@ -605,7 +605,7 @@ export async function syncDealsWithIPFS(
     // Fast sync: minimal logging, skip expensive operations
     // Only log if there are issues
   } else {
-    log.info(
+    log.debug(
       { relayAddress, chainId, options: { onlyActive, dryRun, gunDB: !!gun } },
       `Starting deal sync`
     );
@@ -623,7 +623,7 @@ export async function syncDealsWithIPFS(
       await storageDealRegistryClient.getRelayDeals(relayAddress);
 
     if (!fastSync) {
-      log.info(
+      log.debug(
         `Found ${deals.length} deals on-chain for relay ${relayAddress}`
       );
     }
@@ -638,7 +638,7 @@ export async function syncDealsWithIPFS(
       : deals;
 
     if (!fastSync) {
-      log.info(
+      log.debug(
         `Syncing ${dealsToSync.length} ${onlyActive ? "active" : ""} deals...`
       );
     }
@@ -662,7 +662,7 @@ export async function syncDealsWithIPFS(
     for (const deal of dealsToSync) {
       // Check if shutdown started during processing
       if (isShuttingDown) {
-        log.info(`Deal sync interrupted (shutdown in progress)`);
+        log.debug(`Deal sync interrupted (shutdown in progress)`);
         break;
       }
 
@@ -679,7 +679,7 @@ export async function syncDealsWithIPFS(
 
         if (pinned) {
           if (!fastSync) {
-            log.info(`Deal ${dealId}: CID ${cid} already pinned`);
+            log.debug(`Deal ${dealId}: CID ${cid} already pinned`);
           }
           // Clear from failure cache if it was there
           pinFailureCache.delete(cid);
@@ -721,7 +721,7 @@ export async function syncDealsWithIPFS(
               const minutesSinceAttempt = Math.floor(
                 timeSinceLastAttempt / 60000
               );
-              log.info(
+              log.debug(
                 `Deal ${dealId}: CID ${cid} failed ${failureInfo.consecutiveFailures} time(s) recently (${minutesSinceAttempt}m ago). Skipping retry for now.`
               );
             }
@@ -732,7 +732,7 @@ export async function syncDealsWithIPFS(
         // Pin the CID if not in dry run mode
         if (dryRun) {
           if (!fastSync) {
-            log.info(`[DRY RUN] Would pin CID ${cid} for deal ${dealId}`);
+            log.debug(`[DRY RUN] Would pin CID ${cid} for deal ${dealId}`);
           }
           results.synced++;
         } else {
@@ -740,12 +740,12 @@ export async function syncDealsWithIPFS(
           // Note: Even if the CID is not immediately available, IPFS will continue trying in background
           // The pin request itself will succeed once IPFS retrieves the content
           if (!fastSync) {
-            log.info(`Attempting to pin CID ${cid} for deal ${dealId}...`);
+            log.debug(`Attempting to pin CID ${cid} for deal ${dealId}...`);
           }
           const pinResult = await pinCid(cid);
           if (pinResult.success) {
             if (!fastSync) {
-              log.info(`Deal ${dealId}: CID ${cid} pinned successfully`);
+              log.debug(`Deal ${dealId}: CID ${cid} pinned successfully`);
             }
             // Clear from failure cache on success
             pinFailureCache.delete(cid);
@@ -756,7 +756,7 @@ export async function syncDealsWithIPFS(
               // Don't log as error during shutdown - just skip silently or with minimal info
               if (!isShuttingDown) {
                 // Only log if shutdown wasn't in progress (might be a different shutdown-related error)
-                log.info(`Deal ${dealId}: Pin aborted due to shutdown`);
+                log.debug(`Deal ${dealId}: Pin aborted due to shutdown`);
               }
               continue;
             }
@@ -826,17 +826,17 @@ export async function syncDealsWithIPFS(
             if (!existingDeal || existingDeal.syncedFromOnChain !== true) {
               await saveDeal(gun, gunDBDeal as any, relayKeyPair);
               if (!fastSync) {
-                log.info(`Deal ${dealId}: Synced to GunDB`);
+                log.debug(`Deal ${dealId}: Synced to GunDB`);
               }
               results.gunDBSynced++;
             } else if (!fastSync) {
-              log.info(`Deal ${dealId}: Already exists in GunDB`);
+              log.debug(`Deal ${dealId}: Already exists in GunDB`);
             }
           } catch (gunDBError) {
             // Ignore errors if shutdown is in progress (database may be closed)
             if (isShuttingDown) {
               if (!fastSync) {
-                log.info(
+                log.debug(
                   `GunDB sync skipped for deal ${dealId} (shutdown in progress)`
                 );
               }
@@ -871,7 +871,7 @@ export async function syncDealsWithIPFS(
     }
 
     if (!fastSync) {
-      log.info(
+      log.debug(
         {
           ipfsPinned: results.synced,
           alreadyPinned: results.alreadyPinned,

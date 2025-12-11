@@ -463,34 +463,34 @@ export function createRegistryClientWithSigner(
       );
       
       if (allowance < stakeWei) {
-        log.info(
+        log.debug(
           `Current allowance: ${ethers.formatUnits(allowance, 6)} USDC, Need: ${ethers.formatUnits(stakeWei, 6)} USDC`
         );
         
         // If there's an existing non-zero allowance that's less than what we need,
         // reset it to 0 first (some tokens require this to prevent front-running)
         if (allowance > 0n) {
-          log.info("Resetting existing allowance to 0...");
+          log.debug("Resetting existing allowance to 0...");
           const resetTx = await usdc.approve(registryAddress, 0n);
-          log.info(`Reset transaction: ${resetTx.hash}`);
+          log.debug(`Reset transaction: ${resetTx.hash}`);
           await resetTx.wait();
-          log.info("Allowance reset confirmed");
+          log.debug("Allowance reset confirmed");
           
           // Wait a bit for the state to propagate
           await new Promise((resolve) => setTimeout(resolve, 2000));
         }
         
-        log.info("Approving USDC spend...");
+        log.debug("Approving USDC spend...");
         // Approve slightly more than needed (add 1% buffer) to account for any rounding issues
         // Some tokens/contracts have edge cases with exact amounts
         const approvalBuffer = (stakeWei * 101n) / 100n; // 1% buffer
         const approveTx = await usdc.approve(registryAddress, approvalBuffer);
-        log.info(
+        log.debug(
           `Waiting for approve transaction confirmation: ${approveTx.hash} (approved ${ethers.formatUnits(approvalBuffer, 6)} USDC for ${ethers.formatUnits(stakeWei, 6)} USDC stake)`
         );
         // Wait for approval transaction with at least 1 confirmation
         const approveReceipt = await approveTx.wait(1);
-        log.info(
+        log.debug(
           `Approve transaction confirmed in block ${approveReceipt.blockNumber}`
         );
         
@@ -499,7 +499,7 @@ export function createRegistryClientWithSigner(
         const approvalBlock = approveReceipt.blockNumber;
         const currentBlock = await client.provider.getBlockNumber();
         const blocksToWait = Math.max(3, currentBlock - approvalBlock + 2); // Wait at least 3 blocks after approval
-        log.info(`Approval in block ${approvalBlock}, current block: ${currentBlock}, waiting for ${blocksToWait} more blocks for state propagation...`);
+        log.debug(`Approval in block ${approvalBlock}, current block: ${currentBlock}, waiting for ${blocksToWait} more blocks for state propagation...`);
         
         let blocksWaited = 0;
         while (blocksWaited < blocksToWait) {
@@ -508,10 +508,10 @@ export function createRegistryClientWithSigner(
           const newBlocksWaited = newBlock - approvalBlock;
           if (newBlocksWaited > blocksWaited) {
             blocksWaited = newBlocksWaited;
-            log.info(`Block ${newBlock} mined, ${blocksToWait - blocksWaited} blocks remaining...`);
+            log.debug(`Block ${newBlock} mined, ${blocksToWait - blocksWaited} blocks remaining...`);
           }
         }
-        log.info("State propagation wait complete");
+        log.debug("State propagation wait complete");
         
         // Additional delay to ensure all RPC nodes have synced
         await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -525,13 +525,13 @@ export function createRegistryClientWithSigner(
             registryAddress
           );
           if (newAllowance >= stakeWei) {
-            log.info(
+            log.debug(
               `USDC allowance confirmed: ${ethers.formatUnits(newAllowance, 6)} USDC`
             );
             verified = true;
             break;
           }
-          log.info(
+          log.debug(
             `Waiting for allowance to update... Current: ${ethers.formatUnits(newAllowance, 6)}, Need: ${ethers.formatUnits(stakeWei, 6)} (${retries} retries left)`
           );
           await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -558,11 +558,11 @@ export function createRegistryClientWithSigner(
             `Allowance verification failed before contract call. Expected: ${ethers.formatUnits(stakeWei, 6)} USDC, Got: ${ethers.formatUnits(finalCheck, 6)} USDC`
           );
         }
-        log.info(
+        log.debug(
           `Final allowance check passed: ${ethers.formatUnits(finalCheck, 6)} USDC`
         );
       } else {
-        log.info(
+        log.debug(
           `Sufficient allowance already exists: ${ethers.formatUnits(allowance, 6)} USDC`
         );
       }
@@ -572,7 +572,7 @@ export function createRegistryClientWithSigner(
       const epubBytes = epub ? ethers.toUtf8Bytes(epub) : "0x";
 
       // Register using SDK
-      log.info(
+      log.debug(
         `Registering relay: ${endpoint}${griefingRatio > 0 ? ` with griefing ratio ${griefingRatio} bps` : ""}`
       );
       
@@ -581,7 +581,7 @@ export function createRegistryClientWithSigner(
         wallet.address,
         registryAddress
       );
-      log.info(
+      log.debug(
         `Pre-call allowance check: ${ethers.formatUnits(preCallAllowance, 6)} USDC (need ${ethers.formatUnits(stakeWei, 6)} USDC)`
       );
       
@@ -607,7 +607,7 @@ export function createRegistryClientWithSigner(
             wallet.address,
             registryAddress
           );
-          log.info(
+          log.debug(
             `Final allowance check before transaction: ${ethers.formatUnits(finalAllowanceCheck, 6)} USDC (need ${ethers.formatUnits(stakeWei, 6)} USDC)`
           );
           
@@ -638,7 +638,7 @@ export function createRegistryClientWithSigner(
               if (estimated !== null && estimated !== undefined) {
                 const validEstimate = estimated;
                 gasEstimate = validEstimate;
-                log.info(`Gas estimate successful: ${validEstimate.toString()}`);
+                log.debug(`Gas estimate successful: ${validEstimate.toString()}`);
                 // Add 20% buffer to the gas estimate
                 gasEstimate = (validEstimate * 120n) / 100n;
                 break;
@@ -661,7 +661,7 @@ export function createRegistryClientWithSigner(
                     wallet.address,
                     registryAddress
                   );
-                  log.info(
+                  log.debug(
                     `Retry allowance check: ${ethers.formatUnits(retryAllowance, 6)} USDC`
                   );
                   if (retryAllowance < stakeWei) {
@@ -687,14 +687,14 @@ export function createRegistryClientWithSigner(
           
           // Use estimated gas if available, otherwise use base gas limit
           const gasLimit = gasEstimate || BASE_GAS_LIMIT;
-          log.info(`Using gas limit: ${gasLimit.toString()}`);
+          log.debug(`Using gas limit: ${gasLimit.toString()}`);
           
           // Send the transaction with the gas limit
           tx = await wallet.sendTransaction({
             ...populatedTx,
             gasLimit: gasLimit,
           });
-          log.info(`Registration transaction sent: ${tx.hash}`);
+          log.debug(`Registration transaction sent: ${tx.hash}`);
           break; // Success, exit retry loop
         } catch (error: any) {
           registrationAttempts--;
@@ -714,7 +714,7 @@ export function createRegistryClientWithSigner(
                 wallet.address,
                 registryAddress
               );
-              log.info(
+              log.debug(
                 `Retry allowance check: ${ethers.formatUnits(retryAllowance, 6)} USDC`
               );
               if (retryAllowance < stakeWei) {

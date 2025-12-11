@@ -56,7 +56,7 @@ export async function startBridgeListener(
   }
 
   if (config.enabled === false) {
-    log.info("Bridge listener disabled by config");
+    log.debug("Bridge listener disabled by config");
     return;
   }
 
@@ -68,7 +68,7 @@ export async function startBridgeListener(
 
     const contractAddress = client.contractAddress;
 
-    log.info(
+    log.debug(
       {
         contractAddress,
         chainId: config.chainId,
@@ -89,7 +89,7 @@ export async function startBridgeListener(
           const normalizedUser = event.user.toLowerCase();
           const depositKey = `${event.txHash}:${normalizedUser}:${event.amount}`;
 
-          log.info(
+          log.debug(
             {
               txHash: event.txHash,
               user: normalizedUser,
@@ -130,7 +130,7 @@ export async function startBridgeListener(
               );
               // Continue processing instead of returning
             } else {
-              log.info(
+              log.debug(
                 {
                   txHash: event.txHash,
                   user: normalizedUser,
@@ -146,7 +146,7 @@ export async function startBridgeListener(
             }
           }
 
-          log.info(
+          log.debug(
             {
               txHash: event.txHash,
               user: normalizedUser,
@@ -156,7 +156,7 @@ export async function startBridgeListener(
             "Deposit not yet processed, proceeding with verification"
           );
 
-          log.info(
+          log.debug(
             {
               user: event.user,
               amount: event.amount.toString(),
@@ -173,7 +173,7 @@ export async function startBridgeListener(
           const confirmations = currentBlock - event.blockNumber;
 
           if (confirmations < minConfirmations) {
-            log.info(
+            log.debug(
               {
                 txHash: event.txHash,
                 blockNumber: event.blockNumber,
@@ -237,7 +237,7 @@ export async function startBridgeListener(
           // SECURITY: Only mark as processed AFTER successful credit AND verification to ensure idempotency
           // If creditBalance fails, the deposit will be retried (which is correct behavior)
 
-          log.info(
+          log.debug(
             {
               user: normalizedUser,
               amount: event.amount.toString(),
@@ -260,7 +260,7 @@ export async function startBridgeListener(
           const retryDelay = 500; // 500ms between retries
 
           while (verifyBalance < expectedBalance && retries < maxRetries) {
-            log.info(
+            log.debug(
               {
                 user: normalizedUser,
                 expected: expectedBalance.toString(),
@@ -287,7 +287,7 @@ export async function startBridgeListener(
             throw new Error(`Balance verification failed: expected ${expectedBalance.toString()}, got ${verifyBalance.toString()}`);
           }
 
-          log.info(
+          log.debug(
             {
               user: normalizedUser,
               amount: event.amount.toString(),
@@ -314,9 +314,8 @@ export async function startBridgeListener(
               txHash: event.txHash,
               confirmations,
               newBalance: ethers.formatEther(verifyBalance),
-              balance: "credited",
             },
-            "Deposit credited to L2 balance - verified and marked as processed"
+            "Deposit credited to L2 balance"
           );
         } catch (error) {
           log.error(
@@ -337,7 +336,7 @@ export async function startBridgeListener(
           // Normalize user address
           const normalizedUser = event.user.toLowerCase();
 
-          log.info(
+          log.debug(
             {
               // withdrawalHash: event.withdrawalHash, // Use event.withdrawalHash directly
               user: normalizedUser,
@@ -356,7 +355,7 @@ export async function startBridgeListener(
             timestamp: Date.now()
           });
 
-          log.info({ withdrawalHash: event.withdrawalHash }, "Force withdrawal added to pending queue");
+          log.debug({ withdrawalHash: event.withdrawalHash }, "Force withdrawal added to pending queue");
 
         } catch (error) {
           log.error({ error, event }, "Error processing force withdrawal event");
@@ -370,7 +369,7 @@ export async function startBridgeListener(
     };
     isListening = true;
 
-    log.info("Bridge deposit listener started successfully");
+    log.debug("Bridge deposit listener started successfully");
   } catch (error) {
     log.error({ error, config }, "Failed to start bridge listener");
     throw error;
@@ -385,7 +384,7 @@ export function stopBridgeListener(): void {
     listenerCleanup();
     listenerCleanup = null;
     isListening = false;
-    log.info("Bridge deposit listener stopped");
+    log.debug("Bridge deposit listener stopped");
   }
 }
 
