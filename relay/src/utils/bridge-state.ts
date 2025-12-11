@@ -2151,3 +2151,189 @@ export async function removePendingForceWithdrawals(
     gun.get("bridge").get("force-withdrawals").get("pending").get(w.withdrawalHash).put(null as any);
   }
 }
+
+/**
+ * Reconcile user balance by recalculating from deposits, withdrawals, and L2 transfers
+ * This fixes balance discrepancies caused by old transfer implementations
+ * 
+ * @param gun - GunDB instance
+ * @param userAddress - User's Ethereum address to reconcile
+ * @param relayKeyPair - Relay keypair for signing corrected balances
+ * @param bridgeClient - Bridge client for querying on-chain deposits/withdrawals
+ * @returns Reconciliation result with corrected balance
+ */
+export async function reconcileUserBalance(
+  gun: IGunInstance,
+  userAddress: string,
+  relayKeyPair: { pub: string; priv: string; epub?: string; epriv?: string },
+  bridgeClient: any
+): Promise<{ 
+  success: boolean; 
+  currentBalance: string; 
+  calculatedBalance: string; 
+  corrected: boolean;
+  error?: string;
+}> {
+  try {
+    const normalizedAddress = userAddress.toLowerCase();
+    
+    // Get current balance from GunDB
+    const currentBalance = await getUserBalance(gun, normalizedAddress, relayKeyPair.pub);
+    
+    log.info(
+      { user: normalizedAddress, currentBalance: currentBalance.toString() },
+      "Starting balance reconciliation"
+    );
+    
+    // Calculate correct balance from on-chain deposits and withdrawals
+    // Query all deposits for this user
+    const deposits = await bridgeClient.queryDeposits(0, "latest", normalizedAddress);
+    const totalDeposits: bigint = deposits.reduce((sum: bigint, d: any) => sum + BigInt(d.amount), 0n);
+    
+    // Query all processed withdrawals for this user
+    const withdrawals = await bridgeClient.queryWithdrawals(0, "latest", normalizedAddress);
+    const totalWithdrawals: bigint = withdrawals.reduce((sum: bigint, w: any) => sum + BigInt(w.amount), 0n);
+    
+    // Calculate base balance from deposits - withdrawals
+    let calculatedBalance: bigint = totalDeposits - totalWithdrawals;
+    
+    // Now account for L2 transfers
+    // Get all transfers where this user is sender (subtract) or receiver (add)
+    const allTransfers = await listL2Transfers(gun, relayKeyPair.pub);
+    
+    for (const transfer of allTransfers) {
+      const from = transfer.from?.toLowerCase();
+      const to = transfer.to?.toLowerCase();
+      const amount = BigInt(transfer.amount || "0");
+      
+      if (from === normalizedAddress) {
+        // User sent this amount - subtract
+        calculatedBalance = calculatedBalance - amount;
+      }
+      if (to === normalizedAddress) {
+        // User received this amount - add
+        calculatedBalance = calculatedBalance + amount;
+      }
+    }
+    
+    log.info(
+      {
+        user: normalizedAddress,
+        currentBalance: currentBalance.toString(),
+        calculatedBalance: calculatedBalance.toString(),
+        totalDeposits: totalDeposits.toString(),
+        totalWithdrawals: totalWithdrawals.toString(),
+        transferCount: allTransfers.length,
+      },
+      "Balance reconciliation calculation complete"
+    );
+    
+    // Compare and correct if needed
+    const difference = calculatedBalance - currentBalance;
+    const corrected = difference !== 0n;
+    
+    if (corrected) {
+      log.warn(
+        {
+          user: normalizedAddress,
+          currentBalance: currentBalance.toString(),
+          calculatedBalance: calculatedBalance.toString(),
+          difference: difference.toString(),
+        },
+        "Balance discrepancy detected, correcting..."
+      );
+      
+      if (difference > 0n) {
+        // Current balance is too low - credit the difference
+        await creditBalance(gun, normalizedAddress, difference, relayKeyPair);
+      } else if (difference < 0n) {
+        // Current balance is too high - debit the absolute difference
+        const debitAmount = difference * -1n; // Convert negative to positive
+        await debitBalance(gun, normalizedAddress, debitAmount, relayKeyPair);
+      }
+      
+      // Verify correction
+      const verifiedBalance = await getUserBalance(gun, normalizedAddress, relayKeyPair.pub);
+      log.info(
+        {
+          user: normalizedAddress,
+          expectedBalance: calculatedBalance.toString(),
+          verifiedBalance: verifiedBalance.toString(),
+        },
+        "Balance correction completed"
+      );
+    }
+    
+    return {
+      success: true,
+      currentBalance: currentBalance.toString(),
+      calculatedBalance: calculatedBalance.toString(),
+      corrected,
+    };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    log.error({ error: errorMsg, user: userAddress }, "Balance reconciliation failed");
+    return {
+      success: false,
+      currentBalance: "0",
+      calculatedBalance: "0",
+      corrected: false,
+      error: errorMsg,
+    };
+  }
+}
+
+/**
+ * List all L2 transfers from frozen entries
+ */
+async function listL2Transfers(
+  gun: IGunInstance,
+  relayPub: string
+): Promise<Array<{ from: string; to: string; amount: string; transferHash: string; timestamp: number }>> {
+  return new Promise((resolve) => {
+    const transfers: Array<{ from: string; to: string; amount: string; transferHash: string; timestamp: number }> = [];
+    const timeout = setTimeout(() => resolve(transfers), 10000);
+    
+    // Get all transfer entries from the index
+    gun.get("shogun-index").get("bridge-transfers").map().once(async (index: any, transferHash?: string) => {
+      if (!index || !index.latestHash || !transferHash) return;
+      
+      try {
+        const entry = await FrozenData.readFrozenEntry(
+          gun,
+          "bridge-transfers",
+          index.latestHash,
+          relayPub
+        );
+        
+        if (entry && entry.verified && entry.data) {
+          const transferData = entry.data as {
+            from?: string;
+            to?: string;
+            amount?: string;
+            transferHash?: string;
+            timestamp?: number;
+            type?: string;
+          };
+          
+          if (transferData.type === "bridge-transfer" && transferData.from && transferData.to && transferData.amount) {
+            transfers.push({
+              from: transferData.from,
+              to: transferData.to,
+              amount: transferData.amount,
+              transferHash: transferData.transferHash || transferHash,
+              timestamp: transferData.timestamp || 0,
+            });
+          }
+        }
+      } catch (error) {
+        log.warn({ error, transferHash }, "Error reading transfer entry");
+      }
+    });
+    
+    setTimeout(() => {
+      clearTimeout(timeout);
+      resolve(transfers);
+    }, 5000);
+  });
+}

@@ -1387,6 +1387,92 @@ router.post("/sync-deposits", express.json({ limit: '10mb' }), async (req, res) 
 });
 
 /**
+ * POST /api/v1/bridge/reconcile-balance
+ * 
+ * Reconcile a user's L2 balance by recalculating from deposits, withdrawals, and L2 transfers.
+ * This fixes balance discrepancies caused by old transfer implementations that didn't properly update balances.
+ * 
+ * Body: { user: string }
+ */
+router.post("/reconcile-balance", express.json(), async (req, res) => {
+  try {
+    const gun = req.app.get("gunInstance");
+    if (!gun) {
+      return res.status(503).json({
+        success: false,
+        error: "GunDB not initialized",
+      });
+    }
+
+    const { user } = req.body;
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        error: "user address required",
+      });
+    }
+
+    let userAddress: string;
+    try {
+      userAddress = ethers.getAddress(user);
+    } catch {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid user address",
+      });
+    }
+
+    // Get relay keypair (required for signing corrected balances)
+    const relayKeyPair = req.app.get("relayKeyPair");
+    if (!relayKeyPair) {
+      return res.status(503).json({
+        success: false,
+        error: "Relay keypair not configured",
+      });
+    }
+
+    // Get bridge client for querying on-chain data
+    const client = getBridgeClient();
+
+    log.info({ user: userAddress }, "Starting balance reconciliation");
+
+    const { reconcileUserBalance } = await import("../utils/bridge-state");
+    const result = await reconcileUserBalance(
+      gun,
+      userAddress,
+      relayKeyPair,
+      client
+    );
+
+    if (result.success) {
+      res.json({
+        success: true,
+        user: userAddress,
+        currentBalance: result.currentBalance,
+        calculatedBalance: result.calculatedBalance,
+        corrected: result.corrected,
+        message: result.corrected
+          ? `Balance corrected from ${result.currentBalance} to ${result.calculatedBalance}`
+          : "Balance is already correct",
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error || "Reconciliation failed",
+      });
+    }
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log.error({ error: errorMessage }, "Error in reconcile-balance endpoint");
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+});
+
+/**
  * POST /api/v1/bridge/process-deposit
  * 
  * Force process a specific deposit by transaction hash.
