@@ -666,6 +666,44 @@ router.get("/pending-withdrawals", async (req, res) => {
 });
 
 /**
+ * GET /api/v1/bridge/nonce/:user
+ * 
+ * Get the next nonce for a user (for withdrawal requests).
+ * This allows clients to include the nonce in their signed message.
+ */
+router.get("/nonce/:user", async (req, res) => {
+  try {
+    const { user } = req.params;
+    
+    let userAddress: string;
+    try {
+      userAddress = ethers.getAddress(user);
+    } catch {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid user address",
+      });
+    }
+
+    const lastNonce = getLastNonce(userAddress);
+    const nextNonce = lastNonce + 1n;
+
+    res.json({
+      success: true,
+      lastNonce: lastNonce.toString(),
+      nextNonce: nextNonce.toString(),
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log.error({ error }, "Error getting next nonce");
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+});
+
+/**
  * GET /api/v1/bridge/proof/:user/:amount/:nonce
  * 
  * Generate Merkle proof for a withdrawal.
