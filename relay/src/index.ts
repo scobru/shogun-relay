@@ -1602,9 +1602,10 @@ See docs/RELAY_KEYS.md for more information.
             resolve(0);
           });
           req.end();
-        });
+          });
 
-        pulse.ipfs.numPins = pinCount;
+          pulse.ipfs.numPins = pinCount;
+        }
       } else {
         pulse.ipfs = { connected: false };
       }
