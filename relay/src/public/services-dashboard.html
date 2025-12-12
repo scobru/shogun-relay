@@ -458,10 +458,15 @@
                 const data = await response.json();
 
                 document.getElementById('gun-status').textContent = data.status || 'Unknown';
-                document.getElementById('gun-connections').textContent = data.activeConnections || 0;
-                document.getElementById('gun-total-connections').textContent = data.totalConnections || 0;
-                document.getElementById('gun-memory').textContent = formatBytes(data.memoryUsage?.heapUsed || 0);
-                document.getElementById('gun-uptime').textContent = formatUptime(data.uptime || 0);
+                document.getElementById('gun-connections').textContent = data.connections?.active || 0;
+                document.getElementById('gun-total-connections').textContent = data.connections?.total || 0;
+                // Fix: Use memory.heapUsedMB (in MB) and convert to bytes for formatBytes
+                const memoryMB = data.memory?.heapUsedMB || 0;
+                const memoryBytes = memoryMB * 1024 * 1024;
+                document.getElementById('gun-memory').textContent = formatBytes(memoryBytes);
+                // Fix: Use uptime.seconds (in seconds) and convert to milliseconds for formatUptime
+                const uptimeMs = (data.uptime?.seconds || 0) * 1000;
+                document.getElementById('gun-uptime').textContent = formatUptime(uptimeMs);
 
                 // Map status: healthy -> online, degraded -> warning, others -> offline
                 let indicatorStatus = 'offline';

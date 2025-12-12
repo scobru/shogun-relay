@@ -3068,7 +3068,7 @@ router.get(
         pinsReq.end();
       });
 
-      // Get storage info from files/stat
+      // Get storage info from repo/stat (correct endpoint for repository size)
       const storageRequestOptions: {
         hostname: string;
         port: number;
@@ -3078,7 +3078,7 @@ router.get(
       } = {
         hostname: "127.0.0.1",
         port: 5001,
-        path: "/api/v0/files/stat?arg=/",
+        path: "/api/v0/repo/stat?size-only=true",
         method: "POST",
         headers: {
           "Content-Length": "0",
@@ -3177,12 +3177,14 @@ router.get(
       const versionDataObj = versionData as any;
       const pinKeys = pinsDataObj.Keys || {};
       const numObjects = Object.keys(pinKeys).length;
-      const totalSize = storageDataObj.CumulativeSize || 0;
+      // Fix: Use RepoSize from repo/stat endpoint (in bytes), not CumulativeSize
+      const totalSize = storageDataObj.RepoSize || 0;
       const repoSizeMB = Math.round(totalSize / (1024 * 1024));
 
-      // Estimate storage max (default to 10GB if not available)
-      const storageMaxMB = 10240; // 10GB default
-      const usagePercent = Math.round((repoSizeMB / storageMaxMB) * 100);
+      // Get storage max from repo/stat response, or default to 10GB
+      const storageMaxBytes = storageDataObj.StorageMax || (10240 * 1024 * 1024); // Default 10GB in bytes
+      const storageMaxMB = Math.round(storageMaxBytes / (1024 * 1024));
+      const usagePercent = storageMaxMB > 0 ? Math.round((repoSizeMB / storageMaxMB) * 100) : 0;
 
       res.json({
         success: true,
