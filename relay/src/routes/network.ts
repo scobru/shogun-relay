@@ -549,14 +549,19 @@ router.get("/stats", async (req, res) => {
       );
       try {
         // Get IPFS repo stats
-        const repoStats = await ipfsRequest("/api/v0/repo/stat?size-only=true");
-        if (
-          repoStats &&
-          typeof repoStats === "object" &&
-          "RepoSize" in repoStats
-        ) {
-          const repoSize = (repoStats as { RepoSize?: number }).RepoSize;
-          if (repoSize) {
+        const repoStats = await ipfsRequest("/api/v0/repo/stat");
+        if (repoStats && typeof repoStats === "object") {
+          // Try multiple field names for RepoSize
+          let repoSize = 0;
+          if ("RepoSize" in repoStats) {
+            const size = (repoStats as { RepoSize?: number | string }).RepoSize;
+            repoSize = typeof size === 'string' ? parseInt(size, 10) || 0 : size || 0;
+          } else if ("repoSize" in repoStats) {
+            const size = (repoStats as { repoSize?: number | string }).repoSize;
+            repoSize = typeof size === 'string' ? parseInt(size, 10) || 0 : size || 0;
+          }
+          
+          if (repoSize > 0) {
             stats.totalStorageBytes += repoSize;
             loggers.server.info(
               { repoSize },

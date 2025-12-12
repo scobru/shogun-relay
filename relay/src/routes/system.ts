@@ -457,14 +457,74 @@ router.get("/logs", (req, res) => {
     // Get the last N lines
     const lastLines = lines.slice(-tail);
 
-    // Parse log entries (simple parsing for now)
+    // Parse log entries - extract JSON from log lines
     const logEntries = lastLines.map((line, index) => {
-      const timestamp = new Date().toISOString(); // Default timestamp
+      let timestamp = new Date().toISOString();
+      let level = "info";
+      let logData: any = {};
+      let rawMessage = line;
+      
+      try {
+        // Try to parse JSON log format: timestamp JSON_OBJECT
+        // Format: 2025-12-12T08:21:19.939018162Z {"level":"info","time":"...","pid":85,...}
+        const jsonMatch = line.match(/^(\d{4}-\d{2}-\d{2}T[\d:\.]+Z)\s+(.+)$/);
+        if (jsonMatch) {
+          timestamp = jsonMatch[1];
+          const jsonStr = jsonMatch[2];
+          
+          try {
+            logData = JSON.parse(jsonStr);
+            level = logData.level || "info";
+            rawMessage = jsonStr;
+          } catch (parseError) {
+            // If JSON parsing fails, try to extract JSON from anywhere in the line
+            const jsonStart = line.indexOf('{');
+            if (jsonStart !== -1) {
+              const jsonStr = line.substring(jsonStart);
+              try {
+                logData = JSON.parse(jsonStr);
+                level = logData.level || "info";
+                rawMessage = jsonStr;
+                // Try to extract timestamp from beginning of line
+                const tsMatch = line.substring(0, jsonStart).trim();
+                if (tsMatch) {
+                  timestamp = tsMatch;
+                }
+              } catch (e) {
+                // Keep raw message if parsing fails
+              }
+            }
+          }
+        } else {
+          // Try to find JSON object anywhere in the line
+          const jsonStart = line.indexOf('{');
+          if (jsonStart !== -1) {
+            const jsonStr = line.substring(jsonStart);
+            try {
+              logData = JSON.parse(jsonStr);
+              level = logData.level || "info";
+              rawMessage = jsonStr;
+              // Try to extract timestamp from beginning of line
+              const tsMatch = line.substring(0, jsonStart).trim();
+              if (tsMatch) {
+                timestamp = tsMatch;
+              }
+            } catch (e) {
+              // Keep raw message if parsing fails
+            }
+          }
+        }
+      } catch (error) {
+        // If all parsing fails, use raw line
+      }
+
       return {
         id: `line_${lines.length - tail + index}`,
-        timestamp,
-        level: "info",
-        message: line,
+        timestamp: timestamp,
+        level: level,
+        message: logData.message || logData.msg || rawMessage,
+        raw: rawMessage,
+        data: logData,
         lineNumber: lines.length - tail + index + 1,
       };
     });

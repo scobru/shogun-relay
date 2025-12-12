@@ -1426,7 +1426,7 @@ export class X402Merchant {
       const requestOptions: any = {
         hostname: url.hostname,
         port: url.port || (isHttps ? 443 : 5001),
-        path: "/api/v0/repo/stat?size-only=true",
+        path: "/api/v0/repo/stat",
         method: "POST",
         headers: {
           "Content-Length": "0",
@@ -1444,12 +1444,36 @@ export class X402Merchant {
           clearTimeout(timeout);
           try {
             const result = JSON.parse(data);
+            // Try multiple field names for RepoSize (IPFS API may return different formats)
+            let repoSize = 0;
+            if (result.RepoSize !== undefined) {
+              repoSize = typeof result.RepoSize === 'string' 
+                ? parseInt(result.RepoSize, 10) || 0
+                : result.RepoSize || 0;
+            } else if (result.repoSize !== undefined) {
+              repoSize = typeof result.repoSize === 'string'
+                ? parseInt(result.repoSize, 10) || 0
+                : result.repoSize || 0;
+            }
+            
+            // Try multiple field names for StorageMax
+            let storageMax = 0;
+            if (result.StorageMax !== undefined) {
+              storageMax = typeof result.StorageMax === 'string'
+                ? parseInt(result.StorageMax, 10) || 0
+                : result.StorageMax || 0;
+            } else if (result.storageMax !== undefined) {
+              storageMax = typeof result.storageMax === 'string'
+                ? parseInt(result.storageMax, 10) || 0
+                : result.storageMax || 0;
+            }
+            
             resolve({
-              repoSize: result.RepoSize || 0,
-              storageMax: result.StorageMax || 0,
-              numberObjects: result.numberObjects || 0,
-              repoPath: result.RepoPath || "",
-              version: result.Version || "",
+              repoSize: repoSize,
+              storageMax: storageMax,
+              numberObjects: result.numberObjects || result.NumObjects || 0,
+              repoPath: result.RepoPath || result.repoPath || "",
+              version: result.Version || result.version || "",
             });
           } catch (error: any) {
             log.error({ err: error }, "Error parsing IPFS repo stats");

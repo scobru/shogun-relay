@@ -3069,6 +3069,7 @@ router.get(
       });
 
       // Get storage info from repo/stat (correct endpoint for repository size)
+      // Note: Removed size-only=true to get full stats including RepoSize
       const storageRequestOptions: {
         hostname: string;
         port: number;
@@ -3078,7 +3079,7 @@ router.get(
       } = {
         hostname: "127.0.0.1",
         port: 5001,
-        path: "/api/v0/repo/stat?size-only=true",
+        path: "/api/v0/repo/stat",
         method: "POST",
         headers: {
           "Content-Length": "0",
@@ -3097,6 +3098,10 @@ router.get(
           storageRes.on("end", () => {
             try {
               const storageData = JSON.parse(data);
+              loggers.server.debug(
+                { storageData },
+                "📦 IPFS repo/stat raw response"
+              );
               resolve(storageData);
             } catch (parseError) {
               reject(new Error("Failed to parse storage response"));
@@ -3177,14 +3182,56 @@ router.get(
       const versionDataObj = versionData as any;
       const pinKeys = pinsDataObj.Keys || {};
       const numObjects = Object.keys(pinKeys).length;
-      // Fix: Use RepoSize from repo/stat endpoint (in bytes), not CumulativeSize
-      const totalSize = storageDataObj.RepoSize || 0;
+      
+      // Try multiple field names for RepoSize (IPFS API may return different formats)
+      // RepoSize can be a number (bytes) or string (with units like "1234" or "1234B")
+      let totalSize = 0;
+      if (storageDataObj.RepoSize !== undefined) {
+        totalSize = typeof storageDataObj.RepoSize === 'string' 
+          ? parseInt(storageDataObj.RepoSize, 10) || 0
+          : storageDataObj.RepoSize || 0;
+      } else if (storageDataObj.repoSize !== undefined) {
+        totalSize = typeof storageDataObj.repoSize === 'string'
+          ? parseInt(storageDataObj.repoSize, 10) || 0
+          : storageDataObj.repoSize || 0;
+      } else if (storageDataObj.Size !== undefined) {
+        totalSize = typeof storageDataObj.Size === 'string'
+          ? parseInt(storageDataObj.Size, 10) || 0
+          : storageDataObj.Size || 0;
+      }
+      
+      // If RepoSize is 0 but we have pinned objects, try to calculate from pins
+      if (totalSize === 0 && numObjects > 0) {
+        loggers.server.warn(
+          { numObjects, storageDataKeys: Object.keys(storageDataObj) },
+          "⚠️ RepoSize is 0 but there are pinned objects. This may indicate files are pinned but not yet stored locally."
+        );
+      }
+      
       const repoSizeMB = Math.round(totalSize / (1024 * 1024));
 
       // Get storage max from repo/stat response, or default to 10GB
-      const storageMaxBytes = storageDataObj.StorageMax || (10240 * 1024 * 1024); // Default 10GB in bytes
+      // Try multiple field names for StorageMax
+      let storageMaxBytes = 0;
+      if (storageDataObj.StorageMax !== undefined) {
+        storageMaxBytes = typeof storageDataObj.StorageMax === 'string'
+          ? parseInt(storageDataObj.StorageMax, 10) || (10240 * 1024 * 1024)
+          : storageDataObj.StorageMax || (10240 * 1024 * 1024);
+      } else if (storageDataObj.storageMax !== undefined) {
+        storageMaxBytes = typeof storageDataObj.storageMax === 'string'
+          ? parseInt(storageDataObj.storageMax, 10) || (10240 * 1024 * 1024)
+          : storageDataObj.storageMax || (10240 * 1024 * 1024);
+      } else {
+        storageMaxBytes = 10240 * 1024 * 1024; // Default 10GB in bytes
+      }
+      
       const storageMaxMB = Math.round(storageMaxBytes / (1024 * 1024));
       const usagePercent = storageMaxMB > 0 ? Math.round((repoSizeMB / storageMaxMB) * 100) : 0;
+      
+      loggers.server.debug(
+        { totalSize, repoSizeMB, storageMaxMB, usagePercent, numObjects },
+        "📊 IPFS storage statistics calculated"
+      );
 
       res.json({
         success: true,

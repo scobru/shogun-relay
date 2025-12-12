@@ -1524,7 +1524,7 @@ See docs/RELAY_KEYS.md for more information.
         const options: any = {
           hostname: "127.0.0.1",
           port: 5001,
-          path: "/api/v0/repo/stat?size-only=true",
+          path: "/api/v0/repo/stat",
           method: "POST",
           headers: { "Content-Length": "0" },
         };
@@ -1550,13 +1550,26 @@ See docs/RELAY_KEYS.md for more information.
         req.end();
       });
 
-      if (ipfsStats && ipfsStats.RepoSize !== undefined) {
-        pulse.ipfs = {
-          connected: true,
-          repoSize: ipfsStats.RepoSize,
-          repoSizeMB: Math.round(ipfsStats.RepoSize / (1024 * 1024)),
-          numObjects: ipfsStats.NumObjects || 0,
-        };
+      if (ipfsStats) {
+        // Try multiple field names for RepoSize
+        let repoSize = 0;
+        if (ipfsStats.RepoSize !== undefined) {
+          repoSize = typeof ipfsStats.RepoSize === 'string' 
+            ? parseInt(ipfsStats.RepoSize, 10) || 0
+            : ipfsStats.RepoSize || 0;
+        } else if (ipfsStats.repoSize !== undefined) {
+          repoSize = typeof ipfsStats.repoSize === 'string'
+            ? parseInt(ipfsStats.repoSize, 10) || 0
+            : ipfsStats.repoSize || 0;
+        }
+        
+        if (repoSize !== undefined) {
+          pulse.ipfs = {
+            connected: true,
+            repoSize: repoSize,
+            repoSizeMB: Math.round(repoSize / (1024 * 1024)),
+            numObjects: ipfsStats.NumObjects || ipfsStats.numberObjects || 0,
+          };
 
         // Also get pin count (quick query)
         const pinCount = await new Promise((resolve) => {

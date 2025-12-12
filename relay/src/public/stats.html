@@ -318,6 +318,12 @@
             color: #90CAF9;
         }
 
+        .log-entry.debug {
+            background-color: rgba(156, 39, 176, 0.1);
+            border-left-color: #9C27B0;
+            color: #BA68C8;
+        }
+
         .log-entry.warn {
             background-color: rgba(255, 193, 7, 0.1);
             border-left-color: #FFC107;
@@ -333,12 +339,25 @@
         .log-entry .log-timestamp {
             color: #A0A0A0;
             font-size: 0.75rem;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
         }
 
         .log-entry .log-message {
             color: #E0E0E0;
             word-break: break-word;
+        }
+
+        .log-entry .log-json {
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin: 0;
+            font-size: 0.8125rem;
+            line-height: 1.5;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
         }
 
         .log-entry .log-details {
@@ -692,6 +711,7 @@
                                         <select id="logLevelFilter"
                                             class="input bg-[#282828] border-[#606060] text-[#FFFFFF] rounded-xl px-4 py-3">
                                             <option value="all">All Levels</option>
+                                            <option value="debug">Debug</option>
                                             <option value="info">Info</option>
                                             <option value="warn">Warning</option>
                                             <option value="error">Error</option>
@@ -977,7 +997,8 @@
                     return;
                 }
 
-                const response = await fetch(`/api/v1/system/logs?limit=50&since=${lastLogTimestamp}`, {
+                // Fetch last 100 lines (tail) to get recent logs
+                const response = await fetch(`/api/v1/system/logs?limit=100&tail=100`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -986,8 +1007,14 @@
                 const result = await response.json();
 
                 if (result.success && result.logs) {
-                    // Add new logs to the array
-                    allLogs = [...result.logs, ...allLogs];
+                    // Merge new logs, avoiding duplicates by line number
+                    const existingLineNumbers = new Set(allLogs.map(log => log.lineNumber));
+                    const newLogs = result.logs.filter(log => 
+                        log.lineNumber && !existingLineNumbers.has(log.lineNumber)
+                    );
+                    
+                    // Add new logs to the array (newest first)
+                    allLogs = [...newLogs, ...allLogs];
 
                     // Keep only last 200 logs to prevent memory issues
                     if (allLogs.length > 200) {
@@ -996,7 +1023,17 @@
 
                     // Update timestamp for next fetch
                     if (result.logs.length > 0) {
-                        lastLogTimestamp = Math.max(...result.logs.map(log => log.timestamp || 0));
+                        const timestamps = result.logs
+                            .map(log => {
+                                if (typeof log.timestamp === 'string' && log.timestamp.includes('T')) {
+                                    return new Date(log.timestamp).getTime();
+                                }
+                                return log.timestamp || 0;
+                            })
+                            .filter(ts => ts > 0);
+                        if (timestamps.length > 0) {
+                            lastLogTimestamp = Math.max(...timestamps);
+                        }
                     }
 
                     // Update UI
@@ -1022,16 +1059,46 @@
             }
 
             logsContainer.innerHTML = filteredLogs.map(log => {
-                const timestamp = new Date(log.timestamp || Date.now()).toLocaleTimeString();
+                // Use ISO timestamp if available, otherwise format the timestamp
+                let timestampStr = log.timestamp;
+                if (timestampStr && !timestampStr.includes('T')) {
+                    // If it's not ISO format, try to parse it
+                    try {
+                        const date = new Date(log.timestamp);
+                        timestampStr = date.toISOString();
+                    } catch (e) {
+                        timestampStr = log.timestamp;
+                    }
+                }
+                
                 const level = log.level || 'info';
-                const message = log.message || 'No message';
-                const details = log.details ? JSON.stringify(log.details, null, 2) : '';
+                
+                // If we have raw JSON data, display it formatted
+                let jsonContent = '';
+                if (log.data && typeof log.data === 'object') {
+                    jsonContent = JSON.stringify(log.data, null, 2);
+                } else if (log.raw) {
+                    // Try to parse raw as JSON
+                    try {
+                        const parsed = JSON.parse(log.raw);
+                        jsonContent = JSON.stringify(parsed, null, 2);
+                    } catch (e) {
+                        jsonContent = log.raw;
+                    }
+                } else {
+                    jsonContent = JSON.stringify({
+                        level: level,
+                        message: log.message || 'No message',
+                        timestamp: timestampStr
+                    }, null, 2);
+                }
 
                 return `
                     <div class="log-entry ${level}">
-                        <div class="log-timestamp">${timestamp}</div>
-                        <div class="log-message">${escapeHtml(message)}</div>
-                        ${details ? `<div class="log-details">${escapeHtml(details)}</div>` : ''}
+                        <div class="log-timestamp">${escapeHtml(timestampStr)}</div>
+                        <div class="log-message">
+                            <pre class="log-json">${escapeHtml(jsonContent)}</pre>
+                        </div>
                     </div>
                 `;
             }).join('');
