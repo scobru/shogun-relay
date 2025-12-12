@@ -532,6 +532,18 @@ router.get("/logs", (req, res) => {
     // Apply limit
     const limitedLogs = logEntries.slice(-limit);
 
+    // Log for debugging
+    loggers.server.debug(
+      {
+        totalLines: lines.length,
+        tail: tail,
+        parsedEntries: logEntries.length,
+        limitedLogs: limitedLogs.length,
+        fileExists: fs.existsSync(logFilePath),
+      },
+      "📋 Logs endpoint response"
+    );
+
     res.json({
       success: true,
       logs: limitedLogs,

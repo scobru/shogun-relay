@@ -966,7 +966,12 @@
             logsStatusEl.textContent = 'Live logs active';
             logsContainer.innerHTML = '<div class="text-[#A0A0A0] text-center py-4">Loading logs...</div>';
 
-            // Start fetching logs
+            // Clear existing logs to start fresh
+            allLogs = [];
+            lastLogTimestamp = 0;
+
+            // Start fetching logs immediately
+            console.log('🚀 Starting live logs...');
             fetchLogs();
             logsInterval = setInterval(fetchLogs, 2000); // Fetch every 2 seconds
         }
@@ -1007,11 +1012,30 @@
                 const result = await response.json();
 
                 if (result.success && result.logs) {
-                    // Merge new logs, avoiding duplicates by line number
-                    const existingLineNumbers = new Set(allLogs.map(log => log.lineNumber));
-                    const newLogs = result.logs.filter(log => 
-                        log.lineNumber && !existingLineNumbers.has(log.lineNumber)
+                    console.log('📥 Received logs from API:', result.logs.length);
+                    
+                    // Merge new logs, avoiding duplicates by line number or timestamp+message
+                    const existingLineNumbers = new Set(allLogs.map(log => log.lineNumber).filter(Boolean));
+                    const existingLogKeys = new Set(
+                        allLogs.map(log => {
+                            const key = log.lineNumber 
+                                ? `line_${log.lineNumber}` 
+                                : `${log.timestamp}_${log.message?.substring(0, 50)}`;
+                            return key;
+                        })
                     );
+                    
+                    const newLogs = result.logs.filter(log => {
+                        if (log.lineNumber && existingLineNumbers.has(log.lineNumber)) {
+                            return false;
+                        }
+                        const key = log.lineNumber 
+                            ? `line_${log.lineNumber}` 
+                            : `${log.timestamp}_${log.message?.substring(0, 50)}`;
+                        return !existingLogKeys.has(key);
+                    });
+                    
+                    console.log('✨ New logs to add:', newLogs.length);
                     
                     // Add new logs to the array (newest first)
                     allLogs = [...newLogs, ...allLogs];
@@ -1039,6 +1063,13 @@
                     // Update UI
                     updateLogsDisplay();
                     updateLogsStats();
+                } else {
+                    console.warn('⚠️ No logs in response:', result);
+                    if (result.message) {
+                        logsStatusEl.textContent = result.message;
+                    } else {
+                        logsStatusEl.textContent = 'No logs available';
+                    }
                 }
             } catch (error) {
                 console.error('Error fetching logs:', error);
@@ -1048,13 +1079,20 @@
 
         // Update logs display
         function updateLogsDisplay() {
+            console.log('🔄 Updating logs display. Total logs:', allLogs.length);
             const selectedLevel = logLevelFilter.value;
             const filteredLogs = selectedLevel === 'all'
                 ? allLogs
                 : allLogs.filter(log => log.level === selectedLevel);
 
+            console.log('📊 Filtered logs:', filteredLogs.length, 'for level:', selectedLevel);
+
             if (filteredLogs.length === 0) {
-                logsContainer.innerHTML = '<div class="text-[#A0A0A0] text-center py-8">No logs to display</div>';
+                if (allLogs.length === 0) {
+                    logsContainer.innerHTML = '<div class="text-[#A0A0A0] text-center py-8">No logs to display. Click "Start Live Logs" to begin monitoring.</div>';
+                } else {
+                    logsContainer.innerHTML = `<div class="text-[#A0A0A0] text-center py-8">No logs to display for level "${selectedLevel}". Total logs: ${allLogs.length}. Try selecting "All Levels".</div>`;
+                }
                 return;
             }
 

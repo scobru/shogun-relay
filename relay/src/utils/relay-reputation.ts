@@ -90,6 +90,51 @@ interface ReputationMetrics {
   bridgeProofsFailed?: number;
   bridgeAvgProofResponseTimeMs?: number;
   bridgeProofResponseTimeSamples?: number;
+  // Resource & Capacity metrics (from pulse data)
+  avgConnections?: number;              // Average active connections
+  maxConnections?: number;              // Peak connections observed
+  avgMemoryUsageMB?: number;            // Average memory usage
+  maxMemoryUsageMB?: number;            // Peak memory usage
+  storageCapacityMB?: number;           // Total storage capacity
+  storageUsedMB?: number;               // Storage currently used
+  storageUtilizationPercent?: number;   // Storage utilization percentage
+  ipfsRepoSizeMB?: number;              // IPFS repository size
+  ipfsPinsCount?: number;               // Number of IPFS pins
+  // Performance metrics
+  avgLatencyMs?: number;                // Average network latency
+  latencySamples?: number;              // Number of latency measurements
+  throughputMBps?: number;              // Data throughput (MB/s)
+  errorRate?: number;                   // Error rate percentage
+  // Availability & Reliability
+  meanTimeBetweenFailures?: number;     // MTBF in milliseconds
+  meanTimeToRecovery?: number;          // MTTR in milliseconds
+  downtimeEvents?: number;              // Number of downtime events
+  totalDowntimeMs?: number;            // Total downtime in milliseconds
+  // Data Quality metrics
+  dataIntegrityChecks?: number;         // Number of integrity checks performed
+  dataIntegrityFailures?: number;       // Number of integrity check failures
+  dataFreshnessMs?: number;             // Average data freshness (time since last update)
+  // Network metrics
+  peerConnections?: number;             // Number of GunDB peer connections
+  networkReachability?: number;         // Network reachability score (0-100)
+  // Deal & Subscription metrics
+  dealsTotal?: number;                  // Total deals handled
+  dealsActive?: number;                 // Currently active deals
+  dealsCompleted?: number;              // Successfully completed deals
+  dealsFailed?: number;                 // Failed deals
+  dealFulfillmentRate?: number;         // Deal fulfillment success rate (0-100)
+  subscriptionsTotal?: number;           // Total subscriptions managed
+  subscriptionsActive?: number;         // Currently active subscriptions
+  subscriptionRetentionRate?: number;    // Subscription retention rate (0-100)
+  // API Availability
+  apiRequestsTotal?: number;            // Total API requests
+  apiRequestsSuccessful?: number;       // Successful API requests
+  apiRequestsFailed?: number;          // Failed API requests
+  apiUptimePercent?: number;            // API uptime percentage
+  // Security metrics
+  securityIncidents?: number;           // Number of security incidents
+  lastSecurityIncident?: number;        // Timestamp of last security incident
+  // Calculated fields
   score?: number;
   tier?: string;
   lastScoreUpdate?: number;
@@ -103,6 +148,13 @@ interface ScoreBreakdown {
   responseTime: number;
   pinFulfillment: number;
   longevity: number;
+  // New breakdown components
+  resourceEfficiency?: number;         // Based on memory/connection efficiency
+  storageCapacity?: number;             // Based on available storage capacity
+  dataQuality?: number;                 // Based on integrity and freshness
+  reliability?: number;                 // Based on MTBF and MTTR
+  dealPerformance?: number;            // Based on deal fulfillment rate
+  networkHealth?: number;               // Based on peer connections and reachability
 }
 
 interface ReputationScore {
@@ -124,12 +176,26 @@ interface LeaderboardOptions {
 }
 
 // Reputation weights (must sum to 1.0)
+// Note: Extended weights for additional metrics are calculated separately
+// and can be included in a weighted average or shown as separate scores
 const WEIGHTS: ReputationWeights = {
-  uptime: 0.30,           // 30% - Consistent availability
-  proofSuccess: 0.25,     // 25% - Storage proof reliability
-  responseTime: 0.20,     // 20% - Speed of responses
-  pinFulfillment: 0.15,   // 15% - Honoring pin requests
-  longevity: 0.10,        // 10% - Time in network
+  uptime: 0.25,           // 25% - Consistent availability (reduced from 30%)
+  proofSuccess: 0.20,     // 20% - Storage proof reliability (reduced from 25%)
+  responseTime: 0.15,     // 15% - Speed of responses (reduced from 20%)
+  pinFulfillment: 0.15,   // 15% - Honoring pin requests (unchanged)
+  longevity: 0.10,        // 10% - Time in network (unchanged)
+  // Additional weights for extended metrics (optional, can be added to total)
+  // These are calculated separately and can be shown as supplementary scores
+};
+
+// Extended weights for additional metrics (shown separately or as bonus/penalty)
+const EXTENDED_WEIGHTS = {
+  resourceEfficiency: 0.05,    // 5% - Memory and connection efficiency
+  storageCapacity: 0.05,       // 5% - Available storage capacity
+  dataQuality: 0.03,           // 3% - Data integrity and freshness
+  reliability: 0.02,            // 2% - MTBF and MTTR
+  dealPerformance: 0.00,        // 0% - Deal fulfillment (tracked but not weighted in base score)
+  networkHealth: 0.00,          // 0% - Network metrics (tracked but not weighted in base score)
 };
 
 // Thresholds
@@ -298,13 +364,106 @@ export function calculateReputationScore(metrics: ReputationMetrics): Reputation
     scores.longevity = 0;
   }
 
-  // Calculate weighted total
-  const totalScore =
+  // Calculate extended scores (optional metrics)
+  
+  // 6. Resource Efficiency Score (0-100)
+  // Based on memory and connection efficiency
+  if (metrics.avgMemoryUsageMB !== undefined && metrics.maxMemoryUsageMB !== undefined && metrics.maxMemoryUsageMB > 0) {
+    const memoryEfficiency = 100 - Math.min(100, (metrics.avgMemoryUsageMB / metrics.maxMemoryUsageMB) * 100);
+    const connectionEfficiency = metrics.avgConnections && metrics.maxConnections && metrics.maxConnections > 0
+      ? 100 - Math.min(100, (metrics.avgConnections / metrics.maxConnections) * 100)
+      : 50;
+    scores.resourceEfficiency = (memoryEfficiency + connectionEfficiency) / 2;
+  } else {
+    scores.resourceEfficiency = 50; // Default
+  }
+
+  // 7. Storage Capacity Score (0-100)
+  // Based on available storage capacity
+  if (metrics.storageCapacityMB !== undefined && metrics.storageUsedMB !== undefined) {
+    const utilization = metrics.storageCapacityMB > 0 
+      ? (metrics.storageUsedMB / metrics.storageCapacityMB) * 100 
+      : 0;
+    // Lower utilization = higher score (more capacity available)
+    scores.storageCapacity = Math.max(0, 100 - utilization);
+  } else if (metrics.storageUtilizationPercent !== undefined) {
+    scores.storageCapacity = Math.max(0, 100 - metrics.storageUtilizationPercent);
+  } else {
+    scores.storageCapacity = 50; // Default
+  }
+
+  // 8. Data Quality Score (0-100)
+  // Based on integrity checks and data freshness
+  let integrityScore = 50;
+  if (metrics.dataIntegrityChecks !== undefined && metrics.dataIntegrityChecks > 0) {
+    const integrityRate = 1 - ((metrics.dataIntegrityFailures || 0) / metrics.dataIntegrityChecks);
+    integrityScore = integrityRate * 100;
+  }
+  
+  let freshnessScore = 50;
+  if (metrics.dataFreshnessMs !== undefined) {
+    // Data fresher than 1 hour = 100, older than 24h = 0
+    const hoursOld = metrics.dataFreshnessMs / (1000 * 60 * 60);
+    freshnessScore = Math.max(0, 100 - (hoursOld / 24) * 100);
+  }
+  
+  scores.dataQuality = (integrityScore + freshnessScore) / 2;
+
+  // 9. Reliability Score (0-100)
+  // Based on MTBF and MTTR
+  if (metrics.meanTimeBetweenFailures !== undefined && metrics.meanTimeToRecovery !== undefined) {
+    // Higher MTBF and lower MTTR = better score
+    const mtbfHours = metrics.meanTimeBetweenFailures / (1000 * 60 * 60);
+    const mttrMinutes = metrics.meanTimeToRecovery / (1000 * 60);
+    
+    // MTBF: 24h = 50, 168h (1 week) = 100
+    const mtbfScore = Math.min(100, (mtbfHours / 168) * 100);
+    // MTTR: 0 min = 100, 60 min = 0
+    const mttrScore = Math.max(0, 100 - (mttrMinutes / 60) * 100);
+    
+    scores.reliability = (mtbfScore + mttrScore) / 2;
+  } else {
+    scores.reliability = 50; // Default
+  }
+
+  // 10. Deal Performance Score (0-100)
+  if (metrics.dealFulfillmentRate !== undefined) {
+    scores.dealPerformance = metrics.dealFulfillmentRate;
+  } else if (metrics.dealsTotal !== undefined && metrics.dealsTotal > 0) {
+    const completed = metrics.dealsCompleted || 0;
+    scores.dealPerformance = (completed / metrics.dealsTotal) * 100;
+  } else {
+    scores.dealPerformance = 50; // Default
+  }
+
+  // 11. Network Health Score (0-100)
+  // Based on peer connections and reachability
+  let peerScore = 50;
+  if (metrics.peerConnections !== undefined) {
+    // More peers = better (capped at 20 peers for 100 score)
+    peerScore = Math.min(100, (metrics.peerConnections / 20) * 100);
+  }
+  
+  const reachabilityScore = metrics.networkReachability || 50;
+  scores.networkHealth = (peerScore + reachabilityScore) / 2;
+
+  // Calculate weighted total (base score)
+  const baseScore =
     (scores.uptime || 0) * WEIGHTS.uptime +
     (scores.proofSuccess || 0) * WEIGHTS.proofSuccess +
     (scores.responseTime || 0) * WEIGHTS.responseTime +
     (scores.pinFulfillment || 0) * WEIGHTS.pinFulfillment +
     (scores.longevity || 0) * WEIGHTS.longevity;
+
+  // Calculate extended score (optional bonus/penalty)
+  const extendedScore =
+    (scores.resourceEfficiency || 0) * EXTENDED_WEIGHTS.resourceEfficiency +
+    (scores.storageCapacity || 0) * EXTENDED_WEIGHTS.storageCapacity +
+    (scores.dataQuality || 0) * EXTENDED_WEIGHTS.dataQuality +
+    (scores.reliability || 0) * EXTENDED_WEIGHTS.reliability;
+
+  // Total score = base + extended (capped at 100)
+  const totalScore = Math.min(100, baseScore + extendedScore);
 
   // Determine tier
   let tier: string;
@@ -323,6 +482,12 @@ export function calculateReputationScore(metrics: ReputationMetrics): Reputation
       responseTime: Math.round((scores.responseTime || 0) * 100) / 100,
       pinFulfillment: Math.round((scores.pinFulfillment || 0) * 100) / 100,
       longevity: Math.round((scores.longevity || 0) * 100) / 100,
+      resourceEfficiency: Math.round((scores.resourceEfficiency || 0) * 100) / 100,
+      storageCapacity: Math.round((scores.storageCapacity || 0) * 100) / 100,
+      dataQuality: Math.round((scores.dataQuality || 0) * 100) / 100,
+      reliability: Math.round((scores.reliability || 0) * 100) / 100,
+      dealPerformance: Math.round((scores.dealPerformance || 0) * 100) / 100,
+      networkHealth: Math.round((scores.networkHealth || 0) * 100) / 100,
     },
     weights: WEIGHTS,
     hasEnoughData: (metrics.dataPoints || 0) >= THRESHOLDS.minDataPoints,
@@ -1153,6 +1318,181 @@ export async function updateStoredScore(gun: GunInstance, relayHost: string): Pr
   }
 }
 
+/**
+ * Record resource metrics from pulse data
+ * Called when processing pulse data from other relays
+ * @param gun - GunDB instance
+ * @param relayHost - Host identifier
+ * @param metrics - Resource metrics from pulse
+ */
+export async function recordResourceMetrics(
+  gun: GunInstance,
+  relayHost: string,
+  metrics: {
+    connections?: { active?: number; total?: number };
+    memory?: { heapUsed?: number; heapTotal?: number; rss?: number };
+    ipfs?: { repoSize?: number; numPins?: number; connected?: boolean };
+    storage?: { used?: number; capacity?: number };
+  }
+): Promise<void> {
+  const maxWaitMs = 2000;
+  const startWait = Date.now();
+  while (!acquireLock(relayHost)) {
+    if (Date.now() - startWait > maxWaitMs) break;
+    await new Promise(r => setTimeout(r, 50));
+  }
+
+  try {
+    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    await new Promise<void>((resolve) => {
+      node.once((data: ReputationMetrics | undefined) => {
+        const current = data || {};
+        const now = Date.now();
+        const updates: Record<string, any> = { lastSeenTimestamp: now };
+
+        // Update connection metrics
+        if (metrics.connections?.active !== undefined) {
+          const activeConn = metrics.connections.active;
+          const currentAvg = current.avgConnections || 0;
+          const currentMax = current.maxConnections || 0;
+          const sampleCount = (current.avgConnections !== undefined ? 1 : 0) + 1;
+          
+          updates.avgConnections = currentAvg > 0 
+            ? ((currentAvg * (sampleCount - 1)) + activeConn) / sampleCount
+            : activeConn;
+          updates.maxConnections = Math.max(currentMax, activeConn);
+        }
+
+        // Update memory metrics
+        if (metrics.memory?.heapUsed !== undefined) {
+          const heapUsedMB = metrics.memory.heapUsed / (1024 * 1024);
+          const currentAvg = current.avgMemoryUsageMB || 0;
+          const currentMax = current.maxMemoryUsageMB || 0;
+          const sampleCount = (current.avgMemoryUsageMB !== undefined ? 1 : 0) + 1;
+          
+          updates.avgMemoryUsageMB = currentAvg > 0
+            ? ((currentAvg * (sampleCount - 1)) + heapUsedMB) / sampleCount
+            : heapUsedMB;
+          updates.maxMemoryUsageMB = Math.max(currentMax, heapUsedMB);
+        }
+
+        // Update IPFS/storage metrics
+        if (metrics.ipfs?.repoSize !== undefined) {
+          updates.ipfsRepoSizeMB = Math.round(metrics.ipfs.repoSize / (1024 * 1024));
+        }
+        if (metrics.ipfs?.numPins !== undefined) {
+          updates.ipfsPinsCount = metrics.ipfs.numPins;
+        }
+        if (metrics.storage?.used !== undefined) {
+          updates.storageUsedMB = metrics.storage.used;
+        }
+        if (metrics.storage?.capacity !== undefined) {
+          updates.storageCapacityMB = metrics.storage.capacity;
+          if (metrics.storage.used !== undefined) {
+            updates.storageUtilizationPercent = (metrics.storage.used / metrics.storage.capacity) * 100;
+          }
+        }
+
+        node.put({
+          ...updates,
+          _lastUpdateId: `${now}-${Math.random().toString(36).substr(2, 9)}`,
+        });
+        resolve();
+      });
+    });
+  } finally {
+    releaseLock(relayHost);
+  }
+}
+
+/**
+ * Record deal performance metrics
+ * @param gun - GunDB instance
+ * @param relayHost - Host identifier
+ * @param success - Whether deal was successful
+ */
+export async function recordDealPerformance(
+  gun: GunInstance,
+  relayHost: string,
+  success: boolean
+): Promise<void> {
+  const maxWaitMs = 2000;
+  const startWait = Date.now();
+  while (!acquireLock(relayHost)) {
+    if (Date.now() - startWait > maxWaitMs) break;
+    await new Promise(r => setTimeout(r, 50));
+  }
+
+  try {
+    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    await new Promise<void>((resolve) => {
+      node.once((data: ReputationMetrics | undefined) => {
+        const current = data || {};
+        const now = Date.now();
+        
+        const total = (current.dealsTotal || 0) + 1;
+        const completed = success ? (current.dealsCompleted || 0) + 1 : (current.dealsCompleted || 0);
+        const failed = success ? (current.dealsFailed || 0) : (current.dealsFailed || 0) + 1;
+        const fulfillmentRate = total > 0 ? (completed / total) * 100 : 0;
+
+        node.put({
+          dealsTotal: total,
+          dealsCompleted: completed,
+          dealsFailed: failed,
+          dealFulfillmentRate: Math.round(fulfillmentRate * 100) / 100,
+          lastSeenTimestamp: now,
+          _lastUpdateId: `${now}-${Math.random().toString(36).substr(2, 9)}`,
+        });
+        resolve();
+      });
+    });
+  } finally {
+    releaseLock(relayHost);
+  }
+}
+
+/**
+ * Record data integrity check result
+ * @param gun - GunDB instance
+ * @param relayHost - Host identifier
+ * @param passed - Whether integrity check passed
+ */
+export async function recordDataIntegrityCheck(
+  gun: GunInstance,
+  relayHost: string,
+  passed: boolean
+): Promise<void> {
+  const maxWaitMs = 2000;
+  const startWait = Date.now();
+  while (!acquireLock(relayHost)) {
+    if (Date.now() - startWait > maxWaitMs) break;
+    await new Promise(r => setTimeout(r, 50));
+  }
+
+  try {
+    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    await new Promise<void>((resolve) => {
+      node.once((data: ReputationMetrics | undefined) => {
+        const current = data || {};
+        const now = Date.now();
+        
+        const checks = (current.dataIntegrityChecks || 0) + 1;
+        const failures = passed ? (current.dataIntegrityFailures || 0) : (current.dataIntegrityFailures || 0) + 1;
+
+        node.put({
+          dataIntegrityChecks: checks,
+          dataIntegrityFailures: failures,
+          lastSeenTimestamp: now,
+          _lastUpdateId: `${now}-${Math.random().toString(36).substr(2, 9)}`,
+        });
+        resolve();
+      });
+    });
+  } finally {
+    releaseLock(relayHost);
+  }
+}
+
 export default {
   calculateReputationScore,
   initReputationTracking,
@@ -1164,6 +1504,9 @@ export default {
   recordBridgeProofFailure,
   recordBatchSubmissionSuccess,
   recordBatchSubmissionFailure,
+  recordResourceMetrics,
+  recordDealPerformance,
+  recordDataIntegrityCheck,
   getReputation,
   getReputationLeaderboard,
   updateStoredScore,
@@ -1171,6 +1514,7 @@ export default {
   THRESHOLDS,
   OBSERVER_TYPE,
   OBSERVER_WEIGHTS,
+  EXTENDED_WEIGHTS,
   isSelfRating,
   getObserverType,
 };
