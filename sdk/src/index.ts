@@ -8,6 +8,9 @@ import { RegistryModule } from './modules/registry';
 import { UploadsModule } from './modules/uploads';
 import { BridgeModule } from './modules/bridge';
 
+// Export types
+export * from './types';
+
 export class ShogunRelaySDK {
   private client: ApiClient;
 

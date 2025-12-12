@@ -1,4 +1,12 @@
 import { ApiClient } from '../client';
+import {
+  ReputationResponse,
+  ReputationLeaderboardResponse,
+  BestRelaysResponse,
+  NetworkStatsResponse,
+  RelayInfoResponse,
+  RelaysListResponse,
+} from '../types';
 
 export class NetworkModule {
   private client: ApiClient;
@@ -7,7 +15,7 @@ export class NetworkModule {
     this.client = client;
   }
 
-  public async getRelays(timeout?: number, maxAge?: number): Promise<any> {
+  public async getRelays(timeout?: number, maxAge?: number): Promise<RelaysListResponse> {
     const params: any = {};
     if (timeout) params.timeout = timeout;
     if (maxAge) params.maxAge = maxAge;
@@ -15,11 +23,11 @@ export class NetworkModule {
     return this.client.get('/api/v1/network/relays', { params });
   }
 
-  public async getRelay(host: string): Promise<any> {
+  public async getRelay(host: string): Promise<RelayInfoResponse> {
     return this.client.get(`/api/v1/network/relay/${host}`);
   }
 
-  public async getStats(): Promise<any> {
+  public async getStats(): Promise<NetworkStatsResponse> {
     return this.client.get('/api/v1/network/stats');
   }
 
@@ -34,11 +42,11 @@ export class NetworkModule {
     return this.client.post('/api/v1/network/verify-proof', { proof });
   }
 
-  public async getReputation(host: string): Promise<any> {
+  public async getReputation(host: string): Promise<ReputationResponse> {
     return this.client.get(`/api/v1/network/reputation/${host}`);
   }
 
-  public async getReputationLeaderboard(minScore?: number, limit?: number): Promise<any> {
+  public async getReputationLeaderboard(minScore?: number, limit?: number): Promise<ReputationLeaderboardResponse> {
     const params: any = {};
     if (minScore) params.minScore = minScore;
     if (limit) params.limit = limit;
@@ -46,7 +54,7 @@ export class NetworkModule {
     return this.client.get('/api/v1/network/reputation', { params });
   }
 
-  public async getBestRelays(count?: number, minScore?: number, excludeHost?: string): Promise<any> {
+  public async getBestRelays(count?: number, minScore?: number, excludeHost?: string): Promise<BestRelaysResponse> {
     const params: any = {};
     if (count) params.count = count;
     if (minScore) params.minScore = minScore;
