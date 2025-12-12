@@ -1571,8 +1571,8 @@ See docs/RELAY_KEYS.md for more information.
             numObjects: ipfsStats.NumObjects || ipfsStats.numberObjects || 0,
           };
 
-        // Also get pin count (quick query)
-        const pinCount = await new Promise((resolve) => {
+          // Also get pin count (quick query)
+          const pinCount = await new Promise((resolve) => {
           const timeout = setTimeout(() => resolve(0), 2000);
           const options: any = {
             hostname: "127.0.0.1",
