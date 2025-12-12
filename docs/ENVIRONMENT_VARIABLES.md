@@ -618,6 +618,30 @@ This document provides a comprehensive reference of all environment variables th
 - **Example**: `BRIDGE_RPC_URL=https://sepolia.base.org`
 - **Note**: See [BRIDGE.md](./BRIDGE.md) for complete bridge configuration.
 
+### `BRIDGE_VALID_CHAIN_IDS`
+- **Type**: String (Comma-separated integers)
+- **Required**: No
+- **Default**: `1,11155111,8453,84532,42161,421614,10,11155420,137,80002`
+- **Description**: Whitelist of valid chain IDs for bridge operations. Bridge will not start if configured chain ID is not in this list. Prevents misconfiguration and unauthorized chain usage.
+- **Default chains**: Ethereum Mainnet, Sepolia, Base, Base Sepolia, Arbitrum, Arbitrum Sepolia, Optimism, Op Sepolia, Polygon, Polygon Amoy
+- **Example**: `BRIDGE_VALID_CHAIN_IDS=8453,42161,10` (only Base, Arbitrum, Optimism mainnets)
+
+### `CORS_ORIGINS`
+- **Type**: String (Comma-separated URLs)
+- **Required**: No
+- **Default**: `*` (allow all origins)
+- **Description**: Whitelist of allowed CORS origins. Prevents CSRF attacks by only allowing requests from specified origins. Use `*` for development, specific origins for production.
+- **Example**: `CORS_ORIGINS=https://myapp.com,https://admin.myapp.com`
+- **Security**: In production, always specify exact origins instead of `*`
+
+### `CORS_CREDENTIALS`
+- **Type**: Boolean (String)
+- **Required**: No
+- **Default**: `false`
+- **Description**: Allow credentials (cookies, authorization headers) in CORS requests. Set to `true` if your frontend needs to send authentication headers.
+- **Values**: `"true"` or `"false"`
+- **Example**: `CORS_CREDENTIALS=true`
+
 ---
 
 ## Quick Reference Table
@@ -658,6 +682,9 @@ This document provides a comprehensive reference of all environment variables th
 | `VERBOSE_LOGGING` | No | `false` | Advanced |
 | `BRIDGE_ENABLED` | No | - | Bridge |
 | `BRIDGE_RPC_URL` | No | - | Bridge |
+| `BRIDGE_VALID_CHAIN_IDS` | No | `1,11155111,...` | Security |
+| `CORS_ORIGINS` | No | `*` | Security |
+| `CORS_CREDENTIALS` | No | `false` | Security |
 
 *At least one of `RELAY_SEA_KEYPAIR` or `RELAY_SEA_KEYPAIR_PATH` is required.  
 **Required if using x402 subscriptions or deals.

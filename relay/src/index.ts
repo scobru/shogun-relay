@@ -43,7 +43,7 @@ import {
   packageConfig,
 } from "./config/env-config";
 import { startBatchScheduler } from "./utils/batch-scheduler";
-import { secureCompare, hashToken } from "./utils/security";
+import { secureCompare, hashToken, isValidChainId, getChainName, createProductionErrorHandler } from "./utils/security";
 import { startPeriodicPeerSync } from "./utils/peer-discovery";
 
 dotenv.config();
@@ -156,13 +156,96 @@ async function initializeServer() {
   const publicPath = path.resolve(__dirname, path_public);
   const indexPath = path.resolve(publicPath, "index.html");
 
-  // Middleware
-  app.use(cors());
+  // ===== SECURITY: CORS Configuration =====
+  const corsOptions = {
+    origin: authConfig.corsOrigins.includes('*')
+      ? true  // Allow all origins if '*' is configured
+      : (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+
+        if (authConfig.corsOrigins.some((allowed: string) =>
+          allowed === origin ||
+          origin.endsWith(allowed.replace('*.', '.'))
+        )) {
+          callback(null, true);
+        } else {
+          loggers.server.warn({ origin }, 'CORS blocked request from origin');
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
+    credentials: authConfig.corsCredentials,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'token', 'X-Requested-With', 'X-Session-Token'],
+    exposedHeaders: ['X-Session-Token'],
+    maxAge: 86400, // 24 hours
+  };
+  app.use(cors(corsOptions));
+  loggers.server.info({
+    origins: authConfig.corsOrigins.includes('*') ? 'ALL' : authConfig.corsOrigins,
+    credentials: authConfig.corsCredentials
+  }, '🔒 CORS configured');
+
+  // ===== SECURITY: Security Headers =====
+  app.use((req, res, next) => {
+    // Prevent clickjacking
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    // Prevent MIME type sniffing
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    // XSS Protection
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    // Referrer Policy
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    next();
+  });
+
   app.use(express.json()); // Aggiungi supporto per il parsing del body JSON
   app.use(express.urlencoded({ extended: true })); // Aggiungi supporto per i dati del form
 
   // Fix per rate limiting con proxy
   app.set("trust proxy", 1);
+
+  // ===== ROOT HEALTH CHECK ENDPOINT (for load balancers, k8s probes) =====
+  app.get("/health", (req, res) => {
+    res.status(200).json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      version: packageConfig.version || '1.0.0',
+    });
+  });
+
+  // Liveness probe (minimal check)
+  app.get("/healthz", (req, res) => {
+    res.status(200).send('OK');
+  });
+
+  // Readiness probe (checks dependencies)
+  app.get("/ready", async (req, res) => {
+    try {
+      // Check if essential services are ready
+      const holsterInstance = app.get('holsterInstance');
+      const gunInstance = app.get('gunInstance');
+
+      const checks = {
+        gun: !!gunInstance,
+        holster: !!holsterInstance,
+      };
+
+      const allReady = Object.values(checks).every(Boolean);
+
+      res.status(allReady ? 200 : 503).json({
+        status: allReady ? 'ready' : 'not_ready',
+        checks,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      res.status(503).json({
+        status: 'error',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
 
   // Route specifica per /admin (DEFINITA PRIMA DEL MIDDLEWARE DI AUTENTICAZIONE)
   app.get("/admin", (req, res) => {
@@ -1469,6 +1552,15 @@ See docs/RELAY_KEYS.md for more information.
     loggers.server.error({ err: error }, "❌ Errore nel caricamento delle route modulari");
   }
 
+  // ===== SECURITY: Production Error Handler =====
+  // This must be added AFTER all routes to catch any unhandled errors
+  // In production, it sanitizes error messages to prevent information disclosure
+  const isProduction = serverConfig.nodeEnv === 'production';
+  app.use(createProductionErrorHandler(isProduction));
+  if (isProduction) {
+    loggers.server.info("🔒 Production error handler enabled - errors will be sanitized");
+  }
+
   // Route statiche (DEFINITE DOPO LE API)
 
   app.use(express.static(publicPath));
@@ -1554,7 +1646,7 @@ See docs/RELAY_KEYS.md for more information.
         // Try multiple field names for RepoSize
         let repoSize = 0;
         if (ipfsStats.RepoSize !== undefined) {
-          repoSize = typeof ipfsStats.RepoSize === 'string' 
+          repoSize = typeof ipfsStats.RepoSize === 'string'
             ? parseInt(ipfsStats.RepoSize, 10) || 0
             : ipfsStats.RepoSize || 0;
         } else if (ipfsStats.repoSize !== undefined) {
@@ -1562,7 +1654,7 @@ See docs/RELAY_KEYS.md for more information.
             ? parseInt(ipfsStats.repoSize, 10) || 0
             : ipfsStats.repoSize || 0;
         }
-        
+
         if (repoSize !== undefined) {
           pulse.ipfs = {
             connected: true,
@@ -1573,35 +1665,35 @@ See docs/RELAY_KEYS.md for more information.
 
           // Also get pin count (quick query)
           const pinCount = await new Promise((resolve) => {
-          const timeout = setTimeout(() => resolve(0), 2000);
-          const options: any = {
-            hostname: "127.0.0.1",
-            port: 5001,
-            path: "/api/v0/pin/ls?type=recursive",
-            method: "POST",
-            headers: { "Content-Length": "0" },
-          };
-          if (IPFS_API_TOKEN) {
-            options.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
-          }
-          const req = http.request(options, (res) => {
-            let data = "";
-            res.on("data", (chunk) => (data += chunk));
-            res.on("end", () => {
-              clearTimeout(timeout);
-              try {
-                const pins = JSON.parse(data);
-                resolve(pins.Keys ? Object.keys(pins.Keys).length : 0);
-              } catch {
-                resolve(0);
-              }
+            const timeout = setTimeout(() => resolve(0), 2000);
+            const options: any = {
+              hostname: "127.0.0.1",
+              port: 5001,
+              path: "/api/v0/pin/ls?type=recursive",
+              method: "POST",
+              headers: { "Content-Length": "0" },
+            };
+            if (IPFS_API_TOKEN) {
+              options.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+            }
+            const req = http.request(options, (res) => {
+              let data = "";
+              res.on("data", (chunk) => (data += chunk));
+              res.on("end", () => {
+                clearTimeout(timeout);
+                try {
+                  const pins = JSON.parse(data);
+                  resolve(pins.Keys ? Object.keys(pins.Keys).length : 0);
+                } catch {
+                  resolve(0);
+                }
+              });
             });
-          });
-          req.on("error", () => {
-            clearTimeout(timeout);
-            resolve(0);
-          });
-          req.end();
+            req.on("error", () => {
+              clearTimeout(timeout);
+              resolve(0);
+            });
+            req.end();
           });
 
           pulse.ipfs.numPins = pinCount;
@@ -1874,48 +1966,64 @@ See docs/RELAY_KEYS.md for more information.
 
   // Initialize Bridge Listener (listens to Deposit events)
   if (BRIDGE_ENABLED && BRIDGE_RPC_URL) {
-    try {
-      const { startBridgeListener } = await import("./utils/bridge-listener");
-      const { initNoncePersistence, loadPersistedNonces } = await import("./utils/bridge-state");
-
-      // Initialize nonce persistence with GunDB instance
-      initNoncePersistence(gun);
-
-      // Load persisted nonces from GunDB (survives relay restarts)
-      const loadedNonces = await loadPersistedNonces(gun);
-      if (loadedNonces > 0) {
-        loggers.server.info({ count: loadedNonces }, "🔢 Loaded persisted nonces from GunDB");
-      }
-
-      await startBridgeListener(gun, {
-        rpcUrl: BRIDGE_RPC_URL,
+    // ===== SECURITY: Validate ChainId before starting bridge =====
+    const chainIdValidation = isValidChainId(BRIDGE_CHAIN_ID, bridgeConfig.validChainIds);
+    if (!chainIdValidation.valid) {
+      loggers.server.error({
         chainId: BRIDGE_CHAIN_ID,
-        startBlock: bridgeConfig.startBlock,
-        minConfirmations: bridgeConfig.minConfirmations,
-        relayKeyPair: relayKeyPair, // Pass relay keypair for signing balance data
-        enabled: true,
-      });
-
-      // Get contract address from SDK for logging
-      const { createBridgeClient } = await import("./utils/bridge-client");
-      const tempClient = createBridgeClient({
-        rpcUrl: BRIDGE_RPC_URL,
+        error: chainIdValidation.error,
+        validChainIds: bridgeConfig.validChainIds
+      }, "❌ Invalid Bridge Chain ID - Bridge disabled for security");
+      // Don't start bridge with invalid chain
+    } else {
+      loggers.server.info({
         chainId: BRIDGE_CHAIN_ID,
-      });
+        chainName: getChainName(BRIDGE_CHAIN_ID)
+      }, "✅ Bridge Chain ID validated");
 
-      loggers.server.info(
-        {
-          contractAddress: tempClient.contractAddress,
+      try {
+        const { startBridgeListener } = await import("./utils/bridge-listener");
+        const { initNoncePersistence, loadPersistedNonces } = await import("./utils/bridge-state");
+
+        // Initialize nonce persistence with GunDB instance
+        initNoncePersistence(gun);
+
+        // Load persisted nonces from GunDB (survives relay restarts)
+        const loadedNonces = await loadPersistedNonces(gun);
+        if (loadedNonces > 0) {
+          loggers.server.info({ count: loadedNonces }, "🔢 Loaded persisted nonces from GunDB");
+        }
+
+        await startBridgeListener(gun, {
+          rpcUrl: BRIDGE_RPC_URL,
           chainId: BRIDGE_CHAIN_ID,
-        },
-        "🌉 Bridge deposit listener started"
-      );
-    } catch (error: any) {
-      loggers.server.error(
-        { err: error },
-        "❌ Failed to start bridge listener"
-      );
-    }
+          startBlock: bridgeConfig.startBlock,
+          minConfirmations: bridgeConfig.minConfirmations,
+          relayKeyPair: relayKeyPair, // Pass relay keypair for signing balance data
+          enabled: true,
+        });
+
+        // Get contract address from SDK for logging
+        const { createBridgeClient } = await import("./utils/bridge-client");
+        const tempClient = createBridgeClient({
+          rpcUrl: BRIDGE_RPC_URL,
+          chainId: BRIDGE_CHAIN_ID,
+        });
+
+        loggers.server.info(
+          {
+            contractAddress: tempClient.contractAddress,
+            chainId: BRIDGE_CHAIN_ID,
+          },
+          "🌉 Bridge deposit listener started"
+        );
+      } catch (error: any) {
+        loggers.server.error(
+          { err: error },
+          "❌ Failed to start bridge listener"
+        );
+      }
+    } // End of chainId validation else block
 
     // Auto batch submission (if enabled and relay can act as sequencer)
     if (BRIDGE_AUTO_BATCH_ENABLED && BRIDGE_RPC_URL) {

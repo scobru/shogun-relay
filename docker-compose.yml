@@ -66,6 +66,9 @@ services:
       - HOLSTER_MAX_CONNECTIONS=100
       # Network Federation
       - AUTO_REPLICATION=true
+      - BRIDGE_VALID_CHAIN_IDS=84532,42161
+      - CORS_ORIGINS=https://shogun-deals.vercel.app,https://shogun-l2.vercel.app
+      - CORS_CREDENTIALS=true
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8765/health"]

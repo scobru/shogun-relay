@@ -79,6 +79,9 @@ export const config = {
   auth: {
     adminPassword: process.env.ADMIN_PASSWORD,
     strictSessionIp: process.env.STRICT_SESSION_IP !== 'false',
+    // CORS configuration
+    corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : ['*'],
+    corsCredentials: process.env.CORS_CREDENTIALS === 'true',
   },
 
   // ============================================================================
@@ -162,6 +165,10 @@ export const config = {
     autoBatchEnabled: process.env.BRIDGE_AUTO_BATCH_ENABLED !== 'false',
     autoBatchIntervalMs: parseInt(process.env.BRIDGE_AUTO_BATCH_INTERVAL_MS || '300000') || 5 * 60 * 1000, // 5 minutes
     autoBatchMinWithdrawals: parseInt(process.env.BRIDGE_AUTO_BATCH_MIN_WITHDRAWALS || '1') || 1,
+    // Allowed chain IDs for security validation
+    validChainIds: process.env.BRIDGE_VALID_CHAIN_IDS 
+      ? process.env.BRIDGE_VALID_CHAIN_IDS.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
+      : [1, 11155111, 8453, 84532, 42161, 421614, 10, 11155420, 137, 80002], // Mainnet, Sepolia, Base, Base Sepolia, Arbitrum, Arbitrum Sepolia, Optimism, Op Sepolia, Polygon, Polygon Amoy
   },
 
   // ============================================================================
