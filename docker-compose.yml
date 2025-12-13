@@ -10,11 +10,15 @@ services:
       - "8080:8080" # IPFS Gateway
       - "4001:4001" # IPFS Swarm
     volumes:
-      # Persist IPFS data
+      # Persist IPFS data (repository, pins, blocks)
       - ipfs-data:/data/ipfs
-      # Persist relay data
+      # Persist GunDB data (SQLite DB or radata files)
       - relay-data:/app/relay/data
-      # Mount logs for debugging
+      # Persist relay keys (SEA keypair for relay user)
+      - relay-keys:/app/keys
+      # Persist Holster data (if Holster is enabled)
+      - holster-data:/app/relay/holster-data
+      # Mount logs for debugging (optional, can be removed in production)
       - ./logs:/var/log/supervisor
     environment:
       - NODE_ENV=production
@@ -26,14 +30,45 @@ services:
       - RELAY_STORE=true
       - RELAY_PATH=public
       - RELAY_QR=true
-      - RELAY_NAME=OP1
-      - RELAY_PEERS=wss://ruling-mastodon-improved.ngrok-free.app/gun
+      - RELAY_NAME=shogun-relay
+      - RELAY_PEERS=
       - RELAY_PROTECTED=false
       - IPFS_API_URL=http://127.0.0.1:5001
       - IPFS_GATEWAY_URL=http://127.0.0.1:8080
       - IPFS_API_TOKEN=shogun2025
       - IPFS_API_KEY=shogun2025
       - DISABLE_RADISK=false
+      # Relay GunDB User (owns subscription data) - REQUIRED: RELAY_SEA_KEYPAIR or RELAY_SEA_KEYPAIR_PATH
+      # Example: RELAY_SEA_KEYPAIR='{"pub":"...","priv":"...","epub":"...","epriv":"..."}'
+      # Or: RELAY_SEA_KEYPAIR_PATH=/app/keys/relay-keypair.json
+      # x402 Payment Configuration
+      - X402_PAY_TO_ADDRESS=0xYourWalletAddressHere
+      - X402_NETWORK=base-sepolia
+      - X402_SETTLEMENT_MODE=direct
+      # Required for direct settlement (private key of wallet that will execute transferWithAuthorization)
+      # This wallet needs ETH for gas fees
+      - X402_PRIVATE_KEY=your_private_key_here
+      # Optional: Custom RPC URL
+      # - X402_RPC_URL=https://your-rpc-url
+      # On-Chain Registry Configuration
+      # Private key for on-chain operations (registration, staking, deals)
+      - RELAY_PRIVATE_KEY=0x_your_private_key_here
+      # Chain ID: 84532 = Base Sepolia (testnet), 8453 = Base Mainnet
+      - REGISTRY_CHAIN_ID=84532
+      # Relay Storage Limits (global IPFS storage limit)
+      - RELAY_MAX_STORAGE_GB=10
+      - RELAY_STORAGE_WARNING_THRESHOLD=80
+      # Holster Relay (WebSocket enhancement)
+      - HOLSTER_RELAY_HOST=0.0.0.0
+      # - HOLSTER_RELAY_PORT=8766
+      - HOLSTER_RELAY_STORAGE=true
+      - HOLSTER_RELAY_STORAGE_PATH=/app/relay/holster-data
+      - HOLSTER_MAX_CONNECTIONS=100
+      # Network Federation
+      - AUTO_REPLICATION=true
+      - BRIDGE_VALID_CHAIN_IDS=84532,42161
+      - CORS_ORIGINS=https://shogun-deals.vercel.app,https://shogun-l2.vercel.app
+      - CORS_CREDENTIALS=true
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
@@ -45,9 +80,19 @@ services:
       - shogun-network
 
 volumes:
+  # IPFS repository - contains all IPFS data (blocks, pins, config)
   ipfs-data:
     driver: local
+  # GunDB data - contains gun.db (SQLite) or radata/ directory
+  # This is critical for preserving subscription data, reputation, and all GunDB state
   relay-data:
+    driver: local
+  # Relay keys - contains relay SEA keypair (RELAY_SEA_KEYPAIR_PATH)
+  # Important: Without this, the relay user will be recreated on each deploy
+  relay-keys:
+    driver: local
+  # Holster data - contains Holster relay state (if HOLSTER_RELAY_STORAGE=true)
+  holster-data:
     driver: local
 
 networks:

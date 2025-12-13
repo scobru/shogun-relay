@@ -14,16 +14,47 @@
     <script src="lib/admin-nav.js"></script>
     <script src="lib/admin-auth.js"></script>
     <style>
+        body {
+            background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
+            min-height: 100vh;
+        }
+
+        .hero-gradient {
+            background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
+        }
+
+        @keyframes pulse-glow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4);
+            }
+
+            50% {
+                box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2);
+            }
+        }
+
+        .pulse-glow {
+            animation: pulse-glow 2s infinite;
+        }
+
+        .section-divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #404040, transparent);
+            margin: 2rem 0;
+        }
+
         .service-card {
-            transition: all 0.3s ease;
-            border: 1px solid #606060;
-            background-color: #404040;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid #404040;
+            background-color: #282828;
             border-radius: 1rem;
         }
 
         .service-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 32px rgba(255, 105, 180, 0.2);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
             border-color: rgba(255, 105, 180, 0.3);
         }
 
@@ -60,9 +91,12 @@
         }
 
         @keyframes pulse {
-            0%, 100% {
+
+            0%,
+            100% {
                 opacity: 1;
             }
+
             50% {
                 opacity: 0.5;
             }
@@ -88,139 +122,255 @@
     </style>
 </head>
 
-<body class="antialiased bg-[#1A1A1A]">
-    <div class="container mx-auto p-6">
-        <div class="flex justify-between items-center mb-8">
-            <div>
-                <h1 class="text-3xl font-bold text-[#FFFFFF]">Services Dashboard</h1>
-                <p class="text-[#A0A0A0] text-lg">Monitor and control Shogun Relay services</p>
-            </div>
-            <div class="flex gap-3">
-                <button onclick="refreshAllServices()" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Refresh All</button>
-                <button onclick="clearAdminPassword()" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium" title="Clear stored admin password">Clear Auth</button>
-                <a href="/pin-manager" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Pin Manager</a>
-                <a href="/" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Back</a>
-            </div>
-        </div>
+<body class="antialiased">
+    <div class="hero-gradient min-h-screen">
+        <div class="container mx-auto px-4 py-8 max-w-7xl">
+            <!-- Header -->
+            <header class="mb-12">
+                <div class="flex items-center mb-6">
+                    <a href="/"
+                        class="flex items-center gap-2 text-[#A0A0A0] hover:text-[#FF69B4] transition-colors group">
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                            class="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                        <span>Back to Control Panel</span>
+                    </a>
+                </div>
 
-        <div id="alertPanel" class="alert alert-warning mb-8 bg-[#FFA500]/20 border-[#FFA500]/30 text-[#FFA500] rounded-xl p-4" style="display: none;">
-            <div>
-                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                <span id="alertMessage">Some services are offline or experiencing issues</span>
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <div class="flex items-center gap-4">
+                        <div
+                            class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#64B5F6] to-[#1976D2] pulse-glow">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none"
+                                viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 class="text-3xl md:text-4xl font-bold text-[#FFFFFF]">Services Dashboard</h1>
+                            <p class="text-[#8B94FF]">Monitor and control Shogun Relay services</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="refreshAllServices()"
+                            class="btn bg-transparent border border-[#404040] text-[#E0E0E0] hover:bg-[#404040] hover:border-[#FF69B4] rounded-xl px-4 py-2 font-medium transition-all">Refresh
+                            All</button>
+                        <button onclick="clearAdminPassword()"
+                            class="btn bg-transparent border border-[#404040] text-[#E0E0E0] hover:bg-[#404040] hover:border-[#FF69B4] rounded-xl px-4 py-2 font-medium transition-all"
+                            title="Clear stored admin password">Clear Auth</button>
+                        <a href="/pin-manager"
+                            class="btn bg-transparent border border-[#404040] text-[#E0E0E0] hover:bg-[#404040] hover:border-[#FF69B4] rounded-xl px-4 py-2 font-medium transition-all">Pin
+                            Manager</a>
+                    </div>
+                </div>
+            </header>
+
+            <div id="alertPanel"
+                class="alert alert-warning mb-8 bg-[#FFA500]/20 border-[#FFA500]/30 text-[#FFA500] rounded-xl p-4"
+                style="display: none;">
+                <div>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <span id="alertMessage">Some services are offline or experiencing issues</span>
+                </div>
             </div>
-        </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
 
-            <!-- Gun Relay Service -->
-            <div class="service-card card shadow-xl">
+                <!-- Gun Relay Service -->
+                <div class="service-card card shadow-xl">
+                    <div class="card-body p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="card-title text-lg text-[#FF69B4]">
+                                <span class="status-indicator status-unknown pulse" id="gun-status-indicator"></span>
+                                Gun Relay
+                            </h2>
+                            <div class="badge badge-outline bg-[#282828] border-[#606060] text-[#E0E0E0]"
+                                id="gun-uptime">--</div>
+                        </div>
+
+                        <div class="space-y-3 text-base">
+                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Status:</span><span
+                                    id="gun-status" class="font-semibold text-[#FFFFFF]">Checking...</span></div>
+                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Active
+                                    Connections:</span><span id="gun-connections" class="text-[#FFFFFF]">--</span></div>
+                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Total
+                                    Connections:</span><span id="gun-total-connections" class="text-[#FFFFFF]">--</span>
+                            </div>
+                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Memory Usage:</span><span
+                                    id="gun-memory" class="text-[#FFFFFF]">--</span></div>
+                        </div>
+
+                        <div class="card-actions justify-end mt-6 service-actions">
+                            <button onclick="refreshService('gun')"
+                                class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">🔄
+                                Refresh</button>
+                            <button onclick="restartService('gun')"
+                                class="btn bg-[#FFA500] hover:bg-[#FF8C00] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium restart-btn">🔄
+                                Restart</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- IPFS Service -->
+                <div class="service-card card shadow-xl">
+                    <div class="card-body p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="card-title text-lg text-[#FF69B4]">
+                                <span class="status-indicator status-unknown pulse" id="ipfs-status-indicator"></span>
+                                IPFS Node
+                            </h2>
+                            <div class="badge badge-outline bg-[#282828] border-[#606060] text-[#E0E0E0]"
+                                id="ipfs-version">--</div>
+                        </div>
+
+                        <div class="space-y-3 text-base">
+                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Status:</span><span
+                                    id="ipfs-status" class="font-semibold text-[#FFFFFF]">Checking...</span></div>
+                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Storage Used:</span><span
+                                    id="ipfs-storage" class="text-[#FFFFFF]">--</span></div>
+                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Storage Max:</span><span
+                                    id="ipfs-storage-max" class="text-[#FFFFFF]">--</span></div>
+                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Usage %:</span><span
+                                    id="ipfs-usage-percent" class="text-[#FFFFFF]">--</span></div>
+                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Objects:</span><span
+                                    id="ipfs-objects" class="text-[#FFFFFF]">--</span></div>
+                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Type:</span><span
+                                    id="ipfs-type" class="text-[#FFFFFF]">--</span></div>
+                        </div>
+
+                        <div class="card-actions justify-end mt-6">
+                            <button onclick="refreshService('ipfs')"
+                                class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">🔄
+                                Refresh</button>
+                            <button onclick="restartService('ipfs')"
+                                class="btn bg-[#FFA500] hover:bg-[#FF8C00] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium restart-btn">🔄
+                                Restart</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Holster Service -->
+                <div class="service-card card shadow-xl">
+                    <div class="card-body p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="card-title text-lg text-[#FF69B4]">
+                                <span class="status-indicator status-unknown pulse"
+                                    id="holster-status-indicator"></span>
+                                Holster Relay
+                            </h2>
+                            <div class="badge badge-outline bg-[#282828] border-[#606060] text-[#E0E0E0]"
+                                id="holster-port">--</div>
+                        </div>
+
+                        <div class="space-y-3 text-base">
+                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Status:</span><span
+                                    id="holster-status" class="font-semibold text-[#FFFFFF]">Checking...</span></div>
+                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Port:</span><span
+                                    id="holster-port-value" class="text-[#FFFFFF]">--</span></div>
+                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Host:</span><span
+                                    id="holster-host" class="text-[#FFFFFF]">--</span></div>
+                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Storage:</span><span
+                                    id="holster-storage" class="text-[#FFFFFF]">--</span></div>
+                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Max Connections:</span><span
+                                    id="holster-max-connections" class="text-[#FFFFFF]">--</span></div>
+                        </div>
+
+                        <div class="card-actions justify-end mt-6 service-actions">
+                            <button onclick="refreshService('holster')"
+                                class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">🔄
+                                Refresh</button>
+                            <button onclick="restartService('holster')"
+                                class="btn bg-[#FFA500] hover:bg-[#FF8C00] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium restart-btn">🔄
+                                Restart</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Blockchain RPC Service -->
+                <div class="service-card card shadow-xl">
+                    <div class="card-body p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="card-title text-lg text-[#FF69B4]">
+                                <span class="status-indicator status-unknown pulse" id="rpc-status-indicator"></span>
+                                Blockchain RPC
+                            </h2>
+                            <div class="badge badge-outline bg-[#282828] border-[#606060] text-[#E0E0E0]"
+                                id="rpc-summary">--</div>
+                        </div>
+
+                        <div class="space-y-3 text-base">
+                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Status:</span><span
+                                    id="rpc-status" class="font-semibold text-[#FFFFFF]">Checking...</span></div>
+                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Online:</span><span
+                                    id="rpc-online" class="text-[#FFFFFF]">--</span></div>
+                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Total:</span><span
+                                    id="rpc-total" class="text-[#FFFFFF]">--</span></div>
+                            <div id="rpc-details" class="mt-4 space-y-2 max-h-48 overflow-y-auto">
+                                <!-- RPC details will be populated here -->
+                            </div>
+                        </div>
+
+                        <div class="card-actions justify-end mt-6 service-actions">
+                            <button onclick="refreshService('rpc')"
+                                class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">🔄
+                                Refresh</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="service-card card shadow-xl">
+                    <div class="card-body p-6">
+                        <h2 class="card-title text-lg text-[#FF69B4] mb-6">Quick Actions</h2>
+                        <div class="space-y-4">
+                            <button onclick="healthCheck()"
+                                class="btn bg-[#4CAF50] hover:bg-[#45A049] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium">🔍
+                                Health Check</button>
+                            <button onclick="restartAllServices()"
+                                class="btn bg-[#FFA500] hover:bg-[#FF8C00] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium">🔄
+                                Restart All</button>
+                        </div>
+                        <div class="mt-6">
+                            <p class="text-sm text-[#A0A0A0]">Last updated: <span id="last-update"
+                                    class="text-[#E0E0E0]">--</span></p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Logs Section -->
+            <div class="card bg-[#282828] border border-[#404040] rounded-2xl mt-8">
                 <div class="card-body p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="card-title text-lg text-[#FF69B4]">
-                            <span class="status-indicator status-unknown pulse" id="gun-status-indicator"></span>
-                            Gun Relay
-                        </h2>
-                        <div class="badge badge-outline bg-[#282828] border-[#606060] text-[#E0E0E0]" id="gun-uptime">--</div>
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="card-title text-[#FF69B4] text-xl">Service Logs</h2>
+                        <button onclick="clearLogs()"
+                            class="btn bg-transparent border border-[#404040] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Clear</button>
                     </div>
-
-                    <div class="space-y-3 text-base">
-                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Status:</span><span id="gun-status" class="font-semibold text-[#FFFFFF]">Checking...</span></div>
-                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Active Connections:</span><span id="gun-connections" class="text-[#FFFFFF]">--</span></div>
-                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Total Connections:</span><span id="gun-total-connections" class="text-[#FFFFFF]">--</span></div>
-                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Memory Usage:</span><span id="gun-memory" class="text-[#FFFFFF]">--</span></div>
-                    </div>
-
-                    <div class="card-actions justify-end mt-6 service-actions">
-                        <button onclick="refreshService('gun')" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">🔄 Refresh</button>
-                        <button onclick="restartService('gun')" class="btn bg-[#FFA500] hover:bg-[#FF8C00] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium restart-btn">🔄 Restart</button>
+                    <div id="service-logs"
+                        class="bg-[#1A1A1A] rounded-xl p-4 font-mono text-base h-40 overflow-y-auto text-[#E0E0E0] border border-[#404040]">
+                        <div class="text-[#A0A0A0]">Service monitoring initialized...</div>
                     </div>
                 </div>
             </div>
 
-            <!-- IPFS Service -->
-            <div class="service-card card shadow-xl">
-                <div class="card-body p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="card-title text-lg text-[#FF69B4]">
-                            <span class="status-indicator status-unknown pulse" id="ipfs-status-indicator"></span>
-                            IPFS Node
-                        </h2>
-                        <div class="badge badge-outline bg-[#282828] border-[#606060] text-[#E0E0E0]" id="ipfs-version">--</div>
-                    </div>
-
-                    <div class="space-y-3 text-base">
-                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Status:</span><span id="ipfs-status" class="font-semibold text-[#FFFFFF]">Checking...</span></div>
-                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Storage Used:</span><span id="ipfs-storage" class="text-[#FFFFFF]">--</span></div>
-                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Storage Max:</span><span id="ipfs-storage-max" class="text-[#FFFFFF]">--</span></div>
-                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Usage %:</span><span id="ipfs-usage-percent" class="text-[#FFFFFF]">--</span></div>
-                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Objects:</span><span id="ipfs-objects" class="text-[#FFFFFF]">--</span></div>
-                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Type:</span><span id="ipfs-type" class="text-[#FFFFFF]">--</span></div>
-                    </div>
-
-                    <div class="card-actions justify-end mt-6">
-                        <button onclick="refreshService('ipfs')" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">🔄 Refresh</button>
-                        <button onclick="restartService('ipfs')" class="btn bg-[#FFA500] hover:bg-[#FF8C00] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium restart-btn">🔄 Restart</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Holster Service -->
-            <div class="service-card card shadow-xl">
-                <div class="card-body p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="card-title text-lg text-[#FF69B4]">
-                            <span class="status-indicator status-unknown pulse" id="holster-status-indicator"></span>
-                            Holster Relay
-                        </h2>
-                        <div class="badge badge-outline bg-[#282828] border-[#606060] text-[#E0E0E0]" id="holster-port">--</div>
-                    </div>
-
-                    <div class="space-y-3 text-base">
-                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Status:</span><span id="holster-status" class="font-semibold text-[#FFFFFF]">Checking...</span></div>
-                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Port:</span><span id="holster-port-value" class="text-[#FFFFFF]">--</span></div>
-                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Host:</span><span id="holster-host" class="text-[#FFFFFF]">--</span></div>
-                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Storage:</span><span id="holster-storage" class="text-[#FFFFFF]">--</span></div>
-                        <div class="flex justify-between"><span class="text-[#E0E0E0]">Max Connections:</span><span id="holster-max-connections" class="text-[#FFFFFF]">--</span></div>
-                    </div>
-
-                    <div class="card-actions justify-end mt-6 service-actions">
-                        <button onclick="refreshService('holster')" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">🔄 Refresh</button>
-                        <button onclick="restartService('holster')" class="btn bg-[#FFA500] hover:bg-[#FF8C00] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium restart-btn">🔄 Restart</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Quick Actions -->
-            <div class="service-card card shadow-xl">
-                <div class="card-body p-6">
-                    <h2 class="card-title text-lg text-[#FF69B4] mb-6">Quick Actions</h2>
-                    <div class="space-y-4">
-                        <button onclick="healthCheck()" class="btn bg-[#4CAF50] hover:bg-[#45A049] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium">🔍 Health Check</button>
-                        <button onclick="restartAllServices()" class="btn bg-[#FFA500] hover:bg-[#FF8C00] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium">🔄 Restart All</button>
-                    </div>
-                    <div class="mt-6">
-                        <p class="text-sm text-[#A0A0A0]">Last updated: <span id="last-update" class="text-[#E0E0E0]">--</span></p>
-                    </div>
-                </div>
-            </div>
-
+            <!-- Footer -->
+            <footer class="mt-12 text-center">
+                <div class="section-divider"></div>
+                <p class="text-[#606060] text-sm">
+                    Shogun Relay Services - Part of the <a href="https://github.com/scobru/shogun"
+                        class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">Shogun Project</a>
+                </p>
+            </footer>
         </div>
-
-        <!-- Logs Section -->
-        <div class="card bg-[#404040] border-[#606060] rounded-xl mt-8">
-            <div class="card-body p-6">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="card-title text-[#FF69B4] text-xl">Service Logs</h2>
-                    <button onclick="clearLogs()" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Clear</button>
-                </div>
-                <div id="service-logs" class="bg-[#282828] rounded-xl p-4 font-mono text-base h-40 overflow-y-auto text-[#E0E0E0]">
-                    <div class="text-[#A0A0A0]">Service monitoring initialized...</div>
-                </div>
-            </div>
-        </div>
-
     </div>
 
     <script>
@@ -308,12 +458,24 @@
                 const data = await response.json();
 
                 document.getElementById('gun-status').textContent = data.status || 'Unknown';
-                document.getElementById('gun-connections').textContent = data.activeConnections || 0;
-                document.getElementById('gun-total-connections').textContent = data.totalConnections || 0;
-                document.getElementById('gun-memory').textContent = formatBytes(data.memoryUsage?.heapUsed || 0);
-                document.getElementById('gun-uptime').textContent = formatUptime(data.uptime || 0);
+                document.getElementById('gun-connections').textContent = data.connections?.active || 0;
+                document.getElementById('gun-total-connections').textContent = data.connections?.total || 0;
+                // Fix: Use memory.heapUsedMB (in MB) and convert to bytes for formatBytes
+                const memoryMB = data.memory?.heapUsedMB || 0;
+                const memoryBytes = memoryMB * 1024 * 1024;
+                document.getElementById('gun-memory').textContent = formatBytes(memoryBytes);
+                // Fix: Use uptime.seconds (in seconds) and convert to milliseconds for formatUptime
+                const uptimeMs = (data.uptime?.seconds || 0) * 1000;
+                document.getElementById('gun-uptime').textContent = formatUptime(uptimeMs);
 
-                updateStatusIndicator('gun', data.status === 'healthy' ? 'online' : 'offline');
+                // Map status: healthy -> online, degraded -> warning, others -> offline
+                let indicatorStatus = 'offline';
+                if (data.status === 'healthy') {
+                    indicatorStatus = 'online';
+                } else if (data.status === 'degraded') {
+                    indicatorStatus = 'warning';
+                }
+                updateStatusIndicator('gun', indicatorStatus);
                 return true;
             } catch (error) {
                 document.getElementById('gun-status').textContent = 'Offline';
@@ -327,18 +489,18 @@
             try {
                 // Use the relay's IPFS status endpoint instead of direct connection
                 const response = await fetch('/api/v1/ipfs/status');
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }
-                
+
                 const data = await response.json();
 
                 if (data.success && data.status === 'connected') {
                     document.getElementById('ipfs-status').textContent = 'Online';
                     document.getElementById('ipfs-version').textContent = data.version || '--';
                     document.getElementById('ipfs-type').textContent = 'IPFS';
-                    
+
                     // Get repository statistics using relay API
                     try {
                         const password = getAdminPassword();
@@ -346,14 +508,14 @@
                             const statsResponse = await fetch('/api/v1/ipfs/repo/stat', {
                                 headers: { 'Authorization': `Bearer ${password}` }
                             });
-                            
+
                             if (statsResponse.ok) {
                                 const statsData = await statsResponse.json();
                                 if (statsData.success && statsData.stats) {
                                     const usedMB = statsData.stats.repoSizeMB || 0;
                                     const maxMB = statsData.stats.storageMaxMB || 0;
                                     const usagePercent = maxMB > 0 ? Math.round((usedMB / maxMB) * 100) : 0;
-                                    
+
                                     document.getElementById('ipfs-storage').textContent = `${usedMB} MB`;
                                     document.getElementById('ipfs-storage-max').textContent = `${maxMB} MB`;
                                     document.getElementById('ipfs-usage-percent').textContent = `${usagePercent}%`;
@@ -383,7 +545,7 @@
                         document.getElementById('ipfs-usage-percent').textContent = '--';
                         document.getElementById('ipfs-objects').textContent = '--';
                     }
-                    
+
                     updateStatusIndicator('ipfs', 'online');
                     return true;
                 } else {
@@ -457,6 +619,81 @@
             }
         }
 
+        async function checkRPCStatus() {
+            try {
+                const response = await fetch('/rpc-status');
+                const data = await response.json();
+
+                if (data.success) {
+                    const summary = data.summary || { total: 0, online: 0, offline: 0 };
+                    const rpcs = data.rpcs || [];
+
+                    document.getElementById('rpc-online').textContent = `${summary.online}/${summary.total}`;
+                    document.getElementById('rpc-total').textContent = summary.total;
+                    document.getElementById('rpc-summary').textContent = `${summary.online}/${summary.total} Online`;
+
+                    const status = summary.online === summary.total && summary.total > 0 ? 'All Online' :
+                        summary.online > 0 ? 'Partial' : 'Offline';
+                    document.getElementById('rpc-status').textContent = status;
+
+                    // Update status indicator
+                    if (summary.online === summary.total && summary.total > 0) {
+                        updateStatusIndicator('rpc', 'online');
+                    } else if (summary.online > 0) {
+                        updateStatusIndicator('rpc', 'warning');
+                    } else {
+                        updateStatusIndicator('rpc', 'offline');
+                    }
+
+                    // Populate RPC details
+                    const detailsContainer = document.getElementById('rpc-details');
+                    detailsContainer.innerHTML = '';
+
+                    if (rpcs.length === 0) {
+                        detailsContainer.innerHTML = '<div class="text-[#A0A0A0] text-sm">No RPC endpoints configured</div>';
+                    } else {
+                        rpcs.forEach(rpc => {
+                            const rpcDiv = document.createElement('div');
+                            rpcDiv.className = 'text-sm border-b border-[#404040] pb-2';
+
+                            const statusColor = rpc.status === 'online' ? '#4CAF50' : '#F44336';
+                            const statusIcon = rpc.status === 'online' ? '●' : '○';
+
+                            rpcDiv.innerHTML = `
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[#E0E0E0] font-medium">${rpc.name}</span>
+                                    <span style="color: ${statusColor}">${statusIcon}</span>
+                                </div>
+                                ${rpc.status === 'online' ? `
+                                    <div class="text-[#A0A0A0] text-xs mt-1">
+                                        Block: ${rpc.blockNumber} | Latency: ${rpc.latency}
+                                    </div>
+                                ` : `
+                                    <div class="text-[#F44336] text-xs mt-1">
+                                        ${rpc.error || 'Connection failed'}
+                                    </div>
+                                `}
+                            `;
+                            detailsContainer.appendChild(rpcDiv);
+                        });
+                    }
+
+                    return true;
+                } else {
+                    throw new Error(data.error || 'RPC status check failed');
+                }
+            } catch (error) {
+                document.getElementById('rpc-status').textContent = 'Error';
+                document.getElementById('rpc-online').textContent = '--';
+                document.getElementById('rpc-total').textContent = '--';
+                document.getElementById('rpc-summary').textContent = '--';
+                document.getElementById('rpc-details').innerHTML = '<div class="text-[#F44336] text-sm">Failed to check RPC status</div>';
+                updateStatusIndicator('rpc', 'offline');
+                log(`RPC check failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
         async function refreshService(service) {
             log(`Refreshing ${service} service...`, 'info');
 
@@ -464,6 +701,7 @@
                 case 'gun': await checkGunStatus(); break;
                 case 'ipfs': await checkIPFSStatus(); break;
                 case 'holster': await checkHolsterStatus(); break;
+                case 'rpc': await checkRPCStatus(); break;
             }
 
             document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
@@ -473,9 +711,10 @@
             log('Refreshing all services...', 'info');
 
             await Promise.all([
-                checkGunStatus(), 
-                checkIPFSStatus(), 
-                checkHolsterStatus()
+                checkGunStatus(),
+                checkIPFSStatus(),
+                checkHolsterStatus(),
+                checkRPCStatus()
             ]);
             document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
             log('All services refreshed', 'success');
@@ -549,7 +788,7 @@
 
             log('🔄 Restarting all services...', 'info');
 
-            const services = ['gun', 'ipfs', 'holster'];
+            const services = ['gun', 'ipfs', 'holster', 'rpc'];
             for (const service of services) {
                 try {
                     await restartService(service);
@@ -579,7 +818,7 @@
         window.addEventListener('load', async () => {
             // Initialize ShogunAdmin
             ShogunAdmin.init();
-            
+
             log('Services dashboard initialized', 'info');
             await refreshAllServices();
             updateInterval = setInterval(refreshAllServices, 30000);

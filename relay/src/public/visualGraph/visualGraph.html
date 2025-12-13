@@ -458,15 +458,13 @@
 
     <script type="module">
       const GUN_PEERS = [
-        "https://5eh4twk2f62autunsje4panime.srv.us/gun",
-        "wss://5eh4twk2f62autunsje4panime.srv.us/gun",
-        "https://ojepkbvhx4ok25py2qw4hsa76y.srv.us/gun",
-        "wss://ojepkbvhx4ok25py2qw4hsa76y.srv.us/gun",
-        "https://g3ru5bwxmezpuu3ktnoclbpiw4.srv.us/gun",
-        "wss://g3ru5bwxmezpuu3ktnoclbpiw4.srv.us/gun"
+        "https://shogun-relay.scobrudot.dev/gun",
+        "wss://shogun-relay.scobrudot.dev/gun",
+        "https://peer.wallie.io/gun",
+        "wss://peer.wallie.io/gun"
       ];
 
-      const gun = Gun({ peers: GUN_PEERS, retry: 2000 });
+      const gun = Gun({ peers: GUN_PEERS, retry: 2000 , localStorage: false, radisk: false, log: () => { } });
       const user = gun.user();
       window.gun = gun;
       window.user = user;

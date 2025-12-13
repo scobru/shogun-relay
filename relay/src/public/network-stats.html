@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="shogun-dark">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Network Statistics - Shogun Relay</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/variables.css" rel="stylesheet" type="text/css" />
+    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/base.css" rel="stylesheet" type="text/css" />
+    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/daisyui-overrides.css" rel="stylesheet" type="text/css" />
+    <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        body {
+            line-height: 1.6;
+            background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
+            min-height: 100vh;
+        }
+
+        .hero-gradient {
+            background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4); }
+            50% { box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2); }
+        }
+
+        .pulse-glow {
+            animation: pulse-glow 2s infinite;
+        }
+
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background-color: #404040;
+            border: 1px solid #606060;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            text-align: center;
+            transition: transform 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: #FF69B4;
+            box-shadow: 0 8px 32px rgba(255, 105, 180, 0.2);
+        }
+
+        .stat-title {
+            color: #FF69B4;
+            font-size: 1rem;
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+            color: #FFFFFF;
+        }
+
+        .stat-unit {
+            color: #A0A0A0;
+            font-size: 0.875rem;
+        }
+
+        .section-card {
+            background-color: #404040;
+            border: 1px solid #606060;
+            border-radius: 1rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            transition: all 0.2s ease;
+        }
+
+        .section-card:hover {
+            border-color: #FF69B4;
+        }
+
+        .section-card h2 {
+            color: #FF69B4;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .leaderboard-table th {
+            background-color: #282828;
+            color: #FF69B4;
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 2px solid #606060;
+            font-weight: 600;
+        }
+
+        .leaderboard-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #404040;
+            color: #E0E0E0;
+        }
+
+        .leaderboard-table tr:hover {
+            background-color: #353535;
+        }
+
+        .tier-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .tier-platinum { background-color: #E5E4E2; color: #1A1A1A; }
+        .tier-gold { background-color: #FFD700; color: #1A1A1A; }
+        .tier-silver { background-color: #C0C0C0; color: #1A1A1A; }
+        .tier-bronze { background-color: #CD7F32; color: #FFFFFF; }
+        .tier-basic { background-color: #606060; color: #FFFFFF; }
+
+        .score-bar {
+            height: 8px;
+            background-color: #282828;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.25rem;
+        }
+
+        .score-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #FF69B4, #FF1493);
+            transition: width 0.3s ease;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #A0A0A0;
+        }
+
+        .error {
+            background-color: rgba(244, 67, 54, 0.2);
+            color: #F44336;
+            border-left: 3px solid #F44336;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0.5rem;
+            display: none;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            color: #42A5F5;
+            text-decoration: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            margin-bottom: 1.5rem;
+            transition: all 0.2s ease;
+            font-size: 1rem;
+        }
+
+        .back-link:hover {
+            background-color: rgba(66, 165, 245, 0.1);
+            color: #64B5F6;
+        }
+
+        .refresh-btn {
+            background-color: #FF69B4;
+            color: #FFFFFF;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+            margin-left: auto;
+        }
+
+        .refresh-btn:hover {
+            background-color: #FF1493;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #404040;
+        }
+
+        .stat-item:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            color: #A0A0A0;
+            font-size: 0.9rem;
+        }
+
+        .stat-data {
+            color: #FFFFFF;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .stat-value {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+
+<body class="antialiased">
+    <div class="hero-gradient min-h-screen">
+        <div class="container mx-auto px-4 py-8">
+            <!-- Back Navigation -->
+            <div class="flex items-center mb-8">
+                <a href="/" class="back-link">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    <span>Back to Control Panel</span>
+                </a>
+            </div>
+
+            <div class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover">
+                <div class="p-8 sm:p-10">
+                    <div class="flex flex-col items-center mb-8">
+                        <!-- Header Icon -->
+                        <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-[#42A5F5] to-[#1E88E5] mb-6 pulse-glow">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                            </svg>
+                        </div>
+
+                        <h1 class="text-3xl md:text-4xl font-bold mb-4 text-[#FFFFFF]">Network Statistics</h1>
+                        <p class="text-[#8B94FF] mb-4">Comprehensive network-wide metrics and analytics</p>
+                        <button onclick="refreshAll()" class="refresh-btn">🔄 Refresh All</button>
+                    </div>
+
+                    <!-- Error Display -->
+                    <div id="error" class="error"></div>
+
+                    <!-- Network Overview Stats -->
+                    <div class="section-card">
+                        <h2>🌐 Network Overview</h2>
+                        <div class="stats-grid" id="networkStatsGrid">
+                            <div class="stat-card">
+                                <div class="stat-title">Total Relays</div>
+                                <div class="stat-value" id="totalRelays">-</div>
+                                <div class="stat-unit">relays</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-title">Active Relays</div>
+                                <div class="stat-value" id="activeRelays">-</div>
+                                <div class="stat-unit">relays</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-title">Total Connections</div>
+                                <div class="stat-value" id="totalConnections">-</div>
+                                <div class="stat-unit">connections</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-title">Total Storage</div>
+                                <div class="stat-value" id="totalStorage">-</div>
+                                <div class="stat-unit" id="storageUnit">GB</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-title">Total Pins</div>
+                                <div class="stat-value" id="totalPins">-</div>
+                                <div class="stat-unit">pins</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-title">Active Deals</div>
+                                <div class="stat-value" id="activeDealsCount">-</div>
+                                <div class="stat-unit">deals</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-title">Active Subscriptions</div>
+                                <div class="stat-value" id="activeSubscriptionsCount">-</div>
+                                <div class="stat-unit">subscriptions</div>
+                            </div>
+                        </div>
+                        <!-- Storage Breakdown -->
+                        <div id="storageBreakdown" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #606060; display: none;">
+                            <h3 style="color: #FF69B4; font-size: 1.1rem; margin-bottom: 1rem;">Storage Breakdown</h3>
+                            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                                <div class="stat-item">
+                                    <span class="stat-label">From Deals:</span>
+                                    <span class="stat-data" id="dealStorageMB">-</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">From Subscriptions:</span>
+                                    <span class="stat-data" id="subscriptionStorageMB">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reputation Leaderboard -->
+                    <div class="section-card">
+                        <h2>⭐ Reputation Leaderboard</h2>
+                        <div id="reputationLoading" class="loading">Loading reputation data...</div>
+                        <div id="reputationContent" style="display: none;">
+                            <table class="leaderboard-table">
+                                <thead>
+                                    <tr>
+                                        <th>Rank</th>
+                                        <th>Relay Host</th>
+                                        <th>Score</th>
+                                        <th>Tier</th>
+                                        <th>Uptime %</th>
+                                        <th>Proofs</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reputationTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Deals Statistics -->
+                    <div class="section-card">
+                        <h2>💼 Storage Deals</h2>
+                        <div id="dealsLoading" class="loading">Loading deals statistics...</div>
+                        <div id="dealsContent" style="display: none;">
+                            <div class="stats-grid">
+                                <div class="stat-card">
+                                    <div class="stat-title">Total Deals</div>
+                                    <div class="stat-value" id="totalDeals">-</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-title">Active Deals</div>
+                                    <div class="stat-value" id="activeDeals">-</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-title">Pending Deals</div>
+                                    <div class="stat-value" id="pendingDeals">-</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-title">Expired Deals</div>
+                                    <div class="stat-value" id="expiredDeals">-</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-title">Total Size</div>
+                                    <div class="stat-value" id="totalDealSize">-</div>
+                                    <div class="stat-unit">MB</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-title">Total Revenue</div>
+                                    <div class="stat-value" id="totalRevenue">-</div>
+                                    <div class="stat-unit">USDC</div>
+                                </div>
+                            </div>
+                            <div id="dealsByTier" style="margin-top: 2rem;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Registry Information -->
+                    <div class="section-card">
+                        <h2>📋 Registry Information</h2>
+                        <div id="registryLoading" class="loading">Loading registry data...</div>
+                        <div id="registryContent" style="display: none;">
+                            <div class="stat-item">
+                                <span class="stat-label">Chain ID:</span>
+                                <span class="stat-data" id="registryChainId">-</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Registry Address:</span>
+                                <span class="stat-data" id="registryAddress">-</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Min Stake:</span>
+                                <span class="stat-data" id="minStake">-</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Unstaking Delay:</span>
+                                <span class="stat-data" id="unstakingDelay">-</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Registered Relays:</span>
+                                <span class="stat-data" id="registeredRelays">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="lastUpdated" class="text-center mt-6 text-[#A0A0A0] text-sm"></div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <footer class="mt-12 text-center">
+                <p class="text-[#606060] text-sm">
+                    Shogun Network Stats - Part of the <a href="https://github.com/scobru/shogun" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">Shogun Project</a>
+                </p>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        function formatBytes(bytes, decimals = 2) {
+            if (!bytes || bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        function formatNumber(number) {
+            if (number === null || number === undefined) return '-';
+            if (typeof number === 'number') {
+                if (number >= 1000000) return (number / 1000000).toFixed(2) + 'M';
+                if (number >= 1000) return (number / 1000).toFixed(2) + 'K';
+                return number.toLocaleString();
+            }
+            return number;
+        }
+
+        function getTierClass(score) {
+            if (score >= 90) return 'tier-platinum';
+            if (score >= 75) return 'tier-gold';
+            if (score >= 60) return 'tier-silver';
+            if (score >= 40) return 'tier-bronze';
+            return 'tier-basic';
+        }
+
+        function getTierName(score) {
+            if (score >= 90) return 'Platinum';
+            if (score >= 75) return 'Gold';
+            if (score >= 60) return 'Silver';
+            if (score >= 40) return 'Bronze';
+            return 'Basic';
+        }
+
+        // Fetch Network Stats
+        async function fetchNetworkStats() {
+            try {
+                const response = await fetch('/api/v1/network/stats');
+                const result = await response.json();
+
+                // Store network stats for use in deals stats
+                networkStatsData = result;
+
+                if (result.success && result.stats) {
+                    const stats = result.stats;
+                    document.getElementById('totalRelays').textContent = formatNumber(stats.totalRelays || 0);
+                    document.getElementById('activeRelays').textContent = formatNumber(stats.activeRelays || 0);
+                    document.getElementById('totalConnections').textContent = formatNumber(stats.totalConnections || 0);
+                    
+                    // Use totalStorageBytes if available (includes deals + subscriptions), otherwise fallback to calculated values
+                    let totalStorageBytes = stats.totalStorageBytes || 0;
+                    
+                    // If totalStorageBytes is 0 but we have deal/subscription storage, calculate from those
+                    if (totalStorageBytes === 0) {
+                        const dealStorageBytes = (stats.totalDealStorageMB || 0) * 1024 * 1024;
+                        const subscriptionStorageBytes = (stats.totalSubscriptionStorageMB || 0) * 1024 * 1024;
+                        totalStorageBytes = dealStorageBytes + subscriptionStorageBytes;
+                    }
+                    
+                    // If still 0, use the calculated totalStorageMB/GB from backend
+                    if (totalStorageBytes === 0 && stats.totalStorageMB) {
+                        totalStorageBytes = stats.totalStorageMB * 1024 * 1024;
+                    }
+                    
+                    const storageGB = totalStorageBytes / (1024 * 1024 * 1024);
+                    if (storageGB >= 1) {
+                        document.getElementById('totalStorage').textContent = storageGB.toFixed(2);
+                        document.getElementById('storageUnit').textContent = 'GB';
+                    } else {
+                        const storageMB = totalStorageBytes / (1024 * 1024);
+                        document.getElementById('totalStorage').textContent = formatNumber(Math.round(storageMB));
+                        document.getElementById('storageUnit').textContent = 'MB';
+                    }
+                    
+                    // Total pins includes pins from IPFS + unique CIDs from active deals
+                    const totalPins = stats.totalPins || 0;
+                    document.getElementById('totalPins').textContent = formatNumber(totalPins);
+                    
+                    // Show active deals and subscriptions
+                    const activeDeals = stats.totalActiveDeals || 0;
+                    const activeSubscriptions = stats.totalActiveSubscriptions || 0;
+                    document.getElementById('activeDealsCount').textContent = formatNumber(activeDeals);
+                    document.getElementById('activeSubscriptionsCount').textContent = formatNumber(activeSubscriptions);
+                    
+                    // Show storage breakdown if available
+                    const dealStorageMB = stats.totalDealStorageMB || 0;
+                    const subscriptionStorageMB = stats.totalSubscriptionStorageMB || 0;
+                    
+                    if (dealStorageMB > 0 || subscriptionStorageMB > 0) {
+                        const breakdownDiv = document.getElementById('storageBreakdown');
+                        breakdownDiv.style.display = 'block';
+                        document.getElementById('dealStorageMB').textContent = formatNumber(dealStorageMB) + ' MB';
+                        document.getElementById('subscriptionStorageMB').textContent = formatNumber(subscriptionStorageMB) + ' MB';
+                    }
+                    
+                    // Log debug info if available
+                    if (result.debug && result.debug.sources) {
+                        console.log('Network stats sources:', result.debug.sources);
+                        console.log('Deal stats:', {
+                            activeDeals: activeDeals,
+                            dealStorageMB: dealStorageMB,
+                        });
+                        console.log('Subscription stats:', {
+                            activeSubscriptions: activeSubscriptions,
+                            subscriptionStorageMB: subscriptionStorageMB,
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching network stats:', error);
+                const errorDiv = document.getElementById('error');
+                if (errorDiv) {
+                    errorDiv.textContent = `Error loading network stats: ${error.message}`;
+                    errorDiv.style.display = 'block';
+                }
+            }
+        }
+
+        // Fetch Reputation Leaderboard
+        async function fetchReputation() {
+            try {
+                document.getElementById('reputationLoading').style.display = 'block';
+                document.getElementById('reputationContent').style.display = 'none';
+
+                const response = await fetch('/api/v1/network/reputation?limit=50');
+                const result = await response.json();
+
+                if (result.success && result.leaderboard) {
+                    const tbody = document.getElementById('reputationTableBody');
+                    tbody.innerHTML = '';
+
+                    result.leaderboard.forEach((relay, index) => {
+                        const row = document.createElement('tr');
+                        const score = relay.calculatedScore?.total || 0;
+                        const tier = relay.calculatedScore?.tier || 'basic';
+                        const uptime = relay.uptimePercent || 0;
+                        const proofs = `${relay.proofsSuccessful || 0}/${relay.proofsTotal || 0}`;
+
+                        row.innerHTML = `
+                            <td>#${index + 1}</td>
+                            <td>${escapeHtml(relay.host || 'Unknown')}</td>
+                            <td>
+                                <div>${score.toFixed(2)}</div>
+                                <div class="score-bar">
+                                    <div class="score-bar-fill" style="width: ${score}%"></div>
+                                </div>
+                            </td>
+                            <td><span class="tier-badge ${getTierClass(score)}">${getTierName(score)}</span></td>
+                            <td>${uptime.toFixed(1)}%</td>
+                            <td>${proofs}</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+
+                    document.getElementById('reputationLoading').style.display = 'none';
+                    document.getElementById('reputationContent').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error fetching reputation:', error);
+                document.getElementById('reputationLoading').textContent = 'Error loading reputation data';
+            }
+        }
+
+        // Store network stats for use in deals stats
+        let networkStatsData = null;
+
+        // Fetch Deals Statistics
+        async function fetchDealsStats() {
+            try {
+                document.getElementById('dealsLoading').style.display = 'block';
+                document.getElementById('dealsContent').style.display = 'none';
+
+                let stats = {
+                    totalDeals: 0,
+                    activeDeals: 0,
+                    pendingDeals: 0,
+                    expiredDeals: 0,
+                    totalSizeMB: 0,
+                    totalRevenueUSDC: 0,
+                    byTier: {}
+                };
+
+                // Try to fetch from deals stats endpoint
+                try {
+                    const response = await fetch('/api/v1/deals/stats');
+                    const result = await response.json();
+
+                    if (result.success && result.stats) {
+                        stats = {
+                            totalDeals: result.stats.totalDeals || 0,
+                            activeDeals: result.stats.activeDeals || 0,
+                            pendingDeals: result.stats.pendingDeals || 0,
+                            expiredDeals: result.stats.expiredDeals || 0,
+                            totalSizeMB: result.stats.totalSizeMB || 0,
+                            totalRevenueUSDC: result.stats.totalRevenueUSDC || 0,
+                            byTier: result.stats.byTier || {}
+                        };
+                    }
+                } catch (dealsError) {
+                    console.warn('Error fetching deals stats endpoint, using network stats fallback:', dealsError);
+                }
+
+                // Use network stats as fallback/supplement if deals stats are empty
+                if (networkStatsData && networkStatsData.stats) {
+                    const ns = networkStatsData.stats;
+                    
+                    // If deals stats endpoint returned empty data, use network stats
+                    if (stats.totalDeals === 0 && stats.activeDeals === 0) {
+                        stats.activeDeals = ns.totalActiveDeals || 0;
+                        stats.totalSizeMB = ns.totalDealStorageMB || 0;
+                        
+                        // Estimate total deals from active deals if we don't have the breakdown
+                        if (stats.totalDeals === 0 && stats.activeDeals > 0) {
+                            stats.totalDeals = stats.activeDeals;
+                        }
+                    } else {
+                        // Supplement with network stats if available
+                        if (stats.totalSizeMB === 0 && ns.totalDealStorageMB) {
+                            stats.totalSizeMB = ns.totalDealStorageMB;
+                        }
+                        if (stats.activeDeals === 0 && ns.totalActiveDeals) {
+                            stats.activeDeals = ns.totalActiveDeals;
+                        }
+                    }
+                }
+
+                // Update UI
+                document.getElementById('totalDeals').textContent = formatNumber(stats.totalDeals || 0);
+                document.getElementById('activeDeals').textContent = formatNumber(stats.activeDeals || 0);
+                document.getElementById('pendingDeals').textContent = formatNumber(stats.pendingDeals || 0);
+                document.getElementById('expiredDeals').textContent = formatNumber(stats.expiredDeals || 0);
+                document.getElementById('totalDealSize').textContent = formatNumber(stats.totalSizeMB || 0);
+                document.getElementById('totalRevenue').textContent = formatNumber(stats.totalRevenueUSDC || 0);
+
+                // Deals by Tier
+                if (stats.byTier && Object.keys(stats.byTier).length > 0) {
+                    const tierDiv = document.getElementById('dealsByTier');
+                    tierDiv.innerHTML = '<h3 class="text-lg font-semibold mb-4 text-[#FFFFFF]">Deals by Tier</h3>';
+                    const tierGrid = document.createElement('div');
+                    tierGrid.className = 'stats-grid';
+                    
+                    Object.entries(stats.byTier).forEach(([tier, count]) => {
+                        const card = document.createElement('div');
+                        card.className = 'stat-card';
+                        card.innerHTML = `
+                            <div class="stat-title">${tier}</div>
+                            <div class="stat-value">${formatNumber(count)}</div>
+                        `;
+                        tierGrid.appendChild(card);
+                    });
+                    
+                    tierDiv.appendChild(tierGrid);
+                } else {
+                    // Clear deals by tier if empty
+                    document.getElementById('dealsByTier').innerHTML = '';
+                }
+
+                document.getElementById('dealsLoading').style.display = 'none';
+                document.getElementById('dealsContent').style.display = 'block';
+            } catch (error) {
+                console.error('Error fetching deals stats:', error);
+                document.getElementById('dealsLoading').textContent = 'Error loading deals statistics';
+            }
+        }
+
+        // Fetch Registry Information
+        async function fetchRegistryInfo() {
+            try {
+                document.getElementById('registryLoading').style.display = 'block';
+                document.getElementById('registryContent').style.display = 'none';
+
+                // Try to get registry params
+                const paramsResponse = await fetch('/api/v1/registry/params');
+                const paramsResult = await paramsResponse.json();
+
+                if (paramsResult.success) {
+                    const params = paramsResult.params || {};
+                    document.getElementById('registryChainId').textContent = paramsResult.chainId || '-';
+                    document.getElementById('registryAddress').textContent = paramsResult.registryAddress ? 
+                        paramsResult.registryAddress.substring(0, 10) + '...' + paramsResult.registryAddress.substring(paramsResult.registryAddress.length - 8) : '-';
+                    document.getElementById('minStake').textContent = params.minStake ? formatNumber(params.minStake) : '-';
+                    document.getElementById('unstakingDelay').textContent = params.unstakingDelay ? `${params.unstakingDelay}s` : '-';
+                }
+
+                // Try to get registered relays count
+                try {
+                    const relaysResponse = await fetch('/api/v1/network/onchain/relays?chainId=84532');
+                    const relaysResult = await relaysResponse.json();
+                    if (relaysResult.success && relaysResult.relays) {
+                        document.getElementById('registeredRelays').textContent = formatNumber(relaysResult.relayCount || relaysResult.relays.length || 0);
+                    }
+                } catch (e) {
+                    // Ignore if endpoint not available
+                    console.warn('Could not fetch registered relays:', e);
+                }
+
+                document.getElementById('registryLoading').style.display = 'none';
+                document.getElementById('registryContent').style.display = 'block';
+            } catch (error) {
+                console.error('Error fetching registry info:', error);
+                document.getElementById('registryLoading').textContent = 'Error loading registry data';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function refreshAll() {
+            // Fetch network stats first so deals stats can use it as fallback
+            await fetchNetworkStats();
+            fetchReputation();
+            fetchDealsStats();
+            fetchRegistryInfo();
+            document.getElementById('lastUpdated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+        }
+
+        // Initial load
+        refreshAll();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(refreshAll, 30000);
+    </script>
+    <!-- Include centralized admin authentication -->
+    <script src="lib/admin-auth.js"></script>
+    <script src="lib/admin-nav.js"></script>
+</body>
+
+</html>

@@ -14,7 +14,12 @@
     <style>
         body {
             line-height: 1.6;
-            background-color: #1A1A1A;
+            background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
+            min-height: 100vh;
+        }
+
+        .hero-gradient {
+            background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
         }
 
         .container {
@@ -30,6 +35,30 @@
             color: #FFFFFF;
             font-size: 2.5rem;
             font-weight: bold;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4); }
+            50% { box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2); }
+        }
+
+        .pulse-glow {
+            animation: pulse-glow 2s infinite;
+        }
+
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .section-divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #404040, transparent);
+            margin: 2rem 0;
         }
 
         .stats-grid {
@@ -209,6 +238,69 @@
             font-weight: 500;
         }
 
+        /* Complete Statistics Styles */
+        .stats-category {
+            background-color: #353535;
+            border: 1px solid #505050;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            transition: all 0.2s ease;
+        }
+
+        .stats-category:hover {
+            border-color: #FF69B4;
+        }
+
+        .stats-category h3 {
+            user-select: none;
+        }
+
+        .stats-details {
+            display: none;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #505050;
+        }
+
+        .stats-details.expanded {
+            display: block;
+        }
+
+        .stat-item {
+            background-color: #282828;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #404040;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+
+        .stat-item:hover {
+            border-color: #606060;
+            background-color: #2d2d2d;
+        }
+
+        .stat-label {
+            color: #A0A0A0;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .stat-data {
+            color: #FFFFFF;
+            font-size: 0.95rem;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        #rawJsonContent {
+            font-family: 'Courier New', monospace;
+            line-height: 1.6;
+        }
+
         /* Live Logs Styles */
         .log-entry {
             padding: 0.75rem;
@@ -226,6 +318,12 @@
             color: #90CAF9;
         }
 
+        .log-entry.debug {
+            background-color: rgba(156, 39, 176, 0.1);
+            border-left-color: #9C27B0;
+            color: #BA68C8;
+        }
+
         .log-entry.warn {
             background-color: rgba(255, 193, 7, 0.1);
             border-left-color: #FFC107;
@@ -241,12 +339,25 @@
         .log-entry .log-timestamp {
             color: #A0A0A0;
             font-size: 0.75rem;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
         }
 
         .log-entry .log-message {
             color: #E0E0E0;
             word-break: break-word;
+        }
+
+        .log-entry .log-json {
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin: 0;
+            font-size: 0.8125rem;
+            line-height: 1.5;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
         }
 
         .log-entry .log-details {
@@ -305,23 +416,31 @@
     </style>
 </head>
 
-<body class="antialiased bg-[#1A1A1A]">
-    <div class="container mx-auto p-6">
-        <div class="flex items-center mb-6">
-            <a href="/" class="text-[#42A5F5] hover:text-[#64B5F6] transition-colors text-lg">&larr; Back to Control
-                Panel</a>
-        </div>
-
-        <div class="card bg-[#282828] border-[#404040] rounded-2xl">
-            <div class="p-8 sm:p-10">
-                <div class="flex flex-col items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-6 text-[#FF69B4]" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+<body class="antialiased">
+    <div class="hero-gradient min-h-screen">
+        <div class="container mx-auto px-4 py-8 max-w-6xl">
+            <!-- Back Navigation -->
+            <div class="flex items-center mb-8">
+                <a href="/" class="flex items-center gap-2 text-[#A0A0A0] hover:text-[#FF69B4] transition-colors group">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
+                    <span>Back to Control Panel</span>
+                </a>
+            </div>
 
-                    <h1 class="text-3xl font-semibold mb-8 text-[#FFFFFF]">Gun Relay Live Stats</h1>
+            <div class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover">
+                <div class="p-8 sm:p-10">
+                    <div class="flex flex-col items-center">
+                        <!-- Header Icon -->
+                        <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-[#4CAF50] to-[#43A047] mb-6 pulse-glow">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                        </div>
+
+                        <h1 class="text-3xl md:text-4xl font-bold mb-4 text-[#FFFFFF]">Gun Relay Live Stats</h1>
+                        <p class="text-[#8B94FF] mb-8">Real-time system monitoring and metrics</p>
 
                     <div class="w-full space-y-8">
                         <div class="stats-grid">
@@ -344,6 +463,193 @@
                                 <div class="stat-title">Uptime</div>
                                 <div class="stat-value" id="uptime">-</div>
                                 <div class="stat-unit">hours</div>
+                            </div>
+                        </div>
+
+                        <!-- Complete Statistics Section -->
+                        <div class="admin-controls">
+                            <div class="flex items-center justify-between mb-6">
+                                <h2 class="text-xl font-bold text-[#FF69B4]">Complete Statistics</h2>
+                                <button id="toggleStatsBtn" 
+                                    class="btn bg-[#404040] hover:bg-[#606060] border-[#606060] text-[#FFFFFF] rounded-xl px-4 py-2 text-sm font-medium">
+                                    ▼ Expand All
+                                </button>
+                            </div>
+                            
+                            <div id="completeStatsContainer" class="space-y-6">
+                                <!-- System Info -->
+                                <div class="stats-category">
+                                    <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
+                                        onclick="toggleCategory('systemInfo')">
+                                        <span>🖥️ System Information</span>
+                                        <span class="text-sm text-[#A0A0A0]">▼</span>
+                                    </h3>
+                                    <div id="systemInfo" class="stats-details grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <div class="stat-item">
+                                            <span class="stat-label">Version:</span>
+                                            <span class="stat-data" id="statVersion">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">Uptime:</span>
+                                            <span class="stat-data" id="statUptime">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">Timestamp:</span>
+                                            <span class="stat-data" id="statTimestamp">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Memory Stats -->
+                                <div class="stats-category">
+                                    <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
+                                        onclick="toggleCategory('memoryStats')">
+                                        <span>💾 Memory Statistics</span>
+                                        <span class="text-sm text-[#A0A0A0]">▼</span>
+                                    </h3>
+                                    <div id="memoryStats" class="stats-details grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <div class="stat-item">
+                                            <span class="stat-label">Heap Used:</span>
+                                            <span class="stat-data" id="statHeapUsed">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">Heap Total:</span>
+                                            <span class="stat-data" id="statHeapTotal">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">External:</span>
+                                            <span class="stat-data" id="statExternal">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">RSS:</span>
+                                            <span class="stat-data" id="statRSS">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- CPU Stats -->
+                                <div class="stats-category">
+                                    <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
+                                        onclick="toggleCategory('cpuStats')">
+                                        <span>⚡ CPU Statistics</span>
+                                        <span class="text-sm text-[#A0A0A0]">▼</span>
+                                    </h3>
+                                    <div id="cpuStats" class="stats-details grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <div class="stat-item">
+                                            <span class="stat-label">User (μs):</span>
+                                            <span class="stat-data" id="statCpuUser">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">System (μs):</span>
+                                            <span class="stat-data" id="statCpuSystem">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Peers Stats -->
+                                <div class="stats-category">
+                                    <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
+                                        onclick="toggleCategory('peersStats')">
+                                        <span>🌐 Peers Statistics</span>
+                                        <span class="text-sm text-[#A0A0A0]">▼</span>
+                                    </h3>
+                                    <div id="peersStats" class="stats-details grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <div class="stat-item">
+                                            <span class="stat-label">Count:</span>
+                                            <span class="stat-data" id="statPeersCount">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">Time:</span>
+                                            <span class="stat-data" id="statPeersTime">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Node Stats -->
+                                <div class="stats-category">
+                                    <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
+                                        onclick="toggleCategory('nodeStats')">
+                                        <span>📦 Node Statistics</span>
+                                        <span class="text-sm text-[#A0A0A0]">▼</span>
+                                    </h3>
+                                    <div id="nodeStats" class="stats-details grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <div class="stat-item">
+                                            <span class="stat-label">Count:</span>
+                                            <span class="stat-data" id="statNodeCount">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">Heap Used:</span>
+                                            <span class="stat-data" id="statNodeHeapUsed">-</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">Heap Total:</span>
+                                            <span class="stat-data" id="statNodeHeapTotal">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- DAM (Data Access Manager) Stats -->
+                                <div class="stats-category">
+                                    <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
+                                        onclick="toggleCategory('damStats')">
+                                        <span>📊 Data Access Manager (DAM)</span>
+                                        <span class="text-sm text-[#A0A0A0]">▼</span>
+                                    </h3>
+                                    <div id="damStats" class="stats-details">
+                                        <div class="mb-4">
+                                            <h4 class="text-base font-medium mb-3 text-[#E0E0E0]">Incoming</h4>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div class="stat-item">
+                                                    <span class="stat-label">Rate:</span>
+                                                    <span class="stat-data" id="statDamInRate">-</span>
+                                                </div>
+                                                <div class="stat-item">
+                                                    <span class="stat-label">Count:</span>
+                                                    <span class="stat-data" id="statDamInCount">-</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <h4 class="text-base font-medium mb-3 text-[#E0E0E0]">Outgoing</h4>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div class="stat-item">
+                                                    <span class="stat-label">Rate:</span>
+                                                    <span class="stat-data" id="statDamOutRate">-</span>
+                                                </div>
+                                                <div class="stat-item">
+                                                    <span class="stat-label">Count:</span>
+                                                    <span class="stat-data" id="statDamOutCount">-</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Storage (RAD) Stats -->
+                                <div class="stats-category">
+                                    <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
+                                        onclick="toggleCategory('radStats')">
+                                        <span>💿 Storage (RAD) Statistics</span>
+                                        <span class="text-sm text-[#A0A0A0]">▼</span>
+                                    </h3>
+                                    <div id="radStats" class="stats-details">
+                                        <div id="radStatsContent" class="text-[#A0A0A0]">
+                                            No storage statistics available
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Raw JSON View -->
+                                <div class="stats-category">
+                                    <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
+                                        onclick="toggleCategory('rawJson')">
+                                        <span>📄 Raw JSON Data</span>
+                                        <span class="text-sm text-[#A0A0A0]">▼</span>
+                                    </h3>
+                                    <div id="rawJson" class="stats-details">
+                                        <pre id="rawJsonContent" class="bg-[#282828] p-4 rounded-xl text-xs text-[#E0E0E0] overflow-x-auto max-h-96 overflow-y-auto"></pre>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -405,6 +711,7 @@
                                         <select id="logLevelFilter"
                                             class="input bg-[#282828] border-[#606060] text-[#FFFFFF] rounded-xl px-4 py-3">
                                             <option value="all">All Levels</option>
+                                            <option value="debug">Debug</option>
                                             <option value="info">Info</option>
                                             <option value="warn">Warning</option>
                                             <option value="error">Error</option>
@@ -450,15 +757,28 @@
                             </div>
                         </div>
 
-                        <a href="/charts.html" class="view-charts-link">
-                            📊 View Detailed Charts & Metrics
-                        </a>
+                        <div class="flex gap-4 justify-center mt-6">
+                            <a href="/charts.html" class="view-charts-link">
+                                📊 View Detailed Charts & Metrics
+                            </a>
+                            <a href="/network-stats" class="view-charts-link">
+                                🌐 Network Statistics & Reputation
+                            </a>
+                        </div>
 
                         <div id="error" class="error"></div>
                         <p id="lastUpdated"></p>
                     </div>
                 </div>
             </div>
+
+            <!-- Footer -->
+            <footer class="mt-12 text-center">
+                <div class="section-divider"></div>
+                <p class="text-[#606060] text-sm">
+                    Shogun Relay Stats - Part of the <a href="https://github.com/scobru/shogun" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">Shogun Project</a>
+                </p>
+            </footer>
         </div>
     </div>
 
@@ -646,7 +966,12 @@
             logsStatusEl.textContent = 'Live logs active';
             logsContainer.innerHTML = '<div class="text-[#A0A0A0] text-center py-4">Loading logs...</div>';
 
-            // Start fetching logs
+            // Clear existing logs to start fresh
+            allLogs = [];
+            lastLogTimestamp = 0;
+
+            // Start fetching logs immediately
+            console.log('🚀 Starting live logs...');
             fetchLogs();
             logsInterval = setInterval(fetchLogs, 2000); // Fetch every 2 seconds
         }
@@ -677,7 +1002,8 @@
                     return;
                 }
 
-                const response = await fetch(`/api/v1/system/logs?limit=50&since=${lastLogTimestamp}`, {
+                // Fetch last 100 lines (tail) to get recent logs
+                const response = await fetch(`/api/v1/system/logs?limit=100&tail=100`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -686,8 +1012,33 @@
                 const result = await response.json();
 
                 if (result.success && result.logs) {
-                    // Add new logs to the array
-                    allLogs = [...result.logs, ...allLogs];
+                    console.log('📥 Received logs from API:', result.logs.length);
+                    
+                    // Merge new logs, avoiding duplicates by line number or timestamp+message
+                    const existingLineNumbers = new Set(allLogs.map(log => log.lineNumber).filter(Boolean));
+                    const existingLogKeys = new Set(
+                        allLogs.map(log => {
+                            const key = log.lineNumber 
+                                ? `line_${log.lineNumber}` 
+                                : `${log.timestamp}_${log.message?.substring(0, 50)}`;
+                            return key;
+                        })
+                    );
+                    
+                    const newLogs = result.logs.filter(log => {
+                        if (log.lineNumber && existingLineNumbers.has(log.lineNumber)) {
+                            return false;
+                        }
+                        const key = log.lineNumber 
+                            ? `line_${log.lineNumber}` 
+                            : `${log.timestamp}_${log.message?.substring(0, 50)}`;
+                        return !existingLogKeys.has(key);
+                    });
+                    
+                    console.log('✨ New logs to add:', newLogs.length);
+                    
+                    // Add new logs to the array (newest first)
+                    allLogs = [...newLogs, ...allLogs];
 
                     // Keep only last 200 logs to prevent memory issues
                     if (allLogs.length > 200) {
@@ -696,12 +1047,29 @@
 
                     // Update timestamp for next fetch
                     if (result.logs.length > 0) {
-                        lastLogTimestamp = Math.max(...result.logs.map(log => log.timestamp || 0));
+                        const timestamps = result.logs
+                            .map(log => {
+                                if (typeof log.timestamp === 'string' && log.timestamp.includes('T')) {
+                                    return new Date(log.timestamp).getTime();
+                                }
+                                return log.timestamp || 0;
+                            })
+                            .filter(ts => ts > 0);
+                        if (timestamps.length > 0) {
+                            lastLogTimestamp = Math.max(...timestamps);
+                        }
                     }
 
                     // Update UI
                     updateLogsDisplay();
                     updateLogsStats();
+                } else {
+                    console.warn('⚠️ No logs in response:', result);
+                    if (result.message) {
+                        logsStatusEl.textContent = result.message;
+                    } else {
+                        logsStatusEl.textContent = 'No logs available';
+                    }
                 }
             } catch (error) {
                 console.error('Error fetching logs:', error);
@@ -711,27 +1079,64 @@
 
         // Update logs display
         function updateLogsDisplay() {
+            console.log('🔄 Updating logs display. Total logs:', allLogs.length);
             const selectedLevel = logLevelFilter.value;
             const filteredLogs = selectedLevel === 'all'
                 ? allLogs
                 : allLogs.filter(log => log.level === selectedLevel);
 
+            console.log('📊 Filtered logs:', filteredLogs.length, 'for level:', selectedLevel);
+
             if (filteredLogs.length === 0) {
-                logsContainer.innerHTML = '<div class="text-[#A0A0A0] text-center py-8">No logs to display</div>';
+                if (allLogs.length === 0) {
+                    logsContainer.innerHTML = '<div class="text-[#A0A0A0] text-center py-8">No logs to display. Click "Start Live Logs" to begin monitoring.</div>';
+                } else {
+                    logsContainer.innerHTML = `<div class="text-[#A0A0A0] text-center py-8">No logs to display for level "${selectedLevel}". Total logs: ${allLogs.length}. Try selecting "All Levels".</div>`;
+                }
                 return;
             }
 
             logsContainer.innerHTML = filteredLogs.map(log => {
-                const timestamp = new Date(log.timestamp || Date.now()).toLocaleTimeString();
+                // Use ISO timestamp if available, otherwise format the timestamp
+                let timestampStr = log.timestamp;
+                if (timestampStr && !timestampStr.includes('T')) {
+                    // If it's not ISO format, try to parse it
+                    try {
+                        const date = new Date(log.timestamp);
+                        timestampStr = date.toISOString();
+                    } catch (e) {
+                        timestampStr = log.timestamp;
+                    }
+                }
+                
                 const level = log.level || 'info';
-                const message = log.message || 'No message';
-                const details = log.details ? JSON.stringify(log.details, null, 2) : '';
+                
+                // If we have raw JSON data, display it formatted
+                let jsonContent = '';
+                if (log.data && typeof log.data === 'object') {
+                    jsonContent = JSON.stringify(log.data, null, 2);
+                } else if (log.raw) {
+                    // Try to parse raw as JSON
+                    try {
+                        const parsed = JSON.parse(log.raw);
+                        jsonContent = JSON.stringify(parsed, null, 2);
+                    } catch (e) {
+                        jsonContent = log.raw;
+                    }
+                } else {
+                    jsonContent = JSON.stringify({
+                        level: level,
+                        message: log.message || 'No message',
+                        timestamp: timestampStr
+                    }, null, 2);
+                }
 
                 return `
                     <div class="log-entry ${level}">
-                        <div class="log-timestamp">${timestamp}</div>
-                        <div class="log-message">${escapeHtml(message)}</div>
-                        ${details ? `<div class="log-details">${escapeHtml(details)}</div>` : ''}
+                        <div class="log-timestamp">${escapeHtml(timestampStr)}</div>
+                        <div class="log-message">
+                            <pre class="log-json">${escapeHtml(jsonContent)}</pre>
+                        </div>
                     </div>
                 `;
             }).join('');
@@ -840,6 +1245,49 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
         }
 
+        // Toggle category expansion
+        function toggleCategory(categoryId) {
+            const category = document.getElementById(categoryId);
+            if (!category) return;
+            
+            const header = category.previousElementSibling;
+            if (!header) return;
+            
+            const arrow = header.querySelector('span:last-child');
+            
+            if (category.classList.contains('expanded')) {
+                category.classList.remove('expanded');
+                if (arrow) arrow.textContent = '▼';
+            } else {
+                category.classList.add('expanded');
+                if (arrow) arrow.textContent = '▲';
+            }
+        }
+
+        // Toggle all categories
+        const toggleBtn = document.getElementById('toggleStatsBtn');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function() {
+                const allCategories = document.querySelectorAll('.stats-details');
+                const allArrows = document.querySelectorAll('.stats-category h3 span:last-child');
+                const isExpanded = Array.from(allCategories).some(cat => cat.classList.contains('expanded'));
+                
+                allCategories.forEach(cat => {
+                    if (isExpanded) {
+                        cat.classList.remove('expanded');
+                    } else {
+                        cat.classList.add('expanded');
+                    }
+                });
+                
+                allArrows.forEach(arrow => {
+                    arrow.textContent = isExpanded ? '▼' : '▲';
+                });
+                
+                this.textContent = isExpanded ? '▼ Expand All' : '▲ Collapse All';
+            });
+        }
+
         async function fetchStats() {
             try {
                 const response = await fetch('/api/v1/system/stats');
@@ -851,8 +1299,8 @@
                 if (result.success) {
                     errorEl.style.display = 'none';
 
-                    // Update stats
-                    const { peers, node, rad, up, dam } = result;
+                    // Update main stats cards
+                    const { peers, node, rad, up, dam, memory, cpu, version, timestamp } = result;
 
                     peersCountEl.textContent = peers?.count || 0;
 
@@ -868,6 +1316,75 @@
                         const hours = (up.time / (1000 * 60 * 60)).toFixed(2);
                         uptimeEl.textContent = hours;
                     }
+
+                    // Update complete statistics
+                    // System Info
+                    document.getElementById('statVersion').textContent = version || 'N/A';
+                    if (up?.time) {
+                        const days = Math.floor(up.time / (1000 * 60 * 60 * 24));
+                        const hours = Math.floor((up.time % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                        const minutes = Math.floor((up.time % (1000 * 60 * 60)) / (1000 * 60));
+                        document.getElementById('statUptime').textContent = `${days}d ${hours}h ${minutes}m`;
+                    }
+                    if (timestamp) {
+                        document.getElementById('statTimestamp').textContent = new Date(timestamp).toLocaleString();
+                    }
+
+                    // Memory Stats
+                    if (memory) {
+                        document.getElementById('statHeapUsed').textContent = formatBytes(memory.heapUsed || 0);
+                        document.getElementById('statHeapTotal').textContent = formatBytes(memory.heapTotal || 0);
+                        document.getElementById('statExternal').textContent = formatBytes(memory.external || 0);
+                        document.getElementById('statRSS').textContent = formatBytes(memory.rss || 0);
+                    }
+
+                    // CPU Stats
+                    if (cpu) {
+                        document.getElementById('statCpuUser').textContent = (cpu.user / 1000).toFixed(2) + ' ms';
+                        document.getElementById('statCpuSystem').textContent = (cpu.system / 1000).toFixed(2) + ' ms';
+                    }
+
+                    // Peers Stats
+                    if (peers) {
+                        document.getElementById('statPeersCount').textContent = peers.count || 0;
+                        if (peers.time) {
+                            document.getElementById('statPeersTime').textContent = new Date(peers.time).toLocaleString();
+                        } else {
+                            document.getElementById('statPeersTime').textContent = 'N/A';
+                        }
+                    }
+
+                    // Node Stats
+                    if (node) {
+                        document.getElementById('statNodeCount').textContent = node.count || 0;
+                        if (node.memory) {
+                            document.getElementById('statNodeHeapUsed').textContent = formatBytes(node.memory.heapUsed || 0);
+                            document.getElementById('statNodeHeapTotal').textContent = formatBytes(node.memory.heapTotal || 0);
+                        }
+                    }
+
+                    // DAM Stats
+                    if (dam) {
+                        if (dam.in) {
+                            document.getElementById('statDamInRate').textContent = (dam.in.rate || 0).toFixed(2) + ' req/s';
+                            document.getElementById('statDamInCount').textContent = dam.in.count || 0;
+                        }
+                        if (dam.out) {
+                            document.getElementById('statDamOutRate').textContent = (dam.out.rate || 0).toFixed(2) + ' req/s';
+                            document.getElementById('statDamOutCount').textContent = dam.out.count || 0;
+                        }
+                    }
+
+                    // RAD Stats
+                    if (rad) {
+                        const radContent = document.getElementById('radStatsContent');
+                        radContent.innerHTML = '<pre class="text-sm">' + JSON.stringify(rad, null, 2) + '</pre>';
+                    } else {
+                        document.getElementById('radStatsContent').textContent = 'No storage statistics available';
+                    }
+
+                    // Raw JSON
+                    document.getElementById('rawJsonContent').textContent = JSON.stringify(result, null, 2);
 
                     lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
 
