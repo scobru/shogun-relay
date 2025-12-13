@@ -188,9 +188,37 @@ if [ ! -f "$IPFS_PATH/config" ]; then
         echo "⚠️ No IPFS_API_TOKEN provided, API will be publicly accessible"
     fi
     
+    # Ensure proper permissions after initialization
+    echo "🔐 Setting proper permissions for IPFS repository..."
+    set +e
+    chown -R ipfs:ipfs "$IPFS_PATH" 2>/dev/null || {
+        echo "⚠️ Warning: Could not set IPFS directory ownership (may be running as ipfs user)"
+    }
+    chmod 755 "$IPFS_PATH" 2>/dev/null || true
+    if [ -f "$IPFS_PATH/config" ]; then
+        chmod 644 "$IPFS_PATH/config" 2>/dev/null || true
+        chown ipfs:ipfs "$IPFS_PATH/config" 2>/dev/null || true
+    fi
+    find "$IPFS_PATH" -type d -exec chmod 755 {} \; 2>/dev/null || true
+    find "$IPFS_PATH" -type f -exec chmod 644 {} \; 2>/dev/null || true
+    set -e
+    
     echo "✅ IPFS initialization completed"
 else
     echo "✅ IPFS already initialized"
+    
+    # Ensure proper permissions for existing repository
+    echo "🔐 Ensuring proper permissions for IPFS repository..."
+    set +e
+    chown -R ipfs:ipfs "$IPFS_PATH" 2>/dev/null || {
+        echo "⚠️ Warning: Could not set IPFS directory ownership (may be running as ipfs user)"
+    }
+    if [ -f "$IPFS_PATH/config" ]; then
+        chmod 644 "$IPFS_PATH/config" 2>/dev/null || true
+        chown ipfs:ipfs "$IPFS_PATH/config" 2>/dev/null || true
+        echo "✅ IPFS config file permissions verified"
+    fi
+    set -e
     
     # Verify that the repository is valid and not corrupted
     echo "🔍 Verifying IPFS repository integrity..."
@@ -261,6 +289,28 @@ if [ ! -f "$IPFS_PATH/repo.lock" ]; then
     fi
     set -e  # Re-enable exit on error
 fi
+
+# Final permission check - ensure everything is owned by ipfs user
+echo "🔐 Final permission check..."
+set +e
+chown -R ipfs:ipfs "$IPFS_PATH" 2>/dev/null || {
+    echo "⚠️ Warning: Could not set final IPFS directory ownership"
+}
+# Ensure config is readable
+if [ -f "$IPFS_PATH/config" ]; then
+    chmod 644 "$IPFS_PATH/config" 2>/dev/null || true
+    chown ipfs:ipfs "$IPFS_PATH/config" 2>/dev/null || true
+    # Verify we can read it
+    if [ -r "$IPFS_PATH/config" ]; then
+        echo "✅ IPFS config file is readable"
+    else
+        echo "❌ ERROR: IPFS config file is not readable!"
+        echo "   File: $IPFS_PATH/config"
+        echo "   Permissions: $(ls -l "$IPFS_PATH/config" 2>/dev/null || echo 'cannot check')"
+        exit 1
+    fi
+fi
+set -e
 
 echo "🚀 IPFS initialization successful"
 if [ -n "$IPFS_API_TOKEN" ]; then

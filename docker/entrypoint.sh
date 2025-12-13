@@ -4,6 +4,34 @@ set -e
 # Set correct permissions on persistent data volumes
 # These directories are mounted as volumes and need correct permissions
 
+# IPFS data directory (must be done first, before IPFS init)
+IPFS_DIR="${IPFS_PATH:-/data/ipfs}"
+echo "🔐 Setting permissions for IPFS data volume at ${IPFS_DIR}..."
+if [ -d "$IPFS_DIR" ]; then
+    echo "✅ IPFS data directory exists, setting ownership and permissions"
+    # Set ownership to ipfs user (entrypoint runs as root, so this should work)
+    chown -R ipfs:ipfs "$IPFS_DIR" 2>/dev/null || {
+        echo "⚠️  Warning: Could not set IPFS directory ownership (may need manual fix)"
+    }
+    # Set directory permissions
+    chmod 755 "$IPFS_DIR" 2>/dev/null || true
+    # Set file permissions (config should be readable)
+    if [ -f "$IPFS_DIR/config" ]; then
+        chmod 644 "$IPFS_DIR/config" 2>/dev/null || true
+        chown ipfs:ipfs "$IPFS_DIR/config" 2>/dev/null || true
+    fi
+    # Set permissions for all files and directories recursively
+    find "$IPFS_DIR" -type d -exec chmod 755 {} \; 2>/dev/null || true
+    find "$IPFS_DIR" -type f -exec chmod 644 {} \; 2>/dev/null || true
+    # Ensure ipfs user owns everything
+    chown -R ipfs:ipfs "$IPFS_DIR" 2>/dev/null || true
+else
+    echo "📁 Creating new IPFS data directory"
+    mkdir -p "$IPFS_DIR"
+    chown -R ipfs:ipfs "$IPFS_DIR" 2>/dev/null || true
+    chmod 755 "$IPFS_DIR" 2>/dev/null || true
+fi
+
 # GunDB data directory
 DATA_DIR="${DATA_DIR:-/app/relay/data}"
 echo "🔐 Setting permissions for GunDB data volume at ${DATA_DIR}..."
