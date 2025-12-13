@@ -2597,6 +2597,7 @@ export async function reconcileUserBalance(
   success: boolean;
   currentBalance: string;
   calculatedBalance: string;
+  targetBalance?: string; // Target balance (0 if calculated was negative)
   corrected: boolean;
   error?: string;
 }> {
@@ -2654,8 +2655,24 @@ export async function reconcileUserBalance(
       "Balance reconciliation calculation complete"
     );
 
+    // Handle negative calculated balance (shouldn't happen, but can occur due to data inconsistencies)
+    // If calculated balance is negative, set it to 0 (minimum possible balance)
+    const targetBalance = calculatedBalance < 0n ? 0n : calculatedBalance;
+    
+    if (calculatedBalance < 0n) {
+      log.warn(
+        {
+          user: normalizedAddress,
+          calculatedBalance: calculatedBalance.toString(),
+          totalDeposits: totalDeposits.toString(),
+          totalWithdrawals: totalWithdrawals.toString(),
+        },
+        "⚠️  Calculated balance is negative (more withdrawals than deposits). This may indicate missing deposit records. Setting balance to 0."
+      );
+    }
+
     // Compare and correct if needed
-    const difference = calculatedBalance - currentBalance;
+    const difference = targetBalance - currentBalance;
     const corrected = difference !== 0n;
 
     if (corrected) {
@@ -2664,6 +2681,7 @@ export async function reconcileUserBalance(
           user: normalizedAddress,
           currentBalance: currentBalance.toString(),
           calculatedBalance: calculatedBalance.toString(),
+          targetBalance: targetBalance.toString(),
           difference: difference.toString(),
         },
         "Balance discrepancy detected, correcting..."
@@ -2673,17 +2691,82 @@ export async function reconcileUserBalance(
         // Current balance is too low - credit the difference
         await creditBalance(gun, normalizedAddress, difference, relayKeyPair);
       } else if (difference < 0n) {
-        // Current balance is too high - debit the absolute difference
-        const debitAmount = difference * -1n; // Convert negative to positive
-        await debitBalance(gun, normalizedAddress, debitAmount, relayKeyPair);
+        // Current balance is too high - need to reduce it
+        // If target balance is 0 and current balance is positive, set directly to 0
+        // Otherwise, try to debit the difference
+        if (targetBalance === 0n && currentBalance > 0n) {
+          // Set balance directly to 0 using frozen entry (more reliable than debit when balance might be inconsistent)
+          const balanceData: any = {
+            balance: "0",
+            user: normalizedAddress,
+            ethereumAddress: normalizedAddress,
+            updatedAt: Date.now(),
+            type: "bridge-balance",
+            corrected: true,
+            reconciliation: true, // Flag to indicate this was a reconciliation correction
+          };
+
+          await FrozenData.createFrozenEntry(
+            gun,
+            balanceData,
+            relayKeyPair,
+            "bridge-balances",
+            normalizedAddress
+          );
+
+          log.debug(
+            {
+              user: normalizedAddress,
+              previousBalance: currentBalance.toString(),
+              newBalance: "0",
+            },
+            "Balance set to 0 via direct frozen entry (reconciliation)"
+          );
+        } else {
+          // Normal case: debit the absolute difference
+          const debitAmount = difference * -1n; // Convert negative to positive
+          try {
+            await debitBalance(gun, normalizedAddress, debitAmount, relayKeyPair);
+          } catch (error) {
+            // If debit fails (e.g., insufficient balance), fall back to direct balance setting
+            log.warn(
+              {
+                user: normalizedAddress,
+                error: error instanceof Error ? error.message : String(error),
+                debitAmount: debitAmount.toString(),
+                currentBalance: currentBalance.toString(),
+              },
+              "Debit failed during reconciliation, setting balance directly"
+            );
+
+            const balanceData: any = {
+              balance: targetBalance.toString(),
+              user: normalizedAddress,
+              ethereumAddress: normalizedAddress,
+              updatedAt: Date.now(),
+              type: "bridge-balance",
+              corrected: true,
+              reconciliation: true,
+            };
+
+            await FrozenData.createFrozenEntry(
+              gun,
+              balanceData,
+              relayKeyPair,
+              "bridge-balances",
+              normalizedAddress
+            );
+          }
+        }
       }
 
       // Verify correction
+      await new Promise((resolve) => setTimeout(resolve, 300)); // Wait for GunDB propagation
       const verifiedBalance = await getUserBalance(gun, normalizedAddress, relayKeyPair.pub);
       log.debug(
         {
           user: normalizedAddress,
-          expectedBalance: calculatedBalance.toString(),
+          expectedBalance: targetBalance.toString(),
           verifiedBalance: verifiedBalance.toString(),
         },
         "Balance correction completed"
@@ -2694,6 +2777,7 @@ export async function reconcileUserBalance(
       success: true,
       currentBalance: currentBalance.toString(),
       calculatedBalance: calculatedBalance.toString(),
+      targetBalance: targetBalance.toString(), // Include target balance (0 if calculated was negative)
       corrected,
     };
   } catch (error) {
