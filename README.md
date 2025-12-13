@@ -38,12 +38,13 @@ In practice, instead of orchestrating 3-4 different services, you start a single
 6. [Admin Authentication](#admin-authentication)
 7. [Admin Interfaces](#admin-interfaces)
 8. [API Overview](#api-overview)
-9. [Key Tools](#key-tools)
-10. [Roadmap](#roadmap)
-11. [Development Notes](#development-notes)
-12. [Troubleshooting](#troubleshooting)
-13. [Contributing](#contributing)
-14. [License](#license)
+9. [L2 Bridge](#l2-bridge)
+10. [Key Tools](#key-tools)
+11. [Roadmap](#roadmap)
+12. [Development Notes](#development-notes)
+13. [Troubleshooting](#troubleshooting)
+14. [Contributing](#contributing)
+15. [License](#license)
 
 ---
 
@@ -240,6 +241,19 @@ The admin dashboards rely on `lib/admin-auth.js` to sync the token across tabs. 
 ### Blockchain RPC
 - `GET /rpc-status` – Check status of all configured blockchain RPC endpoints (public).
 
+### L2 Bridge
+- `POST /api/v1/bridge/deposit` – Record L1 deposit event (admin).
+- `POST /api/v1/bridge/withdraw` – Request L2 withdrawal (public).
+- `GET /api/v1/bridge/balance/:user` – Get user L2 balance (public).
+- `POST /api/v1/bridge/reconcile-balance` – Reconcile user balance from on-chain events (public).
+- `GET /api/v1/bridge/pending-withdrawals` – List pending withdrawal requests (public).
+- `POST /api/v1/bridge/submit-batch` – Submit batch of withdrawals to L1 (admin).
+- `GET /api/v1/bridge/proof/:user/:amount/:nonce` – Get Merkle proof for withdrawal (public).
+- `GET /api/v1/bridge/state` – Get current bridge state (root, batchId, etc.) (public).
+- `GET /api/v1/bridge/transaction-history/:user` – Get user transaction history (public).
+
+**Note:** See [Bridge Documentation](./docs/BRIDGE.md) for complete API reference and integration guide.
+
 ### IPFS Management
 - `POST /api/v1/ipfs/upload` – Upload files to IPFS (admin, supports multipart/form-data with optional encryption).
 - `GET /api/v1/ipfs/cat/:cid` – Stream IPFS content (aligned with Kubo's `/api/v0/cat`).
@@ -386,6 +400,48 @@ The admin dashboards rely on `lib/admin-auth.js` to sync the token across tabs. 
 - `GET /endpoints` – API endpoints documentation page (public).
 
 Full endpoint definitions live in `relay/src/routes/`. See `/endpoints` for interactive API documentation.
+
+---
+
+## L2 Bridge
+
+**Shogun Relay** includes a trustless L2 bridge that enables ETH transfers between L1 (Ethereum/Base) and L2 (GunDB). The bridge uses Merkle proofs to ensure withdrawals are mathematically verifiable without trusting the sequencer.
+
+### Features
+
+- **Deposits (L1→L2)**: Users send ETH to the bridge contract, which is credited to their L2 balance
+- **Withdrawals (L2→L1)**: Users request withdrawals that are batched and submitted on-chain with Merkle proofs
+- **L2 Transfers**: Users can transfer ETH between L2 accounts instantly
+- **Balance Reconciliation**: Automatic reconciliation of balances from on-chain deposits/withdrawals
+- **Batch Submissions**: Efficient batching of withdrawals to reduce gas costs
+
+### Quick Start
+
+See the complete **[Bridge Documentation](./docs/BRIDGE.md)** for:
+- Bridge architecture and security model
+- API endpoints and usage examples
+- Configuration variables
+- Integration guide for client applications
+- Testing and troubleshooting
+
+### Key API Endpoints
+
+- `POST /api/v1/bridge/deposit` - Record L1 deposit (admin)
+- `POST /api/v1/bridge/withdraw` - Request L2 withdrawal
+- `GET /api/v1/bridge/balance/:user` - Get user L2 balance
+- `POST /api/v1/bridge/reconcile-balance` - Reconcile user balance
+- `GET /api/v1/bridge/pending-withdrawals` - List pending withdrawals
+- `POST /api/v1/bridge/submit-batch` - Submit withdrawal batch (admin)
+
+### Configuration
+
+```bash
+BRIDGE_ENABLED=true
+BRIDGE_CONTRACT_ADDRESS=0x0F52c90C5704E2aB9cec56eE2C06dD86602988A0
+BRIDGE_RPC_URL=https://sepolia.base.org
+BRIDGE_CHAIN_ID=84532
+BRIDGE_START_BLOCK=0
+```
 
 ---
 
