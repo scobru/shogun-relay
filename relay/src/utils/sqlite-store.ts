@@ -92,7 +92,21 @@ class SQLiteStore {
     try {
       const row = this.getStmt.get(file);
       if (row) {
-        cb(null, row.data);
+        // Validate JSON before returning to prevent GUN parse errors
+        try {
+          // Try to parse the JSON to validate it
+          JSON.parse(row.data);
+          // If parsing succeeds, return the data
+          cb(null, row.data);
+        } catch (parseErr) {
+          // If JSON is corrupted, log and return null (GUN will treat as missing file)
+          log.warn(
+            { file, error: parseErr instanceof Error ? parseErr.message : String(parseErr) },
+            'Corrupted JSON data detected in radisk file, skipping'
+          );
+          // Return null so GUN treats it as a missing file and can recreate it
+          cb(null, null);
+        }
       } else {
         cb(null, null); // File not foundefined, return undefinedefined
       }

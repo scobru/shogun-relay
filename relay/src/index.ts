@@ -2245,6 +2245,39 @@ See docs/RELAY_KEYS.md for more information.
   };
 }
 
+// Add process-level error handlers to catch GUN JSON parse errors
+process.on("uncaughtException", (error: Error) => {
+  // Handle JSON parse errors from GUN's yson.js gracefully
+  if (error.message && error.message.includes("Bad control character in string literal")) {
+    loggers.server.warn(
+      { err: error },
+      "⚠️  Corrupted data file detected in GUN storage. This is usually harmless - GUN will skip the corrupted file."
+    );
+    // Don't exit - let GUN continue with other files
+    return;
+  }
+  
+  // Handle other uncaught exceptions
+  loggers.server.error({ err: error }, "Uncaught exception");
+  // Only exit for critical errors
+  if (error.message && !error.message.includes("JSON")) {
+    process.exit(1);
+  }
+});
+
+process.on("unhandledRejection", (reason: any, promise: Promise<any>) => {
+  // Handle JSON parse errors in promises
+  if (reason && reason.message && reason.message.includes("Bad control character in string literal")) {
+    loggers.server.warn(
+      { err: reason },
+      "⚠️  Corrupted data file detected in GUN storage (promise rejection). This is usually harmless."
+    );
+    return;
+  }
+  
+  loggers.server.error({ err: reason, promise }, "Unhandled promise rejection");
+});
+
 // Avvia il server
 initializeServer().catch((error) => {
   loggers.server.error({ err: error }, "Failed to initialize server");
