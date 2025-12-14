@@ -211,10 +211,11 @@ const USDC_ABI = USDC_EIP3009_ABI;
 
 /**
  * Get network config from SDK instead of hardcoded addresses
+ * Returns null if SDK doesn't have the config (for chains not yet supported)
  */
 function getNetworkConfigFromSDK(chainId: number): NetworkConfigType | null {
   const config = getConfigByChainId(chainId);
-  if (!config) return null;
+  if (!config || !config.usdc) return null;
   
   // Map chainId to viem chain
   let chain;
@@ -233,61 +234,69 @@ function getNetworkConfigFromSDK(chainId: number): NetworkConfigType | null {
   };
 }
 
-// Network configurations with EIP-712 USDC domain info
-// Now uses SDK for USDC addresses, but keeps chain and explorer info
-const NETWORK_CONFIG: Record<NetworkKey, NetworkConfigType> = {
-  base: (() => {
-    const sdkConfig = getNetworkConfigFromSDK(8453);
-    if (!sdkConfig || !sdkConfig.usdc) {
-      throw new Error("Base mainnet config not found in SDK");
-    }
-    return {
+/**
+ * Lazy initialization of network config - only loads when accessed
+ * Uses SDK when available, falls back to hardcoded values for chains not in SDK yet
+ */
+function getNetworkConfig(network: NetworkKey): NetworkConfigType {
+  const chainIdMap: Record<NetworkKey, number> = {
+    base: 8453,
+    "base-sepolia": 84532,
+    polygon: 137,
+    "polygon-amoy": 80002,
+  };
+  
+  const chainId = chainIdMap[network];
+  const sdkConfig = getNetworkConfigFromSDK(chainId);
+  
+  // If SDK has config, use it
+  if (sdkConfig) {
+    return sdkConfig;
+  }
+  
+  // Fallback to hardcoded values for chains not yet in SDK
+  // This allows the relay to work even if SDK doesn't support all chains yet
+  const fallbackConfigs: Record<NetworkKey, NetworkConfigType> = {
+    base: {
       chain: base,
-      usdc: sdkConfig.usdc,
-      explorer: sdkConfig.explorer || "https://basescan.org",
+      usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      explorer: "https://basescan.org",
       usdcName: "USD Coin",
       usdcVersion: "2",
-    };
-  })(),
-  "base-sepolia": (() => {
-    const sdkConfig = getNetworkConfigFromSDK(84532);
-    if (!sdkConfig || !sdkConfig.usdc) {
-      throw new Error("Base Sepolia config not found in SDK");
-    }
-    return {
+    },
+    "base-sepolia": {
       chain: baseSepolia,
-      usdc: sdkConfig.usdc,
-      explorer: sdkConfig.explorer || "https://sepolia.basescan.org",
+      usdc: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      explorer: "https://sepolia.basescan.org",
       usdcName: "USDC",
       usdcVersion: "2",
-    };
-  })(),
-  polygon: (() => {
-    const sdkConfig = getNetworkConfigFromSDK(137);
-    if (!sdkConfig || !sdkConfig.usdc) {
-      throw new Error("Polygon mainnet config not found in SDK");
-    }
-    return {
+    },
+    polygon: {
       chain: polygon,
-      usdc: sdkConfig.usdc,
-      explorer: sdkConfig.explorer || "https://polygonscan.com",
+      usdc: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+      explorer: "https://polygonscan.com",
       usdcName: "USD Coin",
       usdcVersion: "2",
-    };
-  })(),
-  "polygon-amoy": (() => {
-    const sdkConfig = getNetworkConfigFromSDK(80002);
-    if (!sdkConfig || !sdkConfig.usdc) {
-      throw new Error("Polygon Amoy config not found in SDK");
-    }
-    return {
+    },
+    "polygon-amoy": {
       chain: polygonAmoy,
-      usdc: sdkConfig.usdc,
-      explorer: sdkConfig.explorer || "https://amoy.polygonscan.com",
+      usdc: "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
+      explorer: "https://amoy.polygonscan.com",
       usdcName: "USDC",
       usdcVersion: "2",
-    };
-  })(),
+    },
+  };
+  
+  return fallbackConfigs[network];
+}
+
+// Network configurations with EIP-712 USDC domain info
+// Lazy-loaded: uses SDK when available, falls back to hardcoded for unsupported chains
+const NETWORK_CONFIG: Record<NetworkKey, NetworkConfigType> = {
+  get base() { return getNetworkConfig("base"); },
+  get "base-sepolia"() { return getNetworkConfig("base-sepolia"); },
+  get polygon() { return getNetworkConfig("polygon"); },
+  get "polygon-amoy"() { return getNetworkConfig("polygon-amoy"); },
 };
 
 // Import pricing configuration
