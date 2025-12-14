@@ -19,7 +19,7 @@
  */
 
 import { ethers } from "ethers";
-import { ShogunSDK, CONTRACTS_CONFIG, ERC20_ABI } from "shogun-contracts-sdk";
+import { ShogunSDK, CONTRACTS_CONFIG, getConfigByChainId, ERC20_ABI } from "shogun-contracts-sdk";
 import { loggers } from "./logger";
 const log = loggers.registry;
 
@@ -99,52 +99,35 @@ interface DealInfo {
   griefed: boolean;
 }
 
-// Generate contract address mappings from centralized config
-// This maintains backward compatibility while using the centralized configuration
-const generateAddressMappings = (): {
-  registryAddresses: Record<number, string | undefined>;
-  storageDealRegistryAddresses: Record<number, string | undefined>;
-  usdcAddresses: Record<number, string | undefined>;
-  rpcUrls: Record<number, string | undefined>;
-} => {
-  const registryAddresses: Record<number, string | undefined> = Object.create(null);
-  const storageDealRegistryAddresses: Record<number, string | undefined> = Object.create(
-    null
-  );
-  const usdcAddresses: Record<number, string | undefined> = Object.create(null);
-  const rpcUrls: Record<number, string | undefined> = Object.create(null);
-
-  // Iterate through all network configs
-  for (const config of Object.values(CONTRACTS_CONFIG) as Array<NetworkConfig>) {
-    if (config && config.chainId) {
-      registryAddresses[config.chainId] = config.relayRegistry || undefined;
-      storageDealRegistryAddresses[config.chainId] =
-        config.storageDealRegistry || undefined;
-      usdcAddresses[config.chainId] = config.usdc || undefined;
-      rpcUrls[config.chainId] = config.rpc || undefined;
-    }
+/**
+ * Helper function to get config from SDK
+ * Always use SDK's CONTRACTS_CONFIG instead of hardcoded addresses
+ */
+function getConfig(chainId: number | string) {
+  const config = getConfigByChainId(chainId);
+  if (!config) {
+    throw new Error(`Chain ${chainId} is not supported by SDK`);
   }
+  return config;
+}
 
-  return {
-    registryAddresses,
-    storageDealRegistryAddresses,
-    usdcAddresses,
-    rpcUrls,
-  };
-};
+// Export for backward compatibility (deprecated - use getConfig instead)
+// These are kept for backward compatibility but should not be used in new code
+export const REGISTRY_ADDRESSES = Object.fromEntries(
+  Object.values(CONTRACTS_CONFIG).map(c => [c.chainId, c.relayRegistry || undefined])
+) as Record<number, string | undefined>;
 
-const {
-  registryAddresses,
-  storageDealRegistryAddresses,
-  usdcAddresses,
-  rpcUrls,
-} = generateAddressMappings();
+export const STORAGE_DEAL_REGISTRY_ADDRESSES = Object.fromEntries(
+  Object.values(CONTRACTS_CONFIG).map(c => [c.chainId, c.storageDealRegistry || undefined])
+) as Record<number, string | undefined>;
 
-// Export for backward compatibility
-export const REGISTRY_ADDRESSES = registryAddresses;
-export const STORAGE_DEAL_REGISTRY_ADDRESSES = storageDealRegistryAddresses;
-export const USDC_ADDRESSES = usdcAddresses;
-export const RPC_URLS = rpcUrls;
+export const USDC_ADDRESSES = Object.fromEntries(
+  Object.values(CONTRACTS_CONFIG).map(c => [c.chainId, c.usdc || undefined])
+) as Record<number, string | undefined>;
+
+export const RPC_URLS = Object.fromEntries(
+  Object.values(CONTRACTS_CONFIG).map(c => [c.chainId, c.rpc || undefined])
+) as Record<number, string | undefined>;
 
 // Relay status enum
 const RelayStatus: Record<number, string> = {
@@ -203,20 +186,29 @@ export function createRegistryClient(
   chainId: number = 84532,
   rpcUrl: string | undefined = undefined
 ): any {
-  const registryAddress = REGISTRY_ADDRESSES[chainId];
-  if (!registryAddress) {
+  // Get config from SDK (single source of truth)
+  const config = getConfig(chainId);
+  if (!config.relayRegistry) {
     throw new Error(`Registry not deployed on chain ${chainId}`);
   }
 
-  const provider = new ethers.JsonRpcProvider(rpcUrl || RPC_URLS[chainId]);
+  // Use RPC from config if not provided
+  const provider = new ethers.JsonRpcProvider(rpcUrl || config.rpc);
   const sdk = new ShogunSDK({ provider, chainId });
   const relayRegistry = sdk.getRelayRegistry();
-  const usdcAddress = USDC_ADDRESSES[chainId];
+  
+  // Always use address from SDK to ensure consistency
+  const registryAddressFromSDK = relayRegistry.getAddress();
+  const usdcAddress = config.usdc;
+  
+  if (!usdcAddress) {
+    throw new Error(`USDC address not configured for chain ${chainId}`);
+  }
 
   return {
     chainId,
-    registryAddress,
-    usdcAddress,
+    registryAddress: registryAddressFromSDK, // Always from SDK
+    usdcAddress, // From SDK config
     provider,
     registry: relayRegistry.getContract(), // For backward compatibility
     sdk,
@@ -947,20 +939,29 @@ export function createStorageDealRegistryClient(
   chainId: number = 84532,
   rpcUrl: string | undefined = undefined
 ): any {
-  const registryAddress = STORAGE_DEAL_REGISTRY_ADDRESSES[chainId];
-  if (!registryAddress) {
+  // Get config from SDK (single source of truth)
+  const config = getConfig(chainId);
+  if (!config.storageDealRegistry) {
     throw new Error(`StorageDealRegistry not deployed on chain ${chainId}`);
   }
 
-  const provider = new ethers.JsonRpcProvider(rpcUrl || RPC_URLS[chainId]);
+  // Use RPC from config if not provided
+  const provider = new ethers.JsonRpcProvider(rpcUrl || config.rpc);
   const sdk = new ShogunSDK({ provider, chainId });
   const storageDealRegistry = sdk.getStorageDealRegistry();
-  const usdcAddress = USDC_ADDRESSES[chainId];
+  
+  // Always use address from SDK to ensure consistency with frontend
+  const registryAddressFromSDK = storageDealRegistry.getAddress();
+  const usdcAddress = config.usdc;
+  
+  if (!usdcAddress) {
+    throw new Error(`USDC address not configured for chain ${chainId}`);
+  }
 
   return {
     chainId,
-    registryAddress,
-    usdcAddress,
+    registryAddress: registryAddressFromSDK, // Always from SDK
+    usdcAddress, // From SDK config
     provider,
     storageDealRegistry: storageDealRegistry.getContract(), // For backward compatibility
     sdk,

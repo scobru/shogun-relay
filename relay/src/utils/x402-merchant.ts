@@ -16,7 +16,7 @@ import { baseSepolia, base, polygon, polygonAmoy } from "viem/chains";
 import { privateKeyToAccount } from "viem/accounts";
 import { ipfsRequest } from "./ipfs-client";
 import * as RelayUser from "./relay-user";
-import { USDC_EIP3009_ABI } from "shogun-contracts-sdk";
+import { USDC_EIP3009_ABI, getConfigByChainId } from "shogun-contracts-sdk";
 import httpModule from "http";
 import httpsModule from "https";
 import { loggers } from "./logger";
@@ -209,36 +209,85 @@ interface SyncStorageUsageResult {
 
 const USDC_ABI = USDC_EIP3009_ABI;
 
+/**
+ * Get network config from SDK instead of hardcoded addresses
+ */
+function getNetworkConfigFromSDK(chainId: number): NetworkConfigType | null {
+  const config = getConfigByChainId(chainId);
+  if (!config) return null;
+  
+  // Map chainId to viem chain
+  let chain;
+  if (chainId === 8453) chain = base;
+  else if (chainId === 84532) chain = baseSepolia;
+  else if (chainId === 137) chain = polygon;
+  else if (chainId === 80002) chain = polygonAmoy;
+  else return null;
+  
+  return {
+    chain,
+    usdc: config.usdc,
+    explorer: config.explorer || "",
+    usdcName: chainId === 8453 || chainId === 137 ? "USD Coin" : "USDC",
+    usdcVersion: "2",
+  };
+}
+
 // Network configurations with EIP-712 USDC domain info
+// Now uses SDK for USDC addresses, but keeps chain and explorer info
 const NETWORK_CONFIG: Record<NetworkKey, NetworkConfigType> = {
-  base: {
-    chain: base,
-    usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-    explorer: "https://basescan.org",
-    usdcName: "USD Coin",
-    usdcVersion: "2",
-  },
-  "base-sepolia": {
-    chain: baseSepolia,
-    usdc: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
-    explorer: "https://sepolia.basescan.org",
-    usdcName: "USDC",
-    usdcVersion: "2",
-  },
-  polygon: {
-    chain: polygon,
-    usdc: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
-    explorer: "https://polygonscan.com",
-    usdcName: "USD Coin",
-    usdcVersion: "2",
-  },
-  "polygon-amoy": {
-    chain: polygonAmoy,
-    usdc: "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
-    explorer: "https://amoy.polygonscan.com",
-    usdcName: "USDC",
-    usdcVersion: "2",
-  },
+  base: (() => {
+    const sdkConfig = getNetworkConfigFromSDK(8453);
+    if (!sdkConfig || !sdkConfig.usdc) {
+      throw new Error("Base mainnet config not found in SDK");
+    }
+    return {
+      chain: base,
+      usdc: sdkConfig.usdc,
+      explorer: sdkConfig.explorer || "https://basescan.org",
+      usdcName: "USD Coin",
+      usdcVersion: "2",
+    };
+  })(),
+  "base-sepolia": (() => {
+    const sdkConfig = getNetworkConfigFromSDK(84532);
+    if (!sdkConfig || !sdkConfig.usdc) {
+      throw new Error("Base Sepolia config not found in SDK");
+    }
+    return {
+      chain: baseSepolia,
+      usdc: sdkConfig.usdc,
+      explorer: sdkConfig.explorer || "https://sepolia.basescan.org",
+      usdcName: "USDC",
+      usdcVersion: "2",
+    };
+  })(),
+  polygon: (() => {
+    const sdkConfig = getNetworkConfigFromSDK(137);
+    if (!sdkConfig || !sdkConfig.usdc) {
+      throw new Error("Polygon mainnet config not found in SDK");
+    }
+    return {
+      chain: polygon,
+      usdc: sdkConfig.usdc,
+      explorer: sdkConfig.explorer || "https://polygonscan.com",
+      usdcName: "USD Coin",
+      usdcVersion: "2",
+    };
+  })(),
+  "polygon-amoy": (() => {
+    const sdkConfig = getNetworkConfigFromSDK(80002);
+    if (!sdkConfig || !sdkConfig.usdc) {
+      throw new Error("Polygon Amoy config not found in SDK");
+    }
+    return {
+      chain: polygonAmoy,
+      usdc: sdkConfig.usdc,
+      explorer: sdkConfig.explorer || "https://amoy.polygonscan.com",
+      usdcName: "USDC",
+      usdcVersion: "2",
+    };
+  })(),
 };
 
 // Import pricing configuration

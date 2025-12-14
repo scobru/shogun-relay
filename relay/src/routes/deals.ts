@@ -44,7 +44,7 @@ import {
   relayKeysConfig,
   relayConfig,
 } from "../config";
-import { USDC_ADDRESSES } from "../utils/registry-client";
+import { getConfigByChainId } from "shogun-contracts-sdk";
 
 const router: Router = express.Router();
 // IPFS_API_TOKEN is handled by ipfs-client.js
@@ -713,9 +713,10 @@ router.post("/create", express.json(), async (req, res) => {
         currency: "USDC",
         to: relayWalletAddress || "Relay address not configured",
         chainId: REGISTRY_CHAIN_ID || 84532,
-        usdcAddress:
-          USDC_ADDRESSES[REGISTRY_CHAIN_ID] ||
-          "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+        usdcAddress: (() => {
+          const config = getConfigByChainId(REGISTRY_CHAIN_ID || 84532);
+          return config?.usdc || null;
+        })(),
         message: relayWalletAddress
           ? `Transfer ${pricing.totalPriceUSDC} USDC to ${relayWalletAddress}. After payment, the relay will register the deal on-chain.`
           : "Relay not configured. Please contact relay operator for payment instructions.",
@@ -806,15 +807,35 @@ router.post("/:dealId/activate", express.json(), async (req, res) => {
       const storageDealRegistryClient = createStorageDealRegistryClient(
         parseInt(String(REGISTRY_CHAIN_ID))
       );
+      
+      // Use the registry address from SDK (same as frontend uses)
+      const registryAddressFromSDK = storageDealRegistryClient.sdk.getStorageDealRegistry().getAddress();
+      
+      // Use the same provider as storageDealRegistryClient (not registryClient.provider)
+      // This ensures we're using the same RPC endpoint and will see the same state
       const usdcContract = new ethers.Contract(
         storageDealRegistryClient.usdcAddress,
         [
           "function allowance(address owner, address spender) view returns (uint256)",
         ],
-        registryClient.provider
+        storageDealRegistryClient.provider // Use same provider as storageDealRegistryClient
       );
 
       const priceUSDCAtomic = Math.ceil(deal.pricing.totalPriceUSDC * 1000000);
+      
+      // storageDealRegistryClient.registryAddress is now always from SDK (same as frontend uses)
+      const registryAddress = storageDealRegistryClient.registryAddress;
+      
+      // Log detailed information for debugging
+      loggers.server.info({
+        dealId,
+        clientAddress: deal.clientAddress,
+        registryAddress: registryAddress, // Always from SDK now
+        usdcAddress: storageDealRegistryClient.usdcAddress,
+        priceUSDC: deal.pricing.totalPriceUSDC,
+        priceUSDCAtomic: priceUSDCAtomic.toString(),
+        rpcUrl: storageDealRegistryClient.provider.connection?.url || storageDealRegistryClient.provider._getConnection?.()?.url || 'unknown'
+      }, `🔍 Checking allowance - Registry: ${registryAddress}, Client: ${deal.clientAddress}`);
       
       // Retry allowance check with exponential backoff (RPC nodes may lag behind)
       let allowance = 0n;
@@ -823,19 +844,22 @@ router.post("/:dealId/activate", express.json(), async (req, res) => {
       
       while (retries > 0) {
         try {
+          // Use SDK address (same as frontend)
           allowance = await usdcContract.allowance(
             deal.clientAddress,
-            storageDealRegistryClient.registryAddress
+            registryAddressFromSDK // Use SDK address instead of config address
           );
           
           loggers.server.info({
             dealId,
             clientAddress: deal.clientAddress,
-            registryAddress: storageDealRegistryClient.registryAddress,
+            registryAddress: registryAddressFromSDK, // Use SDK address
             allowance: allowance.toString(),
+            allowanceUSDC: (Number(allowance) / 1000000).toFixed(6),
             required: priceUSDCAtomic.toString(),
+            requiredUSDC: (priceUSDCAtomic / 1000000).toFixed(6),
             attempt: 4 - retries
-          }, `Allowance check: ${allowance.toString()} (need ${priceUSDCAtomic})`);
+          }, `Allowance check: ${allowance.toString()} (${(Number(allowance) / 1000000).toFixed(6)} USDC) - need ${priceUSDCAtomic} (${(priceUSDCAtomic / 1000000).toFixed(6)} USDC)`);
           
           if (allowance >= BigInt(priceUSDCAtomic)) {
             break; // Sufficient allowance found
@@ -866,14 +890,18 @@ router.post("/:dealId/activate", express.json(), async (req, res) => {
         loggers.server.error({
           dealId,
           clientAddress: deal.clientAddress,
+          registryAddress: registryAddress,
           allowance: allowance.toString(),
+          allowanceUSDC: (Number(allowance) / 1000000).toFixed(6),
           required: priceUSDCAtomic.toString(),
-          lastError: lastError ? String(lastError) : null
+          requiredUSDC: (priceUSDCAtomic / 1000000).toFixed(6),
+          lastError: lastError ? String(lastError) : null,
+          rpcUrl: storageDealRegistryClient.provider.connection?.url || storageDealRegistryClient.provider._getConnection?.()?.url || 'unknown'
         }, 'Client approval insufficient after retries');
         
         return res.status(400).json({
           success: false,
-          error: `Client has not approved enough USDC. Need: ${priceUSDCAtomic}, Approved: ${allowance.toString()}. Please ensure the approval transaction has been confirmed and try again.`,
+          error: `Client has not approved enough USDC. Need: ${(priceUSDCAtomic / 1000000).toFixed(6)} USDC (${priceUSDCAtomic} atomic), Approved: ${(Number(allowance) / 1000000).toFixed(6)} USDC (${allowance.toString()} atomic). Registry: ${registryAddress}. Please ensure the approval transaction has been confirmed and try again.`,
         });
       }
 
