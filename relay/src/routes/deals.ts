@@ -815,15 +815,65 @@ router.post("/:dealId/activate", express.json(), async (req, res) => {
       );
 
       const priceUSDCAtomic = Math.ceil(deal.pricing.totalPriceUSDC * 1000000);
-      const allowance = await usdcContract.allowance(
-        deal.clientAddress,
-        storageDealRegistryClient.registryAddress
-      );
+      
+      // Retry allowance check with exponential backoff (RPC nodes may lag behind)
+      let allowance = 0n;
+      let retries = 3;
+      let lastError = null;
+      
+      while (retries > 0) {
+        try {
+          allowance = await usdcContract.allowance(
+            deal.clientAddress,
+            storageDealRegistryClient.registryAddress
+          );
+          
+          loggers.server.info({
+            dealId,
+            clientAddress: deal.clientAddress,
+            registryAddress: storageDealRegistryClient.registryAddress,
+            allowance: allowance.toString(),
+            required: priceUSDCAtomic.toString(),
+            attempt: 4 - retries
+          }, `Allowance check: ${allowance.toString()} (need ${priceUSDCAtomic})`);
+          
+          if (allowance >= BigInt(priceUSDCAtomic)) {
+            break; // Sufficient allowance found
+          }
+          
+          // If insufficient and we have retries left, wait and retry
+          if (retries > 1) {
+            const waitTime = (4 - retries) * 2000; // 2s, 4s, 6s
+            loggers.server.warn({
+              dealId,
+              allowance: allowance.toString(),
+              required: priceUSDCAtomic.toString(),
+              waitTime
+            }, `Insufficient allowance, waiting ${waitTime}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          }
+        } catch (error) {
+          lastError = error;
+          loggers.server.warn({ dealId, error: String(error) }, 'Error checking allowance, retrying...');
+          if (retries > 1) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
+        retries--;
+      }
 
       if (allowance < BigInt(priceUSDCAtomic)) {
+        loggers.server.error({
+          dealId,
+          clientAddress: deal.clientAddress,
+          allowance: allowance.toString(),
+          required: priceUSDCAtomic.toString(),
+          lastError: lastError ? String(lastError) : null
+        }, 'Client approval insufficient after retries');
+        
         return res.status(400).json({
           success: false,
-          error: `Client has not approved enough USDC. Need: ${priceUSDCAtomic}, Approved: ${allowance.toString()}`,
+          error: `Client has not approved enough USDC. Need: ${priceUSDCAtomic}, Approved: ${allowance.toString()}. Please ensure the approval transaction has been confirmed and try again.`,
         });
       }
 

@@ -53,7 +53,6 @@ ARG CORS_CREDENTIALS
 ARG DISABLE_RADISK
 ARG GUN_PEERS
 
-
 # Install required system packages
 RUN apk add  \
     git \
