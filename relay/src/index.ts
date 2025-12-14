@@ -169,7 +169,7 @@ async function initializeServer() {
       },
     credentials: authConfig.corsCredentials,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'token', 'X-Requested-With', 'X-Session-Token'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'token', 'X-Requested-With', 'X-Session-Token', 'X-User-Address', 'X-Deal-Upload'],
     exposedHeaders: ['X-Session-Token'],
     maxAge: 86400, // 24 hours
   };
