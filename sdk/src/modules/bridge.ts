@@ -135,9 +135,11 @@ export class BridgeModule {
    * @param userAddress User's Ethereum address
    * @returns Balance info with verification data
    */
-  public async getBalanceInfo(userAddress: string): Promise<{
-    success: boolean;
-  } & BalanceInfo> {
+  public async getBalanceInfo(userAddress: string): Promise<
+    {
+      success: boolean;
+    } & BalanceInfo
+  > {
     return this.client.get(`/api/v1/bridge/balance-info/${userAddress}`);
   }
 
@@ -201,10 +203,10 @@ export class BridgeModule {
   private computeLeaf(user: string, amount: bigint, nonce: bigint): string {
     // Simple browser-compatible keccak256
     // Note: In production, use ethers.keccak256 or similar
-    const userNormalized = user.toLowerCase().replace('0x', '');
-    const amountHex = amount.toString(16).padStart(64, '0');
-    const nonceHex = nonce.toString(16).padStart(64, '0');
-    const packed = '0x' + userNormalized.padStart(40, '0') + amountHex + nonceHex;
+    const userNormalized = user.toLowerCase().replace("0x", "");
+    const amountHex = amount.toString(16).padStart(64, "0");
+    const nonceHex = nonce.toString(16).padStart(64, "0");
+    const packed = "0x" + userNormalized.padStart(40, "0") + amountHex + nonceHex;
 
     // For browser use, we need to import keccak256 dynamically
     // This is a placeholder - client should use ethers.keccak256
@@ -216,7 +218,7 @@ export class BridgeModule {
    */
   private keccak256Packed(a: string, b: string): string {
     // Placeholder - client should use ethers.keccak256
-    const packed = a + b.replace('0x', '');
+    const packed = a + b.replace("0x", "");
     return packed; // Client should compute actual hash
   }
 
