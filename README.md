@@ -1,8 +1,10 @@
 # Shogun Relay
 
+[![CI](https://github.com/scobru/shogun-relay/actions/workflows/ci.yml/badge.svg)](https://github.com/scobru/shogun-relay/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/badge/npm-v1.9.4-blue)](https://www.npmjs.com/package/shogun-relay)
 [![License](https://img.shields.io/badge/license-MIT-yellow)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3.3-blue)](https://www.typescriptlang.org/)
+[![Tests](https://img.shields.io/badge/tests-127%20passing-brightgreen)]()
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/scobru/shogun-relay)
 
 **Shogun Relay** is a production-ready connection hub that unifies **GunDB** and **IPFS** into a single solution.
