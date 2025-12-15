@@ -1,11 +1,11 @@
-import express, { Request, Response, Router } from 'express';
-import { loggers } from '../utils/logger';
+import express, { Request, Response, Router } from "express";
+import { loggers } from "../utils/logger";
 
 const router: Router = express.Router();
 
 // Middleware per ottenere l'istanza Gun dal relay
 const getGunInstance = (req: Request): any => {
-  return req.app.get('gunInstance');
+  return req.app.get("gunInstance");
 };
 
 // Funzione helper per ottenere l'utilizzo MB off-chain
@@ -16,14 +16,18 @@ async function getOffChainMBUsage(userAddress: string, req: Request): Promise<nu
       reject(new Error("MB usage read timeout"));
     }, 10000);
 
-    gun.get("shogun").get("mbUsage").get(userAddress).once((data: any) => {
-      clearTimeout(timeoutId);
-      if (!data) {
-        resolve(0);
-      } else {
-        resolve(data.mbUsed || 0);
-      }
-    });
+    gun
+      .get("shogun")
+      .get("mbUsage")
+      .get(userAddress)
+      .once((data: any) => {
+        clearTimeout(timeoutId);
+        if (!data) {
+          resolve(0);
+        } else {
+          resolve(data.mbUsed || 0);
+        }
+      });
   });
 }
 
@@ -187,7 +191,10 @@ router.get("/user-uploads/:identifier", async (req: Request, res: Response) => {
           dataReceived = true;
           clearTimeout(timeoutId);
 
-          loggers.server.debug({ identifier, parentData, parentDataType: typeof parentData }, `🔍 Debug parent data`);
+          loggers.server.debug(
+            { identifier, parentData, parentDataType: typeof parentData },
+            `🔍 Debug parent data`
+          );
 
           if (!parentData || typeof parentData !== "object") {
             resolve({
@@ -244,34 +251,41 @@ router.post("/user-mb-usage/:identifier/reset", async (req: Request, res: Respon
     loggers.server.info({ identifier }, `🔄 Reset MB usage`);
 
     // Reset MB usage to 0
-    gun.get("shogun").get("mbUsage").get(identifier).put({
-      mbUsed: 0,
-      lastUpdated: Date.now(),
-      userAddress: identifier,
-      resetAt: Date.now(),
-    }, (ack: any) => {
-      if (ack && ack.err) {
-        loggers.server.error({ err: ack.err, identifier }, "❌ Reset MB usage error");
-        res.status(500).json({
-          success: false,
-          error: ack.err,
-        });
-      } else {
-        loggers.server.info({ identifier }, `✅ MB usage reset`);
-        res.json({
-          success: true,
-          message: "MB usage reset successfully",
-          identifier,
-          mbUsage: {
-            mbUsed: 0,
-            limit: 100,
-            remaining: 100,
-            percentage: 0,
-          },
-          timestamp: Date.now(),
-        });
-      }
-    });
+    gun
+      .get("shogun")
+      .get("mbUsage")
+      .get(identifier)
+      .put(
+        {
+          mbUsed: 0,
+          lastUpdated: Date.now(),
+          userAddress: identifier,
+          resetAt: Date.now(),
+        },
+        (ack: any) => {
+          if (ack && ack.err) {
+            loggers.server.error({ err: ack.err, identifier }, "❌ Reset MB usage error");
+            res.status(500).json({
+              success: false,
+              error: ack.err,
+            });
+          } else {
+            loggers.server.info({ identifier }, `✅ MB usage reset`);
+            res.json({
+              success: true,
+              message: "MB usage reset successfully",
+              identifier,
+              mbUsage: {
+                mbUsed: 0,
+                limit: 100,
+                remaining: 100,
+                percentage: 0,
+              },
+              timestamp: Date.now(),
+            });
+          }
+        }
+      );
   } catch (error: any) {
     const { identifier } = req.params;
     loggers.server.error({ err: error, identifier }, `💥 Reset MB usage error`);

@@ -1,4 +1,4 @@
-import { ApiClient } from '../client';
+import { ApiClient } from "../client";
 
 export class X402Module {
   private client: ApiClient;
@@ -8,7 +8,7 @@ export class X402Module {
   }
 
   public async getTiers(): Promise<any> {
-    return this.client.get('/api/v1/x402/tiers');
+    return this.client.get("/api/v1/x402/tiers");
   }
 
   public async getSubscription(userAddress: string): Promise<any> {
@@ -16,7 +16,7 @@ export class X402Module {
   }
 
   public async subscribe(userAddress: string, tier: string, payment?: any): Promise<any> {
-    return this.client.post('/api/v1/x402/subscribe', {
+    return this.client.post("/api/v1/x402/subscribe", {
       userAddress,
       tier,
       payment,
@@ -39,21 +39,25 @@ export class X402Module {
     return this.client.get(`/api/v1/x402/can-upload-verified/${userAddress}?size=${sizeMB}`);
   }
 
-  public async getRecommendation(fileSizeMB: number, durationDays: number, userAddress?: string): Promise<any> {
+  public async getRecommendation(
+    fileSizeMB: number,
+    durationDays: number,
+    userAddress?: string
+  ): Promise<any> {
     const params: any = {
       fileSizeMB,
       durationDays,
     };
     if (userAddress) params.userAddress = userAddress;
-    
-    return this.client.get('/api/v1/x402/recommend', { params });
+
+    return this.client.get("/api/v1/x402/recommend", { params });
   }
 
   public async getConfig(): Promise<any> {
-    return this.client.get('/api/v1/x402/config');
+    return this.client.get("/api/v1/x402/config");
   }
 
   public async getRelayStorage(): Promise<any> {
-    return this.client.get('/api/v1/x402/relay-storage');
+    return this.client.get("/api/v1/x402/relay-storage");
   }
 }

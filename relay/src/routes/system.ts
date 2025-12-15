@@ -273,9 +273,7 @@ router.post("/node/*", async (req, res) => {
     const gun = getGunInstance(req);
 
     if (!path || path.trim() === "") {
-      return res
-        .status(400)
-        .json({ success: false, error: "Node path cannot be empty." });
+      return res.status(400).json({ success: false, error: "Node path cannot be empty." });
     }
 
     if (data === undefined) {
@@ -322,10 +320,7 @@ router.post("/node/*", async (req, res) => {
           });
         } catch (syncError) {
           clearTimeout(timeout);
-          loggers.server.error(
-            { err: syncError, path },
-            `❌ Synchronous error in put`
-          );
+          loggers.server.error({ err: syncError, path }, `❌ Synchronous error in put`);
           reject(syncError);
         }
       });
@@ -336,10 +331,7 @@ router.post("/node/*", async (req, res) => {
     loggers.server.info({ path }, `✅ Node successfully created/updated`);
     return res.json({ success: true, path, data });
   } catch (error: any) {
-    loggers.server.error(
-      { err: error, path: req.params as any[0] },
-      `❌ Error in POST /node/*`
-    );
+    loggers.server.error({ err: error, path: req.params as any[0] }, `❌ Error in POST /node/*`);
     return res.status(500).json({
       success: false,
       error: error.message,
@@ -356,9 +348,7 @@ router.delete("/node/*", async (req, res) => {
     const gun = getGunInstance(req);
 
     if (!path || path.trim() === "") {
-      return res
-        .status(400)
-        .json({ success: false, error: "Node path cannot be empty." });
+      return res.status(400).json({ success: false, error: "Node path cannot be empty." });
     }
 
     loggers.server.debug({ path }, `🗑️ Deleting node`);
@@ -387,10 +377,7 @@ router.delete("/node/*", async (req, res) => {
           node.put(null, (ack: any) => {
             clearTimeout(timeout);
             if (ack.err) {
-              loggers.server.error(
-                { err: ack.err, path },
-                `❌ Gun delete error`
-              );
+              loggers.server.error({ err: ack.err, path }, `❌ Gun delete error`);
               reject(new Error(ack.err));
             } else {
               loggers.server.debug({ path, ack }, `✅ Gun delete success`);
@@ -399,10 +386,7 @@ router.delete("/node/*", async (req, res) => {
           });
         } catch (syncError) {
           clearTimeout(timeout);
-          loggers.server.error(
-            { err: syncError, path },
-            `❌ Synchronous error in delete`
-          );
+          loggers.server.error({ err: syncError, path }, `❌ Synchronous error in delete`);
           reject(syncError);
         }
       });
@@ -417,10 +401,7 @@ router.delete("/node/*", async (req, res) => {
       message: "Node deleted successfully",
     });
   } catch (error: any) {
-    loggers.server.error(
-      { err: error, path: req.params as any[0] },
-      `❌ Error in DELETE /node/*`
-    );
+    loggers.server.error({ err: error, path: req.params as any[0] }, `❌ Error in DELETE /node/*`);
     return res.status(500).json({
       success: false,
       error: error.message,
@@ -463,7 +444,7 @@ router.get("/logs", (req, res) => {
       let level = "info";
       let logData: any = {};
       let rawMessage = line;
-      
+
       try {
         // Try to parse JSON log format: timestamp JSON_OBJECT
         // Format: 2025-12-12T08:21:19.939018162Z {"level":"info","time":"...","pid":85,...}
@@ -471,14 +452,14 @@ router.get("/logs", (req, res) => {
         if (jsonMatch) {
           timestamp = jsonMatch[1];
           const jsonStr = jsonMatch[2];
-          
+
           try {
             logData = JSON.parse(jsonStr);
             level = logData.level || "info";
             rawMessage = jsonStr;
           } catch (parseError) {
             // If JSON parsing fails, try to extract JSON from anywhere in the line
-            const jsonStart = line.indexOf('{');
+            const jsonStart = line.indexOf("{");
             if (jsonStart !== -1) {
               const jsonStr = line.substring(jsonStart);
               try {
@@ -497,7 +478,7 @@ router.get("/logs", (req, res) => {
           }
         } else {
           // Try to find JSON object anywhere in the line
-          const jsonStart = line.indexOf('{');
+          const jsonStart = line.indexOf("{");
           if (jsonStart !== -1) {
             const jsonStr = line.substring(jsonStart);
             try {
@@ -570,10 +551,7 @@ router.delete("/logs", (req, res) => {
       // Clear GunDB logs only (file logs are managed by the system)
       logsNode.put(null, (ack: any) => {
         if (ack.err) {
-          loggers.server.error(
-            { err: ack.err },
-            "❌ Error clearing GunDB logs"
-          );
+          loggers.server.error({ err: ack.err }, "❌ Error clearing GunDB logs");
           res.status(500).json({
             success: false,
             error: ack.err,
@@ -582,8 +560,7 @@ router.delete("/logs", (req, res) => {
           loggers.server.info("✅ GunDB logs cleared successfully");
           res.json({
             success: true,
-            message:
-              "GunDB logs cleared successfully (file logs are managed by the system)",
+            message: "GunDB logs cleared successfully (file logs are managed by the system)",
             timestamp: Date.now(),
           });
         }
@@ -679,8 +656,7 @@ router.post("/rpc/execute", async (req, res) => {
     if (!request.method || !request.jsonrpc) {
       return res.status(400).json({
         success: false,
-        error:
-          "Invalid RPC request format. Must include 'method' and 'jsonrpc'",
+        error: "Invalid RPC request format. Must include 'method' and 'jsonrpc'",
       });
     }
 
@@ -711,7 +687,6 @@ router.post("/rpc/execute", async (req, res) => {
   }
 });
 
-
 // Contracts endpoint
 router.get("/contracts", async (req, res) => {
   try {
@@ -724,7 +699,7 @@ router.get("/contracts", async (req, res) => {
       return res.status(404).json({
         success: false,
         error: `No configuration found for chain ID ${chainId}`,
-        chainId
+        chainId,
       });
     }
 
@@ -734,7 +709,6 @@ router.get("/contracts", async (req, res) => {
       contracts: contractsConfig,
       timestamp: Date.now(),
     });
-
   } catch (error: any) {
     loggers.server.error({ err: error }, "❌ Contracts GET error");
     res.status(500).json({

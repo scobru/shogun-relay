@@ -33,7 +33,7 @@ import {
   createStorageDealRegistryClientWithSigner,
 } from "../utils/registry-client";
 import * as DealSync from "../utils/deal-sync";
-import { loggers } from "../utils/logger"
+import { loggers } from "../utils/logger";
 import {
   blockchainConfig,
   ipfsConfig,
@@ -70,9 +70,7 @@ function cacheDeal(deal: Deal) {
 }
 
 function getCachedDeal(dealId: string): Deal | null {
-  const entry = pendingDealsCache.get(dealId) as
-    | { deal: Deal; cachedAt: number }
-    | undefined;
+  const entry = pendingDealsCache.get(dealId) as { deal: Deal; cachedAt: number } | undefined;
   if (entry && Date.now() - entry.cachedAt < CACHE_TTL) {
     return entry.deal;
   }
@@ -93,9 +91,7 @@ function removeCachedDeal(dealId: string) {
  */
 async function applyTierFeatures(deal: Deal, req: Request) {
   if (!req || !req.app) {
-    loggers.server.warn(
-      "⚠️ Request context not available, skipping tier features"
-    );
+    loggers.server.warn("⚠️ Request context not available, skipping tier features");
     return;
   }
 
@@ -113,9 +109,7 @@ async function applyTierFeatures(deal: Deal, req: Request) {
     { dealId: deal.id, erasureCoding: shouldApplyErasure, replicationFactor },
     `🔧 Applying tier features for deal ${deal.id}:`
   );
-  loggers.server.debug(
-    `   - Erasure Coding: ${shouldApplyErasure ? "Yes" : "No"}`
-  );
+  loggers.server.debug(`   - Erasure Coding: ${shouldApplyErasure ? "Yes" : "No"}`);
   loggers.server.debug(`   - Replication Factor: ${replicationFactor}x`);
 
   // Apply erasure coding if enabled
@@ -124,25 +118,15 @@ async function applyTierFeatures(deal: Deal, req: Request) {
       loggers.server.info({ cid }, `📦 Applying erasure coding to CID: ${cid}`);
 
       // Helper function to download from IPFS
-      const downloadFromIPFS = async (
-        cidToDownload: string
-      ): Promise<Buffer> => {
-        const result = await ipfsRequest(
-          `/cat?arg=${encodeURIComponent(cidToDownload)}`,
-          {
-            responseType: "arraybuffer",
-          }
-        );
-        return Buffer.isBuffer(result)
-          ? result
-          : Buffer.from(result as ArrayBuffer);
+      const downloadFromIPFS = async (cidToDownload: string): Promise<Buffer> => {
+        const result = await ipfsRequest(`/cat?arg=${encodeURIComponent(cidToDownload)}`, {
+          responseType: "arraybuffer",
+        });
+        return Buffer.isBuffer(result) ? result : Buffer.from(result as ArrayBuffer);
       };
 
       // Helper function to upload buffer to IPFS
-      const uploadToIPFS = async (
-        buffer: Buffer,
-        filename = "chunk"
-      ): Promise<string> => {
+      const uploadToIPFS = async (buffer: Buffer, filename = "chunk"): Promise<string> => {
         const form = new FormData();
         form.append("file", buffer, {
           filename: filename,
@@ -188,10 +172,7 @@ async function applyTierFeatures(deal: Deal, req: Request) {
 
       // Upload data chunks
       for (let i = 0; i < encoded.dataChunks.length; i++) {
-        const chunkCid = await uploadToIPFS(
-          encoded.dataChunks[i],
-          `data-chunk-${i}`
-        );
+        const chunkCid = await uploadToIPFS(encoded.dataChunks[i], `data-chunk-${i}`);
         const chunkInfo = encoded.chunks[i]; // chunkInfos array has metadata
         chunkCids.push({
           type: "data",
@@ -209,10 +190,7 @@ async function applyTierFeatures(deal: Deal, req: Request) {
       // Upload parity chunks
       for (let i = 0; i < encoded.parityChunks.length; i++) {
         const parityIndex = encoded.dataChunkCount + i;
-        const parityCid = await uploadToIPFS(
-          encoded.parityChunks[i],
-          `parity-chunk-${i}`
-        );
+        const parityCid = await uploadToIPFS(encoded.parityChunks[i], `parity-chunk-${i}`);
         const chunkInfo = encoded.chunks[parityIndex]; // chunkInfos includes both data and parity
         chunkCids.push({
           type: "parity",
@@ -264,12 +242,8 @@ async function applyTierFeatures(deal: Deal, req: Request) {
         `✅ Erasure coding completed successfully for deal ${deal.id}`
       );
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      loggers.server.error(
-        { err: error, dealId: deal.id, cid },
-        `❌ Erasure coding failed`
-      );
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      loggers.server.error({ err: error, dealId: deal.id, cid }, `❌ Erasure coding failed`);
       // Don't throw - deal is still active without erasure coding
       // But log the error for debugging
       (deal as any).erasureCodingError = {
@@ -305,11 +279,7 @@ async function applyTierFeatures(deal: Deal, req: Request) {
           dealId: deal.id,
         };
 
-        gun
-          .get("shogun-network")
-          .get("pin-requests")
-          .get(requestId)
-          .put(pinRequest);
+        gun.get("shogun-network").get("pin-requests").get(requestId).put(pinRequest);
         loggers.server.info(
           { cid, replicationFactor, requestId },
           `✅ Replication request published: ${cid} (${replicationFactor}x)`
@@ -325,16 +295,10 @@ async function applyTierFeatures(deal: Deal, req: Request) {
           await StorageDeals.saveDeal(gun, deal, (relayUser as any)._?.sea);
         }
       } else {
-        loggers.server.info(
-          { cid },
-          `⚠️ Auto-replication disabled - replication not requested`
-        );
+        loggers.server.info({ cid }, `⚠️ Auto-replication disabled - replication not requested`);
       }
     } catch (error: unknown) {
-      loggers.server.error(
-        { err: error, cid },
-        `❌ Replication request failed`
-      );
+      loggers.server.error({ err: error, cid }, `❌ Replication request failed`);
       // Don't throw - deal is still active without replication
     }
   }
@@ -360,9 +324,7 @@ router.get("/pricing", (req: Request, res: Response) => {
     const tierRaw = req.query.tier;
 
     const sizeMB = Array.isArray(sizeMBRaw) ? sizeMBRaw[0] : sizeMBRaw;
-    const durationDays = Array.isArray(durationDaysRaw)
-      ? durationDaysRaw[0]
-      : durationDaysRaw;
+    const durationDays = Array.isArray(durationDaysRaw) ? durationDaysRaw[0] : durationDaysRaw;
     const tier = Array.isArray(tierRaw) ? tierRaw[0] : tierRaw;
 
     // If parameters provided, calculate specific price
@@ -404,21 +366,17 @@ router.get("/pricing", (req: Request, res: Response) => {
  */
 router.post("/upload", dealUpload.single("file"), async (req, res) => {
   try {
-    const walletAddress =
-      req.headers["x-wallet-address"] || req.body.walletAddress;
+    const walletAddress = req.headers["x-wallet-address"] || req.body.walletAddress;
 
     if (!walletAddress) {
       return res.status(400).json({
         success: false,
-        error:
-          "Wallet address required (x-wallet-address header or walletAddress body param)",
+        error: "Wallet address required (x-wallet-address header or walletAddress body param)",
       });
     }
 
     if (!req.file) {
-      return res
-        .status(400)
-        .json({ success: false, error: "No file provided" });
+      return res.status(400).json({ success: false, error: "No file provided" });
     }
 
     loggers.server.info(
@@ -487,8 +445,7 @@ router.get("/overhead", (req: Request, res: Response) => {
       overhead: {
         ...overhead,
         originalSizeMB: sizeMB,
-        totalSizeMB:
-          Math.round((overhead.totalSize / (1024 * 1024)) * 100) / 100,
+        totalSizeMB: Math.round((overhead.totalSize / (1024 * 1024)) * 100) / 100,
       },
     });
   } catch (error: unknown) {
@@ -540,8 +497,7 @@ router.post("/create", express.json(), async (req, res) => {
     if (!cid || !clientAddress || !sizeMB || !durationDays) {
       return res.status(400).json({
         success: false,
-        error:
-          "Missing required fields: cid, clientAddress, sizeMB, durationDays",
+        error: "Missing required fields: cid, clientAddress, sizeMB, durationDays",
       });
     }
 
@@ -578,14 +534,10 @@ router.post("/create", express.json(), async (req, res) => {
           try {
             const gun = req.app.get("gunInstance");
             if (gun && relayInfo.host) {
-              selectedRelayReputation = await Reputation.getReputation(
-                gun,
-                relayInfo.host
-              );
+              selectedRelayReputation = await Reputation.getReputation(gun, relayInfo.host);
             }
           } catch (repError: unknown) {
-            const repErrorMessage =
-              repError instanceof Error ? repError.message : String(repError);
+            const repErrorMessage = repError instanceof Error ? repError.message : String(repError);
             loggers.server.warn(
               { err: repError, relayAddress },
               "Could not fetch reputation for selected relay"
@@ -598,8 +550,7 @@ router.post("/create", express.json(), async (req, res) => {
           });
         }
       } catch (error: unknown) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         console.error("Error verifying relay address:", error);
         return res.status(400).json({
           success: false,
@@ -615,12 +566,8 @@ router.post("/create", express.json(), async (req, res) => {
           selectedRelayReputation = await Reputation.getReputation(gun, host);
         }
       } catch (repError: unknown) {
-        const repErrorMessage =
-          repError instanceof Error ? repError.message : String(repError);
-        loggers.server.warn(
-          { err: repError },
-          "Could not fetch reputation for current relay"
-        );
+        const repErrorMessage = repError instanceof Error ? repError.message : String(repError);
+        loggers.server.warn({ err: repError }, "Could not fetch reputation for current relay");
       }
     }
 
@@ -662,10 +609,7 @@ router.post("/create", express.json(), async (req, res) => {
     // Get the relay's wallet address for payment
     let relayWalletAddress = null;
     if (RELAY_PRIVATE_KEY && REGISTRY_CHAIN_ID) {
-      const registryClient = createRegistryClientWithSigner(
-        RELAY_PRIVATE_KEY,
-        REGISTRY_CHAIN_ID
-      );
+      const registryClient = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
       relayWalletAddress = registryClient.wallet.address;
     }
 
@@ -682,12 +626,10 @@ router.post("/create", express.json(), async (req, res) => {
               selectedRelayReputation.proofsTotal &&
               selectedRelayReputation.proofsTotal > 0 &&
               selectedRelayReputation.proofsSuccessful !== undefined
-                ? (selectedRelayReputation.proofsSuccessful /
-                    selectedRelayReputation.proofsTotal) *
+                ? (selectedRelayReputation.proofsSuccessful / selectedRelayReputation.proofsTotal) *
                   100
                 : null,
-            avgResponseTimeMs:
-              selectedRelayReputation.avgResponseTimeMs || null,
+            avgResponseTimeMs: selectedRelayReputation.avgResponseTimeMs || null,
           },
         }
       : null;
@@ -807,41 +749,47 @@ router.post("/:dealId/activate", express.json(), async (req, res) => {
       const storageDealRegistryClient = createStorageDealRegistryClient(
         parseInt(String(REGISTRY_CHAIN_ID))
       );
-      
+
       // Use the registry address from SDK (same as frontend uses)
-      const registryAddressFromSDK = storageDealRegistryClient.sdk.getStorageDealRegistry().getAddress();
-      
+      const registryAddressFromSDK = storageDealRegistryClient.sdk
+        .getStorageDealRegistry()
+        .getAddress();
+
       // Use the same provider as storageDealRegistryClient (not registryClient.provider)
       // This ensures we're using the same RPC endpoint and will see the same state
       const usdcContract = new ethers.Contract(
         storageDealRegistryClient.usdcAddress,
-        [
-          "function allowance(address owner, address spender) view returns (uint256)",
-        ],
+        ["function allowance(address owner, address spender) view returns (uint256)"],
         storageDealRegistryClient.provider // Use same provider as storageDealRegistryClient
       );
 
       const priceUSDCAtomic = Math.ceil(deal.pricing.totalPriceUSDC * 1000000);
-      
+
       // storageDealRegistryClient.registryAddress is now always from SDK (same as frontend uses)
       const registryAddress = storageDealRegistryClient.registryAddress;
-      
+
       // Log detailed information for debugging
-      loggers.server.info({
-        dealId,
-        clientAddress: deal.clientAddress,
-        registryAddress: registryAddress, // Always from SDK now
-        usdcAddress: storageDealRegistryClient.usdcAddress,
-        priceUSDC: deal.pricing.totalPriceUSDC,
-        priceUSDCAtomic: priceUSDCAtomic.toString(),
-        rpcUrl: storageDealRegistryClient.provider.connection?.url || storageDealRegistryClient.provider._getConnection?.()?.url || 'unknown'
-      }, `🔍 Checking allowance - Registry: ${registryAddress}, Client: ${deal.clientAddress}`);
-      
+      loggers.server.info(
+        {
+          dealId,
+          clientAddress: deal.clientAddress,
+          registryAddress: registryAddress, // Always from SDK now
+          usdcAddress: storageDealRegistryClient.usdcAddress,
+          priceUSDC: deal.pricing.totalPriceUSDC,
+          priceUSDCAtomic: priceUSDCAtomic.toString(),
+          rpcUrl:
+            storageDealRegistryClient.provider.connection?.url ||
+            storageDealRegistryClient.provider._getConnection?.()?.url ||
+            "unknown",
+        },
+        `🔍 Checking allowance - Registry: ${registryAddress}, Client: ${deal.clientAddress}`
+      );
+
       // Retry allowance check with exponential backoff (RPC nodes may lag behind)
       let allowance = 0n;
       let retries = 3;
       let lastError = null;
-      
+
       while (retries > 0) {
         try {
           // Use SDK address (same as frontend)
@@ -849,56 +797,71 @@ router.post("/:dealId/activate", express.json(), async (req, res) => {
             deal.clientAddress,
             registryAddressFromSDK // Use SDK address instead of config address
           );
-          
-          loggers.server.info({
-            dealId,
-            clientAddress: deal.clientAddress,
-            registryAddress: registryAddressFromSDK, // Use SDK address
-            allowance: allowance.toString(),
-            allowanceUSDC: (Number(allowance) / 1000000).toFixed(6),
-            required: priceUSDCAtomic.toString(),
-            requiredUSDC: (priceUSDCAtomic / 1000000).toFixed(6),
-            attempt: 4 - retries
-          }, `Allowance check: ${allowance.toString()} (${(Number(allowance) / 1000000).toFixed(6)} USDC) - need ${priceUSDCAtomic} (${(priceUSDCAtomic / 1000000).toFixed(6)} USDC)`);
-          
+
+          loggers.server.info(
+            {
+              dealId,
+              clientAddress: deal.clientAddress,
+              registryAddress: registryAddressFromSDK, // Use SDK address
+              allowance: allowance.toString(),
+              allowanceUSDC: (Number(allowance) / 1000000).toFixed(6),
+              required: priceUSDCAtomic.toString(),
+              requiredUSDC: (priceUSDCAtomic / 1000000).toFixed(6),
+              attempt: 4 - retries,
+            },
+            `Allowance check: ${allowance.toString()} (${(Number(allowance) / 1000000).toFixed(6)} USDC) - need ${priceUSDCAtomic} (${(priceUSDCAtomic / 1000000).toFixed(6)} USDC)`
+          );
+
           if (allowance >= BigInt(priceUSDCAtomic)) {
             break; // Sufficient allowance found
           }
-          
+
           // If insufficient and we have retries left, wait and retry
           if (retries > 1) {
             const waitTime = (4 - retries) * 2000; // 2s, 4s, 6s
-            loggers.server.warn({
-              dealId,
-              allowance: allowance.toString(),
-              required: priceUSDCAtomic.toString(),
-              waitTime
-            }, `Insufficient allowance, waiting ${waitTime}ms before retry...`);
-            await new Promise(resolve => setTimeout(resolve, waitTime));
+            loggers.server.warn(
+              {
+                dealId,
+                allowance: allowance.toString(),
+                required: priceUSDCAtomic.toString(),
+                waitTime,
+              },
+              `Insufficient allowance, waiting ${waitTime}ms before retry...`
+            );
+            await new Promise((resolve) => setTimeout(resolve, waitTime));
           }
         } catch (error) {
           lastError = error;
-          loggers.server.warn({ dealId, error: String(error) }, 'Error checking allowance, retrying...');
+          loggers.server.warn(
+            { dealId, error: String(error) },
+            "Error checking allowance, retrying..."
+          );
           if (retries > 1) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise((resolve) => setTimeout(resolve, 2000));
           }
         }
         retries--;
       }
 
       if (allowance < BigInt(priceUSDCAtomic)) {
-        loggers.server.error({
-          dealId,
-          clientAddress: deal.clientAddress,
-          registryAddress: registryAddress,
-          allowance: allowance.toString(),
-          allowanceUSDC: (Number(allowance) / 1000000).toFixed(6),
-          required: priceUSDCAtomic.toString(),
-          requiredUSDC: (priceUSDCAtomic / 1000000).toFixed(6),
-          lastError: lastError ? String(lastError) : null,
-          rpcUrl: storageDealRegistryClient.provider.connection?.url || storageDealRegistryClient.provider._getConnection?.()?.url || 'unknown'
-        }, 'Client approval insufficient after retries');
-        
+        loggers.server.error(
+          {
+            dealId,
+            clientAddress: deal.clientAddress,
+            registryAddress: registryAddress,
+            allowance: allowance.toString(),
+            allowanceUSDC: (Number(allowance) / 1000000).toFixed(6),
+            required: priceUSDCAtomic.toString(),
+            requiredUSDC: (priceUSDCAtomic / 1000000).toFixed(6),
+            lastError: lastError ? String(lastError) : null,
+            rpcUrl:
+              storageDealRegistryClient.provider.connection?.url ||
+              storageDealRegistryClient.provider._getConnection?.()?.url ||
+              "unknown",
+          },
+          "Client approval insufficient after retries"
+        );
+
         return res.status(400).json({
           success: false,
           error: `Client has not approved enough USDC. Need: ${(priceUSDCAtomic / 1000000).toFixed(6)} USDC (${priceUSDCAtomic} atomic), Approved: ${(Number(allowance) / 1000000).toFixed(6)} USDC (${allowance.toString()} atomic). Registry: ${registryAddress}. Please ensure the approval transaction has been confirmed and try again.`,
@@ -910,8 +873,7 @@ router.post("/:dealId/activate", express.json(), async (req, res) => {
         `✅ Client approval verified: ${allowance.toString()} USDC approved`
       );
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.warn(`⚠️ Could not verify approval: ${errorMessage}`);
       // Continue anyway - contract will fail if approval insufficient
     }
@@ -934,11 +896,10 @@ router.post("/:dealId/activate", express.json(), async (req, res) => {
         { dealId },
         `📝 Registering deal ${dealId} on-chain via StorageDealRegistry...`
       );
-      const storageDealRegistryClient =
-        createStorageDealRegistryClientWithSigner(
-          RELAY_PRIVATE_KEY,
-          parseInt(String(REGISTRY_CHAIN_ID))
-        );
+      const storageDealRegistryClient = createStorageDealRegistryClientWithSigner(
+        RELAY_PRIVATE_KEY,
+        parseInt(String(REGISTRY_CHAIN_ID))
+      );
 
       // Convert price from USDC (6 decimals) to atomic units
       const priceUSDCAtomic = Math.ceil(deal.pricing.totalPriceUSDC * 1000000);
@@ -969,9 +930,7 @@ router.post("/:dealId/activate", express.json(), async (req, res) => {
         `✅ Deal registered on-chain via StorageDealRegistry. TX: ${onChainResult.txHash}`
       );
       loggers.server.debug(`   Original Deal ID: ${deal.id}`);
-      loggers.server.debug(
-        `   On-Chain Deal ID (bytes32): ${onChainResult.dealIdBytes32}`
-      );
+      loggers.server.debug(`   On-Chain Deal ID (bytes32): ${onChainResult.dealIdBytes32}`);
 
       // Activate deal with on-chain transaction hash as payment proof
       activatedDeal = StorageDeals.activateDeal(deal);
@@ -994,21 +953,13 @@ router.post("/:dealId/activate", express.json(), async (req, res) => {
         }
       } catch (updateError: unknown) {
         const updateErrorMessage =
-          updateError instanceof Error
-            ? updateError.message
-            : String(updateError);
-        console.warn(
-          `⚠️ Failed to update deal with on-chain info: ${updateErrorMessage}`
-        );
+          updateError instanceof Error ? updateError.message : String(updateError);
+        console.warn(`⚠️ Failed to update deal with on-chain info: ${updateErrorMessage}`);
       }
     } catch (onChainError: unknown) {
       const onChainErrorMessage =
-        onChainError instanceof Error
-          ? onChainError.message
-          : String(onChainError);
-      console.error(
-        `❌ Failed to register deal on-chain: ${onChainErrorMessage}`
-      );
+        onChainError instanceof Error ? onChainError.message : String(onChainError);
+      console.error(`❌ Failed to register deal on-chain: ${onChainErrorMessage}`);
       // If on-chain registration fails, we can't activate the deal
       return res.status(500).json({
         success: false,
@@ -1032,18 +983,11 @@ router.post("/:dealId/activate", express.json(), async (req, res) => {
         const seaKey = (relayUser as any)?._?.sea;
         if (seaKey) {
           await StorageDeals.saveDeal(gun, activatedDeal, seaKey);
-          loggers.server.info(
-            { dealId },
-            `✅ Deal saved to GunDB successfully`
-          );
+          loggers.server.info({ dealId }, `✅ Deal saved to GunDB successfully`);
         }
       } catch (saveError: unknown) {
-        const errorMessage =
-          saveError instanceof Error ? saveError.message : String(saveError);
-        loggers.server.error(
-          { err: saveError, dealId },
-          `⚠️ Error saving activated deal to GunDB`
-        );
+        const errorMessage = saveError instanceof Error ? saveError.message : String(saveError);
+        loggers.server.error({ err: saveError, dealId }, `⚠️ Error saving activated deal to GunDB`);
         saveWarning =
           "Payment processed successfully, but there was a temporary issue saving the deal. It will be retried automatically.";
         // Still continue - payment was successful
@@ -1091,18 +1035,12 @@ router.post("/:dealId/activate", express.json(), async (req, res) => {
                   // IPFS will fetch the content from network if not available locally
                   resolve(result);
                 } catch (e) {
-                  loggers.server.info(
-                    { dealId, cid: deal.cid, data },
-                    `✅ CID ${deal.cid} pinned`
-                  );
+                  loggers.server.info({ dealId, cid: deal.cid, data }, `✅ CID ${deal.cid} pinned`);
                   resolve(data);
                 }
               } else {
                 // Check if error is "already pinned"
-                if (
-                  data.includes("already pinned") ||
-                  data.includes("is already pinned")
-                ) {
+                if (data.includes("already pinned") || data.includes("is already pinned")) {
                   loggers.server.info(
                     { dealId, cid: deal.cid },
                     `ℹ️ CID ${deal.cid} was already pinned`
@@ -1136,8 +1074,7 @@ router.post("/:dealId/activate", express.json(), async (req, res) => {
           req.end();
         });
       } catch (pinError: unknown) {
-        const pinErrorMessage =
-          pinError instanceof Error ? pinError.message : String(pinError);
+        const pinErrorMessage = pinError instanceof Error ? pinError.message : String(pinError);
         loggers.server.warn(
           { dealId, cid: deal.cid, err: pinErrorMessage },
           `⚠️ Error pinning CID ${deal.cid}`
@@ -1177,10 +1114,7 @@ router.post("/:dealId/activate", express.json(), async (req, res) => {
         paymentTx: activatedDeal.paymentTx,
         onChainRegistered: onChainRegistered,
       },
-      message:
-        warnings.length > 0
-          ? warnings.join(" ")
-          : "Deal activated successfully",
+      message: warnings.length > 0 ? warnings.join(" ") : "Deal activated successfully",
       warning: warnings.length > 0 ? warnings.join(" ") : undefined,
     });
   } catch (error: unknown) {
@@ -1200,9 +1134,7 @@ router.get("/by-cid/:cid", async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(503)
-        .json({ success: false, error: "Gun not available" });
+      return res.status(503).json({ success: false, error: "Gun not available" });
     }
 
     const { cid } = req.params;
@@ -1231,9 +1163,7 @@ router.get("/by-client/:address", async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(503)
-        .json({ success: false, error: "Gun not available" });
+      return res.status(503).json({ success: false, error: "Gun not available" });
     }
 
     const { address } = req.params;
@@ -1252,13 +1182,10 @@ router.get("/by-client/:address", async (req, res) => {
     // STEP 1: Fetch from on-chain StorageDealRegistry (source of truth)
     let onChainDeals = [];
     try {
-      const storageDealRegistryClient =
-        createStorageDealRegistryClient(chainId);
+      const storageDealRegistryClient = createStorageDealRegistryClient(chainId);
       // Normalize address to checksum format for consistency with on-chain storage
       const normalizedAddressForQuery = ethers.getAddress(address);
-      onChainDeals = await storageDealRegistryClient.getClientDeals(
-        normalizedAddressForQuery
-      );
+      onChainDeals = await storageDealRegistryClient.getClientDeals(normalizedAddressForQuery);
 
       loggers.server.info(
         {
@@ -1269,9 +1196,7 @@ router.get("/by-client/:address", async (req, res) => {
       );
     } catch (onChainError: unknown) {
       const onChainErrorMessage =
-        onChainError instanceof Error
-          ? onChainError.message
-          : String(onChainError);
+        onChainError instanceof Error ? onChainError.message : String(onChainError);
       console.warn(`⚠️ Failed to fetch on-chain deals: ${onChainErrorMessage}`);
       // Continue with GunDB fallback
     }
@@ -1287,20 +1212,13 @@ router.get("/by-client/:address", async (req, res) => {
       let gunDeal = null;
 
       // Strategy 1: Search all GunDB deals for this client and match by onChainDealId
-      const gunDealsByClient = await StorageDeals.getDealsByClient(
-        gun,
-        address
-      );
-      gunDeal = gunDealsByClient.find(
-        (d) => d.onChainDealId === onChainDeal.dealId
-      );
+      const gunDealsByClient = await StorageDeals.getDealsByClient(gun, address);
+      gunDeal = gunDealsByClient.find((d) => d.onChainDealId === onChainDeal.dealId);
 
       // Strategy 2: If not found, try matching by CID + client address
       if (!gunDeal) {
         gunDeal = gunDealsByClient.find(
-          (d) =>
-            d.clientAddress?.toLowerCase() === normalizedAddress &&
-            d.cid === onChainDeal.cid
+          (d) => d.clientAddress?.toLowerCase() === normalizedAddress && d.cid === onChainDeal.cid
         );
       }
 
@@ -1374,8 +1292,7 @@ router.get("/by-client/:address", async (req, res) => {
           providerPub: null, // Not available from on-chain
           sizeMB: onChainDeal.sizeMB,
           durationDays: Math.ceil(
-            (Number(onChainDeal.expiresAt) - Number(onChainDeal.createdAt)) /
-              (1000 * 60 * 60 * 24)
+            (Number(onChainDeal.expiresAt) - Number(onChainDeal.createdAt)) / (1000 * 60 * 60 * 24)
           ),
           tier: "unknown", // Not stored on-chain
           pricing: {
@@ -1414,10 +1331,7 @@ router.get("/by-client/:address", async (req, res) => {
     const cachedDeals = [];
     for (const [dealId, entry] of pendingDealsCache) {
       const deal = entry.deal;
-      if (
-        deal.clientAddress &&
-        deal.clientAddress.toLowerCase() === normalizedAddress
-      ) {
+      if (deal.clientAddress && deal.clientAddress.toLowerCase() === normalizedAddress) {
         cachedDeals.push(deal);
       }
     }
@@ -1488,9 +1402,7 @@ router.get("/relay/active", async (req, res) => {
     const relayPub = getRelayPub();
 
     if (!gun || !relayPub) {
-      return res
-        .status(503)
-        .json({ success: false, error: "Relay not initialized" });
+      return res.status(503).json({ success: false, error: "Relay not initialized" });
     }
 
     const deals = await StorageDeals.getActiveDealsForRelay(gun, relayPub);
@@ -1518,19 +1430,14 @@ router.get("/stats", async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(503)
-        .json({ success: false, error: "Gun not available" });
+      return res.status(503).json({ success: false, error: "Gun not available" });
     }
 
     // Get all deals from GunDB (across all relays)
     const allDeals: any[] = [];
     const timeoutRaw = req.query.timeout;
     const timeout = timeoutRaw
-      ? parseInt(
-          String(Array.isArray(timeoutRaw) ? timeoutRaw[0] : timeoutRaw),
-          10
-        )
+      ? parseInt(String(Array.isArray(timeoutRaw) ? timeoutRaw[0] : timeoutRaw), 10)
       : 5000;
 
     await new Promise<void>((resolve) => {
@@ -1542,12 +1449,7 @@ router.get("/stats", async (req, res) => {
         .get("frozen-storage-deals")
         .map()
         .once((entry: any, hash: string) => {
-          if (
-            entry &&
-            entry.data &&
-            typeof entry.data === "object" &&
-            entry.data.cid
-          ) {
+          if (entry && entry.data && typeof entry.data === "object" && entry.data.cid) {
             // Extract deal data from frozen entry
             const deal = entry.data;
             allDeals.push({ id: deal.id || hash, ...deal });
@@ -1611,9 +1513,7 @@ router.get("/leaderboard", async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(503)
-        .json({ success: false, error: "Gun not available" });
+      return res.status(503).json({ success: false, error: "Gun not available" });
     }
 
     const limitRaw = req.query.limit;
@@ -1632,10 +1532,7 @@ router.get("/leaderboard", async (req, res) => {
     const timeout = parseInt(String(timeoutStr)) || 5000;
 
     // Get all relays and their deal stats
-    const relayStats = new Map<
-      string,
-      { relayPub: string; host: string; deals: any[] }
-    >(); // host -> { deals, stats }
+    const relayStats = new Map<string, { relayPub: string; host: string; deals: any[] }>(); // host -> { deals, stats }
 
     await new Promise<void>((resolve) => {
       const timer = setTimeout(() => resolve(undefined), timeout);
@@ -1722,9 +1619,7 @@ router.get("/:dealId", async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(503)
-        .json({ success: false, error: "Gun not available" });
+      return res.status(503).json({ success: false, error: "Gun not available" });
     }
 
     const { dealId } = req.params;
@@ -1753,10 +1648,7 @@ router.get("/:dealId", async (req, res) => {
         isExpired,
         needsRenewal,
         daysRemaining: deal.expiresAt
-          ? Math.max(
-              0,
-              Math.ceil((deal.expiresAt - Date.now()) / (24 * 60 * 60 * 1000))
-            )
+          ? Math.max(0, Math.ceil((deal.expiresAt - Date.now()) / (24 * 60 * 60 * 1000)))
           : null,
       },
     });
@@ -1777,9 +1669,7 @@ router.post("/:dealId/renew", express.json(), async (req, res) => {
     const relayUser = getRelayUser();
 
     if (!gun || !relayUser) {
-      return res
-        .status(503)
-        .json({ success: false, error: "Relay not initialized" });
+      return res.status(503).json({ success: false, error: "Relay not initialized" });
     }
 
     const { dealId } = req.params;
@@ -1799,10 +1689,7 @@ router.post("/:dealId/renew", express.json(), async (req, res) => {
     }
 
     // Calculate renewal price
-    const renewalPricing = StorageDeals.calculateRenewalPrice(
-      deal,
-      parseInt(additionalDays)
-    );
+    const renewalPricing = StorageDeals.calculateRenewalPrice(deal, parseInt(additionalDays));
 
     // If no payment, return payment requirements
     if (!payment) {
@@ -1813,9 +1700,7 @@ router.post("/:dealId/renew", express.json(), async (req, res) => {
           x402Version: 1,
           scheme: "exact",
           network: x402Config.network || "base-sepolia",
-          maxAmountRequired: Math.ceil(
-            (renewalPricing as any).totalPriceUSDC * 1000000
-          ).toString(),
+          maxAmountRequired: Math.ceil((renewalPricing as any).totalPriceUSDC * 1000000).toString(),
           resource: `deal-renewal-${dealId}`,
           description: `Renewal: ${additionalDays} additional days`,
           payTo: x402Config.payToAddress,
@@ -1826,9 +1711,7 @@ router.post("/:dealId/renew", express.json(), async (req, res) => {
     // Verify and settle payment (similar to activate)
     const payToAddress = x402Config.payToAddress;
     if (!payToAddress) {
-      return res
-        .status(500)
-        .json({ success: false, error: "X402_PAY_TO_ADDRESS not configured" });
+      return res.status(500).json({ success: false, error: "X402_PAY_TO_ADDRESS not configured" });
     }
     const merchant = new X402Merchant({
       payToAddress,
@@ -1886,9 +1769,7 @@ router.get("/:dealId/verify", async (req, res) => {
     let { dealId } = req.params;
     const gun = req.app.get("gunInstance");
     const IPFS_API_URL =
-      req.app.get("IPFS_API_URL") ||
-      ipfsConfig.apiUrl ||
-      "http://127.0.0.1:5001";
+      req.app.get("IPFS_API_URL") || ipfsConfig.apiUrl || "http://127.0.0.1:5001";
     const IPFS_API_TOKEN = req.app.get("IPFS_API_TOKEN") || ipfsConfig.apiToken;
 
     // Handle on-chain deal IDs (remove "onchain_" prefix if present)
@@ -1908,17 +1789,13 @@ router.get("/:dealId/verify", async (req, res) => {
       try {
         const REGISTRY_CHAIN_ID = blockchainConfig.registryChainId;
         if (REGISTRY_CHAIN_ID) {
-          const { createStorageDealRegistryClient } =
-            await import("../utils/registry-client.js");
+          const { createStorageDealRegistryClient } = await import("../utils/registry-client.js");
           const { ethers } = await import("ethers");
           const storageDealRegistryClient = createStorageDealRegistryClient(
             parseInt(String(REGISTRY_CHAIN_ID))
           );
 
-          loggers.server.info(
-            { dealId },
-            `🔍 Searching for on-chain deal with ID: ${dealId}`
-          );
+          loggers.server.info({ dealId }, `🔍 Searching for on-chain deal with ID: ${dealId}`);
 
           // Try multiple strategies to find the deal
           let onChainDeal = null;
@@ -1958,10 +1835,7 @@ router.get("/:dealId/verify", async (req, res) => {
               const paddedId = dealId.padEnd(66, "0");
               onChainDeal = await storageDealRegistryClient.getDeal(paddedId);
               if (onChainDeal && onChainDeal.createdAt) {
-                loggers.server.info(
-                  { dealId, paddedId },
-                  `✅ Found deal using padded dealId`
-                );
+                loggers.server.info({ dealId, paddedId }, `✅ Found deal using padded dealId`);
                 dealId = paddedId; // Update dealId for consistency
               }
             } catch (e: unknown) {
@@ -1979,10 +1853,7 @@ router.get("/:dealId/verify", async (req, res) => {
               const hashedId = ethers.id(dealId);
               onChainDeal = await storageDealRegistryClient.getDeal(hashedId);
               if (onChainDeal && onChainDeal.createdAt) {
-                loggers.server.info(
-                  { dealId, hashedId },
-                  `✅ Found deal using hashed dealId`
-                );
+                loggers.server.info({ dealId, hashedId }, `✅ Found deal using hashed dealId`);
                 dealId = hashedId; // Update dealId for consistency
               }
             } catch (e: unknown) {
@@ -2004,8 +1875,7 @@ router.get("/:dealId/verify", async (req, res) => {
                   ? clientAddressRaw
                   : "";
               if (clientAddress) {
-                const clientDeals =
-                  await storageDealRegistryClient.getClientDeals(clientAddress);
+                const clientDeals = await storageDealRegistryClient.getClientDeals(clientAddress);
                 loggers.server.debug(
                   { dealId, clientAddress, count: clientDeals.length },
                   `🔍 Found ${clientDeals.length} deals for client, searching for match...`
@@ -2071,9 +1941,7 @@ router.get("/:dealId/verify", async (req, res) => {
             deal = {
               id: originalDealId,
               cid: onChainDeal.cid,
-              status: isActive
-                ? StorageDeals.DEAL_STATUS.ACTIVE
-                : StorageDeals.DEAL_STATUS.EXPIRED,
+              status: isActive ? StorageDeals.DEAL_STATUS.ACTIVE : StorageDeals.DEAL_STATUS.EXPIRED,
               onChainDealId: dealId,
             } as any;
             (deal as any).active = isActive;
@@ -2111,9 +1979,7 @@ router.get("/:dealId/verify", async (req, res) => {
     // If still not found, try searching by CID if provided as query parameter
     if (!deal && req.query.cid) {
       try {
-        const cidQuery = Array.isArray(req.query.cid)
-          ? req.query.cid[0]
-          : req.query.cid;
+        const cidQuery = Array.isArray(req.query.cid) ? req.query.cid[0] : req.query.cid;
         if (!cidQuery || typeof cidQuery !== "string") {
           throw new Error("Invalid CID query parameter");
         }
@@ -2185,11 +2051,7 @@ router.get("/:dealId/verify", async (req, res) => {
                 resolve({ raw: data });
               }
             } else {
-              reject(
-                new Error(
-                  `IPFS API returned ${res.statusCode}: ${data.substring(0, 200)}`
-                )
-              );
+              reject(new Error(`IPFS API returned ${res.statusCode}: ${data.substring(0, 200)}`));
             }
           });
         });
@@ -2216,8 +2078,7 @@ router.get("/:dealId/verify", async (req, res) => {
       blockSize = blockStat?.Size || blockStat?.size;
       ipfsExists = true;
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       loggers.server.debug(
         { err: error, cid },
         `⚠️ CID ${cid} block.stat failed: ${errorMessage}, trying dag.stat`
@@ -2225,15 +2086,12 @@ router.get("/:dealId/verify", async (req, res) => {
 
       // Try dag/stat as fallback (object.stat is deprecated)
       try {
-        const dagStat = (await makeIpfsRequest(
-          `/dag/stat?arg=${encodeURIComponent(cid)}`
-        )) as any;
+        const dagStat = (await makeIpfsRequest(`/dag/stat?arg=${encodeURIComponent(cid)}`)) as any;
         ipfsStat = dagStat;
         blockSize = dagStat?.Size || dagStat?.size;
         ipfsExists = true;
       } catch (dagError: unknown) {
-        const dagErrorMessage =
-          dagError instanceof Error ? dagError.message : String(dagError);
+        const dagErrorMessage = dagError instanceof Error ? dagError.message : String(dagError);
         loggers.server.warn(
           { err: dagError, cid },
           `❌ CID ${cid} not found in IPFS: ${dagErrorMessage}`
@@ -2248,16 +2106,10 @@ router.get("/:dealId/verify", async (req, res) => {
     let pinCheckError = null;
     try {
       // Try to get pin info for specific CID
-      const pinResult = await makeIpfsRequest(
-        `/pin/ls?arg=${encodeURIComponent(cid)}&type=all`
-      );
+      const pinResult = await makeIpfsRequest(`/pin/ls?arg=${encodeURIComponent(cid)}&type=all`);
       // If pin/ls returns successfully with Keys, the CID is pinned
       const pinResultObj = pinResult as any;
-      if (
-        pinResultObj &&
-        pinResultObj.Keys &&
-        Object.keys(pinResultObj.Keys).length > 0
-      ) {
+      if (pinResultObj && pinResultObj.Keys && Object.keys(pinResultObj.Keys).length > 0) {
         isPinned = true;
       } else if (
         pinResultObj &&
@@ -2275,8 +2127,7 @@ router.get("/:dealId/verify", async (req, res) => {
         }
         if (!isPinned) {
           // Don't log as error - pin might still be processing
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
           loggers.server.debug(
             { err: error, cid },
             `ℹ️ CID ${cid} pin status unclear (may still be processing)`
@@ -2285,8 +2136,7 @@ router.get("/:dealId/verify", async (req, res) => {
       } catch (listError: unknown) {
         // If both fail, assume not pinned (but don't treat as error - pin might be processing)
         isPinned = false;
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         loggers.server.debug(
           { err: error, cid },
           `ℹ️ CID ${cid} pin check failed (may still be processing)`
@@ -2340,14 +2190,10 @@ router.get("/:dealId/verify", async (req, res) => {
         contentSample = catData.toString("base64").substring(0, 100); // First 100 chars as base64
       }
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       readError = errorMessage;
       canRead = false;
-      loggers.server.warn(
-        { err: error, cid },
-        `⚠️ Could not read content sample for CID ${cid}`
-      );
+      loggers.server.warn({ err: error, cid }, `⚠️ Could not read content sample for CID ${cid}`);
     }
 
     const isVerified = ipfsExists && isPinned && canRead;
@@ -2409,12 +2255,7 @@ router.get("/:dealId/verify", async (req, res) => {
           const responseTime = 0; // Could be improved by tracking start time
           const relayUser = getRelayUser();
           const keyPair = (relayUser as any)?._?.sea || null;
-          await Reputation.recordProofSuccess(
-            gun,
-            normalizedHost,
-            responseTime,
-            keyPair
-          );
+          await Reputation.recordProofSuccess(gun, normalizedHost, responseTime, keyPair);
           loggers.server.info(
             { dealId, host: normalizedHost },
             `✅ Recorded proof success for deal ${dealId} (host: ${normalizedHost})`
@@ -2431,10 +2272,7 @@ router.get("/:dealId/verify", async (req, res) => {
       } catch (e: unknown) {
         // Non-critical, don't block verification response
         const errorMessage = e instanceof Error ? e.message : String(e);
-        loggers.server.warn(
-          { err: e },
-          "Failed to record proof result for reputation"
-        );
+        loggers.server.warn({ err: e }, "Failed to record proof result for reputation");
       }
     }
 
@@ -2458,20 +2296,15 @@ router.get("/:dealId/verify", async (req, res) => {
 router.get("/:dealId/verify-proof", async (req: Request, res: Response) => {
   try {
     const { dealId } = req.params;
-    const challenge =
-      req.query.challenge || crypto.randomBytes(16).toString("hex");
+    const challenge = req.query.challenge || crypto.randomBytes(16).toString("hex");
 
     const gun = req.app.get("gunInstance");
     const IPFS_API_URL =
-      req.app.get("IPFS_API_URL") ||
-      ipfsConfig.apiUrl ||
-      "http://127.0.0.1:5001";
+      req.app.get("IPFS_API_URL") || ipfsConfig.apiUrl || "http://127.0.0.1:5001";
     const IPFS_API_TOKEN = req.app.get("IPFS_API_TOKEN") || ipfsConfig.apiToken;
 
     if (!gun) {
-      return res
-        .status(503)
-        .json({ success: false, error: "Gun not available" });
+      return res.status(503).json({ success: false, error: "Gun not available" });
     }
 
     // Get deal
@@ -2530,9 +2363,7 @@ router.get("/:dealId/verify-proof", async (req: Request, res: Response) => {
     // 1. Verify CID exists via IPFS block/stat
     let blockStat: any;
     try {
-      blockStat = (await makeIpfsRequest(
-        `/block/stat?arg=${encodeURIComponent(cid)}`
-      )) as any;
+      blockStat = (await makeIpfsRequest(`/block/stat?arg=${encodeURIComponent(cid)}`)) as any;
       if (blockStat?.Message || blockStat?.Type === "error") {
         return res.status(404).json({
           success: false,
@@ -2542,8 +2373,7 @@ router.get("/:dealId/verify-proof", async (req: Request, res: Response) => {
         });
       }
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       return res.status(404).json({
         success: false,
         error: "CID not found on this relay",
@@ -2595,12 +2425,8 @@ router.get("/:dealId/verify-proof", async (req: Request, res: Response) => {
         contentSample = catData.toString("base64");
       }
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      console.warn(
-        `Could not get content sample for CID ${cid}:`,
-        errorMessage
-      );
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn(`Could not get content sample for CID ${cid}:`, errorMessage);
       contentSample = "";
     }
 
@@ -2612,8 +2438,7 @@ router.get("/:dealId/verify-proof", async (req: Request, res: Response) => {
       )) as any;
       isPinned = pinLs?.Keys && Object.keys(pinLs.Keys).length > 0;
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       // Not pinned or error
       isPinned = false;
     }
@@ -2622,10 +2447,7 @@ router.get("/:dealId/verify-proof", async (req: Request, res: Response) => {
     const timestamp = Date.now();
     const blockSize = blockStat.Size || blockStat.size;
     const proofData = `${cid}:${challenge}:${timestamp}:${blockSize}:${contentSample}`;
-    const proofHash = crypto
-      .createHash("sha256")
-      .update(proofData)
-      .digest("hex");
+    const proofHash = crypto.createHash("sha256").update(proofData).digest("hex");
 
     const relayPub = req.app.get("relayUserPub");
 
@@ -2672,21 +2494,14 @@ router.post("/:dealId/report", express.json(), async (req, res) => {
     const { clientAddress, reportType, reason, evidence = "" } = req.body;
 
     if (!gun) {
-      return res
-        .status(503)
-        .json({ success: false, error: "Gun not available" });
+      return res.status(503).json({ success: false, error: "Gun not available" });
     }
 
     if (!clientAddress) {
-      return res
-        .status(400)
-        .json({ success: false, error: "clientAddress is required" });
+      return res.status(400).json({ success: false, error: "clientAddress is required" });
     }
 
-    if (
-      !reportType ||
-      (reportType !== "missedProof" && reportType !== "dataLoss")
-    ) {
+    if (!reportType || (reportType !== "missedProof" && reportType !== "dataLoss")) {
       return res.status(400).json({
         success: false,
         error: 'reportType must be "missedProof" or "dataLoss"',
@@ -2694,9 +2509,7 @@ router.post("/:dealId/report", express.json(), async (req, res) => {
     }
 
     if (!reason || reason.trim().length === 0) {
-      return res
-        .status(400)
-        .json({ success: false, error: "reason is required" });
+      return res.status(400).json({ success: false, error: "reason is required" });
     }
 
     // Get deal (check cache first, then GunDB, then on-chain)
@@ -2709,8 +2522,7 @@ router.post("/:dealId/report", express.json(), async (req, res) => {
     if (!deal && blockchainConfig.registryChainId) {
       try {
         const chainId = parseInt(String(blockchainConfig.registryChainId));
-        const storageDealRegistryClient =
-          createStorageDealRegistryClient(chainId);
+        const storageDealRegistryClient = createStorageDealRegistryClient(chainId);
 
         // Try to get deal from on-chain (using hash of deal ID)
         const dealIdHash = ethers.id(dealId);
@@ -2727,8 +2539,7 @@ router.post("/:dealId/report", express.json(), async (req, res) => {
           (deal as any).onChainRegistered = true;
         }
       } catch (error: unknown) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         loggers.server.warn(
           { err: error, dealId },
           `Failed to fetch deal from on-chain StorageDealRegistry`
@@ -2742,8 +2553,7 @@ router.post("/:dealId/report", express.json(), async (req, res) => {
 
     // Verify ownership - client can only report their own deals
     const normalizedClient = clientAddress.toLowerCase();
-    const dealClient =
-      deal.clientAddress?.toLowerCase() || (deal as any).client?.toLowerCase();
+    const dealClient = deal.clientAddress?.toLowerCase() || (deal as any).client?.toLowerCase();
 
     if (!dealClient || dealClient !== normalizedClient) {
       return res.status(403).json({
@@ -2762,20 +2572,14 @@ router.post("/:dealId/report", express.json(), async (req, res) => {
       // Try to get relay from on-chain deal
       try {
         const chainId = parseInt(String(blockchainConfig.registryChainId));
-        const storageDealRegistryClient =
-          createStorageDealRegistryClient(chainId);
-        const onChainDeal = await storageDealRegistryClient.getDeal(
-          deal.onChainDealId
-        );
+        const storageDealRegistryClient = createStorageDealRegistryClient(chainId);
+        const onChainDeal = await storageDealRegistryClient.getDeal(deal.onChainDealId);
         if (onChainDeal) {
           relayAddress = onChainDeal.relay;
         }
       } catch (error: unknown) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        console.warn(
-          `Failed to get relay address from on-chain deal: ${errorMessage}`
-        );
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.warn(`Failed to get relay address from on-chain deal: ${errorMessage}`);
       }
     }
 
@@ -2795,11 +2599,9 @@ router.post("/:dealId/report", express.json(), async (req, res) => {
 
     // Prepare transaction data
     const chainId =
-      parseInt(String(blockchainConfig.registryChainId)) ||
-      blockchainConfig.registryChainId;
+      parseInt(String(blockchainConfig.registryChainId)) || blockchainConfig.registryChainId;
     const storageDealRegistryClient = createStorageDealRegistryClient(chainId);
-    const storageDealRegistryAddress =
-      storageDealRegistryClient.registryAddress;
+    const storageDealRegistryAddress = storageDealRegistryClient.registryAddress;
 
     // Prepare function call data (using StorageDealRegistry.grief)
     // StorageDealRegistry.grief calculates griefing cost and delegates to RelayRegistry
@@ -2815,8 +2617,7 @@ router.post("/:dealId/report", express.json(), async (req, res) => {
         error: "Could not determine relay address for this deal",
       });
     }
-    const relayInfo =
-      await createRegistryClient(chainId).getRelayInfo(relayAddress);
+    const relayInfo = await createRegistryClient(chainId).getRelayInfo(relayAddress);
     const stakedAmount = BigInt(relayInfo.stakedAmountRaw);
     const slashAmount = (stakedAmount * BigInt(slashBps)) / 10000n;
 
@@ -2887,18 +2688,14 @@ router.post("/:dealId/cancel", express.json(), async (req, res) => {
     const relayUser = getRelayUser();
 
     if (!gun || !relayUser) {
-      return res
-        .status(503)
-        .json({ success: false, error: "Relay not initialized" });
+      return res.status(503).json({ success: false, error: "Relay not initialized" });
     }
 
     const { dealId } = req.params;
     const { clientAddress, reason = "User requested cancellation" } = req.body;
 
     if (!clientAddress) {
-      return res
-        .status(400)
-        .json({ success: false, error: "clientAddress is required" });
+      return res.status(400).json({ success: false, error: "clientAddress is required" });
     }
 
     // Get deal (check cache first)
@@ -2975,9 +2772,7 @@ router.post("/:dealId/terminate", express.json(), async (req, res) => {
     const relayUser = getRelayUser();
 
     if (!gun || !relayUser) {
-      return res
-        .status(503)
-        .json({ success: false, error: "Relay not initialized" });
+      return res.status(503).json({ success: false, error: "Relay not initialized" });
     }
 
     const { dealId } = req.params;
@@ -2999,9 +2794,7 @@ router.post("/:dealId/terminate", express.json(), async (req, res) => {
     (terminatedDeal as any).terminatedAt = Date.now();
     const keyPair = (relayUser as any)?._?.sea || null;
     if (!keyPair) {
-      return res
-        .status(500)
-        .json({ success: false, error: "Key pair not available" });
+      return res.status(500).json({ success: false, error: "Key pair not available" });
     }
     await StorageDeals.saveDeal(gun, terminatedDeal, keyPair);
 
@@ -3049,10 +2842,7 @@ router.post("/sync", async (req: Request, res: Response) => {
     }
 
     // Get relay address from private key
-    const registryClient = createRegistryClientWithSigner(
-      RELAY_PRIVATE_KEY,
-      REGISTRY_CHAIN_ID
-    );
+    const registryClient = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
     const relayAddress = registryClient.wallet.address;
 
     // Get GunDB instance and relay user for GunDB sync
@@ -3069,16 +2859,12 @@ router.post("/sync", async (req: Request, res: Response) => {
     );
 
     // Perform sync
-    const results = await DealSync.syncDealsWithIPFS(
-      relayAddress,
-      REGISTRY_CHAIN_ID,
-      {
-        onlyActive,
-        dryRun,
-        gun: gun,
-        relayKeyPair: relayKeyPair,
-      }
-    );
+    const results = await DealSync.syncDealsWithIPFS(relayAddress, REGISTRY_CHAIN_ID, {
+      onlyActive,
+      dryRun,
+      gun: gun,
+      relayKeyPair: relayKeyPair,
+    });
 
     res.json({
       success: true,
@@ -3123,17 +2909,11 @@ router.get("/sync/status", async (req: Request, res: Response) => {
     }
 
     // Get relay address from private key
-    const registryClient = createRegistryClientWithSigner(
-      RELAY_PRIVATE_KEY,
-      REGISTRY_CHAIN_ID
-    );
+    const registryClient = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
     const relayAddress = registryClient.wallet.address;
 
     // Get sync status
-    const status = await DealSync.getDealSyncStatus(
-      relayAddress,
-      REGISTRY_CHAIN_ID
-    );
+    const status = await DealSync.getDealSyncStatus(relayAddress, REGISTRY_CHAIN_ID);
 
     const summary = {
       total: status.length,

@@ -1,11 +1,11 @@
 /**
  * Merkle Tree Utilities for L2 Bridge
- * 
+ *
  * Provides functions to:
  * - Build Merkle trees from withdrawal data
  * - Generate Merkle proofs for specific leaves
  * - Verify Merkle proofs
- * 
+ *
  * The tree structure matches the Solidity contract's verifyProof function:
  * - Leaves are hashed as: keccak256(abi.encodePacked(user, amount, nonce))
  * - Tree uses sorted pairs (left <= right) for deterministic structure
@@ -26,13 +26,13 @@ export interface WithdrawalLeaf {
 export function computeLeaf(user: string, amount: bigint, nonce: bigint): string {
   // Ensure user is a valid address (checksummed)
   const userAddress = ethers.getAddress(user);
-  
+
   // Encode: user (address, 20 bytes) + amount (uint256, 32 bytes) + nonce (uint256, 32 bytes)
   const encoded = ethers.solidityPacked(
     ["address", "uint256", "uint256"],
     [userAddress, amount, nonce]
   );
-  
+
   return ethers.keccak256(encoded);
 }
 
@@ -55,7 +55,7 @@ export class MerkleTree {
     this.leaves = [...leaves].sort();
     this.tree = [];
     this.proofs = new Map();
-    
+
     this.buildTree();
   }
 
@@ -70,18 +70,20 @@ export class MerkleTree {
     // Build up to root
     while (currentLevel.length > 1) {
       const nextLevel: string[] = [];
-      
+
       // Process pairs
       for (let i = 0; i < currentLevel.length; i += 2) {
         const left = currentLevel[i];
         const right = i + 1 < currentLevel.length ? currentLevel[i + 1] : currentLevel[i];
-        
+
         // Sort to ensure deterministic hashing (left <= right)
         const [first, second] = left <= right ? [left, right] : [right, left];
-        const hash = ethers.keccak256(ethers.solidityPacked(["bytes32", "bytes32"], [first, second]));
+        const hash = ethers.keccak256(
+          ethers.solidityPacked(["bytes32", "bytes32"], [first, second])
+        );
         nextLevel.push(hash);
       }
-      
+
       this.tree.push(nextLevel);
       currentLevel = nextLevel;
     }
@@ -97,22 +99,22 @@ export class MerkleTree {
     for (let i = 0; i < this.leaves.length; i++) {
       const proof: string[] = [];
       let index = i;
-      
+
       // Traverse up the tree, collecting sibling hashes
       for (let level = 0; level < this.tree.length - 1; level++) {
         const currentLevel = this.tree[level];
         const siblingIndex = index % 2 === 0 ? index + 1 : index - 1;
-        
+
         if (siblingIndex < currentLevel.length) {
           proof.push(currentLevel[siblingIndex]);
         } else {
           // If no sibling, use the node itself (for odd-length levels)
           proof.push(currentLevel[index]);
         }
-        
+
         index = Math.floor(index / 2);
       }
-      
+
       this.proofs.set(this.leaves[i], proof);
     }
   }
@@ -197,4 +199,3 @@ export function generateProof(
   const { getProof } = buildMerkleTreeFromWithdrawals(withdrawals);
   return getProof(user, amount, nonce);
 }
-

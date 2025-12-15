@@ -36,7 +36,13 @@ import {
   packageConfig,
 } from "./config/env-config";
 import { startBatchScheduler } from "./utils/batch-scheduler";
-import { secureCompare, hashToken, isValidChainId, getChainName, createProductionErrorHandler } from "./utils/security";
+import {
+  secureCompare,
+  hashToken,
+  isValidChainId,
+  getChainName,
+  createProductionErrorHandler,
+} from "./utils/security";
 import { startPeriodicPeerSync } from "./utils/peer-discovery";
 
 dotenv.config();
@@ -151,44 +157,56 @@ async function initializeServer() {
 
   // ===== SECURITY: CORS Configuration =====
   const corsOptions = {
-    origin: authConfig.corsOrigins.includes('*')
-      ? true  // Allow all origins if '*' is configured
+    origin: authConfig.corsOrigins.includes("*")
+      ? true // Allow all origins if '*' is configured
       : (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
+          // Allow requests with no origin (like mobile apps or curl requests)
+          if (!origin) return callback(null, true);
 
-        if (authConfig.corsOrigins.some((allowed: string) =>
-          allowed === origin ||
-          origin.endsWith(allowed.replace('*.', '.'))
-        )) {
-          callback(null, true);
-        } else {
-          loggers.server.warn({ origin }, 'CORS blocked request from origin');
-          callback(new Error('Not allowed by CORS'));
-        }
-      },
+          if (
+            authConfig.corsOrigins.some(
+              (allowed: string) => allowed === origin || origin.endsWith(allowed.replace("*.", "."))
+            )
+          ) {
+            callback(null, true);
+          } else {
+            loggers.server.warn({ origin }, "CORS blocked request from origin");
+            callback(new Error("Not allowed by CORS"));
+          }
+        },
     credentials: authConfig.corsCredentials,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'token', 'X-Requested-With', 'X-Session-Token', 'X-User-Address', 'X-Deal-Upload'],
-    exposedHeaders: ['X-Session-Token'],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "token",
+      "X-Requested-With",
+      "X-Session-Token",
+      "X-User-Address",
+      "X-Deal-Upload",
+    ],
+    exposedHeaders: ["X-Session-Token"],
     maxAge: 86400, // 24 hours
   };
   app.use(cors(corsOptions));
-  loggers.server.info({
-    origins: authConfig.corsOrigins.includes('*') ? 'ALL' : authConfig.corsOrigins,
-    credentials: authConfig.corsCredentials
-  }, '🔒 CORS configured');
+  loggers.server.info(
+    {
+      origins: authConfig.corsOrigins.includes("*") ? "ALL" : authConfig.corsOrigins,
+      credentials: authConfig.corsCredentials,
+    },
+    "🔒 CORS configured"
+  );
 
   // ===== SECURITY: Security Headers =====
   app.use((req, res, next) => {
     // Prevent clickjacking
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
     // Prevent MIME type sniffing
-    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader("X-Content-Type-Options", "nosniff");
     // XSS Protection
-    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader("X-XSS-Protection", "1; mode=block");
     // Referrer Policy
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     next();
   });
 
@@ -201,24 +219,24 @@ async function initializeServer() {
   // ===== ROOT HEALTH CHECK ENDPOINT (for load balancers, k8s probes) =====
   app.get("/health", (req, res) => {
     res.status(200).json({
-      status: 'healthy',
+      status: "healthy",
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      version: packageConfig.version || '1.0.0',
+      version: packageConfig.version || "1.0.0",
     });
   });
 
   // Liveness probe (minimal check)
   app.get("/healthz", (req, res) => {
-    res.status(200).send('OK');
+    res.status(200).send("OK");
   });
 
   // Readiness probe (checks dependencies)
   app.get("/ready", async (req, res) => {
     try {
       // Check if essential services are ready
-      const holsterInstance = app.get('holsterInstance');
-      const gunInstance = app.get('gunInstance');
+      const holsterInstance = app.get("holsterInstance");
+      const gunInstance = app.get("gunInstance");
 
       const checks = {
         gun: !!gunInstance,
@@ -228,13 +246,13 @@ async function initializeServer() {
       const allReady = Object.values(checks).every(Boolean);
 
       res.status(allReady ? 200 : 503).json({
-        status: allReady ? 'ready' : 'not_ready',
+        status: allReady ? "ready" : "not_ready",
         checks,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
       res.status(503).json({
-        status: 'error',
+        status: "error",
         timestamp: new Date().toISOString(),
       });
     }
@@ -304,9 +322,7 @@ async function initializeServer() {
       if (token === authConfig.adminPassword) {
         next();
       } else {
-        loggers.server.warn(
-          `❌ Accesso negato a ${path} - Token mancante o non valido`
-        );
+        loggers.server.warn(`❌ Accesso negato a ${path} - Token mancante o non valido`);
         return res.status(401).json({
           success: false,
           error: "Unauthorized - Admin authentication required",
@@ -451,14 +467,12 @@ async function initializeServer() {
       loggers.server.warn(`Rate limited IP: ${clientIp}`);
       return res.status(429).json({
         success: false,
-        error:
-          "Too many failed authentication attempts. Please try again later.",
+        error: "Too many failed authentication attempts. Please try again later.",
       });
     }
 
     // Check for session token first (more efficient)
-    const sessionToken =
-      req.headers["x-session-token"] || req.cookies?.sessionToken;
+    const sessionToken = req.headers["x-session-token"] || req.cookies?.sessionToken;
     if (sessionToken && isValidSession(sessionToken, clientIp)) {
       return next();
     }
@@ -471,9 +485,7 @@ async function initializeServer() {
 
     if (!token) {
       recordFailedAttempt(clientIp);
-      return res
-        .status(401)
-        .json({ success: false, error: "Unauthorized - Token required" });
+      return res.status(401).json({ success: false, error: "Unauthorized - Token required" });
     }
 
     // Secure token comparison using hash and timing-safe comparison
@@ -497,9 +509,7 @@ async function initializeServer() {
     } else {
       recordFailedAttempt(clientIp);
       loggers.server.warn(`Auth failed for IP: ${clientIp}`);
-      res
-        .status(401)
-        .json({ success: false, error: "Unauthorized - Invalid token" });
+      res.status(401).json({ success: false, error: "Unauthorized - Invalid token" });
     }
   };
 
@@ -529,13 +539,9 @@ async function initializeServer() {
       secure: true,
       peers: [], // No peers by default
       maxConnections: holsterConfig.maxConnections,
-      file: holsterConfig.storageEnabled
-        ? holsterConfig.storagePath
-        : undefined,
+      file: holsterConfig.storageEnabled ? holsterConfig.storagePath : undefined,
     });
-    loggers.server.info(
-      `✅ Holster Relay initialized on port ${holsterConfig.port}`
-    );
+    loggers.server.info(`✅ Holster Relay initialized on port ${holsterConfig.port}`);
     loggers.server.info(
       `📁 Holster storage: ${holsterConfig.storageEnabled ? holsterConfig.storagePath : "disabled"}`
     );
@@ -620,17 +626,10 @@ async function initializeServer() {
   if (relayKeysConfig.seaKeypair) {
     try {
       relayKeyPair = JSON.parse(relayKeysConfig.seaKeypair);
-      loggers.server.info(
-        "🔑 Using SEA keypair from RELAY_SEA_KEYPAIR env var"
-      );
+      loggers.server.info("🔑 Using SEA keypair from RELAY_SEA_KEYPAIR env var");
     } catch (error: any) {
-      loggers.server.error(
-        { err: error },
-        "❌ Failed to parse RELAY_SEA_KEYPAIR"
-      );
-      loggers.server.error(
-        "   Make sure the JSON is valid and properly escaped in your env file"
-      );
+      loggers.server.error({ err: error }, "❌ Failed to parse RELAY_SEA_KEYPAIR");
+      loggers.server.error("   Make sure the JSON is valid and properly escaped in your env file");
       throw new Error("Invalid RELAY_SEA_KEYPAIR configuration");
     }
   } else if (relayKeysConfig.seaKeypairPath) {
@@ -667,21 +666,13 @@ async function initializeServer() {
         loggers.server.info(
           `✅ Generated and saved new keypair to ${relayKeysConfig.seaKeypairPath}`
         );
-        loggers.server.info(
-          { pub: newKeyPair.pub.substring(0, 30) },
-          `🔑 Public key`
-        );
+        loggers.server.info({ pub: newKeyPair.pub.substring(0, 30) }, `🔑 Public key`);
         loggers.server.warn(`⚠️ IMPORTANT: Save this keypair file securely!`);
       } else {
         // File exists, load it
-        const keyPairContent = fs.readFileSync(
-          relayKeysConfig.seaKeypairPath,
-          "utf8"
-        );
+        const keyPairContent = fs.readFileSync(relayKeysConfig.seaKeypairPath, "utf8");
         relayKeyPair = JSON.parse(keyPairContent);
-        loggers.server.info(
-          `🔑 Loaded SEA keypair from ${relayKeysConfig.seaKeypairPath}`
-        );
+        loggers.server.info(`🔑 Loaded SEA keypair from ${relayKeysConfig.seaKeypairPath}`);
       }
     } catch (error: any) {
       loggers.server.error(
@@ -734,18 +725,11 @@ async function initializeServer() {
         }
 
         // Save to file
-        fs.writeFileSync(
-          keyPairPath,
-          JSON.stringify(newKeyPair, null, 2),
-          "utf8"
-        );
+        fs.writeFileSync(keyPairPath, JSON.stringify(newKeyPair, null, 2), "utf8");
         relayKeyPair = newKeyPair;
 
         loggers.server.info(`✅ Generated new keypair at ${keyPairPath}`);
-        loggers.server.info(
-          { pub: newKeyPair.pub.substring(0, 30) },
-          `🔑 Public key`
-        );
+        loggers.server.info({ pub: newKeyPair.pub.substring(0, 30) }, `🔑 Public key`);
         loggers.server.warn(
           `⚠️ IMPORTANT: Save this keypair file securely or set RELAY_SEA_KEYPAIR_PATH!`
         );
@@ -769,9 +753,7 @@ To configure a keypair manually:
 See docs/RELAY_KEYS.md for more information.
       `.trim();
       loggers.server.error({ err: autoGenError }, errorMsg);
-      throw new Error(
-        `Keypair auto-generation failed: ${autoGenError.message}`
-      );
+      throw new Error(`Keypair auto-generation failed: ${autoGenError.message}`);
     }
   }
 
@@ -789,15 +771,9 @@ See docs/RELAY_KEYS.md for more information.
     app.set("relayUserPub", relayPub);
     app.set("relayKeyPair", relayKeyPair);
     loggers.server.info(`✅ Relay GunDB user initialized with SEA keypair`);
-    loggers.server.info(
-      { pub: relayPub?.substring(0, 30) },
-      `🔑 Relay public key`
-    );
+    loggers.server.info({ pub: relayPub?.substring(0, 30) }, `🔑 Relay public key`);
   } catch (error: any) {
-    loggers.server.error(
-      { err: error },
-      "❌ Failed to initialize relay with keypair"
-    );
+    loggers.server.error({ err: error }, "❌ Failed to initialize relay with keypair");
     throw new Error(`Failed to initialize relay user: ${error.message}`);
   }
 
@@ -819,19 +795,14 @@ See docs/RELAY_KEYS.md for more information.
     Reputation.initReputationTracking(gun, host);
     loggers.server.info({ host }, `📊 Reputation tracking initialized`);
   } catch (e: any) {
-    loggers.server.warn(
-      { err: e },
-      "⚠️ Failed to initialize reputation tracking"
-    );
+    loggers.server.warn({ err: e }, "⚠️ Failed to initialize reputation tracking");
   }
 
   // Initialize Network Pin Request Listener (auto-replication)
   const autoReplication = replicationConfig.autoReplication;
 
   if (autoReplication) {
-    loggers.server.info(
-      "🔄 Auto-replication enabled - listening for pin requests"
-    );
+    loggers.server.info("🔄 Auto-replication enabled - listening for pin requests");
 
     // Cleanup old processed requests periodically
     setInterval(
@@ -859,10 +830,7 @@ See docs/RELAY_KEYS.md for more information.
 
         // Check if we already processed this request recently
         const cached = processedPinRequests.get(requestId);
-        if (
-          cached &&
-          Date.now() - cached.processedAt < PIN_REQUEST_CACHE_TTL_MS
-        ) {
+        if (cached && Date.now() - cached.processedAt < PIN_REQUEST_CACHE_TTL_MS) {
           // Skip - already processed
           return;
         }
@@ -921,10 +889,7 @@ See docs/RELAY_KEYS.md for more information.
 
           if (alreadyPinned) {
             if (loggingConfig.debug) {
-              loggers.server.debug(
-                { cid: data.cid },
-                `✅ CID already pinned locally`
-              );
+              loggers.server.debug({ cid: data.cid }, `✅ CID already pinned locally`);
             }
             processedPinRequests.set(requestId, {
               processedAt: Date.now(),
@@ -938,10 +903,7 @@ See docs/RELAY_KEYS.md for more information.
             loggers.server.debug({ cid: data.cid }, `📌 Pinning`);
           }
           const pinResult: any = await new Promise((resolve, reject) => {
-            const timeout = setTimeout(
-              () => reject(new Error("Pin timeout")),
-              60000
-            );
+            const timeout = setTimeout(() => reject(new Error("Pin timeout")), 60000);
             const options: any = {
               hostname: IPFS_API_HOST,
               port: IPFS_API_PORT,
@@ -984,10 +946,7 @@ See docs/RELAY_KEYS.md for more information.
             try {
               await Reputation.recordPinFulfillment(gun, host, true);
             } catch (e: any) {
-              loggers.server.warn(
-                { err: e },
-                "Failed to record pin fulfillment for reputation"
-              );
+              loggers.server.warn({ err: e }, "Failed to record pin fulfillment for reputation");
             }
 
             // Publish response
@@ -1015,16 +974,16 @@ See docs/RELAY_KEYS.md for more information.
             } catch (e: any) {
               // Silent in production
               if (loggingConfig.debug) {
-                loggers.server.warn(
-                  "Failed to record pin fulfillment for reputation:",
-                  e.message
-                );
+                loggers.server.warn("Failed to record pin fulfillment for reputation:", e.message);
               }
             }
           }
         } catch (error: any) {
           if (loggingConfig.debug) {
-            loggers.server.error({ cid: data.cid, err: error.message }, `Failed to pin ${data.cid}`);
+            loggers.server.error(
+              { cid: data.cid, err: error.message },
+              `Failed to pin ${data.cid}`
+            );
           }
           processedPinRequests.set(requestId, {
             processedAt: Date.now(),
@@ -1248,8 +1207,7 @@ See docs/RELAY_KEYS.md for more information.
   // Contracts configuration endpoint
   app.get("/api/v1/contracts", async (req, res) => {
     try {
-      const { CONTRACTS_CONFIG, getConfigByChainId } =
-        await import("shogun-contracts-sdk");
+      const { CONTRACTS_CONFIG, getConfigByChainId } = await import("shogun-contracts-sdk");
       const chainIdParam = req.query.chainId;
 
       if (chainIdParam) {
@@ -1277,8 +1235,7 @@ See docs/RELAY_KEYS.md for more information.
           success: true,
           chainId: chainIdNum,
           network: Object.keys(CONTRACTS_CONFIG).find(
-            (key: string) =>
-              (CONTRACTS_CONFIG as any)[key].chainId === chainIdNum
+            (key: string) => (CONTRACTS_CONFIG as any)[key].chainId === chainIdNum
           ),
           contracts: {
             relayRegistry: config.relayRegistry,
@@ -1357,10 +1314,7 @@ See docs/RELAY_KEYS.md for more information.
               apiUrl: IPFS_API_URL,
             });
           } catch (parseError) {
-            loggers.server.error(
-              { err: parseError },
-              "IPFS status parse error"
-            );
+            loggers.server.error({ err: parseError }, "IPFS status parse error");
             res.json({
               success: false,
               status: "error",
@@ -1393,8 +1347,7 @@ See docs/RELAY_KEYS.md for more information.
   // Blockchain RPC status endpoint
   app.get("/rpc-status", async (req, res) => {
     try {
-      const { CONTRACTS_CONFIG, getConfigByChainId } =
-        await import("shogun-contracts-sdk");
+      const { CONTRACTS_CONFIG, getConfigByChainId } = await import("shogun-contracts-sdk");
       const { ethers } = await import("ethers");
       const { RPC_URLS } = await import("./utils/registry-client");
 
@@ -1412,9 +1365,7 @@ See docs/RELAY_KEYS.md for more information.
           const startTime = Date.now();
           const blockNumber: any = await Promise.race([
             provider.getBlockNumber(),
-            new Promise((_, reject) =>
-              setTimeout(() => reject(new Error("Timeout")), 5000)
-            ),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000)),
           ]);
           const latency = Date.now() - startTime;
 
@@ -1446,9 +1397,7 @@ See docs/RELAY_KEYS.md for more information.
           const startTime = Date.now();
           const blockNumber: any = await Promise.race([
             provider.getBlockNumber(),
-            new Promise((_, reject) =>
-              setTimeout(() => reject(new Error("Timeout")), 5000)
-            ),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000)),
           ]);
           const latency = Date.now() - startTime;
 
@@ -1485,9 +1434,7 @@ See docs/RELAY_KEYS.md for more information.
             const startTime = Date.now();
             const blockNumber: any = await Promise.race([
               provider.getBlockNumber(),
-              new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("Timeout")), 5000)
-              ),
+              new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000)),
             ]);
             const latency = Date.now() - startTime;
 
@@ -1513,9 +1460,7 @@ See docs/RELAY_KEYS.md for more information.
         }
       }
 
-      const onlineCount = rpcStatuses.filter(
-        (r: any) => r.status === "online"
-      ).length;
+      const onlineCount = rpcStatuses.filter((r: any) => r.status === "online").length;
       const totalCount = rpcStatuses.length;
 
       res.json({
@@ -1548,7 +1493,7 @@ See docs/RELAY_KEYS.md for more information.
   // ===== SECURITY: Production Error Handler =====
   // This must be added AFTER all routes to catch any unhandled errors
   // In production, it sanitizes error messages to prevent information disclosure
-  const isProduction = serverConfig.nodeEnv === 'production';
+  const isProduction = serverConfig.nodeEnv === "production";
   app.use(createProductionErrorHandler(isProduction));
   if (isProduction) {
     loggers.server.info("🔒 Production error handler enabled - errors will be sanitized");
@@ -1639,13 +1584,15 @@ See docs/RELAY_KEYS.md for more information.
         // Try multiple field names for RepoSize
         let repoSize = 0;
         if (ipfsStats.RepoSize !== undefined) {
-          repoSize = typeof ipfsStats.RepoSize === 'string'
-            ? parseInt(ipfsStats.RepoSize, 10) || 0
-            : ipfsStats.RepoSize || 0;
+          repoSize =
+            typeof ipfsStats.RepoSize === "string"
+              ? parseInt(ipfsStats.RepoSize, 10) || 0
+              : ipfsStats.RepoSize || 0;
         } else if (ipfsStats.repoSize !== undefined) {
-          repoSize = typeof ipfsStats.repoSize === 'string'
-            ? parseInt(ipfsStats.repoSize, 10) || 0
-            : ipfsStats.repoSize || 0;
+          repoSize =
+            typeof ipfsStats.repoSize === "string"
+              ? parseInt(ipfsStats.repoSize, 10) || 0
+              : ipfsStats.repoSize || 0;
         }
 
         if (repoSize !== undefined) {
@@ -1719,22 +1666,28 @@ See docs/RELAY_KEYS.md for more information.
       gun.get("relays").get(host).get("pulse").put(pulse);
 
       if (loggingConfig.debug) {
-        loggers.server.debug({
-          host,
-          connections: activeWires,
-          ipfsConnected: pulse.ipfs?.connected,
-          numPins: pulse.ipfs?.numPins || 0
-        }, `📡 Pulse saved to relays`);
+        loggers.server.debug(
+          {
+            host,
+            connections: activeWires,
+            ipfsConnected: pulse.ipfs?.connected,
+            numPins: pulse.ipfs?.numPins || 0,
+          },
+          `📡 Pulse saved to relays`
+        );
       }
     } catch (e: any) {
       loggers.server.warn({ err: e.message }, "Failed to save pulse to GunDB relays namespace");
       if (loggingConfig.debug) {
-        loggers.server.debug({
-          host,
-          connections: activeWires,
-          ipfsConnected: pulse.ipfs?.connected,
-          numPins: pulse.ipfs?.numPins || 0
-        }, `📡 Pulse saved to relays`);
+        loggers.server.debug(
+          {
+            host,
+            connections: activeWires,
+            ipfsConnected: pulse.ipfs?.connected,
+            numPins: pulse.ipfs?.numPins || 0,
+          },
+          `📡 Pulse saved to relays`
+        );
       }
     }
 
@@ -1787,8 +1740,7 @@ See docs/RELAY_KEYS.md for more information.
       }
     } catch (e: any) {
       // Non-critical, frozen announcements are optional
-      if (loggingConfig.debug)
-        loggers.server.debug({ err: e }, "Frozen announcement skipped");
+      if (loggingConfig.debug) loggers.server.debug({ err: e }, "Frozen announcement skipped");
     }
   }, 30000); // 30 seconds
 
@@ -1808,16 +1760,18 @@ See docs/RELAY_KEYS.md for more information.
   let dealSyncFullInterval: any = null; // Full sync for complete synchronization
 
   if (DEAL_SYNC_ENABLED && RELAY_PRIVATE_KEY && REGISTRY_CHAIN_ID) {
-    loggers.server.info({
-      fastSyncInterval: DEAL_SYNC_FAST_INTERVAL_MS / 1000,
-      fullSyncInterval: DEAL_SYNC_INTERVAL_MS / 1000 / 60
-    }, `🔄 Real-time deal sync enabled`);
+    loggers.server.info(
+      {
+        fastSyncInterval: DEAL_SYNC_FAST_INTERVAL_MS / 1000,
+        fullSyncInterval: DEAL_SYNC_INTERVAL_MS / 1000 / 60,
+      },
+      `🔄 Real-time deal sync enabled`
+    );
 
     // Initial sync after short delay (give IPFS time to start)
     dealSyncInitialTimeout = setTimeout(async () => {
       try {
-        const { createRegistryClientWithSigner } =
-          await import("./utils/registry-client");
+        const { createRegistryClientWithSigner } = await import("./utils/registry-client");
         const DealSync = await import("./utils/deal-sync");
         const { getRelayUser } = await import("./utils/relay-user");
 
@@ -1832,16 +1786,12 @@ See docs/RELAY_KEYS.md for more information.
         const relayKeyPair = (relayUser as any)?._?.sea || null;
 
         loggers.server.info({ relayAddress }, `🔄 Starting initial deal sync`);
-        await DealSync.syncDealsWithIPFS(
-          relayAddress,
-          blockchainConfig.registryChainId,
-          {
-            onlyActive: true,
-            dryRun: false,
-            gun: gun,
-            relayKeyPair: relayKeyPair,
-          }
-        );
+        await DealSync.syncDealsWithIPFS(relayAddress, blockchainConfig.registryChainId, {
+          onlyActive: true,
+          dryRun: false,
+          gun: gun,
+          relayKeyPair: relayKeyPair,
+        });
         loggers.server.info(`✅ Initial deal sync completed`);
       } catch (error: any) {
         loggers.server.warn({ err: error }, `⚠️ Initial deal sync failed`);
@@ -1852,8 +1802,7 @@ See docs/RELAY_KEYS.md for more information.
     // This checks for new deals and syncs them quickly
     dealSyncFastInterval = setInterval(async () => {
       try {
-        const { createRegistryClientWithSigner } =
-          await import("./utils/registry-client");
+        const { createRegistryClientWithSigner } = await import("./utils/registry-client");
         const DealSync = await import("./utils/deal-sync");
         const { getRelayUser } = await import("./utils/relay-user");
 
@@ -1868,17 +1817,13 @@ See docs/RELAY_KEYS.md for more information.
         const relayKeyPair = (relayUser as any)?._?.sea || null;
 
         // Fast sync: only sync new/active deals (lightweight)
-        await DealSync.syncDealsWithIPFS(
-          relayAddress,
-          blockchainConfig.registryChainId,
-          {
-            onlyActive: true,
-            dryRun: false,
-            gun: gun,
-            relayKeyPair: relayKeyPair,
-            fastSync: true, // Enable fast sync mode (skip expensive operations)
-          }
-        );
+        await DealSync.syncDealsWithIPFS(relayAddress, blockchainConfig.registryChainId, {
+          onlyActive: true,
+          dryRun: false,
+          gun: gun,
+          relayKeyPair: relayKeyPair,
+          fastSync: true, // Enable fast sync mode (skip expensive operations)
+        });
       } catch (error: any) {
         // Don't log fast sync errors as warnings (too noisy)
         // Only log if it's a critical error
@@ -1896,8 +1841,7 @@ See docs/RELAY_KEYS.md for more information.
     // This runs less frequently but does a thorough sync
     dealSyncFullInterval = setInterval(async () => {
       try {
-        const { createRegistryClientWithSigner } =
-          await import("./utils/registry-client");
+        const { createRegistryClientWithSigner } = await import("./utils/registry-client");
         const DealSync = await import("./utils/deal-sync");
         const { getRelayUser } = await import("./utils/relay-user");
 
@@ -1912,17 +1856,13 @@ See docs/RELAY_KEYS.md for more information.
         const relayKeyPair = (relayUser as any)?._?.sea || null;
 
         loggers.server.info({ relayAddress }, `🔄 Full deal sync`);
-        await DealSync.syncDealsWithIPFS(
-          relayAddress,
-          blockchainConfig.registryChainId,
-          {
-            onlyActive: true,
-            dryRun: false,
-            gun: gun,
-            relayKeyPair: relayKeyPair,
-            fastSync: false, // Full sync mode
-          }
-        );
+        await DealSync.syncDealsWithIPFS(relayAddress, blockchainConfig.registryChainId, {
+          onlyActive: true,
+          dryRun: false,
+          gun: gun,
+          relayKeyPair: relayKeyPair,
+          fastSync: false, // Full sync mode
+        });
         loggers.server.info(`✅ Full deal sync completed`);
       } catch (error: any) {
         loggers.server.warn({ err: error }, `⚠️ Full deal sync failed`);
@@ -1930,17 +1870,11 @@ See docs/RELAY_KEYS.md for more information.
     }, DEAL_SYNC_INTERVAL_MS);
   } else {
     if (!DEAL_SYNC_ENABLED) {
-      loggers.server.info(
-        `⏭️  Deal sync disabled (set DEAL_SYNC_ENABLED=true to enable)`
-      );
+      loggers.server.info(`⏭️  Deal sync disabled (set DEAL_SYNC_ENABLED=true to enable)`);
     } else if (!RELAY_PRIVATE_KEY) {
-      loggers.server.info(
-        `⏭️  Deal sync disabled (RELAY_PRIVATE_KEY not configured)`
-      );
+      loggers.server.info(`⏭️  Deal sync disabled (RELAY_PRIVATE_KEY not configured)`);
     } else if (!REGISTRY_CHAIN_ID) {
-      loggers.server.info(
-        `⏭️  Deal sync disabled (REGISTRY_CHAIN_ID not configured)`
-      );
+      loggers.server.info(`⏭️  Deal sync disabled (REGISTRY_CHAIN_ID not configured)`);
     }
   }
 
@@ -1962,17 +1896,23 @@ See docs/RELAY_KEYS.md for more information.
     // ===== SECURITY: Validate ChainId before starting bridge =====
     const chainIdValidation = isValidChainId(BRIDGE_CHAIN_ID, bridgeConfig.validChainIds);
     if (!chainIdValidation.valid) {
-      loggers.server.error({
-        chainId: BRIDGE_CHAIN_ID,
-        error: chainIdValidation.error,
-        validChainIds: bridgeConfig.validChainIds
-      }, "❌ Invalid Bridge Chain ID - Bridge disabled for security");
+      loggers.server.error(
+        {
+          chainId: BRIDGE_CHAIN_ID,
+          error: chainIdValidation.error,
+          validChainIds: bridgeConfig.validChainIds,
+        },
+        "❌ Invalid Bridge Chain ID - Bridge disabled for security"
+      );
       // Don't start bridge with invalid chain
     } else {
-      loggers.server.info({
-        chainId: BRIDGE_CHAIN_ID,
-        chainName: getChainName(BRIDGE_CHAIN_ID)
-      }, "✅ Bridge Chain ID validated");
+      loggers.server.info(
+        {
+          chainId: BRIDGE_CHAIN_ID,
+          chainName: getChainName(BRIDGE_CHAIN_ID),
+        },
+        "✅ Bridge Chain ID validated"
+      );
 
       try {
         const { startBridgeListener } = await import("./utils/bridge-listener");
@@ -2011,10 +1951,7 @@ See docs/RELAY_KEYS.md for more information.
           "🌉 Bridge deposit listener started"
         );
       } catch (error: any) {
-        loggers.server.error(
-          { err: error },
-          "❌ Failed to start bridge listener"
-        );
+        loggers.server.error({ err: error }, "❌ Failed to start bridge listener");
       }
     } // End of chainId validation else block
 
@@ -2022,7 +1959,8 @@ See docs/RELAY_KEYS.md for more information.
     if (BRIDGE_AUTO_BATCH_ENABLED && BRIDGE_RPC_URL) {
       try {
         const { createBridgeClient } = await import("./utils/bridge-client");
-        const { getPendingWithdrawals, removePendingWithdrawals, saveBatch } = await import("./utils/bridge-state");
+        const { getPendingWithdrawals, removePendingWithdrawals, saveBatch } =
+          await import("./utils/bridge-state");
         const { buildMerkleTreeFromWithdrawals } = await import("./utils/merkle-tree");
 
         const bridgeClient = createBridgeClient({
@@ -2035,8 +1973,10 @@ See docs/RELAY_KEYS.md for more information.
         const sequencer = await bridgeClient.getSequencer();
         const relayAddress = bridgeClient.wallet?.address;
 
-        if (sequencer === "0x0000000000000000000000000000000000000000" ||
-          (relayAddress && relayAddress.toLowerCase() === sequencer.toLowerCase())) {
+        if (
+          sequencer === "0x0000000000000000000000000000000000000000" ||
+          (relayAddress && relayAddress.toLowerCase() === sequencer.toLowerCase())
+        ) {
           loggers.server.info(
             {
               interval: BRIDGE_AUTO_BATCH_INTERVAL_MS / 1000,
@@ -2097,10 +2037,7 @@ See docs/RELAY_KEYS.md for more information.
                 !error.message.includes("ECONNREFUSED") &&
                 !error.message.includes("insufficient funds")
               ) {
-                loggers.server.warn(
-                  { err: error },
-                  "⚠️ Auto batch submission error"
-                );
+                loggers.server.warn({ err: error }, "⚠️ Auto batch submission error");
               }
             }
           }, BRIDGE_AUTO_BATCH_INTERVAL_MS);
@@ -2114,10 +2051,7 @@ See docs/RELAY_KEYS.md for more information.
           );
         }
       } catch (error: any) {
-        loggers.server.warn(
-          { err: error },
-          "⚠️ Failed to initialize auto batch submission"
-        );
+        loggers.server.warn({ err: error }, "⚠️ Failed to initialize auto batch submission");
       }
     } else {
       if (!BRIDGE_AUTO_BATCH_ENABLED) {
@@ -2128,13 +2062,9 @@ See docs/RELAY_KEYS.md for more information.
     }
   } else {
     if (!BRIDGE_ENABLED) {
-      loggers.server.info(
-        "⏭️  Bridge disabled (set BRIDGE_ENABLED=true to enable)"
-      );
+      loggers.server.info("⏭️  Bridge disabled (set BRIDGE_ENABLED=true to enable)");
     } else if (!BRIDGE_RPC_URL) {
-      loggers.server.info(
-        "⏭️  Bridge disabled (BRIDGE_RPC_URL not configured)"
-      );
+      loggers.server.info("⏭️  Bridge disabled (BRIDGE_RPC_URL not configured)");
     }
   }
 
@@ -2147,7 +2077,10 @@ See docs/RELAY_KEYS.md for more information.
       : `http://localhost:${port}`;
 
     startPeriodicPeerSync(gun, chainId, ownEndpoint, 5 * 60 * 1000); // Every 5 minutes
-    loggers.server.info({ chainId, excludeEndpoint: ownEndpoint }, "🔗 Started on-chain relay peer discovery");
+    loggers.server.info(
+      { chainId, excludeEndpoint: ownEndpoint },
+      "🔗 Started on-chain relay peer discovery"
+    );
   } catch (error: any) {
     loggers.server.warn({ err: error }, "⚠️ Failed to start peer discovery");
   }
@@ -2249,7 +2182,7 @@ process.on("uncaughtException", (error: Error) => {
     // Don't exit - let GUN continue with other files
     return;
   }
-  
+
   // Handle other uncaught exceptions
   loggers.server.error({ err: error }, "Uncaught exception");
   // Only exit for critical errors
@@ -2260,14 +2193,18 @@ process.on("uncaughtException", (error: Error) => {
 
 process.on("unhandledRejection", (reason: any, promise: Promise<any>) => {
   // Handle JSON parse errors in promises
-  if (reason && reason.message && reason.message.includes("Bad control character in string literal")) {
+  if (
+    reason &&
+    reason.message &&
+    reason.message.includes("Bad control character in string literal")
+  ) {
     loggers.server.warn(
       { err: reason },
       "⚠️  Corrupted data file detected in GUN storage (promise rejection). This is usually harmless."
     );
     return;
   }
-  
+
   loggers.server.error({ err: reason, promise }, "Unhandled promise rejection");
 });
 

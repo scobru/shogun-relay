@@ -39,9 +39,7 @@ function getMerchant(): X402Merchant {
       network: (x402Config.network || "base-sepolia") as NetworkKey,
       facilitatorUrl: x402Config.facilitatorUrl || "",
       facilitatorApiKey: x402Config.facilitatorApiKey || "",
-      settlementMode: (x402Config.settlementMode || "facilitator") as
-        | "facilitator"
-        | "direct",
+      settlementMode: (x402Config.settlementMode || "facilitator") as "facilitator" | "direct",
       privateKey: x402Config.privateKey || "",
       rpcUrl: x402Config.rpcUrl || "",
     });
@@ -61,18 +59,11 @@ function getGunInstance(req: Request): any {
  */
 router.get("/tiers", async (req, res) => {
   try {
-    const ipfsApiUrl =
-      req.app.get("IPFS_API_URL") ||
-      ipfsConfig.apiUrl ||
-      "http://127.0.0.1:5001";
-    const ipfsApiToken =
-      req.app.get("IPFS_API_TOKEN") || ipfsConfig.apiToken || "";
+    const ipfsApiUrl = req.app.get("IPFS_API_URL") || ipfsConfig.apiUrl || "http://127.0.0.1:5001";
+    const ipfsApiToken = req.app.get("IPFS_API_TOKEN") || ipfsConfig.apiToken || "";
 
     // Get relay storage status
-    const relayStorage = await X402Merchant.getRelayStorageStatus(
-      ipfsApiUrl,
-      ipfsApiToken
-    );
+    const relayStorage = await X402Merchant.getRelayStorageStatus(ipfsApiUrl, ipfsApiToken);
 
     const tiers = Object.entries(SUBSCRIPTION_TIERS).map(([key, tier]) => {
       const tierInfo: any = {
@@ -113,8 +104,7 @@ router.get("/tiers", async (req, res) => {
       };
 
       if (relayStorage.full) {
-        response.relayWarning =
-          "Relay storage is FULL - subscriptions temporarily unavailable";
+        response.relayWarning = "Relay storage is FULL - subscriptions temporarily unavailable";
       } else if (relayStorage.warning) {
         response.relayWarning = `Relay storage at ${relayStorage.percentUsed}% capacity`;
       }
@@ -186,10 +176,7 @@ router.get("/subscription/:userAddress", async (req, res) => {
       });
     }
 
-    const subscription = await X402Merchant.getSubscriptionStatus(
-      gun,
-      userAddress
-    );
+    const subscription = await X402Merchant.getSubscriptionStatus(gun, userAddress);
 
     res.json({
       success: true,
@@ -230,9 +217,7 @@ router.post("/subscribe", async (req, res) => {
       console.log(`Payment network: ${payment.network}`);
       console.log(`Payment from: ${payment.payload?.authorization?.from}`);
       console.log(`Payment value: ${payment.payload?.authorization?.value}`);
-      console.log(
-        `Payment signature: ${payment.payload?.signature ? "present" : "missing"}`
-      );
+      console.log(`Payment signature: ${payment.payload?.signature ? "present" : "missing"}`);
     }
 
     // Validate request
@@ -261,18 +246,10 @@ router.post("/subscribe", async (req, res) => {
     }
 
     // Check if relay has enough global storage for this subscription tier
-    const ipfsApiUrl =
-      req.app.get("IPFS_API_URL") ||
-      ipfsConfig.apiUrl ||
-      "http://127.0.0.1:5001";
-    const ipfsApiToken =
-      req.app.get("IPFS_API_TOKEN") || ipfsConfig.apiToken;
+    const ipfsApiUrl = req.app.get("IPFS_API_URL") || ipfsConfig.apiUrl || "http://127.0.0.1:5001";
+    const ipfsApiToken = req.app.get("IPFS_API_TOKEN") || ipfsConfig.apiToken;
 
-    const relayCapacity = await X402Merchant.canAcceptSubscription(
-      tier,
-      ipfsApiUrl,
-      ipfsApiToken
-    );
+    const relayCapacity = await X402Merchant.canAcceptSubscription(tier, ipfsApiUrl, ipfsApiToken);
 
     if (!relayCapacity.allowed) {
       console.log(`Relay storage check failed: ${relayCapacity.reason}`);
@@ -300,26 +277,26 @@ router.post("/subscribe", async (req, res) => {
     // Check if user already has an active subscription
     // New subscription can only be activated if it's better or equal to the current one
     const currentSubscription = await X402Merchant.getSubscriptionStatus(gun, userAddress);
-    
+
     if (currentSubscription.active && currentSubscription.tier) {
       const currentTier = currentSubscription.tier;
       const currentTierConfig = SUBSCRIPTION_TIERS[currentTier];
       const newTierConfig = SUBSCRIPTION_TIERS[tier];
-      
+
       if (!currentTierConfig || !newTierConfig) {
         return res.status(400).json({
           success: false,
           error: "Invalid tier configuration",
         });
       }
-      
+
       // Compare tiers: new tier must have storageMB >= current tier
       // This ensures only upgrades or same-tier renewals are allowed
       if (newTierConfig.storageMB < currentTierConfig.storageMB) {
-        const expiresAt = currentSubscription.expiresAt 
+        const expiresAt = currentSubscription.expiresAt
           ? new Date(currentSubscription.expiresAt).toLocaleDateString()
-          : 'unknown';
-        
+          : "unknown";
+
         // Get available upgrade tiers
         const availableUpgrades = Object.entries(SUBSCRIPTION_TIERS)
           .filter(([tierName, tierCfg]) => tierCfg.storageMB >= currentTierConfig.storageMB)
@@ -328,7 +305,7 @@ router.post("/subscribe", async (req, res) => {
             storageMB: tierCfg.storageMB,
             priceUSDC: tierCfg.priceUSDC,
           }));
-        
+
         return res.status(409).json({
           success: false,
           error: "Cannot downgrade subscription",
@@ -345,9 +322,11 @@ router.post("/subscribe", async (req, res) => {
           availableUpgrades: availableUpgrades,
         });
       }
-      
+
       // If same or better tier, allow (will extend expiry in saveSubscription)
-      console.log(`User has active ${currentTier} subscription, allowing ${tier} subscription (upgrade or renewal)`);
+      console.log(
+        `User has active ${currentTier} subscription, allowing ${tier} subscription (upgrade or renewal)`
+      );
     }
 
     // If no payment provided, return payment requirements
@@ -406,16 +385,9 @@ router.post("/subscribe", async (req, res) => {
 
     // Save subscription to GunDB
     console.log("Saving subscription...");
-    const subscription = await X402Merchant.saveSubscription(
-      gun,
-      userAddress,
-      tier,
-      settlement
-    );
+    const subscription = await X402Merchant.saveSubscription(gun, userAddress, tier, settlement);
 
-    console.log(
-      `Subscription saved. Expires: ${new Date(subscription.expiresAt).toISOString()}`
-    );
+    console.log(`Subscription saved. Expires: ${new Date(subscription.expiresAt).toISOString()}`);
     console.log("--- Subscription Complete ---\n");
 
     res.json({
@@ -545,11 +517,7 @@ router.post("/update-usage/:userAddress", async (req, res) => {
       });
     }
 
-    const result = await X402Merchant.updateStorageUsage(
-      gun,
-      userAddress,
-      addMB
-    );
+    const result = await X402Merchant.updateStorageUsage(gun, userAddress, addMB);
 
     res.json({
       success: true,
@@ -614,12 +582,8 @@ router.get("/storage/:userAddress", async (req, res) => {
       });
     }
 
-    const ipfsApiUrl =
-      req.app.get("IPFS_API_URL") ||
-      ipfsConfig.apiUrl ||
-      "http://127.0.0.1:5001";
-    const ipfsApiToken =
-      req.app.get("IPFS_API_TOKEN") || ipfsConfig.apiToken;
+    const ipfsApiUrl = req.app.get("IPFS_API_URL") || ipfsConfig.apiUrl || "http://127.0.0.1:5001";
+    const ipfsApiToken = req.app.get("IPFS_API_TOKEN") || ipfsConfig.apiToken;
 
     console.log(`Calculating real storage for ${userAddress}...`);
 
@@ -629,10 +593,7 @@ router.get("/storage/:userAddress", async (req, res) => {
       ipfsApiUrl,
       ipfsApiToken
     );
-    const subscription = await X402Merchant.getSubscriptionStatus(
-      gun,
-      userAddress
-    );
+    const subscription = await X402Merchant.getSubscriptionStatus(gun, userAddress);
 
     res.json({
       success: true,
@@ -648,16 +609,11 @@ router.get("/storage/:userAddress", async (req, res) => {
             tier: subscription.tier,
             totalMB: subscription.storageMB,
             remainingMB: parseFloat(
-              Math.max(
-                0,
-                (subscription.storageMB || 0) - realUsage.totalMB
-              ).toFixed(2)
+              Math.max(0, (subscription.storageMB || 0) - realUsage.totalMB).toFixed(2)
             ),
             recordedUsedMB: subscription.storageUsedMB || 0,
             discrepancy: parseFloat(
-              Math.abs(
-                (subscription.storageUsedMB || 0) - realUsage.totalMB
-              ).toFixed(2)
+              Math.abs((subscription.storageUsedMB || 0) - realUsage.totalMB).toFixed(2)
             ),
             expiresAt: subscription.expiresAt,
           }
@@ -715,12 +671,8 @@ router.post("/storage/sync/:userAddress", async (req, res) => {
       });
     }
 
-    const ipfsApiUrl =
-      req.app.get("IPFS_API_URL") ||
-      ipfsConfig.apiUrl ||
-      "http://127.0.0.1:5001";
-    const ipfsApiToken =
-      req.app.get("IPFS_API_TOKEN") || ipfsConfig.apiToken;
+    const ipfsApiUrl = req.app.get("IPFS_API_URL") || ipfsConfig.apiUrl || "http://127.0.0.1:5001";
+    const ipfsApiToken = req.app.get("IPFS_API_TOKEN") || ipfsConfig.apiToken;
 
     console.log(`Syncing storage for ${userAddress}...`);
 
@@ -739,9 +691,7 @@ router.post("/storage/sync/:userAddress", async (req, res) => {
         currentMB: parseFloat((syncResult.currentMB || 0).toFixed(2)),
         discrepancy: parseFloat((syncResult.discrepancy || 0).toFixed(2)),
         corrected: syncResult.corrected,
-        storageRemainingMB: parseFloat(
-          (syncResult.storageRemainingMB || 0).toFixed(2)
-        ),
+        storageRemainingMB: parseFloat((syncResult.storageRemainingMB || 0).toFixed(2)),
       },
       error: syncResult.error,
     });
@@ -779,12 +729,8 @@ router.get("/can-upload-verified/:userAddress", async (req, res) => {
       });
     }
 
-    const ipfsApiUrl =
-      req.app.get("IPFS_API_URL") ||
-      ipfsConfig.apiUrl ||
-      "http://127.0.0.1:5001";
-    const ipfsApiToken =
-      req.app.get("IPFS_API_TOKEN") || ipfsConfig.apiToken;
+    const ipfsApiUrl = req.app.get("IPFS_API_URL") || ipfsConfig.apiUrl || "http://127.0.0.1:5001";
+    const ipfsApiToken = req.app.get("IPFS_API_TOKEN") || ipfsConfig.apiToken;
 
     const result = await X402Merchant.canUploadVerified(
       gun,
@@ -826,17 +772,10 @@ router.get("/can-upload-verified/:userAddress", async (req, res) => {
  */
 router.get("/relay-storage", async (req, res) => {
   try {
-    const ipfsApiUrl =
-      req.app.get("IPFS_API_URL") ||
-      ipfsConfig.apiUrl ||
-      "http://127.0.0.1:5001";
-    const ipfsApiToken =
-      req.app.get("IPFS_API_TOKEN") || ipfsConfig.apiToken;
+    const ipfsApiUrl = req.app.get("IPFS_API_URL") || ipfsConfig.apiUrl || "http://127.0.0.1:5001";
+    const ipfsApiToken = req.app.get("IPFS_API_TOKEN") || ipfsConfig.apiToken;
 
-    const relayStorage = await X402Merchant.getRelayStorageStatus(
-      ipfsApiUrl,
-      ipfsApiToken
-    );
+    const relayStorage = await X402Merchant.getRelayStorageStatus(ipfsApiUrl, ipfsApiToken);
 
     if (!relayStorage.available) {
       return res.status(503).json({
@@ -859,7 +798,7 @@ router.get("/relay-storage", async (req, res) => {
         warning: relayStorage.warning,
         warningThreshold: relayStorage.warningThreshold,
         full: relayStorage.full,
-        numObjects: relayStorage.numberObjects ,
+        numObjects: relayStorage.numberObjects,
       },
       message: relayStorage.full
         ? "Relay storage is FULL - no new subscriptions can be accepted"
@@ -897,26 +836,16 @@ router.get("/relay-storage/detailed", async (req, res) => {
       });
     }
 
-    const ipfsApiUrl =
-      req.app.get("IPFS_API_URL") ||
-      ipfsConfig.apiUrl ||
-      "http://127.0.0.1:5001";
-    const ipfsApiToken =
-      req.app.get("IPFS_API_TOKEN") || ipfsConfig.apiToken;
+    const ipfsApiUrl = req.app.get("IPFS_API_URL") || ipfsConfig.apiUrl || "http://127.0.0.1:5001";
+    const ipfsApiToken = req.app.get("IPFS_API_TOKEN") || ipfsConfig.apiToken;
 
     console.log("Fetching detailed relay storage (this may take a while)...");
 
     // Get relay storage status
-    const relayStorage = await X402Merchant.getRelayStorageStatus(
-      ipfsApiUrl,
-      ipfsApiToken
-    );
+    const relayStorage = await X402Merchant.getRelayStorageStatus(ipfsApiUrl, ipfsApiToken);
 
     // Get all pins with sizes
-    const pinsInfo = await X402Merchant.getAllPinsSize(
-      ipfsApiUrl,
-      ipfsApiToken
-    );
+    const pinsInfo = await X402Merchant.getAllPinsSize(ipfsApiUrl, ipfsApiToken);
 
     res.json({
       success: true,
@@ -1012,10 +941,7 @@ router.get("/recommend", async (req, res) => {
       try {
         const gun = req.app.get("gunInstance");
         if (gun) {
-          const subStatus = await X402Merchant.getSubscriptionStatus(
-            gun,
-            userAddress as string
-          );
+          const subStatus = await X402Merchant.getSubscriptionStatus(gun, userAddress as string);
           if (subStatus.active) {
             hasActiveSubscription = true;
             subscriptionRemainingMB = subStatus.storageRemainingMB || 0;
@@ -1030,12 +956,8 @@ router.get("/recommend", async (req, res) => {
               recommendation.reasons.push(
                 `You have ${subscriptionRemainingMB.toFixed(1)}MB available in your subscription`
               );
-              recommendation.reasons.push(
-                `File fits within your subscription quota`
-              );
-              recommendation.reasons.push(
-                `Duration is within subscription period (30 days)`
-              );
+              recommendation.reasons.push(`File fits within your subscription quota`);
+              recommendation.reasons.push(`Duration is within subscription period (30 days)`);
             }
           }
         }
@@ -1051,9 +973,7 @@ router.get("/recommend", async (req, res) => {
       recommendation.reasons.push(
         `File is very large (${sizeMB.toFixed(1)}MB) - deals handle large files better`
       );
-      recommendation.reasons.push(
-        `Deals support erasure coding for large files`
-      );
+      recommendation.reasons.push(`Deals support erasure coding for large files`);
       recommendation.reasons.push(`More cost-effective for large single files`);
 
       if (hasActiveSubscription) {
@@ -1068,9 +988,7 @@ router.get("/recommend", async (req, res) => {
       recommendation.reasons.push(
         `File is large (${sizeMB.toFixed(1)}MB) - deals offer better pricing for large files`
       );
-      recommendation.reasons.push(
-        `Deals provide per-file guarantees and on-chain verification`
-      );
+      recommendation.reasons.push(`Deals provide per-file guarantees and on-chain verification`);
 
       if (hasActiveSubscription && subscriptionRemainingMB >= sizeMB) {
         recommendation.alternatives.push({
@@ -1085,9 +1003,7 @@ router.get("/recommend", async (req, res) => {
         `Long duration (${duration} days) - deals support flexible durations up to 5 years`
       );
       recommendation.reasons.push(`Deals can be renewed without losing data`);
-      recommendation.reasons.push(
-        `On-chain verification provides permanent record`
-      );
+      recommendation.reasons.push(`On-chain verification provides permanent record`);
 
       if (hasActiveSubscription) {
         recommendation.alternatives.push({
@@ -1101,22 +1017,14 @@ router.get("/recommend", async (req, res) => {
       recommendation.reasons.push(
         `Combination of file size (${sizeMB.toFixed(1)}MB) and duration (${duration} days) makes deals more suitable`
       );
-      recommendation.reasons.push(
-        `Deals provide better guarantees for important files`
-      );
-    } else if (
-      hasActiveSubscription &&
-      subscriptionRemainingMB >= sizeMB &&
-      duration <= 30
-    ) {
+      recommendation.reasons.push(`Deals provide better guarantees for important files`);
+    } else if (hasActiveSubscription && subscriptionRemainingMB >= sizeMB && duration <= 30) {
       // Small file, short duration, has subscription -> Subscription
       recommendation.recommended = "subscription";
       recommendation.reasons.push(
         `File fits in your subscription quota (${subscriptionRemainingMB.toFixed(1)}MB remaining)`
       );
-      recommendation.reasons.push(
-        `Duration (${duration} days) fits within subscription period`
-      );
+      recommendation.reasons.push(`Duration (${duration} days) fits within subscription period`);
       recommendation.reasons.push(`No additional payment needed`);
 
       recommendation.alternatives.push({
@@ -1126,12 +1034,8 @@ router.get("/recommend", async (req, res) => {
     } else {
       // Default: Subscription for small/medium files with short duration
       recommendation.recommended = "subscription";
-      recommendation.reasons.push(
-        `File size (${sizeMB.toFixed(1)}MB) fits subscription tiers`
-      );
-      recommendation.reasons.push(
-        `Duration (${duration} days) fits subscription model`
-      );
+      recommendation.reasons.push(`File size (${sizeMB.toFixed(1)}MB) fits subscription tiers`);
+      recommendation.reasons.push(`Duration (${duration} days) fits subscription model`);
       recommendation.reasons.push(
         `Subscription is simpler and more cost-effective for regular use`
       );
@@ -1162,13 +1066,8 @@ router.get("/recommend", async (req, res) => {
       }
 
       // Deal cost
-      const dealTier =
-        sizeMB > VERY_LARGE_FILE_THRESHOLD_MB ? "premium" : "standard";
-      const dealPricing = StorageDeals.calculateDealPrice(
-        sizeMB,
-        duration,
-        dealTier
-      );
+      const dealTier = sizeMB > VERY_LARGE_FILE_THRESHOLD_MB ? "premium" : "standard";
+      const dealPricing = StorageDeals.calculateDealPrice(sizeMB, duration, dealTier);
       const dealCost = dealPricing.totalPriceUSDC;
 
       recommendation.comparison = {

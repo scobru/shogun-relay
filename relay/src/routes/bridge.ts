@@ -1,6 +1,6 @@
 /**
  * Bridge Routes - L2 Bridge API
- * 
+ *
  * Endpoints:
  * - POST /api/v1/bridge/deposit - Deposit ETH to bridge (client-side, emits event)
  * - POST /api/v1/bridge/transfer - Transfer balance between users (L2 -> L2)
@@ -52,7 +52,13 @@ import { ethers } from "ethers";
 import { submitBatch } from "../utils/batch-submitter";
 import { adminAuthMiddleware } from "../middleware/admin-auth";
 import rateLimit from "express-rate-limit";
-import { isValidEthereumAddress, isValidAmount, validateString, isValidSignatureFormat, sanitizeForLog } from "../utils/security";
+import {
+  isValidEthereumAddress,
+  isValidAmount,
+  validateString,
+  isValidSignatureFormat,
+  sanitizeForLog,
+} from "../utils/security";
 import * as Reputation from "../utils/relay-reputation";
 import { getRelayKeyPair } from "../utils/relay-user";
 import { relayConfig } from "../config/env-config";
@@ -76,7 +82,7 @@ const bridgeLimiter = rateLimit({
   max: 20, // 20 requests per minute per IP
   message: {
     success: false,
-    error: "Too many requests, please try again later"
+    error: "Too many requests, please try again later",
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -88,7 +94,7 @@ const strictLimiter = rateLimit({
   max: 10, // 10 requests per minute per IP
   message: {
     success: false,
-    error: "Too many requests, please try again later"
+    error: "Too many requests, please try again later",
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -124,7 +130,7 @@ function getBridgeClient(): BridgeClient {
 
 /**
  * POST /api/v1/bridge/deposit
- * 
+ *
  * Note: This endpoint is informational. Actual deposits should be done
  * directly on-chain by calling the contract's deposit() function.
  * This endpoint can be used to verify deposits or get deposit instructions.
@@ -162,10 +168,10 @@ router.post("/deposit", express.json(), async (req, res) => {
 
 /**
  * POST /api/v1/bridge/transfer
- * 
+ *
  * Transfer balance from one user to another (L2 -> L2).
  * This is a pure L2 operation - no on-chain transaction needed.
- * 
+ *
  * Flow:
  * 1. Check sender has sufficient balance
  * 2. Debit sender balance (frozen entry)
@@ -277,7 +283,7 @@ router.post("/transfer", strictLimiter, express.json(), async (req, res) => {
 
 /**
  * POST /api/v1/bridge/withdraw
- * 
+ *
  * Request a withdrawal from L2. This:
  * 1. Checks user has sufficient balance
  * 2. Debits the balance
@@ -348,7 +354,10 @@ router.post("/withdraw", strictLimiter, express.json(), async (req, res) => {
       // Auto-generate: lastNonce + 1
       const lastNonce = getLastNonce(userAddress);
       nonceBigInt = lastNonce + 1n;
-      log.debug({ user: userAddress, autoNonce: nonceBigInt.toString() }, "Auto-generated nonce for withdrawal");
+      log.debug(
+        { user: userAddress, autoNonce: nonceBigInt.toString() },
+        "Auto-generated nonce for withdrawal"
+      );
     }
 
     // Validate message and signatures
@@ -360,14 +369,14 @@ router.post("/withdraw", strictLimiter, express.json(), async (req, res) => {
       });
     }
 
-    if (!isValidSignatureFormat(seaSignature, 'sea')) {
+    if (!isValidSignatureFormat(seaSignature, "sea")) {
       return res.status(400).json({
         success: false,
         error: "Invalid SEA signature format",
       });
     }
 
-    if (!isValidSignatureFormat(ethSignature, 'eth')) {
+    if (!isValidSignatureFormat(ethSignature, "eth")) {
       return res.status(400).json({
         success: false,
         error: "Invalid Ethereum signature format",
@@ -414,7 +423,8 @@ router.post("/withdraw", strictLimiter, express.json(), async (req, res) => {
       );
       return res.status(401).json({
         success: false,
-        error: "Invalid signatures: must provide valid SEA and Ethereum signatures with correct message content",
+        error:
+          "Invalid signatures: must provide valid SEA and Ethereum signatures with correct message content",
       });
     }
 
@@ -442,11 +452,7 @@ router.post("/withdraw", strictLimiter, express.json(), async (req, res) => {
     // SECURITY: Check if withdrawal with this nonce is already processed on-chain
     // This prevents users from losing balance if they try to reuse a nonce
     const client = getBridgeClient();
-    const isProcessed = await client.isWithdrawalProcessed(
-      userAddress,
-      amountBigInt,
-      nonceBigInt
-    );
+    const isProcessed = await client.isWithdrawalProcessed(userAddress, amountBigInt, nonceBigInt);
 
     if (isProcessed) {
       return res.status(400).json({
@@ -457,7 +463,13 @@ router.post("/withdraw", strictLimiter, express.json(), async (req, res) => {
 
     // Debit balance (requires relay keypair for security)
     // Pass the nonce so the debit entry can be linked to this specific withdrawal
-    const debitHash = await debitBalance(gun, userAddress, amountBigInt, relayKeyPair, nonceBigInt.toString());
+    const debitHash = await debitBalance(
+      gun,
+      userAddress,
+      amountBigInt,
+      relayKeyPair,
+      nonceBigInt.toString()
+    );
 
     // Update last nonce for this user (only after successful debit)
     setLastNonce(userAddress, nonceBigInt);
@@ -497,7 +509,7 @@ router.post("/withdraw", strictLimiter, express.json(), async (req, res) => {
           errorMessage: addErrorMessage,
           user: userAddress,
           amount: amountBigInt.toString(),
-          nonce: nonceBigInt.toString()
+          nonce: nonceBigInt.toString(),
         },
         "Error adding pending withdrawal (balance already debited)"
       );
@@ -532,7 +544,7 @@ router.post("/withdraw", strictLimiter, express.json(), async (req, res) => {
 
 /**
  * POST /api/v1/bridge/submit-batch
- * 
+ *
  * Sequencer endpoint: Submit a batch with Merkle root.
  * This:
  * 1. Gets all pending withdrawals
@@ -609,7 +621,7 @@ router.post("/submit-batch", express.json(), async (req, res) => {
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log.error({ error: errorMessage }, "Error in submit-batch endpoint");
-    
+
     // Record batch submission failure for reputation tracking
     try {
       const gun = req.app.get("gunInstance");
@@ -623,7 +635,7 @@ router.post("/submit-batch", express.json(), async (req, res) => {
     } catch (e) {
       log.warn({ err: e }, "Failed to record batch submission failure for reputation");
     }
-    
+
     res.status(500).json({
       success: false,
       error: errorMessage,
@@ -633,7 +645,7 @@ router.post("/submit-batch", express.json(), async (req, res) => {
 
 /**
  * GET /api/v1/bridge/balance/:user
- * 
+ *
  * Get user's L2 balance
  */
 router.get("/balance/:user", async (req, res) => {
@@ -671,7 +683,7 @@ router.get("/balance/:user", async (req, res) => {
       {
         user: userAddress,
         balance: balance.toString(),
-        balanceEth: ethers.formatEther(balance)
+        balanceEth: ethers.formatEther(balance),
       },
       "Balance retrieved"
     );
@@ -693,8 +705,287 @@ router.get("/balance/:user", async (req, res) => {
 });
 
 /**
+ * GET /api/v1/bridge/balance-info/:user
+ *
+ * Get user's L2 balance with verification data for client-side proof checking.
+ * Returns the balance along with the last batch where user operations were included,
+ * enabling independent verification against on-chain Merkle roots.
+ */
+router.get("/balance-info/:user", async (req, res) => {
+  try {
+    const gun = req.app.get("gunInstance");
+    if (!gun) {
+      return res.status(503).json({
+        success: false,
+        error: "GunDB not initialized",
+      });
+    }
+
+    const { user } = req.params;
+
+    let userAddress: string;
+    try {
+      userAddress = ethers.getAddress(user);
+    } catch {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid user address",
+      });
+    }
+
+    const normalizedUser = userAddress.toLowerCase();
+
+    // Get balance
+    const balance = await getUserBalance(gun, userAddress);
+
+    // Get the latest batch where this user has a withdrawal
+    const latestBatch = await getLatestBatch(gun);
+    let lastUserBatch: Batch | null = null;
+    let lastUserWithdrawal: PendingWithdrawal | null = null;
+
+    if (latestBatch) {
+      // Search for user's withdrawal in latest batch
+      const userWithdrawal = latestBatch.withdrawals.find((w: PendingWithdrawal) => {
+        const wUser = (typeof w.user === "string" ? w.user : String(w.user || "")).toLowerCase();
+        return wUser === normalizedUser;
+      });
+
+      if (userWithdrawal) {
+        lastUserBatch = latestBatch;
+        lastUserWithdrawal = userWithdrawal;
+      } else {
+        // Search older batches
+        const batchesPath = "bridge/batches";
+        const batchIds: string[] = [];
+
+        await new Promise<void>((resolve) => {
+          gun
+            .get(batchesPath)
+            .map()
+            .once((batch: any, key: string) => {
+              if (key && !key.startsWith("_") && batch?.batchId) {
+                batchIds.push(batch.batchId);
+              }
+            });
+          setTimeout(resolve, 500);
+        });
+
+        for (const batchId of batchIds.reverse()) {
+          const batch = await getBatch(gun, batchId);
+          if (batch) {
+            const userW = batch.withdrawals.find((w: PendingWithdrawal) => {
+              const wUser = (typeof w.user === "string" ? w.user : String(w.user || "")).toLowerCase();
+              return wUser === normalizedUser;
+            });
+            if (userW) {
+              lastUserBatch = batch;
+              lastUserWithdrawal = userW;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Build verification object
+    let verification: any = null;
+
+    if (lastUserBatch && lastUserWithdrawal) {
+      // Generate Merkle proof for user's last recorded withdrawal
+      const withdrawals: WithdrawalLeaf[] = lastUserBatch.withdrawals.map((w: PendingWithdrawal) => ({
+        user: w.user,
+        amount: BigInt(typeof w.amount === "string" ? w.amount : String(w.amount)),
+        nonce: BigInt(typeof w.nonce === "string" ? w.nonce : String(w.nonce)),
+      }));
+
+      const proof = generateProof(
+        withdrawals,
+        lastUserWithdrawal.user,
+        BigInt(lastUserWithdrawal.amount),
+        BigInt(lastUserWithdrawal.nonce)
+      );
+
+      // Check if batch is finalized on-chain
+      let verifiedOnChain = false;
+      try {
+        const client = getBridgeClient();
+        const batchInfo = await client.getBatchInfo(BigInt(lastUserBatch.batchId));
+        verifiedOnChain = batchInfo.finalized;
+      } catch {
+        // Non-critical, just means we can't verify on-chain status
+      }
+
+      verification = {
+        lastBatchId: lastUserBatch.batchId,
+        lastBatchRoot: lastUserBatch.root,
+        lastBatchTxHash: lastUserBatch.txHash || null,
+        lastBatchTimestamp: lastUserBatch.timestamp,
+        lastWithdrawal: {
+          amount: lastUserWithdrawal.amount,
+          nonce: lastUserWithdrawal.nonce,
+          timestamp: lastUserWithdrawal.timestamp,
+        },
+        merkleProof: proof,
+        verifiedOnChain,
+      };
+    }
+
+    // Get processed deposits count
+    const processedDeposits = await getProcessedDepositsForUser(gun, normalizedUser);
+
+    res.json({
+      success: true,
+      user: userAddress,
+      balance: balance.toString(),
+      balanceEth: ethers.formatEther(balance),
+      verification,
+      stats: {
+        processedDepositsCount: processedDeposits.length,
+        hasVerificationData: verification !== null,
+      },
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log.error({ error }, "Error getting balance info");
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+});
+
+/**
+ * GET /api/v1/bridge/batch-history/:user
+ *
+ * Get batch history for a user - all batches where user has deposits or withdrawals.
+ * This enables users to track their complete on-chain activity.
+ */
+router.get("/batch-history/:user", async (req, res) => {
+  try {
+    const gun = req.app.get("gunInstance");
+    if (!gun) {
+      return res.status(503).json({
+        success: false,
+        error: "GunDB not initialized",
+      });
+    }
+
+    const { user } = req.params;
+
+    let userAddress: string;
+    try {
+      userAddress = ethers.getAddress(user);
+    } catch {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid user address",
+      });
+    }
+
+    const normalizedUser = userAddress.toLowerCase();
+
+    // Collect all batch IDs
+    const batchesPath = "bridge/batches";
+    const batchIds: string[] = [];
+
+    await new Promise<void>((resolve) => {
+      gun
+        .get(batchesPath)
+        .map()
+        .once((batch: any, key: string) => {
+          if (key && !key.startsWith("_") && batch?.batchId) {
+            batchIds.push(batch.batchId);
+          }
+        });
+      setTimeout(resolve, 1000);
+    });
+
+    // Find all batches with user withdrawals
+    const userBatches: Array<{
+      batchId: string;
+      root: string;
+      txHash: string | null;
+      timestamp: number;
+      finalized: boolean;
+      withdrawals: Array<{
+        amount: string;
+        nonce: string;
+        timestamp: number;
+      }>;
+    }> = [];
+
+    const client = getBridgeClient();
+
+    for (const batchId of batchIds) {
+      const batch = await getBatch(gun, batchId);
+      if (!batch) continue;
+
+      const userWithdrawals = batch.withdrawals.filter((w: PendingWithdrawal) => {
+        const wUser = (typeof w.user === "string" ? w.user : String(w.user || "")).toLowerCase();
+        return wUser === normalizedUser;
+      });
+
+      if (userWithdrawals.length > 0) {
+        // Check on-chain status
+        let finalized = false;
+        try {
+          const batchInfo = await client.getBatchInfo(BigInt(batchId));
+          finalized = batchInfo.finalized;
+        } catch {
+          // Non-critical
+        }
+
+        userBatches.push({
+          batchId: batch.batchId,
+          root: batch.root,
+          txHash: batch.txHash || null,
+          timestamp: batch.timestamp,
+          finalized,
+          withdrawals: userWithdrawals.map((w: PendingWithdrawal) => ({
+            amount: typeof w.amount === "string" ? w.amount : String(w.amount),
+            nonce: typeof w.nonce === "string" ? w.nonce : String(w.nonce),
+            timestamp: w.timestamp,
+          })),
+        });
+      }
+    }
+
+    // Get processed deposits
+    const processedDeposits = await getProcessedDepositsForUser(gun, normalizedUser);
+
+    // Sort by timestamp (newest first)
+    userBatches.sort((a, b) => b.timestamp - a.timestamp);
+
+    res.json({
+      success: true,
+      user: userAddress,
+      batches: userBatches,
+      deposits: processedDeposits.map((d) => ({
+        txHash: d.txHash,
+        amount: d.amount,
+        amountEth: ethers.formatEther(BigInt(d.amount)),
+        blockNumber: d.blockNumber,
+        timestamp: d.timestamp,
+      })),
+      summary: {
+        totalBatches: userBatches.length,
+        totalDeposits: processedDeposits.length,
+        totalWithdrawals: userBatches.reduce((sum, b) => sum + b.withdrawals.length, 0),
+      },
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log.error({ error }, "Error getting batch history");
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+});
+
+/**
  * GET /api/v1/bridge/pending-withdrawals
- * 
+ *
  * Get all pending withdrawals (waiting for batch submission)
  */
 router.get("/pending-withdrawals", async (req, res) => {
@@ -726,14 +1017,14 @@ router.get("/pending-withdrawals", async (req, res) => {
 
 /**
  * GET /api/v1/bridge/nonce/:user
- * 
+ *
  * Get the next nonce for a user (for withdrawal requests).
  * This allows clients to include the nonce in their signed message.
  */
 router.get("/nonce/:user", async (req, res) => {
   try {
     const { user } = req.params;
-    
+
     let userAddress: string;
     try {
       userAddress = ethers.getAddress(user);
@@ -764,14 +1055,14 @@ router.get("/nonce/:user", async (req, res) => {
 
 /**
  * GET /api/v1/bridge/proof/:user/:amount/:nonce
- * 
+ *
  * Generate Merkle proof for a withdrawal.
  * The withdrawal must be included in the latest batch.
  */
 router.get("/proof/:user/:amount/:nonce", async (req, res) => {
   const startTime = Date.now();
   let proofGenerated = false;
-  
+
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
@@ -802,12 +1093,14 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     const pendingWithdrawals = await getPendingWithdrawals(gun);
     const normalizedUserAddressForPending = userAddress.toLowerCase();
     const pendingWithdrawal = pendingWithdrawals.find((w: PendingWithdrawal) => {
-      const wUser = (typeof w.user === 'string' ? w.user : String(w.user || '')).toLowerCase();
-      const wAmount = typeof w.amount === 'string' ? w.amount : String(w.amount || '0');
-      const wNonce = typeof w.nonce === 'string' ? w.nonce : String(w.nonce || '0');
-      return wUser === normalizedUserAddressForPending &&
+      const wUser = (typeof w.user === "string" ? w.user : String(w.user || "")).toLowerCase();
+      const wAmount = typeof w.amount === "string" ? w.amount : String(w.amount || "0");
+      const wNonce = typeof w.nonce === "string" ? w.nonce : String(w.nonce || "0");
+      return (
+        wUser === normalizedUserAddressForPending &&
         wAmount === amountBigInt.toString() &&
-        wNonce === nonceBigInt.toString();
+        wNonce === nonceBigInt.toString()
+      );
     });
 
     if (pendingWithdrawal) {
@@ -817,7 +1110,8 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
       return res.status(202).json({
         success: false,
         status: "pending",
-        message: "Withdrawal is queued but not yet included in a batch. Please wait for the next batch submission.",
+        message:
+          "Withdrawal is queued but not yet included in a batch. Please wait for the next batch submission.",
         withdrawal: {
           user: userAddress,
           amount: amountBigInt.toString(),
@@ -839,7 +1133,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     // Use map().on() to collect all batch IDs
     parentNode.map().on((batch: any, key: string) => {
       // Skip metadata keys
-      if (key === '_' || key.startsWith('_') || !key) {
+      if (key === "_" || key.startsWith("_") || !key) {
         return;
       }
 
@@ -847,9 +1141,9 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
 
       if (
         batch &&
-        typeof batch === 'object' &&
-        typeof batch.batchId === 'string' &&
-        typeof batch.root === 'string'
+        typeof batch === "object" &&
+        typeof batch.batchId === "string" &&
+        typeof batch.root === "string"
       ) {
         if (!collectedKeys.has(key)) {
           collectedKeys.add(key);
@@ -861,22 +1155,27 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
 
     // Also try reading the parent node directly
     parentNode.once((parentData: any) => {
-      if (parentData && typeof parentData === 'object') {
-        Object.keys(parentData).forEach(key => {
-          if (key === '_' || key.startsWith('_')) return;
+      if (parentData && typeof parentData === "object") {
+        Object.keys(parentData).forEach((key) => {
+          if (key === "_" || key.startsWith("_")) return;
 
           const batch = parentData[key];
           if (
             batch &&
-            typeof batch === 'object' &&
-            typeof batch.batchId === 'string' &&
-            typeof batch.root === 'string'
+            typeof batch === "object" &&
+            typeof batch.batchId === "string" &&
+            typeof batch.root === "string"
           ) {
             if (!collectedKeys.has(key)) {
               collectedKeys.add(key);
               batchIdsMap.set(key, batch.batchId);
               log.debug(
-                { key, batchId: batch.batchId, source: 'direct-read', totalFound: batchIdsMap.size },
+                {
+                  key,
+                  batchId: batch.batchId,
+                  source: "direct-read",
+                  totalFound: batchIdsMap.size,
+                },
                 "Found batch ID via direct read for proof search"
               );
             }
@@ -886,7 +1185,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     });
 
     // Wait a bit for batch IDs to be collected
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     // Also try getting batch from contract's current batch ID as fallback
     try {
@@ -904,7 +1203,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
           // Use batchId as both key and value for contract-fetched batch
           batchIdsMap.set(batchIdStr, batchIdStr);
           log.debug(
-            { batchId: batchIdStr, source: 'contract' },
+            { batchId: batchIdStr, source: "contract" },
             "Added batch ID from contract for proof search"
           );
         }
@@ -917,10 +1216,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     }
 
     const batchIds = Array.from(batchIdsMap.values());
-    log.debug(
-      { batchIdsCount: batchIds.length, batchIds },
-      "Collected batch IDs for proof search"
-    );
+    log.debug({ batchIdsCount: batchIds.length, batchIds }, "Collected batch IDs for proof search");
 
     if (batchIds.length === 0) {
       log.warn(
@@ -936,7 +1232,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     // Fetch all batches and search for the withdrawal
     // Fetching all batches to search for withdrawal - only log if count is unusual
 
-    const batchPromises = batchIds.map(id => getBatch(gun, id));
+    const batchPromises = batchIds.map((id) => getBatch(gun, id));
     const batches = await Promise.all(batchPromises);
     const validBatches = batches.filter((b: Batch | null): b is Batch => b !== null);
 
@@ -967,9 +1263,11 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
 
       const withdrawal = batch.withdrawals.find((w: PendingWithdrawal) => {
         // Robust matching: handle both string and number types
-        const withdrawalUser = (typeof w.user === 'string' ? w.user : String(w.user || '')).toLowerCase();
-        const withdrawalAmount = typeof w.amount === 'string' ? w.amount : String(w.amount || '0');
-        const withdrawalNonce = typeof w.nonce === 'string' ? w.nonce : String(w.nonce || '0');
+        const withdrawalUser = (
+          typeof w.user === "string" ? w.user : String(w.user || "")
+        ).toLowerCase();
+        const withdrawalAmount = typeof w.amount === "string" ? w.amount : String(w.amount || "0");
+        const withdrawalNonce = typeof w.nonce === "string" ? w.nonce : String(w.nonce || "0");
 
         const userMatch = withdrawalUser === normalizedUserAddress;
         const amountMatch = withdrawalAmount === normalizedAmount;
@@ -1012,8 +1310,8 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
             withdrawalCount: b.withdrawals.length,
             withdrawals: b.withdrawals.map((w: PendingWithdrawal) => ({
               user: w.user?.toLowerCase(),
-              amount: typeof w.amount === 'string' ? w.amount : String(w.amount),
-              nonce: typeof w.nonce === 'string' ? w.nonce : String(w.nonce),
+              amount: typeof w.amount === "string" ? w.amount : String(w.amount),
+              nonce: typeof w.nonce === "string" ? w.nonce : String(w.nonce),
             })),
           })),
         },
@@ -1038,7 +1336,8 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
           return res.status(200).json({
             success: true,
             status: "already_processed",
-            message: "This withdrawal has already been processed on-chain. Check your wallet for the funds.",
+            message:
+              "This withdrawal has already been processed on-chain. Check your wallet for the funds.",
             withdrawal: {
               user: userAddress,
               amount: amountBigInt.toString(),
@@ -1055,16 +1354,18 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
 
       return res.status(404).json({
         success: false,
-        error: "Withdrawal not found in any submitted batch. It may still be pending batch submission.",
-        suggestion: "Please wait for the next batch submission (every 5 minutes) or check your pending withdrawals.",
+        error:
+          "Withdrawal not found in any submitted batch. It may still be pending batch submission.",
+        suggestion:
+          "Please wait for the next batch submission (every 5 minutes) or check your pending withdrawals.",
       });
     }
 
     // Generate proof
     const withdrawals: WithdrawalLeaf[] = foundBatch.withdrawals.map((w: PendingWithdrawal) => ({
       user: w.user,
-      amount: BigInt(typeof w.amount === 'string' ? w.amount : String(w.amount)),
-      nonce: BigInt(typeof w.nonce === 'string' ? w.nonce : String(w.nonce)),
+      amount: BigInt(typeof w.amount === "string" ? w.amount : String(w.amount)),
+      nonce: BigInt(typeof w.nonce === "string" ? w.nonce : String(w.nonce)),
     }));
 
     // Generating Merkle proof - only log errors
@@ -1073,10 +1374,15 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
 
     if (!proof) {
       log.error(
-        { batchId: foundBatch.batchId, user: userAddress, amount: normalizedAmount, nonce: normalizedNonce },
+        {
+          batchId: foundBatch.batchId,
+          user: userAddress,
+          amount: normalizedAmount,
+          nonce: normalizedNonce,
+        },
         "Failed to generate proof"
       );
-      
+
       // Record proof failure for reputation tracking
       try {
         const relayHost = getRelayHost(req);
@@ -1087,7 +1393,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
       } catch (e) {
         log.warn({ err: e }, "Failed to record bridge proof failure for reputation");
       }
-      
+
       return res.status(500).json({
         success: false,
         error: "Failed to generate proof",
@@ -1123,8 +1429,11 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    log.error({ error, user: req.params.user, amount: req.params.amount, nonce: req.params.nonce }, "Error generating proof");
-    
+    log.error(
+      { error, user: req.params.user, amount: req.params.amount, nonce: req.params.nonce },
+      "Error generating proof"
+    );
+
     // Record proof failure for reputation tracking (if not already recorded)
     if (!proofGenerated) {
       try {
@@ -1140,7 +1449,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
         log.warn({ err: e }, "Failed to record bridge proof failure for reputation");
       }
     }
-    
+
     res.status(500).json({
       success: false,
       error: errorMessage,
@@ -1150,7 +1459,7 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
 
 /**
  * GET /api/v1/bridge/state
- * 
+ *
  * Get current bridge state (root, batchId, contract balance, etc.)
  */
 router.get("/state", async (req, res) => {
@@ -1186,21 +1495,21 @@ router.get("/state", async (req, res) => {
 
 /**
  * POST /api/v1/bridge/refresh-trusted-relays
- * 
+ *
  * Force refresh the trusted relays cache from the on-chain registry.
  * This is useful when:
  * - A new relay has been registered
  * - A relay has been removed/unstaked
  * - You want to ensure you have the latest relay list
- * 
+ *
  * SECURITY: Public endpoint (no auth required) - cache refresh is safe
- * 
+ *
  * Response includes the list of trusted relay public keys.
  */
 router.post("/refresh-trusted-relays", express.json(), async (req, res) => {
   try {
-    const chainId = req.body?.chainId 
-      ? parseInt(req.body.chainId) 
+    const chainId = req.body?.chainId
+      ? parseInt(req.body.chainId)
       : parseInt(process.env.REGISTRY_CHAIN_ID || "84532");
 
     log.debug({ chainId }, "Forcing refresh of trusted relays cache");
@@ -1209,7 +1518,7 @@ router.post("/refresh-trusted-relays", express.json(), async (req, res) => {
 
     res.json({
       success: true,
-      trustedRelays: trustedRelays.map(pub => ({
+      trustedRelays: trustedRelays.map((pub) => ({
         pubKey: pub.substring(0, 32) + "...", // Truncated for security
         pubKeyLength: pub.length,
       })),
@@ -1228,405 +1537,410 @@ router.post("/refresh-trusted-relays", express.json(), async (req, res) => {
 
 /**
  * POST /api/v1/bridge/sync-deposits
- * 
+ *
  * Retroactively sync missed deposits from a block range.
  * This is useful if the relay missed some deposits due to downtime or errors.
- * 
+ *
  * SECURITY: Restricted to relay operators only (admin auth required)
- * 
+ *
  * Body: { fromBlock?: number, toBlock?: number | "latest", user?: string }
  * - fromBlock: Block to start from (default: contract deployment block or 0)
  * - toBlock: Block to end at (default: "latest")
  * - user: Optional - only sync deposits for this specific user
  */
-router.post("/sync-deposits", adminAuthMiddleware, express.json({ limit: '10mb' }), async (req, res) => {
-  try {
-    const gun = req.app.get("gunInstance");
-    if (!gun) {
-      return res.status(503).json({
-        success: false,
-        error: "GunDB not initialized",
-      });
-    }
-
-    // Validate request body
-    if (!req.body || typeof req.body !== 'object') {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid request body",
-      });
-    }
-
-    const { fromBlock, toBlock, user } = req.body;
-    const client = getBridgeClient();
-    const relayKeyPair = req.app.get("relayKeyPair");
-
-    if (!relayKeyPair) {
-      return res.status(500).json({
-        success: false,
-        error: "Relay keypair not configured",
-      });
-    }
-
-    // Determine block range
-    const fromBlockNumber = fromBlock !== undefined ? Number(fromBlock) : 0;
-    const toBlockNumber = toBlock !== "latest" && toBlock !== undefined
-      ? Number(toBlock)
-      : "latest";
-
-    log.debug(
-      { fromBlock: fromBlockNumber, toBlock: toBlockNumber, user },
-      "Starting retroactive deposit sync"
-    );
-
-    // Query deposits in the range (with optional user filter)
-    let allDeposits: DepositEvent[];
+router.post(
+  "/sync-deposits",
+  adminAuthMiddleware,
+  express.json({ limit: "10mb" }),
+  async (req, res) => {
     try {
-      allDeposits = await client.queryDeposits(
-        fromBlockNumber,
-        toBlockNumber,
-        user ? ethers.getAddress(user) : undefined
-      );
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-      log.error({
-        error: errorMsg,
-        errorStack,
-        fromBlock: fromBlockNumber,
-        toBlock: toBlockNumber,
-        user
-      }, "Error querying deposits");
-      throw error;
-    }
-
-    // All deposits are already filtered by user if user was specified
-    const depositsToCheck = allDeposits;
-
-    log.debug(
-      { total: allDeposits.length, toCheck: depositsToCheck.length, user },
-      "Deposits found in range"
-    );
-
-    // Query L1 withdrawals to calculate correct net balance
-    let allWithdrawals: { user: string; amount: bigint; nonce: bigint }[] = [];
-    try {
-      // Get unique users from deposits to query their withdrawals
-      const usersToCheck = user
-        ? [user.toLowerCase()]
-        : [...new Set(depositsToCheck.map(d => d.user.toLowerCase()))];
-
-      for (const userAddr of usersToCheck) {
-        const userWithdrawals = await client.queryWithdrawals(
-          fromBlockNumber,
-          toBlockNumber,
-          userAddr
-        );
-        allWithdrawals.push(...userWithdrawals.map(w => ({
-          user: w.user.toLowerCase(),
-          amount: w.amount,
-          nonce: w.nonce,
-        })));
+      const gun = req.app.get("gunInstance");
+      if (!gun) {
+        return res.status(503).json({
+          success: false,
+          error: "GunDB not initialized",
+        });
       }
 
-      log.debug(
-        { withdrawals: allWithdrawals.length },
-        "L1 withdrawals found for balance calculation"
-      );
-    } catch (error) {
-      log.warn(
-        { error },
-        "Failed to query L1 withdrawals - will calculate balance from deposits only"
-      );
-    }
+      // Validate request body
+      if (!req.body || typeof req.body !== "object") {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid request body",
+        });
+      }
 
-    const results = {
-      total: depositsToCheck.length,
-      processed: 0,
-      skipped: 0,
-      failed: 0,
-      withdrawals: allWithdrawals.length,
-      errors: [] as string[],
-    };
+      const { fromBlock, toBlock, user } = req.body;
+      const client = getBridgeClient();
+      const relayKeyPair = req.app.get("relayKeyPair");
 
-    // Calculate expected balances for all users: deposits - withdrawals
-    // Note: L2 transfers are handled atomically and don't need recalculation
-    let userDepositsMap = new Map<string, bigint>(); // user -> total deposits
-    let userWithdrawalsMap = new Map<string, bigint>(); // user -> total withdrawals
+      if (!relayKeyPair) {
+        return res.status(500).json({
+          success: false,
+          error: "Relay keypair not configured",
+        });
+      }
 
-    // Sum deposits by user
-    for (const deposit of depositsToCheck) {
-      const normalizedUser = deposit.user.toLowerCase();
-      const currentTotal = userDepositsMap.get(normalizedUser) || 0n;
-      userDepositsMap.set(normalizedUser, currentTotal + deposit.amount);
-    }
-
-    // Sum withdrawals by user
-    for (const withdrawal of allWithdrawals) {
-      const normalizedUser = withdrawal.user.toLowerCase();
-      const currentTotal = userWithdrawalsMap.get(normalizedUser) || 0n;
-      userWithdrawalsMap.set(normalizedUser, currentTotal + withdrawal.amount);
-    }
-
-    // Calculate net expected balance (deposits - withdrawals) for each user
-    let userExpectedBalanceMap = new Map<string, bigint>();
-    for (const [user, deposits] of userDepositsMap.entries()) {
-      const withdrawals = userWithdrawalsMap.get(user) || 0n;
-      const netBalance = deposits - withdrawals;
-      userExpectedBalanceMap.set(user, netBalance > 0n ? netBalance : 0n);
+      // Determine block range
+      const fromBlockNumber = fromBlock !== undefined ? Number(fromBlock) : 0;
+      const toBlockNumber =
+        toBlock !== "latest" && toBlock !== undefined ? Number(toBlock) : "latest";
 
       log.debug(
-        { user, deposits: deposits.toString(), withdrawals: withdrawals.toString(), netBalance: netBalance.toString() },
-        "Calculated expected net balance for user"
+        { fromBlock: fromBlockNumber, toBlock: toBlockNumber, user },
+        "Starting retroactive deposit sync"
       );
-    }
 
-    // Process each deposit
-    for (const deposit of depositsToCheck) {
+      // Query deposits in the range (with optional user filter)
+      let allDeposits: DepositEvent[];
       try {
+        allDeposits = await client.queryDeposits(
+          fromBlockNumber,
+          toBlockNumber,
+          user ? ethers.getAddress(user) : undefined
+        );
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        log.error(
+          {
+            error: errorMsg,
+            errorStack,
+            fromBlock: fromBlockNumber,
+            toBlock: toBlockNumber,
+            user,
+          },
+          "Error querying deposits"
+        );
+        throw error;
+      }
+
+      // All deposits are already filtered by user if user was specified
+      const depositsToCheck = allDeposits;
+
+      log.debug(
+        { total: allDeposits.length, toCheck: depositsToCheck.length, user },
+        "Deposits found in range"
+      );
+
+      // Query L1 withdrawals to calculate correct net balance
+      let allWithdrawals: { user: string; amount: bigint; nonce: bigint }[] = [];
+      try {
+        // Get unique users from deposits to query their withdrawals
+        const usersToCheck = user
+          ? [user.toLowerCase()]
+          : [...new Set(depositsToCheck.map((d) => d.user.toLowerCase()))];
+
+        for (const userAddr of usersToCheck) {
+          const userWithdrawals = await client.queryWithdrawals(
+            fromBlockNumber,
+            toBlockNumber,
+            userAddr
+          );
+          allWithdrawals.push(
+            ...userWithdrawals.map((w) => ({
+              user: w.user.toLowerCase(),
+              amount: w.amount,
+              nonce: w.nonce,
+            }))
+          );
+        }
+
+        log.debug(
+          { withdrawals: allWithdrawals.length },
+          "L1 withdrawals found for balance calculation"
+        );
+      } catch (error) {
+        log.warn(
+          { error },
+          "Failed to query L1 withdrawals - will calculate balance from deposits only"
+        );
+      }
+
+      const results = {
+        total: depositsToCheck.length,
+        processed: 0,
+        skipped: 0,
+        failed: 0,
+        withdrawals: allWithdrawals.length,
+        errors: [] as string[],
+      };
+
+      // Calculate expected balances for all users: deposits - withdrawals
+      // Note: L2 transfers are handled atomically and don't need recalculation
+      let userDepositsMap = new Map<string, bigint>(); // user -> total deposits
+      let userWithdrawalsMap = new Map<string, bigint>(); // user -> total withdrawals
+
+      // Sum deposits by user
+      for (const deposit of depositsToCheck) {
         const normalizedUser = deposit.user.toLowerCase();
-        const depositKey = `${deposit.txHash}:${normalizedUser}:${deposit.amount}`;
+        const currentTotal = userDepositsMap.get(normalizedUser) || 0n;
+        userDepositsMap.set(normalizedUser, currentTotal + deposit.amount);
+      }
 
-        // Check if already processed
-        let alreadyProcessed = await isDepositProcessed(gun, depositKey);
+      // Sum withdrawals by user
+      for (const withdrawal of allWithdrawals) {
+        const normalizedUser = withdrawal.user.toLowerCase();
+        const currentTotal = userWithdrawalsMap.get(normalizedUser) || 0n;
+        userWithdrawalsMap.set(normalizedUser, currentTotal + withdrawal.amount);
+      }
 
-        // If marked as processed, verify the balance was actually credited
-        if (alreadyProcessed) {
-          const currentL2Balance = await getUserBalance(gun, normalizedUser);
+      // Calculate net expected balance (deposits - withdrawals) for each user
+      let userExpectedBalanceMap = new Map<string, bigint>();
+      for (const [user, deposits] of userDepositsMap.entries()) {
+        const withdrawals = userWithdrawalsMap.get(user) || 0n;
+        const netBalance = deposits - withdrawals;
+        userExpectedBalanceMap.set(user, netBalance > 0n ? netBalance : 0n);
 
-          // If balance is 0, the deposit was marked as processed but not actually credited
-          // This can happen if creditBalance failed silently or was interrupted
-          if (currentL2Balance === 0n) {
+        log.debug(
+          {
+            user,
+            deposits: deposits.toString(),
+            withdrawals: withdrawals.toString(),
+            netBalance: netBalance.toString(),
+          },
+          "Calculated expected net balance for user"
+        );
+      }
+
+      // Process each deposit
+      for (const deposit of depositsToCheck) {
+        try {
+          const normalizedUser = deposit.user.toLowerCase();
+          const depositKey = `${deposit.txHash}:${normalizedUser}:${deposit.amount}`;
+
+          // Check if already processed
+          let alreadyProcessed = await isDepositProcessed(gun, depositKey);
+
+          // If marked as processed, verify the balance was actually credited
+          if (alreadyProcessed) {
+            const currentL2Balance = await getUserBalance(gun, normalizedUser);
+
+            // If balance is 0, the deposit was marked as processed but not actually credited
+            // This can happen if creditBalance failed silently or was interrupted
+            if (currentL2Balance === 0n) {
+              log.warn(
+                {
+                  txHash: deposit.txHash,
+                  user: normalizedUser,
+                  amount: deposit.amount.toString(),
+                  depositKey,
+                  currentL2Balance: currentL2Balance.toString(),
+                },
+                "Deposit marked as processed but L2 balance is 0. Reprocessing to ensure funds are credited."
+              );
+              alreadyProcessed = false; // Force reprocessing
+            } else {
+              log.debug(
+                { txHash: deposit.txHash, user: normalizedUser },
+                "Deposit already processed, skipping"
+              );
+              results.skipped++;
+              continue;
+            }
+          }
+
+          // Verify transaction receipt
+          const provider = client.provider;
+          const receipt = await provider.getTransactionReceipt(deposit.txHash);
+
+          if (!receipt) {
+            log.warn({ txHash: deposit.txHash }, "Transaction receipt not found, skipping");
+            results.skipped++;
+            continue;
+          }
+
+          if (receipt.status !== 1) {
             log.warn(
-              {
-                txHash: deposit.txHash,
-                user: normalizedUser,
-                amount: deposit.amount.toString(),
-                depositKey,
-                currentL2Balance: currentL2Balance.toString(),
-              },
-              "Deposit marked as processed but L2 balance is 0. Reprocessing to ensure funds are credited."
-            );
-            alreadyProcessed = false; // Force reprocessing
-          } else {
-            log.debug(
-              { txHash: deposit.txHash, user: normalizedUser },
-              "Deposit already processed, skipping"
+              { txHash: deposit.txHash, status: receipt.status },
+              "Transaction failed, skipping"
             );
             results.skipped++;
             continue;
           }
-        }
 
-        // Verify transaction receipt
-        const provider = client.provider;
-        const receipt = await provider.getTransactionReceipt(deposit.txHash);
+          // Credit balance
+          await creditBalance(gun, normalizedUser, deposit.amount, relayKeyPair);
 
-        if (!receipt) {
-          log.warn(
-            { txHash: deposit.txHash },
-            "Transaction receipt not found, skipping"
-          );
-          results.skipped++;
-          continue;
-        }
+          // Poll to verify balance was actually written
+          let balanceVerified = false;
+          let attempts = 0;
+          const maxAttempts = 10; // 10 attempts * 500ms = 5 seconds
+          const pollInterval = 500;
 
-        if (receipt.status !== 1) {
-          log.warn(
-            { txHash: deposit.txHash, status: receipt.status },
-            "Transaction failed, skipping"
-          );
-          results.skipped++;
-          continue;
-        }
-
-        // Credit balance
-        await creditBalance(gun, normalizedUser, deposit.amount, relayKeyPair);
-
-        // Poll to verify balance was actually written
-        let balanceVerified = false;
-        let attempts = 0;
-        const maxAttempts = 10; // 10 attempts * 500ms = 5 seconds
-        const pollInterval = 500;
-
-        while (!balanceVerified && attempts < maxAttempts) {
-          const verifyBalance = await getUserBalance(gun, normalizedUser);
-          log.debug(
-            {
-              user: normalizedUser,
-              expectedAmount: ethers.formatEther(deposit.amount),
-              currentL2Balance: ethers.formatEther(verifyBalance),
-              txHash: deposit.txHash,
-              attempt: attempts + 1,
-            },
-            "Polling for L2 balance update after credit (sync)"
-          );
-
-          // Check if the balance is at least the deposited amount (or more if previous deposits exist)
-          if (verifyBalance >= deposit.amount) {
-            balanceVerified = true;
-          } else {
-            await new Promise(resolve => setTimeout(resolve, pollInterval));
-            attempts++;
-          }
-        }
-
-        if (!balanceVerified) {
-          log.error(
-            {
-              user: normalizedUser,
-              amount: deposit.amount.toString(),
-              txHash: deposit.txHash,
-              currentL2Balance: ethers.formatEther(await getUserBalance(gun, normalizedUser)),
-            },
-            "Failed to verify L2 balance update after credit within timeout during sync. Deposit will be retried."
-          );
-          // DO NOT mark as processed, so it can be retried
-          results.failed++;
-          results.errors.push(`${deposit.txHash}: Balance verification failed`);
-          continue;
-        }
-
-        // Mark as processed only after balance is verified
-        await markDepositProcessed(gun, depositKey, {
-          txHash: deposit.txHash,
-          user: normalizedUser,
-          amount: deposit.amount.toString(),
-          blockNumber: deposit.blockNumber,
-          timestamp: Date.now(),
-        });
-
-        const finalVerifyBalance = await getUserBalance(gun, normalizedUser);
-        log.debug(
-          {
-            txHash: deposit.txHash,
-            user: normalizedUser,
-            amount: ethers.formatEther(deposit.amount),
-            newBalance: ethers.formatEther(finalVerifyBalance),
-          },
-          "Deposit synced successfully and balance verified"
-        );
-
-        results.processed++;
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        log.error(
-          { error, txHash: deposit.txHash, user: deposit.user },
-          "Error syncing deposit"
-        );
-        results.failed++;
-        results.errors.push(`${deposit.txHash}: ${errorMsg}`);
-      }
-    }
-
-    // Final verification and correction: Check if actual balances match expected totals
-    // Expected = deposits - withdrawals (L2 transfers are already reflected in balance)
-    if (userExpectedBalanceMap.size > 0) {
-      log.debug(
-        { userCount: userExpectedBalanceMap.size },
-        "Verifying and correcting balances for all users (deposits - withdrawals)"
-      );
-
-      for (const [normalizedUser, expectedTotal] of userExpectedBalanceMap.entries()) {
-        try {
-          const actualBalance = await getUserBalance(gun, normalizedUser);
-
-          if (actualBalance !== expectedTotal) {
-            log.warn(
-              {
-                user: normalizedUser,
-                expectedBalance: expectedTotal.toString(),
-                actualBalance: actualBalance.toString(),
-                difference: (expectedTotal - actualBalance).toString(),
-              },
-              "Balance mismatch detected, correcting to expected net balance (deposits - withdrawals)"
-            );
-
-            // Create a new frozen entry with the correct balance
-            // This overwrites any incorrect entries due to race conditions
-            const balanceData: any = {
-              balance: expectedTotal.toString(),
-              ethereumAddress: normalizedUser,
-              updatedAt: Date.now(),
-              type: "bridge-balance",
-              corrected: true, // Flag to indicate this was a correction
-            };
-
-            await FrozenData.createFrozenEntry(
-              gun,
-              balanceData,
-              relayKeyPair,
-              "bridge-balances",
-              normalizedUser
-            );
-
-            // Verify the correction
-            await new Promise(resolve => setTimeout(resolve, 300));
-            const correctedBalance = await getUserBalance(gun, normalizedUser);
-
-            if (correctedBalance === expectedTotal) {
-              log.debug(
-                {
-                  user: normalizedUser,
-                  correctedBalance: correctedBalance.toString(),
-                },
-                "Balance corrected successfully"
-              );
-              results.processed++; // Count corrections as processed
-            } else {
-              log.error(
-                {
-                  user: normalizedUser,
-                  expectedBalance: expectedTotal.toString(),
-                  correctedBalance: correctedBalance.toString(),
-                },
-                "Failed to correct balance"
-              );
-              results.failed++;
-              results.errors.push(`Balance correction failed for ${normalizedUser}`);
-            }
-          } else {
+          while (!balanceVerified && attempts < maxAttempts) {
+            const verifyBalance = await getUserBalance(gun, normalizedUser);
             log.debug(
               {
                 user: normalizedUser,
-                balance: actualBalance.toString(),
+                expectedAmount: ethers.formatEther(deposit.amount),
+                currentL2Balance: ethers.formatEther(verifyBalance),
+                txHash: deposit.txHash,
+                attempt: attempts + 1,
               },
-              "Balance verified correct"
+              "Polling for L2 balance update after credit (sync)"
             );
+
+            // Check if the balance is at least the deposited amount (or more if previous deposits exist)
+            if (verifyBalance >= deposit.amount) {
+              balanceVerified = true;
+            } else {
+              await new Promise((resolve) => setTimeout(resolve, pollInterval));
+              attempts++;
+            }
           }
+
+          if (!balanceVerified) {
+            log.error(
+              {
+                user: normalizedUser,
+                amount: deposit.amount.toString(),
+                txHash: deposit.txHash,
+                currentL2Balance: ethers.formatEther(await getUserBalance(gun, normalizedUser)),
+              },
+              "Failed to verify L2 balance update after credit within timeout during sync. Deposit will be retried."
+            );
+            // DO NOT mark as processed, so it can be retried
+            results.failed++;
+            results.errors.push(`${deposit.txHash}: Balance verification failed`);
+            continue;
+          }
+
+          // Mark as processed only after balance is verified
+          await markDepositProcessed(gun, depositKey, {
+            txHash: deposit.txHash,
+            user: normalizedUser,
+            amount: deposit.amount.toString(),
+            blockNumber: deposit.blockNumber,
+            timestamp: Date.now(),
+          });
+
+          const finalVerifyBalance = await getUserBalance(gun, normalizedUser);
+          log.debug(
+            {
+              txHash: deposit.txHash,
+              user: normalizedUser,
+              amount: ethers.formatEther(deposit.amount),
+              newBalance: ethers.formatEther(finalVerifyBalance),
+            },
+            "Deposit synced successfully and balance verified"
+          );
+
+          results.processed++;
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error);
-          log.error(
-            { error, user: normalizedUser },
-            "Error verifying/correcting balance"
-          );
-          results.errors.push(`Balance verification failed for ${normalizedUser}: ${errorMsg}`);
+          log.error({ error, txHash: deposit.txHash, user: deposit.user }, "Error syncing deposit");
+          results.failed++;
+          results.errors.push(`${deposit.txHash}: ${errorMsg}`);
         }
       }
+
+      // Final verification and correction: Check if actual balances match expected totals
+      // Expected = deposits - withdrawals (L2 transfers are already reflected in balance)
+      if (userExpectedBalanceMap.size > 0) {
+        log.debug(
+          { userCount: userExpectedBalanceMap.size },
+          "Verifying and correcting balances for all users (deposits - withdrawals)"
+        );
+
+        for (const [normalizedUser, expectedTotal] of userExpectedBalanceMap.entries()) {
+          try {
+            const actualBalance = await getUserBalance(gun, normalizedUser);
+
+            if (actualBalance !== expectedTotal) {
+              log.warn(
+                {
+                  user: normalizedUser,
+                  expectedBalance: expectedTotal.toString(),
+                  actualBalance: actualBalance.toString(),
+                  difference: (expectedTotal - actualBalance).toString(),
+                },
+                "Balance mismatch detected, correcting to expected net balance (deposits - withdrawals)"
+              );
+
+              // Create a new frozen entry with the correct balance
+              // This overwrites any incorrect entries due to race conditions
+              const balanceData: any = {
+                balance: expectedTotal.toString(),
+                ethereumAddress: normalizedUser,
+                updatedAt: Date.now(),
+                type: "bridge-balance",
+                corrected: true, // Flag to indicate this was a correction
+              };
+
+              await FrozenData.createFrozenEntry(
+                gun,
+                balanceData,
+                relayKeyPair,
+                "bridge-balances",
+                normalizedUser
+              );
+
+              // Verify the correction
+              await new Promise((resolve) => setTimeout(resolve, 300));
+              const correctedBalance = await getUserBalance(gun, normalizedUser);
+
+              if (correctedBalance === expectedTotal) {
+                log.debug(
+                  {
+                    user: normalizedUser,
+                    correctedBalance: correctedBalance.toString(),
+                  },
+                  "Balance corrected successfully"
+                );
+                results.processed++; // Count corrections as processed
+              } else {
+                log.error(
+                  {
+                    user: normalizedUser,
+                    expectedBalance: expectedTotal.toString(),
+                    correctedBalance: correctedBalance.toString(),
+                  },
+                  "Failed to correct balance"
+                );
+                results.failed++;
+                results.errors.push(`Balance correction failed for ${normalizedUser}`);
+              }
+            } else {
+              log.debug(
+                {
+                  user: normalizedUser,
+                  balance: actualBalance.toString(),
+                },
+                "Balance verified correct"
+              );
+            }
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            log.error({ error, user: normalizedUser }, "Error verifying/correcting balance");
+            results.errors.push(`Balance verification failed for ${normalizedUser}: ${errorMsg}`);
+          }
+        }
+      }
+
+      log.debug(results, "Retroactive deposit sync completed");
+
+      res.json({
+        success: true,
+        results,
+      });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log.error({ error }, "Error in sync-deposits endpoint");
+      res.status(500).json({
+        success: false,
+        error: errorMessage,
+      });
     }
-
-    log.debug(results, "Retroactive deposit sync completed");
-
-    res.json({
-      success: true,
-      results,
-    });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    log.error({ error }, "Error in sync-deposits endpoint");
-    res.status(500).json({
-      success: false,
-      error: errorMessage,
-    });
   }
-});
+);
 
 /**
  * POST /api/v1/bridge/reconcile-balance
- * 
+ *
  * Reconcile a user's L2 balance by recalculating from deposits, withdrawals, and L2 transfers.
  * This fixes balance discrepancies caused by old transfer implementations that didn't properly update balances.
- * 
+ *
  * Body: { user: string }
  */
 router.post("/reconcile-balance", express.json(), async (req, res) => {
@@ -1673,12 +1987,7 @@ router.post("/reconcile-balance", express.json(), async (req, res) => {
     log.debug({ user: userAddress }, "Starting balance reconciliation");
 
     const { reconcileUserBalance } = await import("../utils/bridge-state");
-    const result = await reconcileUserBalance(
-      gun,
-      userAddress,
-      relayKeyPair,
-      client
-    );
+    const result = await reconcileUserBalance(gun, userAddress, relayKeyPair, client);
 
     if (result.success) {
       res.json({
@@ -1709,171 +2018,174 @@ router.post("/reconcile-balance", express.json(), async (req, res) => {
 
 /**
  * POST /api/v1/bridge/process-deposit
- * 
+ *
  * Force process a specific deposit by transaction hash.
  * Useful for manually recovering a missed deposit.
- * 
+ *
  * SECURITY: Restricted to relay operators only (admin auth required)
- * 
+ *
  * Body: { txHash: string }
  */
-router.post("/process-deposit", adminAuthMiddleware, express.json({ limit: '10mb' }), async (req, res) => {
-  try {
-    const gun = req.app.get("gunInstance");
-    if (!gun) {
-      return res.status(503).json({
-        success: false,
-        error: "GunDB not initialized",
+router.post(
+  "/process-deposit",
+  adminAuthMiddleware,
+  express.json({ limit: "10mb" }),
+  async (req, res) => {
+    try {
+      const gun = req.app.get("gunInstance");
+      if (!gun) {
+        return res.status(503).json({
+          success: false,
+          error: "GunDB not initialized",
+        });
+      }
+
+      // Validate request body
+      if (!req.body || typeof req.body !== "object") {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid request body",
+        });
+      }
+
+      const { txHash } = req.body;
+
+      if (!txHash || typeof txHash !== "string") {
+        return res.status(400).json({
+          success: false,
+          error: "txHash is required",
+        });
+      }
+
+      const client = getBridgeClient();
+      const relayKeyPair = req.app.get("relayKeyPair");
+
+      if (!relayKeyPair) {
+        return res.status(500).json({
+          success: false,
+          error: "Relay keypair not configured",
+        });
+      }
+
+      log.debug({ txHash }, "Processing specific deposit");
+
+      // Get transaction receipt
+      const provider = client.provider;
+      const receipt = await provider.getTransactionReceipt(txHash);
+
+      if (!receipt) {
+        return res.status(404).json({
+          success: false,
+          error: "Transaction not found",
+        });
+      }
+
+      if (receipt.status !== 1) {
+        return res.status(400).json({
+          success: false,
+          error: "Transaction failed",
+        });
+      }
+
+      // Find Deposit event in the receipt
+      const contractAddress = client.contractAddress.toLowerCase();
+      const depositLog = receipt.logs.find((log) => log.address.toLowerCase() === contractAddress);
+
+      if (!depositLog) {
+        return res.status(400).json({
+          success: false,
+          error: "Deposit event not found in transaction",
+        });
+      }
+
+      // Parse event
+      const contract = client.contract;
+      const parsedLog = contract.interface.parseLog({
+        topics: depositLog.topics as string[],
+        data: depositLog.data,
       });
-    }
 
-    // Validate request body
-    if (!req.body || typeof req.body !== 'object') {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid request body",
+      if (!parsedLog || parsedLog.name !== "Deposit") {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid deposit event",
+        });
+      }
+
+      const user = parsedLog.args[0] as string;
+      const amount = parsedLog.args[1] as bigint;
+      const normalizedUser = user.toLowerCase();
+      const depositKey = `${txHash}:${normalizedUser}:${amount}`;
+
+      // Check if already processed
+      const alreadyProcessed = await isDepositProcessed(gun, depositKey);
+
+      if (alreadyProcessed) {
+        return res.json({
+          success: true,
+          message: "Deposit already processed",
+          deposit: {
+            txHash,
+            user: normalizedUser,
+            amount: amount.toString(),
+            amountEth: ethers.formatEther(amount),
+          },
+        });
+      }
+
+      // Credit balance
+      await creditBalance(gun, normalizedUser, amount, relayKeyPair);
+
+      // Mark as processed
+      await markDepositProcessed(gun, depositKey, {
+        txHash,
+        user: normalizedUser,
+        amount: amount.toString(),
+        blockNumber: receipt.blockNumber,
+        timestamp: Date.now(),
       });
-    }
 
-    const { txHash } = req.body;
+      // Verify balance
+      const balance = await getUserBalance(gun, normalizedUser);
 
-    if (!txHash || typeof txHash !== "string") {
-      return res.status(400).json({
-        success: false,
-        error: "txHash is required",
-      });
-    }
+      log.debug(
+        {
+          txHash,
+          user: normalizedUser,
+          amount: ethers.formatEther(amount),
+          balance: ethers.formatEther(balance),
+        },
+        "Deposit processed successfully"
+      );
 
-    const client = getBridgeClient();
-    const relayKeyPair = req.app.get("relayKeyPair");
-
-    if (!relayKeyPair) {
-      return res.status(500).json({
-        success: false,
-        error: "Relay keypair not configured",
-      });
-    }
-
-    log.debug({ txHash }, "Processing specific deposit");
-
-    // Get transaction receipt
-    const provider = client.provider;
-    const receipt = await provider.getTransactionReceipt(txHash);
-
-    if (!receipt) {
-      return res.status(404).json({
-        success: false,
-        error: "Transaction not found",
-      });
-    }
-
-    if (receipt.status !== 1) {
-      return res.status(400).json({
-        success: false,
-        error: "Transaction failed",
-      });
-    }
-
-    // Find Deposit event in the receipt
-    const contractAddress = client.contractAddress.toLowerCase();
-    const depositLog = receipt.logs.find(
-      (log) => log.address.toLowerCase() === contractAddress
-    );
-
-    if (!depositLog) {
-      return res.status(400).json({
-        success: false,
-        error: "Deposit event not found in transaction",
-      });
-    }
-
-    // Parse event
-    const contract = client.contract;
-    const parsedLog = contract.interface.parseLog({
-      topics: depositLog.topics as string[],
-      data: depositLog.data,
-    });
-
-    if (!parsedLog || parsedLog.name !== "Deposit") {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid deposit event",
-      });
-    }
-
-    const user = parsedLog.args[0] as string;
-    const amount = parsedLog.args[1] as bigint;
-    const normalizedUser = user.toLowerCase();
-    const depositKey = `${txHash}:${normalizedUser}:${amount}`;
-
-    // Check if already processed
-    const alreadyProcessed = await isDepositProcessed(gun, depositKey);
-
-    if (alreadyProcessed) {
-      return res.json({
+      res.json({
         success: true,
-        message: "Deposit already processed",
         deposit: {
           txHash,
           user: normalizedUser,
           amount: amount.toString(),
           amountEth: ethers.formatEther(amount),
+          blockNumber: receipt.blockNumber,
+        },
+        balance: {
+          wei: balance.toString(),
+          eth: ethers.formatEther(balance),
         },
       });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log.error({ error, txHash: req.body.txHash }, "Error in process-deposit endpoint");
+      res.status(500).json({
+        success: false,
+        error: errorMessage,
+      });
     }
-
-    // Credit balance
-    await creditBalance(gun, normalizedUser, amount, relayKeyPair);
-
-    // Mark as processed
-    await markDepositProcessed(gun, depositKey, {
-      txHash,
-      user: normalizedUser,
-      amount: amount.toString(),
-      blockNumber: receipt.blockNumber,
-      timestamp: Date.now(),
-    });
-
-    // Verify balance
-    const balance = await getUserBalance(gun, normalizedUser);
-
-    log.debug(
-      {
-        txHash,
-        user: normalizedUser,
-        amount: ethers.formatEther(amount),
-        balance: ethers.formatEther(balance),
-      },
-      "Deposit processed successfully"
-    );
-
-    res.json({
-      success: true,
-      deposit: {
-        txHash,
-        user: normalizedUser,
-        amount: amount.toString(),
-        amountEth: ethers.formatEther(amount),
-        blockNumber: receipt.blockNumber,
-      },
-      balance: {
-        wei: balance.toString(),
-        eth: ethers.formatEther(balance),
-      },
-    });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    log.error({ error, txHash: req.body.txHash }, "Error in process-deposit endpoint");
-    res.status(500).json({
-      success: false,
-      error: errorMessage,
-    });
   }
-});
+);
 
 /**
  * GET /api/v1/bridge/transactions/:user
- * 
+ *
  * Get all transactions (deposits, withdrawals, transfers) for a user.
  * Returns a unified list of all transaction types sorted by timestamp.
  */
@@ -1906,28 +2218,30 @@ router.get("/transactions/:user", async (req, res) => {
     log.debug({ user: normalizedUser }, "Fetching transaction history");
 
     // Fetch all transaction types in parallel
-    const [onChainDeposits, onChainWithdrawals, l2Transfers, processedDeposits] = await Promise.all([
-      // On-chain deposits (from contract events)
-      client.queryDeposits(0, "latest", normalizedUser).catch((err) => {
-        log.warn({ error: err }, "Failed to query on-chain deposits");
-        return [];
-      }),
-      // On-chain withdrawals (from contract events)
-      client.queryWithdrawals(0, "latest", normalizedUser).catch((err) => {
-        log.warn({ error: err }, "Failed to query on-chain withdrawals");
-        return [];
-      }),
-      // L2 transfers (from GunDB frozen entries)
-      listL2Transfers(gun, relayKeyPair?.pub || "").catch((err) => {
-        log.warn({ error: err }, "Failed to query L2 transfers");
-        return [];
-      }),
-      // Processed deposits (from GunDB)
-      getProcessedDepositsForUser(gun, normalizedUser).catch((err) => {
-        log.warn({ error: err }, "Failed to query processed deposits");
-        return [];
-      }),
-    ]);
+    const [onChainDeposits, onChainWithdrawals, l2Transfers, processedDeposits] = await Promise.all(
+      [
+        // On-chain deposits (from contract events)
+        client.queryDeposits(0, "latest", normalizedUser).catch((err) => {
+          log.warn({ error: err }, "Failed to query on-chain deposits");
+          return [];
+        }),
+        // On-chain withdrawals (from contract events)
+        client.queryWithdrawals(0, "latest", normalizedUser).catch((err) => {
+          log.warn({ error: err }, "Failed to query on-chain withdrawals");
+          return [];
+        }),
+        // L2 transfers (from GunDB frozen entries)
+        listL2Transfers(gun, relayKeyPair?.pub || "").catch((err) => {
+          log.warn({ error: err }, "Failed to query L2 transfers");
+          return [];
+        }),
+        // Processed deposits (from GunDB)
+        getProcessedDepositsForUser(gun, normalizedUser).catch((err) => {
+          log.warn({ error: err }, "Failed to query processed deposits");
+          return [];
+        }),
+      ]
+    );
 
     // Build unified transaction list
     const transactions: Array<{
@@ -1949,7 +2263,7 @@ router.get("/transactions/:user", async (req, res) => {
       const processed = processedDeposits.find(
         (p) => p.txHash === deposit.txHash && p.user.toLowerCase() === normalizedUser
       );
-      
+
       transactions.push({
         type: "deposit",
         txHash: deposit.txHash,
@@ -1981,7 +2295,7 @@ router.get("/transactions/:user", async (req, res) => {
     for (const transfer of l2Transfers) {
       const from = transfer.from?.toLowerCase();
       const to = transfer.to?.toLowerCase();
-      
+
       if (from === normalizedUser || to === normalizedUser) {
         transactions.push({
           type: "transfer",
@@ -1999,22 +2313,36 @@ router.get("/transactions/:user", async (req, res) => {
     // Also check pending withdrawals
     const pendingWithdrawals = await getPendingWithdrawals(gun).catch(() => []);
     for (const withdrawal of pendingWithdrawals) {
-      const wUser = (typeof withdrawal.user === 'string' ? withdrawal.user : String(withdrawal.user || '')).toLowerCase();
+      const wUser = (
+        typeof withdrawal.user === "string" ? withdrawal.user : String(withdrawal.user || "")
+      ).toLowerCase();
       if (wUser === normalizedUser) {
         // Check if already in transactions (from on-chain)
         const exists = transactions.some(
           (t) => t.type === "withdrawal" && t.nonce === withdrawal.nonce
         );
-        
+
         if (!exists) {
           transactions.push({
             type: "withdrawal",
             txHash: "",
             from: withdrawal.user,
-            amount: typeof withdrawal.amount === 'string' ? withdrawal.amount : String(withdrawal.amount || '0'),
-            amountEth: ethers.formatEther(BigInt(typeof withdrawal.amount === 'string' ? withdrawal.amount : String(withdrawal.amount || '0'))),
+            amount:
+              typeof withdrawal.amount === "string"
+                ? withdrawal.amount
+                : String(withdrawal.amount || "0"),
+            amountEth: ethers.formatEther(
+              BigInt(
+                typeof withdrawal.amount === "string"
+                  ? withdrawal.amount
+                  : String(withdrawal.amount || "0")
+              )
+            ),
             timestamp: withdrawal.timestamp || Date.now(),
-            nonce: typeof withdrawal.nonce === 'string' ? withdrawal.nonce : String(withdrawal.nonce || '0'),
+            nonce:
+              typeof withdrawal.nonce === "string"
+                ? withdrawal.nonce
+                : String(withdrawal.nonce || "0"),
             status: "pending",
           });
         }
@@ -2052,7 +2380,7 @@ router.get("/transactions/:user", async (req, res) => {
 
 /**
  * GET /api/v1/bridge/transaction/:txHash
- * 
+ *
  * Get detailed information about a specific transaction by hash.
  * Searches across deposits, withdrawals, and transfers.
  */
@@ -2088,11 +2416,13 @@ router.get("/transaction/:txHash", async (req, res) => {
     try {
       const deposits = await client.queryDeposits(0, "latest");
       const deposit = deposits.find((d) => d.txHash.toLowerCase() === txHash.toLowerCase());
-      
+
       if (deposit) {
         const processed = await getProcessedDepositsForUser(gun, deposit.user).catch(() => []);
-        const processedDeposit = processed.find((p) => p.txHash.toLowerCase() === txHash.toLowerCase());
-        
+        const processedDeposit = processed.find(
+          (p) => p.txHash.toLowerCase() === txHash.toLowerCase()
+        );
+
         transaction = {
           type: "deposit",
           txHash: deposit.txHash,
@@ -2114,8 +2444,10 @@ router.get("/transaction/:txHash", async (req, res) => {
     if (!transaction) {
       try {
         const withdrawals = await client.queryWithdrawals(0, "latest");
-        const withdrawal = withdrawals.find((w) => w.txHash?.toLowerCase() === txHash.toLowerCase());
-        
+        const withdrawal = withdrawals.find(
+          (w) => w.txHash?.toLowerCase() === txHash.toLowerCase()
+        );
+
         if (withdrawal) {
           transaction = {
             type: "withdrawal",
@@ -2141,8 +2473,14 @@ router.get("/transaction/:txHash", async (req, res) => {
       try {
         // First, try to read directly from frozen entries using the hash as content hash
         // This handles both transferHash (index key) and latestHash (content hash) cases
-        let transfer: { from: string; to: string; amount: string; transferHash: string; timestamp: number } | null = null;
-        
+        let transfer: {
+          from: string;
+          to: string;
+          amount: string;
+          transferHash: string;
+          timestamp: number;
+        } | null = null;
+
         try {
           const FrozenData = await import("../utils/frozen-data");
           const entry = await FrozenData.readFrozenEntry(
@@ -2151,7 +2489,7 @@ router.get("/transaction/:txHash", async (req, res) => {
             txHash.trim(),
             relayKeyPair?.pub || ""
           );
-          
+
           if (entry && entry.verified && entry.data) {
             const transferData = entry.data as {
               from?: string;
@@ -2161,8 +2499,13 @@ router.get("/transaction/:txHash", async (req, res) => {
               timestamp?: number;
               type?: string;
             };
-            
-            if (transferData.type === "bridge-transfer" && transferData.from && transferData.to && transferData.amount) {
+
+            if (
+              transferData.type === "bridge-transfer" &&
+              transferData.from &&
+              transferData.to &&
+              transferData.amount
+            ) {
               transfer = {
                 from: transferData.from,
                 to: transferData.to,
@@ -2173,30 +2516,36 @@ router.get("/transaction/:txHash", async (req, res) => {
             }
           }
         } catch (err) {
-          log.debug({ error: err, hash: txHash }, "Error reading frozen entry directly, trying list lookup");
+          log.debug(
+            { error: err, hash: txHash },
+            "Error reading frozen entry directly, trying list lookup"
+          );
         }
-        
+
         // If direct read didn't work, try searching in the transfer list
         // This handles cases where the hash is the index key (transferHash)
         if (!transfer) {
           const transfers = await listL2Transfers(gun, relayKeyPair?.pub || "");
-          
+
           // Try exact match first (case-sensitive for base64)
           transfer = transfers.find((t) => t.transferHash === txHash.trim()) || null;
-          
+
           // If not found, try case-insensitive match (handles hex hashes)
           if (!transfer) {
-            transfer = transfers.find(
-              (t) => t.transferHash.toLowerCase() === txHash.toLowerCase().trim()
-            ) || null;
+            transfer =
+              transfers.find((t) => t.transferHash.toLowerCase() === txHash.toLowerCase().trim()) ||
+              null;
           }
-          
+
           // Also check if the hash matches any latestHash by searching the index
           if (!transfer) {
             const normalizedTxHash = txHash.trim().toLowerCase();
             for (const t of transfers) {
               try {
-                const indexNode = gun.get("shogun-index").get("bridge-transfers").get(t.transferHash);
+                const indexNode = gun
+                  .get("shogun-index")
+                  .get("bridge-transfers")
+                  .get(t.transferHash);
                 const indexEntry: any = await new Promise((resolve) => {
                   const timeout = setTimeout(() => resolve(null), 2000);
                   indexNode.once((data: any) => {
@@ -2204,7 +2553,7 @@ router.get("/transaction/:txHash", async (req, res) => {
                     resolve(data);
                   });
                 });
-                
+
                 if (indexEntry && indexEntry.latestHash) {
                   // Compare both as-is and lowercased (base64 might not have case, but we check both)
                   if (
@@ -2221,7 +2570,7 @@ router.get("/transaction/:txHash", async (req, res) => {
             }
           }
         }
-        
+
         if (transfer) {
           transaction = {
             type: "transfer",
@@ -2246,10 +2595,8 @@ router.get("/transaction/:txHash", async (req, res) => {
         const pendingWithdrawals = await getPendingWithdrawals(gun);
         // Note: pending withdrawals don't have txHash yet, so we can't match by hash
         // But we can check if this might be a batch submission tx
-        const batches = await Promise.all([
-          getLatestBatch(gun).catch(() => null),
-        ]);
-        
+        const batches = await Promise.all([getLatestBatch(gun).catch(() => null)]);
+
         // Check if txHash matches a batch submission
         // This would require checking the contract for batch submission events
         // For now, we'll skip this as it's more complex
@@ -2283,4 +2630,3 @@ router.get("/transaction/:txHash", async (req, res) => {
 });
 
 export default router;
-

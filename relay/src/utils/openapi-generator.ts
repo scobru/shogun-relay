@@ -13,26 +13,27 @@ interface OpenAPISpec {
   paths: Record<string, any>;
 }
 
-export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): OpenAPISpec {
+export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): OpenAPISpec {
   return {
     openapi: "3.0.0",
     info: {
       title: "Shogun Relay API",
       version: "1.0.0",
-      description: "Complete API documentation for Shogun Relay. Test endpoints directly from the interactive documentation.",
+      description:
+        "Complete API documentation for Shogun Relay. Test endpoints directly from the interactive documentation.",
       contact: {
         name: "Shogun Project",
-        url: "https://github.com/scobru/shogun"
+        url: "https://github.com/scobru/shogun",
       },
       license: {
-        name: "MIT"
-      }
+        name: "MIT",
+      },
     },
     servers: [
       {
         url: baseUrl,
-        description: "Current Server"
-      }
+        description: "Current Server",
+      },
     ],
     components: {
       securitySchemes: {
@@ -40,20 +41,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
           type: "http",
           scheme: "bearer",
           bearerFormat: "JWT",
-          description: "Bearer token authentication using ADMIN_PASSWORD"
+          description: "Bearer token authentication using ADMIN_PASSWORD",
         },
         tokenHeader: {
           type: "apiKey",
           in: "header",
           name: "token",
-          description: "Custom token header authentication"
+          description: "Custom token header authentication",
         },
         sessionToken: {
           type: "apiKey",
           in: "header",
           name: "X-Session-Token",
-          description: "Session token after initial authentication"
-        }
+          description: "Session token after initial authentication",
+        },
       },
       schemas: {
         Error: {
@@ -61,8 +62,8 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
           properties: {
             success: { type: "boolean", example: false },
             error: { type: "string", example: "Error message" },
-            reason: { type: "string", example: "Detailed reason (optional)" }
-          }
+            reason: { type: "string", example: "Detailed reason (optional)" },
+          },
         },
         HealthResponse: {
           type: "object",
@@ -75,15 +76,15 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               properties: {
                 seconds: { type: "number" },
                 hours: { type: "number" },
-                formatted: { type: "string" }
-              }
+                formatted: { type: "string" },
+              },
             },
             connections: {
               type: "object",
               properties: {
                 active: { type: "number" },
-                total: { type: "number" }
-              }
+                total: { type: "number" },
+              },
             },
             memory: {
               type: "object",
@@ -91,8 +92,8 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                 heapUsedMB: { type: "number" },
                 heapTotalMB: { type: "number" },
                 percent: { type: "number" },
-                rssMB: { type: "number" }
-              }
+                rssMB: { type: "number" },
+              },
             },
             relay: {
               type: "object",
@@ -100,18 +101,18 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                 pub: { type: "string" },
                 name: { type: "string" },
                 host: { type: "string" },
-                port: { type: "number" }
-              }
+                port: { type: "number" },
+              },
             },
             services: {
               type: "object",
               properties: {
                 gun: { type: "string" },
                 holster: { type: "string" },
-                ipfs: { type: "string" }
-              }
-            }
-          }
+                ipfs: { type: "string" },
+              },
+            },
+          },
         },
         NetworkStats: {
           type: "object",
@@ -130,8 +131,8 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                 totalDealStorageMB: { type: "number" },
                 totalSubscriptionStorageMB: { type: "number" },
                 totalStorageMB: { type: "number" },
-                totalStorageGB: { type: "string" }
-              }
+                totalStorageGB: { type: "string" },
+              },
             },
             timestamp: { type: "number" },
             debug: {
@@ -139,10 +140,10 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               properties: {
                 relaysFound: { type: "number" },
                 relaysWithPulse: { type: "number" },
-                sources: { type: "object" }
-              }
-            }
-          }
+                sources: { type: "object" },
+              },
+            },
+          },
         },
         ReputationLeaderboard: {
           type: "object",
@@ -166,14 +167,14 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                     properties: {
                       total: { type: "number" },
                       tier: { type: "string" },
-                      breakdown: { type: "object" }
-                    }
-                  }
-                }
-              }
+                      breakdown: { type: "object" },
+                    },
+                  },
+                },
+              },
             },
-            filters: { type: "object" }
-          }
+            filters: { type: "object" },
+          },
         },
         DealsStats: {
           type: "object",
@@ -188,11 +189,11 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                 expiredDeals: { type: "number" },
                 totalSizeMB: { type: "number" },
                 totalRevenueUSDC: { type: "number" },
-                byTier: { type: "object" }
-              }
+                byTier: { type: "object" },
+              },
             },
-            timestamp: { type: "number" }
-          }
+            timestamp: { type: "number" },
+          },
         },
         RegistryParams: {
           type: "object",
@@ -206,10 +207,10 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                 minStake: { type: "string" },
                 minStakeRaw: { type: "string" },
                 unstakingDelay: { type: "number" },
-                unstakingDelayDays: { type: "number" }
-              }
-            }
-          }
+                unstakingDelayDays: { type: "number" },
+              },
+            },
+          },
         },
         OnChainRelays: {
           type: "object",
@@ -232,12 +233,12 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                   registeredAt: { type: "string" },
                   updatedAt: { type: "string" },
                   totalSlashed: { type: "string" },
-                  griefingRatio: { type: "number" }
-                }
-              }
+                  griefingRatio: { type: "number" },
+                },
+              },
             },
-            registryParams: { $ref: "#/components/schemas/RegistryParams" }
-          }
+            registryParams: { $ref: "#/components/schemas/RegistryParams" },
+          },
         },
         IPFSUploadResponse: {
           type: "object",
@@ -245,8 +246,8 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
             success: { type: "boolean" },
             cid: { type: "string" },
             size: { type: "number" },
-            path: { type: "string" }
-          }
+            path: { type: "string" },
+          },
         },
         IPFSPinList: {
           type: "object",
@@ -254,9 +255,9 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
             success: { type: "boolean" },
             pins: {
               type: "array",
-              items: { type: "string" }
-            }
-          }
+              items: { type: "string" },
+            },
+          },
         },
         X402Tiers: {
           type: "object",
@@ -270,9 +271,9 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                   id: { type: "string" },
                   priceUSDC: { type: "number" },
                   storageMB: { type: "number" },
-                  priceDisplay: { type: "string" }
-                }
-              }
+                  priceDisplay: { type: "string" },
+                },
+              },
             },
             relayStorage: {
               type: "object",
@@ -281,10 +282,10 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                 usedGB: { type: "number" },
                 maxStorageGB: { type: "number" },
                 remainingGB: { type: "number" },
-                percentUsed: { type: "number" }
-              }
-            }
-          }
+                percentUsed: { type: "number" },
+              },
+            },
+          },
         },
         X402Subscription: {
           type: "object",
@@ -298,18 +299,14 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                 tier: { type: "string" },
                 expiresAt: { type: "number" },
                 storageUsedMB: { type: "number" },
-                storageLimitMB: { type: "number" }
-              }
-            }
-          }
-        }
-      }
+                storageLimitMB: { type: "number" },
+              },
+            },
+          },
+        },
+      },
     },
-    security: [
-      { bearerAuth: [] },
-      { tokenHeader: [] },
-      { sessionToken: [] }
-    ],
+    security: [{ bearerAuth: [] }, { tokenHeader: [] }, { sessionToken: [] }],
     paths: {
       "/health": {
         get: {
@@ -322,12 +319,12 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               description: "System health status",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/HealthResponse" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/HealthResponse" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/system/stats": {
         get: {
@@ -341,20 +338,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               description: "System statistics",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/system/contracts": {
         get: {
@@ -374,24 +371,24 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                       chainId: { type: "number" },
                       contracts: {
                         type: "object",
-                        additionalProperties: { type: "string" }
+                        additionalProperties: { type: "string" },
                       },
-                      timestamp: { type: "number" }
-                    }
-                  }
-                }
-              }
+                      timestamp: { type: "number" },
+                    },
+                  },
+                },
+              },
             },
             "500": {
               description: "Server error",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/stats": {
         get: {
@@ -404,20 +401,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               description: "Network statistics",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/NetworkStats" }
-                }
-              }
+                  schema: { $ref: "#/components/schemas/NetworkStats" },
+                },
+              },
             },
             "500": {
               description: "Server error",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/reputation": {
         get: {
@@ -430,35 +427,44 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               name: "limit",
               in: "query",
               schema: { type: "integer", default: 50, minimum: 1, maximum: 100 },
-              description: "Maximum number of results"
+              description: "Maximum number of results",
             },
             {
               name: "minScore",
               in: "query",
               schema: { type: "number", minimum: 0, maximum: 100 },
-              description: "Minimum reputation score"
+              description: "Minimum reputation score",
             },
             {
               name: "tier",
               in: "query",
               schema: {
                 type: "string",
-                enum: ["platinum", "gold", "silver", "bronze", "basic", "average", "good", "excellent"]
+                enum: [
+                  "platinum",
+                  "gold",
+                  "silver",
+                  "bronze",
+                  "basic",
+                  "average",
+                  "good",
+                  "excellent",
+                ],
               },
-              description: "Filter by tier"
-            }
+              description: "Filter by tier",
+            },
           ],
           responses: {
             "200": {
               description: "Reputation leaderboard",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/ReputationLeaderboard" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/ReputationLeaderboard" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/reputation/{host}": {
         get: {
@@ -472,28 +478,28 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               in: "path",
               required: true,
               schema: { type: "string" },
-              description: "Relay hostname"
-            }
+              description: "Relay hostname",
+            },
           ],
           responses: {
             "200": {
               description: "Relay reputation",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "404": {
               description: "Relay not found",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/relays": {
         get: {
@@ -512,15 +518,15 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                       success: { type: "boolean" },
                       relays: {
                         type: "array",
-                        items: { type: "object" }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
+                        items: { type: "object" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/best-relays": {
         get: {
@@ -533,20 +539,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               name: "limit",
               in: "query",
               schema: { type: "integer", default: 10 },
-              description: "Maximum number of relays to return"
-            }
+              description: "Maximum number of relays to return",
+            },
           ],
           responses: {
             "200": {
               description: "List of best relays",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/deals/stats": {
         get: {
@@ -559,28 +565,28 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               name: "timeout",
               in: "query",
               schema: { type: "integer", default: 5000 },
-              description: "Timeout in milliseconds"
-            }
+              description: "Timeout in milliseconds",
+            },
           ],
           responses: {
             "200": {
               description: "Deals statistics",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/DealsStats" }
-                }
-              }
+                  schema: { $ref: "#/components/schemas/DealsStats" },
+                },
+              },
             },
             "503": {
               description: "Service unavailable",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/deals/pricing": {
         get: {
@@ -594,33 +600,33 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               in: "query",
               required: true,
               schema: { type: "number" },
-              description: "Size in MB"
+              description: "Size in MB",
             },
             {
               name: "durationDays",
               in: "query",
               required: true,
               schema: { type: "number" },
-              description: "Duration in days"
+              description: "Duration in days",
             },
             {
               name: "tier",
               in: "query",
               schema: { type: "string", default: "standard" },
-              description: "Storage tier"
-            }
+              description: "Storage tier",
+            },
           ],
           responses: {
             "200": {
               description: "Pricing information",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/deals/by-cid/{cid}": {
         get: {
@@ -634,20 +640,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               in: "path",
               required: true,
               schema: { type: "string" },
-              description: "IPFS CID"
-            }
+              description: "IPFS CID",
+            },
           ],
           responses: {
             "200": {
               description: "List of deals",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/deals/by-client/{address}": {
         get: {
@@ -661,20 +667,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               in: "path",
               required: true,
               schema: { type: "string" },
-              description: "Client Ethereum address"
-            }
+              description: "Client Ethereum address",
+            },
           ],
           responses: {
             "200": {
               description: "List of deals",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/deals/{dealId}": {
         get: {
@@ -688,28 +694,189 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               in: "path",
               required: true,
               schema: { type: "string" },
-              description: "Deal ID"
-            }
+              description: "Deal ID",
+            },
           ],
           responses: {
             "200": {
               description: "Deal details",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "404": {
               description: "Deal not found",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/bridge/balance-info/{user}": {
+        get: {
+          tags: ["Bridge"],
+          summary: "Get balance with verification data",
+          description:
+            "Get user L2 balance with Merkle proof for independent verification against on-chain batch roots. Enables trustless balance verification without relying on the relay.",
+          operationId: "getBalanceInfo",
+          parameters: [
+            {
+              name: "user",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "User's Ethereum address",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Balance info with verification data",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      user: { type: "string" },
+                      balance: { type: "string" },
+                      balanceEth: { type: "string" },
+                      verification: {
+                        type: "object",
+                        nullable: true,
+                        properties: {
+                          lastBatchId: { type: "string" },
+                          lastBatchRoot: { type: "string" },
+                          lastBatchTxHash: { type: "string", nullable: true },
+                          lastBatchTimestamp: { type: "number" },
+                          lastWithdrawal: {
+                            type: "object",
+                            properties: {
+                              amount: { type: "string" },
+                              nonce: { type: "string" },
+                              timestamp: { type: "number" },
+                            },
+                          },
+                          merkleProof: {
+                            type: "array",
+                            items: { type: "string" },
+                          },
+                          verifiedOnChain: { type: "boolean" },
+                        },
+                      },
+                      stats: {
+                        type: "object",
+                        properties: {
+                          processedDepositsCount: { type: "number" },
+                          hasVerificationData: { type: "boolean" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            "400": {
+              description: "Invalid address",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/bridge/batch-history/{user}": {
+        get: {
+          tags: ["Bridge"],
+          summary: "Get batch history for user",
+          description:
+            "Get all batches containing user withdrawals plus processed deposits. Enables users to track their complete on-chain activity.",
+          operationId: "getBatchHistory",
+          parameters: [
+            {
+              name: "user",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "User's Ethereum address",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "User batch history",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      user: { type: "string" },
+                      batches: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            batchId: { type: "string" },
+                            root: { type: "string" },
+                            txHash: { type: "string", nullable: true },
+                            timestamp: { type: "number" },
+                            finalized: { type: "boolean" },
+                            withdrawals: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  amount: { type: "string" },
+                                  nonce: { type: "string" },
+                                  timestamp: { type: "number" },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                      deposits: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            txHash: { type: "string" },
+                            amount: { type: "string" },
+                            amountEth: { type: "string" },
+                            blockNumber: { type: "number" },
+                            timestamp: { type: "number" },
+                          },
+                        },
+                      },
+                      summary: {
+                        type: "object",
+                        properties: {
+                          totalBatches: { type: "number" },
+                          totalDeposits: { type: "number" },
+                          totalWithdrawals: { type: "number" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            "400": {
+              description: "Invalid address",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/registry/params": {
         get: {
@@ -722,12 +889,12 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               description: "Registry parameters",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/RegistryParams" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/RegistryParams" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/registry/status": {
         get: {
@@ -741,20 +908,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               description: "Registry status",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/onchain/relays": {
         get: {
@@ -768,20 +935,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               in: "query",
               required: true,
               schema: { type: "integer" },
-              description: "Chain ID (e.g., 84532 for Base Sepolia)"
-            }
+              description: "Chain ID (e.g., 84532 for Base Sepolia)",
+            },
           ],
           responses: {
             "200": {
               description: "List of on-chain relays",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/OnChainRelays" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/OnChainRelays" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/onchain/relay/{address}": {
         get: {
@@ -795,27 +962,27 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               in: "path",
               required: true,
               schema: { type: "string" },
-              description: "Relay Ethereum address"
+              description: "Relay Ethereum address",
             },
             {
               name: "chainId",
               in: "query",
               required: true,
               schema: { type: "integer" },
-              description: "Chain ID"
-            }
+              description: "Chain ID",
+            },
           ],
           responses: {
             "200": {
               description: "Relay details",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/ipfs/upload": {
         post: {
@@ -834,33 +1001,33 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                     file: {
                       type: "string",
                       format: "binary",
-                      description: "File to upload"
-                    }
+                      description: "File to upload",
+                    },
                   },
-                  required: ["file"]
-                }
-              }
-            }
+                  required: ["file"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "File uploaded successfully",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/IPFSUploadResponse" }
-                }
-              }
+                  schema: { $ref: "#/components/schemas/IPFSUploadResponse" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/ipfs/cat/{cid}": {
         get: {
@@ -874,37 +1041,37 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               in: "path",
               required: true,
               schema: { type: "string" },
-              description: "IPFS CID"
+              description: "IPFS CID",
             },
             {
               name: "json",
               in: "query",
               schema: { type: "boolean" },
-              description: "Return as JSON if content is JSON"
-            }
+              description: "Return as JSON if content is JSON",
+            },
           ],
           responses: {
             "200": {
               description: "File content",
               content: {
                 "application/octet-stream": {
-                  schema: { type: "string", format: "binary" }
+                  schema: { type: "string", format: "binary" },
                 },
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "404": {
               description: "CID not found",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/ipfs/cat/{cid}/json": {
         get: {
@@ -918,20 +1085,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               in: "path",
               required: true,
               schema: { type: "string" },
-              description: "IPFS CID"
-            }
+              description: "IPFS CID",
+            },
           ],
           responses: {
             "200": {
               description: "JSON content",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/ipfs/pin/add": {
         post: {
@@ -949,33 +1116,33 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                   properties: {
                     cid: {
                       type: "string",
-                      description: "IPFS CID to pin"
-                    }
+                      description: "IPFS CID to pin",
+                    },
                   },
-                  required: ["cid"]
-                }
-              }
-            }
+                  required: ["cid"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "CID pinned successfully",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/ipfs/pin/ls": {
         get: {
@@ -989,20 +1156,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               description: "List of pinned CIDs",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/IPFSPinList" }
-                }
-              }
+                  schema: { $ref: "#/components/schemas/IPFSPinList" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/ipfs/pin/rm": {
         post: {
@@ -1020,33 +1187,33 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                   properties: {
                     cid: {
                       type: "string",
-                      description: "IPFS CID to unpin"
-                    }
+                      description: "IPFS CID to unpin",
+                    },
                   },
-                  required: ["cid"]
-                }
-              }
-            }
+                  required: ["cid"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "CID unpinned successfully",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/ipfs/status": {
         get: {
@@ -1059,12 +1226,12 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               description: "IPFS status",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/x402/tiers": {
         get: {
@@ -1077,12 +1244,12 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               description: "List of tiers",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/X402Tiers" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/X402Tiers" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/x402/subscription/{userAddress}": {
         get: {
@@ -1096,20 +1263,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               in: "path",
               required: true,
               schema: { type: "string" },
-              description: "User Ethereum address"
-            }
+              description: "User Ethereum address",
+            },
           ],
           responses: {
             "200": {
               description: "Subscription status",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/X402Subscription" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/X402Subscription" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/x402/can-upload/{userAddress}": {
         get: {
@@ -1123,8 +1290,8 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               in: "path",
               required: true,
               schema: { type: "string" },
-              description: "User Ethereum address"
-            }
+              description: "User Ethereum address",
+            },
           ],
           responses: {
             "200": {
@@ -1136,14 +1303,14 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                     properties: {
                       success: { type: "boolean" },
                       canUpload: { type: "boolean" },
-                      reason: { type: "string" }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
+                      reason: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/x402/relay-storage": {
         get: {
@@ -1156,12 +1323,12 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               description: "Storage information",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/x402/payment-requirements/{tier}": {
         get: {
@@ -1175,20 +1342,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               in: "path",
               required: true,
               schema: { type: "string" },
-              description: "Subscription tier"
-            }
+              description: "Subscription tier",
+            },
           ],
           responses: {
             "200": {
               description: "Payment requirements",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/x402/subscribe": {
         post: {
@@ -1205,32 +1372,32 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                   properties: {
                     userAddress: { type: "string" },
                     tier: { type: "string" },
-                    payment: { type: "object" }
+                    payment: { type: "object" },
                   },
-                  required: ["userAddress", "tier"]
-                }
-              }
-            }
+                  required: ["userAddress", "tier"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "Subscription activated",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "402": {
               description: "Payment required",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/x402/storage/{userAddress}": {
         get: {
@@ -1244,20 +1411,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               in: "path",
               required: true,
               schema: { type: "string" },
-              description: "User Ethereum address"
-            }
+              description: "User Ethereum address",
+            },
           ],
           responses: {
             "200": {
               description: "Storage usage information",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/x402/config": {
         get: {
@@ -1270,12 +1437,12 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               description: "Configuration information",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/deals/create": {
         post: {
@@ -1295,24 +1462,24 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                     sizeMB: { type: "number" },
                     durationDays: { type: "number" },
                     tier: { type: "string" },
-                    relayAddress: { type: "string" }
+                    relayAddress: { type: "string" },
                   },
-                  required: ["cid", "clientAddress", "sizeMB", "durationDays"]
-                }
-              }
-            }
+                  required: ["cid", "clientAddress", "sizeMB", "durationDays"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "Deal created",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/deals/{dealId}/activate": {
         post: {
@@ -1325,8 +1492,8 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               name: "dealId",
               in: "path",
               required: true,
-              schema: { type: "string" }
-            }
+              schema: { type: "string" },
+            },
           ],
           requestBody: {
             content: {
@@ -1335,23 +1502,23 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                   type: "object",
                   properties: {
                     paymentTxHash: { type: "string" },
-                    clientStake: { type: "string" }
-                  }
-                }
-              }
-            }
+                    clientStake: { type: "string" },
+                  },
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "Deal activated",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/deals/{dealId}/renew": {
         post: {
@@ -1364,8 +1531,8 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               name: "dealId",
               in: "path",
               required: true,
-              schema: { type: "string" }
-            }
+              schema: { type: "string" },
+            },
           ],
           requestBody: {
             required: true,
@@ -1375,32 +1542,32 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                   type: "object",
                   properties: {
                     additionalDays: { type: "number" },
-                    payment: { type: "object" }
+                    payment: { type: "object" },
                   },
-                  required: ["additionalDays"]
-                }
-              }
-            }
+                  required: ["additionalDays"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "Deal renewed",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "402": {
               description: "Payment required",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/deals/{dealId}/terminate": {
         post: {
@@ -1413,20 +1580,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               name: "dealId",
               in: "path",
               required: true,
-              schema: { type: "string" }
-            }
+              schema: { type: "string" },
+            },
           ],
           responses: {
             "200": {
               description: "Deal terminated",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/deals/{dealId}/verify": {
         get: {
@@ -1439,20 +1606,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               name: "dealId",
               in: "path",
               required: true,
-              schema: { type: "string" }
-            }
+              schema: { type: "string" },
+            },
           ],
           responses: {
             "200": {
               description: "Verification result",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/deals/overhead": {
         get: {
@@ -1465,20 +1632,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               name: "sizeMB",
               in: "query",
               schema: { type: "number" },
-              description: "File size in MB"
-            }
+              description: "File size in MB",
+            },
           ],
           responses: {
             "200": {
               description: "Overhead calculation",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/deals/leaderboard": {
         get: {
@@ -1490,25 +1657,25 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
             {
               name: "limit",
               in: "query",
-              schema: { type: "integer", default: 50 }
+              schema: { type: "integer", default: 50 },
             },
             {
               name: "timeout",
               in: "query",
-              schema: { type: "integer", default: 5000 }
-            }
+              schema: { type: "integer", default: 5000 },
+            },
           ],
           responses: {
             "200": {
               description: "Leaderboard",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/relay/{host}": {
         get: {
@@ -1521,20 +1688,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               name: "host",
               in: "path",
               required: true,
-              schema: { type: "string" }
-            }
+              schema: { type: "string" },
+            },
           ],
           responses: {
             "200": {
               description: "Relay details",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/proof/{cid}": {
         get: {
@@ -1547,25 +1714,25 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               name: "cid",
               in: "path",
               required: true,
-              schema: { type: "string" }
+              schema: { type: "string" },
             },
             {
               name: "challenge",
               in: "query",
-              schema: { type: "string" }
-            }
+              schema: { type: "string" },
+            },
           ],
           responses: {
             "200": {
               description: "Storage proof",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/verify-proof": {
         post: {
@@ -1580,24 +1747,24 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                 schema: {
                   type: "object",
                   properties: {
-                    proof: { type: "object" }
+                    proof: { type: "object" },
                   },
-                  required: ["proof"]
-                }
-              }
-            }
+                  required: ["proof"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "Verification result",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/pin-request": {
         get: {
@@ -1610,11 +1777,11 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               description: "Pin request information",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
         },
         post: {
           tags: ["Network"],
@@ -1631,32 +1798,32 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                   properties: {
                     cid: { type: "string" },
                     replicationFactor: { type: "integer", default: 3 },
-                    priority: { type: "string", default: "normal" }
+                    priority: { type: "string", default: "normal" },
                   },
-                  required: ["cid"]
-                }
-              }
-            }
+                  required: ["cid"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "Pin request published",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/pin-requests": {
         get: {
@@ -1669,20 +1836,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               name: "maxAge",
               in: "query",
               schema: { type: "integer" },
-              description: "Maximum age in milliseconds"
-            }
+              description: "Maximum age in milliseconds",
+            },
           ],
           responses: {
             "200": {
               description: "List of pin requests",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/pin-response": {
         post: {
@@ -1698,24 +1865,24 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                   type: "object",
                   properties: {
                     requestId: { type: "string" },
-                    status: { type: "string", default: "completed" }
+                    status: { type: "string", default: "completed" },
                   },
-                  required: ["requestId"]
-                }
-              }
-            }
+                  required: ["requestId"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "Pin response published",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/reputation/record-proof": {
         post: {
@@ -1732,24 +1899,24 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                   properties: {
                     host: { type: "string" },
                     success: { type: "boolean" },
-                    responseTimeMs: { type: "number" }
+                    responseTimeMs: { type: "number" },
                   },
-                  required: ["host", "success"]
-                }
-              }
-            }
+                  required: ["host", "success"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "Event recorded",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/verified/relays": {
         get: {
@@ -1761,30 +1928,30 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
             {
               name: "verify",
               in: "query",
-              schema: { type: "boolean", default: true }
+              schema: { type: "boolean", default: true },
             },
             {
               name: "maxAge",
               in: "query",
-              schema: { type: "integer" }
+              schema: { type: "integer" },
             },
             {
               name: "limit",
               in: "query",
-              schema: { type: "integer", default: 50 }
-            }
+              schema: { type: "integer", default: 50 },
+            },
           ],
           responses: {
             "200": {
               description: "List of verified relays",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/verified/relay/{host}": {
         get: {
@@ -1797,28 +1964,28 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               name: "host",
               in: "path",
               required: true,
-              schema: { type: "string" }
-            }
+              schema: { type: "string" },
+            },
           ],
           responses: {
             "200": {
               description: "Verified relay announcement",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "404": {
               description: "Relay not found",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/verified/observation": {
         post: {
@@ -1834,24 +2001,24 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                   type: "object",
                   properties: {
                     observedHost: { type: "string" },
-                    observation: { type: "object" }
+                    observation: { type: "object" },
                   },
-                  required: ["observedHost", "observation"]
-                }
-              }
-            }
+                  required: ["observedHost", "observation"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "Observation created",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/verified/observations/{host}": {
         get: {
@@ -1864,25 +2031,25 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               name: "host",
               in: "path",
               required: true,
-              schema: { type: "string" }
+              schema: { type: "string" },
             },
             {
               name: "limit",
               in: "query",
-              schema: { type: "integer", default: 50 }
-            }
+              schema: { type: "integer", default: 50 },
+            },
           ],
           responses: {
             "200": {
               description: "Observations and aggregated reputation",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/verified/entry/{namespace}/{hash}": {
         get: {
@@ -1895,34 +2062,34 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               name: "namespace",
               in: "path",
               required: true,
-              schema: { type: "string" }
+              schema: { type: "string" },
             },
             {
               name: "hash",
               in: "path",
               required: true,
-              schema: { type: "string" }
-            }
+              schema: { type: "string" },
+            },
           ],
           responses: {
             "200": {
               description: "Verified entry",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "404": {
               description: "Entry not found",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/network/onchain/deals/relay/{address}": {
         get: {
@@ -1935,25 +2102,25 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               name: "address",
               in: "path",
               required: true,
-              schema: { type: "string" }
+              schema: { type: "string" },
             },
             {
               name: "chainId",
               in: "query",
-              schema: { type: "integer", default: 84532 }
-            }
+              schema: { type: "integer", default: 84532 },
+            },
           ],
           responses: {
             "200": {
               description: "List of deals",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/registry/balance": {
         get: {
@@ -1967,20 +2134,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               description: "Wallet balances",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/registry/register": {
         post: {
@@ -1999,32 +2166,32 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                     endpoint: { type: "string" },
                     gunPubKey: { type: "string" },
                     stakeAmount: { type: "string" },
-                    griefingRatio: { type: "integer" }
+                    griefingRatio: { type: "integer" },
                   },
-                  required: ["endpoint", "gunPubKey", "stakeAmount"]
-                }
-              }
-            }
+                  required: ["endpoint", "gunPubKey", "stakeAmount"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "Relay registered",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/registry/update": {
         post: {
@@ -2040,31 +2207,31 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                   type: "object",
                   properties: {
                     newEndpoint: { type: "string" },
-                    newGunPubKey: { type: "string" }
-                  }
-                }
-              }
-            }
+                    newGunPubKey: { type: "string" },
+                  },
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "Relay updated",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/registry/stake/increase": {
         post: {
@@ -2080,32 +2247,32 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                 schema: {
                   type: "object",
                   properties: {
-                    amount: { type: "string" }
+                    amount: { type: "string" },
                   },
-                  required: ["amount"]
-                }
-              }
-            }
+                  required: ["amount"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "Stake increased",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/registry/stake/unstake": {
         post: {
@@ -2119,20 +2286,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               description: "Unstake requested",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/registry/stake/withdraw": {
         post: {
@@ -2146,20 +2313,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               description: "Stake withdrawn",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/registry/deal/register": {
         post: {
@@ -2181,32 +2348,32 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                     sizeMB: { type: "number" },
                     priceUSDC: { type: "string" },
                     durationDays: { type: "number" },
-                    clientStake: { type: "string" }
+                    clientStake: { type: "string" },
                   },
-                  required: ["clientAddress", "cid", "sizeMB", "priceUSDC", "durationDays"]
-                }
-              }
-            }
+                  required: ["clientAddress", "cid", "sizeMB", "priceUSDC", "durationDays"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "Deal registered",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/registry/deals": {
         get: {
@@ -2220,20 +2387,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               description: "List of deals",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/registry/config": {
         get: {
@@ -2246,12 +2413,12 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               description: "Registry configuration",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/registry/deal/complete": {
         post: {
@@ -2267,32 +2434,32 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                 schema: {
                   type: "object",
                   properties: {
-                    dealId: { type: "string" }
+                    dealId: { type: "string" },
                   },
-                  required: ["dealId"]
-                }
-              }
-            }
+                  required: ["dealId"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "Deal completed",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/registry/grief/missed-proof": {
         post: {
@@ -2310,32 +2477,32 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                   properties: {
                     relayAddress: { type: "string" },
                     dealId: { type: "string" },
-                    evidence: { type: "string" }
+                    evidence: { type: "string" },
                   },
-                  required: ["relayAddress", "dealId", "evidence"]
-                }
-              }
-            }
+                  required: ["relayAddress", "dealId", "evidence"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "Missed proof reported",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/registry/grief/data-loss": {
         post: {
@@ -2353,32 +2520,32 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                   properties: {
                     relayAddress: { type: "string" },
                     dealId: { type: "string" },
-                    evidence: { type: "string" }
+                    evidence: { type: "string" },
                   },
-                  required: ["relayAddress", "dealId", "evidence"]
-                }
-              }
-            }
+                  required: ["relayAddress", "dealId", "evidence"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "Data loss reported",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/registry/deal/grief": {
         post: {
@@ -2396,32 +2563,32 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                   properties: {
                     dealId: { type: "string" },
                     slashAmount: { type: "string" },
-                    reason: { type: "string" }
+                    reason: { type: "string" },
                   },
-                  required: ["dealId", "slashAmount", "reason"]
-                }
-              }
-            }
+                  required: ["dealId", "slashAmount", "reason"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "Deal griefed",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/deals/upload": {
         post: {
@@ -2438,26 +2605,26 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                   properties: {
                     file: {
                       type: "string",
-                      format: "binary"
+                      format: "binary",
                     },
-                    walletAddress: { type: "string" }
+                    walletAddress: { type: "string" },
                   },
-                  required: ["file"]
-                }
-              }
-            }
+                  required: ["file"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "File uploaded",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/deals/relay/active": {
         get: {
@@ -2471,20 +2638,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               description: "Active deals",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/deals/{dealId}/verify-proof": {
         get: {
@@ -2497,33 +2664,33 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               name: "dealId",
               in: "path",
               required: true,
-              schema: { type: "string" }
+              schema: { type: "string" },
             },
             {
               name: "challenge",
               in: "query",
-              schema: { type: "string" }
-            }
+              schema: { type: "string" },
+            },
           ],
           responses: {
             "200": {
               description: "Storage proof",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "404": {
               description: "Deal not found",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/x402/can-upload-verified/{userAddress}": {
         get: {
@@ -2536,26 +2703,26 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               name: "userAddress",
               in: "path",
               required: true,
-              schema: { type: "string" }
+              schema: { type: "string" },
             },
             {
               name: "size",
               in: "query",
               schema: { type: "number" },
-              description: "File size in MB"
-            }
+              description: "File size in MB",
+            },
           ],
           responses: {
             "200": {
               description: "Upload permission status",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { type: "object" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/x402/storage/sync/{userAddress}": {
         post: {
@@ -2569,28 +2736,28 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               name: "userAddress",
               in: "path",
               required: true,
-              schema: { type: "string" }
-            }
+              schema: { type: "string" },
+            },
           ],
           responses: {
             "200": {
               description: "Storage synced",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/x402/update-usage/{userAddress}": {
         post: {
@@ -2604,8 +2771,8 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               name: "userAddress",
               in: "path",
               required: true,
-              schema: { type: "string" }
-            }
+              schema: { type: "string" },
+            },
           ],
           requestBody: {
             required: true,
@@ -2614,32 +2781,32 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                 schema: {
                   type: "object",
                   properties: {
-                    addMB: { type: "number" }
+                    addMB: { type: "number" },
                   },
-                  required: ["addMB"]
-                }
-              }
-            }
+                  required: ["addMB"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
               description: "Usage updated",
               content: {
                 "application/json": {
-                  schema: { type: "object" }
-                }
-              }
+                  schema: { type: "object" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/bridge/deposit": {
         post: {
@@ -2653,11 +2820,11 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                 schema: {
                   type: "object",
                   properties: {
-                    amount: { type: "string", description: "Amount in wei" }
-                  }
-                }
-              }
-            }
+                    amount: { type: "string", description: "Amount in wei" },
+                  },
+                },
+              },
+            },
           },
           responses: {
             "200": {
@@ -2671,22 +2838,22 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                       message: { type: "string" },
                       contractAddress: { type: "string" },
                       amount: { type: "string" },
-                      instructions: { type: "string" }
-                    }
-                  }
-                }
-              }
+                      instructions: { type: "string" },
+                    },
+                  },
+                },
+              },
             },
             "400": {
               description: "Bad request",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/bridge/transfer": {
         post: {
@@ -2707,12 +2874,20 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                     message: { type: "string", description: "Message that was signed" },
                     seaSignature: { type: "string", description: "SEA signature" },
                     ethSignature: { type: "string", description: "Ethereum signature" },
-                    gunPubKey: { type: "string", description: "GunDB public key" }
+                    gunPubKey: { type: "string", description: "GunDB public key" },
                   },
-                  required: ["from", "to", "amount", "message", "seaSignature", "ethSignature", "gunPubKey"]
-                }
-              }
-            }
+                  required: [
+                    "from",
+                    "to",
+                    "amount",
+                    "message",
+                    "seaSignature",
+                    "ethSignature",
+                    "gunPubKey",
+                  ],
+                },
+              },
+            },
           },
           responses: {
             "200": {
@@ -2723,30 +2898,30 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                     type: "object",
                     properties: {
                       success: { type: "boolean" },
-                      transfer: { type: "object" }
-                    }
-                  }
-                }
-              }
+                      transfer: { type: "object" },
+                    },
+                  },
+                },
+              },
             },
             "400": {
               description: "Bad request",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized - invalid signatures",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/bridge/withdraw": {
         post: {
@@ -2763,16 +2938,29 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                   properties: {
                     user: { type: "string", description: "User Ethereum address" },
                     amount: { type: "string", description: "Amount in wei" },
-                    nonce: { type: "string", description: "Withdrawal nonce (optional, auto-generated if omitted)" },
-                    message: { type: "string", description: "Message that was signed (must include nonce if provided)" },
+                    nonce: {
+                      type: "string",
+                      description: "Withdrawal nonce (optional, auto-generated if omitted)",
+                    },
+                    message: {
+                      type: "string",
+                      description: "Message that was signed (must include nonce if provided)",
+                    },
                     seaSignature: { type: "string", description: "SEA signature" },
                     ethSignature: { type: "string", description: "Ethereum signature" },
-                    gunPubKey: { type: "string", description: "GunDB public key" }
+                    gunPubKey: { type: "string", description: "GunDB public key" },
                   },
-                  required: ["user", "amount", "message", "seaSignature", "ethSignature", "gunPubKey"]
-                }
-              }
-            }
+                  required: [
+                    "user",
+                    "amount",
+                    "message",
+                    "seaSignature",
+                    "ethSignature",
+                    "gunPubKey",
+                  ],
+                },
+              },
+            },
           },
           responses: {
             "200": {
@@ -2789,33 +2977,33 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                           user: { type: "string" },
                           amount: { type: "string" },
                           nonce: { type: "string" },
-                          timestamp: { type: "number" }
-                        }
+                          timestamp: { type: "number" },
+                        },
                       },
-                      message: { type: "string" }
-                    }
-                  }
-                }
-              }
+                      message: { type: "string" },
+                    },
+                  },
+                },
+              },
             },
             "400": {
               description: "Bad request",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized - invalid signatures",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/bridge/submit-batch": {
         post: {
@@ -2827,10 +3015,10 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
             content: {
               "application/json": {
                 schema: {
-                  type: "object"
-                }
-              }
-            }
+                  type: "object",
+                },
+              },
+            },
           },
           responses: {
             "200": {
@@ -2846,32 +3034,32 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                         properties: {
                           batchId: { type: "string" },
                           root: { type: "string" },
-                          txHash: { type: "string" }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
+                          txHash: { type: "string" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
             "400": {
               description: "Bad request",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
             },
             "403": {
               description: "Forbidden - not authorized to submit batches",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/bridge/balance/{user}": {
         get: {
@@ -2885,8 +3073,8 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               in: "path",
               required: true,
               schema: { type: "string" },
-              description: "User Ethereum address"
-            }
+              description: "User Ethereum address",
+            },
           ],
           responses: {
             "200": {
@@ -2899,22 +3087,22 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                       success: { type: "boolean" },
                       user: { type: "string" },
                       balance: { type: "string" },
-                      balanceEth: { type: "string" }
-                    }
-                  }
-                }
-              }
+                      balanceEth: { type: "string" },
+                    },
+                  },
+                },
+              },
             },
             "400": {
               description: "Bad request",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/bridge/pending-withdrawals": {
         get: {
@@ -2939,32 +3127,33 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                             user: { type: "string" },
                             amount: { type: "string" },
                             nonce: { type: "string" },
-                            timestamp: { type: "number" }
-                          }
-                        }
+                            timestamp: { type: "number" },
+                          },
+                        },
                       },
-                      count: { type: "number" }
-                    }
-                  }
-                }
-              }
+                      count: { type: "number" },
+                    },
+                  },
+                },
+              },
             },
             "503": {
               description: "Service unavailable",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/bridge/nonce/{user}": {
         get: {
           tags: ["Bridge"],
           summary: "Get next nonce",
-          description: "Get the next nonce for a user (for withdrawal requests). This allows clients to include the nonce in their signed message.",
+          description:
+            "Get the next nonce for a user (for withdrawal requests). This allows clients to include the nonce in their signed message.",
           operationId: "getNextNonce",
           parameters: [
             {
@@ -2972,8 +3161,8 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               in: "path",
               required: true,
               schema: { type: "string" },
-              description: "User Ethereum address"
-            }
+              description: "User Ethereum address",
+            },
           ],
           responses: {
             "200": {
@@ -2985,36 +3174,37 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                     properties: {
                       success: { type: "boolean" },
                       lastNonce: { type: "string" },
-                      nextNonce: { type: "string" }
-                    }
-                  }
-                }
-              }
+                      nextNonce: { type: "string" },
+                    },
+                  },
+                },
+              },
             },
             "400": {
               description: "Invalid user address",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
             },
             "500": {
               description: "Server error",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/bridge/proof/{user}/{amount}/{nonce}": {
         get: {
           tags: ["Bridge"],
           summary: "Get withdrawal proof",
-          description: "Generate Merkle proof for a withdrawal. The withdrawal must be included in a batch.",
+          description:
+            "Generate Merkle proof for a withdrawal. The withdrawal must be included in a batch.",
           operationId: "getWithdrawalProof",
           parameters: [
             {
@@ -3022,22 +3212,22 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               in: "path",
               required: true,
               schema: { type: "string" },
-              description: "User Ethereum address"
+              description: "User Ethereum address",
             },
             {
               name: "amount",
               in: "path",
               required: true,
               schema: { type: "string" },
-              description: "Withdrawal amount in wei"
+              description: "Withdrawal amount in wei",
             },
             {
               name: "nonce",
               in: "path",
               required: true,
               schema: { type: "string" },
-              description: "Withdrawal nonce"
-            }
+              description: "Withdrawal nonce",
+            },
           ],
           responses: {
             "200": {
@@ -3051,7 +3241,7 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                       proof: {
                         type: "array",
                         items: { type: "string" },
-                        description: "Merkle proof array"
+                        description: "Merkle proof array",
                       },
                       batchId: { type: "string" },
                       root: { type: "string" },
@@ -3060,13 +3250,13 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                         properties: {
                           user: { type: "string" },
                           amount: { type: "string" },
-                          nonce: { type: "string" }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
+                          nonce: { type: "string" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
             "202": {
               description: "Withdrawal pending - not yet in a batch",
@@ -3077,19 +3267,19 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                     properties: {
                       success: { type: "boolean" },
                       status: { type: "string", example: "pending" },
-                      message: { type: "string" }
-                    }
-                  }
-                }
-              }
+                      message: { type: "string" },
+                    },
+                  },
+                },
+              },
             },
             "404": {
               description: "Proof not found",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
             },
             "410": {
               description: "Withdrawal already processed on-chain",
@@ -3100,14 +3290,14 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                     properties: {
                       success: { type: "boolean" },
                       status: { type: "string", example: "already_processed" },
-                      message: { type: "string" }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
+                      message: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/bridge/state": {
         get: {
@@ -3131,24 +3321,24 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                           currentBatchId: { type: "string" },
                           sequencer: { type: "string" },
                           contractBalance: { type: "string" },
-                          contractBalanceEth: { type: "string" }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
+                          contractBalanceEth: { type: "string" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
             "500": {
               description: "Server error",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/bridge/sync-deposits": {
         post: {
@@ -3164,12 +3354,18 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                   type: "object",
                   properties: {
                     fromBlock: { type: "number", description: "Block to start from (default: 0)" },
-                    toBlock: { type: ["number", "string"], description: 'Block to end at (default: "latest")' },
-                    user: { type: "string", description: "Optional - only sync deposits for this user" }
-                  }
-                }
-              }
-            }
+                    toBlock: {
+                      type: ["number", "string"],
+                      description: 'Block to end at (default: "latest")',
+                    },
+                    user: {
+                      type: "string",
+                      description: "Optional - only sync deposits for this user",
+                    },
+                  },
+                },
+              },
+            },
           },
           responses: {
             "200": {
@@ -3189,39 +3385,40 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                           failed: { type: "number" },
                           errors: {
                             type: "array",
-                            items: { type: "string" }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
+                            items: { type: "string" },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
             },
             "503": {
               description: "Service unavailable",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/bridge/reconcile-balance": {
         post: {
           tags: ["Bridge"],
           summary: "Reconcile balance",
-          description: "Recalculate and fix user balance if it doesn't match deposits/withdrawals/transfers",
+          description:
+            "Recalculate and fix user balance if it doesn't match deposits/withdrawals/transfers",
           operationId: "reconcileBalance",
           requestBody: {
             required: true,
@@ -3230,12 +3427,12 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                 schema: {
                   type: "object",
                   properties: {
-                    user: { type: "string", description: "User Ethereum address" }
+                    user: { type: "string", description: "User Ethereum address" },
                   },
-                  required: ["user"]
-                }
-              }
-            }
+                  required: ["user"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
@@ -3250,30 +3447,30 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                       currentBalance: { type: "string" },
                       calculatedBalance: { type: "string" },
                       corrected: { type: "boolean" },
-                      message: { type: "string" }
-                    }
-                  }
-                }
-              }
+                      message: { type: "string" },
+                    },
+                  },
+                },
+              },
             },
             "400": {
               description: "Bad request",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
             },
             "500": {
               description: "Server error",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/bridge/process-deposit": {
         post: {
@@ -3289,12 +3486,12 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                 schema: {
                   type: "object",
                   properties: {
-                    txHash: { type: "string", description: "Transaction hash of the deposit" }
+                    txHash: { type: "string", description: "Transaction hash of the deposit" },
                   },
-                  required: ["txHash"]
-                }
-              }
-            }
+                  required: ["txHash"],
+                },
+              },
+            },
           },
           responses: {
             "200": {
@@ -3311,52 +3508,53 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                         properties: {
                           user: { type: "string" },
                           amountEth: { type: "string" },
-                          blockNumber: { type: "number" }
-                        }
+                          blockNumber: { type: "number" },
+                        },
                       },
                       balance: {
                         type: "object",
                         properties: {
-                          eth: { type: "string" }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
+                          eth: { type: "string" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
             "400": {
               description: "Bad request",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
             },
             "401": {
               description: "Unauthorized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
             },
             "404": {
               description: "Transaction not found",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/bridge/transactions/{user}": {
         get: {
           tags: ["Bridge"],
           summary: "Get user transaction history",
-          description: "Get all transactions (deposits, withdrawals, transfers) for a user. Returns a unified list of all transaction types sorted by timestamp.",
+          description:
+            "Get all transactions (deposits, withdrawals, transfers) for a user. Returns a unified list of all transaction types sorted by timestamp.",
           operationId: "getUserTransactions",
           parameters: [
             {
@@ -3364,8 +3562,8 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               in: "path",
               required: true,
               schema: { type: "string" },
-              description: "User Ethereum address"
-            }
+              description: "User Ethereum address",
+            },
           ],
           responses: {
             "200": {
@@ -3385,101 +3583,102 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                             type: {
                               type: "string",
                               enum: ["deposit", "withdrawal", "transfer"],
-                              description: "Transaction type"
+                              description: "Transaction type",
                             },
                             txHash: {
                               type: "string",
-                              description: "Transaction hash"
+                              description: "Transaction hash",
                             },
                             from: {
                               type: "string",
-                              description: "Sender address (for withdrawals and transfers)"
+                              description: "Sender address (for withdrawals and transfers)",
                             },
                             to: {
                               type: "string",
-                              description: "Receiver address (for deposits and transfers)"
+                              description: "Receiver address (for deposits and transfers)",
                             },
                             amount: {
                               type: "string",
-                              description: "Amount in wei"
+                              description: "Amount in wei",
                             },
                             amountEth: {
                               type: "string",
-                              description: "Amount in ETH"
+                              description: "Amount in ETH",
                             },
                             timestamp: {
                               type: "number",
-                              description: "Transaction timestamp (milliseconds)"
+                              description: "Transaction timestamp (milliseconds)",
                             },
                             blockNumber: {
                               type: "number",
-                              description: "Block number (for on-chain transactions)"
+                              description: "Block number (for on-chain transactions)",
                             },
                             nonce: {
                               type: "string",
-                              description: "Withdrawal nonce (for withdrawals)"
+                              description: "Withdrawal nonce (for withdrawals)",
                             },
                             batchId: {
                               type: "string",
-                              description: "Batch ID (for batched withdrawals)"
+                              description: "Batch ID (for batched withdrawals)",
                             },
                             status: {
                               type: "string",
                               enum: ["pending", "completed", "batched"],
-                              description: "Transaction status"
-                            }
-                          }
-                        }
+                              description: "Transaction status",
+                            },
+                          },
+                        },
                       },
                       count: {
                         type: "number",
-                        description: "Total number of transactions"
+                        description: "Total number of transactions",
                       },
                       summary: {
                         type: "object",
                         properties: {
                           deposits: { type: "number" },
                           withdrawals: { type: "number" },
-                          transfers: { type: "number" }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
+                          transfers: { type: "number" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
             "400": {
               description: "Bad request - invalid user address",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
             },
             "503": {
               description: "Service unavailable - GunDB not initialized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
             },
             "500": {
               description: "Server error",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
       },
       "/api/v1/bridge/transaction/{txHash}": {
         get: {
           tags: ["Bridge"],
           summary: "Get transaction details",
-          description: "Get detailed information about a specific transaction by hash. Searches across deposits, withdrawals, and transfers.",
+          description:
+            "Get detailed information about a specific transaction by hash. Searches across deposits, withdrawals, and transfers.",
           operationId: "getTransactionDetails",
           parameters: [
             {
@@ -3487,8 +3686,8 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
               in: "path",
               required: true,
               schema: { type: "string" },
-              description: "Transaction hash"
-            }
+              description: "Transaction hash",
+            },
           ],
           responses: {
             "200": {
@@ -3505,64 +3704,64 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                           type: {
                             type: "string",
                             enum: ["deposit", "withdrawal", "transfer"],
-                            description: "Transaction type"
+                            description: "Transaction type",
                           },
                           txHash: {
                             type: "string",
-                            description: "Transaction hash"
+                            description: "Transaction hash",
                           },
                           from: {
                             type: "string",
-                            description: "Sender address"
+                            description: "Sender address",
                           },
                           to: {
                             type: "string",
-                            description: "Receiver address"
+                            description: "Receiver address",
                           },
                           amount: {
                             type: "string",
-                            description: "Amount in wei"
+                            description: "Amount in wei",
                           },
                           amountEth: {
                             type: "string",
-                            description: "Amount in ETH"
+                            description: "Amount in ETH",
                           },
                           timestamp: {
                             type: "number",
-                            description: "Transaction timestamp"
+                            description: "Transaction timestamp",
                           },
                           blockNumber: {
                             type: "number",
-                            description: "Block number"
+                            description: "Block number",
                           },
                           nonce: {
                             type: "string",
-                            description: "Withdrawal nonce"
+                            description: "Withdrawal nonce",
                           },
                           status: {
                             type: "string",
                             enum: ["pending", "completed", "batched"],
-                            description: "Transaction status"
-                          }
-                        }
+                            description: "Transaction status",
+                          },
+                        },
                       },
                       source: {
                         type: "string",
                         enum: ["deposit", "withdrawal", "transfer"],
-                        description: "Source where the transaction was found"
-                      }
-                    }
-                  }
-                }
-              }
+                        description: "Source where the transaction was found",
+                      },
+                    },
+                  },
+                },
+              },
             },
             "400": {
               description: "Bad request - invalid transaction hash",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
             },
             "404": {
               description: "Transaction not found",
@@ -3572,31 +3771,31 @@ export function generateOpenAPISpec(baseUrl: string = 'http://localhost:8765'): 
                     type: "object",
                     properties: {
                       success: { type: "boolean", example: false },
-                      error: { type: "string", example: "Transaction not found" }
-                    }
-                  }
-                }
-              }
+                      error: { type: "string", example: "Transaction not found" },
+                    },
+                  },
+                },
+              },
             },
             "503": {
               description: "Service unavailable - GunDB not initialized",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
             },
             "500": {
               description: "Server error",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   };
 }

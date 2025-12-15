@@ -35,26 +35,23 @@ interface GunMessageHandler {
   }
 
   // Check all incoming traffic
-  (context as any).on(
-    "in",
-    function (this: GunMessageHandler, msg: GunMessage) {
-      const to = this.to;
-      // restrict put
-      if (msg.put) {
-        const isValidMsg = isValid(msg);
+  (context as any).on("in", function (this: GunMessageHandler, msg: GunMessage) {
+    const to = this.to;
+    // restrict put
+    if (msg.put) {
+      const isValidMsg = isValid(msg);
 
-        if (isValidMsg instanceof Error) {
-          (context as any).on("in", { "@": msg["#"], err: isValidMsg.message });
-        } else {
-          if (isValidMsg) {
-            to.next(msg);
-          }
-        }
+      if (isValidMsg instanceof Error) {
+        (context as any).on("in", { "@": msg["#"], err: isValidMsg.message });
       } else {
-        to.next(msg);
+        if (isValidMsg) {
+          to.next(msg);
+        }
       }
+    } else {
+      to.next(msg);
     }
-  );
+  });
 });
 
 export default Gun;

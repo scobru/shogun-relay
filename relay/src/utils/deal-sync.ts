@@ -202,17 +202,11 @@ async function isPinned(cid: string): Promise<boolean> {
   try {
     const gatewayUrl = new URL(IPFS_API_URL);
     const protocolModule =
-      gatewayUrl.protocol === "https:"
-        ? await import("https")
-        : await import("http");
+      gatewayUrl.protocol === "https:" ? await import("https") : await import("http");
 
     const requestOptions: RequestOptions = {
       hostname: gatewayUrl.hostname,
-      port: gatewayUrl.port
-        ? Number(gatewayUrl.port)
-        : gatewayUrl.protocol === "https:"
-          ? 443
-          : 80,
+      port: gatewayUrl.port ? Number(gatewayUrl.port) : gatewayUrl.protocol === "https:" ? 443 : 80,
       path: `/api/v0/pin/ls?arg=${encodeURIComponent(cid)}&type=all`,
       method: "GET",
       headers: {},
@@ -272,8 +266,7 @@ async function pinCid(cid: string, maxRetries: number = 2): Promise<PinResult> {
     };
   }
 
-  const PIN_TIMEOUT =
-    ipfsConfig.pinTimeoutMs || 120000; // Default: 120 seconds (2 minutes)
+  const PIN_TIMEOUT = ipfsConfig.pinTimeoutMs || 120000; // Default: 120 seconds (2 minutes)
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     // Check shutdown status before each attempt
@@ -287,9 +280,7 @@ async function pinCid(cid: string, maxRetries: number = 2): Promise<PinResult> {
     try {
       const gatewayUrl = new URL(IPFS_API_URL);
       const protocolModule =
-        gatewayUrl.protocol === "https:"
-          ? await import("https")
-          : await import("http");
+        gatewayUrl.protocol === "https:" ? await import("https") : await import("http");
 
       const requestOptions: RequestOptions = {
         hostname: gatewayUrl.hostname,
@@ -318,26 +309,22 @@ async function pinCid(cid: string, maxRetries: number = 2): Promise<PinResult> {
               try {
                 const parsed = JSON.parse(data);
                 log.debug(
-                  `CID ${cid} pinned successfully${attempt > 0 ? ` (attempt ${attempt + 1})` : ""
-                  }`
+                  `CID ${cid} pinned successfully${attempt > 0 ? ` (attempt ${attempt + 1})` : ""}`
                 );
                 resolve({ success: true, result: parsed });
               } catch (e) {
                 log.debug(
-                  `CID ${cid} pinned (response: ${data})${attempt > 0 ? ` (attempt ${attempt + 1})` : ""
+                  `CID ${cid} pinned (response: ${data})${
+                    attempt > 0 ? ` (attempt ${attempt + 1})` : ""
                   }`
                 );
                 resolve({ success: true });
               }
             } else {
               // Check if already pinned
-              if (
-                data.includes("already pinned") ||
-                data.includes("is already pinned")
-              ) {
+              if (data.includes("already pinned") || data.includes("is already pinned")) {
                 log.debug(
-                  `CID ${cid} was already pinned${attempt > 0 ? ` (attempt ${attempt + 1})` : ""
-                  }`
+                  `CID ${cid} was already pinned${attempt > 0 ? ` (attempt ${attempt + 1})` : ""}`
                 );
                 resolve({ success: true, alreadyPinned: true });
               } else {
@@ -348,8 +335,9 @@ async function pinCid(cid: string, maxRetries: number = 2): Promise<PinResult> {
                   data.includes("promise channel was closed") ||
                   data.includes("channel was closed");
 
-                const error = `IPFS pin add failed with status ${res.statusCode
-                  }: ${data.substring(0, 200)}`;
+                const error = `IPFS pin add failed with status ${
+                  res.statusCode
+                }: ${data.substring(0, 200)}`;
                 resolve({
                   success: false,
                   error,
@@ -381,8 +369,9 @@ async function pinCid(cid: string, maxRetries: number = 2): Promise<PinResult> {
         req.setTimeout(PIN_TIMEOUT, () => {
           req.destroy();
           // Timeout doesn't necessarily mean failure - pin might continue in background
-          const error = `IPFS pin add timeout after ${PIN_TIMEOUT / 1000
-            }s (CID may still be pinning in background)`;
+          const error = `IPFS pin add timeout after ${
+            PIN_TIMEOUT / 1000
+          }s (CID may still be pinning in background)`;
           log.warn(`${error}${attempt > 0 ? ` (attempt ${attempt + 1})` : ""}`);
           resolve({
             success: false,
@@ -403,10 +392,7 @@ async function pinCid(cid: string, maxRetries: number = 2): Promise<PinResult> {
       // If pending (timeout but might still be processing), check if we should retry
       if (result.pending && attempt < maxRetries && !isShuttingDown) {
         const retryDelay = Math.min(5000 * Math.pow(2, attempt), 30000); // Exponential backoff: 5s, 10s, 20s, max 30s
-        log.debug(
-          `CID ${cid} pin may still be processing. Retrying in ${retryDelay / 1000
-          }s...`
-        );
+        log.debug(`CID ${cid} pin may still be processing. Retrying in ${retryDelay / 1000}s...`);
         await new Promise((resolve) => setTimeout(resolve, retryDelay));
         // Check again after delay in case shutdown started during wait
         if (isShuttingDown) {
@@ -424,7 +410,8 @@ async function pinCid(cid: string, maxRetries: number = 2): Promise<PinResult> {
       if (result.retryable && attempt < maxRetries && !isShuttingDown) {
         const retryDelay = Math.min(2000 * Math.pow(2, attempt), 10000); // Exponential backoff: 2s, 4s, 8s, max 10s
         log.debug(
-          `Retrying pin for CID ${cid} in ${retryDelay / 1000}s (attempt ${attempt + 2
+          `Retrying pin for CID ${cid} in ${retryDelay / 1000}s (attempt ${
+            attempt + 2
           }/${maxRetries + 1})...`
         );
         await new Promise((resolve) => setTimeout(resolve, retryDelay));
@@ -467,8 +454,7 @@ async function pinCid(cid: string, maxRetries: number = 2): Promise<PinResult> {
         const retryDelay = Math.min(2000 * Math.pow(2, attempt), 10000);
         log.warn(
           { err: error },
-          `Error pinning CID ${cid} (attempt ${attempt + 1}). Retrying in ${retryDelay / 1000
-          }s...`
+          `Error pinning CID ${cid} (attempt ${attempt + 1}). Retrying in ${retryDelay / 1000}s...`
         );
         await new Promise((resolve) => setTimeout(resolve, retryDelay));
         // Check again after delay
@@ -531,9 +517,7 @@ async function convertOnChainDealToGunDB(
     sizeMB: onChainDeal.sizeMB,
     durationDays,
     months: durationDays / 30,
-    pricePerMBMonth:
-      parseFloat(onChainDeal.priceUSDC) /
-      (onChainDeal.sizeMB * (durationDays / 30)),
+    pricePerMBMonth: parseFloat(onChainDeal.priceUSDC) / (onChainDeal.sizeMB * (durationDays / 30)),
     basePrice: parseFloat(onChainDeal.priceUSDC),
     storageOverheadPercent: 0,
     replicationFactor: 1,
@@ -613,34 +597,25 @@ export async function syncDealsWithIPFS(
 
   try {
     // Import registry client
-    const { createStorageDealRegistryClient } = await import(
-      "./registry-client"
-    );
+    const { createStorageDealRegistryClient } = await import("./registry-client");
     const storageDealRegistryClient = createStorageDealRegistryClient(chainId);
 
     // Fetch all deals for this relay
-    const deals: Array<OnChainDeal> =
-      await storageDealRegistryClient.getRelayDeals(relayAddress);
+    const deals: Array<OnChainDeal> = await storageDealRegistryClient.getRelayDeals(relayAddress);
 
     if (!fastSync) {
-      log.debug(
-        `Found ${deals.length} deals on-chain for relay ${relayAddress}`
-      );
+      log.debug(`Found ${deals.length} deals on-chain for relay ${relayAddress}`);
     }
 
     // Filter active deals if requested
     const dealsToSync = onlyActive
       ? deals.filter(
-        (deal) =>
-          deal.active &&
-          new Date(deal.expiresAt as unknown as string) > new Date()
-      )
+          (deal) => deal.active && new Date(deal.expiresAt as unknown as string) > new Date()
+        )
       : deals;
 
     if (!fastSync) {
-      log.debug(
-        `Syncing ${dealsToSync.length} ${onlyActive ? "active" : ""} deals...`
-      );
+      log.debug(`Syncing ${dealsToSync.length} ${onlyActive ? "active" : ""} deals...`);
     }
 
     const results: SyncResults = {
@@ -693,10 +668,7 @@ export async function syncDealsWithIPFS(
               const { saveDeal } = await import("./storage-deals");
               const existingDeal = await getDeal(gun, dealId);
               if (!existingDeal || existingDeal.syncedFromOnChain !== true) {
-                const gunDBDeal = await convertOnChainDealToGunDB(
-                  deal,
-                  relayPub
-                );
+                const gunDBDeal = await convertOnChainDealToGunDB(deal, relayPub);
                 await saveDeal(gun, gunDBDeal as any, relayKeyPair);
                 results.gunDBSynced++;
               }
@@ -718,9 +690,7 @@ export async function syncDealsWithIPFS(
 
           if (!shouldRetry) {
             if (!fastSync) {
-              const minutesSinceAttempt = Math.floor(
-                timeSinceLastAttempt / 60000
-              );
+              const minutesSinceAttempt = Math.floor(timeSinceLastAttempt / 60000);
               log.debug(
                 `Deal ${dealId}: CID ${cid} failed ${failureInfo.consecutiveFailures} time(s) recently (${minutesSinceAttempt}m ago). Skipping retry for now.`
               );
@@ -785,10 +755,7 @@ export async function syncDealsWithIPFS(
             } else {
               // Only log and track as failed if not a shutdown error
               if (!pinResult.shutdownError && !isShuttingDown) {
-                log.warn(
-                  { err: pinResult.error },
-                  `Deal ${dealId}: Failed to pin CID ${cid}`
-                );
+                log.warn({ err: pinResult.error }, `Deal ${dealId}: Failed to pin CID ${cid}`);
                 // Track failure for rate limiting
                 const existingFailure = pinFailureCache.get(cid) || {
                   consecutiveFailures: 0,
@@ -836,17 +803,12 @@ export async function syncDealsWithIPFS(
             // Ignore errors if shutdown is in progress (database may be closed)
             if (isShuttingDown) {
               if (!fastSync) {
-                log.debug(
-                  `GunDB sync skipped for deal ${dealId} (shutdown in progress)`
-                );
+                log.debug(`GunDB sync skipped for deal ${dealId} (shutdown in progress)`);
               }
               break;
             }
             if (!fastSync) {
-              log.warn(
-                { err: gunDBError },
-                `Deal ${dealId}: Failed to sync to GunDB`
-              );
+              log.warn({ err: gunDBError }, `Deal ${dealId}: Failed to sync to GunDB`);
             }
             results.gunDBFailed++;
             results.errors.push({
@@ -901,16 +863,12 @@ export async function getDealSyncStatus(
   chainId: number
 ): Promise<Array<DealSyncStatus>> {
   try {
-    const { createStorageDealRegistryClient } = await import(
-      "./registry-client"
-    );
+    const { createStorageDealRegistryClient } = await import("./registry-client");
     const storageDealRegistryClient = createStorageDealRegistryClient(chainId);
 
-    const deals: Array<OnChainDeal> =
-      await storageDealRegistryClient.getRelayDeals(relayAddress);
+    const deals: Array<OnChainDeal> = await storageDealRegistryClient.getRelayDeals(relayAddress);
     const activeDeals = deals.filter(
-      (deal) =>
-        deal.active && new Date(deal.expiresAt as unknown as string) > new Date()
+      (deal) => deal.active && new Date(deal.expiresAt as unknown as string) > new Date()
     );
 
     const status: Array<DealSyncStatus> = [];

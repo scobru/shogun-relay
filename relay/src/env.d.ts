@@ -78,10 +78,9 @@ declare namespace NodeJS {
     RELAY_STORE?: string;
     RELAY_PATH?: string;
     PORT?: string;
-    NODE_ENV?: 'development' | 'production' | 'test';
+    NODE_ENV?: "development" | "production" | "test";
     STRICT_SESSION_IP?: string;
     ENABLE_METRICS?: string;
     ENABLE_HEALTH?: string;
   }
 }
-

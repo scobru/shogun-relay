@@ -1,11 +1,11 @@
 /**
  * Security Utilities
- * 
+ *
  * Provides secure authentication, input validation, and security helpers
  */
 
-import crypto from 'crypto';
-import { loggers } from './logger';
+import crypto from "crypto";
+import { loggers } from "./logger";
 
 const log = loggers.server || console;
 
@@ -19,10 +19,7 @@ export function secureCompare(a: string, b: string): boolean {
   }
 
   try {
-    return crypto.timingSafeEqual(
-      Buffer.from(a, 'utf8'),
-      Buffer.from(b, 'utf8')
-    );
+    return crypto.timingSafeEqual(Buffer.from(a, "utf8"), Buffer.from(b, "utf8"));
   } catch {
     return false;
   }
@@ -34,16 +31,16 @@ export function secureCompare(a: string, b: string): boolean {
  */
 export function hashToken(token: string): string {
   return crypto
-    .createHash('sha256')
-    .update(token || '')
-    .digest('hex');
+    .createHash("sha256")
+    .update(token || "")
+    .digest("hex");
 }
 
 /**
  * Validate Ethereum address format
  */
 export function isValidEthereumAddress(address: string): boolean {
-  if (!address || typeof address !== 'string') {
+  if (!address || typeof address !== "string") {
     return false;
   }
 
@@ -57,13 +54,13 @@ export function isValidEthereumAddress(address: string): boolean {
  */
 export function isValidAmount(amount: bigint): { valid: boolean; error?: string } {
   if (amount <= 0n) {
-    return { valid: false, error: 'Amount must be positive' };
+    return { valid: false, error: "Amount must be positive" };
   }
 
   // Max value: 2^256 - 1 (max uint256)
-  const MAX_AMOUNT = BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF');
+  const MAX_AMOUNT = BigInt("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
   if (amount > MAX_AMOUNT) {
-    return { valid: false, error: 'Amount exceeds maximum value' };
+    return { valid: false, error: "Amount exceeds maximum value" };
   }
 
   return { valid: true };
@@ -78,7 +75,7 @@ export function validateString(
   maxLength: number = 10000,
   minLength: number = 0
 ): { valid: boolean; error?: string; sanitized?: string } {
-  if (typeof value !== 'string') {
+  if (typeof value !== "string") {
     return { valid: false, error: `${fieldName} must be a string` };
   }
 
@@ -92,8 +89,8 @@ export function validateString(
 
   // Basic sanitization: remove null bytes and control characters
   const sanitized = value
-    .replace(/\0/g, '') // Remove null bytes
-    .replace(/[\x00-\x1F\x7F]/g, ''); // Remove control characters
+    .replace(/\0/g, "") // Remove null bytes
+    .replace(/[\x00-\x1F\x7F]/g, ""); // Remove control characters
 
   return { valid: true, sanitized };
 }
@@ -101,12 +98,12 @@ export function validateString(
 /**
  * Validate signature format
  */
-export function isValidSignatureFormat(signature: string, type: 'sea' | 'eth' = 'eth'): boolean {
-  if (!signature || typeof signature !== 'string') {
+export function isValidSignatureFormat(signature: string, type: "sea" | "eth" = "eth"): boolean {
+  if (!signature || typeof signature !== "string") {
     return false;
   }
 
-  if (type === 'eth') {
+  if (type === "eth") {
     // Ethereum signature: 0x + 130 hex characters (65 bytes * 2)
     return /^0x[a-fA-F0-9]{130}$/.test(signature);
   } else {
@@ -119,26 +116,33 @@ export function isValidSignatureFormat(signature: string, type: 'sea' | 'eth' = 
  * Sanitize data for logging (remove sensitive fields)
  */
 export function sanitizeForLog(data: any): any {
-  if (!data || typeof data !== 'object') {
+  if (!data || typeof data !== "object") {
     return data;
   }
 
   const sensitiveFields = [
-    'privateKey', 'priv', 'epriv',
-    'signature', 'seaSignature', 'ethSignature',
-    'password', 'token', 'secret',
-    'apiKey', 'apiToken'
+    "privateKey",
+    "priv",
+    "epriv",
+    "signature",
+    "seaSignature",
+    "ethSignature",
+    "password",
+    "token",
+    "secret",
+    "apiKey",
+    "apiToken",
   ];
 
   const sanitized = Array.isArray(data) ? [...data] : { ...data };
 
   for (const key in sanitized) {
-    if (sensitiveFields.some(field => key.toLowerCase().includes(field.toLowerCase()))) {
-      sanitized[key] = '***REDACTED***';
-    } else if (typeof sanitized[key] === 'string' && sanitized[key].length > 200) {
+    if (sensitiveFields.some((field) => key.toLowerCase().includes(field.toLowerCase()))) {
+      sanitized[key] = "***REDACTED***";
+    } else if (typeof sanitized[key] === "string" && sanitized[key].length > 200) {
       // Truncate long strings
-      sanitized[key] = sanitized[key].substring(0, 200) + '...';
-    } else if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
+      sanitized[key] = sanitized[key].substring(0, 200) + "...";
+    } else if (typeof sanitized[key] === "object" && sanitized[key] !== null) {
       // Recursively sanitize nested objects
       sanitized[key] = sanitizeForLog(sanitized[key]);
     }
@@ -153,13 +157,11 @@ export function sanitizeForLog(data: any): any {
 export function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
-  errorMessage: string = 'Operation timeout'
+  errorMessage: string = "Operation timeout"
 ): Promise<T> {
   return Promise.race([
     promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
-    )
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(errorMessage)), timeoutMs)),
   ]);
 }
 
@@ -173,10 +175,7 @@ class UserLockManager {
    * Execute an operation with a lock for a specific user
    * Ensures only one operation per user executes at a time
    */
-  async executeWithLock<T>(
-    userKey: string,
-    operation: () => Promise<T>
-  ): Promise<T> {
+  async executeWithLock<T>(userKey: string, operation: () => Promise<T>): Promise<T> {
     const normalizedKey = userKey.toLowerCase();
 
     // Wait for any existing operation to complete
@@ -234,13 +233,13 @@ export function isValidChainId(
   allowedChainIds: number[]
 ): { valid: boolean; error?: string } {
   if (!Number.isInteger(chainId) || chainId <= 0) {
-    return { valid: false, error: 'ChainId must be a positive integer' };
+    return { valid: false, error: "ChainId must be a positive integer" };
   }
 
   if (!allowedChainIds.includes(chainId)) {
     return {
       valid: false,
-      error: `ChainId ${chainId} is not in the allowed list. Valid chains: ${allowedChainIds.join(', ')}`
+      error: `ChainId ${chainId} is not in the allowed list. Valid chains: ${allowedChainIds.join(", ")}`,
     };
   }
 
@@ -252,16 +251,16 @@ export function isValidChainId(
  */
 export function getChainName(chainId: number): string {
   const chainNames: Record<number, string> = {
-    1: 'Ethereum Mainnet',
-    11155111: 'Sepolia Testnet',
-    8453: 'Base Mainnet',
-    84532: 'Base Sepolia',
-    42161: 'Arbitrum One',
-    421614: 'Arbitrum Sepolia',
-    10: 'Optimism Mainnet',
-    11155420: 'Optimism Sepolia',
-    137: 'Polygon Mainnet',
-    80002: 'Polygon Amoy',
+    1: "Ethereum Mainnet",
+    11155111: "Sepolia Testnet",
+    8453: "Base Mainnet",
+    84532: "Base Sepolia",
+    42161: "Arbitrum One",
+    421614: "Arbitrum Sepolia",
+    10: "Optimism Mainnet",
+    11155420: "Optimism Sepolia",
+    137: "Polygon Mainnet",
+    80002: "Polygon Amoy",
   };
   return chainNames[chainId] || `Chain ${chainId}`;
 }
@@ -272,17 +271,17 @@ export function getChainName(chainId: number): string {
  */
 export function sanitizeErrorForProduction(
   error: Error | string | unknown,
-  isProduction: boolean = process.env.NODE_ENV === 'production'
+  isProduction: boolean = process.env.NODE_ENV === "production"
 ): { message: string; code?: string } {
   // Generic error messages for production
   const genericMessages: Record<string, string> = {
-    ECONNREFUSED: 'Service temporarily unavailable',
-    ETIMEDOUT: 'Request timed out',
-    ENOTFOUND: 'Service not found',
-    ERR_INVALID_ARG: 'Invalid request parameters',
-    ValidationError: 'Request validation failed',
-    UnauthorizedError: 'Authentication required',
-    ForbiddenError: 'Access denied',
+    ECONNREFUSED: "Service temporarily unavailable",
+    ETIMEDOUT: "Request timed out",
+    ENOTFOUND: "Service not found",
+    ERR_INVALID_ARG: "Invalid request parameters",
+    ValidationError: "Request validation failed",
+    UnauthorizedError: "Authentication required",
+    ForbiddenError: "Access denied",
   };
 
   if (!isProduction) {
@@ -326,35 +325,40 @@ export function sanitizeErrorForProduction(
 
   for (const pattern of sensitivePatterns) {
     if (pattern.test(errorMessage)) {
-      return { message: 'An internal error occurred. Please try again later.' };
+      return { message: "An internal error occurred. Please try again later." };
     }
   }
 
   // Return sanitized message (first 100 chars, no stack trace)
   const sanitizedMessage = errorMessage
-    .split('\n')[0] // Only first line
+    .split("\n")[0] // Only first line
     .substring(0, 100) // Limit length
-    .replace(/\s+$/, ''); // Trim trailing whitespace
+    .replace(/\s+$/, ""); // Trim trailing whitespace
 
-  return { message: sanitizedMessage || 'An unexpected error occurred' };
+  return { message: sanitizedMessage || "An unexpected error occurred" };
 }
 
 /**
  * Express error handler middleware for production
  * Use this as the last error handler in your middleware chain
  */
-export function createProductionErrorHandler(isProduction: boolean = process.env.NODE_ENV === 'production') {
+export function createProductionErrorHandler(
+  isProduction: boolean = process.env.NODE_ENV === "production"
+) {
   return (err: Error, req: any, res: any, next: any) => {
     const sanitized = sanitizeErrorForProduction(err, isProduction);
 
     // Log full error in server logs (not exposed to client)
     if (log.error) {
-      log.error({
-        err,
-        method: req.method,
-        url: req.url,
-        ip: req.ip,
-      }, 'Request error');
+      log.error(
+        {
+          err,
+          method: req.method,
+          url: req.url,
+          ip: req.ip,
+        },
+        "Request error"
+      );
     }
 
     // Determine status code
@@ -367,4 +371,3 @@ export function createProductionErrorHandler(isProduction: boolean = process.env
     });
   };
 }
-

@@ -1,9 +1,9 @@
 /**
  * Erasure Coding Utility for Shogun Relay
- * 
+ *
  * Provides data redundancy through chunk splitting and parity generation.
  * Uses XOR-based parity for simplicity (can be upgraded to Reed-Solomon).
- * 
+ *
  * Features:
  * - Split files into data chunks
  * - Generate parity chunks for redundancy
@@ -11,8 +11,8 @@
  * - Track chunk distribution across relays
  */
 
-import crypto from 'crypto';
-import { loggers } from './logger';
+import crypto from "crypto";
+import { loggers } from "./logger";
 
 const log = loggers.erasure;
 
@@ -26,16 +26,16 @@ interface ErasureCodingConfig {
 
 // Default configuration
 const DEFAULT_CONFIG: ErasureCodingConfig = {
-  chunkSize: 256 * 1024,      // 256KB per chunk
-  dataChunks: 10,              // Number of data chunks
-  parityChunks: 4,             // Number of parity chunks (40% redundancy)
-  minChunksForRecovery: 10,    // Need at least this many to recover
+  chunkSize: 256 * 1024, // 256KB per chunk
+  dataChunks: 10, // Number of data chunks
+  parityChunks: 4, // Number of parity chunks (40% redundancy)
+  minChunksForRecovery: 10, // Need at least this many to recover
 };
 
 // Chunk info interface
 interface ChunkInfo {
   index: number;
-  type: 'data' | 'parity';
+  type: "data" | "parity";
   hash: string;
   size: number;
 }
@@ -98,12 +98,15 @@ interface OverheadResult {
 
 /**
  * Split data into fixed-size chunks
- * 
+ *
  * @param data - Data to split
  * @param chunkSize - Size of each chunk in bytes
  * @returns Array of chunks
  */
-export function splitIntoChunks(data: Buffer, chunkSize: number = DEFAULT_CONFIG.chunkSize): Buffer[] {
+export function splitIntoChunks(
+  data: Buffer,
+  chunkSize: number = DEFAULT_CONFIG.chunkSize
+): Buffer[] {
   const chunks: Buffer[] = [];
   let offset = 0;
 
@@ -120,7 +123,7 @@ export function splitIntoChunks(data: Buffer, chunkSize: number = DEFAULT_CONFIG
 
 /**
  * XOR two buffers together
- * 
+ *
  * @param a - First buffer
  * @param b - Second buffer
  * @returns XOR result
@@ -138,18 +141,21 @@ function xorBuffers(a: Buffer, b: Buffer): Buffer {
 
 /**
  * Generate parity chunks using XOR
- * 
+ *
  * Simple parity scheme:
  * - P0 = XOR(D0, D1, D2, ...)
  * - P1 = XOR(D0, D2, D4, ...) (even indices)
  * - P2 = XOR(D1, D3, D5, ...) (odd indices)
  * - P3 = XOR(all with rotation)
- * 
+ *
  * @param dataChunks - Array of data chunks
  * @param parityCount - Number of parity chunks to generate
  * @returns Array of parity chunks
  */
-export function generateParityChunks(dataChunks: Buffer[], parityCount: number = DEFAULT_CONFIG.parityChunks): Buffer[] {
+export function generateParityChunks(
+  dataChunks: Buffer[],
+  parityCount: number = DEFAULT_CONFIG.parityChunks
+): Buffer[] {
   if (dataChunks.length === 0) {
     return [];
   }
@@ -204,7 +210,7 @@ export function generateParityChunks(dataChunks: Buffer[], parityCount: number =
 
 /**
  * Create erasure-coded representation of data
- * 
+ *
  * @param data - Original data
  * @param config - Configuration options
  * @returns Erasure coding result
@@ -221,10 +227,10 @@ export function encodeData(data: Buffer, config: Partial<ErasureCodingConfig> = 
   // Generate hashes for each chunk
   const allChunks = [...dataChunks, ...parityChunks];
   const chunkInfos: ChunkInfo[] = allChunks.map((chunk, index) => {
-    const hash = crypto.createHash('sha256').update(chunk).digest('hex');
+    const hash = crypto.createHash("sha256").update(chunk).digest("hex");
     return {
       index,
-      type: index < dataChunks.length ? 'data' : 'parity',
+      type: index < dataChunks.length ? "data" : "parity",
       hash,
       size: chunk.length,
     };
@@ -246,7 +252,7 @@ export function encodeData(data: Buffer, config: Partial<ErasureCodingConfig> = 
 
 /**
  * Reconstruct data from chunks (simple case: all data chunks available)
- * 
+ *
  * @param chunks - Available chunks (in order)
  * @param originalSize - Original data size
  * @returns Reconstructed data
@@ -258,7 +264,7 @@ export function reconstructData(chunks: Buffer[], originalSize: number): Buffer 
 
 /**
  * Attempt to recover missing chunk using parity
- * 
+ *
  * @param availableChunks - Map of index -> chunk
  * @param missingIndex - Index of missing chunk
  * @param totalDataChunks - Total number of data chunks
@@ -274,7 +280,7 @@ export function recoverMissingChunk(
   const p0 = availableChunks.get(p0Index);
 
   if (!p0) {
-    log.warn('Cannot recover: P0 parity chunk not available');
+    log.warn("Cannot recover: P0 parity chunk not available");
     return undefined;
   }
 
@@ -288,7 +294,7 @@ export function recoverMissingChunk(
   }
 
   if (!canRecover) {
-    log.warn('Cannot recover: too many missing chunks');
+    log.warn("Cannot recover: too many missing chunks");
     return undefined;
   }
 
@@ -305,7 +311,7 @@ export function recoverMissingChunk(
 
 /**
  * Create chunk distribution plan for multiple relays
- * 
+ *
  * @param encoded - Result from encodeData()
  * @param relayHosts - Available relay hosts
  * @param replicationFactor - Copies per chunk
@@ -317,7 +323,7 @@ export function createDistributionPlan(
   replicationFactor: number = 2
 ): DistributionPlan {
   if (relayHosts.length === 0) {
-    throw new Error('No relays available for distribution');
+    throw new Error("No relays available for distribution");
   }
 
   const plan: DistributionPlan = {
@@ -326,7 +332,7 @@ export function createDistributionPlan(
   };
 
   // Initialize relay assignments
-  relayHosts.forEach(host => {
+  relayHosts.forEach((host) => {
     plan.relayAssignments[host] = [];
   });
 
@@ -355,33 +361,36 @@ export function createDistributionPlan(
 
 /**
  * Verify chunk integrity using hash
- * 
+ *
  * @param chunk - Chunk data
  * @param expectedHash - Expected SHA-256 hash
  * @returns True if valid
  */
 export function verifyChunk(chunk: Buffer, expectedHash: string): boolean {
-  const actualHash = crypto.createHash('sha256').update(chunk).digest('hex');
+  const actualHash = crypto.createHash("sha256").update(chunk).digest("hex");
   return actualHash === expectedHash;
 }
 
 /**
  * Create metadata for storing with the deal
- * 
+ *
  * @param encoded - Result from encodeData()
  * @param distributionPlan - Result from createDistributionPlan()
  * @returns Metadata for storage
  */
-export function createErasureMetadata(encoded: EncodeResult, distributionPlan?: DistributionPlan): ErasureMetadata {
+export function createErasureMetadata(
+  encoded: EncodeResult,
+  distributionPlan?: DistributionPlan
+): ErasureMetadata {
   return {
     version: 1,
-    algorithm: 'xor-parity',
+    algorithm: "xor-parity",
     originalSize: encoded.originalSize,
     chunkSize: encoded.chunkSize,
     dataChunkCount: encoded.dataChunkCount,
     parityChunkCount: encoded.parityChunkCount,
     redundancyPercent: encoded.redundancyPercent,
-    chunks: encoded.chunks.map(c => ({
+    chunks: encoded.chunks.map((c) => ({
       index: c.index,
       type: c.type,
       hash: c.hash,
@@ -393,12 +402,15 @@ export function createErasureMetadata(encoded: EncodeResult, distributionPlan?: 
 
 /**
  * Calculate storage overhead for erasure coding
- * 
+ *
  * @param originalSize - Original file size in bytes
  * @param config - Erasure coding configuration
  * @returns Size calculations
  */
-export function calculateOverhead(originalSize: number, config: ErasureCodingConfig = DEFAULT_CONFIG): OverheadResult {
+export function calculateOverhead(
+  originalSize: number,
+  config: ErasureCodingConfig = DEFAULT_CONFIG
+): OverheadResult {
   const dataChunks = Math.ceil(originalSize / config.chunkSize);
   const parityChunks = config.parityChunks;
   const totalChunks = dataChunks + parityChunks;

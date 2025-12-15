@@ -55,10 +55,7 @@ async function checkIpfsReady(timeout: number = 2000): Promise<boolean> {
     if (IPFS_API_TOKEN) {
       const headers = options.headers || {};
       if (Array.isArray(headers)) {
-        options.headers = [
-          ...headers,
-          ["Authorization", `Bearer ${IPFS_API_TOKEN}`],
-        ];
+        options.headers = [...headers, ["Authorization", `Bearer ${IPFS_API_TOKEN}`]];
       } else {
         options.headers = {
           ...headers,
@@ -142,10 +139,7 @@ async function ipfsRequest(
 
   // Check cache first (if recent check)
   const cacheAge = Date.now() - ipfsReadyCache.lastCheck;
-  if (
-    waitForReady &&
-    (!ipfsReadyCache.isReady || cacheAge > ipfsReadyCache.checkInterval)
-  ) {
+  if (waitForReady && (!ipfsReadyCache.isReady || cacheAge > ipfsReadyCache.checkInterval)) {
     const isReady = await checkIpfsReady(1000);
     if (!isReady) {
       log.debug("IPFS daemon not ready, waiting...");
@@ -163,74 +157,67 @@ async function ipfsRequest(
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const result = await new Promise<Record<string, any> | string | Buffer>(
-        (resolve, reject) => {
-          const requestOptions: http.RequestOptions = {
-            hostname,
-            port,
-            path,
-            method,
-            headers: {
-              "Content-Length": "0",
-              ...headers,
-            },
-            timeout,
-          };
+      const result = await new Promise<Record<string, any> | string | Buffer>((resolve, reject) => {
+        const requestOptions: http.RequestOptions = {
+          hostname,
+          port,
+          path,
+          method,
+          headers: {
+            "Content-Length": "0",
+            ...headers,
+          },
+          timeout,
+        };
 
-          if (IPFS_API_TOKEN) {
-            const reqHeaders = requestOptions.headers || {};
-            if (Array.isArray(reqHeaders)) {
-              requestOptions.headers = {
-                ...(reqHeaders as unknown as Record<string, string>),
-                Authorization: `Bearer ${IPFS_API_TOKEN}`,
-              };
-            } else {
-              requestOptions.headers = {
-                ...(reqHeaders as Record<string, string>),
-                Authorization: `Bearer ${IPFS_API_TOKEN}`,
-              };
-            }
+        if (IPFS_API_TOKEN) {
+          const reqHeaders = requestOptions.headers || {};
+          if (Array.isArray(reqHeaders)) {
+            requestOptions.headers = {
+              ...(reqHeaders as unknown as Record<string, string>),
+              Authorization: `Bearer ${IPFS_API_TOKEN}`,
+            };
+          } else {
+            requestOptions.headers = {
+              ...(reqHeaders as Record<string, string>),
+              Authorization: `Bearer ${IPFS_API_TOKEN}`,
+            };
           }
-
-          const req = httpModule.request(requestOptions, (res) => {
-            const chunks: Buffer[] = [];
-            res.on("data", (chunk: Buffer) => chunks.push(chunk));
-            res.on("end", () => {
-              const buffer = Buffer.concat(chunks);
-              if (res.statusCode === 200) {
-                if (options.responseType === "arraybuffer") {
-                  resolve(buffer);
-                } else {
-                  const data = buffer.toString();
-                  try {
-                    resolve(JSON.parse(data));
-                  } catch {
-                    resolve(data);
-                  }
-                }
-              } else {
-                reject(
-                  new Error(
-                    `IPFS API returned status ${res.statusCode
-                    }: ${buffer.toString()}`
-                  )
-                );
-              }
-            });
-          });
-
-          req.on("error", (err: Error) => {
-            reject(err);
-          });
-
-          req.on("timeout", () => {
-            req.destroy();
-            reject(new Error("Request timeout"));
-          });
-
-          req.end();
         }
-      );
+
+        const req = httpModule.request(requestOptions, (res) => {
+          const chunks: Buffer[] = [];
+          res.on("data", (chunk: Buffer) => chunks.push(chunk));
+          res.on("end", () => {
+            const buffer = Buffer.concat(chunks);
+            if (res.statusCode === 200) {
+              if (options.responseType === "arraybuffer") {
+                resolve(buffer);
+              } else {
+                const data = buffer.toString();
+                try {
+                  resolve(JSON.parse(data));
+                } catch {
+                  resolve(data);
+                }
+              }
+            } else {
+              reject(new Error(`IPFS API returned status ${res.statusCode}: ${buffer.toString()}`));
+            }
+          });
+        });
+
+        req.on("error", (err: Error) => {
+          reject(err);
+        });
+
+        req.on("timeout", () => {
+          req.destroy();
+          reject(new Error("Request timeout"));
+        });
+
+        req.end();
+      });
 
       // Success - update cache
       ipfsReadyCache.isReady = true;
@@ -255,7 +242,8 @@ async function ipfsRequest(
 
       log.warn(
         { err: error },
-        `IPFS request failed (attempt ${attempt + 1}/${maxRetries + 1
+        `IPFS request failed (attempt ${attempt + 1}/${
+          maxRetries + 1
         }). Retrying in ${currentDelay}ms...`
       );
 
@@ -320,10 +308,7 @@ async function ipfsUpload(
         if (IPFS_API_TOKEN) {
           const reqHeaders = requestOptions.headers || {};
           if (Array.isArray(reqHeaders)) {
-            requestOptions.headers = [
-              ...reqHeaders,
-              ["Authorization", `Bearer ${IPFS_API_TOKEN}`],
-            ];
+            requestOptions.headers = [...reqHeaders, ["Authorization", `Bearer ${IPFS_API_TOKEN}`]];
           } else {
             requestOptions.headers = {
               ...reqHeaders,
@@ -346,11 +331,7 @@ async function ipfsUpload(
                 reject(new Error(`Failed to parse IPFS response: ${data}`));
               }
             } else {
-              reject(
-                new Error(
-                  `IPFS upload failed with status ${res.statusCode}: ${data}`
-                )
-              );
+              reject(new Error(`IPFS upload failed with status ${res.statusCode}: ${data}`));
             }
           });
         });
@@ -386,13 +367,16 @@ async function ipfsUpload(
 
       ipfsReadyCache.isReady = false;
 
-      log.warn({
-        attempt: attempt + 1,
-        maxRetries: maxRetries + 1,
-        errorCode: error.code,
-        errorMessage: error.message,
-        retryDelay: currentDelay
-      }, `⚠️ IPFS upload failed, retrying`);
+      log.warn(
+        {
+          attempt: attempt + 1,
+          maxRetries: maxRetries + 1,
+          errorCode: error.code,
+          errorMessage: error.message,
+          retryDelay: currentDelay,
+        },
+        `⚠️ IPFS upload failed, retrying`
+      );
 
       await new Promise((resolve) => setTimeout(resolve, currentDelay));
       currentDelay = Math.min(currentDelay * 1.5, 5000);

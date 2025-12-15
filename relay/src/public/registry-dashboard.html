@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="shogun-dark">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -41,11 +42,30 @@
       font-weight: 500;
     }
 
-    .status-active { background: rgba(76, 175, 80, 0.15); color: #4CAF50; }
-    .status-inactive { background: rgba(136, 136, 160, 0.15); color: #A0A0A0; }
-    .status-unstaking { background: rgba(255, 165, 0, 0.15); color: #FFA500; }
-    .status-slashed { background: rgba(244, 67, 54, 0.15); color: #F44336; }
-    .status-not-configured { background: rgba(139, 92, 246, 0.15); color: #8B5CF6; }
+    .status-active {
+      background: rgba(76, 175, 80, 0.15);
+      color: #4CAF50;
+    }
+
+    .status-inactive {
+      background: rgba(136, 136, 160, 0.15);
+      color: #A0A0A0;
+    }
+
+    .status-unstaking {
+      background: rgba(255, 165, 0, 0.15);
+      color: #FFA500;
+    }
+
+    .status-slashed {
+      background: rgba(244, 67, 54, 0.15);
+      color: #F44336;
+    }
+
+    .status-not-configured {
+      background: rgba(139, 92, 246, 0.15);
+      color: #8B5CF6;
+    }
 
     .address {
       font-family: 'SF Mono', monospace;
@@ -79,6 +99,7 @@
     }
   </style>
 </head>
+
 <body class="antialiased">
   <div class="hero-gradient min-h-screen">
     <div class="container mx-auto px-4 py-8 max-w-7xl">
@@ -86,18 +107,22 @@
       <header class="mb-12">
         <div class="flex items-center mb-6">
           <a href="/" class="flex items-center gap-2 text-[#A0A0A0] hover:text-[#FF69B4] transition-colors group">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:-translate-x-1 transition-transform"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
             <span>Back to Control Panel</span>
           </a>
         </div>
-        
+
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div class="flex items-center gap-4">
-            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9]">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            <div
+              class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9]">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
             </div>
             <div>
@@ -105,7 +130,8 @@
               <p class="text-[#8B94FF]">On-chain relay management and staking</p>
             </div>
           </div>
-          <div class="badge badge-outline bg-[#282828] border-[#606060] text-[#E0E0E0] text-base px-4 py-3" id="chainBadge">Loading...</div>
+          <div class="badge badge-outline bg-[#282828] border-[#606060] text-[#E0E0E0] text-base px-4 py-3"
+            id="chainBadge">Loading...</div>
         </div>
       </header>
 
@@ -123,7 +149,9 @@
                 <span class="text-[#E0E0E0] text-sm">Relay Public Key</span>
                 <span class="info-value address text-[#FFFFFF] text-xs" id="serverRelayPubKey">Loading...</span>
               </div>
-              <button onclick="useServerKey()" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium w-full">Use Server Relay Key</button>
+              <button onclick="useServerKey()"
+                class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium w-full">Use
+                Server Relay Key</button>
             </div>
           </div>
         </div>
@@ -170,33 +198,42 @@
                 <label class="label">
                   <span class="label-text text-[#E0E0E0] text-sm uppercase tracking-wide">Endpoint URL</span>
                 </label>
-                <input type="text" id="endpoint" placeholder="https://your-relay.com" class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
+                <input type="text" id="endpoint" placeholder="https://your-relay.com"
+                  class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
               </div>
               <div class="form-control mb-4">
                 <label class="label">
                   <span class="label-text text-[#E0E0E0] text-sm uppercase tracking-wide">GunDB Public Key</span>
                 </label>
-                <input type="text" id="gunPubKey" placeholder="Your GunDB public key (or use server key)" class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
+                <input type="text" id="gunPubKey" placeholder="Your GunDB public key (or use server key)"
+                  class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
                 <label class="label">
-                  <span class="label-text-alt text-[#A0A0A0] text-xs">Use the server's relay key button above to auto-fill</span>
+                  <span class="label-text-alt text-[#A0A0A0] text-xs">Use the server's relay key button above to
+                    auto-fill</span>
                 </label>
               </div>
               <div class="form-control mb-4">
                 <label class="label">
                   <span class="label-text text-[#E0E0E0] text-sm uppercase tracking-wide">Stake Amount (USDC)</span>
                 </label>
-                <input type="number" id="stakeAmount" value="100" min="0.001" step="0.001" class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
+                <input type="number" id="stakeAmount" value="100" min="0.001" step="0.001"
+                  class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
               </div>
               <div class="form-control mb-4">
                 <label class="label">
-                  <span class="label-text text-[#E0E0E0] text-sm uppercase tracking-wide">Griefing Ratio (Basis Points, Optional)</span>
+                  <span class="label-text text-[#E0E0E0] text-sm uppercase tracking-wide">Griefing Ratio (Basis Points,
+                    Optional)</span>
                 </label>
-                <input type="number" id="griefingRatio" placeholder="0 = use default (500 bps)" min="0" step="1" class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
+                <input type="number" id="griefingRatio" placeholder="0 = use default (500 bps)" min="0" step="1"
+                  class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
                 <label class="label">
-                  <span class="label-text-alt text-[#A0A0A0] text-xs">Custom griefing ratio. 0 = use contract default (500 bps = 5% cost per 1% slash)</span>
+                  <span class="label-text-alt text-[#A0A0A0] text-xs">Custom griefing ratio. 0 = use contract default
+                    (500 bps = 5% cost per 1% slash)</span>
                 </label>
               </div>
-              <button id="registerBtn" onclick="registerRelay()" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium w-full">Register On-Chain</button>
+              <button id="registerBtn" onclick="registerRelay()"
+                class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium w-full">Register
+                On-Chain</button>
             </div>
           </div>
         </div>
@@ -218,23 +255,31 @@
                   <div class="text-[#FFA500] text-xl font-semibold" id="totalSlashed">-</div>
                 </div>
               </div>
-              
+
               <div class="form-control mb-4">
                 <label class="label">
                   <span class="label-text text-[#E0E0E0] text-sm uppercase tracking-wide">Increase Stake (USDC)</span>
                 </label>
-                <input type="number" id="increaseAmount" placeholder="100" min="0.001" step="0.001" class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
-              </div>
-              
-              <div class="flex gap-2">
-                <button onclick="increaseStake()" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium flex-1">Increase Stake</button>
-                <button onclick="requestUnstake()" class="btn bg-[#F44336] hover:bg-[#DC2626] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium flex-1">Request Unstake</button>
+                <input type="number" id="increaseAmount" placeholder="100" min="0.001" step="0.001"
+                  class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
               </div>
 
-              <div id="unstakeInfo" class="alert alert-warning hidden mt-4 bg-[#FFA500]/20 border-[#FFA500]/30 text-[#FFA500] rounded-xl">
+              <div class="flex gap-2">
+                <button onclick="increaseStake()"
+                  class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium flex-1">Increase
+                  Stake</button>
+                <button onclick="requestUnstake()"
+                  class="btn bg-[#F44336] hover:bg-[#DC2626] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium flex-1">Request
+                  Unstake</button>
+              </div>
+
+              <div id="unstakeInfo"
+                class="alert alert-warning hidden mt-4 bg-[#FFA500]/20 border-[#FFA500]/30 text-[#FFA500] rounded-xl">
                 <div>
                   <span>Unstaking in progress. Withdraw available after delay period.</span>
-                  <button onclick="withdrawStake()" class="btn btn-sm bg-[#4CAF50] hover:bg-[#45A049] border-0 text-[#FFFFFF] rounded-xl mt-2 w-full">Withdraw Stake</button>
+                  <button onclick="withdrawStake()"
+                    class="btn btn-sm bg-[#4CAF50] hover:bg-[#45A049] border-0 text-[#FFFFFF] rounded-xl mt-2 w-full">Withdraw
+                    Stake</button>
                 </div>
               </div>
             </div>
@@ -251,15 +296,20 @@
               <label class="label">
                 <span class="label-text text-[#E0E0E0] text-sm uppercase tracking-wide">New Endpoint (optional)</span>
               </label>
-              <input type="text" id="newEndpoint" placeholder="https://new-endpoint.com" class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
+              <input type="text" id="newEndpoint" placeholder="https://new-endpoint.com"
+                class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
             </div>
             <div class="form-control mb-4">
               <label class="label">
-                <span class="label-text text-[#E0E0E0] text-sm uppercase tracking-wide">New GunDB Public Key (optional)</span>
+                <span class="label-text text-[#E0E0E0] text-sm uppercase tracking-wide">New GunDB Public Key
+                  (optional)</span>
               </label>
-              <input type="text" id="newGunPubKey" placeholder="Leave empty to keep current" class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
+              <input type="text" id="newGunPubKey" placeholder="Leave empty to keep current"
+                class="input input-bordered bg-[#1A1A1A] border-[#404040] text-[#FFFFFF] focus:border-[#FF69B4] rounded-xl">
             </div>
-            <button onclick="updateRelay()" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium w-full">Update On-Chain</button>
+            <button onclick="updateRelay()"
+              class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium w-full">Update
+              On-Chain</button>
           </div>
         </div>
 
@@ -283,12 +333,30 @@
           <div class="card-body p-6">
             <div class="flex items-center justify-between mb-4">
               <h2 class="card-title text-lg text-[#FF69B4]">On-Chain Deals</h2>
-              <button onclick="loadDeals()" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Refresh</button>
+              <button onclick="loadDeals()"
+                class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Refresh</button>
             </div>
             <div id="dealsContent">
               <div class="flex justify-center items-center py-8">
                 <span class="loading loading-spinner loading-md text-[#FF69B4]"></span>
                 <span class="ml-3 text-[#E0E0E0]">Loading deals...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subscriptions Card -->
+        <div class="service-card card shadow-xl col-span-1 md:col-span-2 lg:col-span-3" id="subscriptionsCard">
+          <div class="card-body p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="card-title text-lg text-[#FF69B4]">Active Subscriptions</h2>
+              <button onclick="loadSubscriptions()"
+                class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Refresh</button>
+            </div>
+            <div id="subscriptionsContent">
+              <div class="flex justify-center items-center py-8">
+                <span class="loading loading-spinner loading-md text-[#FF69B4]"></span>
+                <span class="ml-3 text-[#E0E0E0]">Loading subscriptions...</span>
               </div>
             </div>
           </div>
@@ -308,7 +376,7 @@
       try {
         const res = await fetch('/health');
         const data = await res.json();
-        
+
         const keyDisplay = document.getElementById('serverRelayPubKey');
         if (data.relay && data.relay.pub) {
           keyDisplay.textContent = data.relay.pub;
@@ -329,12 +397,12 @@
     function useServerKey() {
       const keyDisplay = document.getElementById('serverRelayPubKey');
       const fullKey = keyDisplay.dataset.fullKey || keyDisplay.textContent;
-      
+
       if (!fullKey || fullKey === 'Not configured' || fullKey === 'Failed to load') {
         showAlert('error', 'Server relay key not available');
         return;
       }
-      
+
       const pubKeyInput = document.getElementById('gunPubKey');
       pubKeyInput.value = fullKey;
       pubKeyInput.scrollIntoView({ behavior: 'smooth' });
@@ -349,6 +417,7 @@
         loadBalances(),
         loadParams(),
         loadDeals(),
+        loadSubscriptions(),
         loadServerRelayKey()
       ]);
     });
@@ -357,8 +426,8 @@
       try {
         const res = await fetch(`${API_BASE}/config`);
         config = await res.json();
-        
-        document.getElementById('chainBadge').textContent = 
+
+        document.getElementById('chainBadge').textContent =
           `${config.chainName} (${config.chainId})`;
       } catch (e) {
         console.error('Failed to load config:', e);
@@ -369,10 +438,10 @@
       try {
         const res = await fetch(`${API_BASE}/status`);
         relayStatus = await res.json();
-        
+
         const badge = document.getElementById('statusBadge');
         const content = document.getElementById('statusContent');
-        
+
         if (!relayStatus.configured) {
           badge.textContent = 'Not Configured';
           badge.className = 'status-badge status-not-configured';
@@ -388,7 +457,7 @@
           document.getElementById('dealsCard').classList.add('hidden');
           return;
         }
-        
+
         if (!relayStatus.registered) {
           badge.textContent = 'Not Registered';
           badge.className = 'status-badge status-inactive';
@@ -412,12 +481,12 @@
           document.getElementById('dealsCard').classList.add('hidden');
           return;
         }
-        
+
         // Registered
         const relay = relayStatus.relay;
         badge.textContent = relay.status;
         badge.className = `status-badge status-${relay.status.toLowerCase()}`;
-        
+
         content.innerHTML = `
           <div class="space-y-2">
             <div class="flex justify-between items-center py-2 border-b border-[#404040]">
@@ -440,22 +509,22 @@
             </div>
           </div>
         `;
-        
+
         // Update staking card
         document.getElementById('currentStake').textContent = `${relay.stakedAmount} USDC`;
         document.getElementById('totalSlashed').textContent = `${relay.totalSlashed} USDC`;
-        
+
         // Hide register card, show management cards
         document.getElementById('registerCard').classList.add('hidden');
         document.getElementById('stakingCard').classList.remove('hidden');
         document.getElementById('updateCard').classList.remove('hidden');
         document.getElementById('dealsCard').classList.remove('hidden');
-        
+
         // Show unstake info if unstaking
         if (relay.status === 'Unstaking') {
           document.getElementById('unstakeInfo').classList.remove('hidden');
         }
-        
+
       } catch (e) {
         console.error('Failed to load status:', e);
         content.innerHTML = `
@@ -471,7 +540,7 @@
       try {
         const res = await fetch(`${API_BASE}/balance`);
         const data = await res.json();
-        
+
         if (!data.success) {
           content.innerHTML = `
             <div class="alert alert-warning bg-[#FFA500]/20 border-[#FFA500]/30 text-[#FFA500] rounded-xl">
@@ -480,7 +549,7 @@
           `;
           return;
         }
-        
+
         content.innerHTML = `
           <div class="grid grid-cols-2 gap-4 mb-4">
             <div class="bg-[#1A1A1A] p-4 rounded-xl border border-[#404040]">
@@ -511,7 +580,7 @@
       try {
         const res = await fetch(`${API_BASE}/params`);
         const data = await res.json();
-        
+
         content.innerHTML = `
           <div class="space-y-2">
             <div class="flex justify-between items-center py-2 border-b border-[#404040]">
@@ -546,24 +615,24 @@
       try {
         const res = await fetch(`${API_BASE}/deals`);
         const data = await res.json();
-        
+
         if (!data.success) {
           content.innerHTML = `<div class="alert alert-warning bg-[#FFA500]/20 border-[#FFA500]/30 text-[#FFA500] rounded-xl">${data.error}</div>`;
           return;
         }
-        
+
         if (data.deals.length === 0) {
           content.innerHTML = `<div class="text-center py-8 text-[#A0A0A0]">No on-chain deals yet</div>`;
           return;
         }
-        
+
         // Calculate totals
         const totalDeals = data.deals.length;
         const activeDeals = data.deals.filter(d => d.active && !d.griefed).length;
         const griefedDeals = data.deals.filter(d => d.griefed).length;
         const totalRevenue = data.deals.reduce((sum, d) => sum + parseFloat(d.priceUSDC || 0), 0);
         const paidDeals = data.deals.filter(d => d.paymentStatus === 'paid').length;
-        
+
         content.innerHTML = `
           <div class="mb-4 p-4 bg-[#1A1A1A] rounded-xl border border-[#404040]">
             <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-3">
@@ -610,35 +679,35 @@
               </thead>
               <tbody>
                 ${data.deals.map(d => {
-                  const createdDate = d.createdAt ? new Date(d.createdAt).toLocaleDateString() : 'N/A';
-                  const expiresDate = d.expiresAt ? new Date(d.expiresAt).toLocaleDateString() : 'N/A';
-                  const paymentStatus = d.paymentStatus === 'paid' 
-                    ? '<span class="text-[#4CAF50]">✅ Paid</span>' 
-                    : '<span class="text-[#FFA500]">⏳ Pending</span>';
-                  
-                  // Enhanced status badge
-                  let statusBadge = '';
-                  if (d.griefed) {
-                    statusBadge = '<span class="text-[#F44336] font-semibold">⚠️ Griefed</span>';
-                  } else if (d.active) {
-                    statusBadge = '<span class="text-[#4CAF50]">✅ Active</span>';
-                  } else {
-                    statusBadge = '<span class="text-[#A0A0A0]">⏸️ Inactive</span>';
-                  }
-                  
-                  // Griefing status display
-                  let griefingStatus = '';
-                  if (d.griefed) {
-                    griefingStatus = '<span class="text-[#F44336] font-semibold" title="This deal has been griefed">🔴 Griefed</span>';
-                  } else {
-                    griefingStatus = '<span class="text-[#4CAF50]" title="No griefing reported">✓ Safe</span>';
-                  }
-                  
-                  const activateButton = d.paymentStatus === 'pending' && !d.active && !d.griefed
-                    ? `<button onclick="activatePendingDeal('${d.dealId}', '${d.cid}')" class="btn btn-sm bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl" title="Activate this deal (will call registerDeal on-chain)">Activate</button>`
-                    : '';
-                  
-                  return `
+          const createdDate = d.createdAt ? new Date(d.createdAt).toLocaleDateString() : 'N/A';
+          const expiresDate = d.expiresAt ? new Date(d.expiresAt).toLocaleDateString() : 'N/A';
+          const paymentStatus = d.paymentStatus === 'paid'
+            ? '<span class="text-[#4CAF50]">✅ Paid</span>'
+            : '<span class="text-[#FFA500]">⏳ Pending</span>';
+
+          // Enhanced status badge
+          let statusBadge = '';
+          if (d.griefed) {
+            statusBadge = '<span class="text-[#F44336] font-semibold">⚠️ Griefed</span>';
+          } else if (d.active) {
+            statusBadge = '<span class="text-[#4CAF50]">✅ Active</span>';
+          } else {
+            statusBadge = '<span class="text-[#A0A0A0]">⏸️ Inactive</span>';
+          }
+
+          // Griefing status display
+          let griefingStatus = '';
+          if (d.griefed) {
+            griefingStatus = '<span class="text-[#F44336] font-semibold" title="This deal has been griefed">🔴 Griefed</span>';
+          } else {
+            griefingStatus = '<span class="text-[#4CAF50]" title="No griefing reported">✓ Safe</span>';
+          }
+
+          const activateButton = d.paymentStatus === 'pending' && !d.active && !d.griefed
+            ? `<button onclick="activatePendingDeal('${d.dealId}', '${d.cid}')" class="btn btn-sm bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl" title="Activate this deal (will call registerDeal on-chain)">Activate</button>`
+            : '';
+
+          return `
                   <tr class="${d.griefed ? 'bg-[#F44336]/10' : ''}">
                     <td class="address" title="${d.cid}">${truncateCid(d.cid)}</td>
                     <td class="address" title="${d.client}">${truncateAddress(d.client)}</td>
@@ -652,7 +721,7 @@
                     <td>${activateButton}</td>
                   </tr>
                 `;
-                }).join('')}
+        }).join('')}
               </tbody>
             </table>
           </div>
@@ -662,11 +731,70 @@
       }
     }
 
+    async function loadSubscriptions() {
+      const content = document.getElementById('subscriptionsContent');
+      try {
+        // Fetch network stats which includes subscription info
+        const res = await fetch('/api/v1/network/stats');
+        const data = await res.json();
+
+        if (!data.success) {
+          content.innerHTML = `<div class="alert alert-warning bg-[#FFA500]/20 border-[#FFA500]/30 text-[#FFA500] rounded-xl">${data.error || 'Failed to load subscriptions'}</div>`;
+          return;
+        }
+
+        const stats = data.stats || {};
+        const activeCount = stats.totalActiveSubscriptions || 0;
+        const totalStorageMB = stats.totalSubscriptionStorageMB || 0;
+
+        if (activeCount === 0) {
+          content.innerHTML = `<div class="text-center py-8 text-[#A0A0A0]">No active subscriptions yet</div>`;
+          return;
+        }
+
+        content.innerHTML = `
+          <div class="mb-4 p-4 bg-[#1A1A1A] rounded-xl border border-[#404040]">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+              <div>
+                <div class="text-[#A0A0A0] text-xs mb-1">Active Subscriptions</div>
+                <div class="text-[#4CAF50] text-xl font-semibold">${activeCount}</div>
+              </div>
+              <div>
+                <div class="text-[#A0A0A0] text-xs mb-1">Total Storage Allocated</div>
+                <div class="text-[#3B82F6] text-xl font-semibold">${totalStorageMB.toFixed(1)} MB</div>
+              </div>
+              <div>
+                <div class="text-[#A0A0A0] text-xs mb-1">Storage Used</div>
+                <div class="text-[#FFA500] text-xl font-semibold">${(stats.storageUsedMB || 0).toFixed(1)} MB</div>
+              </div>
+              <div>
+                <div class="text-[#A0A0A0] text-xs mb-1">Relay Storage</div>
+                <div class="text-[#3B82F6] text-xl font-semibold">${(stats.totalStorageBytes / (1024 * 1024 * 1024) || 0).toFixed(2)} GB</div>
+              </div>
+            </div>
+            <div class="pt-3 border-t border-[#404040] text-[#A0A0A0] text-xs">
+              ℹ️ Subscriptions are managed via the x402 payment protocol. View individual user subscriptions in the Storage Management page.
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <a href="/storage-manager.html" class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium">
+              Manage Storage
+            </a>
+            <a href="/api/v1/x402/tiers" target="_blank" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">
+              View Pricing Tiers
+            </a>
+          </div>
+        `;
+      } catch (e) {
+        content.innerHTML = `<div class="alert alert-error bg-[#F44336]/20 border-[#F44336]/30 text-[#F44336] rounded-xl">Failed to load subscriptions: ${e.message}</div>`;
+      }
+    }
+
     async function registerRelay() {
       const btn = document.getElementById('registerBtn');
       btn.disabled = true;
       btn.textContent = 'Approving USDC...';
-      
+
       try {
         const griefingRatio = document.getElementById('griefingRatio').value;
         const body = {
@@ -674,26 +802,26 @@
           gunPubKey: document.getElementById('gunPubKey').value,
           stakeAmount: document.getElementById('stakeAmount').value,
         };
-        
+
         // Only include griefingRatio if provided
         if (griefingRatio && griefingRatio !== '0' && griefingRatio !== '') {
           body.griefingRatio = parseInt(griefingRatio);
         }
-        
+
         // Update button text to show progress
         btn.textContent = 'Waiting for approval...';
-        
+
         const res = await fetch(`${API_BASE}/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        
+
         // Update button text during registration
         btn.textContent = 'Registering relay...';
-        
+
         const data = await res.json();
-        
+
         if (data.success) {
           showAlert('success', `Relay registered! TX: ${truncateAddress(data.txHash)}`);
           await loadStatus();
@@ -719,9 +847,9 @@
             newGunPubKey: document.getElementById('newGunPubKey').value,
           }),
         });
-        
+
         const data = await res.json();
-        
+
         if (data.success) {
           showAlert('success', 'Relay updated successfully!');
           await loadStatus();
@@ -739,16 +867,16 @@
         showAlert('error', 'Please enter an amount');
         return;
       }
-      
+
       try {
         const res = await fetch(`${API_BASE}/stake/increase`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ amount }),
         });
-        
+
         const data = await res.json();
-        
+
         if (data.success) {
           showAlert('success', `Stake increased by ${amount} USDC`);
           await loadStatus();
@@ -765,14 +893,14 @@
       if (!confirm('Are you sure you want to unstake? This will deactivate your relay.')) {
         return;
       }
-      
+
       try {
         const res = await fetch(`${API_BASE}/stake/unstake`, {
           method: 'POST',
         });
-        
+
         const data = await res.json();
-        
+
         if (data.success) {
           showAlert('warning', `Unstake requested. Withdraw available in ${data.unstakingDelayDays} days.`);
           await loadStatus();
@@ -789,9 +917,9 @@
         const res = await fetch(`${API_BASE}/stake/withdraw`, {
           method: 'POST',
         });
-        
+
         const data = await res.json();
-        
+
         if (data.success) {
           showAlert('success', `Stake withdrawn: ${data.withdrawnAmount} USDC`);
           await loadStatus();
@@ -807,18 +935,18 @@
     function showAlert(type, message) {
       const alerts = document.getElementById('alerts');
       const alert = document.createElement('div');
-      
+
       const alertClasses = {
         success: 'alert-success bg-[#4CAF50]/20 border-[#4CAF50]/30 text-[#4CAF50]',
         error: 'alert-error bg-[#F44336]/20 border-[#F44336]/30 text-[#F44336]',
         warning: 'alert-warning bg-[#FFA500]/20 border-[#FFA500]/30 text-[#FFA500]',
         info: 'alert-info bg-[#3B82F6]/20 border-[#3B82F6]/30 text-[#3B82F6]'
       };
-      
+
       alert.className = `alert ${alertClasses[type] || alertClasses.info} rounded-xl p-4 mb-4`;
       alert.textContent = message;
       alerts.appendChild(alert);
-      
+
       setTimeout(() => alert.remove(), 5000);
     }
 
@@ -859,4 +987,5 @@
     }
   </script>
 </body>
+
 </html>

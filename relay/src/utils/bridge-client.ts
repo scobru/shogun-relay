@@ -1,8 +1,8 @@
 /**
  * Bridge Client - Interact with GunL2Bridge contract
- * 
+ *
  * Uses Shogun SDK instead of hardcoded ABIs for better maintainability.
- * 
+ *
  * Provides utilities for:
  * - Depositing ETH to bridge
  * - Submitting batches (sequencer only)
@@ -108,10 +108,7 @@ export function createBridgeClient(config: BridgeConfig) {
         throw new Error("BridgeClient: Transaction receipt not found");
       }
 
-      log.debug(
-        { txHash: receipt.hash, blockNumber: receipt.blockNumber },
-        "Deposit successful"
-      );
+      log.debug({ txHash: receipt.hash, blockNumber: receipt.blockNumber }, "Deposit successful");
 
       return {
         txHash: receipt.hash,
@@ -122,12 +119,18 @@ export function createBridgeClient(config: BridgeConfig) {
     /**
      * Submit a batch (sequencer only)
      */
-    async submitBatch(stateRoot: string, handledForceWithdrawals: string[] = []): Promise<{ txHash: string; blockNumber: number; batchId: bigint }> {
+    async submitBatch(
+      stateRoot: string,
+      handledForceWithdrawals: string[] = []
+    ): Promise<{ txHash: string; blockNumber: number; batchId: bigint }> {
       if (!wallet) {
         throw new Error("BridgeClient: Private key required for batch submission");
       }
 
-      log.debug({ stateRoot, forceWithdrawalCount: handledForceWithdrawals.length }, "Submitting batch to bridge");
+      log.debug(
+        { stateRoot, forceWithdrawalCount: handledForceWithdrawals.length },
+        "Submitting batch to bridge"
+      );
 
       const tx = await bridge.submitBatch(stateRoot, handledForceWithdrawals);
       const receipt = await tx.wait();
@@ -178,7 +181,11 @@ export function createBridgeClient(config: BridgeConfig) {
       }
 
       log.debug(
-        { amount: ethers.formatEther(amount), nonce: nonce.toString(), batchId: batchId.toString() },
+        {
+          amount: ethers.formatEther(amount),
+          nonce: nonce.toString(),
+          batchId: batchId.toString(),
+        },
         "Withdrawing from bridge"
       );
 
@@ -224,11 +231,7 @@ export function createBridgeClient(config: BridgeConfig) {
     /**
      * Check if withdrawal is already processed
      */
-    async isWithdrawalProcessed(
-      user: string,
-      amount: bigint,
-      nonce: bigint
-    ): Promise<boolean> {
+    async isWithdrawalProcessed(user: string, amount: bigint, nonce: bigint): Promise<boolean> {
       return await bridge.isWithdrawalProcessed(user, amount, nonce);
     },
 
@@ -314,8 +317,10 @@ export function createBridgeClient(config: BridgeConfig) {
       const filter = contract.filters.Deposit();
 
       // Helper to extract event data from either parsed EventLog or raw args
-      const extractEventData = (eventOrArgs: any): { user: string; amount: bigint; timestamp: bigint; log: ethers.Log } | null => {
-        if (!eventOrArgs || typeof eventOrArgs !== 'object') {
+      const extractEventData = (
+        eventOrArgs: any
+      ): { user: string; amount: bigint; timestamp: bigint; log: ethers.Log } | null => {
+        if (!eventOrArgs || typeof eventOrArgs !== "object") {
           return null;
         }
 
@@ -323,17 +328,25 @@ export function createBridgeClient(config: BridgeConfig) {
         let actualLog: ethers.Log | null = null;
 
         // Check if eventOrArgs itself is a log object
-        if ('transactionHash' in eventOrArgs && typeof eventOrArgs.transactionHash === 'string') {
+        if ("transactionHash" in eventOrArgs && typeof eventOrArgs.transactionHash === "string") {
           actualLog = eventOrArgs as ethers.Log;
         }
         // Check if there's a nested log property
-        else if (eventOrArgs.log && typeof eventOrArgs.log === 'object' && 'transactionHash' in eventOrArgs.log) {
+        else if (
+          eventOrArgs.log &&
+          typeof eventOrArgs.log === "object" &&
+          "transactionHash" in eventOrArgs.log
+        ) {
           actualLog = eventOrArgs.log as ethers.Log;
         }
         // Check if there's a nested event.log structure
-        else if (eventOrArgs.event && typeof eventOrArgs.event === 'object' && eventOrArgs.event.log) {
+        else if (
+          eventOrArgs.event &&
+          typeof eventOrArgs.event === "object" &&
+          eventOrArgs.event.log
+        ) {
           const nestedLog = eventOrArgs.event.log;
-          if (nestedLog && typeof nestedLog === 'object' && 'transactionHash' in nestedLog) {
+          if (nestedLog && typeof nestedLog === "object" && "transactionHash" in nestedLog) {
             actualLog = nestedLog as ethers.Log;
           }
         }
@@ -378,11 +391,11 @@ export function createBridgeClient(config: BridgeConfig) {
           // Standard format: (user, amount, timestamp, event)
           [user, amount, timestamp, event] = args;
           // Validate event is a Log object
-          if (!event || typeof event !== 'object' || !('transactionHash' in event)) {
+          if (!event || typeof event !== "object" || !("transactionHash" in event)) {
             log.error({ args }, "Invalid event log object in deposit listener");
             return;
           }
-        } else if (args.length === 1 && args[0] && typeof args[0] === 'object') {
+        } else if (args.length === 1 && args[0] && typeof args[0] === "object") {
           // Single EventLog object - may have nested log structure
           const logEvent = args[0] as any;
           if (logEvent.args && Array.isArray(logEvent.args) && logEvent.args.length >= 3) {
@@ -390,9 +403,10 @@ export function createBridgeClient(config: BridgeConfig) {
             amount = logEvent.args[1];
             timestamp = logEvent.args[2];
             // Use nested log if available, otherwise use the event itself
-            event = (logEvent.log && typeof logEvent.log === 'object' && 'transactionHash' in logEvent.log)
-              ? logEvent.log
-              : logEvent;
+            event =
+              logEvent.log && typeof logEvent.log === "object" && "transactionHash" in logEvent.log
+                ? logEvent.log
+                : logEvent;
           } else {
             log.error({ event: logEvent }, "Invalid event format in deposit listener");
             return;
@@ -404,25 +418,41 @@ export function createBridgeClient(config: BridgeConfig) {
 
         // Normalize event - ensure we have the actual log object with transactionHash
         // Some event formats have nested log structure: { args: [...], log: { transactionHash, ... } }
-        if (event && typeof event === 'object' && !('transactionHash' in event)) {
+        if (event && typeof event === "object" && !("transactionHash" in event)) {
           // Try to find log in nested structure
           const eventAny = event as any;
-          if (eventAny.log && typeof eventAny.log === 'object' && 'transactionHash' in eventAny.log) {
+          if (
+            eventAny.log &&
+            typeof eventAny.log === "object" &&
+            "transactionHash" in eventAny.log
+          ) {
             event = eventAny.log as ethers.Log;
-          } else if (eventAny.event && typeof eventAny.event === 'object' && 'log' in eventAny.event) {
+          } else if (
+            eventAny.event &&
+            typeof eventAny.event === "object" &&
+            "log" in eventAny.event
+          ) {
             const nestedLog = eventAny.event.log;
-            if (nestedLog && typeof nestedLog === 'object' && 'transactionHash' in nestedLog) {
+            if (nestedLog && typeof nestedLog === "object" && "transactionHash" in nestedLog) {
               event = nestedLog as ethers.Log;
             }
           } else {
             // Last resort: check if the original args[0] has a log property we missed
-            if (args.length > 0 && args[0] && typeof args[0] === 'object') {
+            if (args.length > 0 && args[0] && typeof args[0] === "object") {
               const firstArg = args[0] as any;
-              if (firstArg.log && typeof firstArg.log === 'object' && 'transactionHash' in firstArg.log) {
+              if (
+                firstArg.log &&
+                typeof firstArg.log === "object" &&
+                "transactionHash" in firstArg.log
+              ) {
                 event = firstArg.log as ethers.Log;
-              } else if (firstArg.event && typeof firstArg.event === 'object' && firstArg.event.log) {
+              } else if (
+                firstArg.event &&
+                typeof firstArg.event === "object" &&
+                firstArg.event.log
+              ) {
                 const nestedLog = firstArg.event.log;
-                if (nestedLog && typeof nestedLog === 'object' && 'transactionHash' in nestedLog) {
+                if (nestedLog && typeof nestedLog === "object" && "transactionHash" in nestedLog) {
                   event = nestedLog as ethers.Log;
                 }
               }
@@ -432,10 +462,11 @@ export function createBridgeClient(config: BridgeConfig) {
 
         try {
           // Validate user address before processing
-          if (!user || typeof user !== 'string') {
-            const txHash = event && typeof event === 'object' && 'transactionHash' in event
-              ? (event as any).transactionHash
-              : 'unknown';
+          if (!user || typeof user !== "string") {
+            const txHash =
+              event && typeof event === "object" && "transactionHash" in event
+                ? (event as any).transactionHash
+                : "unknown";
             log.error(
               { user, amount: amount?.toString(), timestamp: timestamp?.toString(), txHash },
               "Invalid user address in deposit event: user is missing or not a string"
@@ -449,51 +480,79 @@ export function createBridgeClient(config: BridgeConfig) {
             normalizedUser = ethers.getAddress(user);
           } catch (error) {
             log.error(
-              { user, amount: amount?.toString(), timestamp: timestamp?.toString(), txHash: event.transactionHash, error },
+              {
+                user,
+                amount: amount?.toString(),
+                timestamp: timestamp?.toString(),
+                txHash: event.transactionHash,
+                error,
+              },
               "Invalid user address format in deposit event"
             );
             return;
           }
 
           // Validate amount and timestamp
-          if (amount === undefined || amount === null || typeof amount !== 'bigint') {
+          if (amount === undefined || amount === null || typeof amount !== "bigint") {
             log.error(
-              { user: normalizedUser, amount, timestamp: timestamp?.toString(), txHash: event.transactionHash },
+              {
+                user: normalizedUser,
+                amount,
+                timestamp: timestamp?.toString(),
+                txHash: event.transactionHash,
+              },
               "Invalid amount in deposit event"
             );
             return;
           }
 
-          if (timestamp === undefined || timestamp === null || typeof timestamp !== 'bigint') {
+          if (timestamp === undefined || timestamp === null || typeof timestamp !== "bigint") {
             log.error(
-              { user: normalizedUser, amount: amount.toString(), timestamp, txHash: event.transactionHash },
+              {
+                user: normalizedUser,
+                amount: amount.toString(),
+                timestamp,
+                txHash: event.transactionHash,
+              },
               "Invalid timestamp in deposit event"
             );
             return;
           }
 
           // Final check: if transactionHash is still not found, try one more time to extract from nested structure
-          if (!event || typeof event !== 'object' || !('transactionHash' in event)) {
+          if (!event || typeof event !== "object" || !("transactionHash" in event)) {
             // Last resort: check if args[0] has the log we need
-            if (args.length > 0 && args[0] && typeof args[0] === 'object') {
+            if (args.length > 0 && args[0] && typeof args[0] === "object") {
               const firstArg = args[0] as any;
-              if (firstArg.log && typeof firstArg.log === 'object' && 'transactionHash' in firstArg.log) {
+              if (
+                firstArg.log &&
+                typeof firstArg.log === "object" &&
+                "transactionHash" in firstArg.log
+              ) {
                 event = firstArg.log as ethers.Log;
               }
             }
           }
 
           // Validate transactionHash - should be available after normalization
-          if (!event || typeof event !== 'object' || !('transactionHash' in event) || typeof event.transactionHash !== 'string') {
+          if (
+            !event ||
+            typeof event !== "object" ||
+            !("transactionHash" in event) ||
+            typeof event.transactionHash !== "string"
+          ) {
             log.error(
               {
                 user: normalizedUser,
                 amount: amount.toString(),
                 eventKeys: event ? Object.keys(event) : [],
-                eventType: event ? typeof event : 'null',
+                eventType: event ? typeof event : "null",
                 argsLength: args.length,
-                firstArgKeys: args.length > 0 && args[0] && typeof args[0] === 'object' ? Object.keys(args[0]) : [],
-                event
+                firstArgKeys:
+                  args.length > 0 && args[0] && typeof args[0] === "object"
+                    ? Object.keys(args[0])
+                    : [],
+                event,
               },
               "Invalid transactionHash in deposit event - event does not have transactionHash after normalization"
             );
@@ -510,7 +569,7 @@ export function createBridgeClient(config: BridgeConfig) {
                 user: normalizedUser,
                 txHash: event.transactionHash,
                 eventBlockNumber: event.blockNumber,
-                eventKeys: Object.keys(event)
+                eventKeys: Object.keys(event),
               },
               "Event blockNumber is null/undefined, attempting to retrieve from receipt"
             );
@@ -551,9 +610,14 @@ export function createBridgeClient(config: BridgeConfig) {
           }
 
           // Validate blockNumber is a valid number
-          if (typeof blockNumber !== 'number' || isNaN(blockNumber) || blockNumber < 0) {
+          if (typeof blockNumber !== "number" || isNaN(blockNumber) || blockNumber < 0) {
             log.error(
-              { user: normalizedUser, amount: amount.toString(), txHash: event.transactionHash, blockNumber },
+              {
+                user: normalizedUser,
+                amount: amount.toString(),
+                txHash: event.transactionHash,
+                blockNumber,
+              },
               "Invalid blockNumber value in deposit event"
             );
             return;
@@ -570,7 +634,13 @@ export function createBridgeClient(config: BridgeConfig) {
           await callback(depositEvent);
         } catch (error) {
           log.error(
-            { error, user, amount: amount?.toString(), timestamp: timestamp?.toString(), txHash: event.transactionHash },
+            {
+              error,
+              user,
+              amount: amount?.toString(),
+              timestamp: timestamp?.toString(),
+              txHash: event.transactionHash,
+            },
             "Error processing deposit event"
           );
           // Don't throw - continue processing other events
@@ -590,10 +660,7 @@ export function createBridgeClient(config: BridgeConfig) {
             await listener(event);
           }
         } catch (error) {
-          log.error(
-            { error, fromBlock },
-            "Error querying historical deposit events"
-          );
+          log.error({ error, fromBlock }, "Error querying historical deposit events");
           // Don't throw - continue with live listener
         }
       }
@@ -694,14 +761,17 @@ export function createBridgeClient(config: BridgeConfig) {
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         const errorStack = error instanceof Error ? error.stack : undefined;
-        log.error({
-          error: errorMsg,
-          errorStack,
-          fromBlock,
-          toBlock,
-          fromBlockType: typeof fromBlock,
-          toBlockType: typeof toBlock
-        }, "Error querying deposits");
+        log.error(
+          {
+            error: errorMsg,
+            errorStack,
+            fromBlock,
+            toBlock,
+            fromBlockType: typeof fromBlock,
+            toBlockType: typeof toBlock,
+          },
+          "Error querying deposits"
+        );
         throw error;
       }
     },
@@ -826,7 +896,7 @@ export function createBridgeClient(config: BridgeConfig) {
       if (fromBlock !== "latest") {
         const events = await contract.queryFilter(filter, fromBlock);
         for (const event of events) {
-          if ('args' in event && event.args) {
+          if ("args" in event && event.args) {
             await listener(event.args[0], event.args[1], event);
           }
         }
@@ -847,7 +917,13 @@ export function createBridgeClient(config: BridgeConfig) {
       const filter = contract.filters.ForceWithdrawalInitiated();
 
       // event ForceWithdrawalInitiated(bytes32 indexed withdrawalHash, address indexed user, uint256 amount, uint256 deadline)
-      const listener = async (withdrawalHash: string, user: string, amount: bigint, deadline: bigint, event: ethers.Log) => {
+      const listener = async (
+        withdrawalHash: string,
+        user: string,
+        amount: bigint,
+        deadline: bigint,
+        event: ethers.Log
+      ) => {
         const forceEvent: ForceWithdrawalEvent = {
           withdrawalHash,
           user,
@@ -871,7 +947,7 @@ export function createBridgeClient(config: BridgeConfig) {
         try {
           const events = await contract.queryFilter(filter, fromBlock);
           for (const event of events) {
-            if ('args' in event && event.args) {
+            if ("args" in event && event.args) {
               await listener(event.args[0], event.args[1], event.args[2], event.args[3], event);
             }
           }
@@ -888,4 +964,3 @@ export function createBridgeClient(config: BridgeConfig) {
 }
 
 export type BridgeClient = ReturnType<typeof createBridgeClient>;
-

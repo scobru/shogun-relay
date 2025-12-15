@@ -1,4 +1,4 @@
-import { ApiClient } from '../client';
+import { ApiClient } from "../client";
 
 export interface HealthResponse {
   success: boolean;
@@ -19,10 +19,10 @@ export class SystemModule {
 
   public async getHealth(): Promise<HealthResponse> {
     // Use /api/v1/system/health (the correct endpoint in the relay)
-    return this.client.get<HealthResponse>('/api/v1/system/health');
+    return this.client.get<HealthResponse>("/api/v1/system/health");
   }
 
   public async getStats(): Promise<any> {
-    return this.client.get('/api/v1/system/stats');
+    return this.client.get("/api/v1/system/stats");
   }
 }

@@ -114,19 +114,19 @@ function getConfig(chainId: number | string) {
 // Export for backward compatibility (deprecated - use getConfig instead)
 // These are kept for backward compatibility but should not be used in new code
 export const REGISTRY_ADDRESSES = Object.fromEntries(
-  Object.values(CONTRACTS_CONFIG).map(c => [c.chainId, c.relayRegistry || undefined])
+  Object.values(CONTRACTS_CONFIG).map((c) => [c.chainId, c.relayRegistry || undefined])
 ) as Record<number, string | undefined>;
 
 export const STORAGE_DEAL_REGISTRY_ADDRESSES = Object.fromEntries(
-  Object.values(CONTRACTS_CONFIG).map(c => [c.chainId, c.storageDealRegistry || undefined])
+  Object.values(CONTRACTS_CONFIG).map((c) => [c.chainId, c.storageDealRegistry || undefined])
 ) as Record<number, string | undefined>;
 
 export const USDC_ADDRESSES = Object.fromEntries(
-  Object.values(CONTRACTS_CONFIG).map(c => [c.chainId, c.usdc || undefined])
+  Object.values(CONTRACTS_CONFIG).map((c) => [c.chainId, c.usdc || undefined])
 ) as Record<number, string | undefined>;
 
 export const RPC_URLS = Object.fromEntries(
-  Object.values(CONTRACTS_CONFIG).map(c => [c.chainId, c.rpc || undefined])
+  Object.values(CONTRACTS_CONFIG).map((c) => [c.chainId, c.rpc || undefined])
 ) as Record<number, string | undefined>;
 
 // Relay status enum
@@ -152,10 +152,7 @@ function bytesToString(bytes: Uint8Array | string): string {
 /**
  * Helper to format relay info from contract
  */
-function formatRelayInfo(
-  info: RelayInfo,
-  relayAddress: string
-): FormattedRelayInfo {
+function formatRelayInfo(info: RelayInfo, relayAddress: string): FormattedRelayInfo {
   return {
     address: relayAddress,
     owner: info.owner,
@@ -196,11 +193,11 @@ export function createRegistryClient(
   const provider = new ethers.JsonRpcProvider(rpcUrl || config.rpc);
   const sdk = new ShogunSDK({ provider, chainId });
   const relayRegistry = sdk.getRelayRegistry();
-  
+
   // Always use address from SDK to ensure consistency
   const registryAddressFromSDK = relayRegistry.getAddress();
   const usdcAddress = config.usdc;
-  
+
   if (!usdcAddress) {
     throw new Error(`USDC address not configured for chain ${chainId}`);
   }
@@ -449,10 +446,7 @@ export function createRegistryClientWithSigner(
 
       // Check/set allowance - use SDK address to ensure correctness
       // Some USDC tokens require resetting allowance to 0 before setting a new amount
-      const allowance = await usdc.allowance(
-        wallet.address,
-        registryAddress
-      );
+      const allowance = await usdc.allowance(wallet.address, registryAddress);
 
       if (allowance < stakeWei) {
         log.debug(
@@ -482,16 +476,16 @@ export function createRegistryClientWithSigner(
         );
         // Wait for approval transaction with at least 1 confirmation
         const approveReceipt = await approveTx.wait(1);
-        log.debug(
-          `Approve transaction confirmed in block ${approveReceipt.blockNumber}`
-        );
+        log.debug(`Approve transaction confirmed in block ${approveReceipt.blockNumber}`);
 
         // Wait for multiple block confirmations to ensure state propagation across all RPC nodes
         // This is critical because estimateGas may use a different RPC node
         const approvalBlock = approveReceipt.blockNumber;
         const currentBlock = await client.provider.getBlockNumber();
         const blocksToWait = Math.max(3, currentBlock - approvalBlock + 2); // Wait at least 3 blocks after approval
-        log.debug(`Approval in block ${approvalBlock}, current block: ${currentBlock}, waiting for ${blocksToWait} more blocks for state propagation...`);
+        log.debug(
+          `Approval in block ${approvalBlock}, current block: ${currentBlock}, waiting for ${blocksToWait} more blocks for state propagation...`
+        );
 
         let blocksWaited = 0;
         while (blocksWaited < blocksToWait) {
@@ -500,7 +494,9 @@ export function createRegistryClientWithSigner(
           const newBlocksWaited = newBlock - approvalBlock;
           if (newBlocksWaited > blocksWaited) {
             blocksWaited = newBlocksWaited;
-            log.debug(`Block ${newBlock} mined, ${blocksToWait - blocksWaited} blocks remaining...`);
+            log.debug(
+              `Block ${newBlock} mined, ${blocksToWait - blocksWaited} blocks remaining...`
+            );
           }
         }
         log.debug("State propagation wait complete");
@@ -512,14 +508,9 @@ export function createRegistryClientWithSigner(
         let retries = 10;
         let verified = false;
         while (retries > 0) {
-          const newAllowance = await usdc.allowance(
-            wallet.address,
-            registryAddress
-          );
+          const newAllowance = await usdc.allowance(wallet.address, registryAddress);
           if (newAllowance >= stakeWei) {
-            log.debug(
-              `USDC allowance confirmed: ${ethers.formatUnits(newAllowance, 6)} USDC`
-            );
+            log.debug(`USDC allowance confirmed: ${ethers.formatUnits(newAllowance, 6)} USDC`);
             verified = true;
             break;
           }
@@ -531,32 +522,22 @@ export function createRegistryClientWithSigner(
         }
 
         if (!verified) {
-          const finalAllowance = await usdc.allowance(
-            wallet.address,
-            registryAddress
-          );
+          const finalAllowance = await usdc.allowance(wallet.address, registryAddress);
           throw new Error(
             `Allowance not updated after approval. Expected: ${ethers.formatUnits(stakeWei, 6)} USDC, Got: ${ethers.formatUnits(finalAllowance, 6)} USDC. Please try again.`
           );
         }
 
         // Double-check allowance one more time right before the contract call
-        const finalCheck = await usdc.allowance(
-          wallet.address,
-          registryAddress
-        );
+        const finalCheck = await usdc.allowance(wallet.address, registryAddress);
         if (finalCheck < stakeWei) {
           throw new Error(
             `Allowance verification failed before contract call. Expected: ${ethers.formatUnits(stakeWei, 6)} USDC, Got: ${ethers.formatUnits(finalCheck, 6)} USDC`
           );
         }
-        log.debug(
-          `Final allowance check passed: ${ethers.formatUnits(finalCheck, 6)} USDC`
-        );
+        log.debug(`Final allowance check passed: ${ethers.formatUnits(finalCheck, 6)} USDC`);
       } else {
-        log.debug(
-          `Sufficient allowance already exists: ${ethers.formatUnits(allowance, 6)} USDC`
-        );
+        log.debug(`Sufficient allowance already exists: ${ethers.formatUnits(allowance, 6)} USDC`);
       }
 
       // Convert pubkey and epub strings to bytes
@@ -569,10 +550,7 @@ export function createRegistryClientWithSigner(
       );
 
       // Final allowance check right before contract call
-      const preCallAllowance = await usdc.allowance(
-        wallet.address,
-        registryAddress
-      );
+      const preCallAllowance = await usdc.allowance(wallet.address, registryAddress);
       log.debug(
         `Pre-call allowance check: ${ethers.formatUnits(preCallAllowance, 6)} USDC (need ${ethers.formatUnits(stakeWei, 6)} USDC)`
       );
@@ -595,10 +573,7 @@ export function createRegistryClientWithSigner(
       while (registrationAttempts > 0) {
         try {
           // Final allowance check using the same provider that will send the transaction
-          const finalAllowanceCheck = await usdc.allowance(
-            wallet.address,
-            registryAddress
-          );
+          const finalAllowanceCheck = await usdc.allowance(wallet.address, registryAddress);
           log.debug(
             `Final allowance check before transaction: ${ethers.formatUnits(finalAllowanceCheck, 6)} USDC (need ${ethers.formatUnits(stakeWei, 6)} USDC)`
           );
@@ -637,10 +612,10 @@ export function createRegistryClientWithSigner(
               }
             } catch (gasError: any) {
               gasEstimateAttempts--;
-              const isAllowanceError = gasError.message && (
-                gasError.message.includes("allowance") ||
-                gasError.message.includes("ERC20: transfer amount exceeds allowance")
-              );
+              const isAllowanceError =
+                gasError.message &&
+                (gasError.message.includes("allowance") ||
+                  gasError.message.includes("ERC20: transfer amount exceeds allowance"));
 
               if (isAllowanceError) {
                 log.warn(
@@ -649,13 +624,8 @@ export function createRegistryClientWithSigner(
                 if (gasEstimateAttempts > 0) {
                   // Wait a bit and check allowance again
                   await new Promise((resolve) => setTimeout(resolve, 3000));
-                  const retryAllowance = await usdc.allowance(
-                    wallet.address,
-                    registryAddress
-                  );
-                  log.debug(
-                    `Retry allowance check: ${ethers.formatUnits(retryAllowance, 6)} USDC`
-                  );
+                  const retryAllowance = await usdc.allowance(wallet.address, registryAddress);
+                  log.debug(`Retry allowance check: ${ethers.formatUnits(retryAllowance, 6)} USDC`);
                   if (retryAllowance < stakeWei) {
                     throw new Error(
                       `Allowance lost during retry. Expected: ${ethers.formatUnits(stakeWei, 6)} USDC, Got: ${ethers.formatUnits(retryAllowance, 6)} USDC`
@@ -690,10 +660,10 @@ export function createRegistryClientWithSigner(
           break; // Success, exit retry loop
         } catch (error: any) {
           registrationAttempts--;
-          const isAllowanceError = error.message && (
-            error.message.includes("allowance") ||
-            error.message.includes("ERC20: transfer amount exceeds allowance")
-          );
+          const isAllowanceError =
+            error.message &&
+            (error.message.includes("allowance") ||
+              error.message.includes("ERC20: transfer amount exceeds allowance"));
 
           if (isAllowanceError) {
             log.warn(
@@ -702,13 +672,8 @@ export function createRegistryClientWithSigner(
             if (registrationAttempts > 0) {
               // Wait longer and verify allowance before retrying
               await new Promise((resolve) => setTimeout(resolve, 5000));
-              const retryAllowance = await usdc.allowance(
-                wallet.address,
-                registryAddress
-              );
-              log.debug(
-                `Retry allowance check: ${ethers.formatUnits(retryAllowance, 6)} USDC`
-              );
+              const retryAllowance = await usdc.allowance(wallet.address, registryAddress);
+              log.debug(`Retry allowance check: ${ethers.formatUnits(retryAllowance, 6)} USDC`);
               if (retryAllowance < stakeWei) {
                 throw new Error(
                   `Allowance lost during retry. Expected: ${ethers.formatUnits(stakeWei, 6)} USDC, Got: ${ethers.formatUnits(retryAllowance, 6)} USDC`
@@ -772,14 +737,10 @@ export function createRegistryClientWithSigner(
       }
 
       if (newGunPubKey || newEpub) {
-        const pubkeyBytes = newGunPubKey
-          ? ethers.toUtf8Bytes(newGunPubKey)
-          : "0x";
+        const pubkeyBytes = newGunPubKey ? ethers.toUtf8Bytes(newGunPubKey) : "0x";
         const epubBytes = newEpub ? ethers.toUtf8Bytes(newEpub) : "0x";
         const tx = await relayRegistry.updateRelayEncryptionKeys(
-          typeof pubkeyBytes === "string"
-            ? pubkeyBytes
-            : ethers.hexlify(pubkeyBytes),
+          typeof pubkeyBytes === "string" ? pubkeyBytes : ethers.hexlify(pubkeyBytes),
           typeof epubBytes === "string" ? epubBytes : ethers.hexlify(epubBytes)
         );
         const receipt = await tx.wait();
@@ -789,9 +750,7 @@ export function createRegistryClientWithSigner(
         };
       }
 
-      throw new Error(
-        "At least one field (endpoint, gunPubKey, or epub) must be provided"
-      );
+      throw new Error("At least one field (endpoint, gunPubKey, or epub) must be provided");
     },
 
     /**
@@ -803,10 +762,7 @@ export function createRegistryClientWithSigner(
       const amountWei = ethers.parseUnits(amount, 6);
 
       // Check/set allowance
-      const allowance = await usdc.allowance(
-        wallet.address,
-        client.registryAddress
-      );
+      const allowance = await usdc.allowance(wallet.address, client.registryAddress);
       if (allowance < amountWei) {
         const approveTx = await usdc.approve(client.registryAddress, amountWei);
         await approveTx.wait();
@@ -868,11 +824,7 @@ export function createRegistryClientWithSigner(
       const relayInfo = await (this as any).getRelayInfo(relayAddress);
       const stakedAmount = BigInt(relayInfo!.stakedAmountRaw);
       const slashAmount = (stakedAmount * BigInt(slashBps)) / BigInt(10000);
-      return await storageDealClient.grief(
-        dealId,
-        ethers.formatUnits(slashAmount, 6),
-        evidence
-      );
+      return await storageDealClient.grief(dealId, ethers.formatUnits(slashAmount, 6), evidence);
     },
 
     /**
@@ -896,11 +848,7 @@ export function createRegistryClientWithSigner(
       const relayInfo = await (this as any).getRelayInfo(relayAddress);
       const stakedAmount = BigInt(relayInfo!.stakedAmountRaw);
       const slashAmount = (stakedAmount * BigInt(slashBps)) / BigInt(10000);
-      return await storageDealClient.grief(
-        dealId,
-        ethers.formatUnits(slashAmount, 6),
-        evidence
-      );
+      return await storageDealClient.grief(dealId, ethers.formatUnits(slashAmount, 6), evidence);
     },
   };
 }
@@ -949,11 +897,11 @@ export function createStorageDealRegistryClient(
   const provider = new ethers.JsonRpcProvider(rpcUrl || config.rpc);
   const sdk = new ShogunSDK({ provider, chainId });
   const storageDealRegistry = sdk.getStorageDealRegistry();
-  
+
   // Always use address from SDK to ensure consistency with frontend
   const registryAddressFromSDK = storageDealRegistry.getAddress();
   const usdcAddress = config.usdc;
-  
+
   if (!usdcAddress) {
     throw new Error(`USDC address not configured for chain ${chainId}`);
   }
@@ -977,9 +925,7 @@ export function createStorageDealRegistryClient(
         let dealIdBytes32: string;
         if (typeof dealId === "string") {
           dealIdBytes32 =
-            dealId.startsWith("0x") && dealId.length === 66
-              ? dealId
-              : ethers.id(dealId);
+            dealId.startsWith("0x") && dealId.length === 66 ? dealId : ethers.id(dealId);
         } else {
           dealIdBytes32 = ethers.hexlify(dealId);
         }
@@ -991,27 +937,16 @@ export function createStorageDealRegistryClient(
         }
 
         return {
-          dealId:
-            typeof deal.dealId === "string"
-              ? deal.dealId
-              : ethers.hexlify(deal.dealId),
-          relay:
-            typeof deal.relay === "string"
-              ? deal.relay
-              : deal.relay.toLowerCase(),
-          client:
-            typeof deal.client === "string"
-              ? deal.client
-              : deal.client.toLowerCase(),
+          dealId: typeof deal.dealId === "string" ? deal.dealId : ethers.hexlify(deal.dealId),
+          relay: typeof deal.relay === "string" ? deal.relay : deal.relay.toLowerCase(),
+          client: typeof deal.client === "string" ? deal.client : deal.client.toLowerCase(),
           cid: deal.cid,
           sizeMB: Number(deal.sizeMB),
           priceUSDC: ethers.formatUnits(deal.priceUSDC, 6),
           createdAt: new Date(Number(deal.createdAt) * 1000).toISOString(),
           expiresAt: new Date(Number(deal.expiresAt) * 1000).toISOString(),
           active: deal.active,
-          clientStake: deal.clientStake
-            ? ethers.formatUnits(deal.clientStake, 6)
-            : "0",
+          clientStake: deal.clientStake ? ethers.formatUnits(deal.clientStake, 6) : "0",
           clientStakeRaw: deal.clientStake ? deal.clientStake.toString() : "0",
           griefed: deal.griefed || false,
         };
@@ -1034,8 +969,7 @@ export function createStorageDealRegistryClient(
     async getClientDeals(clientAddress: string): Promise<Array<DealInfo>> {
       try {
         const normalizedAddress = ethers.getAddress(clientAddress);
-        const dealIds: Array<string> =
-          await storageDealRegistry.getClientDeals(normalizedAddress);
+        const dealIds: Array<string> = await storageDealRegistry.getClientDeals(normalizedAddress);
 
         if (!dealIds || dealIds.length === 0) {
           return [];
@@ -1076,8 +1010,7 @@ export function createStorageDealRegistryClient(
     async getRelayDeals(relayAddress: string): Promise<Array<DealInfo>> {
       try {
         const normalizedAddress = ethers.getAddress(relayAddress);
-        const dealIds: Array<string> =
-          await storageDealRegistry.getRelayDeals(normalizedAddress);
+        const dealIds: Array<string> = await storageDealRegistry.getRelayDeals(normalizedAddress);
 
         const deals: Array<DealInfo> = [];
         for (const id of dealIds) {
@@ -1188,18 +1121,10 @@ export function createStorageDealRegistryClientWithSigner(
      * @param reason - Reason for griefing
      * @returns Transaction result
      */
-    async grief(
-      dealId: string,
-      slashAmount: string,
-      reason: string
-    ): Promise<TransactionResult> {
+    async grief(dealId: string, slashAmount: string, reason: string): Promise<TransactionResult> {
       const dealIdBytes32 = ethers.id(dealId);
       const slashAmountWei = ethers.parseUnits(slashAmount, 6);
-      const tx = await storageDealRegistry.grief(
-        dealIdBytes32,
-        slashAmountWei,
-        reason
-      );
+      const tx = await storageDealRegistry.grief(dealIdBytes32, slashAmountWei, reason);
       const receipt = await tx.wait();
       return {
         success: true,

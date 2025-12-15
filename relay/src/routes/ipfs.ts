@@ -3,24 +3,13 @@ import http from "http";
 import FormData from "form-data";
 import multer from "multer";
 import { createProxyMiddleware } from "http-proxy-middleware";
-import type {
-  Request as ExpressRequest,
-  Response as ExpressResponse,
-} from "express";
-import type {
-  ClientRequest,
-  IncomingMessage as HttpIncomingMessage,
-} from "http";
+import type { Request as ExpressRequest, Response as ExpressResponse } from "express";
+import type { ClientRequest, IncomingMessage as HttpIncomingMessage } from "http";
 import { X402Merchant } from "../utils/x402-merchant";
 import { ipfsUpload } from "../utils/ipfs-client";
 import { loggers } from "../utils/logger";
 import type { IncomingMessage, ServerResponse } from "http";
-import {
-  authConfig,
-  blockchainConfig,
-  ipfsConfig,
-  x402Config,
-} from "../config";
+import { authConfig, blockchainConfig, ipfsConfig, x402Config } from "../config";
 
 // Extended Request interface with custom properties
 interface CustomRequest extends Request {
@@ -140,11 +129,7 @@ router.use(
     pathRewrite: {
       "^/proxy": "/api/v0",
     },
-    onProxyReq: (
-      proxyReq: ClientRequest,
-      req: ExpressRequest,
-      res: ExpressResponse
-    ) => {
+    onProxyReq: (proxyReq: ClientRequest, req: ExpressRequest, res: ExpressResponse) => {
       loggers.server.debug(
         {
           method: req.method,
@@ -163,9 +148,7 @@ router.use(
       // Override GET requests to POST for IPFS API endpoints
       if (
         req.method === "GET" &&
-        (req.url?.includes("/version") ||
-          req.url?.includes("/id") ||
-          req.url?.includes("/peers"))
+        (req.url?.includes("/version") || req.url?.includes("/id") || req.url?.includes("/peers"))
       ) {
         proxyReq.method = "POST";
         proxyReq.setHeader("Content-Length", "0");
@@ -174,17 +157,10 @@ router.use(
       // Add query parameter to get JSON response
       if (req.url?.includes("/version")) {
         const originalPath = proxyReq.path || "";
-        proxyReq.path =
-          originalPath +
-          (originalPath.includes("?") ? "&" : "?") +
-          "format=json";
+        proxyReq.path = originalPath + (originalPath.includes("?") ? "&" : "?") + "format=json";
       }
     },
-    onProxyRes: (
-      proxyRes: HttpIncomingMessage,
-      req: ExpressRequest,
-      res: ExpressResponse
-    ) => {
+    onProxyRes: (proxyRes: HttpIncomingMessage, req: ExpressRequest, res: ExpressResponse) => {
       loggers.server.debug(
         { statusCode: proxyRes.statusCode, method: req.method, url: req.url },
         `📤 IPFS API Response`
@@ -220,8 +196,8 @@ router.post("/api/v0/cat", async (req: CustomRequest, res: Response) => {
   try {
     const { arg } = req.query; // IPFS API uses ?arg=CID
     const cid = Array.isArray(arg) ? arg[0] : arg;
-    
-    if (!cid || typeof cid !== 'string') {
+
+    if (!cid || typeof cid !== "string") {
       return res.status(400).json({
         success: false,
         error: "CID parameter (arg) is required",
@@ -418,9 +394,7 @@ router.post(
 
     // Check for user address header (for x402 subscription-based uploads)
     const userAddressRaw = req.headers["x-user-address"];
-    const userAddress = Array.isArray(userAddressRaw)
-      ? userAddressRaw[0]
-      : userAddressRaw;
+    const userAddress = Array.isArray(userAddressRaw) ? userAddressRaw[0] : userAddressRaw;
 
     if (isAdmin) {
       req.authType = "admin";
@@ -435,9 +409,7 @@ router.post(
       const dealHeader = Array.isArray(req.headers["x-deal-upload"])
         ? req.headers["x-deal-upload"][0]
         : req.headers["x-deal-upload"];
-      const dealQuery = Array.isArray(req.query.deal)
-        ? req.query.deal[0]
-        : req.query.deal;
+      const dealQuery = Array.isArray(req.query.deal) ? req.query.deal[0] : req.query.deal;
       const isDealUpload = dealHeader === "true" || dealQuery === "true";
 
       if (isDealUpload) {
@@ -456,10 +428,7 @@ router.post(
         }
 
         try {
-          const subscription = await X402Merchant.getSubscriptionStatus(
-            gun,
-            userAddress
-          );
+          const subscription = await X402Merchant.getSubscriptionStatus(gun, userAddress);
 
           if (!subscription.active) {
             loggers.server.warn(
@@ -489,8 +458,7 @@ router.post(
           next();
         } catch (error: unknown) {
           loggers.server.error({ err: error }, "Subscription check error");
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
           return res.status(500).json({
             success: false,
             error: "Error checking subscription status",
@@ -499,17 +467,12 @@ router.post(
         }
       } else {
         // X402 not configured, allow upload anyway (for deals)
-        loggers.server.info(
-          `Upload allowed - X402 not configured, treating as deal upload`
-        );
+        loggers.server.info(`Upload allowed - X402 not configured, treating as deal upload`);
         req.isDealUpload = true;
         next();
       }
     } else {
-      loggers.server.warn(
-        { adminToken: !!adminToken, userAddress: !!userAddress },
-        "Auth failed"
-      );
+      loggers.server.warn({ adminToken: !!adminToken, userAddress: !!userAddress }, "Auth failed");
       res.status(401).json({
         success: false,
         error: "Unauthorized - Admin token or x402 subscription required",
@@ -534,11 +497,8 @@ router.post(
 
         // Get IPFS config
         const ipfsApiUrl =
-          req.app.get("IPFS_API_URL") ||
-          ipfsConfig.apiUrl ||
-          "http://127.0.0.1:5001";
-        const ipfsApiToken =
-          req.app.get("IPFS_API_TOKEN") || ipfsConfig.apiToken;
+          req.app.get("IPFS_API_URL") || ipfsConfig.apiUrl || "http://127.0.0.1:5001";
+        const ipfsApiToken = req.app.get("IPFS_API_TOKEN") || ipfsConfig.apiToken;
         const gun = req.app.get("gunInstance");
 
         // Verify real storage usage from IPFS
@@ -568,11 +528,8 @@ router.post(
             details: {
               fileSizeMB: fileSizeMB.toFixed(2),
               storageUsedMB: canUploadResult.storageUsedMB?.toFixed(2) || "0",
-              storageRemainingMB:
-                canUploadResult.storageRemainingMB?.toFixed(2) || "0",
-              storageTotalMB:
-                canUploadResult.storageTotalMB ||
-                customReq.subscription?.storageMB,
+              storageRemainingMB: canUploadResult.storageRemainingMB?.toFixed(2) || "0",
+              storageTotalMB: canUploadResult.storageTotalMB || customReq.subscription?.storageMB,
               tier: canUploadResult.currentTier || customReq.subscription?.tier,
               verified: canUploadResult.verified,
             },
@@ -602,15 +559,11 @@ router.post(
       });
 
       // Use IPFS client utility with automatic retry
-      const fileResult = await ipfsUpload(
-        "/api/v0/add?wrap-with-directory=false",
-        formData,
-        {
-          timeout: 60000,
-          maxRetries: 3,
-          retryDelay: 1000,
-        }
-      );
+      const fileResult = await ipfsUpload("/api/v0/add?wrap-with-directory=false", formData, {
+        timeout: 60000,
+        maxRetries: 3,
+        retryDelay: 1000,
+      });
 
       loggers.server.debug({ fileResult }, "📤 IPFS Upload response");
 
@@ -634,11 +587,7 @@ router.post(
 
       // If user upload, save to Gun database and update MB usage
       // Skip GunDB save for deal uploads (they're tracked on-chain)
-      if (
-        customReq.authType === "user" &&
-        customReq.userAddress &&
-        !customReq.isDealUpload
-      ) {
+      if (customReq.authType === "user" && customReq.userAddress && !customReq.isDealUpload) {
         const gun = req.app.get("gunInstance");
         const fileSizeMB = req.file.size / (1024 * 1024);
 
@@ -651,9 +600,7 @@ router.post(
         const fileSize = req.file.size;
 
         if (!userAddress) {
-          return res
-            .status(400)
-            .json({ success: false, error: "User address is required" });
+          return res.status(400).json({ success: false, error: "User address is required" });
         }
 
         loggers.server.debug(
@@ -684,11 +631,7 @@ router.post(
         const updateMBPromise = (async () => {
           try {
             const { updateMBUsage } = await import("../utils/storage-utils.js");
-            const newMB = await updateMBUsage(
-              gun,
-              customReq.userAddress!,
-              fileSizeMB
-            );
+            const newMB = await updateMBUsage(gun, customReq.userAddress!, fileSizeMB);
             loggers.server.debug({ newMB }, `✅ MB usage updated successfully`);
             return newMB;
           } catch (error: unknown) {
@@ -702,9 +645,7 @@ router.post(
           // Call the save-system-hash endpoint with admin token
           const adminToken = authConfig.adminPassword;
           if (!adminToken) {
-            loggers.server.warn(
-              `⚠️ ADMIN_PASSWORD not set, skipping system hash save`
-            );
+            loggers.server.warn(`⚠️ ADMIN_PASSWORD not set, skipping system hash save`);
             resolve({ error: "ADMIN_PASSWORD not configured" });
             return;
           }
@@ -739,9 +680,7 @@ router.post(
               try {
                 const result = JSON.parse(data);
                 if (result.success) {
-                  loggers.server.debug(
-                    `✅ System hash saved successfully via endpoint`
-                  );
+                  loggers.server.debug(`✅ System hash saved successfully via endpoint`);
                   resolve({ success: true });
                 } else {
                   loggers.server.error(
@@ -752,23 +691,15 @@ router.post(
                 }
               } catch (parseError: unknown) {
                 const errorMessage =
-                  parseError instanceof Error
-                    ? parseError.message
-                    : String(parseError);
-                loggers.server.error(
-                  { err: parseError },
-                  `❌ Error parsing system hash response`
-                );
+                  parseError instanceof Error ? parseError.message : String(parseError);
+                loggers.server.error({ err: parseError }, `❌ Error parsing system hash response`);
                 resolve({ error: errorMessage });
               }
             });
           });
 
           httpReq.on("error", (error: Error) => {
-            loggers.server.error(
-              { err: error },
-              `❌ Error calling system hash endpoint`
-            );
+            loggers.server.error({ err: error }, `❌ Error calling system hash endpoint`);
             resolve({ error: error.message });
           });
 
@@ -791,19 +722,12 @@ router.post(
               uploadedAt: Date.now(),
             }
           ).catch((err) => {
-            loggers.server.warn(
-              { err },
-              `⚠️ Failed to save upload record to relay space`
-            );
+            loggers.server.warn({ err }, `⚠️ Failed to save upload record to relay space`);
           });
 
           subscriptionUpdatePromise = Promise.all([
             uploadRecordPromise,
-            X402Merchant.updateStorageUsage(
-              gun,
-              customReq.userAddress!,
-              fileSizeMB
-            ),
+            X402Merchant.updateStorageUsage(gun, customReq.userAddress!, fileSizeMB),
           ])
             .then(([, result]) => {
               loggers.server.info(
@@ -816,20 +740,13 @@ router.post(
               return result;
             })
             .catch((err: unknown) => {
-              loggers.server.warn(
-                { err },
-                `⚠️ Subscription storage update failed`
-              );
+              loggers.server.warn({ err }, `⚠️ Subscription storage update failed`);
               return null;
             });
         }
 
         // Wait for critical operations to complete (upload and MB usage)
-        Promise.all([
-          saveUploadPromise,
-          updateMBPromise,
-          subscriptionUpdatePromise,
-        ])
+        Promise.all([saveUploadPromise, updateMBPromise, subscriptionUpdatePromise])
           .then(([, , subscriptionResult]) => {
             loggers.server.info(
               { userAddress: customReq.userAddress, fileSizeMB },
@@ -869,24 +786,21 @@ router.post(
               mbUsage:
                 customReq.authType === "user"
                   ? {
-                    actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
-                    sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
-                    verified: true,
-                  }
+                      actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                      sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
+                      verified: true,
+                    }
                   : undefined,
               subscription: subscriptionResult
                 ? {
-                  storageUsedMB: subscriptionResult.storageUsedMB,
-                  storageRemainingMB: subscriptionResult.storageRemainingMB,
-                }
+                    storageUsedMB: subscriptionResult.storageUsedMB,
+                    storageRemainingMB: subscriptionResult.storageRemainingMB,
+                  }
                 : undefined,
             });
           })
           .catch((error: unknown) => {
-            loggers.server.error(
-              { err: error },
-              `❌ Error during critical GunDB save`
-            );
+            loggers.server.error({ err: error }, `❌ Error during critical GunDB save`);
             // Send response anyway, the file is already on IPFS
             res.json({
               success: true,
@@ -895,12 +809,11 @@ router.post(
               mbUsage:
                 customReq.authType === "user" && req.file
                   ? {
-                    actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
-                    sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
-                    verified: false,
-                    error:
-                      error instanceof Error ? error.message : String(error),
-                  }
+                      actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                      sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
+                      verified: false,
+                      error: error instanceof Error ? error.message : String(error),
+                    }
                   : undefined,
             });
           });
@@ -914,8 +827,7 @@ router.post(
       }
     } catch (error: unknown) {
       loggers.server.error({ err: error }, "❌ IPFS Upload error");
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       res.status(500).json({
         success: false,
         error: errorMessage,
@@ -1063,10 +975,7 @@ router.get("/cat/:cid", async (req, res) => {
     ipfsReq.end();
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    loggers.server.error(
-      { err: error, cid: req.params.cid },
-      `❌ IPFS Content error`
-    );
+    loggers.server.error({ err: error, cid: req.params.cid }, `❌ IPFS Content error`);
     res.status(500).json({
       success: false,
       error: errorMessage,
@@ -1079,7 +988,7 @@ router.get("/content/:cid", async (req, res) => {
   // Redirect to /cat/:cid endpoint
   const { cid } = req.params;
   loggers.server.debug({ cid }, `📄 IPFS Content (compatibility endpoint) request`);
-  
+
   // Reuse the same logic as /cat/:cid
   try {
     const requestOptions: {
@@ -1145,10 +1054,7 @@ router.get("/content/:cid", async (req, res) => {
     ipfsReq.end();
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    loggers.server.error(
-      { err: error, cid: req.params.cid },
-      `❌ IPFS Content error`
-    );
+    loggers.server.error({ err: error, cid: req.params.cid }, `❌ IPFS Content error`);
     res.status(500).json({
       success: false,
       error: errorMessage,
@@ -1161,7 +1067,7 @@ router.get("/ipfs/:cid", async (req, res) => {
   // Redirect to /cat/:cid endpoint
   const { cid } = req.params;
   loggers.server.debug({ cid }, `📄 IPFS Gateway (compatibility endpoint) request`);
-  
+
   // Reuse the same logic as /cat/:cid
   try {
     const requestOptions: {
@@ -1188,19 +1094,29 @@ router.get("/ipfs/:cid", async (req, res) => {
       // Try to detect content type
       let contentType = "application/octet-stream";
       const chunks: Buffer[] = [];
-      
+
       ipfsRes.on("data", (chunk: Buffer) => {
         chunks.push(chunk);
         // Detect content type from first bytes
         if (chunks.length === 1 && chunk.length > 0) {
           const firstBytes = chunk.slice(0, 512);
-          if (firstBytes[0] === 0x89 && firstBytes[1] === 0x50 && firstBytes[2] === 0x4e && firstBytes[3] === 0x47) {
+          if (
+            firstBytes[0] === 0x89 &&
+            firstBytes[1] === 0x50 &&
+            firstBytes[2] === 0x4e &&
+            firstBytes[3] === 0x47
+          ) {
             contentType = "image/png";
           } else if (firstBytes[0] === 0xff && firstBytes[1] === 0xd8) {
             contentType = "image/jpeg";
           } else if (firstBytes[0] === 0x47 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46) {
             contentType = "image/gif";
-          } else if (firstBytes[0] === 0x25 && firstBytes[1] === 0x50 && firstBytes[2] === 0x44 && firstBytes[3] === 0x46) {
+          } else if (
+            firstBytes[0] === 0x25 &&
+            firstBytes[1] === 0x50 &&
+            firstBytes[2] === 0x44 &&
+            firstBytes[3] === 0x46
+          ) {
             contentType = "application/pdf";
           } else {
             try {
@@ -1255,10 +1171,7 @@ router.get("/ipfs/:cid", async (req, res) => {
     ipfsReq.end();
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    loggers.server.error(
-      { err: error, cid: req.params.cid },
-      `❌ IPFS Gateway error`
-    );
+    loggers.server.error({ err: error, cid: req.params.cid }, `❌ IPFS Gateway error`);
     res.status(500).json({
       success: false,
       error: errorMessage,
@@ -1293,14 +1206,9 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
       try {
         const { ethers } = await import("ethers");
         const expectedMessage = "I Love Shogun";
-        const recoveredAddress = ethers.verifyMessage(
-          expectedMessage,
-          tokenStr
-        );
+        const recoveredAddress = ethers.verifyMessage(expectedMessage, tokenStr);
 
-        const userAddressStr = Array.isArray(userAddress)
-          ? userAddress[0]
-          : userAddress;
+        const userAddressStr = Array.isArray(userAddress) ? userAddress[0] : userAddress;
         if (
           userAddressStr &&
           typeof userAddressStr === "string" &&
@@ -1316,10 +1224,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
         }
       } catch (verifyError) {
         // If verification fails, continue - might be a legacy address or different format
-        loggers.server.warn(
-          { err: verifyError },
-          `⚠️ Signature verification skipped`
-        );
+        loggers.server.warn({ err: verifyError }, `⚠️ Signature verification skipped`);
       }
     }
 
@@ -1333,9 +1238,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
           loggers.server.debug(`🔑 Token parsed as JSON successfully`);
         } catch (parseError) {
           // Not valid JSON, use as-is (could be password, address, or signature)
-          loggers.server.debug(
-            `🔑 Token is not JSON, using as-is (password or other format)`
-          );
+          loggers.server.debug(`🔑 Token is not JSON, using as-is (password or other format)`);
         }
       } else {
         // Token is a simplestr(password), use as-is
@@ -1359,8 +1262,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
     // Try API first if we have a local API URL
     const useApi =
       IPFS_GATEWAY_URL &&
-      (IPFS_GATEWAY_URL.includes("127.0.0.1") ||
-        IPFS_GATEWAY_URL.includes("localhost"));
+      (IPFS_GATEWAY_URL.includes("127.0.0.1") || IPFS_GATEWAY_URL.includes("localhost"));
 
     if (useApi) {
       // Use IPFS API directly (more reliable for local files)
@@ -1383,9 +1285,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
       // Use gateway
       const gatewayUrl = new URL(IPFS_GATEWAY_URL);
       protocolModule =
-        gatewayUrl.protocol === "https:"
-          ? await import("https")
-          : await import("http");
+        gatewayUrl.protocol === "https:" ? await import("https") : await import("http");
 
       requestOptions = {
         hostname: gatewayUrl.hostname,
@@ -1403,10 +1303,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
     }
 
     const ipfsReq = protocolModule.request(requestOptions, (ipfsRes) => {
-      loggers.server.debug(
-        { cid, statusCode: ipfsRes.statusCode },
-        `📥 IPFS response received`
-      );
+      loggers.server.debug({ cid, statusCode: ipfsRes.statusCode }, `📥 IPFS response received`);
 
       // Handle IPFS errors
       ipfsRes.on("error", (err) => {
@@ -1422,10 +1319,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
 
       // If no token, just stream the response
       if (!token) {
-        loggers.server.debug(
-          { cid },
-          `📤 Streaming content without decryption`
-        );
+        loggers.server.debug({ cid }, `📤 Streaming content without decryption`);
         res.setHeader(
           "Content-Type",
           ipfsRes.headers["content-type"] || "application/octet-stream"
@@ -1454,18 +1348,12 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
         chunks.push(chunk);
         chunkCount++;
         if (chunkCount === 1) {
-          loggers.server.debug(
-            { cid, chunkSize: chunk.length },
-            `   First chunk received`
-          );
+          loggers.server.debug({ cid, chunkSize: chunk.length }, `   First chunk received`);
         }
       });
       ipfsRes.on("end", async () => {
         const totalSize = chunks.reduce((sum, c) => sum + c.length, 0);
-        loggers.server.debug(
-          { cid, chunkCount, totalSize },
-          `   All chunks received`
-        );
+        loggers.server.debug({ cid, chunkCount, totalSize }, `   All chunks received`);
         // Convert chunks tostrproperly (handles both Buffer andstrchunks)
         const body = Buffer.concat(chunks).toString("utf8");
         loggers.server.debug(
@@ -1478,11 +1366,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
           let encryptedObject = null;
 
           // Check if body is "[object Object]" (happens when File was created with object instead of JSONstr)
-          if (
-            body &&
-            typeof body === "string" &&
-            body.trim() === "[object Object]"
-          ) {
+          if (body && typeof body === "string" && body.trim() === "[object Object]") {
             loggers.server.warn(
               { cid },
               `⚠️ Detected "[object Object]"string- file was uploaded incorrectly`
@@ -1491,8 +1375,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
             if (!res.headersSent) {
               res.status(400).json({
                 success: false,
-                error:
-                  "File was uploaded in incorrect format. Please re-upload the file.",
+                error: "File was uploaded in incorrect format. Please re-upload the file.",
                 details:
                   "The encrypted file was saved as '[object Object]' instead of JSON. This is a known issue with files uploaded before the fix.",
               });
@@ -1516,10 +1399,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
             // This happens when the encrypted object was stringified: JSON.stringify(SEA.encrypt(...))
             // But SEA.encrypt() returns an object, so JSON.stringify() should produce normal JSON
             // However, if the body was saved as astrrepresentation, it might be "SEA{...}"
-            if (
-              typeof parsed === "string" &&
-              parsed.trim().startsWith("SEA{")
-            ) {
+            if (typeof parsed === "string" && parsed.trim().startsWith("SEA{")) {
               loggers.server.debug(
                 {
                   cid,
@@ -1546,10 +1426,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
                 if (
                   innerParsed &&
                   typeof innerParsed === "object" &&
-                  (innerParsed.ct ||
-                    innerParsed.iv ||
-                    innerParsed.s ||
-                    innerParsed.salt)
+                  (innerParsed.ct || innerParsed.iv || innerParsed.s || innerParsed.salt)
                 ) {
                   isEncryptedData = true;
                   encryptedObject = innerParsed;
@@ -1564,10 +1441,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
                   );
                 }
               } catch (innerError) {
-                loggers.server.debug(
-                  { err: innerError, cid },
-                  `⚠️ Failed to parse SEAstr`
-                );
+                loggers.server.debug({ err: innerError, cid }, `⚠️ Failed to parse SEAstr`);
                 // Thestrmight not be valid JSON - this is expected if it's a SEA serialization
                 // In this case, the original body should be the actual JSON object
                 loggers.server.debug(
@@ -1580,10 +1454,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
                   if (
                     directParsed &&
                     typeof directParsed === "object" &&
-                    (directParsed.ct ||
-                      directParsed.iv ||
-                      directParsed.s ||
-                      directParsed.salt)
+                    (directParsed.ct || directParsed.iv || directParsed.s || directParsed.salt)
                   ) {
                     isEncryptedData = true;
                     encryptedObject = directParsed;
@@ -1609,10 +1480,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
             ) {
               isEncryptedData = true;
               encryptedObject = parsed;
-              loggers.server.debug(
-                { cid },
-                `✅ Detected encrypted data structure (direct object)`
-              );
+              loggers.server.debug({ cid }, `✅ Detected encrypted data structure (direct object)`);
             } else if (parsed && typeof parsed === "object") {
               loggers.server.debug(
                 { cid, keys: Object.keys(parsed).join(", ") },
@@ -1644,10 +1512,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
                 if (
                   seaParsed &&
                   typeof seaParsed === "object" &&
-                  (seaParsed.ct ||
-                    seaParsed.iv ||
-                    seaParsed.s ||
-                    seaParsed.salt)
+                  (seaParsed.ct || seaParsed.iv || seaParsed.s || seaParsed.salt)
                 ) {
                   isEncryptedData = true;
                   encryptedObject = seaParsed;
@@ -1664,9 +1529,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
               } catch (seaError: unknown) {
                 const eMessage = e instanceof Error ? e.message : String(e);
                 const seaErrorMessage =
-                  seaError instanceof Error
-                    ? seaError.message
-                    : String(seaError);
+                  seaError instanceof Error ? seaError.message : String(seaError);
                 loggers.server.debug(
                   {
                     cid,
@@ -1701,10 +1564,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
                     ? token.substring(0, 20) + "..."
                     : JSON.stringify(token).substring(0, 50),
                 encryptedKeys: Object.keys(encryptedObject).join(", "),
-                encryptedPreview: JSON.stringify(encryptedObject).substring(
-                  0,
-                  200
-                ),
+                encryptedPreview: JSON.stringify(encryptedObject).substring(0, 200),
               },
               `🔓 Attempting decryption with token`
             );
@@ -1715,16 +1575,9 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
             let decrypted;
             try {
               const tokenForDecrypt =
-                typeof token === "string"
-                  ? token
-                  : Array.isArray(token)
-                    ? token[0]
-                    : "";
+                typeof token === "string" ? token : Array.isArray(token) ? token[0] : "";
               if (typeof tokenForDecrypt === "string") {
-                decrypted = await SEA.default.decrypt(
-                  encryptedObject,
-                  tokenForDecrypt
-                );
+                decrypted = await SEA.default.decrypt(encryptedObject, tokenForDecrypt);
               } else {
                 decrypted = null;
               }
@@ -1740,10 +1593,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
                 `   Decryption result`
               );
             } catch (decryptErr) {
-              loggers.server.error(
-                { err: decryptErr, cid },
-                `   Decryption threw error`
-              );
+              loggers.server.error({ err: decryptErr, cid }, `   Decryption threw error`);
               decrypted = null;
             }
 
@@ -1751,10 +1601,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
               loggers.server.debug({ cid }, `✅ Decryption successful!`);
 
               // Check if decrypted data is a data URL
-              if (
-                typeof decrypted === "string" &&
-                decrypted.startsWith("data:")
-              ) {
+              if (typeof decrypted === "string" && decrypted.startsWith("data:")) {
                 loggers.server.debug(
                   { cid },
                   `📁 Detected data URL, extracting content type and data`
@@ -1774,8 +1621,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
                 } else {
                   res.json({
                     success: true,
-                    message:
-                      "Decryption successful but could not parse data URL",
+                    message: "Decryption successful but could not parse data URL",
                     decryptedData: decrypted,
                     originalLength: body.length,
                   });
@@ -1801,11 +1647,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
                       contentType = "image/png";
                     }
                     // JPEG: FF D8 FF
-                    else if (
-                      buffer[0] === 0xff &&
-                      buffer[1] === 0xd8 &&
-                      buffer[2] === 0xff
-                    ) {
+                    else if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
                       contentType = "image/jpeg";
                     }
                     // GIF: 47 49 46 38
@@ -1853,10 +1695,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
                   return;
                 } catch (base64Error) {
                   // Not valid base64, return as text/plain
-                  loggers.server.debug(
-                    { cid },
-                    `📄 Returning as text/plain (not valid base64)`
-                  );
+                  loggers.server.debug({ cid }, `📄 Returning as text/plain (not valid base64)`);
                   res.setHeader("Content-Type", "text/plain");
                   res.send(decrypted);
                   return;
@@ -1878,13 +1717,8 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
                     typeof token === "string"
                       ? token.substring(0, 30) + "..."
                       : JSON.stringify(token).substring(0, 50),
-                  encryptedKeys: encryptedObject
-                    ? Object.keys(encryptedObject).join(", ")
-                    : "none",
-                  encryptedPreview: JSON.stringify(encryptedObject).substring(
-                    0,
-                    200
-                  ),
+                  encryptedKeys: encryptedObject ? Object.keys(encryptedObject).join(", ") : "none",
+                  encryptedPreview: JSON.stringify(encryptedObject).substring(0, 200),
                 },
                 `⚠️ Decryption returned null - file might not be encrypted or token is wrong`
               );
@@ -1922,10 +1756,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
                     (parsed.ct || parsed.iv || parsed.s || parsed.salt)
                   ) {
                     encryptedObj = parsed;
-                  } else if (
-                    typeof parsed === "string" &&
-                    parsed.trim().startsWith("SEA{")
-                  ) {
+                  } else if (typeof parsed === "string" && parsed.trim().startsWith("SEA{")) {
                     // Handle SEA{...} format
                     let seaString = parsed.trim();
                     if (seaString.startsWith("SEA{")) {
@@ -1935,23 +1766,13 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
                   }
                 } catch (parseErr) {
                   // Body might not be JSON, but could still be encrypted
-                  loggers.server.debug(
-                    { cid },
-                    `   Body is not JSON, cannot attempt decryption`
-                  );
+                  loggers.server.debug({ cid }, `   Body is not JSON, cannot attempt decryption`);
                 }
 
                 if (encryptedObj) {
-                  loggers.server.debug(
-                    { cid },
-                    `   Attempting decryption with parsed object`
-                  );
+                  loggers.server.debug({ cid }, `   Attempting decryption with parsed object`);
                   const tokenForDecrypt =
-                    typeof token === "string"
-                      ? token
-                      : Array.isArray(token)
-                        ? token[0]
-                        : "";
+                    typeof token === "string" ? token : Array.isArray(token) ? token[0] : "";
                   const decrypted =
                     typeof tokenForDecrypt === "string"
                       ? await SEA.default.decrypt(encryptedObj, tokenForDecrypt)
@@ -1959,13 +1780,8 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
                   if (decrypted) {
                     loggers.server.debug({ cid }, `✅ Decryption successful!`);
                     // Handle decrypted data (same as above)
-                    if (
-                      typeof decrypted === "string" &&
-                      decrypted.startsWith("data:")
-                    ) {
-                      const matches = decrypted.match(
-                        /^data:([^;]+);base64,(.+)$/
-                      );
+                    if (typeof decrypted === "string" && decrypted.startsWith("data:")) {
+                      const matches = decrypted.match(/^data:([^;]+);base64,(.+)$/);
                       if (matches) {
                         const contentType = matches[1];
                         const base64Data = matches[2];
@@ -1979,10 +1795,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
                     } else if (typeof decrypted === "string") {
                       try {
                         const buffer = Buffer.from(decrypted, "base64");
-                        res.setHeader(
-                          "Content-Type",
-                          "application/octet-stream"
-                        );
+                        res.setHeader("Content-Type", "application/octet-stream");
                         res.setHeader("Content-Length", buffer.length);
                         res.send(buffer);
                         return;
@@ -1995,10 +1808,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
                   }
                 }
               } catch (fallbackErr) {
-                loggers.server.debug(
-                  { err: fallbackErr, cid },
-                  `   Fallback decryption failed`
-                );
+                loggers.server.debug({ err: fallbackErr, cid }, `   Fallback decryption failed`);
               }
             }
 
@@ -2023,15 +1833,9 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
             return;
           }
         } catch (decryptError) {
-          loggers.server.error(
-            { err: decryptError, cid },
-            "❌ Decryption error"
-          );
+          loggers.server.error({ err: decryptError, cid }, "❌ Decryption error");
           // On error, try to return original content
-          loggers.server.warn(
-            { cid },
-            `⚠️ Returning original content due to decryption error`
-          );
+          loggers.server.warn({ cid }, `⚠️ Returning original content due to decryption error`);
           if (!res.headersSent) {
             res.setHeader(
               "Content-Type",
@@ -2062,10 +1866,7 @@ router.get("/cat/:cid/decrypt", async (req, res) => {
     ipfsReq.end();
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    loggers.server.error(
-      { err: error, cid: req.params.cid },
-      `❌ IPFS Decrypt error`
-    );
+    loggers.server.error({ err: error, cid: req.params.cid }, `❌ IPFS Decrypt error`);
     res.status(500).json({
       success: false,
       error: errorMessage,
@@ -2144,10 +1945,7 @@ router.get("/cat/:cid/json", async (req: Request, res: Response) => {
     ipfsReq.end();
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    loggers.server.error(
-      { err: error, cid: req.params.cid },
-      `❌ IPFS Content JSON error`
-    );
+    loggers.server.error({ err: error, cid: req.params.cid }, `❌ IPFS Content JSON error`);
     res.status(500).json({
       success: false,
       error: errorMessage,
@@ -2245,8 +2043,7 @@ router.post(
 
       ipfsReq.end();
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       loggers.server.error({ err: error }, "❌ IPFS Pin add error");
       res.status(500).json({
         success: false,
@@ -2308,9 +2105,7 @@ router.post(
       if (IPFS_API_TOKEN) {
         (requestOptions.headers as Record<string, string>)["Authorization"] =
           `Bearer ${IPFS_API_TOKEN}`;
-        loggers.server.debug(
-          "🔐 IPFS API token found, adding authorization header"
-        );
+        loggers.server.debug("🔐 IPFS API token found, adding authorization header");
       } else {
         loggers.server.warn("⚠️ No IPFS API token configured");
       }
@@ -2333,10 +2128,7 @@ router.post(
         let data = "";
         ipfsRes.on("data", (chunk) => {
           data += chunk;
-          loggers.server.debug(
-            { chunk: chunk.toString() },
-            `📡 IPFS API data chunk`
-          );
+          loggers.server.debug({ chunk: chunk.toString() }, `📡 IPFS API data chunk`);
         });
 
         ipfsRes.on("end", () => {
@@ -2359,10 +2151,7 @@ router.post(
               success: false,
               error: "Failed to parse IPFS response",
               rawResponse: data,
-              parseError:
-                parseError instanceof Error
-                  ? parseError.message
-                  : String(parseError),
+              parseError: parseError instanceof Error ? parseError.message : String(parseError),
             });
           }
         });
@@ -2392,12 +2181,8 @@ router.post(
       loggers.server.debug({ cid }, `📡 Sending IPFS API request`);
       ipfsReq.end();
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      loggers.server.error(
-        { err: error, cid: req.body?.cid },
-        `❌ IPFS Pin rm unexpected error`
-      );
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      loggers.server.error({ err: error, cid: req.body?.cid }, `❌ IPFS Pin rm unexpected error`);
       res.status(500).json({
         success: false,
         error: errorMessage,
@@ -2435,20 +2220,12 @@ router.post(
   },
   async (req, res) => {
     try {
-      loggers.server.debug(
-        { body: req.body },
-        "🔍 IPFS Pin rm (alias /pins/rm) request"
-      );
+      loggers.server.debug({ body: req.body }, "🔍 IPFS Pin rm (alias /pins/rm) request");
       const { cid } = req.body;
-      loggers.server.debug(
-        { cid },
-        `🔍 IPFS Pin rm (alias /pins/rm) request for CID`
-      );
+      loggers.server.debug({ cid }, `🔍 IPFS Pin rm (alias /pins/rm) request for CID`);
 
       if (!cid) {
-        loggers.server.warn(
-          "❌ IPFS Pin rm (alias /pins/rm) error: CID is required"
-        );
+        loggers.server.warn("❌ IPFS Pin rm (alias /pins/rm) error: CID is required");
         return res.status(400).json({
           success: false,
           error: "CID is required",
@@ -2473,9 +2250,7 @@ router.post(
 
       if (IPFS_API_TOKEN) {
         requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
-        loggers.server.debug(
-          "🔐 IPFS API token found, adding authorization header"
-        );
+        loggers.server.debug("🔐 IPFS API token found, adding authorization header");
       } else {
         loggers.server.warn("⚠️ No IPFS API token configured");
       }
@@ -2487,10 +2262,7 @@ router.post(
           if (ipfsRes.statusCode === 200) {
             try {
               const result = JSON.parse(data);
-              loggers.server.info(
-                { cid, result },
-                `✅ IPFS Pin rm (alias /pins/rm) success`
-              );
+              loggers.server.info({ cid, result }, `✅ IPFS Pin rm (alias /pins/rm) success`);
               res.json({
                 success: true,
                 message: `Pin removed successfully for CID: ${cid}`,
@@ -2509,10 +2281,7 @@ router.post(
             }
           } else {
             const statusCode = ipfsRes.statusCode || 500;
-            loggers.server.error(
-              { cid, statusCode },
-              `❌ IPFS Pin rm (alias /pins/rm) failed`
-            );
+            loggers.server.error({ cid, statusCode }, `❌ IPFS Pin rm (alias /pins/rm) failed`);
             res.status(statusCode).json({
               success: false,
               error: `IPFS pin removal failed: ${statusCode}`,
@@ -2523,10 +2292,7 @@ router.post(
       });
 
       ipfsReq.on("error", (err) => {
-        loggers.server.error(
-          { err, cid },
-          `❌ IPFS Pin rm (alias /pins/rm) network error`
-        );
+        loggers.server.error({ err, cid }, `❌ IPFS Pin rm (alias /pins/rm) network error`);
         res.status(500).json({
           success: false,
           error: "Network error",
@@ -2540,8 +2306,7 @@ router.post(
       loggers.server.debug({ cid }, `📡 Sending IPFS API request`);
       ipfsReq.end();
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       loggers.server.error(
         { err: error, cid: req.body?.cid },
         `❌ IPFS Pin rm (alias /pins/rm) unexpected error`
@@ -2633,8 +2398,7 @@ router.get(
 
       ipfsReq.end();
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       loggers.server.error({ err: error }, "❌ IPFS Pin ls error");
       res.status(500).json({
         success: false,
@@ -2741,8 +2505,7 @@ router.post(
 
       ipfsReq.end();
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       loggers.server.error({ err: error }, "❌ IPFS Repo GC error");
       res.status(500).json({
         success: false,
@@ -2848,8 +2611,7 @@ router.get(
       ipfsReq.setTimeout(10000);
       ipfsReq.end();
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       loggers.server.error({ err: error }, "❌ IPFS API test unexpected error");
       res.status(500).json({
         success: false,
@@ -2899,11 +2661,7 @@ router.get("/stat/:cid", async (req: Request, res: Response) => {
               reject(new Error("Failed to parse stat response"));
             }
           } else {
-            reject(
-              new Error(
-                `IPFS returned status ${statRes.statusCode || "unknown"}`
-              )
-            );
+            reject(new Error(`IPFS returned status ${statRes.statusCode || "unknown"}`));
           }
         });
       });
@@ -3022,9 +2780,7 @@ router.get(
   },
   async (req, res) => {
     try {
-      loggers.server.debug(
-        "📊 Getting IPFS repository statistics (alternative method)..."
-      );
+      loggers.server.debug("📊 Getting IPFS repository statistics (alternative method)...");
 
       // Get all pins first
       const pinsRequestOptions = {
@@ -3038,8 +2794,7 @@ router.get(
       };
 
       if (IPFS_API_TOKEN) {
-        pinsRequestOptions.headers["Authorization"] =
-          `Bearer ${IPFS_API_TOKEN}`;
+        pinsRequestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
       }
 
       const pinsPromise = new Promise((resolve, reject) => {
@@ -3087,8 +2842,7 @@ router.get(
       };
 
       if (IPFS_API_TOKEN) {
-        storageRequestOptions.headers["Authorization"] =
-          `Bearer ${IPFS_API_TOKEN}`;
+        storageRequestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
       }
 
       const storagePromise = new Promise((resolve, reject) => {
@@ -3098,10 +2852,7 @@ router.get(
           storageRes.on("end", () => {
             try {
               const storageData = JSON.parse(data);
-              loggers.server.debug(
-                { storageData },
-                "📦 IPFS repo/stat raw response"
-              );
+              loggers.server.debug({ storageData }, "📦 IPFS repo/stat raw response");
               resolve(storageData);
             } catch (parseError) {
               reject(new Error("Failed to parse storage response"));
@@ -3139,8 +2890,7 @@ router.get(
       };
 
       if (IPFS_API_TOKEN) {
-        versionRequestOptions.headers["Authorization"] =
-          `Bearer ${IPFS_API_TOKEN}`;
+        versionRequestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
       }
 
       const versionPromise = new Promise((resolve, reject) => {
@@ -3182,24 +2932,27 @@ router.get(
       const versionDataObj = versionData as any;
       const pinKeys = pinsDataObj.Keys || {};
       const numObjects = Object.keys(pinKeys).length;
-      
+
       // Try multiple field names for RepoSize (IPFS API may return different formats)
       // RepoSize can be a number (bytes) or string (with units like "1234" or "1234B")
       let totalSize = 0;
       if (storageDataObj.RepoSize !== undefined) {
-        totalSize = typeof storageDataObj.RepoSize === 'string' 
-          ? parseInt(storageDataObj.RepoSize, 10) || 0
-          : storageDataObj.RepoSize || 0;
+        totalSize =
+          typeof storageDataObj.RepoSize === "string"
+            ? parseInt(storageDataObj.RepoSize, 10) || 0
+            : storageDataObj.RepoSize || 0;
       } else if (storageDataObj.repoSize !== undefined) {
-        totalSize = typeof storageDataObj.repoSize === 'string'
-          ? parseInt(storageDataObj.repoSize, 10) || 0
-          : storageDataObj.repoSize || 0;
+        totalSize =
+          typeof storageDataObj.repoSize === "string"
+            ? parseInt(storageDataObj.repoSize, 10) || 0
+            : storageDataObj.repoSize || 0;
       } else if (storageDataObj.Size !== undefined) {
-        totalSize = typeof storageDataObj.Size === 'string'
-          ? parseInt(storageDataObj.Size, 10) || 0
-          : storageDataObj.Size || 0;
+        totalSize =
+          typeof storageDataObj.Size === "string"
+            ? parseInt(storageDataObj.Size, 10) || 0
+            : storageDataObj.Size || 0;
       }
-      
+
       // If RepoSize is 0 but we have pinned objects, try to calculate from pins
       if (totalSize === 0 && numObjects > 0) {
         loggers.server.warn(
@@ -3207,27 +2960,29 @@ router.get(
           "⚠️ RepoSize is 0 but there are pinned objects. This may indicate files are pinned but not yet stored locally."
         );
       }
-      
+
       const repoSizeMB = Math.round(totalSize / (1024 * 1024));
 
       // Get storage max from repo/stat response, or default to 10GB
       // Try multiple field names for StorageMax
       let storageMaxBytes = 0;
       if (storageDataObj.StorageMax !== undefined) {
-        storageMaxBytes = typeof storageDataObj.StorageMax === 'string'
-          ? parseInt(storageDataObj.StorageMax, 10) || (10240 * 1024 * 1024)
-          : storageDataObj.StorageMax || (10240 * 1024 * 1024);
+        storageMaxBytes =
+          typeof storageDataObj.StorageMax === "string"
+            ? parseInt(storageDataObj.StorageMax, 10) || 10240 * 1024 * 1024
+            : storageDataObj.StorageMax || 10240 * 1024 * 1024;
       } else if (storageDataObj.storageMax !== undefined) {
-        storageMaxBytes = typeof storageDataObj.storageMax === 'string'
-          ? parseInt(storageDataObj.storageMax, 10) || (10240 * 1024 * 1024)
-          : storageDataObj.storageMax || (10240 * 1024 * 1024);
+        storageMaxBytes =
+          typeof storageDataObj.storageMax === "string"
+            ? parseInt(storageDataObj.storageMax, 10) || 10240 * 1024 * 1024
+            : storageDataObj.storageMax || 10240 * 1024 * 1024;
       } else {
         storageMaxBytes = 10240 * 1024 * 1024; // Default 10GB in bytes
       }
-      
+
       const storageMaxMB = Math.round(storageMaxBytes / (1024 * 1024));
       const usagePercent = storageMaxMB > 0 ? Math.round((repoSizeMB / storageMaxMB) * 100) : 0;
-      
+
       loggers.server.debug(
         { totalSize, repoSizeMB, storageMaxMB, usagePercent, numObjects },
         "📊 IPFS storage statistics calculated"
@@ -3251,8 +3006,7 @@ router.get(
         },
       });
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       loggers.server.error({ err: error }, "❌ IPFS Repo Stat error");
       res.status(500).json({
         success: false,
@@ -3265,9 +3019,7 @@ router.get(
 // IPFS Version endpoint for connectivity testing (public)
 router.get("/version", async (req, res) => {
   try {
-    loggers.server.debug(
-      "🔍 Testing IPFS API connectivity via /version endpoint..."
-    );
+    loggers.server.debug("🔍 Testing IPFS API connectivity via /version endpoint...");
 
     const requestOptions = {
       hostname: "127.0.0.1",
@@ -3338,10 +3090,7 @@ router.get("/version", async (req, res) => {
     ipfsReq.end();
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    loggers.server.error(
-      { err: error },
-      "❌ IPFS API version unexpected error"
-    );
+    loggers.server.error({ err: error }, "❌ IPFS API version unexpected error");
     res.status(500).json({
       success: false,
       error: errorMessage,
@@ -3377,10 +3126,7 @@ router.get("/user-uploads/:userAddress", async (req, res) => {
     const uploads = await X402Merchant.getUserUploads(gun, userAddress);
 
     // Get subscription status
-    const subscription = await X402Merchant.getSubscriptionStatus(
-      gun,
-      userAddress
-    );
+    const subscription = await X402Merchant.getSubscriptionStatus(gun, userAddress);
 
     res.json({
       success: true,
@@ -3389,19 +3135,18 @@ router.get("/user-uploads/:userAddress", async (req, res) => {
         hash: upload.hash,
         name: upload.name,
         size: upload.size,
-        sizeMB:
-          upload.sizeMB || (upload.size ? upload.size / (1024 * 1024) : 0),
+        sizeMB: upload.sizeMB || (upload.size ? upload.size / (1024 * 1024) : 0),
         mimetype: upload.mimetype,
         uploadedAt: upload.uploadedAt,
       })),
       count: uploads.length,
       subscription: subscription.active
         ? {
-          tier: subscription.tier,
-          storageMB: subscription.storageMB,
-          storageUsedMB: subscription.storageUsedMB,
-          storageRemainingMB: subscription.storageRemainingMB,
-        }
+            tier: subscription.tier,
+            storageMB: subscription.storageMB,
+            storageUsedMB: subscription.storageUsedMB,
+            storageRemainingMB: subscription.storageRemainingMB,
+          }
         : null,
     });
   } catch (error: unknown) {
@@ -3445,8 +3190,7 @@ router.get("/user-uploads/:userAddress/:hash/view", async (req, res) => {
       uploadRecord.mimetype === "application/json" ||
       uploadRecord.mimetype === "text/plain" ||
       (uploadRecord.name &&
-        (uploadRecord.name.endsWith(".encrypted") ||
-          uploadRecord.name.endsWith(".enc")));
+        (uploadRecord.name.endsWith(".encrypted") || uploadRecord.name.endsWith(".enc")));
 
     // For encrypted files, we need to return as JSON so client can decrypt
     // For non-encrypted files, use the original mimetype
@@ -3477,8 +3221,7 @@ router.get("/user-uploads/:userAddress/:hash/view", async (req, res) => {
 
     const ipfsReq = http.request(requestOptions, (ipfsRes) => {
       // Set appropriate headers based on request (view vs download)
-      const isDownload =
-        req.query.download === "true" || req.query.dl === "true";
+      const isDownload = req.query.download === "true" || req.query.dl === "true";
 
       // For encrypted files, always return as JSON (client will decrypt)
       // For non-encrypted files, use original mimetype
@@ -3487,24 +3230,16 @@ router.get("/user-uploads/:userAddress/:hash/view", async (req, res) => {
         res.setHeader("Content-Type", "application/json");
         res.setHeader(
           "Content-Disposition",
-          isDownload
-            ? `attachment; filename="${filename}"`
-            : `inline; filename="${filename}"`
+          isDownload ? `attachment; filename="${filename}"` : `inline; filename="${filename}"`
         );
       } else {
         if (isDownload) {
           res.setHeader("Content-Type", mimetype);
-          res.setHeader(
-            "Content-Disposition",
-            `attachment; filename="${filename}"`
-          );
+          res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
         } else {
           // View in browser
           res.setHeader("Content-Type", mimetype);
-          res.setHeader(
-            "Content-Disposition",
-            `inline; filename="${filename}"`
-          );
+          res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
         }
       }
       res.setHeader("Cache-Control", "public, max-age=31536000"); // 1 year cache
@@ -3565,85 +3300,75 @@ router.get("/user-uploads/:userAddress/:hash/download", async (req, res) => {
 
 // Decrypt user uploaded file (for subscription files)
 // This endpoint verifies file ownership, then delegates to /cat/:cid/decrypt
-router.get(
-  "/user-uploads/:userAddress/:hash/decrypt",
-  async (req: Request, res: Response) => {
-    try {
-      const { userAddress, hash } = req.params;
-      const headerUserAddressRaw = req.headers["x-user-address"];
-      const headerUserAddress = Array.isArray(headerUserAddressRaw)
-        ? headerUserAddressRaw[0]
-        : headerUserAddressRaw;
+router.get("/user-uploads/:userAddress/:hash/decrypt", async (req: Request, res: Response) => {
+  try {
+    const { userAddress, hash } = req.params;
+    const headerUserAddressRaw = req.headers["x-user-address"];
+    const headerUserAddress = Array.isArray(headerUserAddressRaw)
+      ? headerUserAddressRaw[0]
+      : headerUserAddressRaw;
 
-      loggers.server.debug(
-        { hash, userAddress },
-        `🔓 User upload decrypt request`
-      );
+    loggers.server.debug({ hash, userAddress }, `🔓 User upload decrypt request`);
 
-      // Verify user address matches
-      if (
-        !headerUserAddress ||
-        typeof headerUserAddress !== "string" ||
-        headerUserAddress.toLowerCase() !== userAddress.toLowerCase()
-      ) {
-        return res.status(401).json({
-          success: false,
-          error: "Unauthorized - User address mismatch",
-        });
-      }
+    // Verify user address matches
+    if (
+      !headerUserAddress ||
+      typeof headerUserAddress !== "string" ||
+      headerUserAddress.toLowerCase() !== userAddress.toLowerCase()
+    ) {
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized - User address mismatch",
+      });
+    }
 
-      const gun = req.app.get("gunInstance");
-      if (!gun) {
-        return res.status(500).json({
-          success: false,
-          error: "Server error - Gun instance not available",
-        });
-      }
+    const gun = req.app.get("gunInstance");
+    if (!gun) {
+      return res.status(500).json({
+        success: false,
+        error: "Server error - Gun instance not available",
+      });
+    }
 
-      // Get uploads to verify file belongs to user
-      const uploads = await X402Merchant.getUserUploads(gun, userAddress);
-      const uploadRecord = uploads.find((u) => u.hash === hash);
+    // Get uploads to verify file belongs to user
+    const uploads = await X402Merchant.getUserUploads(gun, userAddress);
+    const uploadRecord = uploads.find((u) => u.hash === hash);
 
-      if (!uploadRecord) {
-        return res.status(404).json({
-          success: false,
-          error: "File not found for this user",
-        });
-      }
+    if (!uploadRecord) {
+      return res.status(404).json({
+        success: false,
+        error: "File not found for this user",
+      });
+    }
 
-      // File ownership verified, redirect to /cat/:cid/decrypt endpoint
-      // which already handles IPFS retrieval and decryption properly
-      loggers.server.debug(
-        { hash },
-        `✅ File ownership verified, redirecting to /cat/:cid/decrypt`
-      );
+    // File ownership verified, redirect to /cat/:cid/decrypt endpoint
+    // which already handles IPFS retrieval and decryption properly
+    loggers.server.debug({ hash }, `✅ File ownership verified, redirecting to /cat/:cid/decrypt`);
 
-      // Redirect to the cat decrypt endpoint with same query params
-      const queryParams: Record<string, string> = {};
-      for (const [key, value] of Object.entries(req.query)) {
-        if (typeof value === "string") {
-          queryParams[key] = value;
-        } else if (Array.isArray(value) && value.length > 0) {
-          queryParams[key] = String(value[0]);
-        }
-      }
-      const queryString = new URLSearchParams(queryParams).toString();
-      const redirectUrl = `/api/v1/ipfs/cat/${hash}/decrypt${queryString ? `?${queryString}` : ""}`;
-
-      return res.redirect(redirectUrl);
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      loggers.server.error({ err: error }, "❌ User upload decrypt error");
-      if (!res.headersSent) {
-        res.status(500).json({
-          success: false,
-          error: errorMessage,
-        });
+    // Redirect to the cat decrypt endpoint with same query params
+    const queryParams: Record<string, string> = {};
+    for (const [key, value] of Object.entries(req.query)) {
+      if (typeof value === "string") {
+        queryParams[key] = value;
+      } else if (Array.isArray(value) && value.length > 0) {
+        queryParams[key] = String(value[0]);
       }
     }
+    const queryString = new URLSearchParams(queryParams).toString();
+    const redirectUrl = `/api/v1/ipfs/cat/${hash}/decrypt${queryString ? `?${queryString}` : ""}`;
+
+    return res.redirect(redirectUrl);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    loggers.server.error({ err: error }, "❌ User upload decrypt error");
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: errorMessage,
+      });
+    }
   }
-);
+});
 
 // Delete/unpin user file (for x402 subscription users)
 router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
@@ -3683,10 +3408,7 @@ router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
     }
 
     // Get subscription status to verify user has active subscription
-    const subscription = await X402Merchant.getSubscriptionStatus(
-      gun,
-      userAddress
-    );
+    const subscription = await X402Merchant.getSubscriptionStatus(gun, userAddress);
     if (!subscription.active) {
       return res.status(403).json({
         success: false,
@@ -3706,8 +3428,7 @@ router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
     }
 
     const fileSizeMB =
-      uploadRecord.sizeMB ||
-      (uploadRecord.size ? uploadRecord.size / (1024 * 1024) : 0);
+      uploadRecord.sizeMB || (uploadRecord.size ? uploadRecord.size / (1024 * 1024) : 0);
 
     // Step 1: Unpin from IPFS
     loggers.server.info({ hash }, `📌 Unpinning from IPFS`);
@@ -3765,25 +3486,15 @@ router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
       await X402Merchant.deleteUploadRecord(userAddress, hash);
       loggers.server.info({ hash }, `✅ Upload record deleted`);
     } catch (deleteError: unknown) {
-      loggers.server.warn(
-        { err: deleteError, hash },
-        `⚠️ Failed to delete upload record`
-      );
+      loggers.server.warn({ err: deleteError, hash }, `⚠️ Failed to delete upload record`);
     }
 
     // Step 3: Update storage usage (subtract file size)
-    loggers.server.info(
-      { hash, fileSizeMB: fileSizeMB.toFixed(2) },
-      `📊 Updating storage usage`
-    );
+    loggers.server.info({ hash, fileSizeMB: fileSizeMB.toFixed(2) }, `📊 Updating storage usage`);
 
     try {
       // Use centralized method for consistency
-      const updateResult = await X402Merchant.updateStorageUsage(
-        gun,
-        userAddress,
-        -fileSizeMB
-      );
+      const updateResult = await X402Merchant.updateStorageUsage(gun, userAddress, -fileSizeMB);
       loggers.server.info(
         {
           storageUsedMB: updateResult.storageUsedMB.toFixed(2),
@@ -3793,28 +3504,16 @@ router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
       );
     } catch (updateError: unknown) {
       // If subscription is not active, this is expected - just log warning
-      const errorMessage =
-        updateError instanceof Error
-          ? updateError.message
-          : String(updateError);
+      const errorMessage = updateError instanceof Error ? updateError.message : String(updateError);
       if (errorMessage.includes("No active subscription")) {
-        loggers.server.info(
-          { userAddress },
-          `ℹ️ No active subscription, skipping storage update`
-        );
+        loggers.server.info({ userAddress }, `ℹ️ No active subscription, skipping storage update`);
       } else {
-        loggers.server.warn(
-          { err: updateError },
-          `⚠️ Failed to update storage`
-        );
+        loggers.server.warn({ err: updateError }, `⚠️ Failed to update storage`);
       }
     }
 
     // Get updated subscription status
-    const updatedSubscription = await X402Merchant.getSubscriptionStatus(
-      gun,
-      userAddress
-    );
+    const updatedSubscription = await X402Merchant.getSubscriptionStatus(gun, userAddress);
 
     res.json({
       success: true,
@@ -3823,9 +3522,9 @@ router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
       unpin: unpinResult,
       subscription: updatedSubscription.active
         ? {
-          storageUsedMB: updatedSubscription.storageUsedMB,
-          storageRemainingMB: updatedSubscription.storageRemainingMB,
-        }
+            storageUsedMB: updatedSubscription.storageUsedMB,
+            storageRemainingMB: updatedSubscription.storageRemainingMB,
+          }
         : null,
     });
   } catch (error: unknown) {

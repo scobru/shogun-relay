@@ -16,10 +16,7 @@ import * as Reputation from "../utils/relay-reputation";
 import * as FrozenData from "../utils/frozen-data";
 import * as StorageDeals from "../utils/storage-deals";
 import { getRelayUser, getRelayKeyPair } from "../utils/relay-user";
-import {
-  createRegistryClient,
-  REGISTRY_ADDRESSES,
-} from "../utils/registry-client";
+import { createRegistryClient, REGISTRY_ADDRESSES } from "../utils/registry-client";
 import { authConfig, blockchainConfig, relayConfig } from "../config";
 import { loggers } from "../utils/logger";
 
@@ -54,9 +51,7 @@ router.get("/relays", async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(500)
-        .json({ success: false, error: "Gun instance not available" });
+      return res.status(500).json({ success: false, error: "Gun instance not available" });
     }
 
     const relays: {
@@ -70,8 +65,7 @@ router.get("/relays", async (req, res) => {
       storage: any;
     }[] = [];
     const timeout = parseInt(String(req.query.timeout)) || 5000;
-    const minLastSeen =
-      Date.now() - (parseInt(String(req.query.maxAge)) || 300000); // Default 5 min
+    const minLastSeen = Date.now() - (parseInt(String(req.query.maxAge)) || 300000); // Default 5 min
 
     // GunDB native: read all relays from the synced namespace
     await new Promise((resolve) => {
@@ -141,9 +135,7 @@ router.get("/relay/:host", async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(500)
-        .json({ success: false, error: "Gun instance not available" });
+      return res.status(500).json({ success: false, error: "Gun instance not available" });
     }
 
     const { host } = req.params;
@@ -188,9 +180,7 @@ router.get("/stats", async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(500)
-        .json({ success: false, error: "Gun instance not available" });
+      return res.status(500).json({ success: false, error: "Gun instance not available" });
     }
 
     const stats = {
@@ -232,10 +222,7 @@ router.get("/stats", async (req, res) => {
           );
 
           if (!data || typeof data !== "object") {
-            loggers.server.warn(
-              { host },
-              `   ⚠️ Invalid data for relay ${host}`
-            );
+            loggers.server.warn({ host }, `   ⚠️ Invalid data for relay ${host}`);
             return;
           }
 
@@ -272,25 +259,17 @@ router.get("/stats", async (req, res) => {
                   `   💾 IPFS stats: ${repoSize} bytes, ${numPins} pins`
                 );
               } else {
-                loggers.server.warn(
-                  { host },
-                  `   ⚠️ No IPFS stats for ${host}`
-                );
+                loggers.server.warn({ host }, `   ⚠️ No IPFS stats for ${host}`);
               }
             } else {
-              const age = pulse.timestamp
-                ? Date.now() - pulse.timestamp
-                : "no timestamp";
+              const age = pulse.timestamp ? Date.now() - pulse.timestamp : "no timestamp";
               loggers.server.debug(
                 { host, age },
                 `   ⏰ Relay ${host} pulse too old (${age}ms ago)`
               );
             }
           } else {
-            loggers.server.warn(
-              { host },
-              `   ⚠️ No pulse data for relay ${host}`
-            );
+            loggers.server.warn({ host }, `   ⚠️ No pulse data for relay ${host}`);
           }
         });
 
@@ -309,14 +288,10 @@ router.get("/stats", async (req, res) => {
     loggers.server.info(`📊 Syncing deals from GunDB (retroactive)...`);
     try {
       // List all frozen deal entries
-      const frozenEntries = await FrozenData.listFrozenEntries(
-        gun,
-        "storage-deals",
-        {
-          verifyAll: true, // Get full deal data, not just index
-          limit: 1000,
-        }
-      );
+      const frozenEntries = await FrozenData.listFrozenEntries(gun, "storage-deals", {
+        verifyAll: true, // Get full deal data, not just index
+        limit: 1000,
+      });
 
       const allDeals: StorageDeals.Deal[] = [];
       const dealMap = new Map<string, StorageDeals.Deal>(); // Use map to deduplicate by deal ID
@@ -350,24 +325,18 @@ router.get("/stats", async (req, res) => {
       const REGISTRY_CHAIN_ID = blockchainConfig.registryChainId;
 
       if (RELAY_PRIVATE_KEY && REGISTRY_CHAIN_ID && allDeals.length === 0) {
-        loggers.server.info(
-          `   🔗 No deals in GunDB, checking on-chain registry as fallback...`
-        );
+        loggers.server.info(`   🔗 No deals in GunDB, checking on-chain registry as fallback...`);
         try {
-          const {
-            createStorageDealRegistryClient,
-            createRegistryClientWithSigner,
-          } = await import("../utils/registry-client.js");
+          const { createStorageDealRegistryClient, createRegistryClientWithSigner } =
+            await import("../utils/registry-client.js");
           const registryClient = createRegistryClientWithSigner(
             RELAY_PRIVATE_KEY,
             REGISTRY_CHAIN_ID
           );
           const relayAddress = registryClient.wallet.address;
-          const storageDealRegistryClient =
-            createStorageDealRegistryClient(REGISTRY_CHAIN_ID);
+          const storageDealRegistryClient = createStorageDealRegistryClient(REGISTRY_CHAIN_ID);
 
-          const onChainDeals =
-            await storageDealRegistryClient.getRelayDeals(relayAddress);
+          const onChainDeals = await storageDealRegistryClient.getRelayDeals(relayAddress);
           loggers.server.info(
             { dealCount: onChainDeals.length },
             `   📋 Found ${onChainDeals.length} deals on-chain`
@@ -375,10 +344,7 @@ router.get("/stats", async (req, res) => {
 
           // Convert on-chain deals to GunDB format for stats calculation
           for (const onChainDeal of onChainDeals) {
-            if (
-              onChainDeal.active &&
-              new Date(onChainDeal.expiresAt) > new Date()
-            ) {
+            if (onChainDeal.active && new Date(onChainDeal.expiresAt) > new Date()) {
               const deal: StorageDeals.Deal = {
                 id: onChainDeal.dealId,
                 version: 1,
@@ -423,9 +389,7 @@ router.get("/stats", async (req, res) => {
           }
         } catch (onChainError) {
           const errorMessage =
-            onChainError instanceof Error
-              ? onChainError.message
-              : String(onChainError);
+            onChainError instanceof Error ? onChainError.message : String(onChainError);
           loggers.server.warn(
             { err: onChainError },
             `   ⚠️ Error fetching on-chain deals: ${errorMessage}`
@@ -462,10 +426,8 @@ router.get("/stats", async (req, res) => {
         `   ✅ Deals synced: ${stats.totalActiveDeals} active, ${stats.totalDealStorageMB} MB, ${activeDealCids.size} unique CIDs`
       );
     } catch (dealError) {
-      const errorMessage =
-        dealError instanceof Error ? dealError.message : String(dealError);
-      const errorStack =
-        dealError instanceof Error ? dealError.stack : undefined;
+      const errorMessage = dealError instanceof Error ? dealError.message : String(dealError);
+      const errorStack = dealError instanceof Error ? dealError.stack : undefined;
       loggers.server.warn(
         { err: dealError, stack: errorStack },
         `   ⚠️ Error syncing deals: ${errorMessage}`
@@ -480,8 +442,7 @@ router.get("/stats", async (req, res) => {
     try {
       const relayUser = getRelayUser();
       if (relayUser) {
-        const subscriptions: Array<{ expiresAt?: number; storageMB?: number }> =
-          [];
+        const subscriptions: Array<{ expiresAt?: number; storageMB?: number }> = [];
         await new Promise<void>((resolve) => {
           const timer = setTimeout(() => resolve(), 5000);
 
@@ -500,9 +461,7 @@ router.get("/stats", async (req, res) => {
                 });
 
                 if (cleanData.expiresAt && Date.now() < cleanData.expiresAt) {
-                  subscriptions.push(
-                    cleanData as { expiresAt: number; storageMB?: number }
-                  );
+                  subscriptions.push(cleanData as { expiresAt: number; storageMB?: number });
                 }
               }
             });
@@ -534,19 +493,13 @@ router.get("/stats", async (req, res) => {
         );
       }
     } catch (subError) {
-      const errorMessage =
-        subError instanceof Error ? subError.message : String(subError);
-      loggers.server.warn(
-        { err: subError },
-        `   ⚠️ Error syncing subscriptions: ${errorMessage}`
-      );
+      const errorMessage = subError instanceof Error ? subError.message : String(subError);
+      loggers.server.warn({ err: subError }, `   ⚠️ Error syncing subscriptions: ${errorMessage}`);
     }
 
     // STEP 4: If pulse data is missing/old, try to sync directly from IPFS for this relay
     if (stats.totalStorageBytes === 0 && stats.totalPins === 0) {
-      loggers.server.info(
-        `📊 Pulse data missing/old, syncing directly from IPFS...`
-      );
+      loggers.server.info(`📊 Pulse data missing/old, syncing directly from IPFS...`);
       try {
         // Get IPFS repo stats
         const repoStats = await ipfsRequest("/api/v0/repo/stat");
@@ -555,18 +508,15 @@ router.get("/stats", async (req, res) => {
           let repoSize = 0;
           if ("RepoSize" in repoStats) {
             const size = (repoStats as { RepoSize?: number | string }).RepoSize;
-            repoSize = typeof size === 'string' ? parseInt(size, 10) || 0 : size || 0;
+            repoSize = typeof size === "string" ? parseInt(size, 10) || 0 : size || 0;
           } else if ("repoSize" in repoStats) {
             const size = (repoStats as { repoSize?: number | string }).repoSize;
-            repoSize = typeof size === 'string' ? parseInt(size, 10) || 0 : size || 0;
+            repoSize = typeof size === "string" ? parseInt(size, 10) || 0 : size || 0;
           }
-          
+
           if (repoSize > 0) {
             stats.totalStorageBytes += repoSize;
-            loggers.server.info(
-              { repoSize },
-              `   ✅ IPFS repo size: ${repoSize} bytes`
-            );
+            loggers.server.info({ repoSize }, `   ✅ IPFS repo size: ${repoSize} bytes`);
           }
         }
 
@@ -583,56 +533,41 @@ router.get("/stats", async (req, res) => {
           }
         }
       } catch (ipfsError) {
-        const errorMessage =
-          ipfsError instanceof Error ? ipfsError.message : String(ipfsError);
-        loggers.server.warn(
-          { err: ipfsError },
-          `   ⚠️ Error syncing from IPFS: ${errorMessage}`
-        );
+        const errorMessage = ipfsError instanceof Error ? ipfsError.message : String(ipfsError);
+        loggers.server.warn({ err: ipfsError }, `   ⚠️ Error syncing from IPFS: ${errorMessage}`);
       }
     }
 
-    loggers.server.info(
-      { stats },
-      `📊 Final network stats (with retroactive sync):`,
-      {
-        totalRelays: stats.totalRelays,
-        activeRelays: stats.activeRelays,
-        totalConnections: stats.totalConnections,
-        totalStorageBytes: stats.totalStorageBytes,
-        totalPins: stats.totalPins,
-        totalActiveDeals: stats.totalActiveDeals,
-        totalActiveSubscriptions: stats.totalActiveSubscriptions,
-        totalDealStorageMB: stats.totalDealStorageMB,
-        totalSubscriptionStorageMB: stats.totalSubscriptionStorageMB,
-      }
-    );
+    loggers.server.info({ stats }, `📊 Final network stats (with retroactive sync):`, {
+      totalRelays: stats.totalRelays,
+      activeRelays: stats.activeRelays,
+      totalConnections: stats.totalConnections,
+      totalStorageBytes: stats.totalStorageBytes,
+      totalPins: stats.totalPins,
+      totalActiveDeals: stats.totalActiveDeals,
+      totalActiveSubscriptions: stats.totalActiveSubscriptions,
+      totalDealStorageMB: stats.totalDealStorageMB,
+      totalSubscriptionStorageMB: stats.totalSubscriptionStorageMB,
+    });
 
     res.json({
       success: true,
       stats: {
         ...stats,
         totalStorageMB: Math.round(stats.totalStorageBytes / (1024 * 1024)),
-        totalStorageGB: (
-          stats.totalStorageBytes /
-          (1024 * 1024 * 1024)
-        ).toFixed(2),
+        totalStorageGB: (stats.totalStorageBytes / (1024 * 1024 * 1024)).toFixed(2),
       },
       timestamp: Date.now(),
       debug: {
         relaysFound: relaysFound.length,
-        relaysWithPulse: relaysFound.filter(
-          (r: { host: any; hasPulse: boolean }) => r.hasPulse
-        ).length,
+        relaysWithPulse: relaysFound.filter((r: { host: any; hasPulse: boolean }) => r.hasPulse)
+          .length,
         sources: {
           pulse: stats.activeRelays > 0 ? "pulse data" : "missing/old",
           deals: stats.totalActiveDeals > 0 ? "GunDB deals" : "none",
-          subscriptions:
-            stats.totalActiveSubscriptions > 0 ? "GunDB subscriptions" : "none",
+          subscriptions: stats.totalActiveSubscriptions > 0 ? "GunDB subscriptions" : "none",
           ipfsDirect:
-            stats.totalStorageBytes > 0 && stats.activeRelays === 0
-              ? "IPFS direct"
-              : "not used",
+            stats.totalStorageBytes > 0 && stats.activeRelays === 0 ? "IPFS direct" : "not used",
         },
       },
     });
@@ -657,8 +592,7 @@ router.get("/proof/:cid", async (req, res) => {
   const startTime = Date.now();
   try {
     const { cid } = req.params;
-    const challenge =
-      req.query.challenge || crypto.randomBytes(16).toString("hex");
+    const challenge = req.query.challenge || crypto.randomBytes(16).toString("hex");
 
     // 1. Verify CID exists locally via IPFS block/stat
     let blockStat: {
@@ -691,8 +625,7 @@ router.get("/proof/:cid", async (req, res) => {
         });
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       return res.status(404).json({
         success: false,
         error: "CID not available",
@@ -728,18 +661,12 @@ router.get("/proof/:cid", async (req, res) => {
     // 4. Generate proof
     const timestamp = Date.now();
     const proofData = `${cid}:${challenge}:${timestamp}:${blockStat.Size || 0}`;
-    const proofHash = crypto
-      .createHash("sha256")
-      .update(proofData)
-      .digest("hex");
+    const proofHash = crypto.createHash("sha256").update(proofData).digest("hex");
 
     // 5. Sign with relay identity if available
     const relayPub = req.app.get("relayUserPub");
     const gun = req.app.get("gunInstance");
-    const host =
-      relayConfig.endpoint ||
-      req.headers.host ||
-      "localhost";
+    const host = relayConfig.endpoint || req.headers.host || "localhost";
     const responseTime = Date.now() - startTime;
 
     // Record successful proof for reputation tracking
@@ -784,10 +711,7 @@ router.get("/proof/:cid", async (req, res) => {
 
     // Record failed proof for reputation tracking
     const gun = req.app.get("gunInstance");
-    const host =
-      relayConfig.endpoint ||
-      req.headers.host ||
-      "localhost";
+    const host = relayConfig.endpoint || req.headers.host || "localhost";
     if (gun && host) {
       try {
         const keyPair = getSigningKeyPair();
@@ -816,16 +740,8 @@ router.post("/verify-proof", express.json(), (req, res) => {
   try {
     const { proof } = req.body;
 
-    if (
-      !proof ||
-      !proof.cid ||
-      !proof.challenge ||
-      !proof.timestamp ||
-      !proof.proofHash
-    ) {
-      return res
-        .status(400)
-        .json({ success: false, error: "Invalid proof format" });
+    if (!proof || !proof.cid || !proof.challenge || !proof.timestamp || !proof.proofHash) {
+      return res.status(400).json({ success: false, error: "Invalid proof format" });
     }
 
     // Check expiration
@@ -839,10 +755,7 @@ router.post("/verify-proof", express.json(), (req, res) => {
 
     // Recalculate hash
     const proofData = `${proof.cid}:${proof.challenge}:${proof.timestamp}:${proof.block.size}`;
-    const expectedHash = crypto
-      .createHash("sha256")
-      .update(proofData)
-      .digest("hex");
+    const expectedHash = crypto.createHash("sha256").update(proofData).digest("hex");
 
     const isValid = expectedHash === proof.proofHash;
 
@@ -890,9 +803,7 @@ router.post("/pin-request", express.json(), async (req, res) => {
 
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(500)
-        .json({ success: false, error: "Gun instance not available" });
+      return res.status(500).json({ success: false, error: "Gun instance not available" });
     }
 
     const { cid, replicationFactor = 3, priority = "normal" } = req.body;
@@ -915,11 +826,7 @@ router.post("/pin-request", express.json(), async (req, res) => {
       status: "pending",
     };
 
-    gun
-      .get("shogun-network")
-      .get("pin-requests")
-      .get(requestId)
-      .put(pinRequest);
+    gun.get("shogun-network").get("pin-requests").get(requestId).put(pinRequest);
 
     loggers.server.info(
       { cid, replicationFactor },
@@ -946,16 +853,12 @@ router.get("/pin-requests", async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(500)
-        .json({ success: false, error: "Gun instance not available" });
+      return res.status(500).json({ success: false, error: "Gun instance not available" });
     }
 
     const requests: any[] = [];
     const maxAgeParam =
-      typeof req.query.maxAge === "string"
-        ? req.query.maxAge
-        : String(req.query.maxAge || "");
+      typeof req.query.maxAge === "string" ? req.query.maxAge : String(req.query.maxAge || "");
     const maxAge = Date.now() - (parseInt(maxAgeParam) || 86400000); // 24h default
 
     await new Promise<void>((resolve) => {
@@ -1000,17 +903,13 @@ router.post("/pin-response", express.json(), async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(500)
-        .json({ success: false, error: "Gun instance not available" });
+      return res.status(500).json({ success: false, error: "Gun instance not available" });
     }
 
     const { requestId, status = "completed" } = req.body;
 
     if (!requestId) {
-      return res
-        .status(400)
-        .json({ success: false, error: "requestId required" });
+      return res.status(400).json({ success: false, error: "requestId required" });
     }
 
     const relayPub = req.app.get("relayUserPub");
@@ -1024,11 +923,7 @@ router.post("/pin-response", express.json(), async (req, res) => {
       timestamp: Date.now(),
     };
 
-    gun
-      .get("shogun-network")
-      .get("pin-responses")
-      .get(responseId)
-      .put(response);
+    gun.get("shogun-network").get("pin-responses").get(responseId).put(response);
 
     loggers.server.info(
       { requestId, status },
@@ -1058,9 +953,7 @@ router.get("/reputation/:host", async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(500)
-        .json({ success: false, error: "Gun instance not available" });
+      return res.status(500).json({ success: false, error: "Gun instance not available" });
     }
 
     let { host } = req.params;
@@ -1121,34 +1014,24 @@ router.get("/reputation/:host", async (req, res) => {
         success: false,
         error: "Relay not found or no reputation data",
         host: normalizedHost,
-        searchedHosts: [normalizedHost, host].filter(
-          (h, i, Array) => Array.indexOf(h) === i
-        ),
+        searchedHosts: [normalizedHost, host].filter((h, i, Array) => Array.indexOf(h) === i),
         hint: "Reputation may not be initialized yet. The relay needs to send pulses to build reputation data.",
       });
     }
 
     // Ensure uptimePercent and proofSuccessRate are always present
-    if (
-      reputation.uptimePercent === undefined ||
-      reputation.uptimePercent === null
-    ) {
+    if (reputation.uptimePercent === undefined || reputation.uptimePercent === null) {
       reputation.uptimePercent =
-        reputation.receivedPulses &&
-          reputation.expectedPulses &&
-          reputation.expectedPulses > 0
+        reputation.receivedPulses && reputation.expectedPulses && reputation.expectedPulses > 0
           ? (reputation.receivedPulses / reputation.expectedPulses) * 100
           : undefined;
     }
 
-    if (
-      reputation.proofSuccessRate === undefined ||
-      reputation.proofSuccessRate === null
-    ) {
+    if (reputation.proofSuccessRate === undefined || reputation.proofSuccessRate === null) {
       reputation.proofSuccessRate =
         reputation.proofsTotal &&
-          reputation.proofsTotal > 0 &&
-          reputation.proofsSuccessful !== undefined
+        reputation.proofsTotal > 0 &&
+        reputation.proofsSuccessful !== undefined
           ? (reputation.proofsSuccessful / reputation.proofsTotal) * 100
           : undefined;
     }
@@ -1173,21 +1056,16 @@ router.get("/reputation", async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(500)
-        .json({ success: false, error: "Gun instance not available" });
+      return res.status(500).json({ success: false, error: "Gun instance not available" });
     }
 
     const minScoreParam =
       typeof req.query.minScore === "string"
         ? req.query.minScore
         : String(req.query.minScore || "");
-    const tierParam =
-      typeof req.query.tier === "string" ? req.query.tier : null;
+    const tierParam = typeof req.query.tier === "string" ? req.query.tier : null;
     const limitParam =
-      typeof req.query.limit === "string"
-        ? req.query.limit
-        : String(req.query.limit || "");
+      typeof req.query.limit === "string" ? req.query.limit : String(req.query.limit || "");
 
     const options = {
       minScore: parseFloat(minScoreParam) || 0,
@@ -1219,9 +1097,7 @@ router.post("/reputation/record-proof", express.json(), async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(500)
-        .json({ success: false, error: "Gun instance not available" });
+      return res.status(500).json({ success: false, error: "Gun instance not available" });
     }
 
     const { host, success, responseTimeMs = 0 } = req.body;
@@ -1258,21 +1134,16 @@ router.get("/best-relays", async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(500)
-        .json({ success: false, error: "Gun instance not available" });
+      return res.status(500).json({ success: false, error: "Gun instance not available" });
     }
 
     const countParam =
-      typeof req.query.count === "string"
-        ? req.query.count
-        : String(req.query.count || "");
+      typeof req.query.count === "string" ? req.query.count : String(req.query.count || "");
     const minScoreParam =
       typeof req.query.minScore === "string"
         ? req.query.minScore
         : String(req.query.minScore || "");
-    const excludeHostParam =
-      typeof req.query.exclude === "string" ? req.query.exclude : null;
+    const excludeHostParam = typeof req.query.exclude === "string" ? req.query.exclude : null;
     const count = parseInt(countParam) || 3;
     const minScore = parseFloat(minScoreParam) || 50;
     const excludeHost = excludeHostParam;
@@ -1321,32 +1192,22 @@ router.get("/verified/relays", async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(500)
-        .json({ success: false, error: "Gun instance not available" });
+      return res.status(500).json({ success: false, error: "Gun instance not available" });
     }
 
     const verifyAll = req.query.verify !== "false";
     const maxAgeParam =
-      typeof req.query.maxAge === "string"
-        ? req.query.maxAge
-        : String(req.query.maxAge || "");
+      typeof req.query.maxAge === "string" ? req.query.maxAge : String(req.query.maxAge || "");
     const limitParam =
-      typeof req.query.limit === "string"
-        ? req.query.limit
-        : String(req.query.limit || "");
+      typeof req.query.limit === "string" ? req.query.limit : String(req.query.limit || "");
     const maxAge = parseInt(maxAgeParam) || 600000; // 10 min default
     const limit = parseInt(limitParam) || 50;
 
-    const entries = await FrozenData.listFrozenEntries(
-      gun,
-      "relay-announcements",
-      {
-        verifyAll,
-        maxAge,
-        limit,
-      }
-    );
+    const entries = await FrozenData.listFrozenEntries(gun, "relay-announcements", {
+      verifyAll,
+      maxAge,
+      limit,
+    });
 
     res.json({
       success: true,
@@ -1379,17 +1240,11 @@ router.get("/verified/relay/:host", async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(500)
-        .json({ success: false, error: "Gun instance not available" });
+      return res.status(500).json({ success: false, error: "Gun instance not available" });
     }
 
     const { host } = req.params;
-    const entry = await FrozenData.getLatestFrozenEntry(
-      gun,
-      "relay-announcements",
-      host
-    );
+    const entry = await FrozenData.getLatestFrozenEntry(gun, "relay-announcements", host);
 
     if (!entry) {
       return res.status(404).json({
@@ -1425,9 +1280,7 @@ router.post("/verified/observation", express.json(), async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(500)
-        .json({ success: false, error: "Gun instance not available" });
+      return res.status(500).json({ success: false, error: "Gun instance not available" });
     }
 
     const relayUser = getRelayUser();
@@ -1502,16 +1355,12 @@ router.get("/verified/observations/:host", async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(500)
-        .json({ success: false, error: "Gun instance not available" });
+      return res.status(500).json({ success: false, error: "Gun instance not available" });
     }
 
     const { host } = req.params;
     const limitParam =
-      typeof req.query.limit === "string"
-        ? req.query.limit
-        : String(req.query.limit || "");
+      typeof req.query.limit === "string" ? req.query.limit : String(req.query.limit || "");
     const observations = await FrozenData.getObservationsForHost(gun, host, {
       verifyAll: true,
       limit: parseInt(limitParam) || 50,
@@ -1543,9 +1392,7 @@ router.get("/verified/entry/:namespace/:hash", async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
-      return res
-        .status(500)
-        .json({ success: false, error: "Gun instance not available" });
+      return res.status(500).json({ success: false, error: "Gun instance not available" });
     }
 
     const { namespace, hash } = req.params;
@@ -1590,9 +1437,7 @@ router.get("/verified/entry/:namespace/:hash", async (req, res) => {
 router.get("/onchain/relays", async (req, res) => {
   try {
     const chainIdParam =
-      typeof req.query.chainId === "string"
-        ? req.query.chainId
-        : String(req.query.chainId || "");
+      typeof req.query.chainId === "string" ? req.query.chainId : String(req.query.chainId || "");
     const chainId = parseInt(chainIdParam) || 84532; // Default to Base Sepolia
 
     if (!REGISTRY_ADDRESSES[chainId]) {
@@ -1631,9 +1476,7 @@ router.get("/onchain/relays", async (req, res) => {
 router.get("/onchain/relay/:address", async (req, res) => {
   try {
     const chainIdParam =
-      typeof req.query.chainId === "string"
-        ? req.query.chainId
-        : String(req.query.chainId || "");
+      typeof req.query.chainId === "string" ? req.query.chainId : String(req.query.chainId || "");
     const chainId = parseInt(chainIdParam) || 84532;
     const { address } = req.params;
 
@@ -1674,9 +1517,7 @@ router.get("/onchain/relay/:address", async (req, res) => {
 router.get("/onchain/deals/relay/:address", async (req, res) => {
   try {
     const chainIdParam =
-      typeof req.query.chainId === "string"
-        ? req.query.chainId
-        : String(req.query.chainId || "");
+      typeof req.query.chainId === "string" ? req.query.chainId : String(req.query.chainId || "");
     const chainId = parseInt(chainIdParam) || 84532;
     const { address } = req.params;
 
@@ -1704,9 +1545,7 @@ router.get("/onchain/deals/relay/:address", async (req, res) => {
 router.get("/onchain/deals/client/:address", async (req, res) => {
   try {
     const chainIdParam =
-      typeof req.query.chainId === "string"
-        ? req.query.chainId
-        : String(req.query.chainId || "");
+      typeof req.query.chainId === "string" ? req.query.chainId : String(req.query.chainId || "");
     const chainId = parseInt(chainIdParam) || 84532;
     const { address } = req.params;
 
@@ -1734,9 +1573,7 @@ router.get("/onchain/deals/client/:address", async (req, res) => {
 router.get("/onchain/params", async (req, res) => {
   try {
     const chainIdParam =
-      typeof req.query.chainId === "string"
-        ? req.query.chainId
-        : String(req.query.chainId || "");
+      typeof req.query.chainId === "string" ? req.query.chainId : String(req.query.chainId || "");
     const chainId = parseInt(chainIdParam) || 84532;
 
     if (!REGISTRY_ADDRESSES[chainId]) {

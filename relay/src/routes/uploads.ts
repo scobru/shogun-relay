@@ -103,10 +103,7 @@ async function getAllSystemHashes(req: any): Promise<Array<string>> {
           }
 
           if (completedUsers === totalUsers) {
-            loggers.uploads.info(
-              { count: allHashes.length },
-              "Found system hashes"
-            );
+            loggers.uploads.info({ count: allHashes.length }, "Found system hashes");
             resolve(allHashes);
           }
         });
@@ -139,8 +136,7 @@ async function deleteUploadAndUpdateMB(
           // Use centralized helper for MB usage update
           (async () => {
             try {
-              const { updateMBUsage } =
-                await import("../utils/storage-utils.js");
+              const { updateMBUsage } = await import("../utils/storage-utils.js");
               const newMB = await updateMBUsage(gun, userAddress, -fileSizeMB);
               resolve(newMB);
             } catch (error: any) {
@@ -206,10 +202,7 @@ router.get("/system-hashes-map", async (req, res) => {
       systemHashesNode.once(async (systemHashesData: any) => {
         clearTimeout(timeoutId);
 
-        loggers.uploads.debug(
-          { systemHashesData },
-          "Raw systemHashesData from Gun"
-        );
+        loggers.uploads.debug({ systemHashesData }, "Raw systemHashesData from Gun");
 
         if (!systemHashesData || typeof systemHashesData !== "object") {
           loggers.uploads.warn("No system hashes found, returning empty map");
@@ -222,10 +215,7 @@ router.get("/system-hashes-map", async (req, res) => {
           (key) => key !== "_" && key !== "#" && key !== ">" && key !== "<"
         );
 
-        loggers.uploads.info(
-          { count: hashKeys.length, keys: hashKeys },
-          "Found hash keys"
-        );
+        loggers.uploads.info({ count: hashKeys.length, keys: hashKeys }, "Found hash keys");
 
         if (hashKeys.length === 0) {
           loggers.uploads.warn("No hashes to process");
@@ -300,9 +290,7 @@ router.post(
       next();
     } else {
       loggers.uploads.warn({ adminToken }, "Auth failed - Admin token");
-      res
-        .status(401)
-        .json({ success: false, error: "Unauthorized - Admin token required" });
+      res.status(401).json({ success: false, error: "Unauthorized - Admin token required" });
     }
   },
   async (req, res) => {
@@ -326,10 +314,7 @@ router.post(
         });
       }
 
-      loggers.uploads.info(
-        { hash, userAddress },
-        "Saving hash to systemhash node"
-      );
+      loggers.uploads.info({ hash, userAddress }, "Saving hash to systemhash node");
 
       const gun = getGunInstance(req);
       if (!gun) {
@@ -381,10 +366,7 @@ router.post(
 
         systemHashesNode.get(hash).put(hashRecord, (ack: any) => {
           if (ack && ack.err) {
-            loggers.uploads.error(
-              { err: ack.err },
-              "Error saving hash to systemhash node"
-            );
+            loggers.uploads.error({ err: ack.err }, "Error saving hash to systemhash node");
             reject(new Error(ack.err));
           } else {
             loggers.uploads.info(
@@ -434,9 +416,7 @@ router.delete(
         "Auth failed - Admin token:",
         adminToken ? "provided" : ("missing" as any)
       );
-      res
-        .status(401)
-        .json({ success: false, error: "Unauthorized - Admin token required" });
+      res.status(401).json({ success: false, error: "Unauthorized - Admin token required" });
     }
   },
   async (req, res) => {
@@ -467,15 +447,10 @@ router.delete(
 
         systemHashesNode.get(hash).put(null, (ack: any) => {
           if (ack && ack.err) {
-            loggers.uploads.error(
-              "❌ Error removing hash from systemhash node:",
-              ack.err
-            );
+            loggers.uploads.error("❌ Error removing hash from systemhash node:", ack.err);
             reject(new Error(ack.err));
           } else {
-            loggers.uploads.info(
-              `✅ Hash ${hash} removed from systemhash node successfully`
-            );
+            loggers.uploads.info(`✅ Hash ${hash} removed from systemhash node successfully`);
             resolve(undefined);
           }
         });
@@ -506,9 +481,7 @@ router.get("/:identifier", async (req, res) => {
   try {
     const { identifier } = req.params;
     if (!identifier) {
-      return res
-        .status(400)
-        .json({ success: false, error: "Identificatore richiesto" });
+      return res.status(400).json({ success: false, error: "Identificatore richiesto" });
     }
 
     loggers.uploads.info(`Loading upload for identifier: ${identifier}`);
@@ -523,9 +496,7 @@ router.get("/:identifier", async (req, res) => {
 
         timeoutId = setTimeout(() => {
           if (!dataReceived) {
-            loggers.uploads.warn(
-              `⏰ Timeout raggiunto per ${identifier}, restituendo array vuoto`
-            );
+            loggers.uploads.warn(`⏰ Timeout raggiunto per ${identifier}, restituendo array vuoto`);
             resolve([]);
           }
         }, 15000);
@@ -564,9 +535,7 @@ router.get("/:identifier", async (req, res) => {
 
               if (completedReads === totalReads) {
                 uploadsArray.sort((a, b) => b.uploadedAt - a.uploadedAt);
-                loggers.uploads.info(
-                  `✅ Found ${uploadsArray.length} uploads for: ${identifier}`
-                );
+                loggers.uploads.info(`✅ Found ${uploadsArray.length} uploads for: ${identifier}`);
                 resolve(uploadsArray);
               }
             });
@@ -582,19 +551,13 @@ router.get("/:identifier", async (req, res) => {
       uploads: uploadsArray,
       identifier,
       count: uploadsArray.length,
-      totalSizeMB: uploadsArray.reduce(
-        (sum: number, upload: any) => sum + (upload.sizeMB || 0),
-        0
-      ),
+      totalSizeMB: uploadsArray.reduce((sum: number, upload: any) => sum + (upload.sizeMB || 0), 0),
     };
 
     res.json(response);
   } catch (error: any) {
     const { identifier } = req.params;
-    loggers.uploads.error(
-      { err: error },
-      `Error loading upload for ${identifier}`
-    );
+    loggers.uploads.error({ err: error }, `Error loading upload for ${identifier}`);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -609,21 +572,13 @@ router.delete(
     try {
       const { identifier, hash } = req.params;
       if (!identifier || !hash) {
-        return res
-          .status(400)
-          .json({ success: false, error: "Identificatore e hash richiesti" });
+        return res.status(400).json({ success: false, error: "Identificatore e hash richiesti" });
       }
 
-      loggers.uploads.info(
-        `Delete request for user: ${identifier}, file: ${hash}`
-      );
+      loggers.uploads.info(`Delete request for user: ${identifier}, file: ${hash}`);
 
       const gun = getGunInstance(req);
-      const uploadNode = gun
-        .get("shogun")
-        .get("uploads")
-        .get(identifier)
-        .get(hash);
+      const uploadNode = gun.get("shogun").get("uploads").get(identifier).get(hash);
 
       const fileData = await new Promise<any>((resolve, reject) => {
         const timeoutId = setTimeout(() => {
@@ -641,9 +596,7 @@ router.delete(
       });
 
       const fileSizeMB = Math.ceil(fileData.size / (1024 * 1024));
-      loggers.uploads.info(
-        `File size: ${fileData.size} bytes (${fileSizeMB} MB)`
-      );
+      loggers.uploads.info(`File size: ${fileData.size} bytes (${fileSizeMB} MB)`);
 
       // Remove file from uploads node in GunDB
       await new Promise((resolve, reject) => {
@@ -654,15 +607,10 @@ router.delete(
         uploadNode.put(null, (ack: any) => {
           clearTimeout(timeoutId);
           if (ack && ack.err) {
-            loggers.uploads.error(
-              `Error deleting file from uploads node:`,
-              ack.err
-            );
+            loggers.uploads.error(`Error deleting file from uploads node:`, ack.err);
             reject(new Error(ack.err));
           } else {
-            loggers.uploads.info(
-              `✅ File ${hash} removed from uploads node successfully`
-            );
+            loggers.uploads.info(`✅ File ${hash} removed from uploads node successfully`);
             resolve(undefined);
           }
         });
@@ -686,9 +634,7 @@ router.delete(
       try {
         const adminToken = authConfig.adminPassword;
         if (!adminToken) {
-          loggers.uploads.warn(
-            `⚠️ ADMIN_PASSWORD not set, skipping system hash removal`
-          );
+          loggers.uploads.warn(`⚠️ ADMIN_PASSWORD not set, skipping system hash removal`);
         } else {
           // Call the remove-system-hash endpoint with admin token
           const postData = JSON.stringify({
@@ -740,10 +686,7 @@ router.delete(
             });
 
             req.on("error", (error) => {
-              loggers.uploads.error(
-                { err: error },
-                "Error calling system hash removal endpoint"
-              );
+              loggers.uploads.error({ err: error }, "Error calling system hash removal endpoint");
               reject(error);
             });
 
@@ -752,10 +695,7 @@ router.delete(
           });
         }
       } catch (error: any) {
-        loggers.uploads.warn(
-          { err: error },
-          `Failed to remove hash ${hash} from systemhash node`
-        );
+        loggers.uploads.warn({ err: error }, `Failed to remove hash ${hash} from systemhash node`);
         // Continue even if systemhash removal fails
       }
 

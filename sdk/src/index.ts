@@ -1,15 +1,15 @@
-import { ApiClient, ApiClientConfig } from './client';
-import { SystemModule } from './modules/system';
-import { IpfsModule } from './modules/ipfs';
-import { X402Module } from './modules/x402';
-import { NetworkModule } from './modules/network';
-import { DealsModule } from './modules/deals';
-import { RegistryModule } from './modules/registry';
-import { UploadsModule } from './modules/uploads';
-import { BridgeModule } from './modules/bridge';
+import { ApiClient, ApiClientConfig } from "./client";
+import { SystemModule } from "./modules/system";
+import { IpfsModule } from "./modules/ipfs";
+import { X402Module } from "./modules/x402";
+import { NetworkModule } from "./modules/network";
+import { DealsModule } from "./modules/deals";
+import { RegistryModule } from "./modules/registry";
+import { UploadsModule } from "./modules/uploads";
+import { BridgeModule } from "./modules/bridge";
 
 // Export types
-export * from './types';
+export * from "./types";
 
 export class ShogunRelaySDK {
   private client: ApiClient;
@@ -25,7 +25,7 @@ export class ShogunRelaySDK {
 
   constructor(config: ApiClientConfig) {
     this.client = new ApiClient(config);
-    
+
     this.system = new SystemModule(this.client);
     this.ipfs = new IpfsModule(this.client);
     this.x402 = new X402Module(this.client);

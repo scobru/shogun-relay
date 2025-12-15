@@ -25,11 +25,7 @@ function getAdminPasswordHash(): string | null {
 }
 
 // Middleware di autenticazione admin (secure, timing-safe)
-const tokenAuthMiddleware = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+const tokenAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
   // Check Authorization header (Bearer token)
   const authHeader = req.headers["authorization"];
   const bearerToken = authHeader && authHeader.split(" ")[1];
@@ -78,12 +74,7 @@ import bridgeRouter from "./bridge";
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
-import {
-  authConfig,
-  ipfsConfig,
-  blockchainConfig,
-  packageConfig,
-} from "../config";
+import { authConfig, ipfsConfig, blockchainConfig, packageConfig } from "../config";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -132,88 +123,75 @@ export default (app: express.Application) => {
   );
 
   // IPFS Gateway handler with direct IPFS API fallback
-  app.get(
-    "/ipfs/:cid",
-    async (req: Request, res: Response, next: NextFunction) => {
-      const { cid } = req.params;
-      // Try to retrieve file directly from IPFS API
-      try {
-        loggers.server.debug({ cid }, `📁 Direct IPFS retrieval attempt`);
+  app.get("/ipfs/:cid", async (req: Request, res: Response, next: NextFunction) => {
+    const { cid } = req.params;
+    // Try to retrieve file directly from IPFS API
+    try {
+      loggers.server.debug({ cid }, `📁 Direct IPFS retrieval attempt`);
 
-        // Try to get file from IPFS directly using HTTP API
-        const fileBuffer = (await ipfsRequest(
-          `/cat?arg=${encodeURIComponent(cid)}`,
-          {
-            responseType: "arraybuffer",
+      // Try to get file from IPFS directly using HTTP API
+      const fileBuffer = (await ipfsRequest(`/cat?arg=${encodeURIComponent(cid)}`, {
+        responseType: "arraybuffer",
+      })) as Buffer;
+
+      if (fileBuffer && fileBuffer.length > 0) {
+        // Try to detect content type from first bytes
+        let contentType = "application/octet-stream";
+        const firstBytes = fileBuffer.slice(0, 512);
+
+        // Basic content type detection
+        if (
+          firstBytes[0] === 0x89 &&
+          firstBytes[1] === 0x50 &&
+          firstBytes[2] === 0x4e &&
+          firstBytes[3] === 0x47
+        ) {
+          contentType = "image/png";
+        } else if (firstBytes[0] === 0xff && firstBytes[1] === 0xd8) {
+          contentType = "image/jpeg";
+        } else if (firstBytes[0] === 0x47 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46) {
+          contentType = "image/gif";
+        } else if (
+          firstBytes[0] === 0x25 &&
+          firstBytes[1] === 0x50 &&
+          firstBytes[2] === 0x44 &&
+          firstBytes[3] === 0x46
+        ) {
+          contentType = "application/pdf";
+        } else if (
+          fileBuffer.slice(0, 5).toString() === "<html" ||
+          fileBuffer.slice(0, 9).toString() === "<!DOCTYPE"
+        ) {
+          contentType = "text/html";
+        } else {
+          // Try to detect JSON
+          try {
+            JSON.parse(fileBuffer.toString());
+            contentType = "application/json";
+          } catch (e) {
+            // Not JSON, keep default
           }
-        )) as Buffer;
-
-        if (fileBuffer && fileBuffer.length > 0) {
-          // Try to detect content type from first bytes
-          let contentType = "application/octet-stream";
-          const firstBytes = fileBuffer.slice(0, 512);
-
-          // Basic content type detection
-          if (
-            firstBytes[0] === 0x89 &&
-            firstBytes[1] === 0x50 &&
-            firstBytes[2] === 0x4e &&
-            firstBytes[3] === 0x47
-          ) {
-            contentType = "image/png";
-          } else if (firstBytes[0] === 0xff && firstBytes[1] === 0xd8) {
-            contentType = "image/jpeg";
-          } else if (
-            firstBytes[0] === 0x47 &&
-            firstBytes[1] === 0x49 &&
-            firstBytes[2] === 0x46
-          ) {
-            contentType = "image/gif";
-          } else if (
-            firstBytes[0] === 0x25 &&
-            firstBytes[1] === 0x50 &&
-            firstBytes[2] === 0x44 &&
-            firstBytes[3] === 0x46
-          ) {
-            contentType = "application/pdf";
-          } else if (
-            fileBuffer.slice(0, 5).toString() === "<html" ||
-            fileBuffer.slice(0, 9).toString() === "<!DOCTYPE"
-          ) {
-            contentType = "text/html";
-          } else {
-            // Try to detect JSON
-            try {
-              JSON.parse(fileBuffer.toString());
-              contentType = "application/json";
-            } catch (e) {
-              // Not JSON, keep default
-            }
-          }
-
-          res.setHeader("Content-Type", contentType);
-          res.setHeader("Content-Length", fileBuffer.length);
-          res.setHeader("Cache-Control", "public, max-age=31536000"); // 1 year
-          res.setHeader("X-Content-Source", "ipfs-direct");
-
-          loggers.server.info(
-            { cid, size: fileBuffer.length, contentType },
-            `✅ Served CID directly from IPFS API`
-          );
-          return res.send(fileBuffer);
         }
-      } catch (error: any) {
-        loggers.server.warn(
-          { err: error, cid },
-          `⚠️ Direct IPFS retrieval failed`
-        );
-        // Fall through to proxy gateway
-      }
 
-      // If direct retrieval fails or IPFS not available, pass to proxy
-      next();
+        res.setHeader("Content-Type", contentType);
+        res.setHeader("Content-Length", fileBuffer.length);
+        res.setHeader("Cache-Control", "public, max-age=31536000"); // 1 year
+        res.setHeader("X-Content-Source", "ipfs-direct");
+
+        loggers.server.info(
+          { cid, size: fileBuffer.length, contentType },
+          `✅ Served CID directly from IPFS API`
+        );
+        return res.send(fileBuffer);
+      }
+    } catch (error: any) {
+      loggers.server.warn({ err: error, cid }, `⚠️ Direct IPFS retrieval failed`);
+      // Fall through to proxy gateway
     }
-  );
+
+    // If direct retrieval fails or IPFS not available, pass to proxy
+    next();
+  });
 
   // IPFS Gateway Proxy with fallback - for accessing files via IPFS hash
   app.use(
@@ -246,10 +224,7 @@ export default (app: express.Application) => {
         if (proxyRes.statusCode === 404) {
           const hash = req.url.split("/ipfs/")[1]?.split("?")[0]?.split("#")[0]; // Get CID, remove query/hash
           if (hash) {
-            loggers.server.warn(
-              { hash },
-              `⚠️ Local gateway 404, showing fallback page`
-            );
+            loggers.server.warn({ hash }, `⚠️ Local gateway 404, showing fallback page`);
 
             // Stop the proxy response and send our own HTML page
             const html = `
@@ -375,10 +350,10 @@ export default (app: express.Application) => {
           details: err.message,
           fallback: hash
             ? {
-              publicGateway: `https://ipfs.io/ipfs/${hash}`,
-              cloudflareGateway: `https://cloudflare-ipfs.com/ipfs/${hash}`,
-              dweb: `https://dweb.link/ipfs/${hash}`,
-            }
+                publicGateway: `https://ipfs.io/ipfs/${hash}`,
+                cloudflareGateway: `https://cloudflare-ipfs.com/ipfs/${hash}`,
+                dweb: `https://dweb.link/ipfs/${hash}`,
+              }
             : undefined,
         });
       },
@@ -444,8 +419,7 @@ export default (app: express.Application) => {
             <html>
                <head>
                   <title>${post.title || "Blog Post"}</title>
-                  <meta name="description" content="${post.description || ""
-          }" />
+                  <meta name="description" content="${post.description || ""}" />
                </head>
                <body>
                   ${post.content}
@@ -466,20 +440,15 @@ export default (app: express.Application) => {
     const token =
       req.query?.auth_token ||
       req.query?._auth_token ||
-      (req.headers["authorization"] &&
-        (req.headers["authorization"] as string).split(" ")[1]) ||
+      (req.headers["authorization"] && (req.headers["authorization"] as string).split(" ")[1]) ||
       req.headers["token"];
 
     if (token === authConfig.adminPassword) {
-      res.redirect(
-        "/api/v1/ipfs/webui/?auth_token=" + encodeURIComponent(token as string)
-      );
+      res.redirect("/api/v1/ipfs/webui/?auth_token=" + encodeURIComponent(token as string));
       return;
     }
 
-    res.redirect(
-      `/admin?error=unauthorized&path=${encodeURIComponent(req.originalUrl)}`
-    );
+    res.redirect(`/admin?error=unauthorized&path=${encodeURIComponent(req.originalUrl)}`);
   });
 
   app.get("/admin", (req, res) => {
@@ -676,15 +645,11 @@ export default (app: express.Application) => {
     res.json({
       success: true,
       adminPassword: authConfig.adminPassword ? "CONFIGURED" : "NOT_CONFIGURED",
-      adminPasswordLength: authConfig.adminPassword
-        ? authConfig.adminPassword.length
-        : 0,
+      adminPasswordLength: authConfig.adminPassword ? authConfig.adminPassword.length : 0,
       adminPasswordPreview: authConfig.adminPassword
         ? authConfig.adminPassword.substring(0, 4) +
-        "..." +
-        authConfig.adminPassword.substring(
-          authConfig.adminPassword.length - 4
-        )
+          "..." +
+          authConfig.adminPassword.substring(authConfig.adminPassword.length - 4)
         : "N/A",
       timestamp: Date.now(),
     });
@@ -736,9 +701,7 @@ export default (app: express.Application) => {
         // Override GET requests to POST for IPFS API endpoints
         if (
           req.method === "GET" &&
-          (req.url.includes("/version") ||
-            req.url.includes("/id") ||
-            req.url.includes("/peers"))
+          (req.url.includes("/version") || req.url.includes("/id") || req.url.includes("/peers"))
         ) {
           proxyReq.method = "POST";
           proxyReq.setHeader("Content-Length", "0");
@@ -747,10 +710,7 @@ export default (app: express.Application) => {
         // Add query parameter to get JSON response
         if (req.url.includes("/version")) {
           const originalPath = proxyReq.path;
-          proxyReq.path =
-            originalPath +
-            (originalPath.includes("?") ? "&" : "?") +
-            "format=json";
+          proxyReq.path = originalPath + (originalPath.includes("?") ? "&" : "?") + "format=json";
         }
       },
       // @ts-ignore - http-proxy-middleware types

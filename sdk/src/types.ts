@@ -35,7 +35,7 @@ export interface ReputationWeights {
  */
 export interface ReputationScore {
   total: number;
-  tier: 'excellent' | 'good' | 'average' | 'poor' | 'unreliable';
+  tier: "excellent" | "good" | "average" | "poor" | "unreliable";
   breakdown: ReputationScoreBreakdown;
   weights: ReputationWeights;
   hasEnoughData: boolean;
@@ -49,23 +49,23 @@ export interface ReputationMetrics {
   firstSeenTimestamp?: number;
   lastSeenTimestamp?: number;
   dataPoints?: number;
-  
+
   // Proof metrics
   proofsTotal?: number;
   proofsSuccessful?: number;
   proofsFailed?: number;
   avgResponseTimeMs?: number;
   responseTimeSamples?: number;
-  
+
   // Pin fulfillment
   pinRequestsReceived?: number;
   pinRequestsFulfilled?: number;
-  
+
   // Uptime tracking
   expectedPulses?: number;
   receivedPulses?: number;
   uptimePercent?: number;
-  
+
   // Bridge-specific metrics
   bridgeBatchSubmissionsTotal?: number;
   bridgeBatchSubmissionsSuccessful?: number;
@@ -75,7 +75,7 @@ export interface ReputationMetrics {
   bridgeProofsFailed?: number;
   bridgeAvgProofResponseTimeMs?: number;
   bridgeProofResponseTimeSamples?: number;
-  
+
   // Resource & Capacity metrics (from pulse data)
   avgConnections?: number;
   maxConnections?: number;
@@ -86,28 +86,28 @@ export interface ReputationMetrics {
   storageUtilizationPercent?: number;
   ipfsRepoSizeMB?: number;
   ipfsPinsCount?: number;
-  
+
   // Performance metrics
   avgLatencyMs?: number;
   latencySamples?: number;
   throughputMBps?: number;
   errorRate?: number;
-  
+
   // Availability & Reliability
-  meanTimeBetweenFailures?: number;  // MTBF in milliseconds
-  meanTimeToRecovery?: number;       // MTTR in milliseconds
+  meanTimeBetweenFailures?: number; // MTBF in milliseconds
+  meanTimeToRecovery?: number; // MTTR in milliseconds
   downtimeEvents?: number;
   totalDowntimeMs?: number;
-  
+
   // Data Quality metrics
   dataIntegrityChecks?: number;
   dataIntegrityFailures?: number;
   dataFreshnessMs?: number;
-  
+
   // Network metrics
   peerConnections?: number;
   networkReachability?: number;
-  
+
   // Deal & Subscription metrics
   dealsTotal?: number;
   dealsActive?: number;
@@ -117,17 +117,17 @@ export interface ReputationMetrics {
   subscriptionsTotal?: number;
   subscriptionsActive?: number;
   subscriptionRetentionRate?: number;
-  
+
   // API Availability
   apiRequestsTotal?: number;
   apiRequestsSuccessful?: number;
   apiRequestsFailed?: number;
   apiUptimePercent?: number;
-  
+
   // Security metrics
   securityIncidents?: number;
   lastSecurityIncident?: number;
-  
+
   // Calculated fields
   score?: number;
   tier?: string;
@@ -278,4 +278,3 @@ export interface RelaysListResponse {
   }>;
   error?: string;
 }
-

@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 
 export interface ApiClientConfig {
   baseURL: string;
@@ -16,14 +16,14 @@ export class ApiClient {
       baseURL: config.baseURL,
       timeout: config.timeout || 30000,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     });
 
     // Add auth interceptor
     this.client.interceptors.request.use((req) => {
       if (this.config.token) {
-        req.headers['Authorization'] = `Bearer ${this.config.token}`;
+        req.headers["Authorization"] = `Bearer ${this.config.token}`;
       }
       return req;
     });

@@ -1,16 +1,16 @@
 /**
  * SQLite Store Adapter for Gun Radisk
- * 
+ *
  * Implements the store interface required by radisk:
  * - get(file, cb): Read data from SQLite
  * - put(file, data, cb): Write data to SQLite
  * - list(cb): List all files (optional)
  */
 
-import Database from 'better-sqlite3';
-import { loggers } from './logger';
-import path from 'path';
-import fs from 'fs';
+import Database from "better-sqlite3";
+import { loggers } from "./logger";
+import path from "path";
+import fs from "fs";
 
 const log = loggers.sqlite;
 
@@ -40,8 +40,8 @@ class SQLiteStore {
   private deleteStmt: PreparedStatement;
 
   constructor(options: SQLiteStoreOptions = {}) {
-    this.dbPath = options.dbPath || path.join(process.cwd(), 'data', 'gun.db');
-    this.file = options.file || 'radata';
+    this.dbPath = options.dbPath || path.join(process.cwd(), "data", "gun.db");
+    this.file = options.file || "radata";
     this.isClosed = false; // Track if database is closed
 
     // Ensure data directory exists
@@ -52,7 +52,7 @@ class SQLiteStore {
 
     // Initialize SQLite database
     this.db = new Database(this.dbPath);
-    this.db.pragma('journal_mode = WAL'); // Better performance for concurrent reads
+    this.db.pragma("journal_mode = WAL"); // Better performance for concurrent reads
 
     // Create table for storing radisk files
     this.db.exec(`
@@ -66,14 +66,22 @@ class SQLiteStore {
     `);
 
     // Prepared statements for better performance
-    this.getStmt = this.db.prepare('SELECT data FROM radisk_files WHERE file = ?') as unknown as PreparedStatement;
+    this.getStmt = this.db.prepare(
+      "SELECT data FROM radisk_files WHERE file = ?"
+    ) as unknown as PreparedStatement;
     // Use unixepoch() for timestamp (SQLite 3.38+) or fallback to strftime with single quotes
     // Calculate timestamp in JavaScript to avoid SQL string literal issues
-    this.putStmt = this.db.prepare('INSERT OR REPLACE INTO radisk_files (file, data, updated_at) VALUES (?, ?, ?)') as unknown as PreparedStatement;
-    this.listStmt = this.db.prepare('SELECT file FROM radisk_files ORDER BY file') as unknown as PreparedStatement;
-    this.deleteStmt = this.db.prepare('DELETE FROM radisk_files WHERE file = ?') as unknown as PreparedStatement;
+    this.putStmt = this.db.prepare(
+      "INSERT OR REPLACE INTO radisk_files (file, data, updated_at) VALUES (?, ?, ?)"
+    ) as unknown as PreparedStatement;
+    this.listStmt = this.db.prepare(
+      "SELECT file FROM radisk_files ORDER BY file"
+    ) as unknown as PreparedStatement;
+    this.deleteStmt = this.db.prepare(
+      "DELETE FROM radisk_files WHERE file = ?"
+    ) as unknown as PreparedStatement;
 
-    log.debug({ path: this.dbPath }, 'SQLite store initialized');
+    log.debug({ path: this.dbPath }, "SQLite store initialized");
   }
 
   /**
@@ -102,7 +110,7 @@ class SQLiteStore {
           // If JSON is corrupted, log and return null (GUN will treat as missing file)
           log.warn(
             { file, error: parseErr instanceof Error ? parseErr.message : String(parseErr) },
-            'Corrupted JSON data detected in radisk file, skipping'
+            "Corrupted JSON data detected in radisk file, skipping"
           );
           // Return null so GUN treats it as a missing file and can recreate it
           cb(null, null);
@@ -112,7 +120,7 @@ class SQLiteStore {
       }
     } catch (err) {
       // If error is due to closed database, return undefinedined silently
-      if (err instanceof Error && err.message.includes('not open')) {
+      if (err instanceof Error && err.message.includes("not open")) {
         this.isClosed = true; // Mark as closed
         return cb(null, null);
       }
@@ -139,7 +147,7 @@ class SQLiteStore {
       cb(null, 1); // Success
     } catch (err) {
       // If error is due to closed database, silently ignore
-      if (err instanceof Error && err.message.includes('not open')) {
+      if (err instanceof Error && err.message.includes("not open")) {
         this.isClosed = true; // Mark as closed
         return cb(null, 1);
       }
@@ -166,7 +174,7 @@ class SQLiteStore {
       cb(null); // Signal completion
     } catch (err) {
       // If error is due to closed database, mark as closed and signal completion
-      if (err instanceof Error && err.message.includes('not open')) {
+      if (err instanceof Error && err.message.includes("not open")) {
         this.isClosed = true; // Mark as closed
       }
       cb(null); // On error, just signal completion
@@ -181,7 +189,7 @@ class SQLiteStore {
       // Mark as closed first to prevent new operations
       this.isClosed = true;
       this.db.close();
-      log.debug('SQLite store closed');
+      log.debug("SQLite store closed");
     }
   }
 }

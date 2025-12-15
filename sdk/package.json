@@ -18,7 +18,11 @@
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint src --max-warnings 0",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\""
   },
   "keywords": [
     "shogun",
@@ -42,8 +46,13 @@
     "form-data": "^4.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.15.0",
     "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
+    "eslint": "^9.15.0",
+    "globals": "^15.12.0",
+    "prettier": "^3.7.4",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.15.0"
   },
   "engines": {
     "node": ">=16.0.0"

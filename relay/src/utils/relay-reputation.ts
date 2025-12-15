@@ -1,6 +1,6 @@
 /**
  * Relay Reputation System
- * 
+ *
  * Tracks and calculates reputation scores for relays in the network.
  * Scores are based on:
  * - Uptime consistency
@@ -10,14 +10,14 @@
  * - Response times (combined: storage proofs + bridge proofs)
  * - Pin request fulfillment
  * - Longevity (time in network)
- * 
+ *
  * Data is stored in GunDB and synced across the network.
- * 
+ *
  * Bridge Operations Tracking:
  * - Bridge proof generation (for withdrawals) is tracked separately but included in overall proof success rate
  * - Batch submissions (success/failure) are tracked for sequencer reputation
  * - Response times for bridge proofs are combined with storage proof response times
- * 
+ *
  * SECURITY: Anti-Self-Rating Protection
  * - Self-ratings (relay rating itself) are detected and marked with observerType='self'
  * - Self-ratings have reduced weight (10%) in reputation calculation
@@ -26,14 +26,14 @@
  * - The cache is optimistic but frozen observations are the source of truth
  */
 
-import * as FrozenData from './frozen-data';
-import { getRelayPub } from './relay-user';
-import { loggers } from './logger';
+import * as FrozenData from "./frozen-data";
+import { getRelayPub } from "./relay-user";
+import { loggers } from "./logger";
 
 const log = loggers.reputation;
 
 // Interfaces
-import type { IGunInstanceRoot, IGunChain, IGunInstance } from 'gun/types/gun';
+import type { IGunInstanceRoot, IGunChain, IGunInstance } from "gun/types/gun";
 
 type GunInstance = IGunInstanceRoot<any, any>;
 type GunNode = IGunChain<any, any, any, any>;
@@ -91,49 +91,49 @@ interface ReputationMetrics {
   bridgeAvgProofResponseTimeMs?: number;
   bridgeProofResponseTimeSamples?: number;
   // Resource & Capacity metrics (from pulse data)
-  avgConnections?: number;              // Average active connections
-  maxConnections?: number;              // Peak connections observed
-  avgMemoryUsageMB?: number;            // Average memory usage
-  maxMemoryUsageMB?: number;            // Peak memory usage
-  storageCapacityMB?: number;           // Total storage capacity
-  storageUsedMB?: number;               // Storage currently used
-  storageUtilizationPercent?: number;   // Storage utilization percentage
-  ipfsRepoSizeMB?: number;              // IPFS repository size
-  ipfsPinsCount?: number;               // Number of IPFS pins
+  avgConnections?: number; // Average active connections
+  maxConnections?: number; // Peak connections observed
+  avgMemoryUsageMB?: number; // Average memory usage
+  maxMemoryUsageMB?: number; // Peak memory usage
+  storageCapacityMB?: number; // Total storage capacity
+  storageUsedMB?: number; // Storage currently used
+  storageUtilizationPercent?: number; // Storage utilization percentage
+  ipfsRepoSizeMB?: number; // IPFS repository size
+  ipfsPinsCount?: number; // Number of IPFS pins
   // Performance metrics
-  avgLatencyMs?: number;                // Average network latency
-  latencySamples?: number;              // Number of latency measurements
-  throughputMBps?: number;              // Data throughput (MB/s)
-  errorRate?: number;                   // Error rate percentage
+  avgLatencyMs?: number; // Average network latency
+  latencySamples?: number; // Number of latency measurements
+  throughputMBps?: number; // Data throughput (MB/s)
+  errorRate?: number; // Error rate percentage
   // Availability & Reliability
-  meanTimeBetweenFailures?: number;     // MTBF in milliseconds
-  meanTimeToRecovery?: number;          // MTTR in milliseconds
-  downtimeEvents?: number;              // Number of downtime events
-  totalDowntimeMs?: number;            // Total downtime in milliseconds
+  meanTimeBetweenFailures?: number; // MTBF in milliseconds
+  meanTimeToRecovery?: number; // MTTR in milliseconds
+  downtimeEvents?: number; // Number of downtime events
+  totalDowntimeMs?: number; // Total downtime in milliseconds
   // Data Quality metrics
-  dataIntegrityChecks?: number;         // Number of integrity checks performed
-  dataIntegrityFailures?: number;       // Number of integrity check failures
-  dataFreshnessMs?: number;             // Average data freshness (time since last update)
+  dataIntegrityChecks?: number; // Number of integrity checks performed
+  dataIntegrityFailures?: number; // Number of integrity check failures
+  dataFreshnessMs?: number; // Average data freshness (time since last update)
   // Network metrics
-  peerConnections?: number;             // Number of GunDB peer connections
-  networkReachability?: number;         // Network reachability score (0-100)
+  peerConnections?: number; // Number of GunDB peer connections
+  networkReachability?: number; // Network reachability score (0-100)
   // Deal & Subscription metrics
-  dealsTotal?: number;                  // Total deals handled
-  dealsActive?: number;                 // Currently active deals
-  dealsCompleted?: number;              // Successfully completed deals
-  dealsFailed?: number;                 // Failed deals
-  dealFulfillmentRate?: number;         // Deal fulfillment success rate (0-100)
-  subscriptionsTotal?: number;           // Total subscriptions managed
-  subscriptionsActive?: number;         // Currently active subscriptions
-  subscriptionRetentionRate?: number;    // Subscription retention rate (0-100)
+  dealsTotal?: number; // Total deals handled
+  dealsActive?: number; // Currently active deals
+  dealsCompleted?: number; // Successfully completed deals
+  dealsFailed?: number; // Failed deals
+  dealFulfillmentRate?: number; // Deal fulfillment success rate (0-100)
+  subscriptionsTotal?: number; // Total subscriptions managed
+  subscriptionsActive?: number; // Currently active subscriptions
+  subscriptionRetentionRate?: number; // Subscription retention rate (0-100)
   // API Availability
-  apiRequestsTotal?: number;            // Total API requests
-  apiRequestsSuccessful?: number;       // Successful API requests
-  apiRequestsFailed?: number;          // Failed API requests
-  apiUptimePercent?: number;            // API uptime percentage
+  apiRequestsTotal?: number; // Total API requests
+  apiRequestsSuccessful?: number; // Successful API requests
+  apiRequestsFailed?: number; // Failed API requests
+  apiUptimePercent?: number; // API uptime percentage
   // Security metrics
-  securityIncidents?: number;           // Number of security incidents
-  lastSecurityIncident?: number;        // Timestamp of last security incident
+  securityIncidents?: number; // Number of security incidents
+  lastSecurityIncident?: number; // Timestamp of last security incident
   // Calculated fields
   score?: number;
   tier?: string;
@@ -149,12 +149,12 @@ interface ScoreBreakdown {
   pinFulfillment: number;
   longevity: number;
   // New breakdown components
-  resourceEfficiency?: number;         // Based on memory/connection efficiency
-  storageCapacity?: number;             // Based on available storage capacity
-  dataQuality?: number;                 // Based on integrity and freshness
-  reliability?: number;                 // Based on MTBF and MTTR
-  dealPerformance?: number;            // Based on deal fulfillment rate
-  networkHealth?: number;               // Based on peer connections and reachability
+  resourceEfficiency?: number; // Based on memory/connection efficiency
+  storageCapacity?: number; // Based on available storage capacity
+  dataQuality?: number; // Based on integrity and freshness
+  reliability?: number; // Based on MTBF and MTTR
+  dealPerformance?: number; // Based on deal fulfillment rate
+  networkHealth?: number; // Based on peer connections and reachability
 }
 
 interface ReputationScore {
@@ -179,32 +179,32 @@ interface LeaderboardOptions {
 // Note: Extended weights for additional metrics are calculated separately
 // and can be included in a weighted average or shown as separate scores
 const WEIGHTS: ReputationWeights = {
-  uptime: 0.25,           // 25% - Consistent availability (reduced from 30%)
-  proofSuccess: 0.20,     // 20% - Storage proof reliability (reduced from 25%)
-  responseTime: 0.15,     // 15% - Speed of responses (reduced from 20%)
-  pinFulfillment: 0.15,   // 15% - Honoring pin requests (unchanged)
-  longevity: 0.10,        // 10% - Time in network (unchanged)
+  uptime: 0.25, // 25% - Consistent availability (reduced from 30%)
+  proofSuccess: 0.2, // 20% - Storage proof reliability (reduced from 25%)
+  responseTime: 0.15, // 15% - Speed of responses (reduced from 20%)
+  pinFulfillment: 0.15, // 15% - Honoring pin requests (unchanged)
+  longevity: 0.1, // 10% - Time in network (unchanged)
   // Additional weights for extended metrics (optional, can be added to total)
   // These are calculated separately and can be shown as supplementary scores
 };
 
 // Extended weights for additional metrics (shown separately or as bonus/penalty)
 const EXTENDED_WEIGHTS = {
-  resourceEfficiency: 0.05,    // 5% - Memory and connection efficiency
-  storageCapacity: 0.05,       // 5% - Available storage capacity
-  dataQuality: 0.03,           // 3% - Data integrity and freshness
-  reliability: 0.02,            // 2% - MTBF and MTTR
-  dealPerformance: 0.00,        // 0% - Deal fulfillment (tracked but not weighted in base score)
-  networkHealth: 0.00,          // 0% - Network metrics (tracked but not weighted in base score)
+  resourceEfficiency: 0.05, // 5% - Memory and connection efficiency
+  storageCapacity: 0.05, // 5% - Available storage capacity
+  dataQuality: 0.03, // 3% - Data integrity and freshness
+  reliability: 0.02, // 2% - MTBF and MTTR
+  dealPerformance: 0.0, // 0% - Deal fulfillment (tracked but not weighted in base score)
+  networkHealth: 0.0, // 0% - Network metrics (tracked but not weighted in base score)
 };
 
 // Thresholds
 const THRESHOLDS: ReputationThresholds = {
-  minDataPoints: 10,              // Minimum events before scoring
-  maxResponseTimeMs: 5000,        // Response times above this get 0 score
-  idealResponseTimeMs: 500,       // Response times below this get 100 score
-  uptimeWindowMs: 86400000,       // 24h window for uptime calculation
-  maxLongevityDays: 365,          // Cap longevity bonus at 1 year
+  minDataPoints: 10, // Minimum events before scoring
+  maxResponseTimeMs: 5000, // Response times above this get 0 score
+  idealResponseTimeMs: 500, // Response times below this get 100 score
+  uptimeWindowMs: 86400000, // 24h window for uptime calculation
+  maxLongevityDays: 365, // Cap longevity bonus at 1 year
 };
 
 // Simple mutex-like lock for preventing concurrent counter updates
@@ -222,7 +222,7 @@ function acquireLock(relayHost: string): boolean {
   const existingLock = updateLocks.get(relayHost);
 
   // Check if existing lock has expired
-  if (existingLock && (now - existingLock) < LOCK_TIMEOUT_MS) {
+  if (existingLock && now - existingLock < LOCK_TIMEOUT_MS) {
     return false; // Lock held by another operation
   }
 
@@ -240,15 +240,15 @@ function releaseLock(relayHost: string): void {
 
 // Observer type constants
 export const OBSERVER_TYPE = {
-  SELF: 'self' as const,           // Relay rating itself
-  EXTERNAL: 'external' as const,   // External observer rating the relay
+  SELF: "self" as const, // Relay rating itself
+  EXTERNAL: "external" as const, // External observer rating the relay
 };
 
 // Reputation calculation weights for different observer types
 // Self-ratings have reduced weight to prevent manipulation
 export const OBSERVER_WEIGHTS: Record<string, number> = {
-  self: 0.1,      // Self-rating has only 10% weight
-  external: 0.9,  // External observations have 90% weight
+  self: 0.1, // Self-rating has only 10% weight
+  external: 0.9, // External observations have 90% weight
 };
 
 /**
@@ -279,9 +279,7 @@ export function isSelfRating(relayHost: string, observerKeyPair: SEAKeyPair): bo
  * @returns 'self' or 'external'
  */
 export function getObserverType(relayHost: string, observerKeyPair: SEAKeyPair): string {
-  return isSelfRating(relayHost, observerKeyPair)
-    ? OBSERVER_TYPE.SELF
-    : OBSERVER_TYPE.EXTERNAL;
+  return isSelfRating(relayHost, observerKeyPair) ? OBSERVER_TYPE.SELF : OBSERVER_TYPE.EXTERNAL;
 }
 
 /**
@@ -305,8 +303,9 @@ export function calculateReputationScore(metrics: ReputationMetrics): Reputation
   // 2. Proof Success Score (0-100)
   // Combine storage proofs and bridge proofs
   const totalProofs = (metrics.proofsTotal || 0) + (metrics.bridgeProofsTotal || 0);
-  const totalSuccessfulProofs = (metrics.proofsSuccessful || 0) + (metrics.bridgeProofsSuccessful || 0);
-  
+  const totalSuccessfulProofs =
+    (metrics.proofsSuccessful || 0) + (metrics.bridgeProofsSuccessful || 0);
+
   if (totalProofs > 0) {
     scores.proofSuccess = (totalSuccessfulProofs / totalProofs) * 100;
   } else {
@@ -319,20 +318,20 @@ export function calculateReputationScore(metrics: ReputationMetrics): Reputation
   const storageSamples = metrics.responseTimeSamples || 0;
   const bridgeSamples = metrics.bridgeProofResponseTimeSamples || 0;
   const totalSamples = storageSamples + bridgeSamples;
-  
+
   let avgResponseTime: number | undefined;
   if (totalSamples > 0) {
     const storageWeight = storageSamples / totalSamples;
     const bridgeWeight = bridgeSamples / totalSamples;
     const storageAvg = metrics.avgResponseTimeMs || 0;
     const bridgeAvg = metrics.bridgeAvgProofResponseTimeMs || 0;
-    avgResponseTime = (storageAvg * storageWeight) + (bridgeAvg * bridgeWeight);
+    avgResponseTime = storageAvg * storageWeight + bridgeAvg * bridgeWeight;
   } else if (metrics.avgResponseTimeMs !== undefined) {
     avgResponseTime = metrics.avgResponseTimeMs;
   } else if (metrics.bridgeAvgProofResponseTimeMs !== undefined) {
     avgResponseTime = metrics.bridgeAvgProofResponseTimeMs;
   }
-  
+
   if (avgResponseTime !== undefined) {
     if (avgResponseTime <= THRESHOLDS.idealResponseTimeMs) {
       scores.responseTime = 100;
@@ -350,7 +349,8 @@ export function calculateReputationScore(metrics: ReputationMetrics): Reputation
 
   // 4. Pin Fulfillment Score (0-100)
   if (metrics.pinRequestsReceived && metrics.pinRequestsReceived > 0) {
-    scores.pinFulfillment = ((metrics.pinRequestsFulfilled || 0) / metrics.pinRequestsReceived) * 100;
+    scores.pinFulfillment =
+      ((metrics.pinRequestsFulfilled || 0) / metrics.pinRequestsReceived) * 100;
   } else {
     scores.pinFulfillment = 50; // Default
   }
@@ -365,14 +365,20 @@ export function calculateReputationScore(metrics: ReputationMetrics): Reputation
   }
 
   // Calculate extended scores (optional metrics)
-  
+
   // 6. Resource Efficiency Score (0-100)
   // Based on memory and connection efficiency
-  if (metrics.avgMemoryUsageMB !== undefined && metrics.maxMemoryUsageMB !== undefined && metrics.maxMemoryUsageMB > 0) {
-    const memoryEfficiency = 100 - Math.min(100, (metrics.avgMemoryUsageMB / metrics.maxMemoryUsageMB) * 100);
-    const connectionEfficiency = metrics.avgConnections && metrics.maxConnections && metrics.maxConnections > 0
-      ? 100 - Math.min(100, (metrics.avgConnections / metrics.maxConnections) * 100)
-      : 50;
+  if (
+    metrics.avgMemoryUsageMB !== undefined &&
+    metrics.maxMemoryUsageMB !== undefined &&
+    metrics.maxMemoryUsageMB > 0
+  ) {
+    const memoryEfficiency =
+      100 - Math.min(100, (metrics.avgMemoryUsageMB / metrics.maxMemoryUsageMB) * 100);
+    const connectionEfficiency =
+      metrics.avgConnections && metrics.maxConnections && metrics.maxConnections > 0
+        ? 100 - Math.min(100, (metrics.avgConnections / metrics.maxConnections) * 100)
+        : 50;
     scores.resourceEfficiency = (memoryEfficiency + connectionEfficiency) / 2;
   } else {
     scores.resourceEfficiency = 50; // Default
@@ -381,9 +387,8 @@ export function calculateReputationScore(metrics: ReputationMetrics): Reputation
   // 7. Storage Capacity Score (0-100)
   // Based on available storage capacity
   if (metrics.storageCapacityMB !== undefined && metrics.storageUsedMB !== undefined) {
-    const utilization = metrics.storageCapacityMB > 0 
-      ? (metrics.storageUsedMB / metrics.storageCapacityMB) * 100 
-      : 0;
+    const utilization =
+      metrics.storageCapacityMB > 0 ? (metrics.storageUsedMB / metrics.storageCapacityMB) * 100 : 0;
     // Lower utilization = higher score (more capacity available)
     scores.storageCapacity = Math.max(0, 100 - utilization);
   } else if (metrics.storageUtilizationPercent !== undefined) {
@@ -396,17 +401,17 @@ export function calculateReputationScore(metrics: ReputationMetrics): Reputation
   // Based on integrity checks and data freshness
   let integrityScore = 50;
   if (metrics.dataIntegrityChecks !== undefined && metrics.dataIntegrityChecks > 0) {
-    const integrityRate = 1 - ((metrics.dataIntegrityFailures || 0) / metrics.dataIntegrityChecks);
+    const integrityRate = 1 - (metrics.dataIntegrityFailures || 0) / metrics.dataIntegrityChecks;
     integrityScore = integrityRate * 100;
   }
-  
+
   let freshnessScore = 50;
   if (metrics.dataFreshnessMs !== undefined) {
     // Data fresher than 1 hour = 100, older than 24h = 0
     const hoursOld = metrics.dataFreshnessMs / (1000 * 60 * 60);
     freshnessScore = Math.max(0, 100 - (hoursOld / 24) * 100);
   }
-  
+
   scores.dataQuality = (integrityScore + freshnessScore) / 2;
 
   // 9. Reliability Score (0-100)
@@ -415,12 +420,12 @@ export function calculateReputationScore(metrics: ReputationMetrics): Reputation
     // Higher MTBF and lower MTTR = better score
     const mtbfHours = metrics.meanTimeBetweenFailures / (1000 * 60 * 60);
     const mttrMinutes = metrics.meanTimeToRecovery / (1000 * 60);
-    
+
     // MTBF: 24h = 50, 168h (1 week) = 100
     const mtbfScore = Math.min(100, (mtbfHours / 168) * 100);
     // MTTR: 0 min = 100, 60 min = 0
     const mttrScore = Math.max(0, 100 - (mttrMinutes / 60) * 100);
-    
+
     scores.reliability = (mtbfScore + mttrScore) / 2;
   } else {
     scores.reliability = 50; // Default
@@ -443,7 +448,7 @@ export function calculateReputationScore(metrics: ReputationMetrics): Reputation
     // More peers = better (capped at 20 peers for 100 score)
     peerScore = Math.min(100, (metrics.peerConnections / 20) * 100);
   }
-  
+
   const reachabilityScore = metrics.networkReachability || 50;
   scores.networkHealth = (peerScore + reachabilityScore) / 2;
 
@@ -467,11 +472,11 @@ export function calculateReputationScore(metrics: ReputationMetrics): Reputation
 
   // Determine tier
   let tier: string;
-  if (totalScore >= 90) tier = 'excellent';
-  else if (totalScore >= 75) tier = 'good';
-  else if (totalScore >= 50) tier = 'average';
-  else if (totalScore >= 25) tier = 'poor';
-  else tier = 'unreliable';
+  if (totalScore >= 90) tier = "excellent";
+  else if (totalScore >= 75) tier = "good";
+  else if (totalScore >= 50) tier = "average";
+  else if (totalScore >= 25) tier = "poor";
+  else tier = "unreliable";
 
   return {
     total: Math.round(totalScore * 100) / 100,
@@ -500,7 +505,7 @@ export function calculateReputationScore(metrics: ReputationMetrics): Reputation
  * @param relayHost - Host identifier
  */
 export function initReputationTracking(gun: GunInstance, relayHost: string): GunNode {
-  const reputationNode = gun.get('shogun-network').get('reputation').get(relayHost);
+  const reputationNode = gun.get("shogun-network").get("reputation").get(relayHost);
 
   // Check if already initialized
   reputationNode.once((data: ReputationMetrics | undefined) => {
@@ -536,7 +541,7 @@ export function initReputationTracking(gun: GunInstance, relayHost: string): Gun
         uptimePercent: 100,
         // Calculated score (updated periodically)
         score: 50,
-        tier: 'average',
+        tier: "average",
         lastScoreUpdate: Date.now(),
       });
       log.debug(`Reputation tracking initialized for ${relayHost}`);
@@ -574,21 +579,24 @@ export async function recordProofSuccess(
       log.warn(`recordProofSuccess: timeout waiting for lock on ${relayHost}`);
       break; // Proceed anyway after timeout
     }
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
   }
 
   try {
     if (!observerKeyPair) {
-      log.warn('recordProofSuccess called without keyPair - falling back to unsigned (deprecated)');
+      log.warn("recordProofSuccess called without keyPair - falling back to unsigned (deprecated)");
       // Legacy fallback (mutable counter)
-      const node = gun.get('shogun-network').get('reputation').get(relayHost);
+      const node = gun.get("shogun-network").get("reputation").get(relayHost);
       return new Promise((resolve) => {
         node.once((data: ReputationMetrics | undefined) => {
           const current = data || {};
           const now = Date.now();
-          const newAvgResponseTime = (current.responseTimeSamples || 0) > 0
-            ? (((current.avgResponseTimeMs || 0) * (current.responseTimeSamples || 0)) + responseTimeMs) / ((current.responseTimeSamples || 0) + 1)
-            : responseTimeMs;
+          const newAvgResponseTime =
+            (current.responseTimeSamples || 0) > 0
+              ? ((current.avgResponseTimeMs || 0) * (current.responseTimeSamples || 0) +
+                  responseTimeMs) /
+                ((current.responseTimeSamples || 0) + 1)
+              : responseTimeMs;
 
           node.put({
             proofsTotal: (current.proofsTotal || 0) + 1,
@@ -612,7 +620,7 @@ export async function recordProofSuccess(
     await FrozenData.createSignedReputationEvent(
       gun as IGunInstance,
       relayHost,
-      'proof_success',
+      "proof_success",
       {
         responseTimeMs,
         observerType, // Mark as self or external - used for weighted aggregation
@@ -621,14 +629,17 @@ export async function recordProofSuccess(
     );
 
     // Update local optimistic cache/index for backward compatibility
-    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    const node = gun.get("shogun-network").get("reputation").get(relayHost);
     await new Promise<void>((resolve) => {
       node.once((data: ReputationMetrics | undefined) => {
         const current = data || {};
         const now = Date.now();
-        const newAvgResponseTime = (current.responseTimeSamples || 0) > 0
-          ? (((current.avgResponseTimeMs || 0) * (current.responseTimeSamples || 0)) + responseTimeMs) / ((current.responseTimeSamples || 0) + 1)
-          : responseTimeMs;
+        const newAvgResponseTime =
+          (current.responseTimeSamples || 0) > 0
+            ? ((current.avgResponseTimeMs || 0) * (current.responseTimeSamples || 0) +
+                responseTimeMs) /
+              ((current.responseTimeSamples || 0) + 1)
+            : responseTimeMs;
 
         node.put({
           proofsTotal: (current.proofsTotal || 0) + 1,
@@ -661,7 +672,10 @@ export async function recordProofFailure(
 ): Promise<void> {
   // SECURITY: Prevent self-rating (relay rating itself)
   if (observerKeyPair && isSelfRating(relayHost, observerKeyPair)) {
-    log.warn({ relayHost }, `Blocked self-rating attempt: relay ${relayHost} attempted to rate itself`);
+    log.warn(
+      { relayHost },
+      `Blocked self-rating attempt: relay ${relayHost} attempted to rate itself`
+    );
   }
 
   // Acquire lock to prevent concurrent updates
@@ -672,13 +686,16 @@ export async function recordProofFailure(
       log.warn({ relayHost }, `recordProofFailure: timeout waiting for lock on ${relayHost}`);
       break;
     }
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
   }
 
   try {
     if (!observerKeyPair) {
-      log.warn({ relayHost }, 'recordProofFailure called without keyPair - falling back to unsigned');
-      const node = gun.get('shogun-network').get('reputation').get(relayHost);
+      log.warn(
+        { relayHost },
+        "recordProofFailure called without keyPair - falling back to unsigned"
+      );
+      const node = gun.get("shogun-network").get("reputation").get(relayHost);
       return new Promise((resolve) => {
         node.once((data: ReputationMetrics | undefined) => {
           const current = data || {};
@@ -703,7 +720,7 @@ export async function recordProofFailure(
     await FrozenData.createSignedReputationEvent(
       gun as IGunInstance,
       relayHost,
-      'proof_failure',
+      "proof_failure",
       {
         observerType, // Mark as self or external
       },
@@ -711,7 +728,7 @@ export async function recordProofFailure(
     );
 
     // Optimistic update
-    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    const node = gun.get("shogun-network").get("reputation").get(relayHost);
     await new Promise<void>((resolve) => {
       node.once((data: ReputationMetrics | undefined) => {
         const current = data || {};
@@ -753,13 +770,16 @@ export async function recordPinFulfillment(
       log.warn({ relayHost }, `recordPinFulfillment: timeout waiting for lock on ${relayHost}`);
       break;
     }
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
   }
 
   try {
     if (!observerKeyPair) {
-      log.warn({ relayHost }, 'recordPinFulfillment called without keyPair - falling back to unsigned');
-      const node = gun.get('shogun-network').get('reputation').get(relayHost);
+      log.warn(
+        { relayHost },
+        "recordPinFulfillment called without keyPair - falling back to unsigned"
+      );
+      const node = gun.get("shogun-network").get("reputation").get(relayHost);
       return new Promise((resolve) => {
         node.once((data: ReputationMetrics | undefined) => {
           const current = data || {};
@@ -784,13 +804,13 @@ export async function recordPinFulfillment(
     await FrozenData.createSignedReputationEvent(
       gun as IGunInstance,
       relayHost,
-      'pin_fulfillment',
+      "pin_fulfillment",
       { fulfilled },
       observerKeyPair as SEAKeyPair
     );
 
     // Optimistic update
-    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    const node = gun.get("shogun-network").get("reputation").get(relayHost);
     await new Promise<void>((resolve) => {
       node.once((data: ReputationMetrics | undefined) => {
         const current = data || {};
@@ -828,10 +848,10 @@ export async function recordPulse(gun: GunInstance, relayHost: string): Promise<
       // Don't warn for pulses as they're frequent
       break;
     }
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
   }
 
-  const node = gun.get('shogun-network').get('reputation').get(relayHost);
+  const node = gun.get("shogun-network").get("reputation").get(relayHost);
 
   try {
     return new Promise((resolve) => {
@@ -872,34 +892,41 @@ export async function recordPulse(gun: GunInstance, relayHost: string): Promise<
  * @param relayHost - Host to query
  * @returns Reputation data with calculated score
  */
-export async function getReputation(gun: GunInstance, relayHost: string): Promise<LeaderboardEntry | undefined> {
+export async function getReputation(
+  gun: GunInstance,
+  relayHost: string
+): Promise<LeaderboardEntry | undefined> {
   return new Promise((resolve) => {
     const timeout = setTimeout(() => resolve(undefined), 5000);
 
-    gun.get('shogun-network').get('reputation').get(relayHost).once((data: Record<string, any> | undefined) => {
-      clearTimeout(timeout);
+    gun
+      .get("shogun-network")
+      .get("reputation")
+      .get(relayHost)
+      .once((data: Record<string, any> | undefined) => {
+        clearTimeout(timeout);
 
-      if (!data || typeof data !== 'object') {
-        resolve(undefined);
-        return;
-      }
-
-      // Filter GunDB metadata
-      const metrics: ReputationMetrics = {};
-      Object.keys(data).forEach(key => {
-        if (!['_', '#', '>', '<'].includes(key)) {
-          metrics[key] = data[key];
+        if (!data || typeof data !== "object") {
+          resolve(undefined);
+          return;
         }
-      });
 
-      // Calculate current score
-      const score = calculateReputationScore(metrics);
+        // Filter GunDB metadata
+        const metrics: ReputationMetrics = {};
+        Object.keys(data).forEach((key) => {
+          if (!["_", "#", ">", "<"].includes(key)) {
+            metrics[key] = data[key];
+          }
+        });
 
-      resolve({
-        ...metrics,
-        calculatedScore: score,
+        // Calculate current score
+        const score = calculateReputationScore(metrics);
+
+        resolve({
+          ...metrics,
+          calculatedScore: score,
+        });
       });
-    });
   });
 }
 
@@ -929,29 +956,33 @@ export async function getReputationLeaderboard(
     // Timeout as safety net
     const timeout = setTimeout(finalize, 3000);
 
-    gun.get('shogun-network').get('reputation').map().once((data: Record<string, any> | undefined, host: string) => {
-      if (!data || typeof data !== 'object') return;
+    gun
+      .get("shogun-network")
+      .get("reputation")
+      .map()
+      .once((data: Record<string, any> | undefined, host: string) => {
+        if (!data || typeof data !== "object") return;
 
-      // Filter GunDB metadata
-      const metrics: ReputationMetrics = {};
-      Object.keys(data).forEach(key => {
-        if (!['_', '#', '>', '<'].includes(key)) {
-          metrics[key] = data[key];
-        }
+        // Filter GunDB metadata
+        const metrics: ReputationMetrics = {};
+        Object.keys(data).forEach((key) => {
+          if (!["_", "#", ">", "<"].includes(key)) {
+            metrics[key] = data[key];
+          }
+        });
+
+        const score = calculateReputationScore(metrics);
+
+        // Apply filters
+        if (score.total < minScore) return;
+        if (tier && score.tier !== tier) return;
+
+        relays.push({
+          host,
+          ...metrics,
+          calculatedScore: score,
+        });
       });
-
-      const score = calculateReputationScore(metrics);
-
-      // Apply filters
-      if (score.total < minScore) return;
-      if (tier && score.tier !== tier) return;
-
-      relays.push({
-        host,
-        ...metrics,
-        calculatedScore: score,
-      });
-    });
 
     // Allow time for GunDB to collect, then finalize
     setTimeout(() => {
@@ -960,7 +991,6 @@ export async function getReputationLeaderboard(
     }, 2500);
   });
 }
-
 
 /**
  * Record a successful bridge proof generation (withdrawal proof) (Signed)
@@ -977,7 +1007,9 @@ export async function recordBridgeProofSuccess(
 ): Promise<void> {
   // SECURITY: Prevent self-rating
   if (observerKeyPair && isSelfRating(relayHost, observerKeyPair)) {
-    log.warn(`Blocked self-rating attempt: relay ${relayHost} attempted to rate itself for bridge proof`);
+    log.warn(
+      `Blocked self-rating attempt: relay ${relayHost} attempted to rate itself for bridge proof`
+    );
   }
 
   const maxWaitMs = 3000;
@@ -987,20 +1019,24 @@ export async function recordBridgeProofSuccess(
       log.warn(`recordBridgeProofSuccess: timeout waiting for lock on ${relayHost}`);
       break;
     }
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
   }
 
   try {
     if (!observerKeyPair) {
-      log.warn('recordBridgeProofSuccess called without keyPair - falling back to unsigned');
-      const node = gun.get('shogun-network').get('reputation').get(relayHost);
+      log.warn("recordBridgeProofSuccess called without keyPair - falling back to unsigned");
+      const node = gun.get("shogun-network").get("reputation").get(relayHost);
       return new Promise((resolve) => {
         node.once((data: ReputationMetrics | undefined) => {
           const current = data || {};
           const now = Date.now();
-          const newAvgResponseTime = (current.bridgeProofResponseTimeSamples || 0) > 0
-            ? (((current.bridgeAvgProofResponseTimeMs || 0) * (current.bridgeProofResponseTimeSamples || 0)) + responseTimeMs) / ((current.bridgeProofResponseTimeSamples || 0) + 1)
-            : responseTimeMs;
+          const newAvgResponseTime =
+            (current.bridgeProofResponseTimeSamples || 0) > 0
+              ? ((current.bridgeAvgProofResponseTimeMs || 0) *
+                  (current.bridgeProofResponseTimeSamples || 0) +
+                  responseTimeMs) /
+                ((current.bridgeProofResponseTimeSamples || 0) + 1)
+              : responseTimeMs;
 
           node.put({
             bridgeProofsTotal: (current.bridgeProofsTotal || 0) + 1,
@@ -1023,7 +1059,7 @@ export async function recordBridgeProofSuccess(
     await FrozenData.createSignedReputationEvent(
       gun as any,
       relayHost,
-      'bridge_proof_success',
+      "bridge_proof_success",
       {
         responseTimeMs,
         observerType,
@@ -1032,14 +1068,18 @@ export async function recordBridgeProofSuccess(
     );
 
     // Update optimistic cache
-    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    const node = gun.get("shogun-network").get("reputation").get(relayHost);
     await new Promise<void>((resolve) => {
       node.once((data: ReputationMetrics | undefined) => {
         const current = data || {};
         const now = Date.now();
-        const newAvgResponseTime = (current.bridgeProofResponseTimeSamples || 0) > 0
-          ? (((current.bridgeAvgProofResponseTimeMs || 0) * (current.bridgeProofResponseTimeSamples || 0)) + responseTimeMs) / ((current.bridgeProofResponseTimeSamples || 0) + 1)
-          : responseTimeMs;
+        const newAvgResponseTime =
+          (current.bridgeProofResponseTimeSamples || 0) > 0
+            ? ((current.bridgeAvgProofResponseTimeMs || 0) *
+                (current.bridgeProofResponseTimeSamples || 0) +
+                responseTimeMs) /
+              ((current.bridgeProofResponseTimeSamples || 0) + 1)
+            : responseTimeMs;
 
         node.put({
           bridgeProofsTotal: (current.bridgeProofsTotal || 0) + 1,
@@ -1071,7 +1111,9 @@ export async function recordBridgeProofFailure(
 ): Promise<void> {
   // SECURITY: Prevent self-rating
   if (observerKeyPair && isSelfRating(relayHost, observerKeyPair)) {
-    log.warn(`Blocked self-rating attempt: relay ${relayHost} attempted to rate itself for bridge proof failure`);
+    log.warn(
+      `Blocked self-rating attempt: relay ${relayHost} attempted to rate itself for bridge proof failure`
+    );
   }
 
   const maxWaitMs = 3000;
@@ -1081,13 +1123,13 @@ export async function recordBridgeProofFailure(
       log.warn(`recordBridgeProofFailure: timeout waiting for lock on ${relayHost}`);
       break;
     }
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
   }
 
   try {
     if (!observerKeyPair) {
-      log.warn('recordBridgeProofFailure called without keyPair - falling back to unsigned');
-      const node = gun.get('shogun-network').get('reputation').get(relayHost);
+      log.warn("recordBridgeProofFailure called without keyPair - falling back to unsigned");
+      const node = gun.get("shogun-network").get("reputation").get(relayHost);
       return new Promise((resolve) => {
         node.once((data: ReputationMetrics | undefined) => {
           const current = data || {};
@@ -1110,7 +1152,7 @@ export async function recordBridgeProofFailure(
     await FrozenData.createSignedReputationEvent(
       gun as any,
       relayHost,
-      'bridge_proof_failure',
+      "bridge_proof_failure",
       {
         observerType,
       },
@@ -1118,7 +1160,7 @@ export async function recordBridgeProofFailure(
     );
 
     // Optimistic update
-    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    const node = gun.get("shogun-network").get("reputation").get(relayHost);
     await new Promise<void>((resolve) => {
       node.once((data: ReputationMetrics | undefined) => {
         const current = data || {};
@@ -1153,7 +1195,9 @@ export async function recordBatchSubmissionSuccess(
 ): Promise<void> {
   // SECURITY: Prevent self-rating
   if (observerKeyPair && isSelfRating(relayHost, observerKeyPair)) {
-    log.warn(`Blocked self-rating attempt: relay ${relayHost} attempted to rate itself for batch submission`);
+    log.warn(
+      `Blocked self-rating attempt: relay ${relayHost} attempted to rate itself for batch submission`
+    );
   }
 
   const maxWaitMs = 3000;
@@ -1163,13 +1207,13 @@ export async function recordBatchSubmissionSuccess(
       log.warn(`recordBatchSubmissionSuccess: timeout waiting for lock on ${relayHost}`);
       break;
     }
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
   }
 
   try {
     if (!observerKeyPair) {
-      log.warn('recordBatchSubmissionSuccess called without keyPair - falling back to unsigned');
-      const node = gun.get('shogun-network').get('reputation').get(relayHost);
+      log.warn("recordBatchSubmissionSuccess called without keyPair - falling back to unsigned");
+      const node = gun.get("shogun-network").get("reputation").get(relayHost);
       return new Promise((resolve) => {
         node.once((data: ReputationMetrics | undefined) => {
           const current = data || {};
@@ -1192,7 +1236,7 @@ export async function recordBatchSubmissionSuccess(
     await FrozenData.createSignedReputationEvent(
       gun as any,
       relayHost,
-      'bridge_batch_success',
+      "bridge_batch_success",
       {
         withdrawalCount,
         observerType,
@@ -1201,7 +1245,7 @@ export async function recordBatchSubmissionSuccess(
     );
 
     // Optimistic update
-    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    const node = gun.get("shogun-network").get("reputation").get(relayHost);
     await new Promise<void>((resolve) => {
       node.once((data: ReputationMetrics | undefined) => {
         const current = data || {};
@@ -1234,7 +1278,9 @@ export async function recordBatchSubmissionFailure(
 ): Promise<void> {
   // SECURITY: Prevent self-rating
   if (observerKeyPair && isSelfRating(relayHost, observerKeyPair)) {
-    log.warn(`Blocked self-rating attempt: relay ${relayHost} attempted to rate itself for batch submission failure`);
+    log.warn(
+      `Blocked self-rating attempt: relay ${relayHost} attempted to rate itself for batch submission failure`
+    );
   }
 
   const maxWaitMs = 3000;
@@ -1244,13 +1290,13 @@ export async function recordBatchSubmissionFailure(
       log.warn(`recordBatchSubmissionFailure: timeout waiting for lock on ${relayHost}`);
       break;
     }
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
   }
 
   try {
     if (!observerKeyPair) {
-      log.warn('recordBatchSubmissionFailure called without keyPair - falling back to unsigned');
-      const node = gun.get('shogun-network').get('reputation').get(relayHost);
+      log.warn("recordBatchSubmissionFailure called without keyPair - falling back to unsigned");
+      const node = gun.get("shogun-network").get("reputation").get(relayHost);
       return new Promise((resolve) => {
         node.once((data: ReputationMetrics | undefined) => {
           const current = data || {};
@@ -1273,7 +1319,7 @@ export async function recordBatchSubmissionFailure(
     await FrozenData.createSignedReputationEvent(
       gun as any,
       relayHost,
-      'bridge_batch_failure',
+      "bridge_batch_failure",
       {
         observerType,
       },
@@ -1281,7 +1327,7 @@ export async function recordBatchSubmissionFailure(
     );
 
     // Optimistic update
-    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    const node = gun.get("shogun-network").get("reputation").get(relayHost);
     await new Promise<void>((resolve) => {
       node.once((data: ReputationMetrics | undefined) => {
         const current = data || {};
@@ -1310,7 +1356,7 @@ export async function updateStoredScore(gun: GunInstance, relayHost: string): Pr
   const reputation = await getReputation(gun, relayHost);
 
   if (reputation) {
-    gun.get('shogun-network').get('reputation').get(relayHost).put({
+    gun.get("shogun-network").get("reputation").get(relayHost).put({
       score: reputation.calculatedScore.total,
       tier: reputation.calculatedScore.tier,
       lastScoreUpdate: Date.now(),
@@ -1339,11 +1385,11 @@ export async function recordResourceMetrics(
   const startWait = Date.now();
   while (!acquireLock(relayHost)) {
     if (Date.now() - startWait > maxWaitMs) break;
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
   }
 
   try {
-    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    const node = gun.get("shogun-network").get("reputation").get(relayHost);
     await new Promise<void>((resolve) => {
       node.once((data: ReputationMetrics | undefined) => {
         const current = data || {};
@@ -1356,10 +1402,11 @@ export async function recordResourceMetrics(
           const currentAvg = current.avgConnections || 0;
           const currentMax = current.maxConnections || 0;
           const sampleCount = (current.avgConnections !== undefined ? 1 : 0) + 1;
-          
-          updates.avgConnections = currentAvg > 0 
-            ? ((currentAvg * (sampleCount - 1)) + activeConn) / sampleCount
-            : activeConn;
+
+          updates.avgConnections =
+            currentAvg > 0
+              ? (currentAvg * (sampleCount - 1) + activeConn) / sampleCount
+              : activeConn;
           updates.maxConnections = Math.max(currentMax, activeConn);
         }
 
@@ -1369,10 +1416,11 @@ export async function recordResourceMetrics(
           const currentAvg = current.avgMemoryUsageMB || 0;
           const currentMax = current.maxMemoryUsageMB || 0;
           const sampleCount = (current.avgMemoryUsageMB !== undefined ? 1 : 0) + 1;
-          
-          updates.avgMemoryUsageMB = currentAvg > 0
-            ? ((currentAvg * (sampleCount - 1)) + heapUsedMB) / sampleCount
-            : heapUsedMB;
+
+          updates.avgMemoryUsageMB =
+            currentAvg > 0
+              ? (currentAvg * (sampleCount - 1) + heapUsedMB) / sampleCount
+              : heapUsedMB;
           updates.maxMemoryUsageMB = Math.max(currentMax, heapUsedMB);
         }
 
@@ -1389,7 +1437,8 @@ export async function recordResourceMetrics(
         if (metrics.storage?.capacity !== undefined) {
           updates.storageCapacityMB = metrics.storage.capacity;
           if (metrics.storage.used !== undefined) {
-            updates.storageUtilizationPercent = (metrics.storage.used / metrics.storage.capacity) * 100;
+            updates.storageUtilizationPercent =
+              (metrics.storage.used / metrics.storage.capacity) * 100;
           }
         }
 
@@ -1420,19 +1469,19 @@ export async function recordDealPerformance(
   const startWait = Date.now();
   while (!acquireLock(relayHost)) {
     if (Date.now() - startWait > maxWaitMs) break;
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
   }
 
   try {
-    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    const node = gun.get("shogun-network").get("reputation").get(relayHost);
     await new Promise<void>((resolve) => {
       node.once((data: ReputationMetrics | undefined) => {
         const current = data || {};
         const now = Date.now();
-        
+
         const total = (current.dealsTotal || 0) + 1;
-        const completed = success ? (current.dealsCompleted || 0) + 1 : (current.dealsCompleted || 0);
-        const failed = success ? (current.dealsFailed || 0) : (current.dealsFailed || 0) + 1;
+        const completed = success ? (current.dealsCompleted || 0) + 1 : current.dealsCompleted || 0;
+        const failed = success ? current.dealsFailed || 0 : (current.dealsFailed || 0) + 1;
         const fulfillmentRate = total > 0 ? (completed / total) * 100 : 0;
 
         node.put({
@@ -1466,18 +1515,20 @@ export async function recordDataIntegrityCheck(
   const startWait = Date.now();
   while (!acquireLock(relayHost)) {
     if (Date.now() - startWait > maxWaitMs) break;
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
   }
 
   try {
-    const node = gun.get('shogun-network').get('reputation').get(relayHost);
+    const node = gun.get("shogun-network").get("reputation").get(relayHost);
     await new Promise<void>((resolve) => {
       node.once((data: ReputationMetrics | undefined) => {
         const current = data || {};
         const now = Date.now();
-        
+
         const checks = (current.dataIntegrityChecks || 0) + 1;
-        const failures = passed ? (current.dataIntegrityFailures || 0) : (current.dataIntegrityFailures || 0) + 1;
+        const failures = passed
+          ? current.dataIntegrityFailures || 0
+          : (current.dataIntegrityFailures || 0) + 1;
 
         node.put({
           dataIntegrityChecks: checks,

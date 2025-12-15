@@ -1,6 +1,6 @@
 /**
  * x402 Official Types
- * 
+ *
  * Types copied from the official x402 package (x402/typescript/packages/x402/src/types/verify/x402Specs.ts)
  * Simplified version without Zod validation - using pure TypeScript types only.
  */
@@ -153,4 +153,3 @@ export interface SettleResponse {
   transaction: string; // Transaction hash/ID
   network: Network;
 }
-

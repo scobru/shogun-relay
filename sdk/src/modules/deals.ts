@@ -1,5 +1,5 @@
-import { ApiClient } from '../client';
-import FormData from 'form-data';
+import { ApiClient } from "../client";
+import FormData from "form-data";
 
 export class DealsModule {
   private client: ApiClient;
@@ -13,21 +13,26 @@ export class DealsModule {
     if (sizeMB) params.sizeMB = sizeMB;
     if (durationDays) params.durationDays = durationDays;
     if (tier) params.tier = tier;
-    
-    return this.client.get('/api/v1/deals/pricing', { params });
+
+    return this.client.get("/api/v1/deals/pricing", { params });
   }
 
-  public async uploadForDeal(fileBuffer: Buffer, filename: string, contentType: string, walletAddress: string): Promise<any> {
+  public async uploadForDeal(
+    fileBuffer: Buffer,
+    filename: string,
+    contentType: string,
+    walletAddress: string
+  ): Promise<any> {
     const form = new FormData();
-    form.append('file', fileBuffer, {
+    form.append("file", fileBuffer, {
       filename: filename,
       contentType: contentType,
     });
 
-    return this.client.post('/api/v1/deals/upload', form, {
+    return this.client.post("/api/v1/deals/upload", form, {
       headers: {
         ...form.getHeaders(),
-        'x-wallet-address': walletAddress,
+        "x-wallet-address": walletAddress,
       },
     });
   }
@@ -39,7 +44,7 @@ export class DealsModule {
     durationDays: number;
     tier?: string;
   }): Promise<any> {
-    return this.client.post('/api/v1/deals/create', dealParams);
+    return this.client.post("/api/v1/deals/create", dealParams);
   }
 
   public async activateDeal(dealId: string, payment: any): Promise<any> {
@@ -61,7 +66,7 @@ export class DealsModule {
   public async verifyDeal(dealId: string, clientAddress?: string): Promise<any> {
     const params: any = {};
     if (clientAddress) params.clientAddress = clientAddress;
-    
+
     return this.client.get(`/api/v1/deals/${dealId}/verify`, { params });
   }
 
@@ -75,19 +80,18 @@ export class DealsModule {
   public async cancelDeal(dealId: string, clientAddress: string, reason?: string): Promise<any> {
     return this.client.post(`/api/v1/deals/${dealId}/cancel`, {
       clientAddress,
-      reason: reason || 'User requested cancellation',
+      reason: reason || "User requested cancellation",
     });
   }
 
   public async getDealStats(): Promise<any> {
-    return this.client.get('/api/v1/deals/stats');
+    return this.client.get("/api/v1/deals/stats");
   }
 
   public async getLeaderboard(limit?: number): Promise<any> {
     const params: any = {};
     if (limit) params.limit = limit;
-    
-    return this.client.get('/api/v1/deals/leaderboard', { params });
+
+    return this.client.get("/api/v1/deals/leaderboard", { params });
   }
 }
-

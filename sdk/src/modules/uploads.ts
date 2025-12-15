@@ -1,4 +1,4 @@
-import { ApiClient } from '../client';
+import { ApiClient } from "../client";
 
 export class UploadsModule {
   private client: ApiClient;
@@ -16,6 +16,6 @@ export class UploadsModule {
   }
 
   public async getSystemHashes(): Promise<any> {
-    return this.client.get('/api/v1/user-uploads/system-hashes');
+    return this.client.get("/api/v1/user-uploads/system-hashes");
   }
 }
