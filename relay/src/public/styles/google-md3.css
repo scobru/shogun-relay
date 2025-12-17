@@ -8,42 +8,42 @@
 
 /* ===== CSS CUSTOM PROPERTIES ===== */
 :root {
-  /* Primary Colors - Google Blue */
-  --md-primary: #1a73e8;
-  --md-primary-hover: #1557b0;
+  /* Primary Colors - Shogun Dark */
+  --md-primary: #ff69b4;
+  --md-primary-hover: #ff1493;
   --md-on-primary: #ffffff;
-  --md-primary-container: #d3e3fd;
-  --md-on-primary-container: #041e49;
+  --md-primary-container: #282828;
+  --md-on-primary-container: #ffffff;
 
   /* Secondary Colors */
-  --md-secondary: #5f6368;
-  --md-secondary-container: #e8eaed;
+  --md-secondary: #8b94ff;
+  --md-secondary-container: #282828;
   --md-on-secondary: #ffffff;
 
   /* Tertiary / Accent */
-  --md-tertiary: #1a73e8;
+  --md-tertiary: #42a5f5;
 
-  /* Surface Colors - Light Theme */
-  --md-surface: #ffffff;
-  --md-surface-dim: #dde3ea;
-  --md-surface-container-lowest: #ffffff;
-  --md-surface-container-low: #f8fafd;
-  --md-surface-container: #f1f3f4;
-  --md-surface-container-high: #e8eaed;
-  --md-surface-container-highest: #dde3ea;
-  --md-on-surface: #1f1f1f;
-  --md-on-surface-variant: #5f6368;
-  --md-outline: #dadce0;
-  --md-outline-variant: #e8eaed;
+  /* Surface Colors - Dark Theme */
+  --md-surface: #1a1a1a;
+  --md-surface-dim: #0d0d0d;
+  --md-surface-container-lowest: #1a1a1a;
+  --md-surface-container-low: #202020;
+  --md-surface-container: #282828;
+  --md-surface-container-high: #303030;
+  --md-surface-container-highest: #404040;
+  --md-on-surface: #ffffff;
+  --md-on-surface-variant: #e0e0e0;
+  --md-outline: #404040;
+  --md-outline-variant: #404040;
 
   /* Status Colors */
-  --md-success: #34a853;
-  --md-success-container: #ceead6;
-  --md-error: #ea4335;
-  --md-error-container: #fce8e6;
-  --md-warning: #fbbc04;
-  --md-warning-container: #fef7e0;
-  --md-info: #4285f4;
+  --md-success: #4caf50;
+  --md-success-container: rgba(76, 175, 80, 0.15);
+  --md-error: #f44336;
+  --md-error-container: rgba(244, 67, 54, 0.15);
+  --md-warning: #ffa500;
+  --md-warning-container: rgba(255, 165, 0, 0.15);
+  --md-info: #42a5f5;
 
   /* Elevation Shadows */
   --md-elevation-1: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
@@ -436,19 +436,19 @@ body {
 
 .md-chip-success {
   background-color: var(--md-success-container);
-  color: #137333;
+  color: var(--md-success);
   border-color: transparent;
 }
 
 .md-chip-error {
   background-color: var(--md-error-container);
-  color: #c5221f;
+  color: var(--md-error);
   border-color: transparent;
 }
 
 .md-chip-warning {
   background-color: var(--md-warning-container);
-  color: #b06000;
+  color: var(--md-warning);
   border-color: transparent;
 }
 
