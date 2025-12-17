@@ -1,377 +1,482 @@
 ﻿<!DOCTYPE html>
-<html lang="en" data-theme="shogun-dark">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Services Dashboard - Shogun Relay</title>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/variables.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/base.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/daisyui-overrides.css" rel="stylesheet" type="text/css" />
-    <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="styles/google-md3.css">
     <script src="lib/admin-nav.js"></script>
     <script src="lib/admin-auth.js"></script>
     <style>
-        body {
-            background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
-            min-height: 100vh;
+        .page-header {
+            background-color: var(--md-surface);
+            border-bottom: 1px solid var(--md-outline-variant);
+            padding: 24px;
+            margin-bottom: 24px;
         }
 
-        .hero-gradient {
-            background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
+        .page-header-content {
+            max-width: 1280px;
+            margin: 0 auto;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
         }
 
-        @keyframes pulse-glow {
-
-            0%,
-            100% {
-                box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4);
-            }
-
-            50% {
-                box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2);
-            }
+        .page-title-section {
+            display: flex;
+            align-items: center;
+            gap: 16px;
         }
 
-        .pulse-glow {
-            animation: pulse-glow 2s infinite;
+        .page-icon {
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+            background-color: var(--md-primary-container);
         }
 
-        .section-divider {
-            height: 1px;
-            background: linear-gradient(90deg, transparent, #404040, transparent);
-            margin: 2rem 0;
+        .page-icon svg {
+            width: 28px;
+            height: 28px;
+            color: var(--md-on-primary-container);
+        }
+
+        .service-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
         }
 
         .service-card {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            border: 1px solid #404040;
-            background-color: #282828;
-            border-radius: 1rem;
+            background-color: var(--md-surface);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: 16px;
+            overflow: hidden;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .service-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-            border-color: rgba(255, 105, 180, 0.3);
+            border-color: var(--md-primary);
+            box-shadow: var(--md-elevation-2);
         }
 
-        .status-indicator {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 8px;
-            transition: all 0.3s ease;
+        .service-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--md-outline-variant);
+            background-color: var(--md-surface-container-low);
         }
 
-        .status-online {
-            background-color: #4CAF50;
-            box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+        .service-name {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 500;
+            font-size: 1.125rem;
         }
 
-        .status-offline {
-            background-color: #F44336;
-            box-shadow: 0 0 8px rgba(244, 67, 54, 0.5);
+        .service-card-body {
+            padding: 20px;
         }
 
-        .status-warning {
-            background-color: #FFA500;
-            box-shadow: 0 0 8px rgba(255, 165, 0, 0.5);
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--md-outline-variant);
         }
 
-        .status-unknown {
-            background-color: #A0A0A0;
+        .stat-row:last-child {
+            border-bottom: none;
         }
 
-        .pulse {
-            animation: pulse 2s infinite;
+        .stat-label {
+            color: var(--md-on-surface-variant);
+            font-size: 0.875rem;
         }
 
-        @keyframes pulse {
+        .stat-value {
+            font-weight: 500;
+            font-family: 'Roboto Mono', monospace;
+        }
 
-            0%,
-            100% {
-                opacity: 1;
+        .service-card-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            padding: 12px 20px;
+            background-color: var(--md-surface-container-low);
+            border-top: 1px solid var(--md-outline-variant);
+        }
+
+        .alert-banner {
+            display: none;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            border-radius: 12px;
+            background-color: var(--md-warning-container);
+            color: #b06000;
+        }
+
+        .alert-banner.show {
+            display: flex;
+        }
+
+        .alert-banner svg {
+            width: 24px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .logs-card {
+            background-color: var(--md-surface);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .logs-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background-color: var(--md-surface-container-low);
+            border-bottom: 1px solid var(--md-outline-variant);
+        }
+
+        .logs-content {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            padding: 16px;
+            height: 160px;
+            overflow-y: auto;
+            background-color: var(--md-surface-container);
+            color: var(--md-on-surface);
+        }
+
+        .log-entry {
+            padding: 4px 0;
+        }
+
+        .log-entry.error {
+            color: var(--md-error);
+        }
+
+        .log-entry.success {
+            color: var(--md-success);
+        }
+
+        .log-entry.warning {
+            color: #b06000;
+        }
+
+        .quick-actions-card {
+            background-color: var(--md-primary-container);
+            border: none;
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .quick-actions-title {
+            font-size: 1.125rem;
+            font-weight: 500;
+            color: var(--md-on-primary-container);
+            margin-bottom: 20px;
+        }
+
+        .quick-actions-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .rpc-details {
+            max-height: 120px;
+            overflow-y: auto;
+            margin-top: 12px;
+        }
+
+        .rpc-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            background-color: var(--md-surface-container);
+            border-radius: 8px;
+            font-size: 0.875rem;
+        }
+
+        .rpc-item-name {
+            font-weight: 500;
+        }
+
+        .rpc-item-info {
+            font-size: 0.75rem;
+            color: var(--md-on-surface-variant);
+            margin-top: 2px;
+        }
+
+        @media (max-width: 768px) {
+            .service-grid {
+                grid-template-columns: 1fr;
             }
 
-            50% {
-                opacity: 0.5;
+            .page-header-content {
+                flex-direction: column;
+                align-items: flex-start;
             }
-        }
-
-        .restart-btn {
-            transition: all 0.3s ease;
-        }
-
-        .restart-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 4px 16px rgba(255, 165, 0, 0.3);
-        }
-
-        .service-actions {
-            opacity: 0.7;
-            transition: opacity 0.3s ease;
-        }
-
-        .service-card:hover .service-actions {
-            opacity: 1;
         }
     </style>
 </head>
 
-<body class="antialiased">
-    <div class="hero-gradient min-h-screen">
-        <div class="container mx-auto px-4 py-8 max-w-7xl">
-            <!-- Header -->
-            <header class="mb-12">
-                <div class="flex items-center mb-6">
-                    <a href="/"
-                        class="flex items-center gap-2 text-[#A0A0A0] hover:text-[#FF69B4] transition-colors group">
-                        <svg xmlns="http://www.w3.org/2000/svg"
-                            class="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none"
-                            viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
-                        <span>Back to Control Panel</span>
-                    </a>
-                </div>
-
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                    <div class="flex items-center gap-4">
-                        <div
-                            class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#64B5F6] to-[#1976D2] pulse-glow">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none"
-                                viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                            </svg>
-                        </div>
-                        <div>
-                            <h1 class="text-3xl md:text-4xl font-bold text-[#FFFFFF]">Services Dashboard</h1>
-                            <p class="text-[#8B94FF]">Monitor and control Shogun Relay services</p>
-                        </div>
-                    </div>
-                    <div class="flex flex-wrap gap-3">
-                        <button onclick="refreshAllServices()"
-                            class="btn bg-transparent border border-[#404040] text-[#E0E0E0] hover:bg-[#404040] hover:border-[#FF69B4] rounded-xl px-4 py-2 font-medium transition-all">Refresh
-                            All</button>
-                        <button onclick="clearAdminPassword()"
-                            class="btn bg-transparent border border-[#404040] text-[#E0E0E0] hover:bg-[#404040] hover:border-[#FF69B4] rounded-xl px-4 py-2 font-medium transition-all"
-                            title="Clear stored admin password">Clear Auth</button>
-                        <a href="/pin-manager"
-                            class="btn bg-transparent border border-[#404040] text-[#E0E0E0] hover:bg-[#404040] hover:border-[#FF69B4] rounded-xl px-4 py-2 font-medium transition-all">Pin
-                            Manager</a>
-                    </div>
-                </div>
-            </header>
-
-            <div id="alertPanel"
-                class="alert alert-warning mb-8 bg-[#FFA500]/20 border-[#FFA500]/30 text-[#FFA500] rounded-xl p-4"
-                style="display: none;">
-                <div>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none"
-                        viewBox="0 0 24 24">
+<body>
+    <!-- Header -->
+    <header class="page-header">
+        <div class="page-header-content">
+            <div class="page-title-section">
+                <a href="/admin" class="md-btn md-btn-icon" title="Back to Admin">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        width="24" height="24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                            d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
-                    <span id="alertMessage">Some services are offline or experiencing issues</span>
+                </a>
+                <div class="page-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="md-headline-medium">Services Dashboard</h1>
+                    <p class="md-body-medium md-text-secondary">Monitor and control Shogun Relay services</p>
                 </div>
             </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-
-                <!-- Gun Relay Service -->
-                <div class="service-card card shadow-xl">
-                    <div class="card-body p-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <h2 class="card-title text-lg text-[#FF69B4]">
-                                <span class="status-indicator status-unknown pulse" id="gun-status-indicator"></span>
-                                Gun Relay
-                            </h2>
-                            <div class="badge badge-outline bg-[#282828] border-[#606060] text-[#E0E0E0]"
-                                id="gun-uptime">--</div>
-                        </div>
-
-                        <div class="space-y-3 text-base">
-                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Status:</span><span
-                                    id="gun-status" class="font-semibold text-[#FFFFFF]">Checking...</span></div>
-                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Active
-                                    Connections:</span><span id="gun-connections" class="text-[#FFFFFF]">--</span></div>
-                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Total
-                                    Connections:</span><span id="gun-total-connections" class="text-[#FFFFFF]">--</span>
-                            </div>
-                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Memory Usage:</span><span
-                                    id="gun-memory" class="text-[#FFFFFF]">--</span></div>
-                        </div>
-
-                        <div class="card-actions justify-end mt-6 service-actions">
-                            <button onclick="refreshService('gun')"
-                                class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">🔄
-                                Refresh</button>
-                            <button onclick="restartService('gun')"
-                                class="btn bg-[#FFA500] hover:bg-[#FF8C00] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium restart-btn">🔄
-                                Restart</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- IPFS Service -->
-                <div class="service-card card shadow-xl">
-                    <div class="card-body p-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <h2 class="card-title text-lg text-[#FF69B4]">
-                                <span class="status-indicator status-unknown pulse" id="ipfs-status-indicator"></span>
-                                IPFS Node
-                            </h2>
-                            <div class="badge badge-outline bg-[#282828] border-[#606060] text-[#E0E0E0]"
-                                id="ipfs-version">--</div>
-                        </div>
-
-                        <div class="space-y-3 text-base">
-                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Status:</span><span
-                                    id="ipfs-status" class="font-semibold text-[#FFFFFF]">Checking...</span></div>
-                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Storage Used:</span><span
-                                    id="ipfs-storage" class="text-[#FFFFFF]">--</span></div>
-                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Storage Max:</span><span
-                                    id="ipfs-storage-max" class="text-[#FFFFFF]">--</span></div>
-                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Usage %:</span><span
-                                    id="ipfs-usage-percent" class="text-[#FFFFFF]">--</span></div>
-                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Objects:</span><span
-                                    id="ipfs-objects" class="text-[#FFFFFF]">--</span></div>
-                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Type:</span><span
-                                    id="ipfs-type" class="text-[#FFFFFF]">--</span></div>
-                        </div>
-
-                        <div class="card-actions justify-end mt-6">
-                            <button onclick="refreshService('ipfs')"
-                                class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">🔄
-                                Refresh</button>
-                            <button onclick="restartService('ipfs')"
-                                class="btn bg-[#FFA500] hover:bg-[#FF8C00] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium restart-btn">🔄
-                                Restart</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Holster Service -->
-                <div class="service-card card shadow-xl">
-                    <div class="card-body p-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <h2 class="card-title text-lg text-[#FF69B4]">
-                                <span class="status-indicator status-unknown pulse"
-                                    id="holster-status-indicator"></span>
-                                Holster Relay
-                            </h2>
-                            <div class="badge badge-outline bg-[#282828] border-[#606060] text-[#E0E0E0]"
-                                id="holster-port">--</div>
-                        </div>
-
-                        <div class="space-y-3 text-base">
-                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Status:</span><span
-                                    id="holster-status" class="font-semibold text-[#FFFFFF]">Checking...</span></div>
-                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Port:</span><span
-                                    id="holster-port-value" class="text-[#FFFFFF]">--</span></div>
-                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Host:</span><span
-                                    id="holster-host" class="text-[#FFFFFF]">--</span></div>
-                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Storage:</span><span
-                                    id="holster-storage" class="text-[#FFFFFF]">--</span></div>
-                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Max Connections:</span><span
-                                    id="holster-max-connections" class="text-[#FFFFFF]">--</span></div>
-                        </div>
-
-                        <div class="card-actions justify-end mt-6 service-actions">
-                            <button onclick="refreshService('holster')"
-                                class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">🔄
-                                Refresh</button>
-                            <button onclick="restartService('holster')"
-                                class="btn bg-[#FFA500] hover:bg-[#FF8C00] border-0 text-[#FFFFFF] rounded-xl px-4 py-2 font-medium restart-btn">🔄
-                                Restart</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Blockchain RPC Service -->
-                <div class="service-card card shadow-xl">
-                    <div class="card-body p-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <h2 class="card-title text-lg text-[#FF69B4]">
-                                <span class="status-indicator status-unknown pulse" id="rpc-status-indicator"></span>
-                                Blockchain RPC
-                            </h2>
-                            <div class="badge badge-outline bg-[#282828] border-[#606060] text-[#E0E0E0]"
-                                id="rpc-summary">--</div>
-                        </div>
-
-                        <div class="space-y-3 text-base">
-                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Status:</span><span
-                                    id="rpc-status" class="font-semibold text-[#FFFFFF]">Checking...</span></div>
-                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Online:</span><span
-                                    id="rpc-online" class="text-[#FFFFFF]">--</span></div>
-                            <div class="flex justify-between"><span class="text-[#E0E0E0]">Total:</span><span
-                                    id="rpc-total" class="text-[#FFFFFF]">--</span></div>
-                            <div id="rpc-details" class="mt-4 space-y-2 max-h-48 overflow-y-auto">
-                                <!-- RPC details will be populated here -->
-                            </div>
-                        </div>
-
-                        <div class="card-actions justify-end mt-6 service-actions">
-                            <button onclick="refreshService('rpc')"
-                                class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">🔄
-                                Refresh</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Quick Actions -->
-                <div class="service-card card shadow-xl">
-                    <div class="card-body p-6">
-                        <h2 class="card-title text-lg text-[#FF69B4] mb-6">Quick Actions</h2>
-                        <div class="space-y-4">
-                            <button onclick="healthCheck()"
-                                class="btn bg-[#4CAF50] hover:bg-[#45A049] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium">🔍
-                                Health Check</button>
-                            <button onclick="restartAllServices()"
-                                class="btn bg-[#FFA500] hover:bg-[#FF8C00] border-0 text-[#FFFFFF] w-full rounded-xl px-6 py-3 font-medium">🔄
-                                Restart All</button>
-                        </div>
-                        <div class="mt-6">
-                            <p class="text-sm text-[#A0A0A0]">Last updated: <span id="last-update"
-                                    class="text-[#E0E0E0]">--</span></p>
-                        </div>
-                    </div>
-                </div>
-
+            <div class="md-flex md-gap-sm">
+                <button onclick="refreshAllServices()" class="md-btn md-btn-outlined">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh All
+                </button>
+                <a href="/pin-manager" class="md-btn md-btn-tonal">Pin Manager</a>
             </div>
-
-            <!-- Logs Section -->
-            <div class="card bg-[#282828] border border-[#404040] rounded-2xl mt-8">
-                <div class="card-body p-6">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="card-title text-[#FF69B4] text-xl">Service Logs</h2>
-                        <button onclick="clearLogs()"
-                            class="btn bg-transparent border border-[#404040] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">Clear</button>
-                    </div>
-                    <div id="service-logs"
-                        class="bg-[#1A1A1A] rounded-xl p-4 font-mono text-base h-40 overflow-y-auto text-[#E0E0E0] border border-[#404040]">
-                        <div class="text-[#A0A0A0]">Service monitoring initialized...</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Footer -->
-            <footer class="mt-12 text-center">
-                <div class="section-divider"></div>
-                <p class="text-[#606060] text-sm">
-                    Shogun Relay Services - Part of the <a href="https://github.com/scobru/shogun"
-                        class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">Shogun Project</a>
-                </p>
-            </footer>
         </div>
-    </div>
+    </header>
+
+    <main class="md-container">
+        <!-- Alert Banner -->
+        <div id="alertPanel" class="alert-banner">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <span id="alertMessage">Some services are offline or experiencing issues</span>
+        </div>
+
+        <div class="service-grid">
+            <!-- Gun Relay Service -->
+            <div class="service-card">
+                <div class="service-card-header">
+                    <div class="service-name">
+                        <span id="gun-status-indicator" class="md-status-dot md-status-dot-pulse"></span>
+                        Gun Relay
+                    </div>
+                    <span id="gun-uptime" class="md-chip">--</span>
+                </div>
+                <div class="service-card-body">
+                    <div class="stat-row">
+                        <span class="stat-label">Status</span>
+                        <span class="stat-value" id="gun-status">Checking...</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Active Connections</span>
+                        <span class="stat-value" id="gun-connections">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Total Connections</span>
+                        <span class="stat-value" id="gun-total-connections">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Memory Usage</span>
+                        <span class="stat-value" id="gun-memory">--</span>
+                    </div>
+                </div>
+                <div class="service-card-footer">
+                    <button onclick="refreshService('gun')" class="md-btn md-btn-text">Refresh</button>
+                    <button onclick="restartService('gun')" class="md-btn md-btn-tonal">Restart</button>
+                </div>
+            </div>
+
+            <!-- IPFS Service -->
+            <div class="service-card">
+                <div class="service-card-header">
+                    <div class="service-name">
+                        <span id="ipfs-status-indicator" class="md-status-dot md-status-dot-pulse"></span>
+                        IPFS Node
+                    </div>
+                    <span id="ipfs-version" class="md-chip">--</span>
+                </div>
+                <div class="service-card-body">
+                    <div class="stat-row">
+                        <span class="stat-label">Status</span>
+                        <span class="stat-value" id="ipfs-status">Checking...</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Storage Used</span>
+                        <span class="stat-value" id="ipfs-storage">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Storage Max</span>
+                        <span class="stat-value" id="ipfs-storage-max">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Usage</span>
+                        <span class="stat-value" id="ipfs-usage-percent">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Objects</span>
+                        <span class="stat-value" id="ipfs-objects">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Type</span>
+                        <span class="stat-value" id="ipfs-type">--</span>
+                    </div>
+                </div>
+                <div class="service-card-footer">
+                    <button onclick="refreshService('ipfs')" class="md-btn md-btn-text">Refresh</button>
+                    <button onclick="restartService('ipfs')" class="md-btn md-btn-tonal">Restart</button>
+                </div>
+            </div>
+
+            <!-- Holster Service -->
+            <div class="service-card">
+                <div class="service-card-header">
+                    <div class="service-name">
+                        <span id="holster-status-indicator" class="md-status-dot md-status-dot-pulse"></span>
+                        Holster Relay
+                    </div>
+                    <span id="holster-port" class="md-chip">--</span>
+                </div>
+                <div class="service-card-body">
+                    <div class="stat-row">
+                        <span class="stat-label">Status</span>
+                        <span class="stat-value" id="holster-status">Checking...</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Port</span>
+                        <span class="stat-value" id="holster-port-value">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Host</span>
+                        <span class="stat-value" id="holster-host">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Storage</span>
+                        <span class="stat-value" id="holster-storage">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Max Connections</span>
+                        <span class="stat-value" id="holster-max-connections">--</span>
+                    </div>
+                </div>
+                <div class="service-card-footer">
+                    <button onclick="refreshService('holster')" class="md-btn md-btn-text">Refresh</button>
+                    <button onclick="restartService('holster')" class="md-btn md-btn-tonal">Restart</button>
+                </div>
+            </div>
+
+            <!-- Blockchain RPC Service -->
+            <div class="service-card">
+                <div class="service-card-header">
+                    <div class="service-name">
+                        <span id="rpc-status-indicator" class="md-status-dot md-status-dot-pulse"></span>
+                        Blockchain RPC
+                    </div>
+                    <span id="rpc-summary" class="md-chip">--</span>
+                </div>
+                <div class="service-card-body">
+                    <div class="stat-row">
+                        <span class="stat-label">Status</span>
+                        <span class="stat-value" id="rpc-status">Checking...</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Online</span>
+                        <span class="stat-value" id="rpc-online">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Total</span>
+                        <span class="stat-value" id="rpc-total">--</span>
+                    </div>
+                    <div id="rpc-details" class="rpc-details"></div>
+                </div>
+                <div class="service-card-footer">
+                    <button onclick="refreshService('rpc')" class="md-btn md-btn-text">Refresh</button>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="quick-actions-card">
+                <h3 class="quick-actions-title">Quick Actions</h3>
+                <div class="quick-actions-buttons">
+                    <button onclick="healthCheck()" class="md-btn md-btn-filled" style="width: 100%;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Health Check
+                    </button>
+                    <button onclick="restartAllServices()" class="md-btn md-btn-outlined"
+                        style="width: 100%; background: white;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Restart All Services
+                    </button>
+                </div>
+                <p class="md-body-small md-mt-lg" style="color: var(--md-on-primary-container); opacity: 0.8;">
+                    Last updated: <span id="last-update">--</span>
+                </p>
+            </div>
+        </div>
+
+        <!-- Service Logs -->
+        <div class="logs-card">
+            <div class="logs-header">
+                <h3 class="md-title-medium">Service Logs</h3>
+                <button onclick="clearLogs()" class="md-btn md-btn-text">Clear</button>
+            </div>
+            <div class="logs-content" id="service-logs">
+                <div class="log-entry">Service monitoring initialized...</div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="md-footer">
+            <p class="md-body-small">
+                Shogun Relay Services — Part of the <a href="https://github.com/scobru/shogun">Shogun Project</a>
+            </p>
+        </footer>
+    </main>
 
     <script>
         let updateInterval;
@@ -384,37 +489,34 @@
         function log(message, level = 'info') {
             const logs = document.getElementById('service-logs');
             const timestamp = new Date().toLocaleTimeString();
-            const levelIcon = { 'info': 'ℹ', 'success': '', 'warning': '', 'error': '' }[level] || 'ℹ';
-
             const logEntry = document.createElement('div');
-            logEntry.innerHTML = `[${timestamp}] ${levelIcon} ${message}`;
+            logEntry.className = `log-entry ${level}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
             logs.appendChild(logEntry);
             logs.scrollTop = logs.scrollHeight;
-
             while (logs.children.length > 50) {
                 logs.removeChild(logs.firstChild);
             }
         }
 
         function clearLogs() {
-            document.getElementById('service-logs').innerHTML = '<div class="text-[#A0A0A0]">Logs cleared...</div>';
-        }
-
-        function clearAdminPassword() {
-            ShogunAdmin.clearPassword();
-            log('🔑 Admin password cleared from storage', 'info');
+            document.getElementById('service-logs').innerHTML = '<div class="log-entry">Logs cleared...</div>';
         }
 
         function updateStatusIndicator(service, status) {
             const indicator = document.getElementById(`${service}-status-indicator`);
             if (!indicator) return;
 
-            indicator.className = 'status-indicator ' + {
-                'online': 'status-online',
-                'offline': 'status-offline',
-                'warning': 'status-warning',
-                'unknown': 'status-unknown pulse'
-            }[status];
+            indicator.className = 'md-status-dot';
+            if (status === 'online') {
+                indicator.classList.add('md-status-dot-success');
+            } else if (status === 'offline') {
+                indicator.classList.add('md-status-dot-error');
+            } else if (status === 'warning') {
+                indicator.classList.add('md-status-dot-warning');
+            } else {
+                indicator.classList.add('md-status-dot-pulse');
+            }
 
             servicesStatus[service] = status;
             checkForAlerts();
@@ -422,13 +524,13 @@
 
         function checkForAlerts() {
             const alertPanel = document.getElementById('alertPanel');
-            const offlineServices = Object.keys(servicesStatus).filter(service => servicesStatus[service] === 'offline');
+            const offlineServices = Object.keys(servicesStatus).filter(s => servicesStatus[s] === 'offline');
 
             if (offlineServices.length > 0) {
                 document.getElementById('alertMessage').textContent = `Services offline: ${offlineServices.join(', ')}`;
-                alertPanel.style.display = 'block';
+                alertPanel.classList.add('show');
             } else {
-                alertPanel.style.display = 'none';
+                alertPanel.classList.remove('show');
             }
         }
 
@@ -460,21 +562,14 @@
                 document.getElementById('gun-status').textContent = data.status || 'Unknown';
                 document.getElementById('gun-connections').textContent = data.connections?.active || 0;
                 document.getElementById('gun-total-connections').textContent = data.connections?.total || 0;
-                // Fix: Use memory.heapUsedMB (in MB) and convert to bytes for formatBytes
                 const memoryMB = data.memory?.heapUsedMB || 0;
-                const memoryBytes = memoryMB * 1024 * 1024;
-                document.getElementById('gun-memory').textContent = formatBytes(memoryBytes);
-                // Fix: Use uptime.seconds (in seconds) and convert to milliseconds for formatUptime
+                document.getElementById('gun-memory').textContent = formatBytes(memoryMB * 1024 * 1024);
                 const uptimeMs = (data.uptime?.seconds || 0) * 1000;
                 document.getElementById('gun-uptime').textContent = formatUptime(uptimeMs);
 
-                // Map status: healthy -> online, degraded -> warning, others -> offline
                 let indicatorStatus = 'offline';
-                if (data.status === 'healthy') {
-                    indicatorStatus = 'online';
-                } else if (data.status === 'degraded') {
-                    indicatorStatus = 'warning';
-                }
+                if (data.status === 'healthy') indicatorStatus = 'online';
+                else if (data.status === 'degraded') indicatorStatus = 'warning';
                 updateStatusIndicator('gun', indicatorStatus);
                 return true;
             } catch (error) {
@@ -487,13 +582,8 @@
 
         async function checkIPFSStatus() {
             try {
-                // Use the relay's IPFS status endpoint instead of direct connection
                 const response = await fetch('/api/v1/ipfs/status');
-
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
 
                 if (data.success && data.status === 'connected') {
@@ -501,88 +591,37 @@
                     document.getElementById('ipfs-version').textContent = data.version || '--';
                     document.getElementById('ipfs-type').textContent = 'IPFS';
 
-                    // Get repository statistics using relay API
-                    try {
-                        const password = getAdminPassword();
-                        if (password) {
+                    const password = getAdminPassword();
+                    if (password) {
+                        try {
                             const statsResponse = await fetch('/api/v1/ipfs/repo/stat', {
                                 headers: { 'Authorization': `Bearer ${password}` }
                             });
-
                             if (statsResponse.ok) {
                                 const statsData = await statsResponse.json();
                                 if (statsData.success && statsData.stats) {
                                     const usedMB = statsData.stats.repoSizeMB || 0;
                                     const maxMB = statsData.stats.storageMaxMB || 0;
                                     const usagePercent = maxMB > 0 ? Math.round((usedMB / maxMB) * 100) : 0;
-
                                     document.getElementById('ipfs-storage').textContent = `${usedMB} MB`;
                                     document.getElementById('ipfs-storage-max').textContent = `${maxMB} MB`;
                                     document.getElementById('ipfs-usage-percent').textContent = `${usagePercent}%`;
                                     document.getElementById('ipfs-objects').textContent = statsData.stats.numObjects;
-                                } else {
-                                    document.getElementById('ipfs-storage').textContent = '--';
-                                    document.getElementById('ipfs-storage-max').textContent = '--';
-                                    document.getElementById('ipfs-usage-percent').textContent = '--';
-                                    document.getElementById('ipfs-objects').textContent = '--';
                                 }
-                            } else {
-                                document.getElementById('ipfs-storage').textContent = '--';
-                                document.getElementById('ipfs-storage-max').textContent = '--';
-                                document.getElementById('ipfs-usage-percent').textContent = '--';
-                                document.getElementById('ipfs-objects').textContent = '--';
                             }
-                        } else {
-                            document.getElementById('ipfs-storage').textContent = 'Need Auth';
-                            document.getElementById('ipfs-storage-max').textContent = 'Need Auth';
-                            document.getElementById('ipfs-usage-percent').textContent = 'Need Auth';
-                            document.getElementById('ipfs-objects').textContent = 'Need Auth';
-                        }
-                    } catch (statsError) {
-                        console.warn('Failed to get IPFS stats:', statsError);
-                        document.getElementById('ipfs-storage').textContent = '--';
-                        document.getElementById('ipfs-storage-max').textContent = '--';
-                        document.getElementById('ipfs-usage-percent').textContent = '--';
-                        document.getElementById('ipfs-objects').textContent = '--';
+                        } catch (e) { /* ignore */ }
                     }
-
                     updateStatusIndicator('ipfs', 'online');
                     return true;
                 } else {
-                    // IPFS might be starting up
-                    const status = data.status === 'timeout' || data.error?.includes('ECONNREFUSED') ? 'Starting...' : 'Offline';
-                    document.getElementById('ipfs-status').textContent = status;
-                    document.getElementById('ipfs-version').textContent = '--';
-                    document.getElementById('ipfs-type').textContent = '--';
-                    document.getElementById('ipfs-storage').textContent = '--';
-                    document.getElementById('ipfs-storage-max').textContent = '--';
-                    document.getElementById('ipfs-usage-percent').textContent = '--';
-                    document.getElementById('ipfs-objects').textContent = '--';
-                    updateStatusIndicator('ipfs', status === 'Starting...' ? 'warning' : 'offline');
-                    if (status === 'Starting...') {
-                        log(`IPFS is starting up: ${data.error || data.message}`, 'info');
-                    } else {
-                        log(`IPFS check failed: ${data.error || 'IPFS offline'}`, 'error');
-                    }
+                    document.getElementById('ipfs-status').textContent = 'Offline';
+                    updateStatusIndicator('ipfs', 'offline');
                     return false;
                 }
             } catch (error) {
-                // Network error - might be starting up
-                const isConnectionError = error.message.includes('ECONNREFUSED') || error.message.includes('Failed to fetch');
-                const status = isConnectionError ? 'Starting...' : 'Offline';
-                document.getElementById('ipfs-status').textContent = status;
-                document.getElementById('ipfs-version').textContent = '--';
-                document.getElementById('ipfs-type').textContent = '--';
-                document.getElementById('ipfs-storage').textContent = '--';
-                document.getElementById('ipfs-storage-max').textContent = '--';
-                document.getElementById('ipfs-usage-percent').textContent = '--';
-                document.getElementById('ipfs-objects').textContent = '--';
-                updateStatusIndicator('ipfs', isConnectionError ? 'warning' : 'offline');
-                if (isConnectionError) {
-                    log(`IPFS may be starting up: ${error.message}`, 'info');
-                } else {
-                    log(`IPFS check failed: ${error.message}`, 'error');
-                }
+                document.getElementById('ipfs-status').textContent = 'Offline';
+                updateStatusIndicator('ipfs', 'offline');
+                log(`IPFS check failed: ${error.message}`, 'error');
                 return false;
             }
         }
@@ -593,30 +632,21 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    const status = data.status === 'active' ? 'Online' : 'Offline';
-                    document.getElementById('holster-status').textContent = status;
+                    document.getElementById('holster-status').textContent = data.status === 'active' ? 'Online' : 'Offline';
                     document.getElementById('holster-port').textContent = `Port ${data.config.port}`;
                     document.getElementById('holster-port-value').textContent = data.config.port;
                     document.getElementById('holster-host').textContent = data.config.host;
                     document.getElementById('holster-storage').textContent = data.config.storageEnabled ? 'Enabled' : 'Disabled';
                     document.getElementById('holster-max-connections').textContent = data.config.maxConnections;
-
                     updateStatusIndicator('holster', data.status === 'active' ? 'online' : 'offline');
                     return true;
-                } else {
-                    throw new Error(data.error || 'Holster offline');
                 }
             } catch (error) {
                 document.getElementById('holster-status').textContent = 'Offline';
-                document.getElementById('holster-port').textContent = '--';
-                document.getElementById('holster-port-value').textContent = '--';
-                document.getElementById('holster-host').textContent = '--';
-                document.getElementById('holster-storage').textContent = '--';
-                document.getElementById('holster-max-connections').textContent = '--';
                 updateStatusIndicator('holster', 'offline');
                 log(`Holster check failed: ${error.message}`, 'error');
-                return false;
             }
+            return false;
         }
 
         async function checkRPCStatus() {
@@ -625,18 +655,17 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    const summary = data.summary || { total: 0, online: 0, offline: 0 };
+                    const summary = data.summary || { total: 0, online: 0 };
                     const rpcs = data.rpcs || [];
 
                     document.getElementById('rpc-online').textContent = `${summary.online}/${summary.total}`;
                     document.getElementById('rpc-total').textContent = summary.total;
-                    document.getElementById('rpc-summary').textContent = `${summary.online}/${summary.total} Online`;
+                    document.getElementById('rpc-summary').textContent = `${summary.online}/${summary.total}`;
 
                     const status = summary.online === summary.total && summary.total > 0 ? 'All Online' :
                         summary.online > 0 ? 'Partial' : 'Offline';
                     document.getElementById('rpc-status').textContent = status;
 
-                    // Update status indicator
                     if (summary.online === summary.total && summary.total > 0) {
                         updateStatusIndicator('rpc', 'online');
                     } else if (summary.online > 0) {
@@ -645,187 +674,98 @@
                         updateStatusIndicator('rpc', 'offline');
                     }
 
-                    // Populate RPC details
                     const detailsContainer = document.getElementById('rpc-details');
                     detailsContainer.innerHTML = '';
-
-                    if (rpcs.length === 0) {
-                        detailsContainer.innerHTML = '<div class="text-[#A0A0A0] text-sm">No RPC endpoints configured</div>';
-                    } else {
-                        rpcs.forEach(rpc => {
-                            const rpcDiv = document.createElement('div');
-                            rpcDiv.className = 'text-sm border-b border-[#404040] pb-2';
-
-                            const statusColor = rpc.status === 'online' ? '#4CAF50' : '#F44336';
-                            const statusIcon = rpc.status === 'online' ? '●' : '○';
-
-                            rpcDiv.innerHTML = `
-                                <div class="flex items-center justify-between">
-                                    <span class="text-[#E0E0E0] font-medium">${rpc.name}</span>
-                                    <span style="color: ${statusColor}">${statusIcon}</span>
-                                </div>
-                                ${rpc.status === 'online' ? `
-                                    <div class="text-[#A0A0A0] text-xs mt-1">
-                                        Block: ${rpc.blockNumber} | Latency: ${rpc.latency}
-                                    </div>
-                                ` : `
-                                    <div class="text-[#F44336] text-xs mt-1">
-                                        ${rpc.error || 'Connection failed'}
-                                    </div>
-                                `}
-                            `;
-                            detailsContainer.appendChild(rpcDiv);
-                        });
-                    }
-
+                    rpcs.forEach(rpc => {
+                        const div = document.createElement('div');
+                        div.className = 'rpc-item';
+                        div.innerHTML = `
+                            <div>
+                                <div class="rpc-item-name">${rpc.name}</div>
+                                ${rpc.status === 'online' ? `<div class="rpc-item-info">Block: ${rpc.blockNumber} | ${rpc.latency}</div>` : ''}
+                            </div>
+                            <span class="md-status-dot ${rpc.status === 'online' ? 'md-status-dot-success' : 'md-status-dot-error'}"></span>
+                        `;
+                        detailsContainer.appendChild(div);
+                    });
                     return true;
-                } else {
-                    throw new Error(data.error || 'RPC status check failed');
                 }
             } catch (error) {
                 document.getElementById('rpc-status').textContent = 'Error';
-                document.getElementById('rpc-online').textContent = '--';
-                document.getElementById('rpc-total').textContent = '--';
-                document.getElementById('rpc-summary').textContent = '--';
-                document.getElementById('rpc-details').innerHTML = '<div class="text-[#F44336] text-sm">Failed to check RPC status</div>';
                 updateStatusIndicator('rpc', 'offline');
                 log(`RPC check failed: ${error.message}`, 'error');
-                return false;
             }
+            return false;
         }
 
         async function refreshService(service) {
-            log(`Refreshing ${service} service...`, 'info');
-
+            log(`Refreshing ${service} service...`);
             switch (service) {
                 case 'gun': await checkGunStatus(); break;
                 case 'ipfs': await checkIPFSStatus(); break;
                 case 'holster': await checkHolsterStatus(); break;
                 case 'rpc': await checkRPCStatus(); break;
             }
-
             document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
         }
 
         async function refreshAllServices() {
-            log('Refreshing all services...', 'info');
-
-            await Promise.all([
-                checkGunStatus(),
-                checkIPFSStatus(),
-                checkHolsterStatus(),
-                checkRPCStatus()
-            ]);
+            log('Refreshing all services...');
+            await Promise.all([checkGunStatus(), checkIPFSStatus(), checkHolsterStatus(), checkRPCStatus()]);
             document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
             log('All services refreshed', 'success');
+        }
+
+        async function healthCheck() {
+            log('Running health check...');
+            await refreshAllServices();
+            log('Health check complete', 'success');
         }
 
         async function restartService(service) {
             const password = getAdminPassword();
             if (!password) {
-                alert('⚠️ Admin password required for service restart');
+                alert('Admin password required for service restart');
                 return;
             }
-
-            if (!confirm(`Are you sure you want to restart the ${service} service? This may cause temporary downtime.`)) {
-                return;
-            }
+            if (!confirm(`Restart ${service} service? This may cause temporary downtime.`)) return;
 
             try {
-                log(`Restarting ${service} service...`, 'info');
+                log(`Restarting ${service}...`);
                 const response = await fetch(`/api/v1/services/${service}/restart`, {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${password}`,
-                        'Content-Type': 'application/json'
-                    }
+                    headers: { 'Authorization': `Bearer ${password}`, 'Content-Type': 'application/json' }
                 });
-
                 if (response.ok) {
-                    let data;
-                    try {
-                        data = await response.json();
-                    } catch (parseError) {
-                        // If JSON parsing fails, treat as success since HTTP status is ok
-                        log(`✅ ${service} service restart initiated (HTTP ${response.status})`, 'success');
-                        setTimeout(() => refreshService(service), 3000);
-                        return;
-                    }
-
-                    if (data.success !== false) {
-                        log(`✅ ${service} service restart: ${data.message || 'initiated successfully'}`, 'success');
-                        // Wait a moment then refresh the service status
-                        setTimeout(() => refreshService(service), 3000);
-                    } else {
-                        throw new Error(data.error || 'Restart failed');
-                    }
+                    log(`${service} restart initiated`, 'success');
+                    setTimeout(() => refreshService(service), 3000);
                 } else {
-                    // Try to get error message from response
-                    let errorMessage;
-                    try {
-                        const errorData = await response.json();
-                        errorMessage = errorData.error || `HTTP ${response.status}`;
-                    } catch {
-                        errorMessage = `HTTP ${response.status}`;
-                    }
-                    throw new Error(errorMessage);
+                    throw new Error(`HTTP ${response.status}`);
                 }
             } catch (error) {
-                log(`❌ ${service} restart failed: ${error.message}`, 'error');
+                log(`${service} restart failed: ${error.message}`, 'error');
             }
         }
 
         async function restartAllServices() {
             const password = getAdminPassword();
             if (!password) {
-                alert('⚠️ Admin password required for service restart');
+                alert('Admin password required');
                 return;
             }
+            if (!confirm('Restart ALL services? This will cause temporary downtime.')) return;
 
-            if (!confirm('Are you sure you want to restart ALL services? This will cause temporary downtime.')) {
-                return;
-            }
-
-            log('🔄 Restarting all services...', 'info');
-
-            const services = ['gun', 'ipfs', 'holster', 'rpc'];
-            for (const service of services) {
-                try {
-                    await restartService(service);
-                    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s between restarts
-                } catch (error) {
-                    log(`Failed to restart ${service}: ${error.message}`, 'error');
-                }
-            }
-
-            // Refresh all services after restart attempts
-            setTimeout(refreshAllServices, 5000);
-        }
-
-
-        async function healthCheck() {
-            log('Running comprehensive health check...', 'info');
-            await refreshAllServices();
-
-            const allOnline = Object.values(servicesStatus).every(status => status === 'online');
-            if (allOnline) {
-                log(' All services are healthy', 'success');
-            } else {
-                log(' Some services need attention', 'warning');
+            for (const service of ['gun', 'ipfs', 'holster']) {
+                await restartService(service);
+                await new Promise(r => setTimeout(r, 2000));
             }
         }
 
-        window.addEventListener('load', async () => {
-            // Initialize ShogunAdmin
+        // Initialize
+        window.addEventListener('DOMContentLoaded', async () => {
             ShogunAdmin.init();
-
-            log('Services dashboard initialized', 'info');
             await refreshAllServices();
             updateInterval = setInterval(refreshAllServices, 30000);
-        });
-
-        window.addEventListener('beforeunload', () => {
-            if (updateInterval) clearInterval(updateInterval);
         });
     </script>
 </body>

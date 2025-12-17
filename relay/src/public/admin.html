@@ -1,519 +1,520 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="shogun-dark">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>Shogun Relay Admin Panel</title>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/variables.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/base.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/daisyui-overrides.css" rel="stylesheet" type="text/css" />
-    <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
-
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <title>Admin Panel - Shogun Relay</title>
+    <link rel="stylesheet" href="styles/google-md3.css">
     <script src="lib/admin-auth.js"></script>
-
     <style>
-        body {
-            background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
-            min-height: 100vh;
+        .admin-header {
+            background: linear-gradient(135deg, #1a73e8 0%, #4285f4 100%);
+            color: white;
+            padding: 48px 24px;
+            text-align: center;
+            margin-bottom: 32px;
         }
 
-        .hero-gradient {
-            background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
-        }
-
-        .card-hover {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .card-hover:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-        }
-
-        .nav-link {
-            position: relative;
-            padding: 0.75rem 1rem;
-            border-radius: 0.75rem;
-            transition: all 0.2s ease;
-        }
-
-        .nav-link:hover {
-            background-color: rgba(64, 64, 64, 0.5);
-        }
-
-        .nav-link::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 50%;
-            width: 0;
-            height: 2px;
-            background: linear-gradient(90deg, #FF69B4, #8B94FF);
-            transition: all 0.3s ease;
-            transform: translateX(-50%);
-        }
-
-        .nav-link:hover::after {
-            width: 80%;
-        }
-
-        .feature-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
+        .admin-header-icon {
+            width: 72px;
+            height: 72px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
-            transition: transform 0.2s ease;
+            border-radius: 20px;
+            background-color: rgba(255, 255, 255, 0.2);
+            margin: 0 auto 24px;
         }
 
-        .nav-link:hover .feature-icon {
-            transform: scale(1.1);
+        .admin-header-icon svg {
+            width: 36px;
+            height: 36px;
+            color: white;
         }
 
-        .section-divider {
-            height: 1px;
-            background: linear-gradient(90deg, transparent, #404040, transparent);
-            margin: 2rem 0;
+        .admin-header h1 {
+            font-family: var(--md-font-display);
+            font-size: 2rem;
+            font-weight: 500;
+            margin-bottom: 8px;
         }
 
-        @keyframes pulse-glow {
-
-            0%,
-            100% {
-                box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4);
-            }
-
-            50% {
-                box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2);
-            }
+        .admin-header p {
+            opacity: 0.9;
+            font-size: 1rem;
         }
 
-        .pulse-glow {
-            animation: pulse-glow 2s infinite;
+        .auth-card {
+            max-width: 400px;
+            margin: 0 auto 32px;
         }
 
-        /* Hide protected applications by default */
+        .auth-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-top: 16px;
+        }
+
+        .auth-status-locked {
+            background-color: var(--md-warning-container);
+            color: #b06000;
+        }
+
+        .auth-status-unlocked {
+            background-color: var(--md-success-container);
+            color: #137333;
+        }
+
+        .section-title {
+            font-family: var(--md-font-display);
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: var(--md-on-surface);
+            margin-bottom: 16px;
+            padding-left: 16px;
+            border-left: 3px solid var(--md-primary);
+        }
+
+        .nav-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            border-radius: 12px;
+            text-decoration: none;
+            color: var(--md-on-surface);
+            background-color: var(--md-surface);
+            border: 1px solid var(--md-outline-variant);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .nav-item:hover {
+            background-color: var(--md-surface-container);
+            border-color: var(--md-primary);
+            box-shadow: var(--md-elevation-1);
+        }
+
+        .nav-item-icon {
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            flex-shrink: 0;
+        }
+
+        .nav-item-icon svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .nav-item-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .nav-item-title {
+            font-weight: 500;
+            font-size: 1rem;
+            margin-bottom: 2px;
+        }
+
+        .nav-item-desc {
+            font-size: 0.875rem;
+            color: var(--md-on-surface-variant);
+        }
+
+        .nav-item-badge {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-protected {
+            background-color: var(--md-warning-container);
+            color: #b06000;
+        }
+
+        .badge-new {
+            background-color: var(--md-primary-container);
+            color: var(--md-on-primary-container);
+        }
+
+        /* Icon color variants */
+        .icon-green {
+            background-color: #ceead6;
+            color: #137333;
+        }
+
+        .icon-blue {
+            background-color: #d3e3fd;
+            color: #1967d2;
+        }
+
+        .icon-purple {
+            background-color: #e8d3f8;
+            color: #7627bb;
+        }
+
+        .icon-orange {
+            background-color: #fef0d5;
+            color: #b06000;
+        }
+
+        .icon-red {
+            background-color: #fce8e6;
+            color: #c5221f;
+        }
+
+        .icon-cyan {
+            background-color: #d3f3f8;
+            color: #007b83;
+        }
+
+        .quick-nav {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 32px;
+            padding: 16px;
+            background-color: var(--md-surface-container-low);
+            border-radius: 16px;
+        }
+
+        .quick-nav-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border-radius: 100px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--md-on-surface-variant);
+            background-color: var(--md-surface);
+            border: 1px solid var(--md-outline);
+            transition: all 0.2s;
+        }
+
+        .quick-nav-item:hover {
+            background-color: var(--md-primary-container);
+            border-color: var(--md-primary);
+            color: var(--md-on-primary-container);
+        }
+
+        .quick-nav-item svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Hide protected items by default */
         .admin-protected {
             display: none !important;
         }
 
-        /* Show protected applications when admin is authenticated */
         .admin-authenticated .admin-protected {
             display: flex !important;
+        }
+
+        .category-card {
+            background-color: var(--md-surface);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        @media (max-width: 768px) {
+            .admin-header {
+                padding: 32px 16px;
+            }
+
+            .admin-header h1 {
+                font-size: 1.5rem;
+            }
         }
     </style>
 </head>
 
-<body class="antialiased">
-    <div class="hero-gradient min-h-screen">
-        <div class="container mx-auto px-4 py-8 max-w-6xl">
-            <!-- Header -->
-            <header class="text-center mb-12">
-                <div
-                    class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-[#FF69B4] to-[#FF1493] mb-6 pulse-glow">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                </div>
-                <h1 class="text-4xl md:text-5xl font-bold text-white mb-4">Shogun Relay Admin Panel</h1>
-                <p class="text-[#8B94FF] text-lg">Admin authentication required<span class="animate-pulse">_</span></p>
-            </header>
+<body>
+    <!-- Header -->
+    <header class="admin-header">
+        <div class="admin-header-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+        </div>
+        <h1>Shogun Relay Admin</h1>
+        <p>Admin authentication required</p>
+    </header>
 
-            <!-- Admin Password Section -->
-            <div id="adminPasswordSection"
-                class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover max-w-md mx-auto mb-8">
-                <div class="p-6">
-                    <div class="flex items-center gap-3 mb-4">
-                        <div class="feature-icon bg-gradient-to-br from-[#FF69B4] to-[#FF1493]">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none"
-                                viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                            </svg>
-                        </div>
-                        <h3 class="text-lg font-medium text-[#FF69B4]">Centralized Admin Authentication</h3>
-                    </div>
-                    <p class="text-sm text-[#E0E0E0] leading-relaxed mb-4">
-                        Enter the admin password to access all applications. If the password is incorrect, only public
-                        applications will be visible.
+    <main class="md-container">
+        <!-- Quick Navigation -->
+        <div class="quick-nav">
+            <a href="/" class="quick-nav-item">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+                Home
+            </a>
+            <a href="/endpoints" class="quick-nav-item">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                API Docs
+            </a>
+            <a href="/network-stats" class="quick-nav-item">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9" />
+                </svg>
+                Network
+            </a>
+        </div>
+
+        <!-- Authentication Card -->
+        <div class="auth-card" id="adminPasswordSection">
+            <div class="md-card md-card-outlined">
+                <div class="md-card-body">
+                    <h3 class="md-title-large md-mb-md">Authenticate</h3>
+                    <p class="md-body-medium md-text-secondary md-mb-lg">
+                        Enter the admin password to access protected applications.
                     </p>
-                    <div class="space-y-4">
-                        <input type="password" id="adminPassword"
-                            class="input w-full bg-[#404040] border-0 text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:ring-opacity-50"
-                            placeholder="Enter Admin Password" />
-                        <div class="flex gap-3">
-                            <button
-                                class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] flex-1 rounded-xl px-4 py-3 font-medium transition-all duration-200"
-                                onclick="saveAdminPassword()">
-                                Save Password
-                            </button>
-                            <button
-                                class="btn bg-transparent border border-[#404040] text-[#E0E0E0] hover:bg-[#404040] flex-1 rounded-xl px-4 py-3 font-medium transition-all duration-200"
-                                onclick="clearAdminPassword()">
-                                Clear
-                            </button>
-                        </div>
-                        <div id="passwordStatus"
-                            class="flex items-center gap-2 text-sm text-center text-[#E0E0E0] opacity-90 min-h-[20px]">
-                            <span class="text-[#FFA500]">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-                                    stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                </svg>
-                            </span>
-                            <span>Limited Access - Only public applications visible</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Quick Stats Bar -->
-            <div class="flex flex-wrap justify-center gap-4 mb-12">
-                <a href="/"
-                    class="flex items-center gap-2 px-4 py-2 bg-[#282828] rounded-full border border-[#404040] hover:border-[#FF69B4] transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#42A5F5]" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                    </svg>
-                    <span class="text-[#E0E0E0] text-sm">Back to Public Interface</span>
-                </a>
-                <div class="flex items-center gap-2 px-4 py-2 bg-[#282828] rounded-full border border-[#404040]">
-                    <span class="text-[#FFA500]">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                    <div class="md-field">
+                        <label class="md-label" for="adminPassword">Admin Password</label>
+                        <input type="password" id="adminPassword" class="md-input" placeholder="Enter admin password">
+                    </div>
+
+                    <div class="md-flex md-gap-sm">
+                        <button class="md-btn md-btn-filled" style="flex: 1;" onclick="saveAdminPassword()">
+                            Authenticate
+                        </button>
+                        <button class="md-btn md-btn-outlined" onclick="clearAdminPassword()">
+                            Clear
+                        </button>
+                    </div>
+
+                    <div id="passwordStatus" class="auth-status auth-status-locked">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
-                    </span>
-                    <span class="text-[#E0E0E0] text-sm">Protected Area</span>
-                </div>
-            </div>
-
-            <!-- Main Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-                <!-- Monitoring & Analytics Card -->
-                <div class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover">
-                    <div class="p-6">
-                        <h2 class="text-xl font-semibold text-[#FF69B4] mb-4">Monitoring & Analytics</h2>
-                        <p class="text-[#A0A0A0] text-sm mb-5">Real-time system monitoring and data visualization</p>
-                        <div class="space-y-2">
-                            <a href="/stats" class="nav-link flex items-center gap-3 text-white admin-protected">
-                                <div class="feature-icon bg-[#4CAF50]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#4CAF50]" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                    </svg>
-                                </div>
-                                <div class="flex-1">
-                                    <span class="font-medium">Live Stats</span>
-                                    <p class="text-xs text-[#A0A0A0]">Real-time metrics and monitoring</p>
-                                </div>
-                                <span class="text-[#FFA500]">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                    </svg>
-                                </span>
-                            </a>
-                            <a href="/network-stats" class="nav-link flex items-center gap-3 text-white">
-                                <div class="feature-icon bg-[#42A5F5]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#42A5F5]" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                                    </svg>
-                                </div>
-                                <div class="flex-1">
-                                    <span class="font-medium">Network Stats</span>
-                                    <p class="text-xs text-[#A0A0A0]">Network-wide statistics, reputation & deals</p>
-                                </div>
-                            </a>
-                            <a href="/graph" class="nav-link flex items-center gap-3 text-white">
-                                <div class="feature-icon bg-[#42A5F5]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#42A5F5]" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <span class="font-medium">Live Graph Explorer</span>
-                                    <p class="text-xs text-[#A0A0A0]">Real-time GunDB browser</p>
-                                </div>
-                            </a>
-                            <a href="/visualGraph" class="nav-link flex items-center gap-3 text-white">
-                                <div class="feature-icon bg-[#9C27B0]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#9C27B0]" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <span class="font-medium">Visual Graph Data</span>
-                                    <p class="text-xs text-[#A0A0A0]">Interactive 3D visualization</p>
-                                </div>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Storage & Files Card -->
-                <div class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover">
-                    <div class="p-6">
-                        <h2 class="text-xl font-semibold text-[#FF69B4] mb-4">Storage & Files</h2>
-                        <p class="text-[#A0A0A0] text-sm mb-5">IPFS storage management and file operations</p>
-                        <div class="space-y-2">
-
-                            <a href="/upload" class="nav-link flex items-center gap-3 text-white admin-protected">
-                                <div class="feature-icon bg-[#42A5F5]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#42A5F5]" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                    </svg>
-                                </div>
-                                <div class="flex-1">
-                                    <span class="font-medium">Upload to IPFS</span>
-                                    <p class="text-xs text-[#A0A0A0]">Direct file upload with encryption</p>
-                                </div>
-                                <span class="text-[#FFA500]">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                    </svg>
-                                </span>
-                            </a>
-                            <a href="/pin-manager" class="nav-link flex items-center gap-3 text-white admin-protected">
-                                <div class="feature-icon bg-[#F44336]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#F44336]" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                                    </svg>
-                                </div>
-                                <div class="flex-1">
-                                    <span class="font-medium">IPFS Pin Manager</span>
-                                    <p class="text-xs text-[#A0A0A0]">Manage pins and garbage collection</p>
-                                </div>
-                                <span class="text-[#FFA500]">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                    </svg>
-                                </span>
-                            </a>
-                            <a href="/ipfs-status" class="nav-link flex items-center gap-3 text-white">
-                                <div class="feature-icon bg-[#00BCD4]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#00BCD4]" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <span class="font-medium">IPFS Node Status</span>
-                                    <p class="text-xs text-[#A0A0A0]">Node health & metrics</p>
-                                </div>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Blockchain RPC Card -->
-                <div class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover">
-                    <div class="p-6">
-                        <h2 class="text-xl font-semibold text-[#FF69B4] mb-4">Blockchain RPC</h2>
-                        <p class="text-[#A0A0A0] text-sm mb-5">Interact with blockchain RPC endpoints</p>
-                        <div class="space-y-2">
-                            <a href="/rpc-console" class="nav-link flex items-center gap-3 text-white">
-                                <div class="feature-icon bg-[#9C27B0]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#9C27B0]" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                    </svg>
-                                </div>
-                                <div class="flex-1">
-                                    <span class="font-medium">RPC Console</span>
-                                    <p class="text-xs text-[#A0A0A0]">Execute blockchain RPC calls</p>
-                                </div>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Data Management Card -->
-                <div class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover">
-                    <div class="p-6">
-                        <h2 class="text-xl font-semibold text-[#FF69B4] mb-4">Data Management</h2>
-                        <p class="text-[#A0A0A0] text-sm mb-5">System administration and configuration</p>
-                        <div class="space-y-2">
-                            <a href="/admin" class="nav-link flex items-center gap-3 text-white">
-                                <div class="feature-icon bg-[#FFB74D]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#FFB74D]" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <span class="font-medium">Admin Panel</span>
-                                    <p class="text-xs text-[#A0A0A0]">GunDB management & config</p>
-                                </div>
-                            </a>
-                            <a href="/services-dashboard"
-                                class="nav-link flex items-center gap-3 text-white admin-protected">
-                                <div class="feature-icon bg-[#64B5F6]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#64B5F6]" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                                    </svg>
-                                </div>
-                                <div class="flex-1">
-                                    <span class="font-medium">Services Dashboard</span>
-                                    <p class="text-xs text-[#A0A0A0]">Monitor system services</p>
-                                </div>
-                                <span class="text-[#FFA500]">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                    </svg>
-                                </span>
-                            </a>
-                            <a href="/charts" class="nav-link flex items-center gap-3 text-white admin-protected">
-                                <div class="feature-icon bg-[#4CAF50]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#4CAF50]" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-                                    </svg>
-                                </div>
-                                <div class="flex-1">
-                                    <span class="font-medium">Charts & Stats</span>
-                                    <p class="text-xs text-[#A0A0A0]">Performance visualization</p>
-                                </div>
-                                <span class="text-[#FFA500]">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                    </svg>
-                                </span>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- On-Chain Registry Card -->
-                <div class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover">
-                    <div class="p-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <h2 class="text-xl font-semibold text-[#FF69B4]">On-Chain Registry</h2>
-                            <span class="badge-new">Base</span>
-                        </div>
-                        <p class="text-[#A0A0A0] text-sm mb-5">Manage relay registration, staking, and on-chain
-                            operations</p>
-                        <div class="space-y-2">
-                            <a href="/registry-dashboard"
-                                class="nav-link flex items-center gap-3 text-white admin-protected">
-                                <div class="feature-icon bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9]">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                    </svg>
-                                </div>
-                                <div class="flex-1">
-                                    <span class="font-medium">Registry Dashboard</span>
-                                    <p class="text-xs text-[#A0A0A0]">Staking, registration, slashing</p>
-                                </div>
-                                <span class="text-[#FFA500]">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                    </svg>
-                                </span>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Security & Tools Card -->
-                <div class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover">
-                    <div class="p-6">
-                        <h2 class="text-xl font-semibold text-[#FF69B4] mb-4">Security & Tools</h2>
-                        <p class="text-[#A0A0A0] text-sm mb-5">API documentation and system tools</p>
-                        <div class="space-y-2">
-                            <a href="/ipfs-status" class="nav-link flex items-center gap-3 text-white">
-                                <div class="feature-icon bg-[#A0A0A0]/20">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#A0A0A0]" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <span class="font-medium">IPFS API Version</span>
-                                    <p class="text-xs text-[#A0A0A0]">Check compatibility status</p>
-                                </div>
-                            </a>
-                        </div>
+                        <span>Limited access — Only public applications visible</span>
                     </div>
                 </div>
             </div>
-
-            <!-- Footer -->
-            <footer class="mt-16 text-center">
-                <div class="section-divider"></div>
-                <div class="flex flex-col items-center gap-4">
-                    <div class="flex items-center gap-6">
-                        <a href="https://github.com/scobru/shogun" target="_blank" rel="noopener"
-                            class="text-[#A0A0A0] hover:text-[#FF69B4] transition-colors flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor"
-                                viewBox="0 0 24 24">
-                                <path
-                                    d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-                            </svg>
-                            GitHub
-                        </a>
-                        <a href="/endpoints" class="text-[#A0A0A0] hover:text-[#FF69B4] transition-colors">Docs</a>
-                    </div>
-                    <p class="text-[#606060] text-sm">
-                        Shogun Relay Admin Panel - Built with GunDB & IPFS
-                    </p>
-                    <p class="text-[#606060] text-xs">
-                        Part of the <a href="https://github.com/scobru/shogun"
-                            class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">Shogun Project</a>
-                    </p>
-                </div>
-            </footer>
         </div>
-    </div>
+
+        <!-- Monitoring & Analytics -->
+        <div class="category-card">
+            <h2 class="section-title">Monitoring & Analytics</h2>
+            <div class="nav-grid">
+                <a href="/stats" class="nav-item admin-protected">
+                    <div class="nav-item-icon icon-green">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                    </div>
+                    <div class="nav-item-content">
+                        <div class="nav-item-title">Live Stats</div>
+                        <div class="nav-item-desc">Real-time metrics and monitoring</div>
+                    </div>
+                    <span class="nav-item-badge badge-protected">🔒</span>
+                </a>
+                <a href="/network-stats" class="nav-item">
+                    <div class="nav-item-icon icon-blue">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9" />
+                        </svg>
+                    </div>
+                    <div class="nav-item-content">
+                        <div class="nav-item-title">Network Stats</div>
+                        <div class="nav-item-desc">Network-wide statistics, reputation & deals</div>
+                    </div>
+                </a>
+                <a href="/graph" class="nav-item">
+                    <div class="nav-item-icon icon-blue">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                        </svg>
+                    </div>
+                    <div class="nav-item-content">
+                        <div class="nav-item-title">Graph Explorer</div>
+                        <div class="nav-item-desc">Real-time GunDB browser</div>
+                    </div>
+                </a>
+                <a href="/visualGraph" class="nav-item">
+                    <div class="nav-item-icon icon-purple">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
+                        </svg>
+                    </div>
+                    <div class="nav-item-content">
+                        <div class="nav-item-title">Visual Graph</div>
+                        <div class="nav-item-desc">Interactive 3D visualization</div>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <!-- Storage & Files -->
+        <div class="category-card">
+            <h2 class="section-title">Storage & Files</h2>
+            <div class="nav-grid">
+                <a href="/upload" class="nav-item admin-protected">
+                    <div class="nav-item-icon icon-blue">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                    </div>
+                    <div class="nav-item-content">
+                        <div class="nav-item-title">Upload to IPFS</div>
+                        <div class="nav-item-desc">Direct file upload with encryption</div>
+                    </div>
+                    <span class="nav-item-badge badge-protected">🔒</span>
+                </a>
+                <a href="/pin-manager" class="nav-item admin-protected">
+                    <div class="nav-item-icon icon-red">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                        </svg>
+                    </div>
+                    <div class="nav-item-content">
+                        <div class="nav-item-title">Pin Manager</div>
+                        <div class="nav-item-desc">Manage pins and garbage collection</div>
+                    </div>
+                    <span class="nav-item-badge badge-protected">🔒</span>
+                </a>
+                <a href="/ipfs-status" class="nav-item">
+                    <div class="nav-item-icon icon-cyan">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                    </div>
+                    <div class="nav-item-content">
+                        <div class="nav-item-title">IPFS Node Status</div>
+                        <div class="nav-item-desc">Node health & metrics</div>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <!-- System Administration -->
+        <div class="category-card">
+            <h2 class="section-title">System Administration</h2>
+            <div class="nav-grid">
+                <a href="/services-dashboard" class="nav-item admin-protected">
+                    <div class="nav-item-icon icon-blue">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                        </svg>
+                    </div>
+                    <div class="nav-item-content">
+                        <div class="nav-item-title">Services Dashboard</div>
+                        <div class="nav-item-desc">Monitor and control system services</div>
+                    </div>
+                    <span class="nav-item-badge badge-protected">🔒</span>
+                </a>
+                <a href="/charts" class="nav-item admin-protected">
+                    <div class="nav-item-icon icon-green">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                        </svg>
+                    </div>
+                    <div class="nav-item-content">
+                        <div class="nav-item-title">Charts & Metrics</div>
+                        <div class="nav-item-desc">Performance visualization</div>
+                    </div>
+                    <span class="nav-item-badge badge-protected">🔒</span>
+                </a>
+                <a href="/rpc-console" class="nav-item">
+                    <div class="nav-item-icon icon-purple">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                    </div>
+                    <div class="nav-item-content">
+                        <div class="nav-item-title">RPC Console</div>
+                        <div class="nav-item-desc">Execute blockchain RPC calls</div>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <!-- On-Chain Registry -->
+        <div class="category-card">
+            <h2 class="section-title">On-Chain Registry</h2>
+            <div class="nav-grid">
+                <a href="/registry-dashboard" class="nav-item admin-protected">
+                    <div class="nav-item-icon icon-purple">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                    </div>
+                    <div class="nav-item-content">
+                        <div class="nav-item-title">Registry Dashboard</div>
+                        <div class="nav-item-desc">Staking, registration, slashing</div>
+                    </div>
+                    <span class="nav-item-badge badge-new">Base</span>
+                    <span class="nav-item-badge badge-protected">🔒</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="md-footer md-mt-xl">
+            <div class="md-flex-center md-gap-lg md-mb-md">
+                <a href="https://github.com/scobru/shogun" target="_blank" rel="noopener" class="md-flex md-gap-sm"
+                    style="color: var(--md-on-surface-variant); text-decoration: none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
+                        viewBox="0 0 24 24">
+                        <path
+                            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                    </svg>
+                    GitHub
+                </a>
+                <a href="/endpoints" style="color: var(--md-on-surface-variant); text-decoration: none;">
+                    Documentation
+                </a>
+            </div>
+            <p class="md-body-small">
+                Shogun Relay Admin Panel — Part of the <a href="https://github.com/scobru/shogun">Shogun Project</a>
+            </p>
+        </footer>
+    </main>
 
     <script>
         // Admin authentication functions
@@ -528,6 +529,7 @@
 
         function clearAdminPassword() {
             ShogunAdmin.clearPassword();
+            document.getElementById('adminPassword').value = '';
             updateAuthSectionsVisibility();
             forceCorrectVisibility();
         }
@@ -537,12 +539,24 @@
             const passwordSection = document.getElementById('adminPasswordSection');
 
             if (ShogunAdmin.hasPassword()) {
-                statusElement.innerHTML = '<span class="text-[#4CAF50]"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg></span><span>Admin Access - All applications available</span>';
+                statusElement.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Full access — All applications available</span>
+                `;
+                statusElement.className = 'auth-status auth-status-unlocked';
                 if (passwordSection) {
                     passwordSection.style.display = 'none';
                 }
             } else {
-                statusElement.innerHTML = '<span class="text-[#FFA500]"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg></span><span>Limited Access - Only public applications visible</span>';
+                statusElement.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    <span>Limited access — Only public applications visible</span>
+                `;
+                statusElement.className = 'auth-status auth-status-locked';
                 if (passwordSection) {
                     passwordSection.style.display = 'block';
                 }
@@ -584,6 +598,13 @@
             });
 
             document.getElementById('adminPassword').focus();
+
+            // Handle enter key in password field
+            document.getElementById('adminPassword').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    saveAdminPassword();
+                }
+            });
 
             document.addEventListener('click', function (e) {
                 const link = e.target.closest('a');

@@ -1,1003 +1,618 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="shogun-dark">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
-    <title>Gun Relay Stats</title>
+    <title>Live Stats - Shogun Relay</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/variables.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/base.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/daisyui-overrides.css" rel="stylesheet" type="text/css" />
-    <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="styles/google-md3.css">
     <style>
-        body {
-            line-height: 1.6;
-            background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
-            min-height: 100vh;
+        .page-header {
+            background-color: var(--md-surface);
+            border-bottom: 1px solid var(--md-outline-variant);
+            padding: 24px;
+            margin-bottom: 32px;
         }
 
-        .hero-gradient {
-            background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
-        }
-
-        .container {
-            max-width: 1200px;
+        .page-header-content {
+            max-width: 1280px;
             margin: 0 auto;
-            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 16px;
         }
 
-        h1 {
-            border-bottom: 1px solid #606060;
-            padding-bottom: 1rem;
-            margin-bottom: 2rem;
-            color: #FFFFFF;
-            font-size: 2.5rem;
-            font-weight: bold;
+        .page-icon {
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+            background-color: #ceead6;
         }
 
-        @keyframes pulse-glow {
-
-            0%,
-            100% {
-                box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4);
-            }
-
-            50% {
-                box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2);
-            }
-        }
-
-        .pulse-glow {
-            animation: pulse-glow 2s infinite;
-        }
-
-        .card-hover {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .card-hover:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-        }
-
-        .section-divider {
-            height: 1px;
-            background: linear-gradient(90deg, transparent, #404040, transparent);
-            margin: 2rem 0;
+        .page-icon svg {
+            width: 28px;
+            height: 28px;
+            color: #137333;
         }
 
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 2rem;
-            margin-bottom: 3rem;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
         }
 
         .stat-card {
-            background-color: #404040;
-            border: 1px solid #606060;
-            border-radius: 1rem;
-            padding: 2rem;
+            background-color: var(--md-surface);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: 16px;
+            padding: 24px;
             text-align: center;
-            transition: transform 0.2s ease;
+            transition: all 0.2s;
         }
 
         .stat-card:hover {
-            transform: translateY(-2px);
-            border-color: #FF69B4;
-            box-shadow: 0 8px 32px rgba(255, 105, 180, 0.2);
+            border-color: var(--md-primary);
+            box-shadow: var(--md-elevation-1);
         }
 
         .stat-title {
-            color: #FF69B4;
-            font-size: 1.25rem;
-            margin-bottom: 1rem;
-            font-weight: 600;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--md-primary);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .stat-value {
             font-size: 2.5rem;
-            font-weight: bold;
-            margin: 1rem 0;
-            color: #FFFFFF;
+            font-weight: 500;
+            color: var(--md-on-surface);
+            margin-bottom: 4px;
+            font-family: 'Google Sans', sans-serif;
         }
 
         .stat-unit {
-            color: #A0A0A0;
-            font-size: 1rem;
+            font-size: 0.875rem;
+            color: var(--md-on-surface-variant);
         }
 
-        .error {
-            background-color: rgba(244, 67, 54, 0.2);
-            color: #F44336;
-            border-left: 3px solid #F44336;
-            padding: 1.5rem;
-            margin-top: 1.5rem;
-            display: none;
-            border-radius: 0.75rem;
+        .section-card {
+            background-color: var(--md-surface);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: 16px;
+            margin-bottom: 24px;
+            overflow: hidden;
         }
 
-        #lastUpdated {
-            margin-top: 3rem;
-            color: #A0A0A0;
-            font-size: 1rem;
-            text-align: center;
-        }
-
-        .back-link {
-            display: inline-flex;
+        .section-header {
+            display: flex;
             align-items: center;
-            color: #42A5F5;
-            text-decoration: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.75rem;
-            margin-bottom: 1.5rem;
-            transition: all 0.2s ease;
-            font-size: 1.1rem;
-        }
-
-        .back-link:hover {
-            background-color: rgba(66, 165, 245, 0.1);
-            color: #64B5F6;
-        }
-
-        .back-link svg {
-            margin-right: 0.75rem;
-        }
-
-        .view-charts-link {
-            display: block;
-            text-align: center;
-            margin-top: 3rem;
-            color: #42A5F5;
-            text-decoration: none;
-            padding: 1.5rem;
-            border: 1px solid #606060;
-            border-radius: 1rem;
-            transition: all 0.2s ease;
-            font-size: 1.1rem;
-        }
-
-        .view-charts-link:hover {
-            background-color: rgba(66, 165, 245, 0.1);
-            border-color: #42A5F5;
-            color: #64B5F6;
-        }
-
-        /* Admin Controls Styles */
-        .admin-controls {
-            background-color: #404040;
-            border: 1px solid #606060;
-            margin-top: 3rem;
-            padding: 2rem;
-            border-radius: 1rem;
-            transition: all 0.2s ease;
-        }
-
-        .admin-controls:hover {
-            border-color: #FF69B4;
-        }
-
-        .admin-controls h2 {
-            color: #FF69B4;
-            font-size: 1.5rem;
-            margin-bottom: 1.5rem;
-            font-weight: 600;
-        }
-
-        .admin-controls h3 {
-            color: #FFFFFF;
-            font-size: 1.25rem;
-            margin-bottom: 1rem;
-            font-weight: 500;
-        }
-
-        .admin-controls .btn {
-            background-color: #FF69B4;
-            color: #FFFFFF;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.75rem;
+            justify-content: space-between;
+            padding: 16px 20px;
+            background-color: var(--md-surface-container-low);
+            border-bottom: 1px solid var(--md-outline-variant);
             cursor: pointer;
-            transition: all 0.2s ease;
+        }
+
+        .section-header:hover {
+            background-color: var(--md-surface-container);
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
             font-weight: 500;
-        }
-
-        .admin-controls .btn:hover {
-            background-color: #FF1493;
-            transform: translateY(-1px);
-        }
-
-        .admin-controls .input {
-            background-color: #282828;
-            border: 1px solid #606060;
-            color: #FFFFFF;
-            padding: 0.75rem;
-            border-radius: 0.75rem;
-            width: 100%;
             font-size: 1rem;
         }
 
-        .admin-controls .input:focus {
-            border-color: #FF69B4;
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(255, 105, 180, 0.2);
-        }
-
-        .admin-controls .text-success {
-            color: #4CAF50;
-        }
-
-        .admin-controls .text-error {
-            color: #F44336;
-        }
-
-        .admin-controls .form-control {
-            margin-bottom: 1.5rem;
-        }
-
-        .admin-controls .label-text {
-            color: #E0E0E0;
-            font-size: 1rem;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-        }
-
-        /* Complete Statistics Styles */
-        .stats-category {
-            background-color: #353535;
-            border: 1px solid #505050;
-            border-radius: 0.75rem;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-            transition: all 0.2s ease;
-        }
-
-        .stats-category:hover {
-            border-color: #FF69B4;
-        }
-
-        .stats-category h3 {
-            user-select: none;
-        }
-
-        .stats-details {
+        .section-body {
             display: none;
-            margin-top: 1rem;
-            padding-top: 1rem;
-            border-top: 1px solid #505050;
+            padding: 20px;
         }
 
-        .stats-details.expanded {
+        .section-body.expanded {
             display: block;
         }
 
-        .stat-item {
-            background-color: #282828;
-            padding: 0.75rem 1rem;
-            border-radius: 0.5rem;
-            border: 1px solid #404040;
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .detail-item {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            transition: all 0.2s ease;
+            padding: 12px 16px;
+            background-color: var(--md-surface-container);
+            border-radius: 8px;
         }
 
-        .stat-item:hover {
-            border-color: #606060;
-            background-color: #2d2d2d;
+        .detail-label {
+            font-size: 0.875rem;
+            color: var(--md-on-surface-variant);
         }
 
-        .stat-label {
-            color: #A0A0A0;
-            font-size: 0.9rem;
+        .detail-value {
             font-weight: 500;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.875rem;
         }
 
-        .stat-data {
-            color: #FFFFFF;
-            font-size: 0.95rem;
-            font-weight: 600;
-            font-family: 'Courier New', monospace;
+        .admin-section {
+            background-color: var(--md-surface);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
         }
 
-        #rawJsonContent {
-            font-family: 'Courier New', monospace;
-            line-height: 1.6;
+        .admin-section-title {
+            font-size: 1.125rem;
+            font-weight: 500;
+            margin-bottom: 20px;
+            color: var(--md-on-surface);
         }
 
-        @media (max-width: 768px) {
-            .stats-grid {
-                grid-template-columns: 1fr 1fr;
-                gap: 1.5rem;
-            }
-
-            .stat-value {
-                font-size: 2rem;
-            }
+        .form-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
         }
 
-        @media (max-width: 480px) {
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
+        .form-row .md-input {
+            flex: 1;
+        }
 
-            body {
-                padding: 1rem;
-            }
+        .peer-list {
+            list-style: none;
+            padding: 16px;
+            background-color: var(--md-surface-container);
+            border-radius: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
 
-            .container {
-                padding: 1rem;
-            }
+        .peer-list li {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--md-outline-variant);
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.875rem;
+        }
+
+        .peer-list li:last-child {
+            border-bottom: none;
+        }
+
+        .raw-json {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 12px;
+            background-color: var(--md-surface-container);
+            border-radius: 12px;
+            padding: 16px;
+            max-height: 300px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .links-row {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 32px;
+        }
+
+        .link-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 24px;
+            background-color: var(--md-surface);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: 12px;
+            text-decoration: none;
+            color: var(--md-on-surface);
+            transition: all 0.2s;
+        }
+
+        .link-card:hover {
+            border-color: var(--md-primary);
+            box-shadow: var(--md-elevation-1);
+        }
+
+        .link-card svg {
+            width: 24px;
+            height: 24px;
+            color: var(--md-primary);
+        }
+
+        .error-message {
+            display: none;
+            padding: 16px;
+            background-color: var(--md-error-container);
+            color: #c5221f;
+            border-radius: 12px;
+            margin-top: 16px;
+        }
+
+        .last-updated {
+            text-align: center;
+            color: var(--md-on-surface-variant);
+            font-size: 0.875rem;
+            margin-top: 24px;
+        }
+
+        .chevron {
+            transition: transform 0.2s;
+        }
+
+        .section-header.open .chevron {
+            transform: rotate(180deg);
         }
     </style>
 </head>
 
-<body class="antialiased">
-    <div class="hero-gradient min-h-screen">
-        <div class="container mx-auto px-4 py-8 max-w-6xl">
-            <!-- Back Navigation -->
-            <div class="flex items-center mb-8">
-                <a href="/" class="flex items-center gap-2 text-[#A0A0A0] hover:text-[#FF69B4] transition-colors group">
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                        class="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
-                    <span>Back to Control Panel</span>
-                </a>
+<body>
+    <!-- Header -->
+    <header class="page-header">
+        <div class="page-header-content">
+            <a href="/admin" class="md-btn md-btn-icon" title="Back">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+            </a>
+            <div class="page-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
             </div>
+            <div>
+                <h1 class="md-headline-medium">Live Stats</h1>
+                <p class="md-body-medium md-text-secondary">Real-time system monitoring and metrics</p>
+            </div>
+        </div>
+    </header>
 
-            <div class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover">
-                <div class="p-8 sm:p-10">
-                    <div class="flex flex-col items-center">
-                        <!-- Header Icon -->
-                        <div
-                            class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-[#4CAF50] to-[#43A047] mb-6 pulse-glow">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none"
-                                viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                            </svg>
-                        </div>
-
-                        <h1 class="text-3xl md:text-4xl font-bold mb-4 text-[#FFFFFF]">Gun Relay Live Stats</h1>
-                        <p class="text-[#8B94FF] mb-8">Real-time system monitoring and metrics</p>
-
-                        <div class="w-full space-y-8">
-                            <div class="stats-grid">
-                                <div class="stat-card">
-                                    <div class="stat-title">Connected Peers</div>
-                                    <div class="stat-value" id="peersCount">-</div>
-                                    <div class="stat-unit">peers</div>
-                                </div>
-                                <div class="stat-card">
-                                    <div class="stat-title">Memory Usage</div>
-                                    <div class="stat-value" id="memoryUsage">-</div>
-                                    <div class="stat-unit">MB</div>
-                                </div>
-                                <div class="stat-card">
-                                    <div class="stat-title">Request Rate</div>
-                                    <div class="stat-value" id="requestRate">-</div>
-                                    <div class="stat-unit">req/s</div>
-                                </div>
-                                <div class="stat-card">
-                                    <div class="stat-title">Uptime</div>
-                                    <div class="stat-value" id="uptime">-</div>
-                                    <div class="stat-unit">hours</div>
-                                </div>
-                            </div>
-
-                            <!-- Complete Statistics Section -->
-                            <div class="admin-controls">
-                                <div class="flex items-center justify-between mb-6">
-                                    <h2 class="text-xl font-bold text-[#FF69B4]">Complete Statistics</h2>
-                                    <button id="toggleStatsBtn"
-                                        class="btn bg-[#404040] hover:bg-[#606060] border-[#606060] text-[#FFFFFF] rounded-xl px-4 py-2 text-sm font-medium">
-                                        ▼ Expand All
-                                    </button>
-                                </div>
-
-                                <div id="completeStatsContainer" class="space-y-6">
-                                    <!-- System Info -->
-                                    <div class="stats-category">
-                                        <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
-                                            onclick="toggleCategory('systemInfo')">
-                                            <span>🖥️ System Information</span>
-                                            <span class="text-sm text-[#A0A0A0]">▼</span>
-                                        </h3>
-                                        <div id="systemInfo"
-                                            class="stats-details grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            <div class="stat-item">
-                                                <span class="stat-label">Version:</span>
-                                                <span class="stat-data" id="statVersion">-</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-label">Uptime:</span>
-                                                <span class="stat-data" id="statUptime">-</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-label">Timestamp:</span>
-                                                <span class="stat-data" id="statTimestamp">-</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Memory Stats -->
-                                    <div class="stats-category">
-                                        <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
-                                            onclick="toggleCategory('memoryStats')">
-                                            <span>💾 Memory Statistics</span>
-                                            <span class="text-sm text-[#A0A0A0]">▼</span>
-                                        </h3>
-                                        <div id="memoryStats"
-                                            class="stats-details grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            <div class="stat-item">
-                                                <span class="stat-label">Heap Used:</span>
-                                                <span class="stat-data" id="statHeapUsed">-</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-label">Heap Total:</span>
-                                                <span class="stat-data" id="statHeapTotal">-</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-label">External:</span>
-                                                <span class="stat-data" id="statExternal">-</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-label">RSS:</span>
-                                                <span class="stat-data" id="statRSS">-</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- CPU Stats -->
-                                    <div class="stats-category">
-                                        <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
-                                            onclick="toggleCategory('cpuStats')">
-                                            <span>⚡ CPU Statistics</span>
-                                            <span class="text-sm text-[#A0A0A0]">▼</span>
-                                        </h3>
-                                        <div id="cpuStats"
-                                            class="stats-details grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            <div class="stat-item">
-                                                <span class="stat-label">User (μs):</span>
-                                                <span class="stat-data" id="statCpuUser">-</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-label">System (μs):</span>
-                                                <span class="stat-data" id="statCpuSystem">-</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Peers Stats -->
-                                    <div class="stats-category">
-                                        <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
-                                            onclick="toggleCategory('peersStats')">
-                                            <span>🌐 Peers Statistics</span>
-                                            <span class="text-sm text-[#A0A0A0]">▼</span>
-                                        </h3>
-                                        <div id="peersStats"
-                                            class="stats-details grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            <div class="stat-item">
-                                                <span class="stat-label">Count:</span>
-                                                <span class="stat-data" id="statPeersCount">-</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-label">Time:</span>
-                                                <span class="stat-data" id="statPeersTime">-</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Node Stats -->
-                                    <div class="stats-category">
-                                        <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
-                                            onclick="toggleCategory('nodeStats')">
-                                            <span>📦 Node Statistics</span>
-                                            <span class="text-sm text-[#A0A0A0]">▼</span>
-                                        </h3>
-                                        <div id="nodeStats"
-                                            class="stats-details grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            <div class="stat-item">
-                                                <span class="stat-label">Count:</span>
-                                                <span class="stat-data" id="statNodeCount">-</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-label">Heap Used:</span>
-                                                <span class="stat-data" id="statNodeHeapUsed">-</span>
-                                            </div>
-                                            <div class="stat-item">
-                                                <span class="stat-label">Heap Total:</span>
-                                                <span class="stat-data" id="statNodeHeapTotal">-</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- DAM (Data Access Manager) Stats -->
-                                    <div class="stats-category">
-                                        <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
-                                            onclick="toggleCategory('damStats')">
-                                            <span>📊 Data Access Manager (DAM)</span>
-                                            <span class="text-sm text-[#A0A0A0]">▼</span>
-                                        </h3>
-                                        <div id="damStats" class="stats-details">
-                                            <div class="mb-4">
-                                                <h4 class="text-base font-medium mb-3 text-[#E0E0E0]">Incoming</h4>
-                                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    <div class="stat-item">
-                                                        <span class="stat-label">Rate:</span>
-                                                        <span class="stat-data" id="statDamInRate">-</span>
-                                                    </div>
-                                                    <div class="stat-item">
-                                                        <span class="stat-label">Count:</span>
-                                                        <span class="stat-data" id="statDamInCount">-</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <h4 class="text-base font-medium mb-3 text-[#E0E0E0]">Outgoing</h4>
-                                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    <div class="stat-item">
-                                                        <span class="stat-label">Rate:</span>
-                                                        <span class="stat-data" id="statDamOutRate">-</span>
-                                                    </div>
-                                                    <div class="stat-item">
-                                                        <span class="stat-label">Count:</span>
-                                                        <span class="stat-data" id="statDamOutCount">-</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Storage (RAD) Stats -->
-                                    <div class="stats-category">
-                                        <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
-                                            onclick="toggleCategory('radStats')">
-                                            <span>💿 Storage (RAD) Statistics</span>
-                                            <span class="text-sm text-[#A0A0A0]">▼</span>
-                                        </h3>
-                                        <div id="radStats" class="stats-details">
-                                            <div id="radStatsContent" class="text-[#A0A0A0]">
-                                                No storage statistics available
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Raw JSON View -->
-                                    <div class="stats-category">
-                                        <h3 class="text-lg font-semibold mb-4 text-[#FFFFFF] cursor-pointer flex items-center justify-between"
-                                            onclick="toggleCategory('rawJson')">
-                                            <span>📄 Raw JSON Data</span>
-                                            <span class="text-sm text-[#A0A0A0]">▼</span>
-                                        </h3>
-                                        <div id="rawJson" class="stats-details">
-                                            <pre id="rawJsonContent"
-                                                class="bg-[#282828] p-4 rounded-xl text-xs text-[#E0E0E0] overflow-x-auto max-h-96 overflow-y-auto"></pre>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Admin Controls Section -->
-                            <div class="admin-controls">
-                                <h2 class="text-xl font-bold mb-6 text-[#FF69B4]">Admin Controls</h2>
-
-
-                                <!-- Stats Modification -->
-                                <div class="mb-8">
-                                    <h3 class="text-lg mb-4 text-[#FFFFFF]">Modify Stats</h3>
-                                    <div class="flex flex-col gap-6">
-                                        <div class="form-control">
-                                            <label class="label">
-                                                <span class="label-text text-[#E0E0E0] text-base">GET Requests</span>
-                                            </label>
-                                            <div class="flex gap-3">
-                                                <input type="number" id="getRequestsInput"
-                                                    class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none"
-                                                    placeholder="Enter value">
-                                                <button onclick="updateStat('getRequests')"
-                                                    class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium">Update</button>
-                                            </div>
-                                        </div>
-                                        <div class="form-control">
-                                            <label class="label">
-                                                <span class="label-text text-[#E0E0E0] text-base">PUT Requests</span>
-                                            </label>
-                                            <div class="flex gap-3">
-                                                <input type="number" id="putRequestsInput"
-                                                    class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none"
-                                                    placeholder="Enter value">
-                                                <button onclick="updateStat('putRequests')"
-                                                    class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium">Update</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div id="updateStatus" class="mt-3 text-base"></div>
-                                </div>
-
-                                <!-- Peer Management -->
-                                <div class="mt-8">
-                                    <h3 class="text-lg mb-4 text-[#FFFFFF]">Peer Management</h3>
-                                    <div class="mb-6">
-                                        <h4 class="text-lg font-semibold mb-3 text-[#E0E0E0]">Connected Peers:</h4>
-                                        <ul id="peerList"
-                                            class="list-disc list-inside bg-[#282828] p-4 rounded-xl text-base min-h-[5rem] text-[#E0E0E0]">
-                                            <!-- Peers will be listed here -->
-                                            <li>Loading...</li>
-                                        </ul>
-                                    </div>
-                                    <div class="form-control">
-                                        <label class="label">
-                                            <span class="label-text text-[#E0E0E0] text-base">Add New Peer</span>
-                                        </label>
-                                        <div class="flex gap-3">
-                                            <input type="text" id="peerInput"
-                                                class="input w-full bg-[#282828] border-[#606060] text-[#FFFFFF] placeholder-[#A0A0A0] rounded-xl px-4 py-3 focus:ring-[#FF69B4] focus:ring-opacity-50 focus:outline-none"
-                                                placeholder="e.g., wss://gun.shogun.to/gun">
-                                            <button id="addPeerBtn"
-                                                class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-medium">Add</button>
-                                        </div>
-                                    </div>
-                                    <div id="peerStatus" class="mt-3 text-base"></div>
-                                </div>
-                            </div>
-
-                            <div class="flex gap-4 justify-center mt-6">
-                                <a href="/charts.html" class="view-charts-link">
-                                    📊 View Detailed Charts & Metrics
-                                </a>
-                                <a href="/network-stats" class="view-charts-link">
-                                    🌐 Network Statistics & Reputation
-                                </a>
-                            </div>
-
-                            <div id="error" class="error"></div>
-                            <p id="lastUpdated"></p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Footer -->
-                <footer class="mt-12 text-center">
-                    <div class="section-divider"></div>
-                    <p class="text-[#606060] text-sm">
-                        Shogun Relay Stats - Part of the <a href="https://github.com/scobru/shogun"
-                            class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">Shogun Project</a>
-                    </p>
-                </footer>
+    <main class="md-container">
+        <!-- Quick Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-title">Connected Peers</div>
+                <div class="stat-value" id="peersCount">-</div>
+                <div class="stat-unit">peers</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Memory Usage</div>
+                <div class="stat-value" id="memoryUsage">-</div>
+                <div class="stat-unit">MB</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Request Rate</div>
+                <div class="stat-value" id="requestRate">-</div>
+                <div class="stat-unit">req/s</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Uptime</div>
+                <div class="stat-value" id="uptime">-</div>
+                <div class="stat-unit">hours</div>
             </div>
         </div>
 
-        <script>
-            const peersCountEl = document.getElementById('peersCount');
-            const memoryUsageEl = document.getElementById('memoryUsage');
-            const requestRateEl = document.getElementById('requestRate');
-            const uptimeEl = document.getElementById('uptime');
-            const errorEl = document.getElementById('error');
-            const lastUpdatedEl = document.getElementById('lastUpdated');
-            const updateStatusEl = document.getElementById('updateStatus');
-            const peerStatusEl = document.getElementById('peerStatus');
-            const peerListEl = document.getElementById('peerList');
+        <!-- Detailed Statistics -->
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection('systemInfo', this)">
+                <span class="section-title">🖥️ System Information</span>
+                <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </div>
+            <div id="systemInfo" class="section-body">
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <span class="detail-label">Version</span>
+                        <span class="detail-value" id="statVersion">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Uptime</span>
+                        <span class="detail-value" id="statUptime">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Timestamp</span>
+                        <span class="detail-value" id="statTimestamp">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection('memoryStats', this)">
+                <span class="section-title">💾 Memory Statistics</span>
+                <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </div>
+            <div id="memoryStats" class="section-body">
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <span class="detail-label">Heap Used</span>
+                        <span class="detail-value" id="statHeapUsed">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Heap Total</span>
+                        <span class="detail-value" id="statHeapTotal">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">External</span>
+                        <span class="detail-value" id="statExternal">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">RSS</span>
+                        <span class="detail-value" id="statRSS">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection('cpuStats', this)">
+                <span class="section-title">⚡ CPU Statistics</span>
+                <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </div>
+            <div id="cpuStats" class="section-body">
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <span class="detail-label">User (μs)</span>
+                        <span class="detail-value" id="statCpuUser">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">System (μs)</span>
+                        <span class="detail-value" id="statCpuSystem">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-            // Get the token from localStorage or prompt the user
-            function getAuthToken() {
-                let token = localStorage.getItem('shogun-relay-admin-password');
-                if (!token) {
-                    token = prompt('Please enter your admin token:');
-                    if (token) {
-                        localStorage.setItem('shogun-relay-admin-password', token);
-                    }
-                }
-                return token;
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection('peersStats', this)">
+                <span class="section-title">🌐 Peers Statistics</span>
+                <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </div>
+            <div id="peersStats" class="section-body">
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <span class="detail-label">Count</span>
+                        <span class="detail-value" id="statPeersCount">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Time</span>
+                        <span class="detail-value" id="statPeersTime">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection('rawJson', this)">
+                <span class="section-title">📄 Raw JSON Data</span>
+                <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </div>
+            <div id="rawJson" class="section-body">
+                <pre class="raw-json" id="rawJsonContent"></pre>
+            </div>
+        </div>
+
+        <!-- Admin Controls -->
+        <div class="admin-section">
+            <h2 class="admin-section-title">Admin Controls</h2>
+
+            <h3 class="md-title-medium md-mb-md">Modify Stats</h3>
+            <div class="form-row">
+                <input type="number" id="getRequestsInput" class="md-input" placeholder="GET Requests value">
+                <button onclick="updateStat('getRequests')" class="md-btn md-btn-filled">Update GET</button>
+            </div>
+            <div class="form-row">
+                <input type="number" id="putRequestsInput" class="md-input" placeholder="PUT Requests value">
+                <button onclick="updateStat('putRequests')" class="md-btn md-btn-filled">Update PUT</button>
+            </div>
+            <div id="updateStatus" class="md-body-medium md-mt-sm"></div>
+
+            <h3 class="md-title-medium md-mt-lg md-mb-md">Peer Management</h3>
+            <h4 class="md-label-large md-mb-sm">Connected Peers:</h4>
+            <ul class="peer-list" id="peerList">
+                <li>Loading...</li>
+            </ul>
+            <div class="form-row md-mt-md">
+                <input type="text" id="peerInput" class="md-input" placeholder="e.g., wss://gun.shogun.to/gun">
+                <button id="addPeerBtn" class="md-btn md-btn-filled">Add Peer</button>
+            </div>
+            <div id="peerStatus" class="md-body-medium md-mt-sm"></div>
+        </div>
+
+        <!-- Links -->
+        <div class="links-row">
+            <a href="/charts.html" class="link-card">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                </svg>
+                <span>Detailed Charts & Metrics</span>
+            </a>
+            <a href="/network-stats" class="link-card">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9" />
+                </svg>
+                <span>Network Statistics & Reputation</span>
+            </a>
+        </div>
+
+        <div id="error" class="error-message"></div>
+        <p id="lastUpdated" class="last-updated"></p>
+
+        <!-- Footer -->
+        <footer class="md-footer">
+            <p class="md-body-small">
+                Shogun Relay Stats — Part of the <a href="https://github.com/scobru/shogun">Shogun Project</a>
+            </p>
+        </footer>
+    </main>
+
+    <script>
+        function toggleSection(id, header) {
+            const section = document.getElementById(id);
+            section.classList.toggle('expanded');
+            header.classList.toggle('open');
+        }
+
+        function getAuthToken() {
+            let token = localStorage.getItem('shogun-relay-admin-password');
+            if (!token) {
+                token = prompt('Please enter your admin token:');
+                if (token) localStorage.setItem('shogun-relay-admin-password', token);
+            }
+            return token;
+        }
+
+        async function fetchStats() {
+            try {
+                const response = await fetch('/gun/stats');
+                const data = await response.json();
+
+                document.getElementById('peersCount').textContent = data.peers?.count || 0;
+                document.getElementById('memoryUsage').textContent = Math.round((data.memory?.heapUsed || 0) / 1024 / 1024);
+                document.getElementById('requestRate').textContent = data.dam?.in?.rate || 0;
+                document.getElementById('uptime').textContent = Math.round((data.uptime || 0) / 3600);
+
+                // Detailed stats
+                document.getElementById('statVersion').textContent = data.version || '-';
+                document.getElementById('statUptime').textContent = `${Math.round((data.uptime || 0) / 60)} min`;
+                document.getElementById('statTimestamp').textContent = new Date(data.timestamp || Date.now()).toLocaleString();
+
+                document.getElementById('statHeapUsed').textContent = `${Math.round((data.memory?.heapUsed || 0) / 1024 / 1024)} MB`;
+                document.getElementById('statHeapTotal').textContent = `${Math.round((data.memory?.heapTotal || 0) / 1024 / 1024)} MB`;
+                document.getElementById('statExternal').textContent = `${Math.round((data.memory?.external || 0) / 1024 / 1024)} MB`;
+                document.getElementById('statRSS').textContent = `${Math.round((data.memory?.rss || 0) / 1024 / 1024)} MB`;
+
+                document.getElementById('statCpuUser').textContent = data.cpu?.user || '-';
+                document.getElementById('statCpuSystem').textContent = data.cpu?.system || '-';
+
+                document.getElementById('statPeersCount').textContent = data.peers?.count || 0;
+                document.getElementById('statPeersTime').textContent = `${data.peers?.time || 0} ms`;
+
+                document.getElementById('rawJsonContent').textContent = JSON.stringify(data, null, 2);
+                document.getElementById('lastUpdated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+            } catch (error) {
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = `Error fetching stats: ${error.message}`;
+            }
+        }
+
+        async function fetchPeers() {
+            const token = getAuthToken();
+            if (!token) {
+                document.getElementById('peerList').innerHTML = '<li>Authentication required</li>';
+                return;
             }
 
-
-            // Function to update stats
-            async function updateStat(key) {
-                const token = getAuthToken();
-                if (!token) {
-                    updateStatusEl.innerHTML = '<span class="text-error">Authentication required</span>';
-                    return;
-                }
-
-                const input = document.getElementById(`${key}Input`);
-                const value = parseInt(input.value);
-
-                if (isNaN(value)) {
-                    updateStatusEl.innerHTML = '<span class="text-error">Please enter a valid number</span>';
-                    return;
-                }
-
-                try {
-                    const response = await fetch('/api/v1/system/stats/update', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ key, value })
-                    });
-
-                    const result = await response.json();
-
-                    if (result.success) {
-                        updateStatusEl.innerHTML = `<span class="text-success">✓ ${key} updated to ${value}</span>`;
-                        input.value = ''; // Clear input
-                    } else {
-                        updateStatusEl.innerHTML = `<span class="text-error">✗ Error: ${result.error}</span>`;
-                    }
-                } catch (error) {
-                    updateStatusEl.innerHTML = `<span class="text-error">✗ Error: ${error.message}</span>`;
-                }
-            }
-
-            // Add event listeners
-            document.getElementById('addPeerBtn').addEventListener('click', addPeer);
-
-
-
-            // --- Peer Management Functions ---
-            async function fetchPeers() {
-                const token = getAuthToken();
-                if (!token) {
-                    peerListEl.innerHTML = '<li>Authentication required to view peers.</li>';
-                    return;
-                }
-
-                try {
-                    const response = await fetch('/api/v1/system/peers', {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    const result = await response.json();
-
-                    if (result.success) {
-                        peerListEl.innerHTML = ''; // Clear existing list
-                        if (result.peers && result.peers.length > 0) {
-                            result.peers.forEach(peer => {
-                                const li = document.createElement('li');
-                                li.textContent = peer;
-                                peerListEl.appendChild(li);
-                            });
-                        } else {
-                            peerListEl.innerHTML = '<li>No active peer connections found.</li>';
-                        }
-                    } else {
-                        peerListEl.innerHTML = `<li>Error: ${result.error}</li>`;
-                    }
-                } catch (error) {
-                    peerListEl.innerHTML = `<li>Error loading peers: ${error.message}</li>`;
-                }
-            }
-
-            // Add peer function
-            async function addPeer() {
-                const token = getAuthToken();
-                if (!token) {
-                    alert('Authentication required to add peers.');
-                    return;
-                }
-
-                const peerInput = document.getElementById('peerInput');
-                const peerAddress = peerInput.value.trim();
-
-                if (!peerAddress) {
-                    alert('Please enter a peer address.');
-                    return;
-                }
-
-                try {
-                    const response = await fetch('/api/v1/system/peers/add', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ peer: peerAddress })
-                    });
-
-                    const result = await response.json();
-
-                    if (result.success) {
-                        alert('Peer added successfully!');
-                        peerInput.value = '';
-                        fetchPeers(); // Refresh the list
-                    } else {
-                        alert(`Failed to add peer: ${result.error}`);
-                    }
-                } catch (error) {
-                    alert(`Error adding peer: ${error.message}`);
-                }
-            }
-
-
-
-            // Escape HTML to prevent XSS
-            function escapeHtml(text) {
-                const div = document.createElement('div');
-                div.textContent = text;
-                return div.innerHTML;
-            }
-
-            function formatBytes(bytes, decimals = 2) {
-                if (!bytes || bytes === 0) return '0 Bytes';
-                const k = 1024;
-                const dm = decimals < 0 ? 0 : decimals;
-                const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-                const i = Math.floor(Math.log(bytes) / Math.log(k));
-                return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-            }
-
-            // Toggle category expansion
-            function toggleCategory(categoryId) {
-                const category = document.getElementById(categoryId);
-                if (!category) return;
-
-                const header = category.previousElementSibling;
-                if (!header) return;
-
-                const arrow = header.querySelector('span:last-child');
-
-                if (category.classList.contains('expanded')) {
-                    category.classList.remove('expanded');
-                    if (arrow) arrow.textContent = '▼';
-                } else {
-                    category.classList.add('expanded');
-                    if (arrow) arrow.textContent = '▲';
-                }
-            }
-
-            // Toggle all categories
-            const toggleBtn = document.getElementById('toggleStatsBtn');
-            if (toggleBtn) {
-                toggleBtn.addEventListener('click', function () {
-                    const allCategories = document.querySelectorAll('.stats-details');
-                    const allArrows = document.querySelectorAll('.stats-category h3 span:last-child');
-                    const isExpanded = Array.from(allCategories).some(cat => cat.classList.contains('expanded'));
-
-                    allCategories.forEach(cat => {
-                        if (isExpanded) {
-                            cat.classList.remove('expanded');
-                        } else {
-                            cat.classList.add('expanded');
-                        }
-                    });
-
-                    allArrows.forEach(arrow => {
-                        arrow.textContent = isExpanded ? '▼' : '▲';
-                    });
-
-                    this.textContent = isExpanded ? '▼ Expand All' : '▲ Collapse All';
+            try {
+                const response = await fetch('/api/v1/system/peers', {
+                    headers: { 'Authorization': `Bearer ${token}` }
                 });
-            }
+                const result = await response.json();
 
-            async function fetchStats() {
-                try {
-                    const response = await fetch('/api/v1/system/stats');
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    const result = await response.json();
-
-                    if (result.success) {
-                        errorEl.style.display = 'none';
-
-                        // Update main stats cards
-                        const { peers, node, rad, up, dam, memory, cpu, version, timestamp } = result;
-
-                        peersCountEl.textContent = peers?.count || 0;
-
-                        if (node?.memory?.heapUsed) {
-                            memoryUsageEl.textContent = formatBytes(node.memory.heapUsed);
-                        }
-
-                        if (dam?.in?.rate) {
-                            requestRateEl.textContent = dam.in.rate.toFixed(2);
-                        }
-
-                        if (up?.time) {
-                            const hours = (up.time / (1000 * 60 * 60)).toFixed(2);
-                            uptimeEl.textContent = hours;
-                        }
-
-                        // Update complete statistics
-                        // System Info
-                        document.getElementById('statVersion').textContent = version || 'N/A';
-                        if (up?.time) {
-                            const days = Math.floor(up.time / (1000 * 60 * 60 * 24));
-                            const hours = Math.floor((up.time % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                            const minutes = Math.floor((up.time % (1000 * 60 * 60)) / (1000 * 60));
-                            document.getElementById('statUptime').textContent = `${days}d ${hours}h ${minutes}m`;
-                        }
-                        if (timestamp) {
-                            document.getElementById('statTimestamp').textContent = new Date(timestamp).toLocaleString();
-                        }
-
-                        // Memory Stats
-                        if (memory) {
-                            document.getElementById('statHeapUsed').textContent = formatBytes(memory.heapUsed || 0);
-                            document.getElementById('statHeapTotal').textContent = formatBytes(memory.heapTotal || 0);
-                            document.getElementById('statExternal').textContent = formatBytes(memory.external || 0);
-                            document.getElementById('statRSS').textContent = formatBytes(memory.rss || 0);
-                        }
-
-                        // CPU Stats
-                        if (cpu) {
-                            document.getElementById('statCpuUser').textContent = (cpu.user / 1000).toFixed(2) + ' ms';
-                            document.getElementById('statCpuSystem').textContent = (cpu.system / 1000).toFixed(2) + ' ms';
-                        }
-
-                        // Peers Stats
-                        if (peers) {
-                            document.getElementById('statPeersCount').textContent = peers.count || 0;
-                            if (peers.time) {
-                                document.getElementById('statPeersTime').textContent = new Date(peers.time).toLocaleString();
-                            } else {
-                                document.getElementById('statPeersTime').textContent = 'N/A';
-                            }
-                        }
-
-                        // Node Stats
-                        if (node) {
-                            document.getElementById('statNodeCount').textContent = node.count || 0;
-                            if (node.memory) {
-                                document.getElementById('statNodeHeapUsed').textContent = formatBytes(node.memory.heapUsed || 0);
-                                document.getElementById('statNodeHeapTotal').textContent = formatBytes(node.memory.heapTotal || 0);
-                            }
-                        }
-
-                        // DAM Stats
-                        if (dam) {
-                            if (dam.in) {
-                                document.getElementById('statDamInRate').textContent = (dam.in.rate || 0).toFixed(2) + ' req/s';
-                                document.getElementById('statDamInCount').textContent = dam.in.count || 0;
-                            }
-                            if (dam.out) {
-                                document.getElementById('statDamOutRate').textContent = (dam.out.rate || 0).toFixed(2) + ' req/s';
-                                document.getElementById('statDamOutCount').textContent = dam.out.count || 0;
-                            }
-                        }
-
-                        // RAD Stats
-                        if (rad) {
-                            const radContent = document.getElementById('radStatsContent');
-                            radContent.innerHTML = '<pre class="text-sm">' + JSON.stringify(rad, null, 2) + '</pre>';
-                        } else {
-                            document.getElementById('radStatsContent').textContent = 'No storage statistics available';
-                        }
-
-                        // Raw JSON
-                        document.getElementById('rawJsonContent').textContent = JSON.stringify(result, null, 2);
-
-                        lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
-
-                    } else {
-                        throw new Error(result.error || 'Failed to fetch stats.');
-                    }
-                } catch (err) {
-                    errorEl.textContent = `Error fetching stats: ${err.message}`;
-                    errorEl.style.display = 'block';
+                if (result.success && result.peers?.length > 0) {
+                    document.getElementById('peerList').innerHTML = result.peers.map(p => `<li>${p}</li>`).join('');
+                } else {
+                    document.getElementById('peerList').innerHTML = '<li>No peers connected</li>';
                 }
+            } catch (error) {
+                document.getElementById('peerList').innerHTML = `<li>Error: ${error.message}</li>`;
+            }
+        }
+
+        async function updateStat(key) {
+            const token = getAuthToken();
+            if (!token) return;
+
+            const value = parseInt(document.getElementById(`${key}Input`).value);
+            if (isNaN(value)) {
+                document.getElementById('updateStatus').innerHTML = '<span class="md-text-error">Please enter a valid number</span>';
+                return;
             }
 
-            fetchStats();
-            fetchPeers();
-            setInterval(fetchStats, 5000); // Refresh every 5 seconds
-            setInterval(fetchPeers, 30000); // Refresh peer list every 30 seconds
+            try {
+                const response = await fetch('/api/v1/system/stats/update', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key, value })
+                });
+                const result = await response.json();
 
-            // Initialize logs display
-            updateLogsStats();
-        </script>
-        <!-- Include centralized admin authentication -->
-        <script src="lib/admin-auth.js"></script>
-        <script src="lib/admin-nav.js"></script>
+                if (result.success) {
+                    document.getElementById('updateStatus').innerHTML = `<span class="md-text-success">✓ ${key} updated to ${value}</span>`;
+                    document.getElementById(`${key}Input`).value = '';
+                } else {
+                    document.getElementById('updateStatus').innerHTML = `<span class="md-text-error">✗ ${result.error}</span>`;
+                }
+            } catch (error) {
+                document.getElementById('updateStatus').innerHTML = `<span class="md-text-error">✗ ${error.message}</span>`;
+            }
+        }
+
+        async function addPeer() {
+            const token = getAuthToken();
+            if (!token) return;
+
+            const peerAddress = document.getElementById('peerInput').value.trim();
+            if (!peerAddress) {
+                alert('Please enter a peer address');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/v1/system/peers/add', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ peer: peerAddress })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    document.getElementById('peerStatus').innerHTML = '<span class="md-text-success">✓ Peer added successfully</span>';
+                    document.getElementById('peerInput').value = '';
+                    fetchPeers();
+                } else {
+                    document.getElementById('peerStatus').innerHTML = `<span class="md-text-error">✗ ${result.error}</span>`;
+                }
+            } catch (error) {
+                document.getElementById('peerStatus').innerHTML = `<span class="md-text-error">✗ ${error.message}</span>`;
+            }
+        }
+
+        document.getElementById('addPeerBtn').addEventListener('click', addPeer);
+
+        // Initialize
+        fetchStats();
+        fetchPeers();
+        setInterval(fetchStats, 5000);
+    </script>
 </body>
 
 </html>

@@ -1,90 +1,182 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="shogun-dark">
+<html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shogun Relay</title>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <meta name="description" content="Shogun Relay - Decentralized infrastructure powered by GunDB & IPFS">
+    <link rel="stylesheet" href="styles/google-md3.css">
     <style>
-        body {
-            background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
-            min-height: 100vh;
+        .hero-bg {
+            background: linear-gradient(135deg, #f8fafd 0%, #e8f0fe 100%);
+        }
+
+        .logo-container {
+            width: 96px;
+            height: 96px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            border-radius: 28px;
+            background: linear-gradient(135deg, #1a73e8 0%, #4285f4 100%);
+            box-shadow: 0 8px 32px rgba(26, 115, 232, 0.3);
+            margin-bottom: 32px;
         }
 
-        .hero-gradient {
-            background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
-        }
-
-        @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4); }
-            50% { box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2); }
-        }
-
-        .pulse-glow {
-            animation: pulse-glow 2s infinite;
-        }
-
-        .welcome-card {
-            background: rgba(40, 40, 40, 0.8);
-            border: 1px solid #404040;
-            border-radius: 2rem;
-            padding: 4rem 3rem;
-            text-align: center;
-            max-width: 600px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        .logo-container svg {
+            width: 48px;
+            height: 48px;
+            color: white;
         }
 
         .relay-name {
-            background: linear-gradient(135deg, #FF69B4, #8B94FF);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: var(--md-primary);
+        }
+
+        .hero-card {
+            max-width: 480px;
+            width: 100%;
+            padding: 48px 40px;
+            text-align: center;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background-color: var(--md-success-container);
+            border-radius: 100px;
+            margin-bottom: 24px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--md-success);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .status-text {
+            font-size: 14px;
+            font-weight: 500;
+            color: #137333;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 32px;
+        }
+
+        @media (min-width: 480px) {
+            .action-buttons {
+                flex-direction: row;
+                justify-content: center;
+            }
+        }
+
+        .footer-links {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            margin-top: 48px;
+            padding-top: 24px;
+            border-top: 1px solid var(--md-outline-variant);
+        }
+
+        .footer-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--md-on-surface-variant);
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
+
+        .footer-link:hover {
+            color: var(--md-primary);
+        }
+
+        .footer-link svg {
+            width: 20px;
+            height: 20px;
         }
     </style>
 </head>
-<body class="antialiased">
-    <div class="hero-gradient min-h-screen w-full flex items-center justify-center">
-        <div class="welcome-card">
-            <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-[#FF69B4] to-[#FF1493] mb-6 pulse-glow">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-            </div>
-            
-            <h1 class="text-4xl md:text-5xl font-bold text-white mb-4">
-                Welcome to
-            </h1>
-            
-            <h2 class="text-3xl md:text-4xl font-bold mb-8 relay-name" id="relayName">
-                Shogun Relay
-            </h2>
-            
-            <div class="flex items-center justify-center gap-2 mb-6">
-                <span class="w-2 h-2 bg-[#4CAF50] rounded-full animate-pulse"></span>
-                <span class="text-[#A0A0A0] text-sm">Relay Online</span>
-            </div>
-            
-            <p class="text-[#A0A0A0] text-sm mb-8">
-                Decentralized infrastructure powered by GunDB & IPFS
-            </p>
-            
-            <div class="pt-6 border-t border-[#404040]">
-                <div class="flex flex-col gap-3">
-                    <a href="/admin" class="btn bg-[#42A5F5] hover:bg-[#1976D2] border-0 text-white">
-                        Access Admin Panel
-                    </a>
-                    <a href="/endpoints" class="btn bg-[#8B94FF] hover:bg-[#6B75E8] border-0 text-white">
-                        API Documentation
-                    </a>
+
+<body>
+    <main class="md-hero hero-bg">
+        <div class="md-card md-card-elevated hero-card md-animate-fade-in">
+            <!-- Logo -->
+            <div class="md-flex-center">
+                <div class="logo-container">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
                 </div>
             </div>
+
+            <!-- Title -->
+            <h1 class="md-headline-large md-mb-sm">Welcome to</h1>
+            <h2 class="md-display-small relay-name md-mb-lg" id="relayName">Shogun Relay</h2>
+
+            <!-- Status Badge -->
+            <div class="status-badge">
+                <span class="status-dot"></span>
+                <span class="status-text">Relay Online</span>
+            </div>
+
+            <!-- Description -->
+            <p class="md-body-large md-text-secondary">
+                Decentralized infrastructure powered by GunDB & IPFS
+            </p>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <a href="/admin" class="md-btn md-btn-filled">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="md-icon-sm" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    Admin Panel
+                </a>
+                <a href="/endpoints" class="md-btn md-btn-outlined">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="md-icon-sm" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    API Documentation
+                </a>
+            </div>
+
+            <!-- Footer Links -->
+            <div class="footer-links">
+                <a href="https://github.com/scobru/shogun" target="_blank" rel="noopener" class="footer-link">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
+                        <path
+                            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                    </svg>
+                    GitHub
+                </a>
+                <a href="/network-stats" class="footer-link">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9" />
+                    </svg>
+                    Network
+                </a>
+            </div>
         </div>
-    </div>
+    </main>
 
     <script>
         // Fetch relay name from API
@@ -107,4 +199,5 @@
         });
     </script>
 </body>
+
 </html>
