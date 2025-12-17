@@ -493,7 +493,8 @@
 
         async function fetchStats() {
             try {
-                const response = await fetch('/gun/stats');
+                // Use the new system stats API (same source as charts page)
+                const response = await fetch('/api/v1/system/stats.json');
                 const data = await response.json();
 
                 document.getElementById('peersCount').textContent = data.peers?.count || 0;
