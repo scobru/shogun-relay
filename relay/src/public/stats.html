@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="styles/google-md3.css">
     <style>
         .page-header {
-            background-color: var(--md-surface);
+            background-color: var(--md-surface-container-low);
             border-bottom: 1px solid var(--md-outline-variant);
             padding: 24px;
             margin-bottom: 32px;
@@ -29,13 +29,14 @@
             align-items: center;
             justify-content: center;
             border-radius: 16px;
-            background-color: #ceead6;
+            background: linear-gradient(135deg, #42A5F5, #1E88E5);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
         }
 
         .page-icon svg {
             width: 28px;
             height: 28px;
-            color: #137333;
+            color: #FFFFFF;
         }
 
         .stats-grid {
@@ -46,7 +47,7 @@
         }
 
         .stat-card {
-            background-color: var(--md-surface);
+            background-color: var(--md-surface-container);
             border: 1px solid var(--md-outline-variant);
             border-radius: 16px;
             padding: 24px;
@@ -82,7 +83,7 @@
         }
 
         .section-card {
-            background-color: var(--md-surface);
+            background-color: var(--md-surface-container);
             border: 1px solid var(--md-outline-variant);
             border-radius: 16px;
             margin-bottom: 24px;
@@ -146,7 +147,7 @@
         }
 
         .admin-section {
-            background-color: var(--md-surface);
+            background-color: var(--md-surface-container);
             border: 1px solid var(--md-outline-variant);
             border-radius: 16px;
             padding: 24px;
@@ -215,7 +216,7 @@
             align-items: center;
             gap: 12px;
             padding: 16px 24px;
-            background-color: var(--md-surface);
+            background-color: var(--md-surface-container);
             border: 1px solid var(--md-outline-variant);
             border-radius: 12px;
             text-decoration: none;
@@ -238,7 +239,7 @@
             display: none;
             padding: 16px;
             background-color: var(--md-error-container);
-            color: #c5221f;
+            color: var(--md-error);
             border-radius: 12px;
             margin-top: 16px;
         }

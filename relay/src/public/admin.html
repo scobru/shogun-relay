@@ -10,11 +10,14 @@
     <script src="lib/admin-auth.js"></script>
     <style>
         .admin-header {
-            background: linear-gradient(135deg, #1a73e8 0%, #4285f4 100%);
+            background:
+                radial-gradient(ellipse at top, rgba(255, 105, 180, 0.18) 0%, transparent 60%),
+                linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
             color: white;
             padding: 48px 24px;
             text-align: center;
             margin-bottom: 32px;
+            border-bottom: 1px solid var(--md-outline-variant);
         }
 
         .admin-header-icon {
@@ -63,12 +66,12 @@
 
         .auth-status-locked {
             background-color: var(--md-warning-container);
-            color: #b06000;
+            color: #FFA500;
         }
 
         .auth-status-unlocked {
             background-color: var(--md-success-container);
-            color: #137333;
+            color: #4CAF50;
         }
 
         .section-title {
@@ -94,7 +97,7 @@
             border-radius: 12px;
             text-decoration: none;
             color: var(--md-on-surface);
-            background-color: var(--md-surface);
+            background-color: var(--md-surface-container);
             border: 1px solid var(--md-outline-variant);
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -148,7 +151,7 @@
 
         .badge-protected {
             background-color: var(--md-warning-container);
-            color: #b06000;
+            color: #FFA500;
         }
 
         .badge-new {
@@ -158,33 +161,33 @@
 
         /* Icon color variants */
         .icon-green {
-            background-color: #ceead6;
-            color: #137333;
+            background-color: rgba(76, 175, 80, 0.18);
+            color: #4CAF50;
         }
 
         .icon-blue {
-            background-color: #d3e3fd;
-            color: #1967d2;
+            background-color: rgba(66, 165, 245, 0.18);
+            color: #42A5F5;
         }
 
         .icon-purple {
-            background-color: #e8d3f8;
-            color: #7627bb;
+            background-color: rgba(139, 92, 246, 0.18);
+            color: #8B5CF6;
         }
 
         .icon-orange {
-            background-color: #fef0d5;
-            color: #b06000;
+            background-color: rgba(255, 165, 0, 0.18);
+            color: #FFA500;
         }
 
         .icon-red {
-            background-color: #fce8e6;
-            color: #c5221f;
+            background-color: rgba(244, 67, 54, 0.18);
+            color: #F44336;
         }
 
         .icon-cyan {
-            background-color: #d3f3f8;
-            color: #007b83;
+            background-color: rgba(0, 188, 212, 0.18);
+            color: #00BCD4;
         }
 
         .quick-nav {
@@ -208,7 +211,7 @@
             font-size: 14px;
             font-weight: 500;
             color: var(--md-on-surface-variant);
-            background-color: var(--md-surface);
+            background-color: var(--md-surface-container);
             border: 1px solid var(--md-outline);
             transition: all 0.2s;
         }
@@ -234,7 +237,7 @@
         }
 
         .category-card {
-            background-color: var(--md-surface);
+            background-color: var(--md-surface-container);
             border: 1px solid var(--md-outline-variant);
             border-radius: 16px;
             padding: 24px;

@@ -15,8 +15,8 @@ h3 {
 }
 
 body {
-  background-color: #222;
-  color: #eee;
+  background-color: #1A1A1A;
+  color: #E0E0E0;
   font-family: "Menlo", "Consolas", monospace;
   line-height: 1.6;
   margin: 2em;
@@ -32,11 +32,10 @@ svg {
   box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
 }
 
-input {
   margin: 5px;
   padding: 8px;
-  background-color: #333;
-  color: #eee;
+  background-color: #282828;
+  color: #E0E0E0;
   border: solid 1px #555;
   border-radius: 3px;
   font-family: inherit;
@@ -64,8 +63,8 @@ label {
 }
 
 button {
-  background-color: #333;
-  color: #eee;
+  background-color: #282828;
+  color: #E0E0E0;
   margin: 10px 0;
   padding: 10px 15px;
   width: auto;
@@ -83,20 +82,19 @@ button:hover {
 }
 
 .links line {
-  stroke: #8af;
+  stroke: #42A5F5;
   stroke-opacity: 0.6;
 }
 
 .nodes circle {
-  stroke: #fff;
+  stroke: #FFFFFF;
   stroke-width: 1.5px;
-  fill: #8af; /* Use the theme color for nodes */
+  fill: #42A5F5; /* Use the theme color for nodes */
 }
 
-text {
   font-family: "Menlo", "Consolas", monospace;
   font-size: 10px;
-  fill: #eee;
+  fill: #E0E0E0;
   pointer-events: none; /* Make text non-interactive */
 }
 
@@ -144,11 +142,11 @@ text {
 }
 
 .link {
-  color: #8af;
+  color: #42A5F5;
   text-decoration: underline;
   cursor: pointer;
 }
 
 .link:hover {
-  color: #9bf;
+  color: #64B5F6;
 }
