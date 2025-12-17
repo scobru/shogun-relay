@@ -1,250 +1,300 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="shogun-dark">
+<html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IPFS Pin Manager - Shogun Relay</title>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/variables.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/base.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/daisyui-overrides.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <link rel="stylesheet" href="styles/wormhole.css">
+    <link rel="stylesheet" href="styles/google-md3.css">
     <script src="lib/admin-auth.js"></script>
     <script src="lib/admin-nav.js"></script>
     <style>
-        /* Page Styles */
-        .pin-manager-page {
-            min-height: 100vh;
-            background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
-            color: #E0E0E0;
+        .page-header {
+            background-color: var(--md-surface-container-low);
+            border-bottom: 1px solid var(--md-outline-variant);
+            padding: 24px;
+            margin-bottom: 32px;
         }
 
-        .hero-gradient {
-            background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
-        }
-
-        @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4); }
-            50% { box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2); }
-        }
-
-        .pulse-glow {
-            animation: pulse-glow 2s infinite;
-        }
-
-        .section-divider {
-            height: 1px;
-            background: linear-gradient(90deg, transparent, #404040, transparent);
-            margin: 2rem 0;
-        }
-        
-        .pin-manager-header {
-            background: linear-gradient(135deg, #282828, #1A1A1A);
-            border-bottom: 1px solid rgba(64, 64, 64, 0.4);
-            padding: 1.5rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-shrink: 0;
-        }
-        
-        .pin-manager-body {
-            flex: 1;
-            padding: 2rem;
+        .page-header-content {
             max-width: 1400px;
             margin: 0 auto;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
         }
-        
+
+        .page-title-section {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .page-icon {
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #F44336, #D32F2F);
+            box-shadow: 0 8px 24px rgba(244, 67, 54, 0.3);
+        }
+
+        .page-icon svg {
+            width: 28px;
+            height: 28px;
+            color: white;
+        }
+
         .pin-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 1.5rem;
+            gap: 20px;
         }
-        
+
         .pin-card {
-            background: #282828;
-            border: 1px solid #404040;
+            background-color: var(--md-surface-container);
+            border: 1px solid var(--md-outline-variant);
             border-radius: 16px;
-            padding: 1.5rem;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
+            padding: 20px;
+            transition: all 0.2s;
         }
-        
+
         .pin-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-            border-color: rgba(255, 105, 180, 0.3);
+            border-color: var(--md-primary);
+            box-shadow: var(--md-elevation-1);
         }
-        
-        .pin-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #FF69B4, #42A5F5);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .pin-card:hover::before {
-            opacity: 1;
-        }
-        
+
         .cid-display {
-            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-family: 'Roboto Mono', monospace;
             font-size: 0.875rem;
-            background: rgba(40, 40, 40, 0.8);
-            padding: 0.75rem;
+            background-color: var(--md-surface-container-low);
+            padding: 12px;
             border-radius: 8px;
-            border: 1px solid rgba(96, 96, 96, 0.3);
+            border: 1px solid var(--md-outline-variant);
             word-break: break-all;
-            color: #E0E0E0;
-            margin-bottom: 1rem;
+            color: var(--md-on-surface);
+            margin-bottom: 12px;
         }
-        
+
         .pin-meta {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1rem;
-            font-size: 0.875rem;
+            margin-bottom: 12px;
         }
-        
+
         .pin-type-badge {
-            background: linear-gradient(135deg, #4CAF50, #45A049);
+            background: linear-gradient(135deg, var(--md-success), #45A049);
             color: white;
-            padding: 0.25rem 0.75rem;
+            padding: 4px 12px;
             border-radius: 12px;
             font-size: 0.75rem;
             font-weight: 600;
         }
-        
+
+        .pin-name {
+            color: var(--md-on-surface-variant);
+            font-size: 0.875rem;
+        }
+
         .pin-actions {
             display: grid;
-            grid-template-columns: repeat(5, minmax(0, 1fr));
-            gap: 0.5rem;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
         }
-        
+
         .action-btn {
-            padding: 0.5rem;
+            padding: 8px;
             border-radius: 8px;
-            font-size: 0.75rem;
-            font-weight: 600;
+            font-size: 0.875rem;
             border: none;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 0.25rem;
         }
-        
+
         .action-btn:hover {
-            transform: translateY(-1px);
+            transform: translateY(-2px);
         }
-        
-        .btn-copy { background: linear-gradient(135deg, #42A5F5, #1976D2); color: white; }
-        .btn-copy:hover { background: linear-gradient(135deg, #1976D2, #1565C0); }
-        
-        .btn-pin { background: linear-gradient(135deg, #4CAF50, #45A049); color: white; }
-        .btn-pin:hover { background: linear-gradient(135deg, #45A049, #388E3C); }
-        
-        .btn-unpin { background: linear-gradient(135deg, #FFA500, #FF8C00); color: white; }
-        .btn-unpin:hover { background: linear-gradient(135deg, #FF8C00, #FF7F00); }
-        
-        .btn-remove { background: linear-gradient(135deg, #F44336, #D32F2F); color: white; }
-        .btn-remove:hover { background: linear-gradient(135deg, #D32F2F, #B71C1C); }
-        
-        .btn-preview { background: linear-gradient(135deg, #8B94FF, #6366F1); color: white; }
-        .btn-preview:hover { background: linear-gradient(135deg, #6366F1, #4F46E5); }
-        
-        .search-bar {
-            background: rgba(40, 40, 40, 0.8);
-            border: 2px solid rgba(96, 96, 96, 0.3);
-            border-radius: 12px;
-            padding: 1rem;
-            color: #E0E0E0;
-            font-size: 1rem;
-            width: 100%;
-            transition: all 0.3s ease;
-        }
-        
-        .search-bar:focus {
-            outline: none;
-            border-color: #FF69B4;
-            box-shadow: 0 0 0 3px rgba(255, 105, 180, 0.1);
-        }
-        
-        .filter-tabs {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1.5rem;
-            flex-wrap: wrap;
-        }
-        
-        .filter-tab {
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.875rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: 2px solid transparent;
-        }
-        
-        .filter-tab.active {
-            background: linear-gradient(135deg, #FF69B4, #FF1493);
+
+        .btn-preview {
+            background: linear-gradient(135deg, #8B94FF, #6366F1);
             color: white;
-            border-color: #FF69B4;
         }
-        
-        .filter-tab:not(.active) {
-            background: rgba(40, 40, 40, 0.6);
-            color: #A0A0A0;
-            border-color: rgba(96, 96, 96, 0.3);
+
+        .btn-copy {
+            background: linear-gradient(135deg, #42A5F5, #1976D2);
+            color: white;
         }
-        
-        .filter-tab:hover:not(.active) {
-            background: rgba(96, 96, 96, 0.3);
-            color: #E0E0E0;
+
+        .btn-pin {
+            background: linear-gradient(135deg, #4CAF50, #45A049);
+            color: white;
         }
-        
+
+        .btn-unpin {
+            background: linear-gradient(135deg, #FFA500, #FF8C00);
+            color: white;
+        }
+
+        .btn-remove {
+            background: linear-gradient(135deg, #F44336, #D32F2F);
+            color: white;
+        }
+
         .stats-bar {
-            background: #282828;
-            border: 1px solid #404040;
+            background-color: var(--md-surface-container);
+            border: 1px solid var(--md-outline-variant);
             border-radius: 16px;
-            padding: 1rem;
-            margin-bottom: 1.5rem;
+            padding: 16px 24px;
+            margin-bottom: 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 1rem;
+            gap: 16px;
         }
-        
+
         .stat-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
             text-align: center;
         }
-        
+
         .stat-value {
             font-size: 1.5rem;
-            font-weight: bold;
-            color: #FF69B4;
+            font-weight: 500;
+            color: var(--md-primary);
         }
-        
+
         .stat-label {
             font-size: 0.875rem;
-            color: #A0A0A0;
-            margin-top: 0.25rem;
+            color: var(--md-on-surface-variant);
         }
-        
+
+        .search-bar {
+            background-color: var(--md-surface-container-low);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: 12px;
+            padding: 12px 16px;
+            color: var(--md-on-surface);
+            font-size: 1rem;
+            width: 100%;
+            margin-bottom: 16px;
+        }
+
+        .search-bar:focus {
+            outline: none;
+            border-color: var(--md-primary);
+        }
+
+        .filter-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .filter-tab {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .filter-tab.active {
+            background-color: var(--md-primary);
+            color: white;
+            border-color: var(--md-primary);
+        }
+
+        .filter-tab:not(.active) {
+            background-color: var(--md-surface-container-low);
+            color: var(--md-on-surface-variant);
+            border-color: var(--md-outline-variant);
+        }
+
+        .filter-tab:hover:not(.active) {
+            background-color: var(--md-surface-container);
+        }
+
+        .section-card {
+            background-color: var(--md-surface-container);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .section-card h3 {
+            color: var(--md-primary);
+            font-size: 1.25rem;
+            font-weight: 500;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .quick-add-row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .quick-add-row .md-field {
+            flex: 1;
+        }
+
+        .batch-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .preview-panel {
+            display: none;
+            margin-top: 24px;
+            background-color: var(--md-surface-container);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .preview-panel.active {
+            display: block;
+        }
+
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .preview-content {
+            background-color: var(--md-surface-container-low);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: 12px;
+            padding: 16px;
+            max-height: 400px;
+            overflow: auto;
+        }
+
+        .preview-content img,
+        .preview-content video {
+            max-width: 100%;
+            border-radius: 12px;
+        }
+
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -256,278 +306,188 @@
             align-items: center;
             justify-content: center;
             z-index: 9999;
-            backdrop-filter: blur(5px);
+            backdrop-filter: blur(4px);
         }
-        
+
         .loading-content {
-            background: linear-gradient(135deg, #404040, #353535);
-            border: 1px solid rgba(96, 96, 96, 0.4);
+            background-color: var(--md-surface-container);
+            border: 1px solid var(--md-outline-variant);
             border-radius: 16px;
-            padding: 2rem;
+            padding: 32px;
             text-align: center;
-            color: #E0E0E0;
         }
-        
+
         .progress-ring {
             width: 60px;
             height: 60px;
-            margin: 0 auto 1rem;
+            margin: 0 auto 16px;
         }
-        
+
         .progress-ring circle {
             fill: none;
             stroke-width: 4;
             stroke-linecap: round;
         }
-        
+
         .progress-ring .bg {
-            stroke: rgba(96, 96, 96, 0.3);
+            stroke: var(--md-outline-variant);
         }
-        
+
         .progress-ring .progress {
-            stroke: #FF69B4;
+            stroke: var(--md-primary);
             stroke-dasharray: 157;
             stroke-dashoffset: 157;
             transition: stroke-dashoffset 0.3s ease;
         }
-        
-        .preview-panel {
-            display: none;
-            margin-top: 1.5rem;
-            background: linear-gradient(135deg, #404040, #353535);
-            border: 1px solid rgba(96, 96, 96, 0.4);
-            border-radius: 16px;
-            padding: 1.5rem;
+
+        .empty-state {
+            text-align: center;
+            padding: 48px;
         }
-        
-        .preview-panel.active {
-            display: block;
-        }
-        
-        .preview-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-        
-        .preview-content {
-            background: rgba(40, 40, 40, 0.85);
-            border: 1px solid rgba(96, 96, 96, 0.4);
-            border-radius: 12px;
-            padding: 1rem;
-            max-height: 400px;
-            overflow: auto;
-            font-family: 'JetBrains Mono', 'Fira Code', monospace;
-            font-size: 0.85rem;
-            color: #E0E0E0;
-        }
-        
-        .preview-content img,
-        .preview-content video {
-            max-width: 100%;
-            border-radius: 12px;
-        }
-        
-        .preview-actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-        
-        .preview-meta {
-            font-size: 0.8rem;
-            color: #A0A0A0;
-            margin-bottom: 0.75rem;
-        }
-        
-        @media (max-width: 768px) {
-            .pin-manager-body {
-                padding: 1rem;
-            }
-            
-            .pin-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .stats-bar {
-                flex-direction: column;
-                text-align: center;
-            }
+
+        .empty-state svg {
+            width: 96px;
+            height: 96px;
+            margin: 0 auto 16px;
+            color: var(--md-outline);
         }
     </style>
 </head>
-<body class="antialiased">
-    <!-- Pin Manager Page -->
-    <div class="pin-manager-page hero-gradient">
-        <!-- Header -->
-        <div class="pin-manager-header">
-            <div class="flex items-center gap-4">
-                <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-[#F44336] to-[#D32F2F] pulse-glow">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+
+<body>
+    <!-- Header -->
+    <header class="page-header">
+        <div class="page-header-content">
+            <div class="page-title-section">
+                <a href="/admin" class="md-btn md-btn-icon" title="Back">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        width="24" height="24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                </a>
+                <div class="page-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                     </svg>
                 </div>
                 <div>
-                    <h1 class="text-2xl font-bold text-[#FFFFFF]">IPFS Pin Manager</h1>
-                    <p class="text-[#8B94FF] text-sm">Manage your IPFS pins with ease</p>
-                </div>
-            </div>
-            <div class="flex items-center gap-4">
-                <a href="/" class="flex items-center gap-2 text-[#A0A0A0] hover:text-[#FF69B4] transition-colors group">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
-                    <span>Back</span>
-                </a>
-            </div>
-        </div>
-
-        <!-- Body -->
-        <div class="pin-manager-body">
-                <!-- Loading Overlay -->
-                <div id="loadingOverlay" class="loading-overlay" style="display: none;">
-                    <div class="loading-content">
-                        <svg class="progress-ring" viewBox="0 0 60 60">
-                            <circle class="bg" cx="30" cy="30" r="25"></circle>
-                            <circle class="progress" cx="30" cy="30" r="25"></circle>
-                        </svg>
-                        <div id="loadingText">Loading...</div>
-                    </div>
-                </div>
-
-                <!-- Quick Add Section -->
-                <div class="card bg-[#282828] border border-[#404040] rounded-2xl mb-8">
-                    <div class="card-body p-6">
-                        <h3 class="card-title text-xl font-bold mb-6 text-[#FF69B4] flex items-center">
-                            <div class="feature-icon bg-[#4CAF50]/20 mr-3" style="width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#4CAF50]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                </svg>
-                            </div>
-                            Quick Add Pin
-                        </h3>
-                        
-                        <div class="flex gap-4 items-end">
-                            <div class="flex-1">
-                                <label class="label">
-                                    <span class="label-text font-semibold text-[#FFFFFF]">CID IPFS:</span>
-                                </label>
-                                <input type="text" id="quickCidInput" class="search-bar" placeholder="Qm... o ba...">
-                            </div>
-                            <button onclick="quickAddPin()" class="btn bg-gradient-to-r from-[#FF69B4] to-[#FF1493] hover:from-[#FF1493] hover:to-[#DC143C] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-semibold">
-                                📌 Aggiungi
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Batch Operations Section -->
-                <div class="card bg-[#282828] border border-[#404040] rounded-2xl mb-8">
-                    <div class="card-body p-6">
-                        <h3 class="card-title text-xl font-bold mb-6 text-[#FF69B4] flex items-center">
-                            <div class="feature-icon bg-[#F44336]/20 mr-3" style="width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#F44336]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                            </div>
-                            Batch Operations
-                        </h3>
-                        
-                        <div class="space-y-4">
-                            <div class="form-control">
-                                <label class="label cursor-pointer justify-start gap-4">
-                                    <input type="checkbox" id="preserveSystemFiles" class="checkbox checkbox-primary" checked>
-                                    <div>
-                                        <span class="label-text font-semibold text-[#FFFFFF]">Preserve system files</span>
-                                        <p class="text-sm text-[#A0A0A0]">User uploaded files will not be removed</p>
-                                    </div>
-                                </label>
-                            </div>
-                            
-                            <div class="flex gap-4">
-                                <button onclick="showBatchUnpinModal()" class="btn bg-gradient-to-r from-[#F44336] to-[#D32F2F] hover:from-[#D32F2F] hover:to-[#B71C1C] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-semibold">
-                                    🗑️ Remove All Pins
-                                </button>
-                                <button onclick="runGarbageCollection()" class="btn bg-gradient-to-r from-[#42A5F5] to-[#1976D2] hover:from-[#1976D2] hover:to-[#1565C0] border-0 text-[#FFFFFF] rounded-xl px-6 py-3 font-semibold">
-                                    🧹 Garbage Collection
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                    
-                <!-- Statistics Bar -->
-                <div class="stats-bar">
-                    <div class="stat-item">
-                        <div class="stat-value" id="totalPins">--</div>
-                        <div class="stat-label">Pin Totali</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="totalSize">--</div>
-                        <div class="stat-label">Dimensione Totale</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="lastUpdate">--</div>
-                        <div class="stat-label">Ultimo Aggiornamento</div>
-                    </div>
-                    <div class="stat-item">
-                        <button onclick="refreshPins()" class="btn bg-transparent border-[#606060] text-[#E0E0E0] hover:bg-[#404040] rounded-xl px-4 py-2 font-medium">
-                            🔄 Aggiorna
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Search and Filters -->
-                <div class="mb-6">
-                    <input type="text" id="searchInput" class="search-bar" placeholder="🔍 Search by CID...">
-                    
-                    <div class="filter-tabs mt-4">
-                        <div class="filter-tab active" data-filter="all">All</div>
-                        <div class="filter-tab" data-filter="recursive">Recursive</div>
-                        <div class="filter-tab" data-filter="direct">Direct</div>
-                        <div class="filter-tab" data-filter="indirect">Indirect</div>
-                    </div>
-                </div>
-
-                <!-- Pins Grid -->
-                <div id="pinsContainer">
-                    <div class="pin-grid" id="pinsGrid">
-                        <!-- Pins will be loaded here -->
-                    </div>
-                </div>
-                
-                <!-- Preview Panel -->
-                <div id="previewPanel" class="preview-panel">
-                    <div class="preview-header">
-                        <div>
-                            <h3 class="text-lg font-semibold text-[#FFFFFF] mb-1">Content Preview</h3>
-                            <p id="previewCid" class="text-xs text-[#A0A0A0] font-mono break-all"></p>
-                        </div>
-                        <div class="preview-actions">
-                            <button onclick="openPreviewInGateway()" class="relay-button neutral">🌐 Open Gateway</button>
-                            <button onclick="downloadPreview()" class="relay-button neutral">⬇️ Download</button>
-                            <button onclick="closePreview()" class="relay-button primary">Close</button>
-                        </div>
-                    </div>
-                    <div id="previewMeta" class="preview-meta"></div>
-                    <div id="previewContent" class="preview-content text-sm text-[#E0E0E0]">
-                        Select a pin to view its content.
-                    </div>
-                </div>
-                    
-                <!-- Empty State -->
-                <div id="emptyState" class="text-center py-12" style="display: none;">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24 mx-auto text-[#606060] mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                    </svg>
-                    <h3 class="text-xl font-semibold text-[#A0A0A0] mb-2">No pins found</h3>
-                    <p class="text-[#808080]">Add your first IPFS pin to get started</p>
+                    <h1 class="md-headline-medium">IPFS Pin Manager</h1>
+                    <p class="md-body-medium md-text-secondary">Manage your IPFS pins</p>
                 </div>
             </div>
         </div>
-    </div>
+    </header>
+
+    <main class="md-container">
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+            <div class="loading-content">
+                <svg class="progress-ring" viewBox="0 0 60 60">
+                    <circle class="bg" cx="30" cy="30" r="25"></circle>
+                    <circle class="progress" cx="30" cy="30" r="25"></circle>
+                </svg>
+                <div id="loadingText">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Quick Add Section -->
+        <div class="section-card">
+            <h3>📌 Quick Add Pin</h3>
+            <div class="quick-add-row">
+                <div class="md-field">
+                    <label class="md-label">IPFS CID</label>
+                    <input type="text" id="quickCidInput" class="md-input" placeholder="Qm... or ba...">
+                </div>
+                <button onclick="quickAddPin()" class="md-btn md-btn-filled">Add Pin</button>
+            </div>
+        </div>
+
+        <!-- Batch Operations -->
+        <div class="section-card">
+            <h3>🗑️ Batch Operations</h3>
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                <input type="checkbox" id="preserveSystemFiles" checked
+                    style="width: 20px; height: 20px; accent-color: var(--md-primary);">
+                <label for="preserveSystemFiles">Preserve system files</label>
+            </div>
+            <div class="batch-actions">
+                <button onclick="showBatchUnpinModal()" class="md-btn md-btn-outlined"
+                    style="color: var(--md-error); border-color: var(--md-error);">
+                    Remove All Pins
+                </button>
+                <button onclick="runGarbageCollection()" class="md-btn md-btn-outlined">
+                    Garbage Collection
+                </button>
+            </div>
+        </div>
+
+        <!-- Statistics Bar -->
+        <div class="stats-bar">
+            <div class="stat-item">
+                <div class="stat-value" id="totalPins">--</div>
+                <div class="stat-label">Total Pins</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="totalSize">--</div>
+                <div class="stat-label">Total Size</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="lastUpdate">--</div>
+                <div class="stat-label">Last Update</div>
+            </div>
+            <button onclick="refreshPins()" class="md-btn md-btn-outlined">🔄 Refresh</button>
+        </div>
+
+        <!-- Search and Filters -->
+        <input type="text" id="searchInput" class="search-bar" placeholder="🔍 Search by CID...">
+
+        <div class="filter-tabs">
+            <div class="filter-tab active" data-filter="all">All</div>
+            <div class="filter-tab" data-filter="recursive">Recursive</div>
+            <div class="filter-tab" data-filter="direct">Direct</div>
+            <div class="filter-tab" data-filter="indirect">Indirect</div>
+        </div>
+
+        <!-- Pins Grid -->
+        <div id="pinsGrid" class="pin-grid"></div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
+                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+            </svg>
+            <h3 class="md-title-large md-mb-sm">No pins found</h3>
+            <p class="md-body-medium md-text-secondary">Add your first IPFS pin to get started</p>
+        </div>
+
+        <!-- Preview Panel -->
+        <div id="previewPanel" class="preview-panel">
+            <div class="preview-header">
+                <div>
+                    <h3 class="md-title-large">Content Preview</h3>
+                    <p id="previewCid" class="md-body-small md-text-secondary"
+                        style="font-family: monospace; word-break: break-all;"></p>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="openPreviewInGateway()" class="md-btn md-btn-outlined">🌐 Open</button>
+                    <button onclick="downloadPreview()" class="md-btn md-btn-outlined">⬇️ Download</button>
+                    <button onclick="closePreview()" class="md-btn md-btn-filled">Close</button>
+                </div>
+            </div>
+            <div id="previewMeta" class="md-body-small md-text-secondary md-mb-md"></div>
+            <div id="previewContent" class="preview-content">Select a pin to view its content.</div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="md-footer">
+            <p class="md-body-small">
+                Shogun IPFS Pin Manager — Part of the <a href="https://github.com/scobru/shogun">Shogun Project</a>
+            </p>
+        </footer>
+    </main>
 
     <script>
         let allPins = [];
@@ -542,7 +502,6 @@
         let previewContentType = null;
         let previewFileName = null;
 
-        // Initialize admin authentication
         document.addEventListener('DOMContentLoaded', () => {
             ShogunAdmin.init({
                 autoFill: true,
@@ -550,19 +509,16 @@
                 adminFieldId: 'adminPassword',
                 syncEnabled: true
             });
-            
-            // Initialize smart back button
+
             if (window.replaceExistingBackButtons) {
                 window.replaceExistingBackButtons();
             }
-            
-            // Setup search functionality
+
             document.getElementById('searchInput').addEventListener('input', (e) => {
                 searchTerm = e.target.value.toLowerCase();
                 filterPins();
             });
-            
-            // Setup filter tabs
+
             document.querySelectorAll('.filter-tab').forEach(tab => {
                 tab.addEventListener('click', () => {
                     document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
@@ -571,8 +527,7 @@
                     filterPins();
                 });
             });
-            
-            // Auto-load pins if password is available
+
             if (ShogunAdmin.hasPassword()) {
                 setTimeout(loadPins, 1000);
             }
@@ -580,10 +535,8 @@
             closePreview();
         });
 
-        // Listen for password updates
         window.addEventListener('shogun-admin-password-updated', (event) => {
             if (event.detail.hasPassword) {
-                console.log('Admin password updated, reloading pins...');
                 loadPins();
             }
         });
@@ -599,150 +552,83 @@
 
         function updateProgress(percentage) {
             const progressCircle = document.querySelector('.progress-ring .progress');
-            const circumference = 2 * Math.PI * 25; // r=25
-            const offset = circumference - (percentage / 100) * circumference;
+            const offset = 157 - (percentage / 100) * 157;
             progressCircle.style.strokeDashoffset = offset;
         }
 
         async function apiCall(endpoint, method = 'POST', body = {}, options = {}) {
-            const manageVisibility = options.manageVisibility !== false;
-            
-            if (manageVisibility) {
-                showLoading();
-            }
+            if (options.manageVisibility !== false) showLoading();
 
             try {
                 const authHeaders = ShogunAdmin.getAuthHeaders();
                 if (!authHeaders['Authorization']) {
-                    throw new Error('Admin Token is required. Please set it in the Control Panel.');
+                    throw new Error('Admin Token required');
                 }
 
-                console.log(`Making ${method} request to ${endpoint}`);
-                
                 const requestOptions = {
                     method: method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...authHeaders
-                    }
+                    headers: { 'Content-Type': 'application/json', ...authHeaders }
                 };
 
                 if (method !== 'GET' && method !== 'HEAD') {
                     requestOptions.body = JSON.stringify(body);
                 }
-                
-                const response = await fetch(endpoint, requestOptions);
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                const response = await fetch(endpoint, requestOptions);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
                 const result = await response.json();
-                console.log('Response:', result);
-
-                if (result.success === false) {
-                    throw new Error(result.error || 'API returned success:false');
-                }
+                if (result.success === false) throw new Error(result.error || 'API error');
 
                 return result;
             } catch (error) {
-                console.log('API call error:', error);
                 showNotification(error.message, 'error');
                 return null;
             } finally {
-                if (manageVisibility) {
-                    hideLoading();
-                }
+                if (options.manageVisibility !== false) hideLoading();
             }
         }
 
         function showNotification(message, type = 'info') {
-            // Create notification element
             const notification = document.createElement('div');
-            notification.className = `fixed top-4 right-4 p-4 rounded-xl text-white font-semibold z-50 transition-all duration-300 transform translate-x-full`;
-            
-            if (type === 'error') {
-                notification.style.background = 'linear-gradient(135deg, #F44336, #D32F2F)';
-            } else if (type === 'success') {
-                notification.style.background = 'linear-gradient(135deg, #4CAF50, #45A049)';
-            } else {
-                notification.style.background = 'linear-gradient(135deg, #42A5F5, #1976D2)';
-            }
-            
+            notification.style.cssText = `
+                position: fixed; top: 24px; right: 24px; padding: 16px 24px;
+                border-radius: 12px; color: white; font-weight: 500; z-index: 9999;
+                transform: translateX(100%); transition: transform 0.3s;
+                background: ${type === 'error' ? 'var(--md-error)' : type === 'success' ? 'var(--md-success)' : 'var(--md-primary)'};
+            `;
             notification.textContent = message;
             document.body.appendChild(notification);
-            
-            // Animate in
+            setTimeout(() => notification.style.transform = 'translateX(0)', 100);
             setTimeout(() => {
-                notification.style.transform = 'translateX(0)';
-            }, 100);
-            
-            // Remove after 3 seconds
-            setTimeout(() => {
-                notification.style.transform = 'translateX(full)';
-                setTimeout(() => {
-                    document.body.removeChild(notification);
-                }, 300);
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => document.body.removeChild(notification), 300);
             }, 3000);
         }
 
         async function loadPins() {
             showLoading('Loading pins...');
-            
+
             const [pinsResult, systemHashesResult] = await Promise.all([
                 apiCall('/api/v1/ipfs/pin/ls', 'GET', undefined, { manageVisibility: false }),
                 apiCall('/api/v1/user-uploads/system-hashes-map', 'GET', undefined, { manageVisibility: false })
             ]);
-            
+
             systemHashMap = (systemHashesResult && systemHashesResult.systemHashes) || {};
-            
-            console.log('🗂️ System Hash Map retrieved:', systemHashMap);
-            console.log('🗂️ System Hash Map keys:', Object.keys(systemHashMap));
-            console.log('🗂️ Number of system hashes:', Object.keys(systemHashMap).length);
-            
-            // Log each hash in the map
-            Object.keys(systemHashMap).forEach(hashKey => {
-                console.log(`🗂️ Hash ${hashKey}:`, systemHashMap[hashKey]);
-                console.log(`🗂️ Hash ${hashKey} JSON:`, JSON.stringify(systemHashMap[hashKey], null, 2));
-            });
-            
+
             if (pinsResult && pinsResult.pins) {
                 allPins = Object.entries(pinsResult.pins).map(([cid, info]) => {
-                    console.log(`\n🔍 === Processing Pin: ${cid} ===`);
-                    console.log(`🔍 CID exists in systemHashMap:`, cid in systemHashMap);
-                    console.log(`🔍 systemHashMap[cid]:`, systemHashMap[cid]);
-                    
                     const metadata = systemHashMap[cid] || {};
-                    
-                    console.log(`🔍 Metadata type:`, typeof metadata);
-                    console.log(`🔍 Metadata keys:`, Object.keys(metadata));
-                    console.log(`🔍 Metadata JSON:`, JSON.stringify(metadata, null, 2));
-                    console.log(`🔍 Metadata.displayName:`, metadata.displayName);
-                    console.log(`🔍 Metadata.fileName:`, metadata.fileName);
-                    console.log(`🔍 Metadata.originalName:`, metadata.originalName);
-                    
-                    // Try multiple fields to get the display name
-                    const displayName =
-                        metadata.displayName ||
-                        metadata.fileName ||
-                        metadata.originalName ||
-                        metadata.name ||
-                        info.Name ||
-                        info.Metadata?.name ||
-                        '';
-                    
-                    console.log(`📋 Pin ${cid.substring(0, 12)}... - Final Name: "${displayName}"`);
-                    
+                    const displayName = metadata.displayName || metadata.fileName || metadata.originalName || metadata.name || info.Name || '';
                     return {
                         cid,
                         type: info.Type || 'recursive',
                         name: displayName,
-                        timestamp: metadata.timestamp || metadata.uploadedAt || Date.now(),
+                        timestamp: metadata.timestamp || Date.now(),
                         metadata,
                         rawInfo: info
                     };
                 });
-                
                 updateStats();
                 filterPins();
                 showNotification(`Loaded ${allPins.length} pins`, 'success');
@@ -750,69 +636,50 @@
                 allPins = [];
                 updateStats();
                 filterPins();
-                showNotification('No pins found', 'info');
             }
-            
+
             hideLoading();
         }
 
         function updateStats() {
             document.getElementById('totalPins').textContent = allPins.length;
-            document.getElementById('totalSize').textContent = '--'; // Size info not available from pins API
+            document.getElementById('totalSize').textContent = '--';
             document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
         }
 
         function filterPins() {
             filteredPins = allPins.filter(pin => {
-                const matchesSearch = pin.cid.toLowerCase().includes(searchTerm) || 
-                                    pin.name.toLowerCase().includes(searchTerm);
-                
-                const matchesFilter = currentFilter === 'all' || 
-                                    pin.type.toLowerCase() === currentFilter;
-                
+                const matchesSearch = pin.cid.toLowerCase().includes(searchTerm) || pin.name.toLowerCase().includes(searchTerm);
+                const matchesFilter = currentFilter === 'all' || pin.type.toLowerCase() === currentFilter;
                 return matchesSearch && matchesFilter;
             });
-            
             renderPins();
         }
 
         function renderPins() {
             const grid = document.getElementById('pinsGrid');
             const emptyState = document.getElementById('emptyState');
-            
+
             if (filteredPins.length === 0) {
                 grid.innerHTML = '';
                 emptyState.style.display = 'block';
                 return;
             }
-            
+
             emptyState.style.display = 'none';
-            
             grid.innerHTML = filteredPins.map(pin => `
                 <div class="pin-card">
                     <div class="cid-display">${pin.cid}</div>
                     <div class="pin-meta">
-                        <div class="pin-type-badge">${pin.type}</div>
-                        <div class="text-[#A0A0A0] text-sm">
-                            ${(pin.name || (pin.rawInfo && pin.rawInfo.Metadata?.name) || '').trim() || 'Senza nome'}
-                        </div>
+                        <span class="pin-type-badge">${pin.type}</span>
+                        <span class="pin-name">${pin.name || 'Unnamed'}</span>
                     </div>
                     <div class="pin-actions">
-                        <button onclick="previewCid('${pin.cid}')" class="action-btn btn-preview" title="Anteprima">
-                            👁️
-                        </button>
-                        <button onclick="copyCid('${pin.cid}')" class="action-btn btn-copy" title="Copia CID">
-                            📋
-                        </button>
-                        <button onclick="repinCid('${pin.cid}')" class="action-btn btn-pin" title="Pin di nuovo">
-                            📌
-                        </button>
-                        <button onclick="unpinCid('${pin.cid}')" class="action-btn btn-unpin" title="Unpin">
-                            📍
-                        </button>
-                        <button onclick="removeCid('${pin.cid}')" class="action-btn btn-remove" title="Remove">
-                            🗑️
-                        </button>
+                        <button onclick="previewCid('${pin.cid}')" class="action-btn btn-preview" title="Preview">👁️</button>
+                        <button onclick="copyCid('${pin.cid}')" class="action-btn btn-copy" title="Copy">📋</button>
+                        <button onclick="repinCid('${pin.cid}')" class="action-btn btn-pin" title="Repin">📌</button>
+                        <button onclick="unpinCid('${pin.cid}')" class="action-btn btn-unpin" title="Unpin">📍</button>
+                        <button onclick="removeCid('${pin.cid}')" class="action-btn btn-remove" title="Remove">🗑️</button>
                     </div>
                 </div>
             `).join('');
@@ -820,54 +687,34 @@
 
         async function quickAddPin() {
             const cid = document.getElementById('quickCidInput').value.trim();
-            if (!cid) {
-                showNotification('Please enter a valid CID', 'error');
-                return;
-            }
+            if (!cid) { showNotification('Please enter a CID', 'error'); return; }
 
             const result = await apiCall('/api/v1/ipfs/pin/add', 'POST', { cid }, { manageVisibility: false });
             if (result) {
-                showNotification('Pin added successfully', 'success');
+                showNotification('Pin added', 'success');
                 document.getElementById('quickCidInput').value = '';
                 await loadPins();
             }
         }
 
         async function copyCid(cid) {
-            try {
-                await navigator.clipboard.writeText(cid);
-                showNotification('CID copied to clipboard', 'success');
-            } catch (error) {
-                showNotification('Error copying CID', 'error');
-            }
+            await navigator.clipboard.writeText(cid);
+            showNotification('CID copied', 'success');
         }
 
         async function repinCid(cid) {
             const result = await apiCall('/api/v1/ipfs/pin/add', 'POST', { cid }, { manageVisibility: false });
-            if (result) {
-                showNotification('Pin reapplied successfully', 'success');
-            }
+            if (result) showNotification('Repinned', 'success');
         }
 
         function escapeHtml(value) {
             if (value === null || value === undefined) return '';
-            return String(value).replace(/[&<>"']/g, function (match) {
-                const escapeMap = {
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#39;',
-                };
-                return escapeMap[match];
-            });
+            return String(value).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
         }
 
         function resetPreviewState() {
-            if (previewObjectUrl) {
-                URL.revokeObjectURL(previewObjectUrl);
-                previewObjectUrl = null;
-            }
+            if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+            previewObjectUrl = null;
             previewBlob = null;
             previewContentType = null;
             previewFileName = null;
@@ -879,77 +726,38 @@
         }
 
         function closePreview() {
-            const panel = document.getElementById('previewPanel');
             resetPreviewState();
-            panel.classList.remove('active');
+            document.getElementById('previewPanel').classList.remove('active');
         }
 
         function activatePreview() {
-            const panel = document.getElementById('previewPanel');
-            panel.classList.add('active');
+            document.getElementById('previewPanel').classList.add('active');
         }
 
         function formatBytes(bytes) {
             if (!bytes || isNaN(bytes)) return '';
-            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-            const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-            const value = bytes / Math.pow(1024, exponent);
-            return `${value.toFixed(2)} ${units[exponent]}`;
-        }
-
-        function getExtensionFromType(type) {
-            if (!type) return '';
-            if (type.includes('json')) return '.json';
-            if (type.startsWith('text/')) return '.txt';
-            if (type.startsWith('image/')) return '.' + type.split('/')[1];
-            if (type.startsWith('video/')) return '.' + type.split('/')[1];
-            if (type.startsWith('audio/')) return '.' + type.split('/')[1];
-            return '';
+            const units = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+            return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${units[i]}`;
         }
 
         async function previewCid(cid) {
             const authHeaders = ShogunAdmin.getAuthHeaders();
-            if (!authHeaders['Authorization']) {
-                showNotification('Admin Token is required. Please set it in the Control Panel.', 'error');
-                return;
-            }
+            if (!authHeaders['Authorization']) { showNotification('Admin Token required', 'error'); return; }
 
             showLoading('Loading content…');
             resetPreviewState();
 
             try {
-                const response = await fetch(`/api/v1/ipfs/cat/${cid}`, {
-                    headers: {
-                        ...authHeaders,
-                        'Accept': '*/*'
-                    }
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
+                const response = await fetch(`/api/v1/ipfs/cat/${cid}`, { headers: { ...authHeaders, 'Accept': '*/*' } });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
                 const contentType = response.headers.get('Content-Type') || 'application/octet-stream';
                 const contentLength = parseInt(response.headers.get('Content-Length') || '0', 10);
+                const metadata = systemHashMap[cid] || {};
+                const displayName = metadata.displayName || metadata.fileName || metadata.originalName || '';
 
                 let previewHtml = '';
-                const metadata = systemHashMap[cid] || {};
-                const displayName =
-                    metadata.displayName ||
-                    metadata.fileName ||
-                    metadata.originalName ||
-                    metadata.name ||
-                    '';
-
-                let metaPieces = [];
-                if (displayName) {
-                    metaPieces.push(`Name: ${displayName}`);
-                }
-                metaPieces.push(`Type: ${contentType}`);
-                if (contentLength) {
-                    metaPieces.push(`Size: ${formatBytes(contentLength)}`);
-                }
-
                 let blob;
 
                 if (contentType.startsWith('image/')) {
@@ -959,52 +767,36 @@
                 } else if (contentType.startsWith('video/')) {
                     blob = await response.blob();
                     previewObjectUrl = URL.createObjectURL(blob);
-                    previewHtml = `
-                        <video controls src="${previewObjectUrl}" style="width:100%; border-radius: 12px;">
-                            Il tuo browser non supporta la riproduzione video.
-                        </video>`;
+                    previewHtml = `<video controls src="${previewObjectUrl}" style="width:100%; border-radius: 12px;"></video>`;
                 } else if (contentType.startsWith('audio/')) {
                     blob = await response.blob();
                     previewObjectUrl = URL.createObjectURL(blob);
-                    previewHtml = `
-                        <audio controls src="${previewObjectUrl}" style="width:100%;">
-                            Il tuo browser non supporta la riproduzione audio.
-                        </audio>`;
-                } else if (contentType.includes('application/json')) {
+                    previewHtml = `<audio controls src="${previewObjectUrl}" style="width:100%;"></audio>`;
+                } else if (contentType.includes('json') || contentType.startsWith('text/')) {
                     const text = await response.text();
-                    blob = new Blob([text], { type: 'application/json' });
-                    previewHtml = `<pre>${escapeHtml(text)}</pre>`;
-                    previewObjectUrl = URL.createObjectURL(blob);
-                } else if (contentType.startsWith('text/') || contentType === 'application/javascript' || contentType === 'application/xml') {
-                    const text = await response.text();
-                    blob = new Blob([text], { type: contentType || 'text/plain' });
+                    blob = new Blob([text], { type: contentType });
                     previewHtml = `<pre>${escapeHtml(text)}</pre>`;
                     previewObjectUrl = URL.createObjectURL(blob);
                 } else {
                     blob = await response.blob();
                     previewObjectUrl = URL.createObjectURL(blob);
-                    previewHtml = `
-                        <p class="text-[#A0A0A0] mb-3">
-                            Content is not directly viewable. Use the buttons above to open it in the gateway or download it.
-                        </p>
-                        <p class="text-xs text-[#808080]">CID: ${escapeHtml(cid)}</p>
-                    `;
+                    previewHtml = `<p class="md-text-secondary">Cannot preview this content type. Use buttons to open or download.</p>`;
                 }
 
                 previewBlob = blob;
                 previewContentType = contentType;
                 currentPreviewCid = cid;
-                currentPreviewMetadata = metadata || null;
+                currentPreviewMetadata = metadata;
                 previewFileName = displayName;
 
                 document.getElementById('previewCid').textContent = cid;
-                document.getElementById('previewMeta').textContent = metaPieces.join(' • ');
+                document.getElementById('previewMeta').textContent = `Type: ${contentType}${contentLength ? ` • Size: ${formatBytes(contentLength)}` : ''}`;
                 document.getElementById('previewContent').innerHTML = previewHtml;
 
                 activatePreview();
                 document.getElementById('previewPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
             } catch (error) {
-                showNotification(`Unable to load content: ${error.message}`, 'error');
+                showNotification(`Error: ${error.message}`, 'error');
                 closePreview();
             } finally {
                 hideLoading();
@@ -1012,236 +804,78 @@
         }
 
         function openPreviewInGateway() {
-            if (!currentPreviewCid) {
-                showNotification('Nessun CID selezionato', 'error');
-                return;
+            if (!currentPreviewCid) return;
+            const metadata = currentPreviewMetadata || {};
+            let url = metadata.relayUrl || `${window.location.origin}/api/v1/ipfs/cat/${currentPreviewCid}`;
+            if (metadata.isEncrypted) {
+                const password = ShogunAdmin.getPassword();
+                if (password) url += `${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(password)}`;
             }
-            
-            const metadata = currentPreviewMetadata || systemHashMap[currentPreviewCid] || {};
-            let url = metadata.relayUrl || `${window.location.origin}/api/v1/ipfs/cat/${currentPreviewCid}/decrypt`;
-            const password = ShogunAdmin.getPassword();
-
-            if (metadata.isEncrypted && !url.includes("token=")) {
-                if (!password) {
-                    showNotification('Admin token required to open encrypted content', 'error');
-                    return;
-                }
-                const separator = url.includes('?') ? '&' : '?';
-                url = `${url}${separator}token=${encodeURIComponent(password)}`;
-            }
-
-            window.open(url, '_blank', 'noopener');
+            window.open(url, '_blank');
         }
 
         function downloadPreview() {
-            if (!previewBlob || !currentPreviewCid) {
-                showNotification('No content to download', 'error');
-                return;
-            }
-
+            if (!previewBlob || !currentPreviewCid) return;
             const link = document.createElement('a');
-            const url = previewObjectUrl || URL.createObjectURL(previewBlob);
-            if (!previewObjectUrl) {
-                previewObjectUrl = url;
-            }
-            const extension = getExtensionFromType(previewContentType);
-            const metadata = currentPreviewMetadata || systemHashMap[currentPreviewCid] || {};
-            const filename =
-                previewFileName ||
-                metadata.displayName ||
-                metadata.fileName ||
-                metadata.originalName ||
-                currentPreviewCid;
-
-            link.href = url;
-            link.download = `${filename}${extension || ''}`;
+            link.href = previewObjectUrl || URL.createObjectURL(previewBlob);
+            link.download = previewFileName || currentPreviewCid;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
         }
 
         async function unpinCid(cid) {
-            if (!confirm('Are you sure you want to remove this pin?')) return;
-            
+            if (!confirm('Remove this pin?')) return;
             const result = await apiCall('/api/v1/ipfs/pin/rm', 'POST', { cid }, { manageVisibility: false });
-            if (result) {
-                showNotification('Pin removed successfully', 'success');
-                await loadPins();
-            }
+            if (result) { showNotification('Pin removed', 'success'); await loadPins(); }
         }
 
         async function removeCid(cid) {
-            if (!confirm('This will remove the pin and run garbage collection. Are you sure?')) return;
-            
+            if (!confirm('Remove pin and run garbage collection?')) return;
             showLoading('Removing...');
-            
-            try {
-                // Unpin first
-                const unpinResult = await apiCall('/api/v1/ipfs/pin/rm', 'POST', { cid }, { manageVisibility: false });
-                if (unpinResult) {
-                    showNotification('Pin removed, running garbage collection...', 'info');
-                    
-                    // Run garbage collection
-                    const gcResult = await apiCall('/api/v1/ipfs/repo/gc', 'POST', {}, { manageVisibility: false });
-                    if (gcResult) {
-                        showNotification('File removed and garbage collection completed', 'success');
-                        await loadPins();
-                    } else {
-                        showNotification('Pin removed but garbage collection failed', 'error');
-                    }
-                }
-            } catch (error) {
-                showNotification(`Error: ${error.message}`, 'error');
-            } finally {
-                hideLoading();
+            const unpinResult = await apiCall('/api/v1/ipfs/pin/rm', 'POST', { cid }, { manageVisibility: false });
+            if (unpinResult) {
+                await apiCall('/api/v1/ipfs/repo/gc', 'POST', {}, { manageVisibility: false });
+                showNotification('Removed', 'success');
+                await loadPins();
             }
+            hideLoading();
         }
 
         async function runGarbageCollection() {
-            if (!confirm('Run garbage collection? This process may take some time.')) return;
-            
-            showLoading('Running garbage collection...');
+            if (!confirm('Run garbage collection?')) return;
+            showLoading('Running GC...');
             const result = await apiCall('/api/v1/ipfs/repo/gc', 'POST', {}, { manageVisibility: false });
-            
-            if (result) {
-                showNotification('Garbage collection completed successfully', 'success');
-            }
-            
+            if (result) showNotification('GC completed', 'success');
             hideLoading();
         }
 
         function showBatchUnpinModal() {
-            const preserveSystemFiles = document.getElementById('preserveSystemFiles').checked;
-            const message = preserveSystemFiles 
-                ? '⚠️ This will remove all non-system pins. Are you sure?' 
-                : '⚠️ This will remove ALL pins. Are you sure?';
-            
-            if (confirm(message)) {
-                confirmBatchUnpin();
-            }
+            if (confirm('Remove all pins?')) confirmBatchUnpin();
         }
 
         async function confirmBatchUnpin() {
-            const preserveSystemFiles = document.getElementById('preserveSystemFiles').checked;
-            showLoading('Running batch removal...');
-            
-            const confirmMessage = preserveSystemFiles 
-                ? '⚠️ This will remove all non-system pins. Confirm?' 
-                : '⚠️ This will remove ALL pins. Confirm?';
-            
-            if (!confirm(confirmMessage)) {
-                hideLoading();
-                return;
+            showLoading('Batch removal...');
+            const listResult = await apiCall('/api/v1/ipfs/pin/ls', 'GET', undefined, { manageVisibility: false });
+            if (!listResult?.pins) { hideLoading(); return; }
+
+            const allCids = Object.keys(listResult.pins);
+            let success = 0;
+            for (let i = 0; i < allCids.length; i++) {
+                updateProgress(((i + 1) / allCids.length) * 100);
+                const result = await apiCall('/api/v1/ipfs/pin/rm', 'POST', { cid: allCids[i] }, { manageVisibility: false });
+                if (result) success++;
+                await new Promise(r => setTimeout(r, 100));
             }
-
-            try {
-                // Get all pins using relay API
-                const listResult = await apiCall('/api/v1/ipfs/pin/ls', 'GET', undefined, { manageVisibility: false });
-                
-                if (!listResult || !listResult.pins) {
-                    showNotification('Impossibile ottenere la lista dei pin', 'error');
-                    return;
-                }
-
-                const allPins = Object.keys(listResult.pins);
-                let pinsToRemove = allPins;
-                
-                if (preserveSystemFiles) {
-                    // Filter out system files (this would need to be implemented based on your system)
-                    // For now, we'll just unpin all but log the intention
-                    console.log('System file preservation enabled, but not implemented yet - removing all pins');
-                    showNotification('System file preservation not yet implemented - removing all pins', 'warning');
-                }
-
-                if (pinsToRemove.length === 0) {
-                    showNotification('No pins to remove', 'info');
-                    return;
-                }
-
-                let successCount = 0;
-                let errorCount = 0;
-
-                for (let i = 0; i < pinsToRemove.length; i++) {
-                    const cid = pinsToRemove[i];
-                    const progress = Math.round(((i + 1) / pinsToRemove.length) * 100);
-                    
-                    updateProgress(progress);
-                    showLoading(`Removing ${i + 1}/${pinsToRemove.length}: ${cid.substring(0, 12)}...`);
-
-                    try {
-                        const result = await apiCall('/api/v1/ipfs/pin/rm', 'POST', { cid }, { manageVisibility: false });
-                        if (result) {
-                            successCount++;
-                        } else {
-                            errorCount++;
-                        }
-                    } catch (error) {
-                        errorCount++;
-                    }
-
-                    // Small delay to prevent overwhelming the API
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
-
-                updateProgress(100);
-                showNotification(`Batch completed: ${successCount} removed, ${errorCount} errors`, successCount > 0 ? 'success' : 'error');
-                
-                if (successCount > 0) {
-                    await loadPins();
-                }
-                
-            } catch (error) {
-                showNotification(`Batch error: ${error.message}`, 'error');
-            } finally {
-                hideLoading();
-                updateProgress(0);
-            }
+            showNotification(`Removed ${success} pins`, 'success');
+            await loadPins();
+            hideLoading();
         }
 
-        function refreshPins() {
-            loadPins();
-        }
+        function refreshPins() { loadPins(); }
 
-        function showQuickAddModal() {
-            document.getElementById('quickCidInput').focus();
-        }
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey || e.metaKey) {
-                switch (e.key) {
-                    case 'r':
-                        e.preventDefault();
-                        refreshPins();
-                        break;
-                    case 'f':
-                        e.preventDefault();
-                        document.getElementById('searchInput').focus();
-                        break;
-                    case 'n':
-                        e.preventDefault();
-                        document.getElementById('quickCidInput').focus();
-                        break;
-                }
-            }
-            
-            // ESC key to close modal
-            if (e.key === 'Escape') {
-                // This function is no longer needed as the modal is removed
-                // The page content is now directly visible.
-                // If you want to re-open the modal, you'd need to re-render the page content.
-                // For now, we'll just ensure the page is visible.
-                document.querySelector('.pin-manager-page').style.display = 'block';
-            }
-        });
-
-        // Expose functions globally for external use
-        window.PinManager = {
-            loadPins: loadPins,
-            refreshPins: refreshPins,
-            previewCid: previewCid
-        };
+        window.PinManager = { loadPins, refreshPins, previewCid };
     </script>
 </body>
+
 </html>
- 

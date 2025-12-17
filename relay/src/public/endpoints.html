@@ -1,66 +1,71 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="shogun-dark">
+<html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>API Documentation - Shogun Relay</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/variables.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/base.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/daisyui-overrides.css" rel="stylesheet" type="text/css" />
-    <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    
-    <!-- RapiDoc - Must be loaded as ES module -->
+    <link rel="stylesheet" href="styles/google-md3.css">
     <script type="module" src="https://unpkg.com/rapidoc/dist/rapidoc-min.js"></script>
-    
     <style>
-        body {
-            line-height: 1.6;
-            background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
-            min-height: 100vh;
+        .page-header {
+            background-color: var(--md-surface-container-low);
+            border-bottom: 1px solid var(--md-outline-variant);
+            padding: 24px;
+            margin-bottom: 24px;
         }
 
-        .hero-gradient {
-            background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
-        }
-
-        .container {
+        .page-header-content {
             max-width: 1600px;
             margin: 0 auto;
-            padding: 1.5rem;
-        }
-
-        .back-link {
-            display: inline-flex;
+            display: flex;
             align-items: center;
-            color: #42A5F5;
-            text-decoration: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.75rem;
-            margin-bottom: 1.5rem;
-            transition: all 0.2s ease;
-            font-size: 1rem;
+            gap: 16px;
         }
 
-        .back-link:hover {
-            background-color: rgba(66, 165, 245, 0.1);
-            color: #64B5F6;
+        .page-icon {
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #42A5F5, #1E88E5);
+            box-shadow: 0 8px 24px rgba(66, 165, 245, 0.3);
         }
 
-        /* Override RapiDoc styles for dark theme */
-        :root {
-            --rapidoc-primary-color: #FF69B4;
-            --rapidoc-bg-color: #1A1A1A;
-            --rapidoc-text-color: #E0E0E0;
-            --rapidoc-border-color: #404040;
-            --rapidoc-nav-bg-color: #282828;
-            --rapidoc-nav-hover-bg-color: #353535;
-            --rapidoc-nav-text-color: #E0E0E0;
-            --rapidoc-nav-accent-color: #FF69B4;
+        .page-icon svg {
+            width: 28px;
+            height: 28px;
+            color: white;
         }
 
-        rapidoc {
+        .docs-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 0 24px 24px;
+        }
+
+        .loading-card {
+            background-color: var(--md-surface-container);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: 16px;
+            padding: 32px;
+            text-align: center;
+        }
+
+        .loading-text {
+            color: var(--md-primary);
+            margin-bottom: 8px;
+        }
+
+        .loading-subtext {
+            color: var(--md-on-surface-variant);
+            font-size: 0.875rem;
+        }
+
+        /* RapiDoc styling overrides for dark theme */
+        rapi-doc {
             --nav-hover-bg-color: #353535;
             --nav-active-bg-color: #404040;
             --nav-active-text-color: #FF69B4;
@@ -86,183 +91,77 @@
             --response-border-color: #404040;
         }
 
-        /* Fix scroll issues with RapiDoc */
-        body {
-            overflow-x: hidden;
-        }
-
         #rapidoc-element {
-            height: calc(100vh - 300px);
+            height: calc(100vh - 200px);
             min-height: 600px;
-        }
-
-        /* Prevent RapiDoc from interfering with page scroll */
-        rapidoc {
-            display: block;
-            height: 100%;
-        }
-
-        /* Ensure container doesn't interfere */
-        .container {
-            overflow: visible;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid var(--md-outline-variant);
         }
     </style>
 </head>
 
-<body class="antialiased">
-    <div class="hero-gradient min-h-screen">
-        <div class="container mx-auto px-4 py-8">
-            <!-- Back Navigation -->
-            <div class="flex items-center mb-8">
-                <a href="/" class="back-link">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
-                    <span>Back to Control Panel</span>
-                </a>
+<body>
+    <!-- Header -->
+    <header class="page-header">
+        <div class="page-header-content">
+            <a href="/admin" class="md-btn md-btn-icon" title="Back to Admin">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24"
+                    height="24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+            </a>
+            <div class="page-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
             </div>
-
-            <div class="card bg-[#282828] border border-[#404040] rounded-2xl mb-8">
-                <div class="p-8">
-                    <div class="flex flex-col items-center mb-6">
-                        <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-[#42A5F5] to-[#1E88E5] mb-6">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                        </div>
-                        <h1 class="text-3xl md:text-4xl font-bold mb-4 text-[#FFFFFF]">API Documentation</h1>
-                        <p class="text-[#8B94FF] mb-4 text-center">Interactive API explorer - Test endpoints directly from your browser</p>
-                    </div>
-                </div>
+            <div>
+                <h1 class="md-headline-medium">API Documentation</h1>
+                <p class="md-body-medium md-text-secondary">Interactive API explorer - Test endpoints directly</p>
             </div>
-
-            <!-- Loading indicator -->
-            <div id="loadingIndicator" class="card bg-[#282828] border border-[#404040] rounded-2xl p-8 text-center">
-                <div class="text-[#FF69B4] mb-4">Loading API documentation...</div>
-                <div class="text-[#A0A0A0] text-sm">Fetching OpenAPI specification from /api/openapi.json</div>
-            </div>
-
-            <!-- RapiDoc Component - Note: tag name is rapi-doc (with hyphen) -->
-            <rapi-doc
-                id="rapidoc-element"
-                spec-url="/api/openapi.json"
-                theme="dark"
-                render-style="read"
-                show-header="false"
-                allow-authentication="true"
-                allow-server-selection="false"
-                show-meta="true"
-                show-components="true"
-                show-info="true"
-                show-servers="true"
-                regular-font="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-                mono-font="'Fira Code', 'Courier New', monospace"
-                font-size="14px"
-                primary-color="#FF69B4"
-                bg-color="#1A1A1A"
-                text-color="#E0E0E0"
-                nav-bg-color="#282828"
-                nav-text-color="#E0E0E0"
-                nav-hover-bg-color="#353535"
-                nav-accent-color="#FF69B4"
-                nav-hover-text-color="#FF69B4"
-                header-color="#FF69B4"
-                border-color="#404040"
-                default-schema-tab="example"
-                show-schema-description="true"
-                schema-style="table"
-                schema-expand-level="2"
-                layout="column"
-                use-path-in-nav-bar="false"
-                style="height: calc(100vh - 300px); min-height: 600px;"
-            ></rapi-doc>
         </div>
+    </header>
+
+    <div class="docs-container">
+        <!-- Loading indicator -->
+        <div id="loadingIndicator" class="loading-card">
+            <div class="loading-text">Loading API documentation...</div>
+            <div class="loading-subtext">Fetching OpenAPI specification from /api/openapi.json</div>
+        </div>
+
+        <!-- RapiDoc Component -->
+        <rapi-doc id="rapidoc-element" spec-url="/api/openapi.json" theme="dark" render-style="read" show-header="false"
+            allow-authentication="true" allow-server-selection="false" show-meta="true" show-components="true"
+            show-info="true" show-servers="true" regular-font="'Roboto', -apple-system, BlinkMacSystemFont, sans-serif"
+            mono-font="'Roboto Mono', monospace" font-size="14px" primary-color="#FF69B4" bg-color="#1A1A1A"
+            text-color="#E0E0E0" nav-bg-color="#282828" nav-text-color="#E0E0E0" nav-hover-bg-color="#353535"
+            nav-accent-color="#FF69B4" nav-hover-text-color="#FF69B4" header-color="#FF69B4" border-color="#404040"
+            default-schema-tab="example" show-schema-description="true" schema-style="table" schema-expand-level="2"
+            layout="column" use-path-in-nav-bar="false"></rapi-doc>
     </div>
 
-    <!-- Include centralized admin authentication -->
     <script src="lib/admin-auth.js"></script>
     <script src="lib/admin-nav.js"></script>
-
     <script>
-        // Prevent scroll jumping - more aggressive approach
-        let lastScrollTop = 0;
-        let scrollTimeout = null;
-        let isUserScrolling = true;
-        
-        // Save scroll position frequently
-        window.addEventListener('scroll', () => {
-            if (isUserScrolling) {
-                lastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
-            }
-        }, { passive: true });
-        
-        // Prevent hash change from scrolling to top
-        const originalPushState = history.pushState;
-        history.pushState = function() {
-            const scrollPos = window.pageYOffset || document.documentElement.scrollTop;
-            originalPushState.apply(history, arguments);
-            // Restore scroll position after state change
-            requestAnimationFrame(() => {
-                window.scrollTo(0, scrollPos);
-            });
-        };
-        
-        window.addEventListener('hashchange', (e) => {
-            // Don't scroll to top on hash change
-            e.preventDefault();
-            requestAnimationFrame(() => {
-                if (lastScrollTop > 0) {
-                    window.scrollTo(0, lastScrollTop);
-                }
-            });
-        }, false);
-        
-        // Prevent anchor links from jumping
-        document.addEventListener('click', (e) => {
-            const link = e.target.closest('a');
-            if (link && link.getAttribute('href')?.startsWith('#')) {
-                const href = link.getAttribute('href');
-                if (href !== '#' && href !== '#top') {
-                    // Allow navigation but prevent scroll jump
-                    setTimeout(() => {
-                        const target = document.querySelector(href);
-                        if (target) {
-                            const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
-                            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                            // If it jumped too much, restore
-                            setTimeout(() => {
-                                const newScroll = window.pageYOffset || document.documentElement.scrollTop;
-                                if (Math.abs(newScroll - currentScroll) > 500) {
-                                    window.scrollTo(0, currentScroll);
-                                }
-                            }, 100);
-                        }
-                    }, 50);
-                }
-            }
-        }, true);
-        
-        // Simple initialization - RapiDoc will load spec-url automatically
         document.addEventListener('DOMContentLoaded', () => {
             console.log('📄 API Documentation page loaded');
-            
+
             const loadingIndicator = document.getElementById('loadingIndicator');
             const rapidocEl = document.getElementById('rapidoc-element');
-            
+
             // Verify endpoint is accessible
             fetch('/api/openapi.json')
                 .then(response => {
-                    console.log('✅ OpenAPI endpoint response status:', response.status);
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
                     return response.json();
                 })
                 .then(spec => {
-                    console.log('✅ OpenAPI spec loaded successfully:', spec.info?.title || 'Unknown');
-                    console.log('📊 Number of paths:', Object.keys(spec.paths || {}).length);
-                    
-                    // Hide loading indicator after a short delay to let RapiDoc start rendering
+                    console.log('✅ OpenAPI spec loaded:', spec.info?.title);
                     setTimeout(() => {
                         if (loadingIndicator) {
                             loadingIndicator.style.display = 'none';
@@ -273,53 +172,28 @@
                     console.error('❌ Error loading OpenAPI spec:', error);
                     if (loadingIndicator) {
                         loadingIndicator.innerHTML = `
-                            <div style="color: #F44336; margin-bottom: 1rem;">
-                                <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Error loading API documentation</h2>
-                                <p style="color: #A0A0A0; font-size: 0.9rem;">${error.message}</p>
-                            </div>
-                            <div style="margin-top: 1rem;">
-                                <a href="/api/openapi.json" target="_blank" style="color: #42A5F5; text-decoration: underline;">
-                                    Try opening the spec directly
-                                </a>
-                            </div>
+                            <div class="loading-text" style="color: var(--md-error);">Error loading API documentation</div>
+                            <div class="loading-subtext">${error.message}</div>
+                            <a href="/api/openapi.json" target="_blank" class="md-btn md-btn-outlined" style="margin-top: 16px;">
+                                Try opening the spec directly
+                            </a>
                         `;
                     }
                 });
-            
+
             // Monitor RapiDoc events
             if (rapidocEl) {
                 rapidocEl.addEventListener('spec-loaded', () => {
                     console.log('✅ RapiDoc spec-loaded event fired');
                     if (loadingIndicator) loadingIndicator.style.display = 'none';
                 });
-                
+
                 rapidocEl.addEventListener('spec-error', (e) => {
                     console.error('❌ RapiDoc spec-error:', e.detail);
                 });
-                
-                // Prevent RapiDoc from scrolling page to top on navigation
-                rapidocEl.addEventListener('click', (e) => {
-                    // Allow normal click behavior but prevent scroll jumps
-                    lastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
-                }, true);
             }
-            
-            // Prevent anchor links from scrolling to top
-            document.addEventListener('click', (e) => {
-                if (e.target.tagName === 'A' && e.target.getAttribute('href')?.startsWith('#')) {
-                    const href = e.target.getAttribute('href');
-                    if (href !== '#') {
-                        // Allow the hash change but prevent scroll
-                        setTimeout(() => {
-                            const target = document.querySelector(href);
-                            if (target) {
-                                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                            }
-                        }, 100);
-                    }
-                }
-            }, true);
         });
     </script>
 </body>
+
 </html>

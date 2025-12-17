@@ -1,55 +1,54 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="shogun-dark">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <title>RPC Console - Shogun Relay</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/variables.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/base.css" rel="stylesheet" type="text/css" />
-    <link href="https://unpkg.com/shogun-theme@1.0.0/styles/daisyui-overrides.css" rel="stylesheet" type="text/css" />
-    <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="styles/google-md3.css">
     <style>
-        body {
-            line-height: 1.6;
-            background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
-            min-height: 100vh;
+        .page-header {
+            background-color: var(--md-surface-container-low);
+            border-bottom: 1px solid var(--md-outline-variant);
+            padding: 24px;
+            margin-bottom: 32px;
         }
 
-        .hero-gradient {
-            background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
-        }
-
-        .container {
+        .page-header-content {
             max-width: 1400px;
             margin: 0 auto;
-            padding: 1.5rem;
-        }
-
-        .back-link {
-            display: inline-flex;
+            display: flex;
             align-items: center;
-            color: #42A5F5;
-            text-decoration: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.75rem;
-            margin-bottom: 1.5rem;
-            transition: all 0.2s ease;
-            font-size: 1rem;
+            gap: 16px;
         }
 
-        .back-link:hover {
-            background-color: rgba(66, 165, 245, 0.1);
-            color: #64B5F6;
+        .page-icon {
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #FF69B4, #FF1493);
+            box-shadow: 0 8px 24px rgba(255, 105, 180, 0.3);
+        }
+
+        .page-icon svg {
+            width: 28px;
+            height: 28px;
+            color: white;
+        }
+
+        .console-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 24px;
         }
 
         .console-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-            margin-top: 2rem;
+            gap: 24px;
         }
 
         @media (max-width: 1024px) {
@@ -58,73 +57,55 @@
             }
         }
 
-        .config-panel {
-            background-color: #404040;
-            border: 1px solid #606060;
-            border-radius: 1rem;
-            padding: 2rem;
+        .console-card {
+            background-color: var(--md-surface-container);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: 16px;
+            padding: 24px;
         }
 
-        .request-panel {
-            background-color: #404040;
-            border: 1px solid #606060;
-            border-radius: 1rem;
-            padding: 2rem;
+        .console-card h2 {
+            color: var(--md-primary);
+            font-size: 1.25rem;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .console-card p {
+            color: var(--md-on-surface-variant);
+            font-size: 0.875rem;
+            margin-bottom: 24px;
         }
 
         .form-group {
-            margin-bottom: 1.5rem;
+            margin-bottom: 20px;
         }
 
-        .form-label {
+        .form-group label {
             display: block;
-            color: #E0E0E0;
+            color: var(--md-on-surface);
             font-size: 0.875rem;
             font-weight: 500;
-            margin-bottom: 0.5rem;
+            margin-bottom: 8px;
         }
 
-        .form-input {
-            width: 100%;
-            background-color: #282828;
-            border: 1px solid #606060;
-            color: #FFFFFF;
-            padding: 0.75rem;
-            border-radius: 0.5rem;
-            font-size: 0.875rem;
-            font-family: 'Courier New', monospace;
+        .form-row {
+            display: flex;
+            gap: 12px;
         }
 
-        .form-input:focus {
-            border-color: #FF69B4;
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(255, 105, 180, 0.2);
-        }
-
-        .form-select {
-            width: 100%;
-            background-color: #282828;
-            border: 1px solid #606060;
-            color: #FFFFFF;
-            padding: 0.75rem;
-            border-radius: 0.5rem;
-            font-size: 0.875rem;
-        }
-
-        .form-select:focus {
-            border-color: #FF69B4;
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(255, 105, 180, 0.2);
+        .form-row .md-input {
+            flex: 1;
         }
 
         .code-block {
-            background-color: #1A1A1A;
-            border: 1px solid #404040;
-            border-radius: 0.5rem;
-            padding: 1rem;
-            font-family: 'Courier New', monospace;
+            background-color: var(--md-surface-container-low);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'Roboto Mono', monospace;
             font-size: 0.875rem;
-            color: #E0E0E0;
+            color: var(--md-on-surface);
             overflow-x: auto;
             white-space: pre-wrap;
             word-break: break-all;
@@ -136,237 +117,197 @@
             max-height: 500px;
         }
 
-        .btn-primary {
-            background-color: #FF69B4;
-            color: #FFFFFF;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.5rem;
+        .response-success {
+            border-left: 3px solid var(--md-success);
+        }
+
+        .response-error {
+            border-left: 3px solid var(--md-error);
+        }
+
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .checkbox-row input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--md-primary);
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .section-header h2 {
+            margin-bottom: 0;
+        }
+
+        .section-header .md-flex {
+            display: flex;
+            gap: 8px;
+        }
+
+        select.md-input {
+            appearance: auto;
             cursor: pointer;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            width: 100%;
         }
 
-        .btn-primary:hover {
-            background-color: #FF1493;
+        textarea.md-input {
+            min-height: 100px;
+            resize: vertical;
         }
 
-        .btn-primary:disabled {
-            background-color: #606060;
-            cursor: not-allowed;
-        }
-
-        .btn-secondary {
-            background-color: #404040;
-            color: #FFFFFF;
-            border: 1px solid #606060;
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            cursor: pointer;
-            font-size: 0.875rem;
-            transition: all 0.2s ease;
-        }
-
-        .btn-secondary:hover {
-            background-color: #505050;
-        }
-
-        .method-option {
-            padding: 0.5rem;
-            border-bottom: 1px solid #404040;
-        }
-
-        .method-option:hover {
-            background-color: #353535;
-        }
-
-        .method-name {
-            color: #FF69B4;
-            font-weight: 600;
-            font-family: 'Courier New', monospace;
-        }
-
-        .method-desc {
-            color: #A0A0A0;
-            font-size: 0.75rem;
-            margin-top: 0.25rem;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            border-radius: 0.5rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .status-online {
-            background-color: #4CAF50;
-            color: #FFFFFF;
-        }
-
-        .status-offline {
-            background-color: #F44336;
-            color: #FFFFFF;
-        }
-
-        .loading {
+        .loading-spinner {
             display: inline-block;
             width: 16px;
             height: 16px;
-            border: 2px solid #606060;
-            border-top-color: #FF69B4;
+            border: 2px solid var(--md-outline);
+            border-top-color: var(--md-primary);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
 
         @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .params-input {
-            min-height: 100px;
-            resize: vertical;
-        }
-
-        .response-success {
-            border-left: 3px solid #4CAF50;
-        }
-
-        .response-error {
-            border-left: 3px solid #F44336;
+            to {
+                transform: rotate(360deg);
+            }
         }
     </style>
 </head>
 
-<body class="antialiased">
-    <div class="hero-gradient min-h-screen">
-        <div class="container mx-auto px-4 py-8">
-            <!-- Back Navigation -->
-            <div class="flex items-center mb-8">
-                <a href="/" class="back-link">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
-                    <span>Back to Control Panel</span>
-                </a>
+<body>
+    <!-- Header -->
+    <header class="page-header">
+        <div class="page-header-content">
+            <a href="/admin" class="md-btn md-btn-icon" title="Back to Admin">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24"
+                    height="24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+            </a>
+            <div class="page-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
             </div>
-
-            <div class="card bg-[#282828] border border-[#404040] rounded-2xl">
-                <div class="p-8 sm:p-10">
-                    <div class="flex flex-col items-center mb-8">
-                        <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-[#FF69B4] to-[#FF1493] mb-6">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                        </div>
-                        <h1 class="text-3xl md:text-4xl font-bold mb-4 text-[#FFFFFF]">RPC Console</h1>
-                        <p class="text-[#8B94FF] mb-4">Interact with blockchain RPC endpoints</p>
-                    </div>
-
-                    <div class="console-grid">
-                        <!-- Configuration Panel -->
-                        <div class="config-panel">
-                            <h2 class="text-xl font-bold mb-6 text-[#FF69B4]">Get started</h2>
-                            <p class="text-[#A0A0A0] mb-6 text-sm">Make your first API request using our Node RPC API.</p>
-
-                            <!-- Endpoint URL -->
-                            <div class="form-group">
-                                <label class="form-label">Endpoint URL</label>
-                                <div class="flex gap-2">
-                                    <input type="text" id="endpointUrl" class="form-input" 
-                                        placeholder="https://base-sepolia.g.alchemy.com/v2/..." />
-                                    <button onclick="copyEndpoint()" class="btn-secondary">Copy</button>
-                                </div>
-                            </div>
-
-                            <!-- Network Selector -->
-                            <div class="form-group">
-                                <label class="form-label">Network</label>
-                                <select id="networkSelect" class="form-select">
-                                    <option value="">Loading networks...</option>
-                                </select>
-                            </div>
-
-                            <!-- Method Selector -->
-                            <div class="form-group">
-                                <label class="form-label">Method</label>
-                                <select id="methodSelect" class="form-select">
-                                    <option value="">Select a method...</option>
-                                </select>
-                            </div>
-
-                            <!-- Parameters (optional) -->
-                            <div class="form-group">
-                                <label class="form-label">Parameters (JSON array, optional)</label>
-                                <textarea id="paramsInput" class="form-input params-input" 
-                                    placeholder='["0x1", "latest"]'></textarea>
-                            </div>
-
-                            <!-- Use Proxy Option -->
-                            <div class="form-group">
-                                <label class="form-label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                    <input type="checkbox" id="useProxy" style="width: auto; cursor: pointer;">
-                                    <span>Use relay proxy (if CORS blocked)</span>
-                                </label>
-                            </div>
-
-                            <!-- Execute Button -->
-                            <button onclick="executeRpc()" id="executeBtn" class="btn-primary">
-                                Execute Request
-                            </button>
-                        </div>
-
-                        <!-- Request/Response Panel -->
-                        <div class="request-panel">
-                            <div class="flex items-center justify-between mb-4">
-                                <h2 class="text-xl font-bold text-[#FF69B4]">Request</h2>
-                                <div class="flex gap-2">
-                                    <select id="codeFormat" class="form-select" style="width: auto; padding: 0.5rem;">
-                                        <option value="curl">Shell (curl)</option>
-                                        <option value="javascript">JavaScript</option>
-                                        <option value="python">Python</option>
-                                    </select>
-                                    <button onclick="copyRequest()" class="btn-secondary">Copy</button>
-                                </div>
-                            </div>
-                            <div id="requestCode" class="code-block"></div>
-
-                            <h2 class="text-xl font-bold mt-6 mb-4 text-[#FF69B4]">Response</h2>
-                            <div id="responseCode" class="code-block response"></div>
-                        </div>
-                    </div>
-                </div>
+            <div>
+                <h1 class="md-headline-medium">RPC Console</h1>
+                <p class="md-body-medium md-text-secondary">Interact with blockchain RPC endpoints</p>
             </div>
         </div>
-    </div>
+    </header>
 
+    <main class="console-container">
+        <div class="console-grid">
+            <!-- Configuration Panel -->
+            <div class="console-card">
+                <h2>Get Started</h2>
+                <p>Make your first API request using our Node RPC API.</p>
+
+                <!-- Endpoint URL -->
+                <div class="form-group">
+                    <label>Endpoint URL</label>
+                    <div class="form-row">
+                        <input type="text" id="endpointUrl" class="md-input"
+                            placeholder="https://base-sepolia.g.alchemy.com/v2/...">
+                        <button onclick="copyEndpoint()" class="md-btn md-btn-outlined">Copy</button>
+                    </div>
+                </div>
+
+                <!-- Network Selector -->
+                <div class="form-group">
+                    <label>Network</label>
+                    <select id="networkSelect" class="md-input">
+                        <option value="">Loading networks...</option>
+                    </select>
+                </div>
+
+                <!-- Method Selector -->
+                <div class="form-group">
+                    <label>Method</label>
+                    <select id="methodSelect" class="md-input">
+                        <option value="">Select a method...</option>
+                    </select>
+                </div>
+
+                <!-- Parameters -->
+                <div class="form-group">
+                    <label>Parameters (JSON array, optional)</label>
+                    <textarea id="paramsInput" class="md-input" placeholder='["0x1", "latest"]'></textarea>
+                </div>
+
+                <!-- Use Proxy Option -->
+                <div class="checkbox-row">
+                    <input type="checkbox" id="useProxy">
+                    <label for="useProxy" style="margin-bottom: 0;">Use relay proxy (if CORS blocked)</label>
+                </div>
+
+                <!-- Execute Button -->
+                <button onclick="executeRpc()" id="executeBtn" class="md-btn md-btn-filled" style="width: 100%;">
+                    Execute Request
+                </button>
+            </div>
+
+            <!-- Request/Response Panel -->
+            <div class="console-card">
+                <div class="section-header">
+                    <h2>Request</h2>
+                    <div class="md-flex">
+                        <select id="codeFormat" class="md-input" style="width: auto; min-height: 40px;">
+                            <option value="curl">Shell (curl)</option>
+                            <option value="javascript">JavaScript</option>
+                            <option value="python">Python</option>
+                        </select>
+                        <button onclick="copyRequest()" class="md-btn md-btn-outlined">Copy</button>
+                    </div>
+                </div>
+                <div id="requestCode" class="code-block">Configure endpoint and method to see request preview</div>
+
+                <h2 style="margin-top: 24px;">Response</h2>
+                <div id="responseCode" class="code-block response"></div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="md-footer">
+            <p class="md-body-small">
+                Shogun Relay RPC Console — Part of the <a href="https://github.com/scobru/shogun">Shogun Project</a>
+            </p>
+        </footer>
+    </main>
+
+    <script src="lib/admin-auth.js"></script>
+    <script src="lib/admin-nav.js"></script>
     <script>
         // Common RPC methods
         const RPC_METHODS = [
             { name: 'eth_blockNumber', desc: 'Get the latest block number', params: [] },
             { name: 'eth_getBalance', desc: 'Get balance of an address', params: ['address', 'block'] },
-            { name: 'eth_getTransactionCount', desc: 'Get transaction count (nonce) for an address', params: ['address', 'block'] },
-            { name: 'eth_getBlockByNumber', desc: 'Get block information by block number', params: ['blockNumber', 'fullTransactions'] },
-            { name: 'eth_getBlockByHash', desc: 'Get block information by block hash', params: ['blockHash', 'fullTransactions'] },
+            { name: 'eth_getTransactionCount', desc: 'Get transaction count (nonce)', params: ['address', 'block'] },
+            { name: 'eth_getBlockByNumber', desc: 'Get block by number', params: ['blockNumber', 'fullTransactions'] },
+            { name: 'eth_getBlockByHash', desc: 'Get block by hash', params: ['blockHash', 'fullTransactions'] },
             { name: 'eth_getTransactionByHash', desc: 'Get transaction by hash', params: ['txHash'] },
             { name: 'eth_getTransactionReceipt', desc: 'Get transaction receipt', params: ['txHash'] },
-            { name: 'eth_sendRawTransaction', desc: 'Send a signed transaction', params: ['signedTx'] },
-            { name: 'eth_call', desc: 'Execute a message call', params: ['callObject', 'block'] },
-            { name: 'eth_estimateGas', desc: 'Estimate gas usage for a pending transaction', params: ['callObject'] },
-            { name: 'eth_getLogs', desc: 'Query logs matching address and topics across blocks', params: ['filterObject'] },
-            { name: 'eth_feeHistory', desc: 'Fetch base fee and reward history for recent blocks', params: ['blockCount', 'newestBlock', 'rewardPercentiles'] },
-            { name: 'eth_getBlockReceipts', desc: 'Fetch all transaction receipts in a given block', params: ['blockNumber'] },
+            { name: 'eth_sendRawTransaction', desc: 'Send signed transaction', params: ['signedTx'] },
+            { name: 'eth_call', desc: 'Execute message call', params: ['callObject', 'block'] },
+            { name: 'eth_estimateGas', desc: 'Estimate gas usage', params: ['callObject'] },
+            { name: 'eth_getLogs', desc: 'Query logs', params: ['filterObject'] },
             { name: 'eth_gasPrice', desc: 'Get current gas price', params: [] },
             { name: 'eth_chainId', desc: 'Get chain ID', params: [] },
             { name: 'net_version', desc: 'Get network ID', params: [] },
-            { name: 'net_peerCount', desc: 'Get number of peers', params: [] },
         ];
 
         let availableNetworks = [];
 
-        // Load RPC status and populate networks
         async function loadRpcStatus() {
             try {
                 const response = await fetch('/rpc-status');
@@ -380,10 +321,7 @@
                     result.rpcs.forEach((rpc, index) => {
                         const option = document.createElement('option');
                         option.value = index;
-                        option.textContent = `${rpc.name} (${rpc.network})`;
-                        if (rpc.status === 'online') {
-                            option.textContent += ' ✓';
-                        }
+                        option.textContent = `${rpc.name} (${rpc.network})${rpc.status === 'online' ? ' ✓' : ''}`;
                         networkSelect.appendChild(option);
                     });
                 }
@@ -392,7 +330,6 @@
             }
         }
 
-        // Populate methods
         function populateMethods() {
             const methodSelect = document.getElementById('methodSelect');
             methodSelect.innerHTML = '<option value="">Select a method...</option>';
@@ -405,16 +342,14 @@
             });
         }
 
-        // Update request code preview
         function updateRequestPreview() {
             const endpointUrl = document.getElementById('endpointUrl').value;
-            const networkIndex = document.getElementById('networkSelect').value;
             const method = document.getElementById('methodSelect').value;
             const params = document.getElementById('paramsInput').value;
             const format = document.getElementById('codeFormat').value;
 
             if (!endpointUrl || !method) {
-                document.getElementById('requestCode').textContent = 'Configure endpoint and method to see request preview';
+                document.getElementById('requestCode').textContent = 'Configure endpoint and method to see preview';
                 return;
             }
 
@@ -423,35 +358,23 @@
                 if (params.trim()) {
                     paramsArray = JSON.parse(params);
                 }
-            } catch (e) {
-                // Invalid JSON, will be handled on execute
-            }
+            } catch (e) { }
 
-            const requestBody = {
-                jsonrpc: "2.0",
-                method: method,
-                params: paramsArray,
-                id: 1
-            };
+            const requestBody = { jsonrpc: "2.0", method: method, params: paramsArray, id: 1 };
 
             let code = '';
             if (format === 'curl') {
                 code = `curl --request POST \\
   --url ${endpointUrl} \\
-  --header 'accept: application/json' \\
   --header 'content-type: application/json' \\
   --data '${JSON.stringify(requestBody)}'`;
             } else if (format === 'javascript') {
                 code = `const response = await fetch('${endpointUrl}', {
   method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(${JSON.stringify(requestBody, null, 2)})
 });
-
-const data = await response.json();
-console.log(data);`;
+const data = await response.json();`;
             } else if (format === 'python') {
                 code = `import requests
 
@@ -460,14 +383,12 @@ response = requests.post(
     headers={'Content-Type': 'application/json'},
     json=${JSON.stringify(requestBody, null, 2)}
 )
-
 print(response.json())`;
             }
 
             document.getElementById('requestCode').textContent = code;
         }
 
-        // Execute RPC call - directly to RPC endpoint
         async function executeRpc() {
             const endpointUrl = document.getElementById('endpointUrl').value;
             const method = document.getElementById('methodSelect').value;
@@ -478,19 +399,9 @@ print(response.json())`;
                 return;
             }
 
-            // Validate endpoint URL
-            try {
-                new URL(endpointUrl);
-            } catch (e) {
-                alert('Invalid endpoint URL: ' + e.message);
-                return;
-            }
-
             let paramsArray = [];
             try {
-                if (params.trim()) {
-                    paramsArray = JSON.parse(params);
-                }
+                if (params.trim()) paramsArray = JSON.parse(params);
             } catch (e) {
                 alert('Invalid JSON in parameters: ' + e.message);
                 return;
@@ -498,83 +409,42 @@ print(response.json())`;
 
             const executeBtn = document.getElementById('executeBtn');
             const responseCode = document.getElementById('responseCode');
-            
+
             executeBtn.disabled = true;
-            executeBtn.innerHTML = '<span class="loading"></span> Executing...';
+            executeBtn.innerHTML = '<span class="loading-spinner"></span> Executing...';
             responseCode.textContent = 'Executing request...';
             responseCode.className = 'code-block response';
 
             const useProxy = document.getElementById('useProxy').checked;
-            const requestBody = {
-                jsonrpc: "2.0",
-                method: method,
-                params: paramsArray,
-                id: 1
-            };
+            const requestBody = { jsonrpc: "2.0", method: method, params: paramsArray, id: 1 };
 
             try {
                 let response;
-                
+
                 if (useProxy) {
-                    // Use relay proxy
                     response = await fetch('/api/v1/system/rpc/execute', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            endpoint: endpointUrl,
-                            request: requestBody
-                        })
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ endpoint: endpointUrl, request: requestBody })
                     });
-
                     const result = await response.json();
-                    
-                    if (result.success) {
-                        responseCode.textContent = JSON.stringify(result.response, null, 2);
-                        responseCode.classList.add('response-success');
-                    } else {
-                        responseCode.textContent = JSON.stringify(result, null, 2);
-                        responseCode.classList.add('response-error');
-                    }
+                    responseCode.textContent = JSON.stringify(result.success ? result.response : result, null, 2);
+                    responseCode.classList.add(result.success ? 'response-success' : 'response-error');
                 } else {
-                    // Make request directly to RPC endpoint
                     response = await fetch(endpointUrl, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                        },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(requestBody)
                     });
-
                     const responseData = await response.json();
-                    
-                    if (response.ok) {
-                        responseCode.textContent = JSON.stringify(responseData, null, 2);
-                        responseCode.classList.add('response-success');
-                    } else {
-                        responseCode.textContent = JSON.stringify({
-                            error: `HTTP ${response.status}: ${response.statusText}`,
-                            response: responseData
-                        }, null, 2);
-                        responseCode.classList.add('response-error');
-                    }
+                    responseCode.textContent = JSON.stringify(responseData, null, 2);
+                    responseCode.classList.add(response.ok ? 'response-success' : 'response-error');
                 }
             } catch (error) {
-                // Handle CORS or network errors
-                if (!useProxy && (error.message.includes('CORS') || error.message.includes('Failed to fetch'))) {
-                    responseCode.textContent = JSON.stringify({
-                        error: 'CORS Error: Cannot make direct request to this endpoint from browser.',
-                        message: 'The RPC endpoint does not allow cross-origin requests.',
-                        suggestion: 'Enable "Use relay proxy" checkbox to route through the relay server.'
-                    }, null, 2);
-                } else {
-                    responseCode.textContent = JSON.stringify({
-                        error: error.message,
-                        type: error.name
-                    }, null, 2);
-                }
+                responseCode.textContent = JSON.stringify({
+                    error: error.message,
+                    suggestion: 'Enable "Use relay proxy" if CORS blocked'
+                }, null, 2);
                 responseCode.classList.add('response-error');
             } finally {
                 executeBtn.disabled = false;
@@ -582,31 +452,21 @@ print(response.json())`;
             }
         }
 
-        // Copy functions
         function copyEndpoint() {
-            const endpoint = document.getElementById('endpointUrl');
-            endpoint.select();
-            document.execCommand('copy');
-            alert('Endpoint URL copied to clipboard');
+            navigator.clipboard.writeText(document.getElementById('endpointUrl').value);
+            alert('Copied!');
         }
 
         function copyRequest() {
-            const requestCode = document.getElementById('requestCode');
-            const textarea = document.createElement('textarea');
-            textarea.value = requestCode.textContent;
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textarea);
-            alert('Request code copied to clipboard');
+            navigator.clipboard.writeText(document.getElementById('requestCode').textContent);
+            alert('Copied!');
         }
 
         // Event listeners
-        document.getElementById('networkSelect').addEventListener('change', function() {
+        document.getElementById('networkSelect').addEventListener('change', function () {
             const index = this.value;
             if (index !== '' && availableNetworks[index]) {
-                const rpc = availableNetworks[index];
-                document.getElementById('endpointUrl').value = rpc.rpc;
+                document.getElementById('endpointUrl').value = availableNetworks[index].rpc;
                 updateRequestPreview();
             }
         });
@@ -620,9 +480,6 @@ print(response.json())`;
         loadRpcStatus();
         populateMethods();
     </script>
-    <!-- Include centralized admin authentication -->
-    <script src="lib/admin-auth.js"></script>
-    <script src="lib/admin-nav.js"></script>
 </body>
 
 </html>

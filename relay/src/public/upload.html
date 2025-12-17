@@ -1,218 +1,230 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="shogun-dark">
+<html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>IPFS File Uploader</title>
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-  <link href="https://unpkg.com/shogun-theme@1.0.0/styles/variables.css" rel="stylesheet" type="text/css" />
-  <link href="https://unpkg.com/shogun-theme@1.0.0/styles/base.css" rel="stylesheet" type="text/css" />
-  <link href="https://unpkg.com/shogun-theme@1.0.0/styles/daisyui-overrides.css" rel="stylesheet" type="text/css" />
-  <link href="styles/wormhole.css" rel="stylesheet" type="text/css" />
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-  <!-- Include centralized admin authentication -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IPFS File Uploader - Shogun Relay</title>
+  <link rel="stylesheet" href="styles/google-md3.css">
   <script src="lib/admin-auth.js"></script>
   <script src="lib/admin-nav.js"></script>
   <style>
-    body {
-      line-height: 1.6;
-      background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
-      min-height: 100vh;
+    .page-header {
+      background-color: var(--md-surface-container-low);
+      border-bottom: 1px solid var(--md-outline-variant);
+      padding: 24px;
+      margin-bottom: 32px;
     }
 
-    .hero-gradient {
-      background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.1) 0%, transparent 60%);
+    .page-header-content {
+      max-width: 800px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 16px;
     }
 
-    @keyframes pulse-glow {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(255, 105, 180, 0.4); }
-      50% { box-shadow: 0 0 20px 5px rgba(255, 105, 180, 0.2); }
+    .page-icon {
+      width: 56px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #42A5F5, #1976D2);
+      box-shadow: 0 8px 24px rgba(66, 165, 245, 0.3);
     }
 
-    .pulse-glow {
-      animation: pulse-glow 2s infinite;
+    .page-icon svg {
+      width: 28px;
+      height: 28px;
+      color: white;
     }
 
-    .card-hover {
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    .upload-container {
+      max-width: 600px;
+      margin: 0 auto;
     }
 
-    .card-hover:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-    }
-
-    .section-divider {
-      height: 1px;
-      background: linear-gradient(90deg, transparent, #404040, transparent);
-      margin: 2rem 0;
+    .upload-card {
+      background-color: var(--md-surface-container);
+      border: 1px solid var(--md-outline-variant);
+      border-radius: 16px;
+      padding: 32px;
     }
 
     .drag-drop-area {
-      border: 2px dashed #606060;
-      border-radius: 1rem;
-      padding: 2rem;
+      border: 2px dashed var(--md-outline);
+      border-radius: 16px;
+      padding: 48px 24px;
       text-align: center;
-      margin-top: 1.5rem;
-      margin-bottom: 1.5rem;
+      margin-bottom: 24px;
       transition: all 0.3s ease;
       cursor: pointer;
-      background-color: rgba(64, 64, 64, 0.3);
+      background-color: var(--md-surface-container-low);
+    }
+
+    .drag-drop-area:hover {
+      border-color: var(--md-primary);
+      background-color: var(--md-surface-container);
     }
 
     .drag-drop-area.drag-over {
-      border-color: #FF69B4;
+      border-color: var(--md-primary);
       background-color: rgba(255, 105, 180, 0.1);
     }
 
     .drag-drop-area svg {
-      width: 6rem;
-      height: 6rem;
-      margin: 0 auto 0.5rem;
-      color: #FF69B4;
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 16px;
+      color: var(--md-primary);
+    }
+
+    .drag-drop-text {
+      font-size: 1rem;
+      color: var(--md-on-surface-variant);
     }
 
     .upload-progress {
-      background-color: #404040;
-      border-radius: 1rem;
+      background-color: var(--md-surface-container-high);
+      border-radius: 8px;
       overflow: hidden;
-      margin-top: 1.5rem;
+      margin-top: 24px;
       display: none;
     }
 
     .progress-bar {
-      height: 1.5rem;
-      background-color: #4CAF50;
-      color: #FFFFFF;
+      height: 24px;
+      background-color: var(--md-success);
+      color: white;
       text-align: center;
       font-size: 0.875rem;
-      line-height: 1.5rem;
-      transition: all 0.3s ease;
+      line-height: 24px;
+      transition: width 0.3s ease;
     }
 
     .message {
-      padding: 1.5rem;
-      border-radius: 1rem;
-      margin-top: 1.5rem;
+      padding: 16px;
+      border-radius: 12px;
+      margin-top: 24px;
       display: none;
     }
 
     .message.success {
-      background-color: rgba(76, 175, 80, 0.2);
-      border: 1px solid rgba(76, 175, 80, 0.3);
-      color: #4CAF50;
+      background-color: var(--md-success-container);
+      border: 1px solid var(--md-success);
+      color: var(--md-success);
     }
 
     .message.error {
-      background-color: rgba(244, 67, 54, 0.2);
-      border: 1px solid rgba(244, 67, 54, 0.3);
-      color: #F44336;
+      background-color: var(--md-error-container);
+      border: 1px solid var(--md-error);
+      color: var(--md-error);
     }
 
     .message a {
-      color: #42A5F5;
+      color: var(--md-tertiary);
       text-decoration: underline;
     }
 
-    .message a:hover {
-      color: #64B5F6;
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      padding: 12px 16px;
+      background-color: var(--md-surface-container-low);
+      border-radius: 8px;
+    }
+
+    .checkbox-row input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      accent-color: var(--md-primary);
+    }
+
+    .checkbox-label {
+      color: var(--md-on-surface);
+      font-size: 0.875rem;
     }
   </style>
 </head>
 
-<body class="antialiased">
-  <div class="hero-gradient min-h-screen">
-    <div class="container mx-auto px-4 py-8 max-w-4xl">
-      <!-- Back Navigation -->
-      <div class="flex items-center mb-8">
-        <a href="/" class="flex items-center gap-2 text-[#A0A0A0] hover:text-[#FF69B4] transition-colors group">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          <span>Back to Control Panel</span>
-        </a>
+<body>
+  <!-- Header -->
+  <header class="page-header">
+    <div class="page-header-content">
+      <a href="/admin" class="md-btn md-btn-icon" title="Back to Admin">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24"
+          height="24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        </svg>
+      </a>
+      <div class="page-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        </svg>
       </div>
-
-      <div class="card bg-[#282828] border border-[#404040] rounded-2xl card-hover">
-        <div class="p-8 sm:p-10">
-          <div class="flex flex-col items-center">
-            <!-- Header Icon -->
-            <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-[#42A5F5] to-[#1976D2] mb-6 pulse-glow">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-            </div>
-
-            <h1 class="text-3xl md:text-4xl font-bold mb-4 text-[#FFFFFF]">IPFS File Uploader</h1>
-            <p class="text-[#8B94FF] mb-8">Direct file upload with optional encryption</p>
-
-          <div class="w-full space-y-8">
-            <div class="form-group">
-              <label class="block text-lg font-medium mb-3 text-[#FFFFFF]">File Upload:</label>
-              <p class="text-[#A0A0A0] text-base mb-6">
-                Select a file to upload to your IPFS node via the relay.
-              </p>
-
-              <div class="drag-drop-area" id="dropArea">
-                <svg class="flex flex-col items-center w-32 h-32 mx-auto" xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd"
-                    d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z"
-                    clip-rule="evenodd" />
-                </svg>
-
-                <p class="text-[#E0E0E0] text-lg">Drag & drop files here or click to select</p>
-                <input type="file" id="fileInput" class="hidden" />
-              </div>
-
-              <div class="form-control mb-6">
-                <label class="label cursor-pointer justify-start gap-3">
-                  <input type="checkbox" id="encryptCheck" class="checkbox checkbox-primary" />
-                  <span class="label-text text-[#E0E0E0] text-base">Encrypt file with admin token before upload?</span>
-                </label>
-              </div>
-
-              <div class="upload-progress" id="uploadProgress">
-                <div class="progress-bar" id="progressBar">0%</div>
-              </div>
-
-              <button class="btn bg-[#FF69B4] hover:bg-[#FF1493] border-0 text-[#FFFFFF] mt-6 rounded-xl px-8 py-4 font-medium" id="uploadBtn">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd"
-                    d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z"
-                    clip-rule="evenodd" />
-                </svg>
-                Upload File
-              </button>
-              <div class="form-group mt-6">
-                <label class="block text-lg font-medium mb-3 text-[#FFFFFF]" for="fileNameInput">
-                  File Name Override (optional):
-                </label>
-                <input
-                  type="text"
-                  id="fileNameInput"
-                  class="input input-bordered w-full bg-[#1A1A1A] border-[#404040] text-[#E0E0E0]"
-                  placeholder="Leave empty to use the original file name"
-                  autocomplete="off"
-                />
-              </div>
-            </div>
-
-            <div id="message" class="message"></div>
-          </div>
-        </div>
+      <div>
+        <h1 class="md-headline-medium">IPFS File Uploader</h1>
+        <p class="md-body-medium md-text-secondary">Direct file upload with optional encryption</p>
       </div>
-
-      <!-- Footer -->
-      <footer class="mt-12 text-center">
-        <div class="section-divider"></div>
-        <p class="text-[#606060] text-sm">
-          Shogun Relay Upload - Part of the <a href="https://github.com/scobru/shogun" class="text-[#FF69B4] hover:text-[#FF1493] transition-colors">Shogun Project</a>
-        </p>
-      </footer>
     </div>
-  </div>
+  </header>
+
+  <main class="md-container upload-container">
+    <div class="upload-card">
+      <!-- Drag & Drop Area -->
+      <div class="drag-drop-area" id="dropArea">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path fill-rule="evenodd"
+            d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z"
+            clip-rule="evenodd" />
+        </svg>
+        <p class="drag-drop-text">Drag & drop files here or click to select</p>
+        <input type="file" id="fileInput" style="display: none;">
+      </div>
+
+      <!-- File Name Override -->
+      <div class="md-field">
+        <label class="md-label" for="fileNameInput">File Name Override (optional)</label>
+        <input type="text" id="fileNameInput" class="md-input" placeholder="Leave empty to use the original file name">
+      </div>
+
+      <!-- Encrypt Checkbox -->
+      <div class="checkbox-row">
+        <input type="checkbox" id="encryptCheck">
+        <label class="checkbox-label" for="encryptCheck">Encrypt file with admin token before upload</label>
+      </div>
+
+      <!-- Upload Button -->
+      <button class="md-btn md-btn-filled" style="width: 100%;" id="uploadBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" class="md-icon-sm" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd"
+            d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z"
+            clip-rule="evenodd" />
+        </svg>
+        Upload File
+      </button>
+
+      <!-- Progress Bar -->
+      <div class="upload-progress" id="uploadProgress">
+        <div class="progress-bar" id="progressBar">0%</div>
+      </div>
+
+      <!-- Message -->
+      <div id="message" class="message"></div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="md-footer">
+      <p class="md-body-small">
+        Shogun Relay Upload — Part of the <a href="https://github.com/scobru/shogun">Shogun Project</a>
+      </p>
+    </footer>
+  </main>
 
   <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
@@ -282,22 +294,19 @@
     // Initialize admin authentication
     document.addEventListener('DOMContentLoaded', () => {
       ShogunAdmin.init({
-          autoFill: true,
-          showIndicator: true,
-          adminFieldId: 'adminPassword',
-          syncEnabled: true
+        autoFill: true,
+        showIndicator: true,
+        adminFieldId: 'adminPassword',
+        syncEnabled: true
       });
     });
 
     uploadBtn.addEventListener("click", async () => {
       const file = fileInput.files[0];
-      // Use centralized admin password
       const token = ShogunAdmin.getPassword();
 
-      console.log(`💾 Token:`, token);
-
       if (!token) {
-        showMessage("Admin Token is required. Please set it in the Control Panel.");
+        showMessage("Admin Token is required. Please set it in the Admin Panel.");
         return;
       }
 
@@ -307,7 +316,7 @@
       }
 
       uploadBtn.disabled = true;
-      uploadBtn.classList.add("loading");
+      uploadBtn.textContent = "Uploading...";
       messageEl.style.display = "none";
       uploadProgress.style.display = "block";
       progressBar.style.width = "0%";
@@ -330,10 +339,7 @@
             reader.readAsDataURL(file);
           });
 
-
           const encryptedData = await SEA.encrypt(base64data, token);
-          // Convert encrypted object to JSON string (SEA.encrypt returns an object)
-          // This is critical: if we don't stringify, File constructor will convert it to "[object Object]"
           const encryptedDataJson = JSON.stringify(encryptedData);
           const encryptionFileName = baseFileName.endsWith(".enc")
             ? baseFileName
@@ -348,7 +354,7 @@
         } catch (err) {
           showMessage(`Encryption failed: ${err.message}`);
           uploadBtn.disabled = false;
-          uploadBtn.classList.remove("loading");
+          uploadBtn.textContent = "Upload File";
           uploadProgress.style.display = "none";
           return;
         }
@@ -380,27 +386,20 @@
 
           const { hash } = result.file;
           const isEncrypted = encryptCheck.checked;
-          
-          // Build relay URL (always go through relay viewer)
+
           const baseUrl = window.location.origin;
           const finalIpfsUrl = isEncrypted
             ? `${baseUrl}/api/v1/ipfs/cat/${hash}/decrypt?token=${encodeURIComponent(token)}`
             : `${baseUrl}/api/v1/ipfs/cat/${hash}`;
-          
-          console.log(`🔗 Relay URL: ${finalIpfsUrl}`);
-          console.log(`🔒 Is encrypted: ${isEncrypted}`);
 
-          // Add file to system hashes (admin upload)
+          // Add file to system hashes
           try {
-            console.log('💾 Adding file to system hashes...');
-            
-            // Prepare metadata for system hash
             const systemHashData = {
               hash: hash,
               userAddress: 'admin-upload',
               timestamp: Date.now(),
               fileName: uploadFileName,
-              displayName: uploadFileName, // Add displayName for pin manager
+              displayName: uploadFileName,
               originalName: file.name,
               fileSize: fileToUpload.size ?? file.size,
               isEncrypted: isEncrypted,
@@ -409,10 +408,8 @@
               gatewayUrl: `${baseUrl}/ipfs/${hash}`,
               uploadedAt: Date.now()
             };
-            
-            console.log('💾 System hash data:', systemHashData);
-            
-            const systemHashResponse = await fetch('/api/v1/user-uploads/save-system-hash', {
+
+            await fetch('/api/v1/user-uploads/save-system-hash', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -420,40 +417,26 @@
               },
               body: JSON.stringify(systemHashData)
             });
-
-            if (systemHashResponse.ok) {
-              await systemHashResponse.json();
-              console.log('✅ File added to system hashes');
-            } else {
-              console.warn('⚠️ Failed to add file to system hashes:', systemHashResponse.status);
-              const errorText = await systemHashResponse.text();
-              console.warn('⚠️ Error details:', errorText);
-            }
           } catch (error) {
-            console.error('❌ Error adding file to system hashes:', error);
-            // Don't block the upload if system hash save fails
+            console.error('Error adding file to system hashes:', error);
           }
 
           const successMessage = `
-            <div class="flex flex-col gap-2">
-              <div class="font-semibold text-success">✅ File uploaded successfully!</div>
-              <div class="font-mono text-sm">Hash: ${hash}</div>
-              <div class="flex flex-col gap-1">
-                <a href="${finalIpfsUrl}" target="_blank" class="link">🔗 Relay URL ${isEncrypted ? "(decrypted)" : ""}</a>
-              </div>
-            </div>
-          `;
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <div style="font-weight: 600;">✅ File uploaded successfully!</div>
+                            <div style="font-family: monospace; font-size: 0.875rem;">Hash: ${hash}</div>
+                            <a href="${finalIpfsUrl}" target="_blank">🔗 View File ${isEncrypted ? "(decrypted)" : ""}</a>
+                        </div>
+                    `;
           showMessage(successMessage, "success");
         } else {
-          throw new Error(
-            result.error || "Upload failed for an unknown reason."
-          );
+          throw new Error(result.error || "Upload failed for an unknown reason.");
         }
       } catch (err) {
         showMessage(`Upload failed: ${err.message}`);
       } finally {
         uploadBtn.disabled = false;
-        uploadBtn.classList.remove("loading");
+        uploadBtn.textContent = "Upload File";
       }
     });
   </script>
