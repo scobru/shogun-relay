@@ -55,6 +55,10 @@ services:
       - RELAY_PRIVATE_KEY=0x_your_private_key_here
       # Chain ID: 84532 = Base Sepolia (testnet), 8453 = Base Mainnet
       - REGISTRY_CHAIN_ID=84532
+      # Oracle Configuration
+      - ORACLE_ENABLED=true
+      - ORACLE_CHAIN_ID=84532
+      - ORACLE_DEFAULT_VALIDITY_SECS=600
       # Relay Storage Limits (global IPFS storage limit)
       - RELAY_MAX_STORAGE_GB=10
       - RELAY_STORAGE_WARNING_THRESHOLD=80
