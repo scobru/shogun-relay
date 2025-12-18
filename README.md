@@ -18,6 +18,7 @@
 - **L2 Bridge** — Trustless ETH bridge between L1 and GunDB L2
 - **Network Federation** — Relay discovery, storage proofs, and reputation system
 - **On-Chain Registry** — Staking and slashing on Base blockchain
+- **Oracle System** — Decentralized price feeds with dual payment model (x402/ETH)
 
 ---
 
@@ -71,6 +72,7 @@ See **[Environment Variables](./docs/ENVIRONMENT_VARIABLES.md)** for complete re
 | `/upload` | IPFS uploads |
 | `/visualGraph` | GunDB explorer |
 | `/registry-dashboard` | On-chain registry |
+| `/oracle-dashboard` | Oracle feeds & stats |
 | `/endpoints` | API documentation |
 
 ---
@@ -86,6 +88,7 @@ See **[Environment Variables](./docs/ENVIRONMENT_VARIABLES.md)** for complete re
 | **[x402 Payments](./docs/X402_PAYMENTS.md)** | Subscription payment system |
 | **[Storage Deals](./docs/STORAGE_DEALS.md)** | Per-file contracts & erasure coding |
 | **[Network Federation](./docs/NETWORK_FEDERATION.md)** | Relay discovery & reputation |
+| **[Oracle System](./docs/ORACLE.md)** | Paid data feeds & verification |
 | **[Relay Keys](./docs/RELAY_KEYS.md)** | Keypair configuration |
 | **[Roadmap](./docs/ROADMAP.md)** | Evolution path |
 
@@ -117,6 +120,14 @@ See **[Environment Variables](./docs/ENVIRONMENT_VARIABLES.md)** for complete re
 | `POST /api/v1/bridge/deposit` | Record L1 deposit |
 | `POST /api/v1/bridge/withdraw` | Request withdrawal |
 | `GET /api/v1/bridge/balance/:user` | Get L2 balance |
+
+### Oracle
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/v1/oracle/feeds` | List available feeds |
+| `GET /api/v1/oracle/data/:feedId` | Get signed data (requires payment) |
+| `GET /api/v1/oracle/stats/global` | Revenue & usage stats |
 
 Full API documentation at `/endpoints` or see **[API Reference](./docs/API.md)**.
 

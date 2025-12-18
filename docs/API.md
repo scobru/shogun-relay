@@ -240,6 +240,60 @@ Activate a deal on-chain.
 }
 ```
 
+### Oracle System
+
+#### GET `/api/v1/oracle/feeds`
+List all available data feeds.
+
+**Response:**
+```json
+{
+  "success": true,
+  "feeds": [
+    {
+      "feedId": "0x...",
+      "name": "ETH/USD",
+      "priceUSDC": 1.0,
+      "dataType": 0,
+      "active": true
+    }
+  ]
+}
+```
+
+#### GET `/api/v1/oracle/data/:feedId`
+Get signed data packet for off-chain use (requires x402 payment if priced).
+
+**Headers:**
+- `X-Payment: <x402-payment-string>` (if feed has price)
+
+**Response:**
+```json
+{
+  "success": true,
+  "packet": {
+    "feedId": "0x...",
+    "value": "0x...",
+    "timestamp": 1700000000,
+    "signature": "0x..."
+  }
+}
+```
+
+#### GET `/api/v1/oracle/stats/global`
+Get global revenue and usage statistics.
+
+**Response:**
+```json
+{
+  "success": true,
+  "stats": {
+    "totalAccesses": 1500,
+    "totalRevenueUSDC": 50.5
+  }
+}
+```
+
 ### Network & Discovery
 
 #### GET `/api/v1/network/relays`

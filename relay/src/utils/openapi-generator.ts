@@ -304,6 +304,39 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
             },
           },
         },
+        OracleFeed: {
+          type: "object",
+          properties: {
+            feedId: { type: "string" },
+            name: { type: "string", example: "ETH/USD" },
+            priceUSDC: { type: "number", example: 1.0 },
+            dataType: { type: "number", example: 0 },
+            active: { type: "boolean" },
+            schema: { type: "string", example: "uint256" },
+            dataTypeName: { type: "string", example: "PRICE" }
+          }
+        },
+        OraclePacket: {
+          type: "object",
+          properties: {
+            feedId: { type: "string" },
+            value: { type: "string", example: "0x..." },
+            timestamp: { type: "number" },
+            signature: { type: "string", example: "0x..." },
+            deadline: { type: "number" },
+            payload: { type: "string", example: "0x..." }
+          }
+        },
+        OracleGlobalStats: {
+          type: "object",
+          properties: {
+            totalAccesses: { type: "number" },
+            totalRevenueUSDC: { type: "number" },
+            lastAccess: { type: "string", format: "date-time" },
+            accessesByFeed: { type: "object", additionalProperties: { type: "number" } },
+            revenueByFeed: { type: "object", additionalProperties: { type: "number" } }
+          }
+        },
       },
     },
     security: [{ bearerAuth: [] }, { tokenHeader: [] }, { sessionToken: [] }],
@@ -326,6 +359,101 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
           },
         },
       },
+      "/api/v1/oracle/feeds": {
+        get: {
+          tags: ["Oracle"],
+          summary: "List feeds",
+          description: "Get list of all available oracle data feeds",
+          operationId: "getOracleFeeds",
+          responses: {
+            "200": {
+              description: "List of feeds",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      feeds: {
+                        type: "array",
+                        items: { $ref: "#/components/schemas/OracleFeed" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/oracle/data/{feedId}": {
+        get: {
+          tags: ["Oracle"],
+          summary: "Get feed data",
+          description: "Get signed data packet for a specific feed",
+          operationId: "getOracleData",
+          parameters: [
+            {
+              name: "feedId",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "Feed ID"
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Signed data packet",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      packet: { $ref: "#/components/schemas/OraclePacket" },
+                      paymentRequired: { type: "boolean" },
+                      priceUSDC: { type: "number" }
+                    }
+                  }
+                }
+              }
+            },
+            "402": {
+              description: "Payment required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/oracle/stats/global": {
+        get: {
+          tags: ["Oracle"],
+          summary: "Global stats",
+          description: "Get global oracle revenue and usage statistics",
+          operationId: "getOracleGlobalStats",
+          responses: {
+            "200": {
+              description: "Global stats",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      stats: { $ref: "#/components/schemas/OracleGlobalStats" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+
       "/api/v1/system/stats": {
         get: {
           tags: ["System"],
