@@ -573,9 +573,9 @@ export function initializeOracle(config: {
     }
 
     // Get contract address from SDK deployments (no env needed!)
-    const deployment = getContractDeployment(config.chainId, "ShogunPriceOracle");
+    const deployment = getContractDeployment(config.chainId, "ShogunPaidOracle");
     if (!deployment?.address) {
-        log.warn(`Oracle enabled but ShogunPriceOracle not deployed on chain ${config.chainId}`);
+        log.warn(`Oracle enabled but ShogunPaidOracle not deployed on chain ${config.chainId}`);
         return;
     }
 
