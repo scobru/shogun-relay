@@ -218,11 +218,23 @@ router.get("/data/:feedId", async (req: Request, res: Response) => {
             const paymentHeader = req.headers["x-payment"];
 
             if (!paymentHeader) {
-                // Return 402 Payment Required with requirements
+                // Generate the signed packet FIRST so we can include it in the 402 response
+                // This allows on-chain payment via ShogunPaidOracle.updatePrice()
+                const value = await feed.getValue();
+                const packet = await signer.signPacket(
+                    feed.name,
+                    value,
+                    feed.schema,
+                    oracleConfig?.defaultValiditySecs || 600
+                );
+
+                // Return 402 Payment Required with requirements AND the packet
                 const priceAtomic = Math.floor(feed.priceUSDC * 1e6); // USDC has 6 decimals
                 return res.status(402).json({
                     success: false,
                     error: "Payment required",
+                    paymentRequired: true,
+                    packet, // Include signed packet for on-chain payment
                     x402: {
                         x402Version: 1,
                         accepts: [{
