@@ -7,6 +7,7 @@ import { DealsModule } from "./modules/deals";
 import { RegistryModule } from "./modules/registry";
 import { UploadsModule } from "./modules/uploads";
 import { BridgeModule } from "./modules/bridge";
+import { OracleModule } from "./modules/oracle";
 
 // Export types
 export * from "./types";
@@ -22,6 +23,7 @@ export class ShogunRelaySDK {
   public registry: RegistryModule;
   public uploads: UploadsModule;
   public bridge: BridgeModule;
+  public oracle: OracleModule;
 
   constructor(config: ApiClientConfig) {
     this.client = new ApiClient(config);
@@ -34,6 +36,7 @@ export class ShogunRelaySDK {
     this.registry = new RegistryModule(this.client);
     this.uploads = new UploadsModule(this.client);
     this.bridge = new BridgeModule(this.client);
+    this.oracle = new OracleModule(this.client);
   }
 
   public setToken(token: string) {

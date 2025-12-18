@@ -278,3 +278,72 @@ export interface RelaysListResponse {
   }>;
   error?: string;
 }
+
+/**
+ * Oracle Data Feed
+ */
+export interface OracleFeed {
+  feedId: string;
+  name: string;
+  priceUSDC: number;
+  dataType: number; // 0=PRICE, 1=STRING, 2=JSON, 3=BYTES
+  dataTypeName: string;
+  active: boolean;
+  schema: string;
+}
+
+/**
+ * Validated Oracle Packet
+ */
+export interface OraclePacket {
+  feedId: string;
+  value: string;
+  timestamp: number;
+  signature: string;
+  deadline: number;
+  payload: string;
+}
+
+/**
+ * Global Oracle Stats
+ */
+export interface OracleGlobalStats {
+  totalAccesses: number;
+  totalRevenueUSDC: number;
+  lastAccess?: string;
+  accessesByFeed: Record<string, number>;
+  revenueByFeed: Record<string, number>;
+}
+
+/**
+ * Oracle Feeds Response
+ */
+export interface OracleFeedsResponse {
+  success: boolean;
+  feeds: OracleFeed[];
+}
+
+/**
+ * Oracle Data Response
+ */
+export interface OracleDataResponse {
+  success: boolean;
+  packet?: OraclePacket;
+  paymentRequired?: boolean;
+  priceUSDC?: number;
+  error?: string;
+  paymentDetails?: {
+    required: boolean;
+    amountUSDC: number;
+    tiers: any[];
+    x402: any;
+  };
+}
+
+/**
+ * Oracle Global Stats Response
+ */
+export interface OracleGlobalStatsResponse {
+  success: boolean;
+  stats: OracleGlobalStats;
+}
