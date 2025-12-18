@@ -152,6 +152,16 @@ export const config = {
   },
 
   // ============================================================================
+  // WORMHOLE CLEANUP CONFIGURATION
+  // ============================================================================
+
+  wormhole: {
+    cleanupEnabled: process.env.WORMHOLE_CLEANUP_ENABLED !== "false",
+    cleanupIntervalMs: parseInt(process.env.WORMHOLE_CLEANUP_INTERVAL_MS || "3600000") || 60 * 60 * 1000, // 1 hour
+    maxAgeSecs: parseInt(process.env.WORMHOLE_MAX_AGE_SECS || "86400") || 24 * 60 * 60, // 24 hours
+  },
+
+  // ============================================================================
   // BRIDGE CONFIGURATION (L2 Bridge)
   // ============================================================================
 
@@ -173,8 +183,8 @@ export const config = {
     // Allowed chain IDs for security validation
     validChainIds: process.env.BRIDGE_VALID_CHAIN_IDS
       ? process.env.BRIDGE_VALID_CHAIN_IDS.split(",")
-          .map((id) => parseInt(id.trim()))
-          .filter((id) => !isNaN(id))
+        .map((id) => parseInt(id.trim()))
+        .filter((id) => !isNaN(id))
       : [1, 11155111, 8453, 84532, 42161, 421614, 10, 11155420, 137, 80002], // Mainnet, Sepolia, Base, Base Sepolia, Arbitrum, Arbitrum Sepolia, Optimism, Op Sepolia, Polygon, Polygon Amoy
   },
 
@@ -246,6 +256,7 @@ export const relayKeysConfig = config.relayKeys;
 export const blockchainConfig = config.blockchain;
 export const x402Config = config.x402;
 export const dealSyncConfig = config.dealSync;
+export const wormholeConfig = config.wormhole;
 export const bridgeConfig = config.bridge;
 export const replicationConfig = config.replication;
 export const loggingConfig = config.logging;

@@ -36,6 +36,7 @@ import {
   packageConfig,
 } from "./config/env-config";
 import { startBatchScheduler } from "./utils/batch-scheduler";
+import { startWormholeCleanup } from "./utils/wormhole-cleanup";
 import {
   secureCompare,
   hashToken,
@@ -160,20 +161,20 @@ async function initializeServer() {
     origin: authConfig.corsOrigins.includes("*")
       ? true // Allow all origins if '*' is configured
       : (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-          // Allow requests with no origin (like mobile apps or curl requests)
-          if (!origin) return callback(null, true);
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
 
-          if (
-            authConfig.corsOrigins.some(
-              (allowed: string) => allowed === origin || origin.endsWith(allowed.replace("*.", "."))
-            )
-          ) {
-            callback(null, true);
-          } else {
-            loggers.server.warn({ origin }, "CORS blocked request from origin");
-            callback(new Error("Not allowed by CORS"));
-          }
-        },
+        if (
+          authConfig.corsOrigins.some(
+            (allowed: string) => allowed === origin || origin.endsWith(allowed.replace("*.", "."))
+          )
+        ) {
+          callback(null, true);
+        } else {
+          loggers.server.warn({ origin }, "CORS blocked request from origin");
+          callback(new Error("Not allowed by CORS"));
+        }
+      },
     credentials: authConfig.corsCredentials,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: [
@@ -609,6 +610,9 @@ async function initializeServer() {
 
   // Start batch scheduler for automated L2 -> L1 submission
   startBatchScheduler(gun);
+
+  // Start wormhole cleanup scheduler for orphaned transfer cleanup
+  startWormholeCleanup(gun);
 
   // Note: "Data hash not same as hash!" warnings from GunDB are benign
   // They occur when using content-addressed storage with # namespace

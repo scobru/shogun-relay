@@ -495,6 +495,28 @@ This document provides a comprehensive reference of all environment variables th
 - **Description**: Delay in milliseconds before starting the initial deal synchronization after relay startup. Gives IPFS time to initialize before syncing deals.
 - **Example**: `DEAL_SYNC_INITIAL_DELAY_MS=30000` (30 seconds)
 
+### `WORMHOLE_CLEANUP_ENABLED`
+- **Type**: Boolean (String)
+- **Required**: No
+- **Default**: `true`
+- **Description**: Enable automatic cleanup of orphaned wormhole file transfers. When enabled, files uploaded via the wormhole that haven't been downloaded after the max age are automatically unpinned from IPFS.
+- **Values**: `"true"` or `"false"`
+- **Example**: `WORMHOLE_CLEANUP_ENABLED=true`
+
+### `WORMHOLE_CLEANUP_INTERVAL_MS`
+- **Type**: Integer
+- **Required**: No
+- **Default**: `3600000` (1 hour)
+- **Description**: Interval in milliseconds between wormhole cleanup runs. Controls how often the relay checks for orphaned transfers.
+- **Example**: `WORMHOLE_CLEANUP_INTERVAL_MS=3600000` (1 hour)
+
+### `WORMHOLE_MAX_AGE_SECS`
+- **Type**: Integer
+- **Required**: No
+- **Default**: `86400` (24 hours)
+- **Description**: Maximum age in seconds for wormhole transfers. Transfers older than this that haven't been completed are automatically unpinned from IPFS.
+- **Example**: `WORMHOLE_MAX_AGE_SECS=86400` (24 hours)
+
 ---
 
 ## Holster Relay
