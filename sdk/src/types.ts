@@ -280,16 +280,28 @@ export interface RelaysListResponse {
 }
 
 /**
+ * Supported data types for feed payloads
+ */
+export enum DataType {
+  PRICE = 0,
+  STRING = 1,
+  JSON = 2,
+  BYTES = 3,
+  CUSTOM = 4,
+}
+
+/**
  * Oracle Data Feed
  */
 export interface OracleFeed {
   feedId: string;
   name: string;
   priceUSDC: number;
-  dataType: number; // 0=PRICE, 1=STRING, 2=JSON, 3=BYTES
+  dataType: DataType;
   dataTypeName: string;
   active: boolean;
   schema: string;
+  updateFreqSecs: number;
 }
 
 /**
@@ -297,11 +309,13 @@ export interface OracleFeed {
  */
 export interface OraclePacket {
   feedId: string;
-  value: string;
-  timestamp: number;
-  signature: string;
   deadline: number;
   payload: string;
+  signature: {
+    v: number;
+    r: string;
+    s: string;
+  };
 }
 
 /**
@@ -321,6 +335,7 @@ export interface OracleGlobalStats {
 export interface OracleFeedsResponse {
   success: boolean;
   feeds: OracleFeed[];
+  relay?: string;
 }
 
 /**
@@ -329,6 +344,12 @@ export interface OracleFeedsResponse {
 export interface OracleDataResponse {
   success: boolean;
   packet?: OraclePacket;
+  data?: {
+    feedId: string;
+    feedName: string;
+    value: any;
+    timestamp: number;
+  };
   paymentRequired?: boolean;
   priceUSDC?: number;
   error?: string;
