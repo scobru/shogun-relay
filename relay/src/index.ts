@@ -160,20 +160,20 @@ async function initializeServer() {
     origin: authConfig.corsOrigins.includes("*")
       ? true // Allow all origins if '*' is configured
       : (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-          // Allow requests with no origin (like mobile apps or curl requests)
-          if (!origin) return callback(null, true);
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
 
-          if (
-            authConfig.corsOrigins.some(
-              (allowed: string) => allowed === origin || origin.endsWith(allowed.replace("*.", "."))
-            )
-          ) {
-            callback(null, true);
-          } else {
-            loggers.server.warn({ origin }, "CORS blocked request from origin");
-            callback(new Error("Not allowed by CORS"));
-          }
-        },
+        if (
+          authConfig.corsOrigins.some(
+            (allowed: string) => allowed === origin || origin.endsWith(allowed.replace("*.", "."))
+          )
+        ) {
+          callback(null, true);
+        } else {
+          loggers.server.warn({ origin }, "CORS blocked request from origin");
+          callback(new Error("Not allowed by CORS"));
+        }
+      },
     credentials: authConfig.corsCredentials,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: [
@@ -1488,6 +1488,31 @@ See docs/RELAY_KEYS.md for more information.
     loggers.server.info("✅ Route modulari configurate con successo");
   } catch (error) {
     loggers.server.error({ err: error }, "❌ Errore nel caricamento delle route modulari");
+  }
+
+  // ===== ORACLE INITIALIZATION =====
+  // Initialize oracle system and load feed plugins
+  try {
+    const { oracleConfig } = await import("./config/env-config.js");
+    if (oracleConfig.enabled) {
+      // Initialize the oracle signer
+      const { initializeOracle } = await import("./routes/oracle.js");
+      initializeOracle({
+        enabled: true,
+        chainId: oracleConfig.chainId,
+        defaultValiditySecs: oracleConfig.defaultValiditySecs,
+      });
+
+      // Load all feed plugins from oracle-feeds/ folder
+      const { loadOracleFeeds } = await import("./oracle-feeds/index.js");
+      await loadOracleFeeds();
+
+      loggers.server.info("✅ Oracle system initialized with feed plugins");
+    } else {
+      loggers.server.info("ℹ️ Oracle system disabled (ORACLE_ENABLED=false)");
+    }
+  } catch (error) {
+    loggers.server.warn({ err: error }, "⚠️ Oracle initialization failed (non-critical)");
   }
 
   // ===== SECURITY: Production Error Handler =====

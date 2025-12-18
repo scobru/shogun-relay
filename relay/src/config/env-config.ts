@@ -152,6 +152,19 @@ export const config = {
   },
 
   // ============================================================================
+  // ORACLE CONFIGURATION
+  // ============================================================================
+
+  oracle: {
+    enabled: process.env.ORACLE_ENABLED === "true",
+    // Uses RELAY_PRIVATE_KEY - same signer as all relay services
+    // Contract addresses are obtained from SDK deployments (no env needed)
+    chainId: parseInt(process.env.ORACLE_CHAIN_ID || process.env.BRIDGE_CHAIN_ID || "84532"),
+    defaultValiditySecs: parseInt(process.env.ORACLE_DEFAULT_VALIDITY_SECS || "600") || 600, // 10 minutes
+  },
+
+
+  // ============================================================================
   // BRIDGE CONFIGURATION (L2 Bridge)
   // ============================================================================
 
@@ -173,8 +186,8 @@ export const config = {
     // Allowed chain IDs for security validation
     validChainIds: process.env.BRIDGE_VALID_CHAIN_IDS
       ? process.env.BRIDGE_VALID_CHAIN_IDS.split(",")
-          .map((id) => parseInt(id.trim()))
-          .filter((id) => !isNaN(id))
+        .map((id) => parseInt(id.trim()))
+        .filter((id) => !isNaN(id))
       : [1, 11155111, 8453, 84532, 42161, 421614, 10, 11155420, 137, 80002], // Mainnet, Sepolia, Base, Base Sepolia, Arbitrum, Arbitrum Sepolia, Optimism, Op Sepolia, Polygon, Polygon Amoy
   },
 
@@ -246,6 +259,7 @@ export const relayKeysConfig = config.relayKeys;
 export const blockchainConfig = config.blockchain;
 export const x402Config = config.x402;
 export const dealSyncConfig = config.dealSync;
+export const oracleConfig = config.oracle;
 export const bridgeConfig = config.bridge;
 export const replicationConfig = config.replication;
 export const loggingConfig = config.logging;

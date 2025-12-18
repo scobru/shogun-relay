@@ -71,6 +71,7 @@ import networkRouter from "./network";
 import dealsRouter from "./deals";
 import registryRouter from "./registry";
 import bridgeRouter from "./bridge";
+import oracleRouter from "./oracle";
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
@@ -350,10 +351,10 @@ export default (app: express.Application) => {
           details: err.message,
           fallback: hash
             ? {
-                publicGateway: `https://ipfs.io/ipfs/${hash}`,
-                cloudflareGateway: `https://cloudflare-ipfs.com/ipfs/${hash}`,
-                dweb: `https://dweb.link/ipfs/${hash}`,
-              }
+              publicGateway: `https://ipfs.io/ipfs/${hash}`,
+              cloudflareGateway: `https://cloudflare-ipfs.com/ipfs/${hash}`,
+              dweb: `https://dweb.link/ipfs/${hash}`,
+            }
             : undefined,
         });
       },
@@ -539,6 +540,11 @@ export default (app: express.Application) => {
     res.sendFile(path.resolve(publicPath, "endpoints.html"));
   });
 
+  app.get("/oracle-dashboard", (req, res) => {
+    const publicPath = path.resolve(__dirname, "../public");
+    res.sendFile(path.resolve(publicPath, "oracle-dashboard.html"));
+  });
+
   // Route per servire i file JavaScript dalla directory lib
   app.get("/lib/:filename", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
@@ -630,6 +636,9 @@ export default (app: express.Application) => {
   // Route per L2 Bridge (deposits, withdrawals, batch submission)
   app.use(`${baseRoute}/bridge`, bridgeRouter);
 
+  // Route per Oracle feeds (decentralized data marketplace)
+  app.use(`${baseRoute}/oracle`, oracleRouter);
+
   // Route di test per verificare se le route sono registrate correttamente
   app.get(`${baseRoute}/test`, (req, res) => {
     res.json({
@@ -648,8 +657,8 @@ export default (app: express.Application) => {
       adminPasswordLength: authConfig.adminPassword ? authConfig.adminPassword.length : 0,
       adminPasswordPreview: authConfig.adminPassword
         ? authConfig.adminPassword.substring(0, 4) +
-          "..." +
-          authConfig.adminPassword.substring(authConfig.adminPassword.length - 4)
+        "..." +
+        authConfig.adminPassword.substring(authConfig.adminPassword.length - 4)
         : "N/A",
       timestamp: Date.now(),
     });

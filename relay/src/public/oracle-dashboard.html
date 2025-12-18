@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oracle Dashboard - Shogun Relay</title>
+    <link rel="stylesheet" href="styles/google-md3.css">
+    <script src="lib/admin-nav.js"></script>
+    <script src="lib/admin-auth.js"></script>
+    <style>
+        .page-header {
+            background-color: var(--md-surface-container-low);
+            border-bottom: 1px solid var(--md-outline-variant);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .page-header-content {
+            max-width: 1280px;
+            margin: 0 auto;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .page-title-section {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .page-icon {
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+            background-color: var(--md-primary-container);
+        }
+
+        .page-icon svg {
+            width: 28px;
+            height: 28px;
+            color: var(--md-on-primary-container);
+        }
+
+        .feed-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .feed-card {
+            background-color: var(--md-surface-container);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: 16px;
+            overflow: hidden;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .feed-card:hover {
+            border-color: var(--md-primary);
+            box-shadow: var(--md-elevation-2);
+        }
+
+        .feed-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--md-outline-variant);
+            background-color: var(--md-surface-container-low);
+        }
+
+        .feed-name {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 500;
+            font-size: 1.125rem;
+        }
+
+        .feed-card-body {
+            padding: 20px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--md-outline-variant);
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            color: var(--md-on-surface-variant);
+            font-size: 0.875rem;
+        }
+
+        .stat-value {
+            font-weight: 500;
+            font-family: 'Roboto Mono', monospace;
+        }
+
+        .feed-card-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            padding: 12px 20px;
+            background-color: var(--md-surface-container-low);
+            border-top: 1px solid var(--md-outline-variant);
+        }
+
+        .config-card {
+            background-color: var(--md-surface-container);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .config-title {
+            font-size: 1.125rem;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+
+        .register-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            font-size: 0.875rem;
+            color: var(--md-on-surface-variant);
+        }
+
+        .form-group input,
+        .form-group select {
+            padding: 12px;
+            border: 1px solid var(--md-outline);
+            border-radius: 8px;
+            background-color: var(--md-surface);
+            color: var(--md-on-surface);
+            font-size: 1rem;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--md-primary);
+        }
+
+        .quick-actions-card {
+            background-color: var(--md-primary-container);
+            border: none;
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .quick-actions-title {
+            font-size: 1.125rem;
+            font-weight: 500;
+            color: var(--md-on-primary-container);
+            margin-bottom: 20px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 48px;
+            color: var(--md-on-surface-variant);
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        @media (max-width: 768px) {
+            .feed-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .page-header-content {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="page-header">
+        <div class="page-header-content">
+            <div class="page-title-section">
+                <a href="/admin" class="md-btn md-btn-icon" title="Back to Admin">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        width="24" height="24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                </a>
+                <div class="page-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="md-headline-medium">Oracle Dashboard</h1>
+                    <p class="md-body-medium md-text-secondary">Manage oracle data feeds</p>
+                </div>
+            </div>
+            <div class="md-flex md-gap-sm">
+                <button onclick="refreshFeeds()" class="md-btn md-btn-outlined">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="md-container">
+        <!-- Oracle Config Status -->
+        <div class="config-card">
+            <h3 class="config-title">Oracle Configuration</h3>
+            <div class="stat-row">
+                <span class="stat-label">Status</span>
+                <span class="stat-value" id="oracle-status">Checking...</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Signer Address</span>
+                <span class="stat-value" id="oracle-signer">--</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Total Feeds</span>
+                <span class="stat-value" id="oracle-feed-count">--</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Default Validity</span>
+                <span class="stat-value" id="oracle-validity">--</span>
+            </div>
+        </div>
+
+        <!-- Register New Feed -->
+        <div class="config-card">
+            <h3 class="config-title">Register New Feed</h3>
+            <form id="register-form" class="register-form">
+                <div class="form-group">
+                    <label for="feed-name">Feed Name *</label>
+                    <input type="text" id="feed-name" placeholder="ETH/USD" required>
+                </div>
+                <div class="form-group">
+                    <label for="feed-type">Data Type</label>
+                    <select id="feed-type">
+                        <option value="0">PRICE</option>
+                        <option value="1">STRING</option>
+                        <option value="2">JSON</option>
+                        <option value="3">BYTES</option>
+                        <option value="4" selected>CUSTOM</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="feed-schema">Schema</label>
+                    <input type="text" id="feed-schema" placeholder="uint256">
+                </div>
+                <div class="form-group">
+                    <label for="feed-price">Price (USDC)</label>
+                    <input type="number" id="feed-price" value="0" min="0" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label for="feed-interval">Update Interval (sec)</label>
+                    <input type="number" id="feed-interval" value="60" min="1">
+                </div>
+            </form>
+            <button onclick="registerFeed()" class="md-btn md-btn-filled">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Register Feed
+            </button>
+        </div>
+
+        <!-- Global Stats -->
+        <div class="config-card">
+            <h3 class="config-title">Global Statistics</h3>
+            <div class="stat-row">
+                <span class="stat-label">Total Accesses</span>
+                <span class="stat-value" id="global-accesses">--</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Total Revenue</span>
+                <span class="stat-value" id="global-revenue">--</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Last Access</span>
+                <span class="stat-value" id="global-last-access">--</span>
+            </div>
+        </div>
+
+        <!-- Feeds Grid -->
+        <h2 class="md-title-large md-mb-md">Registered Feeds</h2>
+        <div class="feed-grid" id="feeds-container">
+            <!-- Feeds will be loaded here -->
+        </div>
+
+        <!-- Footer -->
+        <footer class="md-footer">
+            <p class="md-body-small">
+                Shogun Oracle — Part of the <a href="https://github.com/scobru/shogun">Shogun Project</a>
+            </p>
+        </footer>
+    </main>
+
+    <script>
+        function getAdminPassword() {
+            return ShogunAdmin.getPassword();
+        }
+
+        let globalStats = null;
+
+        async function fetchGlobalStats() {
+            try {
+                const response = await fetch('/api/v1/oracle/stats/global');
+                const data = await response.json();
+
+                if (data.success) {
+                    globalStats = data.stats;
+                    document.getElementById('global-accesses').textContent = globalStats.totalAccesses;
+                    document.getElementById('global-revenue').textContent = `${globalStats.totalRevenueUSDC.toFixed(4)} USDC`;
+                    document.getElementById('global-last-access').textContent = globalStats.lastAccess
+                        ? new Date(globalStats.lastAccess).toLocaleString()
+                        : 'Never';
+                }
+            } catch (error) {
+                console.error('Error fetching global stats:', error);
+            }
+        }
+
+        async function fetchOracleConfig() {
+            try {
+                const response = await fetch('/api/v1/oracle/config');
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('oracle-status').textContent = data.configured ? 'Configured' : 'Not Configured';
+                    document.getElementById('oracle-status').style.color = data.configured ? 'var(--md-success)' : 'var(--md-error)';
+                    document.getElementById('oracle-signer').textContent = data.signerAddress || 'Not set';
+                    document.getElementById('oracle-feed-count').textContent = data.feedCount;
+                    document.getElementById('oracle-validity').textContent = `${data.defaultValiditySecs}s`;
+                } else {
+                    document.getElementById('oracle-status').textContent = 'Error';
+                    document.getElementById('oracle-status').style.color = 'var(--md-error)';
+                }
+            } catch (error) {
+                document.getElementById('oracle-status').textContent = 'Offline';
+                document.getElementById('oracle-status').style.color = 'var(--md-error)';
+            }
+        }
+
+        async function refreshFeeds() {
+            await Promise.all([fetchOracleConfig(), fetchGlobalStats()]);
+
+            try {
+                const response = await fetch('/api/v1/oracle/feeds');
+                const data = await response.json();
+
+                const container = document.getElementById('feeds-container');
+
+                if (!data.success || !data.feeds || data.feeds.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            <p>No feeds registered yet</p>
+                            <p class="md-body-small">Register your first data feed above</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = data.feeds.map(feed => {
+                    const accesses = globalStats?.accessesByFeed?.[feed.feedId] || 0;
+                    const revenue = globalStats?.revenueByFeed?.[feed.feedId] || 0;
+
+                    return `
+                    <div class="feed-card">
+                        <div class="feed-card-header">
+                            <div class="feed-name">
+                                <span class="md-status-dot ${feed.active ? 'md-status-dot-success' : 'md-status-dot-error'}"></span>
+                                ${feed.name}
+                            </div>
+                            <span class="md-chip">${feed.dataTypeName}</span>
+                        </div>
+                        <div class="feed-card-body">
+                            <div class="stat-row">
+                                <span class="stat-label">Feed ID</span>
+                                <span class="stat-value" style="font-size: 0.75rem;">${feed.feedId.substring(0, 10)}...${feed.feedId.substring(58)}</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Schema</span>
+                                <span class="stat-value">${feed.schema || 'bytes'}</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Price</span>
+                                <span class="stat-value">${feed.priceUSDC > 0 ? feed.priceUSDC + ' USDC' : 'Free'}</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Update Interval</span>
+                                <span class="stat-value">${feed.updateFreqSecs}s</span>
+                            </div>
+                            <div class="stat-row" style="margin-top: 12px; border-top: 1px dashed var(--md-outline-variant); padding-top: 12px;">
+                                <span class="stat-label">Total Accesses</span>
+                                <span class="stat-value">${accesses}</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Total Revenue</span>
+                                <span class="stat-value" style="color: var(--md-success);">${revenue.toFixed(4)} USDC</span>
+                            </div>
+                        </div>
+                        <div class="feed-card-footer">
+                            <button onclick="updateFeedValue('${feed.feedId}', '${feed.name}')" class="md-btn md-btn-text">Update Value</button>
+                            <button onclick="getFeedData('${feed.feedId}')" class="md-btn md-btn-tonal">Get Data</button>
+                            ${feed.active ? `<button onclick="deactivateFeed('${feed.feedId}')" class="md-btn md-btn-text" style="color: var(--md-error)">Deactivate</button>` : ''}
+                        </div>
+                    </div>
+                `}).join('');
+            } catch (error) {
+                console.error('Error loading feeds:', error);
+            }
+        }
+
+        async function registerFeed() {
+            const password = getAdminPassword();
+            if (!password) {
+                alert('Admin password required');
+                return;
+            }
+
+            const name = document.getElementById('feed-name').value;
+            if (!name) {
+                alert('Feed name is required');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/v1/oracle/feeds', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${password}`
+                    },
+                    body: JSON.stringify({
+                        name,
+                        dataType: parseInt(document.getElementById('feed-type').value),
+                        schema: document.getElementById('feed-schema').value || 'bytes',
+                        priceUSDC: parseFloat(document.getElementById('feed-price').value) || 0,
+                        updateFreqSecs: parseInt(document.getElementById('feed-interval').value) || 60
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(`Feed "${name}" registered successfully!\nFeed ID: ${data.feedId}`);
+                    document.getElementById('register-form').reset();
+                    refreshFeeds();
+                } else {
+                    alert(`Error: ${data.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        async function updateFeedValue(feedId, feedName) {
+            const password = getAdminPassword();
+            if (!password) {
+                alert('Admin password required');
+                return;
+            }
+
+            const value = prompt(`Enter new value for "${feedName}":`);
+            if (value === null) return;
+
+            try {
+                const response = await fetch(`/api/v1/oracle/feeds/${feedId}/value`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${password}`
+                    },
+                    body: JSON.stringify({ value })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('Value updated successfully!');
+                } else {
+                    alert(`Error: ${data.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        async function getFeedData(feedId) {
+            try {
+                const response = await fetch(`/api/v1/oracle/data/${feedId}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    const packet = data.packet;
+                    alert(`Signed Oracle Packet:
+Feed: ${data.data.feedName}
+Value: ${JSON.stringify(data.data.value)}
+Deadline: ${new Date(packet.deadline * 1000).toISOString()}
+Signature: ${packet.signature.r.substring(0, 10)}...`);
+                } else {
+                    alert(`Error: ${data.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        async function deactivateFeed(feedId) {
+            const password = getAdminPassword();
+            if (!password) {
+                alert('Admin password required');
+                return;
+            }
+
+            if (!confirm('Deactivate this feed?')) return;
+
+            try {
+                const response = await fetch(`/api/v1/oracle/feeds/${feedId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${password}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('Feed deactivated');
+                    refreshFeeds();
+                } else {
+                    alert(`Error: ${data.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', async () => {
+            ShogunAdmin.init();
+            await refreshFeeds();
+        });
+    </script>
+</body>
+
+</html>
